@@ -1,0 +1,91 @@
+/* MARK: wave3 desktop-agents — §36.1–36.4: model chips, resume badge, stop / menu buttons, the SendMessage continuation row,
+   the §36 report row, the HUD agent list and the agent details sheet. Colours are variables (light / dark / pre-hydration). */
+:root {
+  --model-opus: #6d28d9;
+  --model-opus-bg: rgba(124, 58, 237, 0.13);
+}
+:root[data-theme="dark"] {
+  --model-opus: #c4b5fd;
+  --model-opus-bg: rgba(167, 139, 250, 0.2);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --model-opus: #c4b5fd;
+    --model-opus-bg: rgba(167, 139, 250, 0.2);
+  }
+}
+
+/* ------------------------------------------------------------ chips */
+.model-chip { display: inline-flex; align-items: center; flex: none; font-size: 10px; font-weight: 650; line-height: 15px; padding: 0 6px; border-radius: 999px; font-family: var(--mono); letter-spacing: 0.01em; white-space: nowrap; }
+.model-chip.purple { background: var(--model-opus-bg); color: var(--model-opus); }
+.model-chip.blue { background: var(--accent-bg); color: var(--blue); }
+.model-chip.green { background: var(--green-bg); color: var(--green); }
+.model-chip.gray { background: var(--bg-3); color: var(--fg-2); }
+.pill.resumed-badge { background: var(--accent-bg); color: var(--blue); flex: none; white-space: nowrap; }
+
+/* ------------------------------------------------------------ stop / menu buttons */
+.agent-stop { display: inline-flex; align-items: center; gap: 5px; flex: none; color: var(--red); }
+.agent-stop.plain { width: 18px; height: 18px; justify-content: center; padding: 0; border-radius: 4px; font-size: 9px; line-height: 1; }
+.agent-stop.plain:hover:not(:disabled) { background: var(--red-bg); }
+.agent-stop:disabled { color: var(--fg-3); cursor: not-allowed; }
+.agent-stop .spinner { width: 9px; height: 9px; }
+.agent-stop.hover { opacity: 0; transition: opacity 0.12s; }
+.agent-card:hover .agent-stop.hover, .agent-head:hover .agent-stop.hover, .agent-stop.hover:focus-visible { opacity: 1; }
+.agent-more { flex: none; width: 20px; height: 18px; padding: 0; border-radius: 4px; color: var(--fg-2); font-size: 13px; line-height: 1; letter-spacing: 1px; }
+.agent-more:hover, .agent-more[aria-expanded="true"] { background: var(--bg-3); color: var(--fg); }
+.agent-menu { min-width: 190px; max-width: 360px; z-index: 90; }
+.agent-menu .item { flex-direction: column; align-items: flex-start; gap: 0; }
+.agent-menu .item.disabled { cursor: not-allowed; }
+.agent-menu .agent-menu-why { max-width: 100%; white-space: normal; }
+
+/* ------------------------------------------------------------ agent card */
+.agent-card .agent-full-report { align-self: flex-start; color: var(--accent); padding: 0 2px; margin-top: -2px; }
+.agent-card .agent-title .model-chip { align-self: center; }
+.agent-card .agent-report-plain { white-space: pre-line; }
+
+/* ------------------------------------------------------------ composer: §36.4 the main turn waits on subagents */
+.composer-waiting { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; color: var(--blue); background: var(--accent-bg); border-radius: 8px; padding: 4px 10px; }
+.composer-waiting .spinner { width: 10px; height: 10px; flex: none; }
+
+/* ------------------------------------------------------------ chat rows */
+.tool-row.continue-row .icon { color: var(--blue); }
+.tool-row.continue-row .detail { color: var(--fg); font-family: var(--font); }
+.agent-report-row .agent-report-preview { padding: 4px 6px 2px 18px; font-size: 12.5px; color: var(--fg); max-height: 260px; overflow: auto; }
+.agent-report-row .agent-report-preview .markdown > :first-child { margin-top: 0; }
+.agent-report-row .agent-report-preview .markdown > :last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------ HUD agent list */
+.hud .agents-list-btn { flex: none; margin-left: -4px; border: 0; background: transparent; color: var(--fg-2); font-size: 10px; padding: 0 4px; line-height: 16px; border-radius: 5px; }
+.hud .agents-list-btn:hover, .hud .agents-list-btn[aria-expanded="true"] { background: var(--bg-3); color: var(--fg); }
+.agent-list .agent-list-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.agent-list .agent-list-item .agent-type { font-weight: 600; min-width: 0; }
+
+/* ------------------------------------------------------------ the details sheet */
+.dialog:has(> .agent-sheet) { width: 780px; }
+.agent-sheet { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.agent-sheet-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.agent-sheet-head .agent-type { font-weight: 650; font-size: 14px; color: var(--fg); }
+.agent-sheet-desc { font-size: 12.5px; line-height: 1.45; margin-top: -6px; }
+.agent-sheet-section { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; min-width: 0; }
+.agent-sheet-section h4 { margin: 0; font-size: 12px; font-weight: 650; color: var(--fg-2); text-transform: none; }
+.agent-sheet-section-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.agent-sheet-prompt { font-size: 12.5px; line-height: 1.5; background: var(--bg-2); border-radius: 8px; padding: 6px 10px; overflow: hidden; }
+.agent-sheet-prompt.folded { max-height: calc(4.5em + 12px); }
+.agent-sheet-prompt.folded.overflowing { -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent); mask-image: linear-gradient(to bottom, #000 55%, transparent); }
+.agent-sheet-prompt.all { max-height: 40vh; overflow: auto; }
+.agent-sheet-prompt .markdown > :first-child, .agent-sheet-report .markdown > :first-child { margin-top: 0; }
+.agent-sheet-report { font-size: 13px; line-height: 1.5; max-height: 45vh; overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--panel); }
+.agent-sheet-calls { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; max-height: 220px; overflow: auto; }
+.agent-call { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 2px 6px; border-radius: 5px; text-align: left; font-size: 12px; }
+.agent-call:hover { background: var(--bg-2); }
+.agent-call .icon { width: 16px; text-align: center; color: var(--fg-2); flex: none; }
+.agent-call .name { font-weight: 600; flex: none; }
+.agent-call .detail { flex: 1; min-width: 0; color: var(--fg-2); }
+.agent-call .spinner { width: 9px; height: 9px; }
+.agent-sheet .agent-files .file-link { max-width: 320px; }
+.agent-usage { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 12.5px; color: var(--fg-2); }
+.agent-usage .model-chip { margin-left: 3px; vertical-align: 1px; }
+
+/* ------------------------------------------------------------ §36.10 side thread head */
+.pill.side-running-turn { background: var(--orange-bg); color: var(--orange); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-fork-hint { margin: 2px 0 0; }

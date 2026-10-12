@@ -1,0 +1,27 @@
+/* MARK: wave4b w4b-agents — subagents at a glance (§39.3). Colors come from the theme tokens (light and dark). */
+.pill.amber { background: var(--orange-bg-soft); color: var(--orange); border: 1px solid var(--orange-bg); }
+.pill.purple { background: var(--model-opus-bg); color: var(--model-opus); }
+.glance-badge { font-size: 10px; }
+.agent-last.ended { opacity: 0.65; }
+.glance-isolation { gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.agent-earlier { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.agent-earlier-head { display: flex; align-items: center; gap: 6px; text-align: left; }
+.agent-earlier-turn { display: flex; flex-direction: column; gap: 2px; padding-left: 14px; }
+.agent-earlier-row { gap: 4px; align-items: center; }
+.agent-earlier-row > button.grow { text-align: left; color: var(--fg-2); }
+.agent-earlier-row > button.grow:hover { color: var(--fg); }
+
+.agent-group .agent-stats-line { color: var(--fg-2); font-size: 11px; padding: 0 10px 2px 30px; }
+
+.tool-name-mcp .mcp-server { font-size: 10px; padding: 0 5px; }
+
+.file-authors { display: inline-flex; gap: 3px; align-items: center; }
+.author-chip { font-size: 10px; }
+.author-filters { gap: 4px; flex-wrap: wrap; padding: 2px 10px 4px; }
+.author-filter { border: 1px solid var(--border); border-radius: 10px; padding: 0 8px; }
+.author-filter.active { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
+
+.ts-agents { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.ts-agent-row { gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.ts-agent-files { display: inline-flex; gap: 4px; flex-wrap: wrap; }

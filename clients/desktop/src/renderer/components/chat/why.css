@@ -1,0 +1,8 @@
+/* MARK: wave5 w5-fixes — §43.5 '왜?' on plan steps: the summary's step rows reveal it on hover, the plan dialog shows it. */
+.turn-summary .ts-plan > li:hover .side-ask.hover,
+.turn-summary .ts-plan > li:focus-within .side-ask.hover { opacity: 1; }
+.turn-summary .ts-plan > li .side-ask { margin-left: auto; }
+.plan-review-step .plan-step-why { margin-left: 8px; vertical-align: 1px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) {
+  .turn-summary .ts-plan .side-ask.hover { transition: none; }
+}

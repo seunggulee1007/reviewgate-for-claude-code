@@ -1,0 +1,15 @@
+/* MARK: wave2 desktop-diff — the chat's folded mini diff of an Edit / MultiEdit / Write row (ToolRows.tsx, miniDiff.ts). */
+.tool-row .mini-toggle { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 0 5px; margin: 0; font-size: 11px; line-height: 16px; border-radius: 5px; color: var(--fg-2); }
+.tool-row .mini-toggle:hover:not(:disabled) { background: var(--bg-3); }
+.tool-row .mini-toggle.open { background: var(--bg-2); }
+.tool-row .mini-toggle .chev { font-size: 10px; color: var(--fg-3); }
+.mini-diff { margin: 2px 0 4px 22px; padding: 4px 0; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-size: 11.5px; line-height: 1.45; max-height: 320px; overflow: auto; user-select: text; tab-size: 4; }
+.mini-line { display: flex; white-space: pre-wrap; overflow-wrap: anywhere; padding: 0 8px 0 0; }
+.mini-line .sign { flex: none; width: 16px; text-align: center; color: var(--fg-3); user-select: none; }
+.mini-line .text { flex: 1 1 auto; min-width: 0; }
+.mini-line.add { background: var(--add-bg); }
+.mini-line.del { background: var(--del-bg); }
+.mini-line.add .seg { background: color-mix(in srgb, var(--green) 30%, transparent); border-radius: 2px; }
+.mini-line.del .seg { background: color-mix(in srgb, var(--red) 28%, transparent); border-radius: 2px; }
+.mini-gap { padding: 0 8px 0 16px; color: var(--fg-3); line-height: 1.2; user-select: none; }
+.mini-more { padding: 2px 8px 0 16px; font-family: var(--font); font-size: 10.5px; color: var(--fg-3); }

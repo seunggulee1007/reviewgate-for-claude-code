@@ -1,0 +1,54 @@
+/*
+ * wave1 desktop-review — review provenance (docs/PROTOCOL.md §31–32): the Changes list groups, the "outside the app" pill,
+ * the gate banners (BannerStack) and the per-file notices of the diff pane. Colours come from the M18 theme variables
+ * (styles.css); the yellow pair of the "another Claude session" banner is defined here for both themes the same way
+ * (light, pinned dark, and the pre-hydration dark fallback). Text / background pairs stay >= 4.5:1.
+ */
+:root {
+  --yellow: #7a5a00;
+  --yellow-bg: rgba(234, 179, 8, 0.16);
+}
+:root[data-theme="dark"] {
+  --yellow: #f2d15c;
+  --yellow-bg: rgba(234, 179, 8, 0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --yellow: #f2d15c;
+    --yellow-bg: rgba(234, 179, 8, 0.14);
+  }
+}
+
+/* "앱 밖 변경": grey pill, orange text (not Claude's work, worth a look). */
+.pill.external { color: var(--orange); }
+
+/* ---------------------------------------------------------------- Changes list groups */
+.list .section.group-head { display: flex; align-items: center; gap: 6px; padding-top: 10px; text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+.list .section.group-head.mods { color: var(--red); }
+.list .section.group-head.external { color: var(--orange); }
+.list .section.group-head .group-count { flex: none; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--bg-3); color: var(--fg-2); font-size: 10.5px; line-height: 16px; text-align: center; }
+.list .group-hint { padding: 0 6px 2px; cursor: default; }
+.list .group-hint:hover { background: transparent; }
+
+/* ---------------------------------------------------------------- gate banners (BannerStack) */
+.banner.yellow { background: var(--yellow-bg); color: var(--yellow); }
+.gate-banner { align-items: flex-start; }
+.gate-banner .gate-main { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+/* Two lines at most (what happened + what it means); the full text is the tooltip, and an opened banner shows all of it. */
+.gate-banner .gate-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.4; user-select: text; }
+.gate-banner.open .gate-text { -webkit-line-clamp: unset; }
+.gate-banner .gate-sub { font-size: 11.5px; color: var(--fg-2); user-select: text; }
+.gate-banner .gate-actions { display: flex; gap: 6px; align-items: center; flex: none; }
+.gate-banner .gate-details { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; }
+.gate-banner .gate-details li { font-size: 11.5px; color: var(--fg); }
+.gate-banner .gate-details .mono { font-family: var(--mono); color: var(--fg-2); user-select: text; }
+
+/* ---------------------------------------------------------------- diff pane: per-file notices, no recorded cause */
+.file-notices { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.file-notices .notice { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.file-notices .notice.red { color: var(--red); }
+.file-notices .notice.orange { color: var(--orange); }
+.file-notices .notice.gray { color: var(--fg-2); }
+.change-cause.none .cause-none { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+.change-cause.none .cause-none .why { flex: 1 1 auto; min-width: 0; }
+.change-cause.none .cause-none.external .why { color: var(--orange); }

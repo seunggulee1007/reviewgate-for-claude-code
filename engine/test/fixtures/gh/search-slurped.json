@@ -1,0 +1,17 @@
+[
+  {"total_count": 3, "incomplete_results": false, "items": [
+    {"number": 5, "title": "feat: one", "repository_url": "https://api.github.com/repos/acme/widgets",
+     "user": {"login": "alice", "id": 1}, "updated_at": "2026-09-07T11:15:09Z",
+     "html_url": "https://github.com/acme/widgets/pull/5", "draft": false,
+     "pull_request": {"url": "https://api.github.com/repos/acme/widgets/pulls/5", "merged_at": null}},
+    {"number": 12, "title": "wip", "repository_url": "https://ghe.example.com/api/v3/repos/team/svc",
+     "user": {"login": "bob"}, "updated_at": "2026-09-01T00:00:00Z",
+     "html_url": "https://ghe.example.com/team/svc/pull/12", "draft": true,
+     "pull_request": {}}
+  ]},
+  {"total_count": 3, "incomplete_results": false, "items": [
+    {"number": 7, "title": "page two", "repository_url": "https://api.github.com/repos/acme/widgets",
+     "user": {"login": "carol"}, "updated_at": "2026-08-30T10:00:00Z",
+     "html_url": "https://github.com/acme/widgets/pull/7"}
+  ]}
+]

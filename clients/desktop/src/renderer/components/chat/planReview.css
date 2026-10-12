@@ -1,0 +1,53 @@
+/* MARK: wave4d w4d-plan — §42.1 the plan at full size with per-step notes (PlanReviewDialog) */
+.plan-review {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr);
+  gap: 12px;
+  height: min(64vh, 640px);
+  min-width: min(860px, 86vw);
+}
+.plan-review-text {
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.plan-review-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.plan-review-steps {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+.plan-review-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.plan-review-step.noted {
+  border-color: var(--orange-border);
+  background: var(--orange-bg-soft);
+}
+.plan-review-step .step-text {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.plan-review textarea {
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+.plan-card .plan-body.compact {
+  max-height: 150px;
+}

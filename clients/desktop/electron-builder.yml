@@ -1,0 +1,30 @@
+appId: io.github.seunggulee1007.reviewgate.desktop
+productName: ReviewGate
+directories:
+  output: release
+  buildResources: build
+asar: true
+files:
+  - dist/**
+  - package.json
+  # The SDK's per-platform optional packages carry a ~200 MB native `claude` each. ReviewGate never
+  # runs it: the engine always passes `pathToClaudeCodeExecutable` = the user's installed claude
+  # (PATH / Settings override; on Windows a `claude.cmd` shim is resolved first — src/main/winClaude.ts)
+  # and refuses to start a session when none is found. So no platform binary ships, for any target
+  # (a mac-built win installer used to carry claude-agent-sdk-darwin-arm64) — docs/M11-WINDOWS.md.
+  - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+# The engine spawns external `claude` / `gh` / `git` from PATH (or the Settings overrides); nothing is bundled.
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # rcedit (icon / version resource) needs wine on macOS; the installer builds without it.
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dir
+  identity: null
+npmRebuild: false

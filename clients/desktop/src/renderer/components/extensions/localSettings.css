@@ -1,0 +1,9 @@
+/* MARK: wave3 desktop-session — §36.6 "Not applied in the app" (theme tokens only: light and dark). */
+.not-applied { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--orange-border-soft); background: var(--orange-bg-soft); color: var(--fg); min-width: 0; }
+.not-applied > .bold { color: var(--orange); }
+.not-applied .na-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
+.not-applied .na-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.not-applied .na-group li { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.not-applied .na-list { color: var(--fg-2); word-break: break-word; user-select: text; }
+.not-applied button { margin-top: 2px; }
+.caps-not-applied { align-self: flex-start; color: var(--orange); margin: -2px 0 8px; padding: 0; }

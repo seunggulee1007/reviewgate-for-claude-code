@@ -1,0 +1,32 @@
+{
+  "_doc": "docs/PROTOCOL.md §42.4: one display rule for a turn's per-model cost, checked by Core ModelCostTests and Electron agentCost.test.ts. Group by family (opus / sonnet / haiku; any other model by its name without `claude-` and the date), sum, most expensive first, leave out what cost nothing; percent = round(cost / total × 100); the line '<label> <usd> · …' with usd '$%.2f', under half a cent '<$0.01'.",
+  "cases": [
+    {
+      "models": [
+        { "model": "claude-opus-4-1-20250805", "costUsd": 0.3812, "inputTokens": 1200, "outputTokens": 300, "cacheReadTokens": 40000, "cacheCreationTokens": 2000 },
+        { "model": "claude-haiku-4-5", "costUsd": 0.012, "inputTokens": 100, "outputTokens": 20, "cacheReadTokens": 0, "cacheCreationTokens": 0 },
+        { "model": "claude-sonnet-4-5-20250929", "costUsd": 0.06, "inputTokens": 800, "outputTokens": 90, "cacheReadTokens": 5000, "cacheCreationTokens": 0 }
+      ],
+      "shares": [
+        { "key": "opus", "label": "opus", "family": "opus", "costUsd": 0.3812, "percent": 84, "models": ["claude-opus-4-1-20250805"] },
+        { "key": "sonnet", "label": "sonnet", "family": "sonnet", "costUsd": 0.06, "percent": 13, "models": ["claude-sonnet-4-5-20250929"] },
+        { "key": "haiku", "label": "haiku", "family": "haiku", "costUsd": 0.012, "percent": 3, "models": ["claude-haiku-4-5"] }
+      ],
+      "line": "opus $0.38 · sonnet $0.06 · haiku $0.01"
+    },
+    {
+      "models": [
+        { "model": "claude-opus-4-1", "costUsd": 0.2, "inputTokens": 10, "outputTokens": 1, "cacheReadTokens": 0, "cacheCreationTokens": 0 },
+        { "model": "claude-fable-1-20260101", "costUsd": 0.004, "inputTokens": 3, "outputTokens": 1, "cacheReadTokens": 0, "cacheCreationTokens": 0 },
+        { "model": "claude-opus-4-5", "costUsd": 0.1, "inputTokens": 5, "outputTokens": 1, "cacheReadTokens": 0, "cacheCreationTokens": 0 },
+        { "model": "claude-haiku-4-5", "costUsd": 0, "inputTokens": 7, "outputTokens": 0, "cacheReadTokens": 0, "cacheCreationTokens": 0 }
+      ],
+      "shares": [
+        { "key": "opus", "label": "opus", "family": "opus", "costUsd": 0.3, "percent": 99, "models": ["claude-opus-4-1", "claude-opus-4-5"] },
+        { "key": "fable-1", "label": "fable-1", "family": "other", "costUsd": 0.004, "percent": 1, "models": ["claude-fable-1-20260101"] }
+      ],
+      "line": "opus $0.30 · fable-1 <$0.01"
+    },
+    { "models": [], "shares": [], "line": "" }
+  ]
+}

@@ -1,0 +1,79 @@
+/*
+ * wave2 desktop-flow — review round 2 (docs/PROTOCOL.md §34): the Changes list's "본 뒤 바뀜" dot and badges, the running
+ * turn's "진행 중 변경" section / HUD chip / read-only diff, the diff head's range selector and "이번 턴 전 기준" banner, sent
+ * note cards and the History tab's round in progress. Colours come from the M18 theme variables (styles.css) only, so
+ * light, pinned dark and the pre-hydration dark fallback follow by themselves; text / background pairs stay >= 4.5:1.
+ */
+
+/* ---------------------------------------------------------------- Changes list */
+.pill.blue { background: var(--accent-bg); color: var(--accent); }
+.round-reason { padding: 0 12px 6px; }
+/* Viewed, then the content changed: half filled. */
+.viewed-dot.changed { border-color: var(--accent); background: linear-gradient(90deg, var(--accent) 50%, transparent 50%); }
+/* §34.2: a fresh turn runs — the previous round's decided files stay listed, dimmed, without a diff. */
+.list.previous-round li:not(.section) { opacity: 0.55; }
+
+/* ---------------------------------------------------------------- the running turn's changes so far */
+.round-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); position: relative; flex: none; display: inline-block; }
+.round-pulse::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid var(--accent); animation: round-pulse 1.4s ease-out infinite; }
+@keyframes round-pulse {
+  from { opacity: 0.9; transform: scale(0.6); }
+  to { opacity: 0; transform: scale(1.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .round-pulse::after { animation: none; }
+}
+.live-changes { margin: 4px 8px 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); flex: none; }
+.live-changes .live-head { display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; }
+.live-changes .live-toggle { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; padding: 2px 4px; color: var(--accent); font-size: 12px; text-align: left; }
+.live-changes .live-toggle .chev { width: 10px; font-size: 10px; color: var(--fg-3); flex: none; }
+.live-changes .group-count { flex: none; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); font-size: 10.5px; line-height: 16px; text-align: center; }
+.live-changes .live-list { max-height: 220px; overflow: auto; padding-top: 0; }
+.live-changes .live-list li:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.live-changes .live-note { cursor: default; }
+.live-changes .live-note:hover { background: transparent; }
+.hud .live-chip { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 0; border-radius: 999px; padding: 0 8px 0 7px; line-height: 17px; font-size: 10.5px; font-weight: 600; background: var(--accent-bg); color: var(--accent); cursor: pointer; }
+.hud .live-chip:hover { filter: brightness(1.12); }
+.hud .live-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.live-diff .live-banner { flex: none; }
+
+/* ---------------------------------------------------------------- diff head: range + "before this turn" */
+.diff-round { display: flex; flex-direction: column; gap: 0; flex: none; border-bottom: 1px solid var(--border); }
+.diff-round .stale-banner { align-items: flex-start; }
+.diff-round .stale-banner .stale-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.diff-round .stale-banner .stale-sub { font-size: 11.5px; color: var(--fg-2); }
+.diff-round .range-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px; flex-wrap: wrap; }
+.range-seg { display: inline-flex; background: var(--bg-3); border-radius: 7px; padding: 2px; gap: 2px; }
+.range-seg button { border: 0; background: transparent; border-radius: 5px; padding: 1px 9px; font-size: 11.5px; color: var(--fg-2); line-height: 18px; }
+.range-seg button:hover:not(:disabled) { color: var(--fg); }
+.range-seg button.active { background: var(--segment-active); color: var(--fg); box-shadow: var(--shadow-sm); font-weight: 600; }
+.range-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------------------------------------------------------------- notes sent with request changes */
+/* Only the left edge is drawn on a bubble: a sent note's is dashed, on a softer wash. */
+.note-bubble.sent { border-left-style: dashed; background: var(--orange-bg-soft); }
+.note-bubble.sent .sent-label { font-weight: 600; }
+.note-bubble .note-flags { display: inline-flex; gap: 4px; align-items: center; }
+.outside-notes { display: flex; flex-direction: column; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--border); flex: none; max-height: 220px; overflow: auto; }
+.outside-notes .note-bubble { margin: 0; }
+
+/* ---------------------------------------------------------------- composer: what a send does to a standing review */
+.pending-banner .pending-merge { color: var(--fg-2); margin-top: 2px; line-height: 1.4; }
+
+/* ---------------------------------------------------------------- History: the round in progress */
+.history-entry.in-progress > .entry-head { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* ---------------------------------------------------------------- wave3 check-clients: the HUD's "진행 중" chip in view
+   The HUD clips its overflow at narrow widths and the chip sat after the spacer, the first thing cut off. Without moving
+   the HUD's code, flex order puts it right after the turn's time, before the activity text (the one item that shrinks). */
+.hud .activity { order: 2; }
+.hud .spacer, .hud .spacer ~ * { order: 3; }
+.hud .live-chip { order: 1; }
+/* …and a HUD too narrow for its words shows the count only, as the Mac's chip does (ViewThatFits); the HUD's popovers are
+   portaled, so the size container changes nothing else. */
+.hud { container: hud / inline-size; }
+.hud .live-chip .short { display: none; }
+@container hud (max-width: 680px) {
+  .hud .live-chip .long { display: none; }
+  .hud .live-chip .short { display: inline; }
+}

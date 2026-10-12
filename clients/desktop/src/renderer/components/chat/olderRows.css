@@ -1,0 +1,5 @@
+/* MARK: wave4 w4-history — §38.3 [이전 대화 더 보기] over the oldest shown row. */
+.older-rows { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 0 8px; }
+.older-rows button { display: inline-flex; align-items: center; gap: 6px; }
+.search-match-line { display: block; color: var(--fg-2); }
+.search-match-line mark { background: var(--selection); color: inherit; border-radius: 2px; }

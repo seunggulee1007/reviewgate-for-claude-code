@@ -1,0 +1,81 @@
+name: ReviewGate
+options:
+  bundleIdPrefix: io.github.seunggulee1007.reviewgate
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+packages:
+  ReviewGateCore:
+    path: Core
+targets:
+  ReviewGate:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: sidecar/dist
+        type: folder
+        buildPhase: resources
+        optional: true
+    dependencies:
+      - package: ReviewGateCore
+    preBuildScripts:
+      - name: Build sidecar
+        script: |
+          # Node is discovered by scripts/find-node.sh (Xcode's PATH has no nvm / Homebrew); npm ci runs only
+          # when node_modules is missing or package-lock.json changed; Release fails without a sidecar,
+          # Debug warns; SKIP_SIDECAR_BUILD=YES skips. See scripts/build-sidecar.sh.
+          exec "$SRCROOT/scripts/build-sidecar.sh"
+        outputFiles:
+          - $(SRCROOT)/sidecar/dist/sidecar.mjs
+        basedOnDependencyAnalysis: false
+    postBuildScripts:
+      - name: Embed sidecar
+        script: |
+          # The folder resource above is only wired in if sidecar/dist existed at `xcodegen generate` time;
+          # this copy makes the bundle correct either way.
+          SRC="$SRCROOT/sidecar/dist/sidecar.mjs"
+          DST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/dist"
+          if [ -f "$SRC" ]; then mkdir -p "$DST" && cp -f "$SRC" "$DST/"; echo "embedded $SRC"
+          elif [ "$CONFIGURATION" = "Release" ]; then echo "error: sidecar.mjs missing — refusing to build a Release app without its engine"; exit 1
+          else echo "warning: sidecar.mjs missing — app will report it at runtime"; fi
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        PRODUCT_NAME: ReviewGate
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.seunggulee1007.reviewgate
+        MARKETING_VERSION: "0.5.5"
+        CURRENT_PROJECT_VERSION: "1055"
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: QW7DJ7FBDT
+        SWIFT_STRICT_CONCURRENCY: complete
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        # wave3 mac-session: merged into the generated one — the folder document type and the reviewgate:// scheme (§36.9)
+        INFOPLIST_FILE: App/Info.plist
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSHumanReadableCopyright: "Copyright © 2026 leeseunggu. All rights reserved."
+        INFOPLIST_KEY_LSMinimumSystemVersion: "15.0"
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_CFBundleDisplayName: ReviewGate
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon   # App/Assets.xcassets — drawn from design/icon/*.svg
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        SWIFT_EMIT_LOC_STRINGS: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+schemes:
+  ReviewGate:
+    build:
+      targets:
+        ReviewGate: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,77 @@
+/* Applied extensions (§16): dialog sections, plugin switches, MCP status dots, the fallback banner. */
+.ext-body { display: flex; flex-direction: column; gap: 2px; max-height: 62vh; padding-right: 4px; }
+.ext-note { border-radius: 8px; }
+.ext-section { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ext-section:last-child { border-bottom: 0; }
+.ext-section h4 { margin: 0; font-size: 12.5px; display: flex; gap: 6px; align-items: baseline; }
+.ext-plugins, .ext-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ext-plugins li { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 7px; min-width: 0; }
+.ext-plugins li:hover { background: var(--bg-2); }
+.ext-plugins li.off .bold { color: var(--fg-2); }
+.ext-files li { display: flex; align-items: center; gap: 8px; padding: 2px 6px; min-width: 0; }
+.ext-files li.off { opacity: 0.6; }
+.ext-event { font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); }
+.ext-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; }
+.ext-mcp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ext-toggle { align-items: flex-start !important; }
+.ext-toggle input { margin-top: 3px; }
+.ext-count { display: inline-flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ext-count-list { display: flex; flex-wrap: wrap; gap: 3px 8px; max-height: 120px; overflow: auto; color: var(--fg-2); }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--fg-3); }
+.status-dot.green { background: var(--green); }
+.status-dot.red { background: var(--red); }
+.status-dot.orange { background: var(--orange); }
+/* a small on/off switch */
+.switch { position: relative; display: inline-flex; flex: none; width: 30px; height: 17px; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch .track { width: 100%; height: 100%; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--border-strong); transition: background 0.15s; position: relative; }
+.switch .track::after { content: ""; position: absolute; top: 1px; left: 1px; width: 13px; height: 13px; border-radius: 50%; background: var(--fg-2); transition: transform 0.15s, background 0.15s; }
+.switch input:checked + .track { background: var(--accent-solid); border-color: var(--accent-solid); }
+.switch input:checked + .track::after { transform: translateX(13px); background: var(--on-accent); }
+.switch input:disabled + .track { opacity: 0.45; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ext-fallback { align-items: center; }
+.ext-fallback .glyph { font-size: 16px; flex: none; }
+.popover .caps-head { margin-bottom: 8px; gap: 6px; }
+.popover .caps-fallback { margin: -2px 0 8px; }
+/* §22 MCP server management */
+.mcp-head { align-items: center !important; }
+.mcp-head .spinner { width: 9px; height: 9px; border-width: 1.5px; }
+.mcp-head button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.mcp-banner { border-radius: 7px; padding: 6px 10px; }
+.mcp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mcp-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; }
+.mcp-row:hover { background: var(--bg-2); border-color: var(--border); }
+.mcp-row .switch { margin-top: 2px; }
+.mcp-row.off .mono.bold { color: var(--fg-2); }
+.mcp-row .spinner { width: 10px; height: 10px; }
+.mcp-row button.small { font-size: 11px; padding: 0 8px; }
+.mcp-source { flex: none; }
+.mcp-error { white-space: pre-wrap; word-break: break-word; user-select: text; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.mcp-keys { color: var(--fg-3); }
+.mcp-tools { display: flex; flex-wrap: wrap; gap: 3px 10px; max-height: 120px; overflow: auto; color: var(--fg-2); padding: 2px 0 0 2px; }
+.mcp-confirm { flex-wrap: wrap; justify-content: flex-end; }
+.mcp-form { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-2); }
+.mcp-form-grid { display: grid; grid-template-columns: 88px 1fr; gap: 8px 10px; align-items: start; }
+.mcp-form-grid > label, .mcp-form-grid > span { font-size: 12px; color: var(--fg-2); padding-top: 4px; }
+.mcp-form input[type="text"], .mcp-form input[type="password"] { width: 100%; min-width: 0; font-size: 12px; }
+.segmented.mini { margin: 0; align-self: flex-start; justify-self: start; }
+.segmented.mini button { font-size: 11.5px; padding: 1px 10px; flex: none; }
+.mcp-kv { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.3fr) auto; gap: 4px; align-items: center; }
+.mcp-kv-add { align-self: flex-start; font-size: 11.5px; }
+.mcp-argchips { display: flex; flex-wrap: wrap; gap: 3px; }
+.mcp-argchips > span { background: var(--bg-3); border-radius: 4px; padding: 0 5px; color: var(--fg-2); }
+.mcp-warn-dot { margin-right: 5px; vertical-align: 0; width: 7px; height: 7px; }
+/* MARK: wave4d w4d-config — §42.3 Claude's instructions: rows, the CLAUDE.md editor and its diff */
+.ext-instructions li { align-items: flex-start; padding: 4px 6px; }
+.ext-instructions li .pill { margin-top: 1px; flex: none; }
+.ext-agent-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ext-editor { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-2); }
+.ext-editor-text { width: 100%; min-height: 220px; resize: vertical; font-size: 12px; line-height: 1.45; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+.ext-editor-diff { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 4px 0; white-space: pre-wrap; word-break: break-word; }
+.ext-editor-diff > div { padding: 0 8px; }
+.ext-editor-diff .add { background: var(--add-bg); }
+.ext-editor-diff .del { background: var(--del-bg); }
+.ext-editor-diff .ctx { color: var(--fg-2); }
+.ext-editor-diff .fold { font-style: italic; }
+.ext-editor-diff .sign { display: inline-block; width: 14px; color: var(--fg-3); }

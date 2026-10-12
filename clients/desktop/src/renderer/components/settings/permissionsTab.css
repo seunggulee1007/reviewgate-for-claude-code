@@ -1,0 +1,15 @@
+/* Settings › Permissions (wave1 desktop-perms): remembered allows, terminal (Claude Code) allow rules and their import. Theme variables only. */
+.settings .remembered-list { display: flex; flex-direction: column; gap: 2px; max-height: 9em; overflow: auto; margin: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); list-style: none; }
+.settings .remembered-list li { font-family: var(--mono); font-size: 11.5px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+.settings .terminal-rules { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.settings .rule-sources { display: flex; flex-direction: column; gap: 3px; }
+.settings .rule-source { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; }
+.settings .rule-source .pill { flex: none; }
+.settings .rule-source .mono { font-size: 11.5px; color: var(--fg-2); direction: rtl; text-align: left; }
+.settings .rule-source .error { color: var(--red); }
+.settings .rule-table tr.ignored td { color: var(--fg-2); }
+.settings .rule-table td:first-child { width: 22px; }
+.settings .rule-table .rule-name { font-size: 11.5px; word-break: break-all; user-select: text; }
+.settings .rule-table .risk-mark { color: var(--orange); font-weight: 700; margin-right: 4px; }
+.settings .rule-table .pill { margin-right: 4px; }
+.settings .import-row label.check.inline { display: inline-flex; gap: 4px; align-items: center; font-size: 12.5px; }

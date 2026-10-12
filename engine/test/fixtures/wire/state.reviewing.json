@@ -1,0 +1,439 @@
+{
+  "seq": 42,
+  "project": {
+    "path": "/repo",
+    "root": "/repo",
+    "name": "repo",
+    "branch": "main",
+    "remoteURL": null
+  },
+  "gitInit": null,
+  "session": {
+    "open": true,
+    "starting": false,
+    "sessionId": "sess-1",
+    "model": "claude-test",
+    "capabilities": {
+      "slashCommands": [
+        "commit"
+      ],
+      "skills": [
+        "graphify"
+      ],
+      "plugins": [
+        "p"
+      ],
+      "mcpServers": [
+        {
+          "name": "fs",
+          "status": "connected"
+        }
+      ],
+      "pluginDetails": [
+        {
+          "name": "p",
+          "path": "/p",
+          "id": null
+        }
+      ],
+      "state": "ready"
+    },
+    "capabilitiesCached": false,
+    "pendingPermission": null,
+    "pendingPermissions": [],
+    "rememberedAllows": [],
+    "permissionMode": "default",
+    "pendingPlan": null,
+    "prePlanMode": null,
+    "extensions": {
+      "settingSources": [
+        "project",
+        "local"
+      ],
+      "fallback": null,
+      "plugins": [
+        {
+          "name": "p",
+          "id": null,
+          "path": "/p",
+          "enabled": true
+        }
+      ],
+      "disabledPlugins": [],
+      "unresolvedDisabledPlugins": [],
+      "userHooksDisabled": false,
+      "skills": [
+        "graphify"
+      ],
+      "slashCommands": [
+        "commit"
+      ],
+      "mcpServers": [
+        {
+          "name": "fs",
+          "status": "connected"
+        }
+      ],
+      "memoryFiles": null,
+      "claudeMd": {
+        "user": false,
+        "project": false,
+        "source": "files"
+      },
+      "hooks": [],
+      "notApplied": null,
+      "projectInstructions": [
+        {
+          "path": "/repo/CLAUDE.md",
+          "relPath": "CLAUDE.md",
+          "kind": "project",
+          "exists": false
+        },
+        {
+          "path": "/repo/CLAUDE.local.md",
+          "relPath": "CLAUDE.local.md",
+          "kind": "local",
+          "exists": false
+        }
+      ]
+    },
+    "extensionsWaitingOn": null,
+    "cli": null,
+    "effort": null,
+    "selectedModel": null,
+    "availableModels": [
+      {
+        "value": "claude-opus-5-5",
+        "displayName": "Opus 5.5",
+        "description": "Complex work and everyday tasks",
+        "supportsEffort": true,
+        "supportedEffortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      {
+        "value": "claude-sonnet-5-5",
+        "displayName": "Sonnet 5.5",
+        "description": "Efficient for simpler tasks",
+        "supportsEffort": true,
+        "supportedEffortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      {
+        "value": "claude-haiku-5-5",
+        "displayName": "Haiku 5.5",
+        "description": "Fastest for quick answers",
+        "supportsEffort": true,
+        "supportedEffortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      },
+      {
+        "value": "claude-fable-5-1",
+        "displayName": "Fable 5.1",
+        "description": "For the toughest challenges",
+        "supportsEffort": true,
+        "supportedEffortLevels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ]
+      }
+    ],
+    "checkpoints": [
+      {
+        "turn": 1,
+        "prompt": "Change README",
+        "startedAt": "2026-01-02T03:04:05Z",
+        "endedAt": "2026-01-02T03:04:05Z",
+        "filesChanged": 2,
+        "filesSince": 1,
+        "canRewindFiles": true,
+        "canRewindConversation": true
+      }
+    ],
+    "ready": true,
+    "peerInbound": "ask",
+    "peerInbox": [],
+    "externalTurn": null,
+    "peerTurn": null,
+    "canRestart": true
+  },
+  "toolchain": {
+    "claude": "/usr/bin/true",
+    "gh": null,
+    "git": null,
+    "claudeVersion": null,
+    "ghVersion": null
+  },
+  "gate": {
+    "phase": "reviewing",
+    "canSend": true,
+    "canRequestChanges": true,
+    "blockedReason": null,
+    "collectError": null,
+    "pendingCount": 1,
+    "changesRequestedCount": 0,
+    "isRequestingChanges": false,
+    "turnStartTree": "39d4a6a666e123cf991fb753f142aa4132a12ef7",
+    "turnEndTree": "a914defe34f932be66198d956585ee44643d4f89",
+    "lastReviewSummary": "[Review gate] Accepted: new.txt.",
+    "changedOutside": [],
+    "ignoredTouched": [],
+    "filteredByPattern": [],
+    "restored": false,
+    "reviewSummary": {
+      "files": 2,
+      "added": 3,
+      "deleted": 1
+    },
+    "externalPendingCount": 0,
+    "headMoved": null,
+    "concurrentClaude": [],
+    "stale": null,
+    "localSettingsChanged": null,
+    "nestedChanges": [],
+    "snapshotSkipped": [],
+    "reviewEndTree": "a914defe34f932be66198d956585ee44643d4f89",
+    "reviewTurns": [
+      1
+    ],
+    "lastTurnChanges": {
+      "turn": 1,
+      "files": 2,
+      "added": 3,
+      "deleted": 1
+    },
+    "lastRequest": null,
+    "prereviews": []
+  },
+  "changedFiles": [
+    {
+      "path": "README.md",
+      "oldPath": null,
+      "status": "M",
+      "added": 2,
+      "deleted": 1,
+      "isBinary": false,
+      "tools": [
+        "Edit"
+      ],
+      "toolUseIds": [
+        "toolu_1"
+      ],
+      "state": "pending",
+      "why": {
+        "text": "Tighten line 2.",
+        "source": "same_message",
+        "toolUseId": "toolu_1",
+        "agent": {
+          "toolUseId": "toolu_ag",
+          "subagentType": "Explore"
+        },
+        "turn": 1
+      },
+      "changedThisTurn": true,
+      "turnAdded": 2,
+      "turnDeleted": 1,
+      "blob": "a16f0f76662d4657cc5c241dcaa9684018cb7dfa",
+      "noteCount": 1,
+      "origin": "tool",
+      "risks": [],
+      "riskScore": 0
+    },
+    {
+      "path": "new.txt",
+      "oldPath": null,
+      "status": "A",
+      "added": 1,
+      "deleted": 0,
+      "isBinary": false,
+      "tools": [],
+      "toolUseIds": [],
+      "state": "accepted",
+      "why": {
+        "text": null,
+        "source": "none",
+        "turn": 1
+      },
+      "changedThisTurn": true,
+      "turnAdded": 1,
+      "turnDeleted": 0,
+      "blob": "d5a09df94c94924d13f8b5cd72a193b3eddb08cb",
+      "noteCount": 0,
+      "origin": "external",
+      "risks": [
+        "external"
+      ],
+      "riskScore": 20
+    }
+  ],
+  "reviewNotes": [
+    {
+      "id": "note-1",
+      "path": "README.md",
+      "line": 2,
+      "side": "new",
+      "excerpt": "line2 changed",
+      "body": "why?"
+    }
+  ],
+  "budget": {
+    "maxFiles": 5,
+    "maxLines": 200
+  },
+  "budgetUsage": {
+    "files": 0,
+    "lines": 0,
+    "denied": false
+  },
+  "hud": {
+    "contextTokens": 100,
+    "contextWindow": null,
+    "sessionCostUSD": 0.01,
+    "turnCount": 1,
+    "lastTurnMs": 1234,
+    "activity": {
+      "kind": "idle"
+    },
+    "subagentDepth": 0,
+    "agents": [
+      {
+        "id": "task-1",
+        "toolUseId": "toolu_ag",
+        "type": "Explore",
+        "description": "Inspect README",
+        "status": "completed",
+        "isBackground": false,
+        "depth": 1,
+        "startedAt": 1700000000000,
+        "files": [
+          "README.md"
+        ],
+        "turn": 1,
+        "model": null,
+        "lastTool": "Edit",
+        "summary": "Edited README",
+        "tokens": 1500,
+        "toolUses": 2,
+        "durationMs": 3000,
+        "endedAt": 1700000000000
+      }
+    ],
+    "turnStartedAt": null,
+    "sideCostUSD": 0,
+    "turnFiles": 0,
+    "waitingOnAgents": null,
+    "agentHistory": []
+  },
+  "branches": {
+    "list": [
+      {
+        "name": "main",
+        "isCurrent": true,
+        "upstream": null,
+        "ahead": 0,
+        "behind": 0,
+        "lastCommitDate": 1767323045
+      }
+    ],
+    "isWorktreeDirty": true,
+    "switchBlocker": {
+      "kind": "pendingReview",
+      "count": 1
+    },
+    "remotes": []
+  },
+  "pr": {
+    "host": "github.com",
+    "mine": [],
+    "reviewRequested": [],
+    "selectedSummary": null,
+    "selected": null,
+    "files": [],
+    "comments": [],
+    "reviews": [],
+    "draftComments": [],
+    "accounts": [],
+    "isLoading": false,
+    "isSubmitting": false,
+    "errorText": null,
+    "lastSubmitResult": null,
+    "lastCreatedPR": null
+  },
+  "lastError": null,
+  "workbenches": {
+    "list": [
+      {
+        "path": "/repo",
+        "branch": "main",
+        "head": "303656faa7f0623b8ae656dd42a95434fab9ccce",
+        "isMain": true,
+        "isCurrent": true,
+        "locked": {
+          "pid": 4242,
+          "since": "2026-01-02T03:04:05Z",
+          "client": "test"
+        },
+        "dirty": true
+      }
+    ],
+    "current": "/repo",
+    "managedRoot": "/home/user/.reviewgate/worktrees/repo-01234567"
+  },
+  "lockConflict": null,
+  "commit": {
+    "lastCommit": null,
+    "canCommit": true,
+    "acceptedPaths": [
+      "new.txt"
+    ],
+    "suggestedMessage": "Change README\n\nFiles:\n- new.txt",
+    "identity": {
+      "name": "Test",
+      "email": "test@example.com"
+    }
+  },
+  "sessions": {
+    "list": [
+      {
+        "id": "sess-1",
+        "title": "Change README",
+        "createdAt": "2026-01-02T03:04:05Z",
+        "updatedAt": "2026-01-02T03:04:05Z",
+        "turns": 1,
+        "costUSD": 0.01,
+        "lastUserText": "Change README",
+        "cliKnown": true
+      }
+    ],
+    "currentId": "sess-1",
+    "openTabIds": [
+      "sess-1"
+    ]
+  },
+  "storage": {
+    "saveFailed": null,
+    "disk": {
+      "freeBytes": 107374182400,
+      "totalBytes": 494384795648,
+      "level": "ok",
+      "at": "2026-01-02T03:04:05Z"
+    }
+  }
+}

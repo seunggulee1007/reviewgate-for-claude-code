@@ -1,0 +1,6 @@
+/* MARK: wave5 w5-fixes — §43.5 the "plan vs actual" basis menu on the newest turn summary */
+.turn-summary .ts-basis { margin-left: auto; flex: 0 1 auto; min-width: 0; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.turn-summary .ts-basis .menu-button { font-size: 11px; color: var(--fg-2); max-width: 260px; }
+.turn-summary .ts-basis .menu { min-width: 280px; max-width: 420px; }
+.turn-summary .ts-basis-line { flex-direction: row; align-items: center; gap: 6px; }
+.turn-summary .ts-basis-line .ts-label { flex: 0 0 auto; }

@@ -1,0 +1,100 @@
+/* Agent activity: status chips, the bottom panel (org-chart tree + timeline) and the transcript's agent groups. */
+.agent-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; padding: 0 7px 0 6px; line-height: 17px; border-radius: 999px; white-space: nowrap; flex: none; }
+.agent-chip .pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; position: relative; flex: none; }
+.agent-chip.live .pulse::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; animation: agent-pulse 1.4s ease-out infinite; }
+@keyframes agent-pulse { 0% { transform: scale(0.5); opacity: 0.9; } 100% { transform: scale(1.9); opacity: 0; } }
+.agent-chip.blue { background: var(--accent-bg); color: var(--blue); }
+.agent-chip.green { background: var(--green-bg); color: var(--green); }
+.agent-chip.red { background: var(--red-bg); color: var(--red); }
+.agent-chip.amber { background: var(--orange-bg); color: var(--orange); }
+.agent-chip.gray { background: var(--bg-3); color: var(--fg-2); }
+
+/* ------------------------------------------------------------ panel */
+.agent-panel { flex: none; position: relative; display: flex; flex-direction: column; min-height: 150px; border-top: 1px solid var(--border-strong); background: var(--panel); }
+.agent-resize { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: row-resize; z-index: 5; }
+.agent-resize:hover { background: var(--accent-bg); }
+body.resizing-row { cursor: row-resize; user-select: none; }
+.agent-panel-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.agent-icon { color: var(--accent); font-size: 11px; }
+/* tree and timeline: stacked in a narrow panel (the tree keeps ≥ 150px and scrolls on its own, the timeline shrinks
+   first), side by side once the panel is wide enough that the timeline no longer steals the tree's height */
+.agent-panel { container-type: inline-size; container-name: agentpanel; }
+.agent-panel-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.agent-panel-body { flex: 1 1 auto; min-height: 150px; overflow: auto; padding: 14px 14px 10px; }
+.agent-panel-head .timeline-toggle { color: var(--fg-2); padding: 0 6px; }
+.agent-panel-head .timeline-toggle.active { color: var(--accent); }
+.agent-empty { text-align: center; padding: 6px 0 0; }
+
+/* org chart: each branch centres its card over the level of its children; the connectors are the classic before/after pair */
+.agent-tree { display: flex; justify-content: center; min-width: min-content; }
+.agent-level { display: flex; align-items: flex-start; }
+.agent-branch { display: flex; flex-direction: column; align-items: center; position: relative; padding: 14px 6px 0; }
+.agent-branch.root { padding-top: 0; }
+.agent-level > .agent-branch::before, .agent-level > .agent-branch::after { content: ""; position: absolute; top: 0; width: 50%; height: 14px; border-top: 1px solid var(--border-strong); }
+.agent-level > .agent-branch::before { right: 50%; }
+.agent-level > .agent-branch::after { left: 50%; border-left: 1px solid var(--border-strong); }
+.agent-level > .agent-branch:first-child::before, .agent-level > .agent-branch:last-child::after { border-top: 0; }
+.agent-level > .agent-branch:only-child::after { border-top: 0; }
+.agent-children { position: relative; padding-top: 14px; display: flex; justify-content: center; }
+.agent-children::before { content: ""; position: absolute; top: 0; left: 50%; height: 14px; border-left: 1px solid var(--border-strong); }
+
+.agent-card { width: 248px; display: flex; flex-direction: column; gap: 5px; padding: 9px 11px 10px; border-radius: 10px; background: var(--elevated); border: 1px solid var(--border); border-top: 2px solid var(--tone, var(--border-strong)); box-shadow: var(--shadow-sm); font-size: 12px; text-align: left; }
+.agent-card.main { width: 270px; background: var(--bg-2); }
+.agent-card.tone-blue, .agent-group.tone-blue { --tone: var(--blue); }
+.agent-card.tone-green, .agent-group.tone-green { --tone: var(--green); }
+.agent-card.tone-red, .agent-group.tone-red { --tone: var(--red); }
+.agent-card.tone-amber, .agent-group.tone-amber { --tone: var(--orange); }
+.agent-card.tone-gray, .agent-group.tone-gray { --tone: var(--fg-3); }
+.agent-card.tone-blue { box-shadow: 0 0 0 1px var(--accent-bg), var(--shadow-sm); }
+.agent-card-top { display: flex; align-items: center; gap: 6px; }
+.agent-title { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; }
+.agent-title.plain:hover { background: transparent; text-decoration: underline; text-decoration-color: var(--fg-3); }
+.agent-type { font-weight: 650; font-size: 12.5px; color: var(--fg); }
+.agent-desc { color: var(--fg-2); line-height: 1.4; }
+.agent-last { color: var(--blue); }
+.agent-summary-text { color: var(--fg); line-height: 1.4; background: var(--bg-2); border-radius: 6px; padding: 4px 7px; }
+.agent-error { color: var(--red); line-height: 1.4; }
+.agent-stats { display: flex; gap: 10px; }
+.agent-files { display: flex; flex-wrap: wrap; gap: 4px; }
+.clamp2, .clamp3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.clamp2 { -webkit-line-clamp: 2; }
+.clamp3 { -webkit-line-clamp: 3; }
+
+/* file chips (agent cards + Bash rows): click → that file's diff */
+.file-link { font-family: var(--mono); font-size: 10.5px; padding: 0 6px; line-height: 17px; border-radius: 5px; background: var(--bg-3); border: 1px solid transparent; color: var(--fg-2); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.file-link:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-bg); background: var(--accent-bg); }
+.file-link.current { color: var(--accent); border-color: var(--accent); }
+
+/* timeline */
+.agent-timeline { flex: 0 1 auto; min-height: 0; max-height: 128px; overflow: auto; border-top: 1px solid var(--border); padding: 6px 14px 6px; display: flex; flex-direction: column; gap: 3px; background: var(--bg-2); }
+.tl-row { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 10px; height: 14px; font-size: 11px; color: var(--fg-2); }
+.tl-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-track { position: relative; height: 8px; border-radius: 4px; background: var(--bg-3); }
+.tl-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; cursor: pointer; min-width: 3px; }
+.tl-bar.blue { background: var(--blue); }
+.tl-bar.green { background: var(--green); }
+.tl-bar.red { background: var(--red); }
+.tl-bar.amber { background: var(--orange); }
+.tl-bar.gray { background: var(--fg-3); }
+.tl-bar.main { opacity: 0.45; cursor: default; }
+.tl-bar.live { background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.22) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.22) 75%, transparent 75%); background-size: 10px 10px; animation: tl-stripes 0.9s linear infinite; }
+@keyframes tl-stripes { to { background-position: 10px 0; } }
+.tl-axis { display: flex; justify-content: space-between; margin-left: 140px; padding-top: 1px; }
+
+/* ------------------------------------------------------------ transcript agent groups */
+.agent-group { border: 1px solid var(--border); border-left: 2px solid var(--tone, var(--border-strong)); border-radius: 8px; background: var(--panel); font-size: 12.5px; }
+.agent-group.nested { margin-left: 4px; }
+.agent-head { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; min-width: 0; border-radius: 8px; }
+.agent-head:hover { background: var(--bg-3); }
+.agent-head .chev { width: 10px; color: var(--fg-3); font-size: 10px; flex: none; }
+.agent-head .agent-desc { flex: 1; }
+.agent-body { display: flex; flex-direction: column; gap: 6px; padding: 4px 10px 8px 22px; border-top: 1px solid var(--border); }
+.agent-group > .agent-summary { padding: 0 10px 6px 22px; color: var(--fg-2); font-size: 11.5px; }
+.hud .agents-chip { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; flex: none; border: 0; }
+.hud .agents-chip:hover { filter: brightness(1.15); }
+@container agentpanel (min-width: 900px) {
+  .agent-panel-main { flex-direction: row; }
+  .agent-timeline { flex: 0 0 38%; max-height: none; border-top: 0; border-left: 1px solid var(--border); padding-top: 10px; }
+  .tl-row { grid-template-columns: 96px 1fr; }
+  .tl-axis { margin-left: 106px; }
+}

@@ -1,0 +1,11 @@
+/* MARK: wave4b w4b-tabs — §39.2: the bar above the composer while another chat is shown, and folded exploration rows. */
+.viewing-bar { margin: 6px 12px 0; padding: 6px 8px; border-radius: 8px; background: var(--accent-bg); display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.viewing-bar .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viewing-review-note { padding: 4px 12px; }
+.explore-run { border-radius: 8px; background: var(--panel); padding: 3px 8px; }
+.explore-run .explore-head { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; text-align: left; color: var(--fg-2); font-size: 12.5px; padding: 2px 0; }
+.explore-run .explore-head .chev { width: 10px; }
+.explore-run .explore-body { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 4px 14px; }
+.explore-run .spinner { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent-bg); border-top-color: var(--accent); animation: rg-explore-spin 0.8s linear infinite; }
+@keyframes rg-explore-spin { to { transform: rotate(360deg); } }
+.chat-tab .dot.hollow { background: transparent; border: 1.5px solid var(--accent); box-sizing: border-box; }

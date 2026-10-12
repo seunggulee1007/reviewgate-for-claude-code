@@ -1,0 +1,14 @@
+/* MARK: wave4d w4d-speed — audit polish-10: text only a screen reader reads ("추가된 줄 42:", "수정됨", "12줄 추가, 3줄 삭제"). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  user-select: none;
+}

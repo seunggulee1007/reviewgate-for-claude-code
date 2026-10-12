@@ -1,0 +1,14 @@
+/* Settings panel (General / Accounts tabs inside the settings dialog). */
+.settings { display: flex; flex-direction: column; min-height: 0; }
+.settings .body { overflow: auto; min-height: 0; max-height: 70vh; }
+.settings section:last-child { border-bottom: 0; }
+.settings .note { font-size: 11.5px; color: var(--fg-2); line-height: 1.4; }
+.settings .stepper { display: flex; align-items: center; gap: 6px; }
+.settings .stepper input { width: 80px; }
+.settings textarea { width: 100%; }
+.settings input[type="text"] { width: 100%; }
+.settings .tool-path { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; user-select: text; }
+.settings .tool-path.missing { color: var(--orange); direction: ltr; }
+.settings .detail { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); white-space: pre-wrap; max-height: 8em; overflow: auto; user-select: text; }
+.settings td.status.ok { color: var(--green); }
+.settings td.status.bad { color: var(--red); }

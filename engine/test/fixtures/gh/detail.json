@@ -1,0 +1,5 @@
+{"additions": 1029, "author": {"id": "MDQ6VXNlcjMyNjkyODA3", "is_bot": false, "login": "alice", "name": "Alice"},
+ "baseRefName": "main", "body": "Hello\n\nworld", "changedFiles": 9, "deletions": 22,
+ "headRefName": "feat/x", "headRefOid": "65e2b6c57f7e1fd6a616d631fe71dce97ce8257f", "number": 5,
+ "reviewDecision": "CHANGES_REQUESTED", "state": "OPEN", "title": "feat: x",
+ "url": "https://github.com/acme/widgets/pull/5"}

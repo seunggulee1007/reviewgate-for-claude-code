@@ -1,0 +1,147 @@
+/* Side questions (§21): the panel right of the chat, the "?" entry buttons, the "곁질문 N" badges, the promote dialog. */
+
+/* ---------------------------------------------------------------- entry points */
+.side-ask {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-size: 11px; line-height: 1.5; padding: 0 7px 0 3px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--bg-2); color: var(--fg-2);
+}
+.side-ask:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+.side-ask .q {
+  display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent); font-weight: 700; font-size: 10px;
+}
+.side-ask.icon-only { padding: 0 3px; }
+/* Revealed on hover where they would add noise otherwise (file rows, tool rows, summary rows). */
+.side-ask.hover { opacity: 0; transition: opacity 0.12s; }
+li:hover > .file-row .side-ask.hover, .tool-row:hover .side-ask.hover, .ts-file:hover .side-ask.hover,
+.cause-item:hover .side-ask.hover, li.selected .side-ask.hover, .side-ask.hover:focus-visible { opacity: 1; }
+.side-badge {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  font-size: 10.5px; font-weight: 600; line-height: 16px; padding: 0 7px; border-radius: 999px;
+  border: 0; background: var(--accent-bg); color: var(--accent);
+}
+.side-badge:hover:not(:disabled) { background: var(--accent-bg); filter: brightness(1.2); }
+.side-badge .spinner { width: 9px; height: 9px; border-width: 1.5px; }
+/* The diff line gutter "?" (next to the note "+"). */
+.unified .gutter-ask { width: 16px; flex: none; visibility: hidden; text-align: center; color: var(--accent); cursor: pointer; font-weight: 700; user-select: none; font-family: var(--font); font-size: 11px; }
+.unified .line:hover .gutter-ask { visibility: visible; }
+.unified .line.side-anchored { box-shadow: inset 2px 0 0 var(--accent); }
+.unified .hunk-aside { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; }
+
+/* ---------------------------------------------------------------- panel */
+.main > .panes { position: relative; overflow: hidden; }
+.side-panel {
+  flex: 0 1 380px; width: 380px; min-width: 320px; display: flex; flex-direction: column; min-height: 0;
+  background: var(--panel); border-left: 1px solid var(--border);
+}
+/* Narrow windows: the panel floats over the chat instead of squeezing three panes. */
+@media (max-width: 1519px) {
+  .side-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(400px, 92vw); z-index: 30; box-shadow: var(--shadow); border-left: 1px solid var(--border-strong); }
+}
+.side-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border); min-height: 34px; background: var(--bg-2); }
+.side-title { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
+.side-glyph {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 6px;
+  background: var(--accent-solid); color: var(--on-accent); font-weight: 800; font-size: 11px;
+}
+.side-running { display: inline-flex; align-items: center; gap: 4px; }
+.side-running .spinner { width: 9px; height: 9px; border-width: 1.5px; }
+.side-back { font-weight: 600; }
+.side-empty { padding: 28px 22px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; line-height: 1.5; }
+.side-empty-glyph {
+  width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-bg); color: var(--accent); font-size: 22px; font-weight: 800; margin-bottom: 4px;
+}
+.side-list { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.side-row {
+  display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; white-space: normal;
+  background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 7px 8px;
+}
+.side-row:hover:not(:disabled) { background: var(--bg-2); border-color: var(--border); }
+.side-row-title { font-weight: 600; font-size: 12.5px; }
+.side-dot { margin-top: 4px; flex: none; }
+.spinner.side-dot { width: 9px; height: 9px; border-width: 1.5px; }
+.anchor-chip {
+  display: inline-block; max-width: 200px; font-family: var(--mono); font-size: 10.5px; line-height: 16px;
+  padding: 0 6px; border-radius: 5px; background: var(--bg-3); color: var(--fg-2); flex: 0 1 auto;
+}
+.anchor-chip.none { font-family: var(--font); }
+.side-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.side-anchor { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.side-anchor-body { display: flex; flex-direction: column; gap: 6px; }
+.side-anchor-tool { display: flex; align-items: center; gap: 6px; font-size: 12px; min-width: 0; }
+.side-anchor-why { font-size: 12px; color: var(--fg-2); font-style: italic; line-height: 1.4; }
+.side-anchor-diff { border: 1px solid var(--border); border-radius: 7px; background: var(--bg); font-size: 11px; line-height: 1.55; overflow: hidden; max-height: 230px; overflow-y: auto; }
+.side-anchor-diff .l { display: flex; white-space: pre; min-width: 0; }
+.side-anchor-diff .l.add { background: var(--add-bg); }
+.side-anchor-diff .l.del { background: var(--del-bg); }
+.side-anchor-diff .l.focus { box-shadow: inset 3px 0 0 var(--accent); }
+.side-anchor-diff .no { width: 34px; flex: none; text-align: right; padding-right: 6px; color: var(--fg-3); user-select: none; }
+.side-anchor-diff .s { width: 12px; flex: none; color: var(--fg-3); }
+.side-anchor-diff .x { overflow: hidden; text-overflow: ellipsis; }
+.side-anchor-text { margin: 0; max-height: 160px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; font-size: 11px; white-space: pre-wrap; }
+.side-related { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.side-compose { display: flex; flex-direction: column; gap: 6px; }
+.side-compose textarea {
+  resize: none; width: 100%; border-radius: 9px; padding: 8px 10px; line-height: 1.45; background: var(--bg);
+  border: 1px solid var(--border-strong);
+}
+.side-compose textarea:focus { border-color: var(--accent); }
+.side-compose kbd, .side-footer kbd { font-family: var(--font); font-size: 10px; opacity: 0.75; margin-left: 3px; }
+.side-compose .primary .spinner { width: 9px; height: 9px; border-width: 1.5px; vertical-align: -1px; }
+.side-chip { font-size: 11px; padding: 0 8px; border-radius: 999px; line-height: 1.7; color: var(--fg-2); background: transparent; }
+.side-chip:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
+.side-notice { margin: 0 12px 8px; padding: 6px 10px; border-radius: 7px; background: var(--orange-bg); color: var(--orange); font-size: 12px; }
+
+.side-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.side-thread-head { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 7px; }
+.side-messages { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.side-msg { border-radius: 10px; padding: 7px 10px; font-size: 12.5px; line-height: 1.5; word-break: break-word; user-select: text; min-width: 0; }
+.side-msg.user { align-self: flex-end; max-width: 88%; background: var(--accent-bg); white-space: pre-wrap; }
+.side-msg.assistant { align-self: stretch; background: var(--bg-2); border: 1px solid var(--border); }
+.side-msg.assistant .markdown pre { font-size: 11.5px; }
+.side-msg .cursor { display: inline-block; width: 6px; height: 12px; margin-left: 2px; background: var(--accent); vertical-align: -1px; animation: blink 1s steps(2) infinite; }
+.side-fork { text-align: center; }
+.side-tools { display: flex; flex-direction: column; gap: 1px; margin: -2px 0 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
+.side-tool-row {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; font-size: 11.5px; padding: 1px 4px;
+  background: transparent; border: 0; border-radius: 5px; color: var(--fg-2);
+}
+.side-tool-row:hover:not(:disabled) { background: var(--bg-3); }
+.side-tool-row .icon { width: 14px; text-align: center; flex: none; }
+.side-tool-row .name { font-weight: 600; color: var(--fg); flex: none; }
+.side-tool-row .detail { flex: 1 1 auto; }
+.side-tool-row .spinner { width: 8px; height: 8px; border-width: 1.5px; }
+.side-tool-row.error .name { color: var(--red); }
+.side-tool-out { margin: 2px 0 4px 20px; max-height: 140px; overflow: auto; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; white-space: pre-wrap; }
+.side-error { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 8px; background: var(--red-bg); color: var(--red); }
+.side-error .mono { color: var(--fg); word-break: break-word; }
+.side-promoted { align-self: center; font-size: 11.5px; font-weight: 600; color: var(--green); background: var(--green-bg); border-radius: 999px; padding: 2px 10px; }
+.side-footer { border-top: 1px solid var(--border); padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); }
+.side-promote-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.side-promote-row button { flex: 1 1 auto; }
+.side-compose.follow textarea { min-height: 44px; }
+
+/* ---------------------------------------------------------------- promote dialog */
+.segmented.promote-as { margin: 0; }
+.promote-target { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: var(--fg-2); background: var(--bg-2); border-radius: 7px; padding: 6px 10px; }
+.promote-target .arrow { color: var(--accent); font-weight: 700; }
+.promote-edit { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.promote-edit textarea { width: 100%; min-height: 160px; line-height: 1.5; font-size: 12.5px; }
+.promote-loading { position: absolute; inset: 0 0 18px 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--fg-2); font-size: 12.5px; background: color-mix(in srgb, var(--bg) 70%, transparent); border-radius: 6px; z-index: 1; }
+.promote-error { border-radius: 7px; }
+
+/* HUD chip */
+.side-chip-hud { flex: none; margin: 0 2px; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 0 8px; line-height: 18px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--fg-2); }
+.side-chip-hud:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.side-chip-hud[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
+.side-chip-hud .spinner { width: 8px; height: 8px; border-width: 1.5px; }
+
+/* Placement of the "왜?" buttons next to rows that are buttons themselves. */
+.turn-summary .ts-file { position: relative; }
+.turn-summary .ts-file .ts-ask { position: absolute; right: 4px; top: 2px; }
+.change-cause .cause-li { position: relative; }
+.change-cause .cause-li .cause-ask { position: absolute; right: 30px; top: 6px; }
+.change-cause .cause-li:hover .side-ask.hover { opacity: 1; }
+.file-row > .side-ask { margin-top: 1px; }

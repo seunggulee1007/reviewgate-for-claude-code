@@ -1,0 +1,9 @@
+[[
+  {"sha": "x", "filename": "README.md", "status": "modified", "additions": 1, "deletions": 1, "changes": 2,
+   "blob_url": "b", "raw_url": "r", "contents_url": "c",
+   "patch": "@@ -1,2 +1,2 @@\n line\n-old\n+new"},
+  {"sha": "y", "filename": "new/name.swift", "previous_filename": "old/name.swift", "status": "renamed",
+   "additions": 0, "deletions": 0, "changes": 0, "blob_url": "b", "raw_url": "r", "contents_url": "c"},
+  {"sha": "z", "filename": "img.png", "status": "added", "additions": 0, "deletions": 0, "changes": 0,
+   "blob_url": "b", "raw_url": "r", "contents_url": "c"}
+]]

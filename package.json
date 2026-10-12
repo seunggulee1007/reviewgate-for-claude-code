@@ -1,0 +1,12 @@
+{
+  "name": "reviewgate",
+  "private": true,
+  "workspaces": [
+    "engine",
+    "sidecar",
+    "clients/*"
+  ],
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.43.0"
+  }
+}

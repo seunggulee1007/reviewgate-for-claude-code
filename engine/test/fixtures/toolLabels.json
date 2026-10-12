@@ -1,0 +1,33 @@
+{
+  "about": "§39.3 toolLabel: one rule for MCP and Skill calls, checked by the engine (engine/src/session/toolLabel.ts), Electron (clients/desktop/src/renderer/toolLabel.ts) and the Mac (ToolLabel in Core AgentGlance.swift). Add a case here and all three must agree.",
+  "cases": [
+    { "name": "mcp__dooray__dooray_get_posts", "input": { "projectId": "100", "postNumber": 4821 },
+      "label": { "kind": "mcp", "server": "dooray", "name": "get posts", "arg": "4821" } },
+    { "name": "mcp__mysql__execute_query", "input": { "query": "SELECT * FROM tenant\n WHERE id = 1" },
+      "label": { "kind": "mcp", "server": "mysql", "name": "execute query", "arg": "SELECT * FROM tenant WHERE id = 1" } },
+    { "name": "mcp__elasticsearch__esql", "input": { "query": "FROM logs-* | WHERE level == \"ERROR\" | STATS n = COUNT(*) BY logger | SORT n DESC" },
+      "label": { "kind": "mcp", "server": "elasticsearch", "name": "esql", "arg": "FROM logs-* | WHERE level == \"ERROR\" | STATS n = COUNT(*) BY…" } },
+    { "name": "mcp__elasticsearch__search", "input": { "index": "docs-kb", "query_body": { "size": 3 } },
+      "label": { "kind": "mcp", "server": "elasticsearch", "name": "search", "arg": "docs-kb" } },
+    { "name": "mcp__claude-in-chrome__tabs_context_mcp", "input": {},
+      "label": { "kind": "mcp", "server": "claude-in-chrome", "name": "tabs context mcp" } },
+    { "name": "mcp__context7__query-docs", "input": { "libraryId": "/spring/boot", "query": "스프링에서 트랜잭션 전파는 어떻게 설정하나요? 서비스 메서드끼리 호출할 때 REQUIRES_NEW 와 NESTED 의 차이" },
+      "label": { "kind": "mcp", "server": "context7", "name": "query docs", "arg": "스프링에서 트랜잭션 전파는 어떻게 설정하나요? 서비스 메서드끼리 호출할 때 REQUIRES_NEW 와 NES…" } },
+    { "name": "mcp__claude_ai_Claude_Docs__batch", "input": { "opId": "a1", "verbose": true },
+      "label": { "kind": "mcp", "server": "claude_ai_Claude_Docs", "name": "batch" } },
+    { "name": "mcp__mysql__mysql_", "input": { "sql": "  ", "name": "tenant" },
+      "label": { "kind": "mcp", "server": "mysql", "name": "mysql", "arg": "tenant" } },
+    { "name": "mcp__lonely", "input": { "query": "x" },
+      "label": { "kind": "tool", "name": "mcp__lonely" } },
+    { "name": "Skill", "input": { "skill": "acme-tools:smoke" },
+      "label": { "kind": "skill", "name": "acme-tools:smoke" } },
+    { "name": "Skill", "input": { "skill": "commit", "args": "-m 'Fix the tenant filter'" },
+      "label": { "kind": "skill", "name": "commit", "arg": "-m 'Fix the tenant filter'" } },
+    { "name": "Skill", "input": {},
+      "label": { "kind": "skill", "name": "" } },
+    { "name": "Bash", "input": { "command": "./gradlew :acme-api:test" },
+      "label": { "kind": "tool", "name": "Bash" } },
+    { "name": "Read", "input": { "file_path": "/repo/A.java" },
+      "label": { "kind": "tool", "name": "Read" } }
+  ]
+}

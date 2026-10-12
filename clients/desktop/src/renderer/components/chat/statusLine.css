@@ -1,0 +1,37 @@
+/* MARK: wave6 w6-statusline — §44.2 the user's Claude Code status line under the composer (StatusLine.tsx). Plain text
+   is the terminal's dim default (--fg-2); every other color comes from the line's own ANSI codes (renderer/ansi.ts). */
+.status-line {
+  --sl-fg: var(--fg-2);
+  position: relative;
+  padding: 0 12px 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--sl-fg);
+  overflow: hidden;
+  user-select: text;
+}
+/* Nothing to show: no height, so a chat without a status line keeps its layout (the box still measures the width). */
+.status-line.sl-empty {
+  padding-bottom: 0;
+  height: 0;
+}
+.sl-line {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-line a {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.sl-line a:hover {
+  text-decoration: underline;
+}
+.sl-probe {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}
