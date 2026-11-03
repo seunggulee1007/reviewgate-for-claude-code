@@ -2,8 +2,8 @@ import Foundation
 import CryptoKit
 
 // MARK: app-update
-// docs/PROTOCOL.md §48, the install half. `gh release download` (no quarantine: the app is signed but not notarized, so a
-// browser download would be refused by Gatekeeper) → the sha256 against the `.sha256` asset → `hdiutil attach -readonly`
+// docs/PROTOCOL.md §48, the install half. `gh release download` (no quarantine: releases before 0.5.7 were not notarized,
+// and Gatekeeper refuses a browser download of those) → the sha256 against the `.sha256` asset → `hdiutil attach -readonly`
 // → the new app's signature (`codesign --verify --deep --strict`), team (the running app's) and version (the tag's) → no
 // window has Claude working or waiting → a detached helper waits for this pid to exit, swaps the bundle at
 // `Bundle.main.bundleURL` for a `ditto` copy of the image's, detaches the image and reopens the app. Nothing is replaced

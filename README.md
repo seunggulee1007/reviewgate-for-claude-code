@@ -109,13 +109,8 @@ over the engine's protocol, and so is the Windows client (Electron, preview).
 ## Install
 
 1. Download `ReviewGate-x.y.z.dmg` from [Releases](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest).
-2. Open it and drag **ReviewGate** to **Applications**.
-3. The app is signed but not notarized yet, so macOS blocks the first launch of a downloaded copy. Allow it once in
-   **System Settings › Privacy & Security › Open Anyway**, or run:
-
-   ```sh
-   xattr -dr com.apple.quarantine /Applications/ReviewGate.app
-   ```
+2. Open it and drag **ReviewGate** to **Applications**. The app is notarized by Apple, so it opens like any other
+   downloaded app.
 
 After that, updates arrive in the app: a banner offers **Install and Restart**.
 

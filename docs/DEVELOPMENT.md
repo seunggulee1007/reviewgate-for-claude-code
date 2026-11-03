@@ -31,7 +31,8 @@ cannot be built; a Debug build only warns.
 
 ### Building without the developer certificate
 
-project.yml signs with an `Apple Development` certificate of team QW7DJ7FBDT. Without it, sign ad hoc:
+project.yml signs Debug with an `Apple Development` certificate and Release with a `Developer ID Application`
+certificate, both of team QW7DJ7FBDT. Without them, sign ad hoc:
 
 ```sh
 xcodegen generate
@@ -78,8 +79,16 @@ The single source of the version is the root `VERSION` file. After changing it, 
 `make test` first runs `scripts/sync-version.mjs --check` and fails on any mismatch. The build number is not checked.
 
 A release is one command, `make release VERSION=x.y.z` (`scripts/release.sh`). It makes the version commit, builds
-Release, makes the DMG and its sha256, and checks the version and signature of both the built app and the app inside the
-DMG. Then it tags, pushes the tag and runs `gh release create`. `DRY_RUN=1` runs only the local steps.
+Release, notarizes the app and staples its ticket, makes the DMG, signs, notarizes and staples it too, writes its sha256,
+and checks the version, signature and Gatekeeper verdict of the built app, the app inside the DMG and the DMG. Then it
+tags, pushes the tag and runs `gh release create`. `DRY_RUN=1` runs only the local steps (notarization included).
+
+Notarizing takes the `Developer ID Application` certificate in the keychain and a notarytool profile there, stored once
+with an app-specific password from appleid.apple.com (`NOTARY_PROFILE` picks another profile name):
+
+```sh
+xcrun notarytool store-credentials reviewgate --apple-id <your Apple ID> --team-id QW7DJ7FBDT
+```
 
 The app checks for a new release at launch and every 6 hours through the user's `gh`, announces it in a banner, and on
 **Install and Restart** downloads, verifies and swaps the bundle ([PROTOCOL.md §48](PROTOCOL.md)).

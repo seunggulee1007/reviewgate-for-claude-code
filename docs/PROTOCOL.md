@@ -5987,9 +5987,10 @@ type ProjectSearchMatch = { path: string; line: number; text: string };
 ## 48. Releases and in-app updates
 
 The user releases by building a DMG on their Mac. Until now nobody learned of a new one unless told, and a DMG downloaded
-by a browser is refused by Gatekeeper (the app is signed with an "Apple Development" certificate, team QW7DJ7FBDT, not
-notarized). A release is now a GitHub release of `seunggulee1007/reviewgate-for-claude-code` (private), the app notices it and installs it
-on one click. Nothing here touches the engine or the wire.
+by a browser was refused by Gatekeeper (the app was signed with an "Apple Development" certificate, team QW7DJ7FBDT, not
+notarized; from 0.5.7 on a release is signed with a Developer ID of the same team and notarized). A release is now a
+GitHub release of `seunggulee1007/reviewgate-for-claude-code`, the app notices it and installs it on one click. Nothing
+here touches the engine or the wire.
 
 The app's bundle identifier is `io.github.seunggulee1007.reviewgate` from 0.5.6 on. The bundle gate below refuses a
 download whose identifier differs from the running app's, so a build with an older identifier cannot update itself to
@@ -5997,7 +5998,9 @@ download whose identifier differs from the running app's, so a build with an old
 
 - **Releasing** (`make release VERSION=X.Y.Z`, `scripts/release.sh`). Preconditions first: X.Y.Z newer than `VERSION`
   (or `VERSION` already X.Y.Z with `chore: X.Y.Z` at HEAD — a re-run after a later step failed), tracked files clean, on
-  a branch, tag `vX.Y.Z` neither in the clone nor on origin, `gh` logged in to github.com, the tools and Node. Then
+  a branch, tag `vX.Y.Z` neither in the clone nor on origin, `gh` logged in to github.com, the tools and Node, a
+  `Developer ID Application` identity in the keychain and a working notarytool keychain profile (`NOTARY_PROFILE`,
+  default `reviewgate`). Then
   `VERSION` ← X.Y.Z, `make version`, commit `chore: X.Y.Z`; `make gen && make sidecar`; `xcodebuild … -configuration
   Release -derivedDataPath build build` in the foreground, started only once no other `xcodebuild` writes the same
   derived data (matched by `-derivedDataPath`, resolved against the other process's working folder) and checked again
@@ -6005,15 +6008,21 @@ download whose identifier differs from the running app's, so a build with an old
   `hdiutil create -volname "ReviewGate X.Y.Z" -srcfolder <.app + Applications link> -fs APFS -format UDZO`, the app inside
   the image attached read-only must both say X.Y.Z (`CFBundleShortVersionString`), carry project.yml's build number
   (`CFBundleVersion`), embed a sidecar whose `ENGINE_VERSION` is X.Y.Z and pass `codesign --verify --deep --strict`;
-  anything else fails the release. `build/dist/ReviewGate-X.Y.Z.dmg.sha256` (`shasum -a 256`) goes beside the DMG, the
-  notes are the commit subjects since the previous `v*` tag (no tag yet: since the previous `chore: x.y.z`, at most 200,
-  the version commit left out) with how to install. Last: `git tag vX.Y.Z`, `git push origin vX.Y.Z` (the branch is not
+  anything else fails the release. Notarization: the built app must be signed by a `Developer ID Application` identity
+  with the hardened runtime and a secure timestamp (project.yml, Release: `CODE_SIGN_IDENTITY`,
+  `OTHER_CODE_SIGN_FLAGS=--timestamp`); a zip of it goes through `xcrun notarytool submit --wait` (anything but
+  `Accepted` prints Apple's log and fails) and `stapler staple` puts the ticket into the app before it is packaged. The
+  DMG is signed with the same identity, notarized and stapled the same way; Gatekeeper (`spctl -a -vv`) must accept the
+  built app, the app inside the image and the image (`-t open --context context:primary-signature`) as
+  `source=Notarized Developer ID`. `build/dist/ReviewGate-X.Y.Z.dmg.sha256` (`shasum -a 256`, of the stapled image)
+  goes beside the DMG, the notes are the commit subjects since the previous `v*` tag (no tag yet: since the previous
+  `chore: x.y.z`, at most 200, the version commit left out) with how to install. Last: `git tag vX.Y.Z`, `git push origin vX.Y.Z` (the branch is not
   pushed), `gh release create vX.Y.Z <dmg> <sha256> --repo github.com/seunggulee1007/reviewgate-for-claude-code --title "ReviewGate X.Y.Z"
-  --notes-file … --verify-tag --latest`. `--dry-run` (`DRY_RUN=1`) runs everything local — the build, the DMG, its checks,
-  the notes — puts the version files back and prints the commit, the tag, the push and the release instead; `--check`
+  --notes-file … --verify-tag --latest`. `--dry-run` (`DRY_RUN=1`) runs everything local — the build, the notarizations,
+  the DMG, its checks, the notes — puts the version files back and prints the commit, the tag, the push and the release instead; `--check`
   stops after the preconditions.
-- **Checking** (Core `Session/AppUpdate.swift` — `AppUpdateChecker`, `AppRelease`, `SemanticVersion`). The repository is
-  private, so the app cannot ask the public API anonymously: it runs the user's own `gh api --hostname github.com
+- **Checking** (Core `Session/AppUpdate.swift` — `AppUpdateChecker`, `AppRelease`, `SemanticVersion`). The app
+  runs the user's own `gh api --hostname github.com
   repos/seunggulee1007/reviewgate-for-claude-code/releases/latest`. `gh` is the path an open window's engine resolved
   (`state.toolchain.gh`), else the first `gh` on the login shell's PATH (the window's, or the probe that finds `node`),
   else Homebrew's; it runs with that PATH, `GH_PROMPT_DISABLED`, without `GH_HOST` / `GH_REPO`. The reply's `tag_name`

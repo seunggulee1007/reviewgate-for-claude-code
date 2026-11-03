@@ -75,6 +75,10 @@ targets:
           DEPLOYMENT_POSTPROCESSING: YES
           STRIP_INSTALLED_PRODUCT: YES
           STRIP_STYLE: debugging
+          # A release is notarized (scripts/release.sh), which takes a Developer ID signature with a secure timestamp;
+          # Debug keeps the Apple Development certificate.
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
 schemes:
   ReviewGate:
     build:

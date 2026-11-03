@@ -107,13 +107,8 @@ flowchart LR
 
 1. [Releases](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest)에서
    `ReviewGate-x.y.z.dmg`를 내려받습니다.
-2. 열어서 **ReviewGate**를 **응용 프로그램**으로 끌어 놓습니다.
-3. 서명은 되어 있지만 아직 공증(notarization)을 받지 않아서, 내려받은 앱을 처음 열 때 macOS가 막습니다.
-   **시스템 설정 › 개인정보 보호 및 보안 › 그래도 열기**에서 한 번 허용하거나, 터미널에서:
-
-   ```sh
-   xattr -dr com.apple.quarantine /Applications/ReviewGate.app
-   ```
+2. 열어서 **ReviewGate**를 **응용 프로그램**으로 끌어 놓습니다. Apple 공증(notarization)을 받은 앱이라 내려받은
+   다른 앱처럼 열립니다.
 
 그다음부터는 앱 안에서 업데이트됩니다. 배너의 **설치하고 다시 시작**을 누르면 됩니다.
 

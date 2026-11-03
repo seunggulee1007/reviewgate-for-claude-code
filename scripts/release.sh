@@ -5,20 +5,26 @@
 #
 # 1. Preconditions: X.Y.Z newer than VERSION (or VERSION already X.Y.Z with "chore: X.Y.Z" at HEAD — a re-run after a
 #    later step failed), tracked files clean, on a branch, tag vX.Y.Z neither here nor on origin, gh logged in to
-#    github.com, xcodegen / xcodebuild / hdiutil / codesign / ditto / shasum, Node >= 24 (scripts/find-node.sh).
+#    github.com, xcodegen / xcodebuild / hdiutil / codesign / ditto / shasum / xcrun, Node >= 24 (scripts/find-node.sh),
+#    a "Developer ID Application" identity in the keychain and the notarytool keychain profile $NOTARY_PROFILE
+#    (default "reviewgate"; once: xcrun notarytool store-credentials reviewgate --apple-id … --team-id QW7DJ7FBDT).
 # 2. VERSION <- X.Y.Z, make version, commit "chore: X.Y.Z".
 # 3. make gen && make sidecar, then xcodebuild Release in the foreground — only once no other xcodebuild writes the same
 #    derived data (build/): a DMG was once packaged from a stale binary while a build still ran. The built app must say
-#    X.Y.Z (CFBundleShortVersionString), carry project.yml's build number, embed an X.Y.Z sidecar and pass
-#    codesign --verify --deep --strict.
+#    X.Y.Z (CFBundleShortVersionString), carry project.yml's build number, embed an X.Y.Z sidecar, pass
+#    codesign --verify --deep --strict and be signed by a Developer ID with the hardened runtime and a secure timestamp.
+#    It is notarized (a zip of it through notarytool submit --wait) and the ticket stapled to it.
 # 4. The .app and an Applications link staged in a temporary folder -> hdiutil create build/dist/ReviewGate-X.Y.Z.dmg,
-#    attached read-only and checked again (version, build, sidecar, codesign); build/dist/ReviewGate-X.Y.Z.dmg.sha256.
+#    signed with the app's Developer ID, notarized and stapled, then attached read-only and checked again (version, build,
+#    sidecar, codesign, the app's ticket, Gatekeeper); Gatekeeper must accept the image too.
+#    build/dist/ReviewGate-X.Y.Z.dmg.sha256 is the stapled image's.
 # 5. Release notes: the commit subjects since the previous v* tag (no tag yet: since the previous "chore: x.y.z").
 # 6. git tag vX.Y.Z, git push origin vX.Y.Z, gh release create vX.Y.Z <dmg> <sha256> --title … --notes-file ….
 #    The branch itself is not pushed.
 #
-# --dry-run  steps 1-5 for real (gh's login and origin's tags only warn); the version files are put back afterwards and
-#            nothing is committed — the commit and step 6 are printed instead. The DMG stays in build/dist.
+# --dry-run  steps 1-5 for real, notarization included (gh's login and origin's tags only warn); the version files are
+#            put back afterwards and nothing is committed — the commit and step 6 are printed instead. The DMG stays in
+#            build/dist.
 # --check    step 1 only, as strict as a real release (with --dry-run: as lenient as a dry run).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -29,6 +35,7 @@ REPO=seunggulee1007/reviewgate-for-claude-code
 DERIVED="$ROOT/build"
 DIST="$DERIVED/dist"
 PLISTBUDDY=/usr/libexec/PlistBuddy
+NOTARY_PROFILE="${NOTARY_PROFILE:-reviewgate}"
 # What `make version` (scripts/sync-version.mjs) writes.
 VERSION_FILES="VERSION engine/package.json sidecar/package.json clients/desktop/package.json package-lock.json engine/src/version.ts project.yml"
 
@@ -96,10 +103,14 @@ if [ -z "$GH" ]; then
 elif ! "$GH" auth status --hostname "$HOST" >/dev/null 2>&1; then
   soft "gh is not logged in to $HOST (gh auth login)"
 fi
-for tool in xcodegen xcodebuild hdiutil codesign ditto shasum "$PLISTBUDDY"; do
+for tool in xcodegen xcodebuild hdiutil codesign ditto shasum xcrun spctl "$PLISTBUDDY"; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool not found"
 done
 ./scripts/find-node.sh >/dev/null || die "Node.js >= 24 not found (scripts/find-node.sh)"
+security find-identity -v -p codesigning 2>/dev/null | grep -q '"Developer ID Application: ' \
+  || die "no \"Developer ID Application\" signing identity in the keychain — a release is notarized (docs/DEVELOPMENT.md)"
+xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
+  || die "notarytool cannot use the keychain profile \"$NOTARY_PROFILE\" (xcrun notarytool store-credentials $NOTARY_PROFILE …)"
 
 say "release $TAG from $BRANCH (VERSION $CURRENT)$([ "$DRY_RUN" = 1 ] && printf ' — dry run')"
 if [ "$CHECK_ONLY" = 1 ]; then
@@ -188,6 +199,50 @@ check_app() {
   codesign --verify --deep --strict "$1" || die "$2: codesign --verify --deep --strict failed"
 }
 
+# check_developer_id <app> <label>: what notarization takes — a Developer ID signature, the hardened runtime and a
+# secure timestamp. SIGN_ID <- the signing identity, which signs the DMG too.
+check_developer_id() {
+  info="$(codesign -dvv "$1" 2>&1)"
+  SIGN_ID="$(printf '%s\n' "$info" | sed -n 's/^Authority=\(Developer ID Application: .*\)$/\1/p' | head -n 1)"
+  [ -n "$SIGN_ID" ] || die "$2 is not signed by a Developer ID Application certificate (project.yml, Release)"
+  printf '%s\n' "$info" | grep -q 'flags=[^ ]*runtime' || die "$2 lacks the hardened runtime"
+  printf '%s\n' "$info" | grep -q '^Timestamp=' || die "$2 has no secure timestamp (OTHER_CODE_SIGN_FLAGS=--timestamp)"
+}
+
+# notarize <file> <label>: notarytool submit --wait; anything but Accepted prints Apple's log and stops the release.
+notarize() {
+  say "notarizing $2 (notarytool, profile $NOTARY_PROFILE)…"
+  result="$(xcrun notarytool submit "$1" --keychain-profile "$NOTARY_PROFILE" --wait --timeout 1h --output-format json \
+    2>"$DIST/notarytool.err")"
+  id="$(printf '%s' "$result" | grep -o '"id" *: *"[^"]*"' | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+  status="$(printf '%s' "$result" | grep -o '"status" *: *"[^"]*"' | tail -n 1 | sed 's/.*"\([^"]*\)"$/\1/')"
+  if [ "$status" != Accepted ]; then
+    cat "$DIST/notarytool.err" >&2
+    printf '%s\n' "$result" >&2
+    [ -n "$id" ] && xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" >&2
+    die "$2: notarization ended ${status:-without a status}"
+  fi
+  rm -f "$DIST/notarytool.err"
+  say "$2 notarized (submission $id)"
+}
+
+# staple <path> <label>: the ticket goes into the app or the image, so Gatekeeper accepts it offline too.
+staple() {
+  xcrun stapler staple -q "$1" || die "$2: stapler staple failed"
+  xcrun stapler validate -q "$1" || die "$2: stapler validate failed"
+}
+
+# gatekeeper <label> <spctl arguments…>: Gatekeeper accepts it as notarized.
+gatekeeper() {
+  label="$1"
+  shift
+  verdict="$(spctl -a -vv "$@" 2>&1)"
+  case "$verdict" in
+    *": accepted"*"source=Notarized Developer ID"*) ;;
+    *) printf '%s\n' "$verdict" >&2; die "$label: Gatekeeper does not accept it as notarized" ;;
+  esac
+}
+
 say "make gen"
 make gen >/dev/null || die "make gen failed"
 say "make sidecar"
@@ -206,15 +261,19 @@ APP="$DERIVED/Build/Products/Release/ReviewGate.app"
 # for that date (the generic one, before the app had an icon). The bundle carries this build's date.
 touch "$APP"
 check_app "$APP" "the built app"
-TEAM="$(codesign -dv "$APP" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
-case "$TEAM" in
-  "" | "not set") warn "the app has no team signature — the in-app updater refuses to install it" ;;
-  *) say "signed by team $TEAM" ;;
-esac
+check_developer_id "$APP" "the built app"
+say "signed by $SIGN_ID"
+mkdir -p "$DIST"
+ZIP="$DIST/ReviewGate-$NEW-app.zip"
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP" || die "ditto could not zip the app for notarization"
+notarize "$ZIP" "the app"
+rm -f "$ZIP"
+staple "$APP" "the app"
+gatekeeper "the app" -t exec "$APP"
 
 # --- 4. package --------------------------------------------------------------------------------------------------------
 DMG="$DIST/ReviewGate-$NEW.dmg"
-mkdir -p "$DIST"
 rm -f "$DMG" "$DMG.sha256"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/reviewgate-stage.XXXXXX")" || die "mktemp failed"
 ditto "$APP" "$STAGE/ReviewGate.app" || die "ditto failed"
@@ -222,15 +281,21 @@ ln -s /Applications "$STAGE/Applications" || die "cannot make the Applications l
 say "hdiutil create $DMG"
 hdiutil create -volname "ReviewGate $NEW" -srcfolder "$STAGE" -fs APFS -format UDZO "$DMG" >/dev/null || die "hdiutil create failed"
 rm -rf "$STAGE"
+codesign --sign "$SIGN_ID" --timestamp "$DMG" || die "codesign could not sign the DMG"
+notarize "$DMG" "the DMG"
+staple "$DMG" "the DMG"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/reviewgate-verify.XXXXXX")" || die "mktemp failed"
 hdiutil attach -readonly -nobrowse -noautoopen -mountpoint "$STAGE" "$DMG" >/dev/null || die "hdiutil attach failed"
 ATTACHED="$STAGE"
 check_app "$STAGE/ReviewGate.app" "the packaged app"
+xcrun stapler validate -q "$STAGE/ReviewGate.app" || die "the packaged app carries no notarization ticket"
+gatekeeper "the packaged app" -t exec "$STAGE/ReviewGate.app"
 [ -L "$STAGE/Applications" ] || die "the image has no Applications link"
 hdiutil detach "$STAGE" -quiet || hdiutil detach "$STAGE" -force -quiet || die "hdiutil detach failed"
 ATTACHED=""
 rm -rf "$STAGE"
 STAGE=""
+gatekeeper "the DMG" -t open --context context:primary-signature "$DMG"
 (cd "$DIST" && shasum -a 256 "ReviewGate-$NEW.dmg" > "ReviewGate-$NEW.dmg.sha256") || die "shasum failed"
 say "packaged $DMG ($(du -h "$DMG" | awk '{ print $1 }')), sha256 $(cut -d' ' -f1 "$DMG.sha256")"
 
@@ -257,7 +322,7 @@ COUNT="$(printf '%s' "$SUBJECTS" | grep -c '^- ')"
   fi
   printf '\n'
   printf 'Install from the app (ReviewGate › Check for Updates…), or with `gh release download %s -R %s -p '"'"'ReviewGate-*.dmg*'"'"'`.\n' "$TAG" "$REPO"
-  printf 'A browser download is refused by Gatekeeper: the app is signed for development, not notarized.\n'
+  printf 'The app is signed with a Developer ID and notarized by Apple.\n'
 } > "$NOTES"
 say "release notes ($COUNT commits since $SINCE): $NOTES"
 
