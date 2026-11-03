@@ -114,6 +114,10 @@ over the engine's protocol, and so is the Windows client (Electron, preview).
 
 After that, updates arrive in the app: a banner offers **Install and Restart**.
 
+**Windows (preview).** The same release has `ReviewGate-Setup-x.y.z.exe`. It is not code-signed, so SmartScreen asks
+before the first run (**More info › Run anyway**). It has not been tried on a real Windows machine yet and does not
+update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
+
 ## Quick start
 
 1. **Open a project** — File › Open Project… (⌘O), drop a folder on the Dock icon, or from a terminal:

@@ -82,6 +82,8 @@ A release is one command, `make release VERSION=x.y.z` (`scripts/release.sh`). I
 Release, notarizes the app and staples its ticket, makes the DMG, signs, notarizes and staples it too, writes its sha256,
 and checks the version, signature and Gatekeeper verdict of the built app, the app inside the DMG and the DMG. Then it
 tags, pushes the tag and runs `gh release create`. `DRY_RUN=1` runs only the local steps (notarization included).
+Publishing the release starts `.github/workflows/windows-installer.yml`, which builds the Windows installer (preview) on
+Windows and attaches it with its sha256 ([M11-WINDOWS.md](M11-WINDOWS.md)).
 
 Notarizing takes the `Developer ID Application` certificate in the keychain and a notarytool profile there, stored once
 with an app-specific password from appleid.apple.com (`NOTARY_PROFILE` picks another profile name):

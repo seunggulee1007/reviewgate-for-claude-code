@@ -20,7 +20,8 @@
 #    build/dist/ReviewGate-X.Y.Z.dmg.sha256 is the stapled image's.
 # 5. Release notes: the commit subjects since the previous v* tag (no tag yet: since the previous "chore: x.y.z").
 # 6. git tag vX.Y.Z, git push origin vX.Y.Z, gh release create vX.Y.Z <dmg> <sha256> --title … --notes-file ….
-#    The branch itself is not pushed.
+#    The branch itself is not pushed. The published release starts .github/workflows/windows-installer.yml, which
+#    attaches the Windows installer (preview).
 #
 # --dry-run  steps 1-5 for real, notarization included (gh's login and origin's tags only warn); the version files are
 #            put back afterwards and nothing is committed — the commit and step 6 are printed instead. The DMG stays in

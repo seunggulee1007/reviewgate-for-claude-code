@@ -21,6 +21,11 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 - Node ≥ 20 is only needed to build; the packaged app bundles Electron's Node.
 - `dist:win` builds on macOS without wine: `electron-builder.yml` sets `win.signAndEditExecutable: false`
   (no rcedit → the exe keeps Electron's icon/version resource). No code signing; SmartScreen will warn.
+- A release's installer is built on Windows by `.github/workflows/windows-installer.yml`, started by publishing the
+  release (or by hand: `gh workflow run windows-installer.yml -f tag=vX.Y.Z`). There rcedit runs
+  (`-c.win.signAndEditExecutable=true`), so the exe carries the app icon and version. It is named
+  `ReviewGate-Setup-<version>.exe`, installed silently and launched once (still running after 20 s; a screenshot is
+  the run's `smoke-screenshot` artifact), then attached to the release with its `.sha256`. Still unsigned.
 - `dist:mac` uses `CSC_IDENTITY_AUTO_DISCOVERY=false` semantics (`mac.identity: null`) → unsigned, for local runs only.
 - Nothing external is bundled: the engine spawns `claude`, `gh` and `git` from `PATH` (or the paths in Settings → General).
   `electron-builder.yml` excludes `node_modules/@anthropic-ai/claude-agent-sdk-*/**` for every target: those
