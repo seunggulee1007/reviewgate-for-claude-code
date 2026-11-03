@@ -29,7 +29,6 @@ jobs:
         shell: bash
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -88,6 +87,10 @@ jobs:
           path: ${{ runner.temp }}/smoke.png
           if-no-files-found: ignore
       - name: attach the installer and its sha256 to the release
+        # The token only here: with GH_TOKEN in its environment electron-builder turns to publishing on GitHub, and with
+        # no repository in package.json that config resolves to null ("Cannot read properties of null (reading 'channel')").
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           cd clients/desktop/release
           f="ReviewGate-Setup-$VERSION.exe"
