@@ -140,7 +140,8 @@ describe("§47 project_search", () => {
 });
 
 describe("§47 searchProject", () => {
-  it("parses a path holding a newline (git prints it verbatim with -z)", async () => {
+  // Windows file names cannot hold a newline.
+  it.skipIf(process.platform === "win32")("parses a path holding a newline (git prints it verbatim with -z)", async () => {
     const dir = track(makeRepo());
     write(dir, "odd\nname.txt", "tenant\n");
     const r = await searchProject(dir, { query: "tenant", caseSensitive: true });
