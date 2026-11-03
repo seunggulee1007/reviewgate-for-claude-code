@@ -94,6 +94,8 @@ public actor EngineTransport<Command: TransportCommand, Event: TransportEvent> {
     private var readersAtEOF = 0
     private var exited = false
     private var exitStatus: Int32 = 0
+    /// When the termination handler saw the exit (not when this actor got to it).
+    private var exitedAt: ContinuousClock.Instant?
     private var stopping = false
     private var finished = false
     /// Instant of the last fatal `error` line from the sidecar; used to drop the redundant
@@ -150,8 +152,9 @@ public actor EngineTransport<Command: TransportCommand, Event: TransportEvent> {
         let cont = continuation
         p.terminationHandler = { [weak self] proc in
             let status = proc.terminationStatus
+            let at = ContinuousClock.now
             guard let self else { cont.finish(); return }
-            Task { await self.handleExit(status: status) }
+            Task { await self.handleExit(status: status, at: at) }
         }
 
         let onEOF: @Sendable () -> Void = { [weak self] in
@@ -218,9 +221,10 @@ public actor EngineTransport<Command: TransportCommand, Event: TransportEvent> {
         return exited
     }
 
-    private func handleExit(status: Int32) {
+    private func handleExit(status: Int32, at: ContinuousClock.Instant) {
         exited = true
         exitStatus = status
+        exitedAt = at
         try? stdinHandle?.close()
         stdinHandle = nil
         finishIfComplete()
@@ -239,7 +243,9 @@ public actor EngineTransport<Command: TransportCommand, Event: TransportEvent> {
         finished = true
         readers = []
         if !stopping || exitStatus != 0 {
-            let recentFatal = lastFatalError.value.map { .now - $0 < Self.fatalErrorExitWindow } ?? false
+            // From the fatal line's arrival to the exit, both stamped where they were observed: by the time this actor runs,
+            // a busy cooperative pool may have held it for seconds (CI showed the duplicate row after a 3.5 s stall).
+            let recentFatal = lastFatalError.value.map { (exitedAt ?? .now) - $0 < Self.fatalErrorExitWindow } ?? false
             if !recentFatal {
                 continuation.yield(Event.transportExit(message: String(localized: "sidecar exited \(exitStatus)", bundle: .module)))
             }

@@ -123,12 +123,15 @@ private typealias TestTransport = EngineTransport<TestCommand, TestEvent>
         func arrival(of m: TestEvent) -> Duration { arrivals.first { $0.message == m }?.at ?? .seconds(99) }
         let info = TestEvent.sessionInfo(sessionId: "s1")
         let early = TestEvent.textDelta(text: "early")
+        let trailing = TestEvent.textDelta(text: "trailing-no-newline")
         let firstStdout = received.first { if case .log = $0 { return false } else { return true } }
         #expect(firstStdout == info)
-        #expect(arrival(of: info) < .seconds(2), "session_info arrived at \(arrival(of: info))")
-        #expect(arrival(of: early) < .seconds(3.5), "second line arrived at \(arrival(of: early))")
+        // Measured against the last line, written 6 s and 5 s after these: a reader holding lines until EOF delivers them
+        // together. Not against the start — a busy runner starts the script late (CI saw session_info at 3.1 s).
+        #expect(arrival(of: trailing) - arrival(of: info) > .seconds(3), "session_info \(arrival(of: info)), last \(arrival(of: trailing))")
+        #expect(arrival(of: trailing) - arrival(of: early) > .seconds(2), "second line \(arrival(of: early)), last \(arrival(of: trailing))")
         // A trailing partial line (no newline) is flushed at EOF, and the stream closes only after it.
-        #expect(received.contains(.textDelta(text: "trailing-no-newline")))
+        #expect(received.contains(trailing))
         #expect(ContinuousClock.now - start >= .seconds(7))
     }
 
@@ -200,6 +203,21 @@ private typealias TestTransport = EngineTransport<TestCommand, TestEvent>
         var errors: [TestEvent] = []
         for await e in client.events { if case .error = e { errors.append(e) } }
         #expect(errors == [.error(message: "boom", fatal: true)])
+    }
+
+    /// A fatal error long before the exit (a session's: the Claude CLI failed, the sidecar ran on) keeps the exit row.
+    @Test func fatalErrorLongBeforeExitKeepsTheExitRow() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rg-fake-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let script = dir.appendingPathComponent("late.sh")
+        try "#!/bin/sh\necho '{\"type\":\"error\",\"message\":\"cli failed\",\"fatal\":true}'\nsleep 5\nexit 1\n"
+            .write(to: script, atomically: true, encoding: .utf8)
+
+        let client = TestTransport(nodePath: "/bin/sh", scriptPath: script.path, env: ["PATH": "/usr/bin:/bin"])
+        try await client.start()
+        var errors: [TestEvent] = []
+        for await e in client.events { if case .error = e { errors.append(e) } }
+        #expect(errors == [.error(message: "cli failed", fatal: true), .error(message: "sidecar exited 1", fatal: true)])
     }
 
     /// code-browser (§47): a multi-megabyte line (a `project_file` reply) arrives over many reads and is delivered whole,
