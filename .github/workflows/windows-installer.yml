@@ -1,0 +1,96 @@
+# The Windows installer (preview) of a release. Built on Windows, so the exe carries the app icon and version resource
+# (rcedit, which electron-builder.yml turns off because a Mac would need wine for it). A silent install is launched once
+# as a smoke test (a screenshot of it is kept as the run's artifact), then the installer and its sha256 are attached to
+# the GitHub release. Unsigned: SmartScreen asks before the first run. The Mac DMG is built, notarized and published on
+# the developer's Mac (scripts/release.sh); publishing that release starts this workflow from the tagged commit.
+name: Windows installer
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to build and attach to (vX.Y.Z)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-installer-${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: the tag is the desktop client's version
+        run: |
+          version="$(node -p "require('./clients/desktop/package.json').version")"
+          [ "v$version" = "$TAG" ] || { echo "::error::clients/desktop is $version but the tag is $TAG"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: build the installer
+        run: |
+          npm run build -w clients/desktop
+          cd clients/desktop
+          # shellcheck disable=SC2016 # ${version} is electron-builder's macro, not the shell's
+          npx electron-builder --win nsis --x64 --publish never \
+            -c.win.signAndEditExecutable=true \
+            '-c.nsis.artifactName=ReviewGate-Setup-${version}.exe'
+          ls -la release
+      - name: smoke test — silent install, the app still runs after 20 s, uninstall
+        shell: pwsh
+        env:
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: |
+          $installer = "clients/desktop/release/ReviewGate-Setup-$env:VERSION.exe"
+          Start-Process -FilePath $installer -ArgumentList '/S' -Wait
+          $app = Get-ChildItem -Path "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'ReviewGate.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $app) { throw "the silent install left no ReviewGate.exe under $env:LOCALAPPDATA\Programs" }
+          Write-Host "installed: $($app.FullName) ($((Get-Item $app.FullName).VersionInfo.ProductVersion))"
+          $p = Start-Process -FilePath $app.FullName -PassThru `
+            -RedirectStandardOutput "$env:RUNNER_TEMP\app.out" -RedirectStandardError "$env:RUNNER_TEMP\app.err"
+          Start-Sleep -Seconds 20
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("$env:RUNNER_TEMP\smoke.png")
+          } catch { Write-Host "no screenshot: $_" }
+          $exited = $p.HasExited
+          if (-not $exited) { taskkill /PID $p.Id /T /F | Out-Null }
+          Get-Content "$env:RUNNER_TEMP\app.err" -Tail 40 -ErrorAction SilentlyContinue
+          if ($exited) { throw "ReviewGate exited within 20 s (exit code $($p.ExitCode))" }
+          $uninstaller = Get-ChildItem -Path $app.DirectoryName -Filter 'Uninstall*.exe' | Select-Object -First 1
+          if ($uninstaller) { Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshot
+          path: ${{ runner.temp }}/smoke.png
+          if-no-files-found: ignore
+      - name: attach the installer and its sha256 to the release
+        run: |
+          cd clients/desktop/release
+          f="ReviewGate-Setup-$VERSION.exe"
+          printf '%s  %s\n' "$(sha256sum "$f" | cut -d' ' -f1)" "$f" > "$f.sha256"
+          cat "$f.sha256"
+          gh release upload "$TAG" "$f" "$f.sha256" --clobber --repo "$GITHUB_REPOSITORY"
