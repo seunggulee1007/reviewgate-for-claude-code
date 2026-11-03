@@ -68,6 +68,13 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         SWIFT_EMIT_LOC_STRINGS: YES
         LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      configs:
+        Release:
+          # The shipped executable leaves its debug map behind: unstripped, it named every source and object file by
+          # the build machine's absolute path. The dSYM next to the app in build/ keeps the symbols.
+          DEPLOYMENT_POSTPROCESSING: YES
+          STRIP_INSTALLED_PRODUCT: YES
+          STRIP_STYLE: debugging
 schemes:
   ReviewGate:
     build:
