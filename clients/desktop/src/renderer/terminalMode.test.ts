@@ -179,6 +179,10 @@ describe("Shift+Tab in the store (§44.1)", () => {
     // Back to the mode the snapshot shows while another switch is on its way: still sent.
     useStore.getState().cyclePermissionMode();
     expect(modeCalls()).toEqual(["acceptEdits", "plan", "auto", "default"]);
+    // The engine's snapshot after its answers ends every switch's settle(), in the order sent. Sent before the answers, it
+    // left each switch waiting out settle()'s 500 ms, and the "auto" one could finish after this test had ended and clear
+    // the next test's autoModeUnavailable (Windows CI).
+    await flush();
     snapshot(useStore, "default");
     await until(() => useStore.getState().requestedPermissionMode === null);
   });
@@ -199,6 +203,7 @@ describe("Shift+Tab in the store (§44.1)", () => {
     });
     expect(planApproveMode(useStore.getState().state, useStore.getState().autoModeUnavailable)).toBe("auto");
     const answered = useStore.getState().approvePlan("auto");
+    await flush(); // the refusal is in, and its settle() waits for the engine's next snapshot
     const s2 = useStore.getState().state;
     useStore.getState().handleEvent({ type: "state", state: { ...s2, seq: s2.seq + 1 } }); // ends the refusal's settle()
     await answered;
