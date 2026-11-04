@@ -95,7 +95,9 @@ final class AppMoveController {
             helper.standardError = FileHandle.nullDevice
             try helper.run()
         },
-        quit: { DispatchQueue.main.async { NSApp.terminate(nil) } })
+        // From the run loop, not a main-queue job: Quit's `.terminateLater` needs the main queue for the engines' shutdown
+        // (and its 6 s cap), and a nested run loop inside a main-queue job does not drain it — the app hung in Quit.
+        quit: { RunLoop.main.perform { NSApp.terminate(nil) } })
 
     private nonisolated static func stripQuarantine(_ path: String) {
         let xattr = Process()

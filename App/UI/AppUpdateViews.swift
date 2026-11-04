@@ -193,7 +193,10 @@ final class AppUpdateController {
         }
         restartRequested = true
         // The usual quit: the window list is written and every engine stops; the helper waits for this pid to exit.
-        NSApp.terminate(nil)
+        // From the run loop, not from this main-queue job: Quit's `.terminateLater` waits for engine shutdown tasks (and
+        // its 6 s cap) that need the main queue, which a nested run loop does not drain inside a main-queue job — called
+        // from here, the app hung in Quit with any project open, and the helper gave up after 10 minutes (0.5.6–0.5.8).
+        RunLoop.main.perform { NSApp.terminate(nil) }
     }
 
     /// Forgets the prepared update at once (the wait loop stops on its next look) and detaches / removes it behind.

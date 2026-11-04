@@ -6066,6 +6066,12 @@ download whose identifier differs from the running app's, so a build with an old
   anything failed — and removes the work folder; it logs to `~/Library/Logs/ReviewGate/update.log`. Nothing is killed by
   name (no `pkill` / `killall`). A quit cancelled at the last moment (a turn started meanwhile) terminates the helper by
   its pid and detaches the image; quitting while an update waits detaches it too.
+  The quit is called from the run loop (`RunLoop.main.perform`), not from a main-queue job. Quit's `.terminateLater`
+  waits for the engines' shutdown and its 6 s cap, and both need the main queue, which a nested run loop inside a
+  main-queue job does not drain. 0.5.6–0.5.8 called it from the update's Task. With any project open, those apps hung
+  in Quit (⌘Q did nothing either) until the helper gave up. To update from them: close every project window before
+  **Install and Restart**, or force-quit the app (⌥⌘Esc) within the 10 minutes, and the helper finishes. "Move to
+  Applications" (`AppMoveBanner`) had the same hang and quits from the run loop too.
 - **Compatibility.** No wire change; the Electron client does not check for updates. Teammates' ad-hoc builds never
   install an update from the app (no team to compare); they install by hand as before.
 - **Verified.** Core `AppUpdateTests`: semver parsing and order, the `releases/latest` reply (assets, digest, drafts,
