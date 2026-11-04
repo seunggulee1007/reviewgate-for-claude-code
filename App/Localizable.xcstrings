@@ -1601,6 +1601,22 @@
         }
       }
     },
+    "A task link, a key such as ABC-123, or what to do — sent as the first message there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A task link, a key such as ABC-123, or what to do — sent as the first message there."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 링크, ABC-123 같은 키, 또는 할 일 — 그곳의 첫 메시지로 보내요."
+          }
+        }
+      }
+    },
     "AI pre-review": {
       "localizations": {
         "en": {
@@ -2269,6 +2285,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 세션에 쌓인 것 %lld개"
+          }
+        }
+      }
+    },
+    "Adds \"Run as Task\" to the composer and the Workbenches menu: the message starts in a new workbench (its own branch, folder, window and chat), so this chat is left as it is.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds \"Run as Task\" to the composer and the Workbenches menu: the message starts in a new workbench (its own branch, folder, window and chat), so this chat is left as it is."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력창과 워크벤치 메뉴에 \"업무로 실행\"을 추가해요. 메시지가 새 워크벤치(자기 브랜치·폴더·창·채팅)에서 시작돼서 지금 채팅은 그대로 남아요."
           }
         }
       }
@@ -4115,6 +4147,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@에서 분기해 새 워크트리를 만듭니다."
+          }
+        }
+      }
+    },
+    "Branches from %@ into a new worktree; its window sends the task in a fresh chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branches from %@ into a new worktree; its window sends the task in a fresh chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 분기해 새 워크트리를 만들고, 그 창의 새 채팅에서 업무를 보내요."
           }
         }
       }
@@ -7603,6 +7651,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "거부하고 지시…"
+          }
+        }
+      }
+    },
+    "Describe the task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Describe the task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 내용을 적어 주세요"
+          }
+        }
+      }
+    },
+    "Describe the task first (at most 100,000 characters).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Describe the task first (at most 100,000 characters)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 업무 내용을 적어 주세요 (최대 100,000자)."
           }
         }
       }
@@ -11644,6 +11724,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "내 PR"
+          }
+        }
+      }
+    },
+    "Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모드"
           }
         }
       }
@@ -17942,6 +18038,54 @@
         }
       }
     },
+    "Run as Task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run as Task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무로 실행"
+          }
+        }
+      }
+    },
+    "Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무로 실행 — 이 메시지를 새 워크벤치(자기 브랜치·창·채팅)에서 시작해요. 지금 채팅은 그대로 남아요"
+          }
+        }
+      }
+    },
+    "Run as Task…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run as Task…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무로 실행…"
+          }
+        }
+      }
+    },
     "Run hooks from settings files and plugins": {
       "localizations": {
         "en": {
@@ -20326,6 +20470,22 @@
         }
       }
     },
+    "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무를 전용 워크벤치(새 브랜치와 폴더, 자기 창과 새 채팅)에서 시작해요. 지금 채팅은 그대로 남아요."
+          }
+        }
+      }
+    },
     "Status": {
       "localizations": {
         "en": {
@@ -20930,6 +21090,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "가져오기"
+          }
+        }
+      }
+    },
+    "Task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무"
           }
         }
       }
@@ -22082,6 +22258,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "워크벤치를 아직 준비 중입니다 — 준비되면 창이 열립니다"
+          }
+        }
+      }
+    },
+    "The workbench was created, but the task could not be handed to it: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The workbench was created, but the task could not be handed to it: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치는 만들었지만 업무를 넘기지 못했어요: %@"
           }
         }
       }

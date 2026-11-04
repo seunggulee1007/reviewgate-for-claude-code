@@ -30,6 +30,10 @@ public enum AppSettings {
         public static let recentProjects = "recentProjects"
         /// Managed folder for workbench worktrees (M10); empty → `defaultWorktreeRoot`.
         public static let worktreeRoot = "worktreeRoot"
+        /// §49 "Run as Task" (Bool, default true): the composer's and the Workbenches menu's entry.
+        public static let runAsTaskEnabled = "runAsTaskEnabled"
+        /// §49: the branch prefix "Run as Task" suggests (the one used last; `TaskBranchName.defaultPrefix` until then).
+        public static let taskBranchPrefix = "taskBranchPrefix"
         /// JSON `SessionCapabilities` of the last `session_info`; pre-populates the palette before the first turn.
         public static let cachedCapabilities = "cachedCapabilities"
         /// M12: the commit sheet's "Push to origin" default (Bool, default false).

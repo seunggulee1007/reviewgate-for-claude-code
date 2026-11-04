@@ -114,6 +114,19 @@ final class WindowModel {
     // MARK: wave3 mac-flow
     /// §36.14: the PR the New Workbench sheet checks out ("Open as workbench"); the sheet clears it when it closes.
     var newWorkbenchFromPr: PRWorkbenchRequest?
+    // MARK: §49 Run as Task
+    /// The New Workbench sheet runs as "Run as Task" with this text (the composer's draft, "" from the menu); nil = a plain
+    /// workbench. The sheet clears it when it closes.
+    var newWorkbenchTask: String?
+    /// A task taken from the composer started in its workbench: the composer empties its draft if it still holds that text.
+    var startedTaskText: String?
+    var startedTaskTick = 0
+
+    /// §49: opens the New Workbench sheet as "Run as Task" with `text`.
+    func runAsTask(_ text: String) {
+        newWorkbenchTask = text
+        showNewWorkbench = true
+    }
     /// Text for the composer (`insertIntoComposer`: PR comments §36.14, an agent's report §36.1) — the chat takes it on
     /// `composerDraftTick`, or when it appears (the PR tab has no chat).
     var composerDraft: String?

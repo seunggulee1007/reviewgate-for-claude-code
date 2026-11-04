@@ -218,6 +218,8 @@ public final class AppState {
     public internal(set) var isLoadingPermissionRules = false
     /// §2.8: the terminal's default mode, offered once when a project is opened ("터미널처럼 auto 모드로 시작할까요?").
     public internal(set) var defaultModeOffer: PermissionMode?
+    /// §49: a task handed to this worktree that the session could not take — the chat puts it into the composer (once per id).
+    public internal(set) var taskForComposer: TaskComposerText?
     /// The UserDefaults this window's settings live in (the extensions in other files cannot see `defaults`).
     var permsDefaults: UserDefaults { defaults }
     public internal(set) var selectedDiff: FileDiff?
@@ -1117,7 +1119,7 @@ public final class AppState {
     }
 
     /// Stores the mode for the open project (and as the last mode used anywhere, which seeds `hello`).
-    private func rememberPermissionMode(_ mode: PermissionMode) {
+    func rememberPermissionMode(_ mode: PermissionMode) {
         AppSettings.setPermissionMode(mode, root: projectURL.map(AppSettings.projectKey), defaults: defaults)
     }
 
@@ -2108,6 +2110,8 @@ public final class AppState {
         case let .planApprovedInto(info):
             if info.target == nil { rememberPermissionMode(info.mode) }   // the chat that implements takes the mode
             applyPlanApproved(info)
+        case let .taskStarted(info):   // §49
+            applyTaskStarted(info)
         case let .attachment(_, hash, _, dataBase64):
             if let data = Data(base64Encoded: dataBase64, options: .ignoreUnknownCharacters), !hash.isEmpty { attachmentData[hash] = data }
         case .activity, .ready, .result, .fileDiff, .fullFileContent, .prCreated, .committed, .toolOutput, .reviewHistory, .historyDiff,

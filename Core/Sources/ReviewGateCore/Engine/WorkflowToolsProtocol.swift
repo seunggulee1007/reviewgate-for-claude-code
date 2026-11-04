@@ -103,22 +103,36 @@ public struct WorkbenchFromPr: Codable, Sendable, Hashable {
     }
 }
 
+/// §49 `workbench_create.task`: the first message of the new workbench's fresh chat, in `mode` (nil: its default).
+public struct WorkbenchTask: Codable, Sendable, Hashable {
+    public var text: String
+    public var mode: PermissionMode?
+
+    public init(text: String, mode: PermissionMode? = nil) {
+        self.text = text
+        self.mode = mode
+    }
+}
+
 /// The §36.12 / §36.14 fields of `workbench_create`; nil = the engine's default (`fetch` = `fetchBase`, `setup` = true,
-/// `location` = the setting's).
+/// `location` = the setting's). §49 `task`.
 public struct WorkbenchCreateOptions: Encodable, Sendable, Equatable {
     public var fetch: Bool?
     public var setup: Bool?
     public var location: WorkbenchLocation?
     public var fromPr: WorkbenchFromPr?
+    public var task: WorkbenchTask?
 
-    public init(fetch: Bool? = nil, setup: Bool? = nil, location: WorkbenchLocation? = nil, fromPr: WorkbenchFromPr? = nil) {
+    public init(fetch: Bool? = nil, setup: Bool? = nil, location: WorkbenchLocation? = nil, fromPr: WorkbenchFromPr? = nil,
+                task: WorkbenchTask? = nil) {
         self.fetch = fetch
         self.setup = setup
         self.location = location
         self.fromPr = fromPr
+        self.task = task
     }
 
-    private enum CodingKeys: String, CodingKey { case fetch, setup, location, fromPr }
+    private enum CodingKeys: String, CodingKey { case fetch, setup, location, fromPr, task }
 
     /// Next to the command's own fields (same keyed container of the envelope).
     public func encode(to encoder: Encoder) throws {
@@ -127,6 +141,7 @@ public struct WorkbenchCreateOptions: Encodable, Sendable, Equatable {
         try c.encodeIfPresent(setup, forKey: .setup)
         try c.encodeIfPresent(location, forKey: .location)
         try c.encodeIfPresent(fromPr, forKey: .fromPr)
+        try c.encodeIfPresent(task, forKey: .task)
     }
 }
 

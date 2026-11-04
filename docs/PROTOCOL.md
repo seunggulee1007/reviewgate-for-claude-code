@@ -6088,3 +6088,71 @@ download whose identifier differs from the running app's, so a build with an old
 - Owner: app-update (Core `Session/AppUpdate.swift`, `Session/AppUpdateInstall.swift`; App `UI/AppUpdateViews.swift`,
   `ReviewGateApp.swift`, `UI/MainWindow.swift`, `UI/Settings/SettingsView.swift`; `scripts/release.sh`, `Makefile`).
   Tests: `Core/Tests/ReviewGateCoreTests/AppUpdateTests.swift`.
+
+## 49. Run as Task, and a chat column that fits a short window
+
+The user works task by task (a tracker's task: a link or a key), each on a branch of its own. Asking for one in an open
+chat made that chat create the worktree and branch itself and do the work there: the conversation filled up with an
+unrelated task, and the review followed it around (§39.4). "Run as Task" starts the task where it belongs from the first
+message: a new workbench (§36.12) whose window sends the task as the first message of a fresh chat. The chat it was typed
+in sends nothing and keeps its context.
+
+```ts
+// command: workbench_create + task?: { text: string; mode?: PermissionMode }   // §36.12 / §36.14 fields as before
+// event:   task_started { text: string; mode: PermissionMode; from: string; sent: boolean }   // in the new worktree's engine
+// const:   MAX_TASK_TEXT = 100_000 (characters)
+```
+
+- **Create** (`workbench_create {task}`). The task is checked before anything else, and nothing is created when it is
+  refused: `invalid_task` for an empty text (whitespace only) or one over `MAX_TASK_TEXT`, `invalid_mode` for a mode
+  that is not one of the four. Once the worktree exists (before the setup of §36.12), the engine writes
+  `<new worktree's git dir>/reviewgate/task-handoff.json` (`{version: 1, from: {path, name}, text, mode?, at}`). If that
+  write fails, the create is refused with `task_handoff_failed:<why>` (code `task_handoff_failed`). The worktree stays
+  and the workbench list is refreshed, and the client keeps the text. Nothing is sent from the creating chat.
+- **Take** (`open_project` in the new worktree). The engine takes the handoff once and deletes it on read. A handoff
+  that is malformed, has an empty text, has an unknown mode, or is more than 15 minutes old (or that far in the future)
+  is ignored. A chat moved there (§39.4) or a plan handed there (§42.1) comes first, and the task's file stays for the
+  next open. Otherwise a fresh chat becomes current, and the session starts in the task's `mode` (absent: the worktree's
+  usual mode, `settings.permissionMode` or its stored one). Once the session runs, the task's text is sent as a normal
+  `send` through the gate, and `task_started {text, mode, from, sent: true}` is emitted. When the session cannot take a
+  message, nothing is sent: `task_started {…, sent: false}` hands the text back, and the client puts it into the
+  composer.
+- **Mac.** Settings › Workbenches › "업무로 실행" (`runAsTaskEnabled`, on by default) shows the entry in two places: a
+  button in the composer's tools (next to 📎 and @), which takes the draft and its @ mentions as `@path` (images stay in
+  this composer), and Workbenches › "업무로 실행…" (also in the sidebar's workbench section), which starts with an empty
+  task. Both open the New Workbench sheet as "업무로 실행". It has the task (an editor) and the mode of the fresh chat
+  (this chat's mode at first), then branch, base, folder and setup as before. The branch is suggested from the task until
+  the user types one (`TaskBranchName.suggest`): a link's last path number (`…/tasks/3901234567` → `task/3901234567`),
+  `#project/123` → `task/project-123`, `ABC-123`, `#123`, else up to five ASCII words of the first line, else the date
+  and time. The prefix is the one the last task branch used (`taskBranchPrefix`, `task/` at first), cleaned so the
+  name stays valid. After a create, the new window opens. The composer empties its draft if it still holds the text it
+  handed over. `task_started` remembers the mode for the new workbench. With `sent: false`, the text goes into that
+  window's composer (`AppState.taskForComposer`, taken once).
+- **Electron.** The same entry points, setting, dialog fields and fallback.
+
+### 49.2 The chat column in a short window
+
+A new workbench's window, a short screen, or a card above the composer that appears (the "터미널처럼 자동 모드로
+시작할까요?" offer of §2.8, a plan, the peer inbox) pushed the HUD and the composer below the window's edge. The chat
+column is now laid out bottom up (`ChatColumnLayout`):
+
+- The composer and the HUD keep their own height at the bottom.
+- The cards above the composer get theirs while the transcript keeps 80 pt. They never get less than 60% of what is left
+  (`ChatColumnSplit`), and they scroll when it is not enough.
+- The transcript takes the rest, down to nothing.
+- The tab strip stays on top.
+
+The column's minimum height is the tab strip, the HUD and the composer. Nothing above the composer can push it out of the
+window. The mode offer's explanation is two lines at most (the whole text in its tooltip).
+
+- **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the
+  first message sent in the task's mode, `task_started` sent: true, the file gone, a second open plain), no mode (the
+  default), a session that cannot start (`sent: false`, nothing sent), refusals before anything is created, and
+  `takeTaskHandoff` on malformed, stale, future, empty and wrong-mode files. Core `RunAsTaskTests`: the task on the wire
+  only when set, `task_started` with odd values, the composer fallback taken once, branch suggestions and prefixes, and
+  the column's split.
+- Owner: run-as-task (engine `review/taskHandoff.ts`, `engine.ts` `workbenchCreate` / `loadSessions` /
+  `afterTaskReceived`, `protocol.ts`; Core `Session/AppState+Task.swift`, `Engine/WorkflowToolsProtocol.swift`; App
+  `UI/Sidebar/WorkbenchSheets.swift`, `UI/Chat/ChatComposer.swift`, `UI/Chat/ChatView.swift`,
+  `UI/Chat/DefaultModeOfferBanner.swift`, `UI/Settings/SettingsView.swift`, `UI/MenuCommands.swift`, `UI/MainWindow.swift`,
+  `WorkbenchRegistry.swift`).

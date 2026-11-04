@@ -212,6 +212,7 @@ struct ChatComposer: View {
     @State private var confirmAcceptAndSend = false
     /// ↩ sends, ⇧↩ is a new line (Settings › General); off: ↩ is a new line and ⌘↩ sends.
     @AppStorage(AppSettings.Key.returnSends) private var returnSends = true
+    @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -417,6 +418,22 @@ struct ChatComposer: View {
         // wave3 mac-flow (§36.14): "Send to Claude" from the PR tab — also when the chat was not on screen yet.
         .onChange(of: model.composerDraftTick) { _, _ in composer.takeComposerDraft(model) }
         .onAppear { composer.takeComposerDraft(model) }
+        // MARK: §49 Run as Task — the task started in its workbench: its text leaves this composer (unless edited since);
+        // a task handed here that the session could not take comes into it.
+        .onChange(of: model.startedTaskTick) { _, _ in
+            guard let started = model.startedTaskText else { return }
+            model.startedTaskText = nil
+            if Self.taskText(draft: composer.draft, mentions: composer.mentions) == started {
+                composer.draft = ""
+                composer.mentions = []
+                composer.closePalette()
+            }
+        }
+        .onChange(of: store.taskForComposer?.id, initial: true) { _, _ in
+            guard let handed = store.taskForComposer else { return }
+            store.takeTaskForComposer(handed.id)
+            model.insertIntoComposer(handed.text)
+        }
         // MARK: wave4 w4-safety — polish-12: each chat tab keeps its own draft (text, mentions, images).
         .onChange(of: store.draftChatId) { previous, current in
             guard let previous, let current, previous != current else { return }
@@ -626,7 +643,15 @@ struct ChatComposer: View {
         .accessibilityIdentifier("Composer box")
     }
 
-    /// Attach (images) and @ (opens the mention popover at the caret).
+    /// §49: what "Run as Task" takes from the composer — the draft, then its @ mentions (images stay here).
+    static func taskText(draft: String, mentions: [String]) -> String {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !mentions.isEmpty else { return text }
+        let tags = mentions.map { "@\($0)" }.joined(separator: " ")
+        return text.isEmpty ? tags : text + "\n\n" + tags
+    }
+
+    /// Attach (images), @ (opens the mention popover at the caret) and §49 Run as Task.
     private var composerTools: some View {
         HStack(spacing: 2) {
             Button {
@@ -648,6 +673,17 @@ struct ChatComposer: View {
             .help("Mention a file or folder (@) — or drag files from Changes or Finder here")
             .accessibilityLabel("Mention a file")
             .accessibilityIdentifier("Mention a file")
+            if runAsTaskEnabled {   // §49
+                Button {
+                    model.runAsTask(Self.taskText(draft: composer.draft, mentions: composer.mentions))
+                } label: {
+                    Image(systemName: "arrow.triangle.branch")
+                }
+                .disabled(store.projectInfo == nil || store.viewingChat != nil)
+                .help("Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is")
+                .accessibilityLabel("Run as Task")
+                .accessibilityIdentifier("Run as Task")
+            }
         }
         .buttonStyle(IconButtonStyle(padding: 2))   // `.borderless` left an 11 pt target
         .foregroundStyle(.secondary)

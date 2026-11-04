@@ -2759,6 +2759,8 @@ public enum EngineEvent: Sendable, Equatable {
     // MARK: wave4d w4d-plan
     /// §42.1: `plan_approved` with `into` — the fresh chat, the plan handed to a workbench, or received from one.
     case planApprovedInto(PlanApprovedInfo)
+    /// §49: a task handed to this worktree by another window was sent (or comes back for the composer).
+    case taskStarted(TaskStartedInfo)
     case error(message: String, fatal: Bool, scope: ErrorScope, detail: EngineErrorDetail = EngineErrorDetail())
     case log(level: LogLevel, message: String)
 
@@ -2986,6 +2988,8 @@ extension EngineEvent: Decodable {
             self = .historyCleanup(try HistoryCleanupReply(from: decoder))
         case "chat_moved":   // wave4b w4b-follow (§39.4)
             self = .chatMoved(try ChatMovedEvent(from: decoder))
+        case "task_started":   // §49
+            self = .taskStarted(try TaskStartedInfo(from: decoder))
         case "commit_format":   // wave4c w4c-commit (§41.1)
             self = .commitFormat(try CommitFormatReply(from: decoder))
         case "pr_draft":

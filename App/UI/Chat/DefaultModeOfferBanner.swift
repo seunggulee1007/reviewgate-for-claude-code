@@ -17,9 +17,11 @@ struct DefaultModeOfferBanner: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Start in \(mode.displayName) mode like the terminal?")
                             .font(.callout.weight(.semibold))
+                        // §49.2: two lines at most (the whole text in the tooltip) — the card sits right above the composer.
                         Text("Claude Code starts in this mode in your terminal (permissions.defaultMode): \(mode.helpText)")
                             .font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(2)
+                            .help(String(localized: "Claude Code starts in this mode in your terminal (permissions.defaultMode): \(mode.helpText)"))
                     }
                     Spacer(minLength: 8)
                     Button("No") { store.declineDefaultModeOffer() }

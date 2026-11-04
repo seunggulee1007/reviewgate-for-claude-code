@@ -36,6 +36,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.autoAllowBash) private var autoAllowBash = false
     @AppStorage(AppSettings.Key.loadUserSettings) private var loadUserSettings = true
     @AppStorage(AppSettings.Key.worktreeRoot) private var worktreeRoot = ""
+    @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
     @AppStorage(AppSettings.Key.commitPushByDefault) private var commitPushByDefault = false
     @AppStorage(AppSettings.Key.commitTrailer) private var commitTrailer = ""
     @AppStorage(AppSettings.Key.autoRestartSession) private var autoRestartSession = true
@@ -178,6 +179,11 @@ private struct GeneralSettingsView: View {
                 TextField("Worktree folder", text: $worktreeRoot, prompt: Text(verbatim: AppSettings.defaultWorktreeRoot))
                     .accessibilityIdentifier("Worktree folder")
                 Text("New workbenches are created under this folder as <repo>-<hash>/<branch>. Never inside the repository.")
+                    .font(.caption).foregroundStyle(.secondary)
+                // §49
+                Toggle("Run as Task", isOn: $runAsTaskEnabled)
+                    .accessibilityIdentifier("Run as Task enabled")
+                Text("Adds \"Run as Task\" to the composer and the Workbenches menu: the message starts in a new workbench (its own branch, folder, window and chat), so this chat is left as it is.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Commit") {

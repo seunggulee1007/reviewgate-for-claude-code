@@ -142,6 +142,7 @@ struct ReviewCommands: Commands {
 struct WorkbenchCommands: Commands {
     let focused: WorkbenchWindowEntry?
     let openWindow: OpenWindowAction
+    @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
 
     var body: some Commands {
         CommandMenu("Workbenches") {
@@ -150,6 +151,11 @@ struct WorkbenchCommands: Commands {
             Button("New Workbench…") { focused?.model.showNewWorkbench = true }
                 .disabled(!menu.hasProject)
                 .accessibilityIdentifier("Workbenches menu New Workbench…")
+            if runAsTaskEnabled {   // §49
+                Button("Run as Task…") { focused?.model.runAsTask("") }
+                    .disabled(!menu.hasProject)
+                    .accessibilityIdentifier("Workbenches menu Run as Task…")
+            }
             Button("Refresh") { if let store { Task { await store.refreshWorkbenches() } } }
                 .disabled(!menu.hasProject)
             Divider()

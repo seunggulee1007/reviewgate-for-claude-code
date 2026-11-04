@@ -65,6 +65,7 @@ struct MainWindow: View {
     // MARK: wave4 w4-install
     /// Bumped when the switcher removes a recent, so the menu re-reads the list.
     @State private var recentsTick = 0
+    @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
 
     var body: some View {
         @Bindable var model = model
@@ -92,7 +93,7 @@ struct MainWindow: View {
             // wave1 mac-review — §31–32: reverting changes from outside the app, the stale-review sheet, Finish review.
             .modifier(ReviewProvenanceModals())
             .modifier(SessionToolsModals())   // wave3 mac-session (§36.9): CLI 세션 가져오기
-            .sheet(isPresented: $model.showNewWorkbench, onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil }) {
+            .sheet(isPresented: $model.showNewWorkbench, onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil }) {
                 NewWorkbenchSheet(initialBranch: model.newWorkbenchBranch ?? "") { url in workbenchCreated(url) }   // wave4d w4d-plan
             }
             .sheet(isPresented: $showCreatePR) {
@@ -564,6 +565,11 @@ struct MainWindow: View {
             Button("New Workbench…") { model.showNewWorkbench = true }
                 .disabled(store.projectInfo == nil)
                 .accessibilityIdentifier("New Workbench…")
+            if runAsTaskEnabled {   // §49
+                Button("Run as Task…") { model.runAsTask("") }
+                    .disabled(store.projectInfo == nil)
+                    .accessibilityIdentifier("Run as Task…")
+            }
             Button("Prune") { Task { await store.pruneWorkbenches() } }
                 .disabled(store.projectInfo == nil)
                 .accessibilityIdentifier("Prune workbenches")

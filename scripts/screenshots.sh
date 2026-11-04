@@ -20,6 +20,7 @@
 #   DEMO_DIR       the demo project (default /Users/Shared/acme-shop; not under /tmp, where the app shows a banner)
 #   SHOTS_PROMPT   the prompt (default: the tour's own)       SHOTS_MODEL    default haiku
 #   SHOTS_WIDTH    image width in pixels (default 1600)        SHOTS_TIMEOUT  seconds for the tour (default 600)
+#   SHOTS_LAYOUT   1: no turn — the chat column in short windows and the "Run as Task" sheet, PNGs left in SHOTS_DIR/raw
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -304,7 +305,7 @@ env -i HOME="$HOME" USER="$USER" LOGNAME="${LOGNAME:-$USER}" SHELL="${SHELL:-/bi
   open -n -W -a "$APP" --stdout "$SHOTS_DIR/app.log" --stderr "$SHOTS_DIR/app.log" \
   --env LANG=en_US.UTF-8 --env "REVIEWGATE_PROJECT=$DEMO_DIR" --env "REVIEWGATE_DATA_DIR=$DATA" \
   --env "REVIEWGATE_SCREENSHOT_TOUR=$RAW" --env "REVIEWGATE_SCREENSHOT_PROMPT=${SHOTS_PROMPT:-}" \
-  --env "REVIEWGATE_SCREENSHOT_MODEL=${SHOTS_MODEL:-}" \
+  --env "REVIEWGATE_SCREENSHOT_MODEL=${SHOTS_MODEL:-}" --env "REVIEWGATE_SCREENSHOT_LAYOUT=${SHOTS_LAYOUT:-}" \
   --args -AppleLanguages "(en)" -AppleLocale en_US -ApplePersistenceIgnoreState YES &
 OPEN_PID=$!
 waited=0
@@ -319,6 +320,11 @@ done
 OPEN_PID=""
 [ ! -f "$RAW/tour-failed.txt" ] || die "the tour failed: $(cat "$RAW/tour-failed.txt") (log: $RAW/tour.log)"
 ls "$RAW"/*.png >/dev/null 2>&1 || die "the tour wrote no images (log: $RAW/tour.log)"
+
+if [ "${SHOTS_LAYOUT:-}" = 1 ]; then   # the layout check: its PNGs stay in the scratch folder, never in docs/images
+  say "layout shots: $(ls "$RAW"/*.png | tr '\n' ' ')"
+  exit 0
+fi
 
 # --- docs/images ------------------------------------------------------------------------------------------------------
 

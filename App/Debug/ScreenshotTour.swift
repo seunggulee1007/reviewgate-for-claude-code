@@ -58,6 +58,10 @@ private final class Tour {
     }
 
     func run() async {
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "1" {
+            do { try await layoutShots(); finish(nil) } catch { finish(error) }
+            return
+        }
         do {
             try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
             try place()
@@ -168,6 +172,34 @@ private final class Tour {
             try write(try render(window), "agents-\(appearance.rawValue)")
         }
         UserDefaults.standard.set(false, forKey: AgentPanel.storageKey)
+    }
+
+    /// §49.2 (`SHOTS_LAYOUT=1`): no turn — the chat column in short windows with the mode offer card up, and the
+    /// "Run as Task" sheet. `layout-<w>x<h>.png`, `run-as-task.png`.
+    private func layoutShots() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        store.debugShowDefaultModeOffer(.auto)
+        for size in [NSSize(width: 1100, height: 752), NSSize(width: 1100, height: 640), NSSize(width: 1100, height: 572)] {
+            window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
+            try await Task.sleep(for: .milliseconds(1200))
+            log("frame \(NSStringFromRect(window.frame)), min \(NSStringFromSize(window.minSize))")
+            try write(try render(window), "layout-\(Int(size.width))x\(Int(size.height))")
+        }
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1100, height: 752)), display: true)
+        entry.model.runAsTask("Do the task at https://tasks.example.com/project/tasks/4821 — fix the cart total")
+        try await Task.sleep(for: .milliseconds(1500))
+        guard let sheet = window.attachedSheet, let frame = sheet.contentView?.superview else { throw TourError("no Run as Task sheet") }
+        frame.layoutSubtreeIfNeeded()
+        guard let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { throw TourError("no bitmap") }
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        try write(rep, "run-as-task")
+        entry.model.showNewWorkbench = false
     }
 
     /// The chat's scroll view, found before the agent panel adds scroll views of its own.

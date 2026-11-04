@@ -14,21 +14,33 @@ struct ChatView: View {
     @State private var actions = ChatActions()
 
     var body: some View {
-        VStack(spacing: 0) {
-            ChatHeader()
-            Divider()
+        // §49.2: a short window (a new workbench's, or one with the mode offer up) never pushes the HUD or the composer out
+        // of sight — the transcript gives way first, then the cards above the composer scroll.
+        ChatColumnLayout {
+            VStack(spacing: 0) {
+                ChatHeader()
+                Divider()
+            }
             TranscriptPane(view: transcript, composer: composer)
                 .overlay(alignment: .bottomLeading) { ComposerPalettes(composer: composer) }
                 .overlay(alignment: .top) { PermissionToast() }   // wave1 mac-perms: "이미 처리된 권한 요청입니다"
-            Divider()
-            HUDStrip()
-            Divider()
-            ChatPlanSlot(composer: composer)
-            DefaultModeOfferBanner()   // wave1 mac-perms: "터미널처럼 auto 모드로 시작할까요?" (§2.8)
-            ChatPeerInboxSlot()   // §2.7: the inbox card sits right above the composer
-            ChatMoveBar()   // wave4b w4b-follow (§39.4): "옮김 → <worktree>" / why a move was refused
+            VStack(spacing: 0) {
+                Divider()
+                HUDStrip()
+                Divider()
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    ChatPlanSlot(composer: composer)
+                    DefaultModeOfferBanner()   // wave1 mac-perms: "터미널처럼 auto 모드로 시작할까요?" (§2.8)
+                    ChatPeerInboxSlot()   // §2.7: the inbox card sits right above the composer
+                    ChatMoveBar()   // wave4b w4b-follow (§39.4): "옮김 → <worktree>" / why a move was refused
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
             ChatComposer(composer: composer, transcript: transcript)
         }
+        .clipped()
         .environment(transcript)
         .environment(\.chatActions, actions)
         .onAppear { actions.attach(store: store, window: model, composer: composer, transcript: transcript, openWindow: openWindow) }
@@ -105,5 +117,53 @@ private struct ChatPeerInboxSlot: View {
             PeerInboxCard()
                 .padding(.horizontal, 12).padding(.top, 10)
         }
+    }
+}
+
+/// §49.2: the chat column, bottom up — the composer and the HUD at their own height, the cards above the composer (plan,
+/// mode offer, peer inbox, move bar) at theirs as long as the transcript keeps `minTranscript` (else they scroll), the
+/// transcript the rest, down to nothing; the header on top. Its minimum height is header + HUD + composer, so a short window
+/// (or a card that appears) never pushes the composer below the window's edge. Subviews: header, transcript, HUD, cards,
+/// composer — in that order.
+struct ChatColumnLayout: Layout {
+    struct Heights: Equatable {
+        var header: CGFloat = 0
+        var hud: CGFloat = 0
+        var cards: CGFloat = 0
+        var composer: CGFloat = 0
+        var fixed: CGFloat { header + hud + composer }
+    }
+
+    /// Each part's own height at `width` (the transcript has none: it takes what is left).
+    static func heights(width: CGFloat, subviews: Subviews) -> Heights {
+        guard subviews.count == 5 else { return Heights() }
+        let p = ProposedViewSize(width: width, height: nil)
+        return Heights(header: subviews[0].sizeThatFits(p).height, hud: subviews[2].sizeThatFits(p).height,
+                       cards: subviews[3].sizeThatFits(p).height, composer: subviews[4].sizeThatFits(p).height)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let h = Self.heights(width: width, subviews: subviews)
+        guard let height = proposal.height else { return CGSize(width: width, height: h.fixed + h.cards + ChatColumnSplit.minTranscript) }
+        return CGSize(width: width, height: height.isFinite ? max(height, h.fixed) : height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 5 else { return }
+        let w = bounds.width
+        let h = Self.heights(width: w, subviews: subviews)
+        let (transcript, cards) = ChatColumnSplit.split(room: bounds.height - h.fixed, cards: h.cards)
+        func place(_ index: Int, y: CGFloat, height: CGFloat) {
+            subviews[index].place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: w, height: height))
+        }
+        let composerY = bounds.maxY - h.composer
+        let cardsY = composerY - cards
+        let hudY = cardsY - h.hud
+        place(4, y: composerY, height: h.composer)
+        place(3, y: cardsY, height: cards)
+        place(2, y: hudY, height: h.hud)
+        place(1, y: bounds.minY + h.header, height: transcript)
+        place(0, y: bounds.minY, height: h.header)
     }
 }

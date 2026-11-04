@@ -43,6 +43,8 @@ func workbenchRefusalText(_ code: String) -> String {
     case "detached_head": return String(localized: "Check out a branch first (HEAD is detached).")
     case "unsupported_remote": return String(localized: "The origin remote is not a GitHub URL: \(detail)")
     case "fetch_failed": return FlowText.refusal(code: "fetch_failed", detail: detail) ?? code   // wave3 mac-flow (§36.12)
+    case "invalid_task": return String(localized: "Describe the task first (at most 100,000 characters).")   // §49
+    case "task_handoff_failed": return String(localized: "The workbench was created, but the task could not be handed to it: \(detail)")
     default: return EngineMessages.refusal(error: code)
     }
 }
@@ -75,9 +77,22 @@ struct NewWorkbenchSheet: View {
     @State private var showSteps = false
     /// Observed: an edit of the repository's setup ("편집…") asks for the preview again.
     @AppStorage(AppSettings.Key.projectWorkbenchSetup) private var setupsRaw = Data()
+    // MARK: §49 Run as Task — the task (taken from the window model when the sheet opens), its chat's mode, the branch
+    // suggested from it until the user types one.
+    @State private var runsTask = false
+    @State private var task = ""
+    /// The text the composer handed over: the composer empties its draft once the task started.
+    @State private var handedTask = ""
+    @State private var taskMode: PermissionMode = .default
+    @State private var branchTyped = false
+    @AppStorage(AppSettings.Key.taskBranchPrefix) private var taskPrefix = TaskBranchName.defaultPrefix
+    private var trimmedTask: String { task.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// An existing local branch is fine for a PR (the engine checks it out as it is).
-    private var hint: String? { branchNameHint(branch, existing: fromPr == nil ? store.branches : []) }
+    /// An existing local branch is fine for a PR (the engine checks it out as it is). §49: a task needs its text.
+    private var hint: String? {
+        if runsTask, trimmedTask.isEmpty { return String(localized: "Describe the task") }
+        return branchNameHint(branch, existing: fromPr == nil ? store.branches : [])
+    }
     private var trimmedBranch: String { branch.trimmingCharacters(in: .whitespaces) }
     private var supportsSetup: Bool { store.supportsWorkbenchSetup }
     private var isRemoteBase: Bool { fromPr == nil && store.remoteBranches.contains { $0.name == base } }
@@ -99,7 +114,11 @@ struct NewWorkbenchSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            TextField("Branch name", text: $branch)
+            if runsTask {
+                taskFields
+                Text("Branch name").font(.subheadline.weight(.semibold))   // filled in already: the field shows no placeholder
+            }
+            TextField("Branch name", text: Binding(get: { branch }, set: { branch = $0; branchTyped = true }))
                 .textFieldStyle(.roundedBorder)
                 .font(.body.monospaced())
                 .disabled(creating)
@@ -153,6 +172,10 @@ struct NewWorkbenchSheet: View {
             } else if let fromPr {
                 Text("Checks out PR #\(fromPr.number)'s head into a new worktree.")
                     .font(.caption).foregroundStyle(.secondary)
+            } else if runsTask {
+                Text("Branches from \(base.isEmpty ? "HEAD" : base) into a new worktree; its window sends the task in a fresh chat.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Branches from \(base.isEmpty ? "HEAD" : base) into a new worktree.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -164,7 +187,7 @@ struct NewWorkbenchSheet: View {
                 Button(creating ? LocalizedStringKey("Close") : LocalizedStringKey("Cancel"), role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .help(creating ? String(localized: "The workbench is still being prepared; its window opens when it is ready") : "")
-                Button(fromPr == nil ? LocalizedStringKey("Create workbench") : LocalizedStringKey("Open as workbench"), action: create)
+                Button(createTitle, action: create)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(hint != nil || creating)
@@ -174,6 +197,14 @@ struct NewWorkbenchSheet: View {
         .padding(20)
         .frame(width: 500)
         .onAppear {
+            // §49: "Run as Task" — the composer's text (or none from the menu), this chat's mode.
+            if let text = model.newWorkbenchTask {
+                runsTask = true
+                task = text
+                handedTask = text
+                taskMode = store.permissionMode
+                if branch.isEmpty, initialBranch.isEmpty { branch = TaskBranchName.suggest(text: text, prefix: taskPrefix) }
+            }
             // wave3 mac-flow: a PR from the PR tab, the repository's setup defaults.
             if let request = model.newWorkbenchFromPr {
                 fromPr = request
@@ -198,12 +229,52 @@ struct NewWorkbenchSheet: View {
         .onChange(of: setupsRaw) { _, _ in
             if supportsSetup, hint == nil { store.flow.requestPreview(previewRequest) }
         }
-        .onDisappear { model.newWorkbenchFromPr = nil }
+        .onChange(of: task) { _, text in
+            if runsTask, !branchTyped { branch = TaskBranchName.suggest(text: text, prefix: taskPrefix) }
+        }
+        .onDisappear { model.newWorkbenchFromPr = nil; model.newWorkbenchTask = nil }
+    }
+
+    private var createTitle: LocalizedStringKey {
+        if runsTask { return "Run as Task" }
+        return fromPr == nil ? "Create workbench" : "Open as workbench"
+    }
+
+    /// §49: the task — the first message of the new workbench's fresh chat — and the mode that chat starts in.
+    @ViewBuilder
+    private var taskFields: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Task").font(.subheadline.weight(.semibold))
+            TextEditor(text: $task)
+                .font(.body)
+                .frame(minHeight: 72, maxHeight: 160)
+                .scrollContentBackground(.hidden)
+                .padding(4)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+                .disabled(creating)
+                .accessibilityIdentifier("Run as Task text")
+            Text("A task link, a key such as ABC-123, or what to do — sent as the first message there.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        Picker("Mode", selection: $taskMode) {
+            ForEach(PermissionMode.allCases) { mode in
+                Text(verbatim: "\(mode.displayName) — \(mode.helpText)").tag(mode)
+            }
+        }
+        .disabled(creating)
+        .accessibilityIdentifier("Run as Task mode")
     }
 
     @ViewBuilder
     private var header: some View {
-        if let fromPr {
+        if runsTask {
+            Text("Run as Task").font(.headline)
+            Text("Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let fromPr {
             Text("Open PR #\(fromPr.number) as a workbench").font(.headline)
             Text(verbatim: fromPr.title)
                 .font(.callout)
@@ -264,14 +335,23 @@ struct NewWorkbenchSheet: View {
             fetch: supportsSetup && isRemoteBase ? fetch : nil,
             setup: supportsSetup ? runSetup : nil,
             location: supportsSetup ? location : nil,
-            fromPr: fromPr.map { WorkbenchFromPr(number: $0.number, headRef: $0.headRef) })
+            fromPr: fromPr.map { WorkbenchFromPr(number: $0.number, headRef: $0.headRef) },
+            task: runsTask ? WorkbenchTask(text: task, mode: taskMode) : nil)   // §49
         let from = baseRef
+        let started = runsTask ? handedTask : nil
         Task {
             let url = await store.createWorkbench(branch: name, from: from, options: options)
             creating = false
             if let url {
                 // A failed setup does not fail the create: the new window opens and shows the log.
                 if store.flow.setupFailed { WorkbenchSetupReports.shared.record(path: url.path, progress: store.flow.progress) }
+                if let started {   // §49: the next suggestion starts the way this branch did; the composer lets the text go
+                    taskPrefix = TaskBranchName.prefix(of: name)
+                    if !started.isEmpty {
+                        model.startedTaskText = started
+                        model.startedTaskTick &+= 1
+                    }
+                }
                 dismiss()
                 onCreated(url)
             } else {
