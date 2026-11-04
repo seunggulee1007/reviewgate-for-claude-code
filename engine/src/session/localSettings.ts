@@ -16,7 +16,7 @@ import { LOCAL_SETTINGS } from "../git/mods.js";
 /** A hook command shown in `notApplied.hooks` is cut to this many chars. */
 export const NOT_APPLIED_COMMAND_MAX = 200;
 /** `~/.claude.json` can be megabytes: read once per (mtime, size). */
-let claudeJsonCache: { path: string; mtimeMs: number; size: number; projects: Record<string, unknown> | null } | null = null;
+let claudeJsonCache: { path: string; mtimeMs: number; size: number; projects: Record<string, unknown> | null; chromeByDefault: boolean } | null = null;
 
 export function localSettingsPath(root: string): string {
   return join(root, ...LOCAL_SETTINGS.split("/"));
@@ -65,17 +65,30 @@ export function claudeJsonPath(env: Record<string, string | undefined>): string 
   return dir && dir.trim() ? join(resolve(dir), ".claude.json") : join(homedir(), ".claude.json");
 }
 
-function claudeJsonProjects(path: string): Record<string, unknown> | null {
+function claudeJson(path: string): { projects: Record<string, unknown> | null; chromeByDefault: boolean } | null {
   let st: { mtimeMs: number; size: number };
   try {
     st = statSync(path);
   } catch {
     return null;
   }
-  if (claudeJsonCache && claudeJsonCache.path === path && claudeJsonCache.mtimeMs === st.mtimeMs && claudeJsonCache.size === st.size) return claudeJsonCache.projects;
-  const projects = obj(readJsonObject(path)?.projects);
-  claudeJsonCache = { path, mtimeMs: st.mtimeMs, size: st.size, projects };
-  return projects;
+  if (claudeJsonCache && claudeJsonCache.path === path && claudeJsonCache.mtimeMs === st.mtimeMs && claudeJsonCache.size === st.size) return claudeJsonCache;
+  const o = readJsonObject(path);
+  claudeJsonCache = { path, mtimeMs: st.mtimeMs, size: st.size, projects: obj(o?.projects), chromeByDefault: o?.claudeInChromeDefaultEnabled === true };
+  return claudeJsonCache;
+}
+
+function claudeJsonProjects(path: string): Record<string, unknown> | null {
+  return claudeJson(path)?.projects ?? null;
+}
+
+/**
+ * Claude Code's `/chrome` › "Enabled by default" (`claudeInChromeDefaultEnabled` in `.claude.json`): the terminal then
+ * starts with Claude in Chrome, a session the SDK starts does not — only `--chrome` connects `claude-in-chrome` (verified
+ * against CLI 2.1.317).
+ */
+export function chromeEnabledByDefault(env: Record<string, string | undefined>): boolean {
+  return claudeJson(claudeJsonPath(env))?.chromeByDefault === true;
 }
 
 /** Names of the local-scope MCP servers of the project (keyed by its path as given or symlink-resolved, and its root). */

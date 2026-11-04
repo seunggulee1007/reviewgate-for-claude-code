@@ -2968,6 +2968,12 @@ app says what it left out.
   of these.
 - `mcp_add` / `mcp_remove` take `scope: "local"` (`claude mcp add|remove --scope local`: `~/.claude.json`, this project
   only). `McpServerInfo.source: "local"` already exists.
+- Claude in Chrome: with user settings loaded, a session starts with `--chrome` when Claude Code's own `/chrome` ›
+  "Enabled by default" is on (`claudeInChromeDefaultEnabled` in the same `.claude.json`), as the terminal does. A session
+  the SDK starts ignores that setting, so without the flag `claude-in-chrome` never connects (verified against CLI
+  2.1.317 and 2.1.318). The server shows in `mcp_status` with scope `dynamic` (source `session`). Its tools are MCP tools,
+  so each call has its card. The exception is a tool that only reads and that one of the user's own allow rules covers
+  (§33.5). A session without user settings, such as the §16 fallback, starts without it.
 - Security: local `permissions.allow` rules are §33.5 rules of scope `local` — they apply only to tools that cannot change
   files, and the engine's PreToolUse hook decides before the CLI's rules — so they never skip a card the engine asks today,
   nor the review of an edit or a command. Local hooks run like user / project hooks (§16; `disableUserHooks` turns them off

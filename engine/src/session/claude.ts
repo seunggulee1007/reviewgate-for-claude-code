@@ -46,6 +46,7 @@ import { normalizeForCompare } from "../platform/paths.js";
 import { API_ERROR_MESSAGES, codeOfAssistantError, codeOfErrorText, codeOfStatus, firstLineOf, isoFromEpoch, type ApiErrorCode } from "./apiErrors.js";
 import { codeOfStartFailure, redactDetail, START_FAILURE_MESSAGES, type StartFailureCode } from "./cliRecords.js";
 import { extensionQueryOptions } from "./extensions.js";
+import { chromeEnabledByDefault } from "./localSettings.js";
 import { detectTestOutcome, keptOutput, PREVIEW_CHARS } from "./toolOutput.js";
 import { AGENT_REPORT_KEPT_CHARS, cleanAgentReport } from "./agentReport.js";
 import { toolLabel } from "./toolLabel.js"; // MARK: wave4b w4b-agents
@@ -444,6 +445,9 @@ export class ClaudeSession implements ClaudeSessionLike {
     // read-only tool, hooks.ts) and the engine shows them on the diff lines; an explicit value in the environment wins.
     env.CLAUDE_CODE_REPORT_FINDINGS ??= "1";
     const exe = resolveClaudeExecutable(this.opts.claudePath, this.opts.platform.isWindows);
+    // §36.6: Claude in Chrome as in the terminal — on when Claude Code's own "Enabled by default" is. Not without user
+    // settings: the §36.7 fallback starts bare, and the Chrome connection is one more thing that could hold the start.
+    if (loadUserSettings && chromeEnabledByDefault(env)) extraArgs.chrome = null;
 
     this.q = (this.opts.queryFn ?? query)({
       prompt: this.inbox,

@@ -102,7 +102,7 @@ describe("local allow rules (§36.6 + §33.5)", () => {
 
 type Wired = { options: Options; pre: (tool: string, input: Record<string, unknown>) => Promise<string | undefined>; canUse: CanUseTool; events: SessionEvent[]; dispose: () => Promise<void> };
 
-async function wire(root: string, loadLocalSettings: boolean): Promise<Wired> {
+async function wire(root: string, loadLocalSettings: boolean, opts: { env?: Record<string, string>; loadUserSettings?: boolean } = {}): Promise<Wired> {
   let options: Options | undefined;
   const events: SessionEvent[] = [];
   const queryFn = (args: { options?: Options }): Query => {
@@ -131,13 +131,13 @@ async function wire(root: string, loadLocalSettings: boolean): Promise<Wired> {
       budget: { maxFiles: 10, maxLines: 400 },
       ignorePatterns: [],
       autoAllowTools: [],
-      loadUserSettings: true,
+      loadUserSettings: opts.loadUserSettings ?? true,
       loadLocalSettings,
       systemPromptAppend: "",
       userRules: sessionUserRules(rules, true),
     },
     claudePath: "/nonexistent/claude",
-    env: {},
+    env: opts.env ?? {},
     platform: { killTree: async () => undefined, isWindows: false },
     emit: (e) => events.push(e),
     log: () => {},
@@ -161,6 +161,27 @@ async function wire(root: string, loadLocalSettings: boolean): Promise<Wired> {
   };
   return { options: options!, pre, canUse: options!.canUseTool!, events, dispose: () => s.dispose() };
 }
+
+describe("Claude in Chrome (§36.6)", () => {
+  it("--chrome when Claude Code's own \"Enabled by default\" is on, as in the terminal; not when it is off, nor without user settings", async () => {
+    const root = tmp("rg-chrome-root");
+    sh(root, "init", "-q");
+    const config = tmp("rg-chrome-config");
+    const env = { CLAUDE_CONFIG_DIR: config };
+    write(config, ".claude.json", JSON.stringify({ claudeInChromeDefaultEnabled: true }));
+    const on = await wire(root, false, { env });
+    const bare = await wire(root, false, { env, loadUserSettings: false });
+    write(config, ".claude.json", JSON.stringify({ claudeInChromeDefaultEnabled: false, projects: {} }));
+    const off = await wire(root, false, { env });
+    try {
+      expect(on.options.extraArgs).toEqual({ chrome: null });
+      expect(bare.options.extraArgs ?? {}).toEqual({});
+      expect(off.options.extraArgs ?? {}).toEqual({});
+    } finally {
+      for (const w of [on, bare, off]) await w.dispose();
+    }
+  });
+});
 
 describe("the gate stays with local settings loaded (§36.6 security)", () => {
   it("local permissions.allow never answers a card the engine asks today, nor skips the review of an edit or a command", async () => {
