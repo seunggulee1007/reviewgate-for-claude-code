@@ -6163,7 +6163,8 @@ In the terminal, a message typed while Claude works reaches Claude as soon as th
 turn. The app only offered "Add to queue" (sent after the turn) and "Stop and send". Verified with CLI 2.1.318 over
 stream-json: a user message written while a `sleep` runs gets `command_lifecycle` frames `queued` → `started` (right after
 the tool result, with its replay) → `completed`, all before the turn's single `result` (`num_turns` 2). The reply answers
-both messages. `priority` makes no difference here (`next` and none behave alike).
+both messages. The engine sends it with `priority: "next"`: without one the CLI's default (`next` or `later`) follows a
+feature flag of its own, and on this machine both folded alike.
 
 ```ts
 // command: steer { text: string; mentions?: string[] }      // refused steer_unavailable:<why> (code steer_unavailable)

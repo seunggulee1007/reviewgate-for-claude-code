@@ -341,6 +341,7 @@ describe("§50 a message put into the running turn (steerUser)", () => {
     await until(() => script.sent.length === 2, "the message put in");
     const steered = script.sent[1]!;
     expect(steered.message.content).toBe("Also check the README");
+    expect(steered.priority).toBe("next");
     expect(steered.uuid).not.toBe(first);
     script.push(lifecycle(steered.uuid!, "queued"));
     script.push(lifecycle(steered.uuid!, "started"));

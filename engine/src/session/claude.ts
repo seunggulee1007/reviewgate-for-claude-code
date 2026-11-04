@@ -671,6 +671,8 @@ export class ClaudeSession implements ClaudeSessionLike {
       parent_tool_use_id: null,
       session_id: this.currentSessionId ?? "",
       origin: HUMAN_ORIGIN,
+      // Into the running turn, said explicitly: without a priority the CLI's default (next or later) follows a flag of its own.
+      priority: "next",
     });
   }
 
