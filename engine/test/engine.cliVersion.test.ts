@@ -90,14 +90,14 @@ describe("session.cli and the version notice (§36.8)", () => {
 describe("cli_versions and pinning (§36.8)", () => {
   it("lists the installed versions newest first with the current one and the pinned path — also without a project", async () => {
     const versions = tmp("rg-cli-list");
-    for (const v of ["2.1.307", "2.1.309", "2.1.315"]) writeFileSync(join(versions, v), "");
+    for (const v of ["2.1.307", "2.1.309", "2.1.319"]) writeFileSync(join(versions, v), "");
     const h = harness({ dataDir: tmp("rg-cli-data3"), cliVersionsDir: versions });
     await h.hello();
     const before = await h.engine.request({ type: "cli_versions" });
     expect(before).toMatchObject({
       type: "cli_versions",
       versions: [
-        { version: "2.1.315", path: join(versions, "2.1.315"), verified: false },
+        { version: "2.1.319", path: join(versions, "2.1.319"), verified: false },
         { version: "2.1.309", path: join(versions, "2.1.309"), verified: true },
         { version: "2.1.307", path: join(versions, "2.1.307"), verified: true },
       ],

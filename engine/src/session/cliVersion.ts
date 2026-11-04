@@ -12,7 +12,7 @@ import { compareVersions } from "../platform/toolchain.js";
  */
 
 /** The CLIs ReviewGate's drivers ran against (inclusive). The integration step moves `max` after a driver run on a new CLI. */
-export const VERIFIED_CLI_RANGE: CliVersionRange = { min: "2.1.301", max: "2.1.314" }; // §36.8: every real-CLI driver passed on 2.1.314
+export const VERIFIED_CLI_RANGE: CliVersionRange = { min: "2.1.301", max: "2.1.318" }; // §36.8: every real-CLI driver passed on 2.1.318
 
 /**
  * `<data dir>/verified-cli.json`: versions verified after the release (`make verify-cli` — every real-CLI driver passed on

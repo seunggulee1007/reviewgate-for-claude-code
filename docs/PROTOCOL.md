@@ -3036,7 +3036,7 @@ A CLI that updated overnight is noticed, and an unverified one can be swapped fo
   session start, and while the version is unknown). `version`: what the running CLI reports (`system/init`
   `claude_code_version`; until then `toolchain.claudeVersion` read at every session start — only a `<x.y.z> (Claude Code)`
   line counts). `verified`: inside `verifiedRange`, an engine constant (inclusive, `compareVersions`; today
-  `{min: "2.1.301", max: "2.1.314"}` — the top is the CLI the real-CLI drivers last passed on). `previous`: the version
+  `{min: "2.1.301", max: "2.1.318"}` — the top is the CLI the real-CLI drivers last passed on). `previous`: the version
   used before this one, from an app-wide record (`<app data>/cli-versions.json`, §20); `path` =
   `~/.local/share/claude/versions/<ver>` (or `<ver>.exe`) while it exists (pinnable), else null.
 - When the version differs from the record's last one, the first session that sees it sends **once** the notice
@@ -3055,7 +3055,7 @@ A CLI that updated overnight is noticed, and an unverified one can be swapped fo
   verified when it is inside `VERIFIED_CLI_RANGE` or listed there (`verifiedCliVersions`, read at each session start and
   for `cli_versions`), so `session.cli.verified` and the clients' banner follow without a new app. `IF_NEW=1` skips a
   version already verified (for a scheduled run); a failed driver records nothing and keeps the logs. A release may still
-  raise `VERIFIED_CLI_RANGE.max` to fold listed versions into the range. 2.1.314: all eleven passed with haiku (2026-10-30).
+  raise `VERIFIED_CLI_RANGE.max` to fold listed versions into the range. 2.1.314: all eleven passed with haiku (2026-10-30); 2.1.318 too (2026-11-04).
 - Pinning is `set_settings {claudePath: <path>}`, unpinning `claudePath: ""`. The engine re-locates the toolchain right
   away (`state.toolchain` shows the pinned CLI); the next session start (`restart_session`) uses it. `cli_versions` runs on
   the `query` lane.
