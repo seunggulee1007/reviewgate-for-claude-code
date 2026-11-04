@@ -987,6 +987,9 @@ export class ReviewEngine {
       case "request_changes":
         await this.requestChanges(cmd.extra ?? null, cmd.noteIds);
         return;
+      case "steer": // §50
+        this.steer(cmd.text, cmd.mentions);
+        return;
       case "interrupt":
         await this.interruptTurn();
         return;
@@ -3228,6 +3231,40 @@ export class ReviewEngine {
     this.touch();
     await this.checkConcurrent("send");
     return true;
+  }
+
+  /**
+   * §50 `steer {text, mentions?}`: the message goes into the turn that runs — the CLI gives it to Claude once the current
+   * tool call is done, as typing while Claude works does in the terminal. Its changes are this turn's (one review). Refused
+   * `steer_unavailable:<why>` when no turn of ours runs or its review is being collected (the client queues it then).
+   */
+  private steer(text: unknown, mentionsIn: unknown): void {
+    const trimmed = typeof text === "string" ? text.trim() : "";
+    if (trimmed.length === 0) throw new CommandRefused("empty message", { code: "empty_message" });
+    const session = this.session;
+    const g = this.gate;
+    const why = !session?.steerUser ? "no_session"
+      : this.sessionState.externalTurn ? "external_turn"
+      : g.collecting || g.reverting ? "collecting"
+      : !g.running || !session.isTurnActive ? "not_running"
+      : null;
+    if (why !== null || !session?.steerUser) throw new CommandRefused(`steer_unavailable:${why ?? "no_session"}`, { code: "steer_unavailable" });
+    const mentions = this.sendOptions(mentionsIn, undefined).mentions ?? [];
+    let outgoing = trimmed;
+    if (mentions.length > 0) outgoing += `\n\nReferenced files: ${mentions.map((m) => mentionToken(m.path, m.kind)).join(" ")}`;
+    session.steerUser(outgoing);
+    const extras = mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {};
+    this.record({ kind: "user_message", text: trimmed, ...extras, steered: true });
+    this.emit({ type: "user_message", text: trimmed, turn: this.turn, ...extras, steered: true });
+    this.commitSlice.lastUserText = trimmed;
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (meta) {
+      meta.lastUserText = trimmed;
+      meta.updatedAt = new Date().toISOString();
+      this.persistSessions();
+    }
+    this.log("info", `message put into turn ${this.turn}`);
+    this.touch();
   }
 
   private async requestChanges(extra: string | null, noteIds?: readonly string[]): Promise<void> {
@@ -7112,6 +7149,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
   if (type.startsWith("pr_") || type === "accounts" || type === "login_in_terminal") return "pr";
   switch (type) {
     case "send":
+    case "steer":
     case "request_changes":
     case "interrupt":
     case "set_model":

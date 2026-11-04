@@ -61,6 +61,28 @@ extension AppState {
     }
 }
 
+// MARK: §50 Send now — a message into the turn that runs
+
+extension AppState {
+    /// §50: a turn of ours runs, so a message can go into it now (as typing while Claude works does in the terminal).
+    /// The engine has the last word: a refusal (the turn ended meanwhile, its review is being collected) queues it.
+    public var canSteer: Bool { isRunning && !isExternalTurn && viewingChat == nil }
+
+    /// §50 "바로 보내기": the message goes into the running turn — Claude reads it once the current tool call is done; its
+    /// changes join this turn's review. Refused, it waits in the queue instead (never lost).
+    public func steer(_ text: String, mentions: [String] = []) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        recordPrompt(trimmed)
+        do {
+            try await request(.steer(text: trimmed, mentions: mentions))
+        } catch {
+            appendLog("[info] steer refused (\(error.localizedDescription)) — queued instead")
+            enqueue(trimmed, mentions: mentions)
+        }
+    }
+}
+
 /// §49: the branch "Run as Task" suggests for a task — `<prefix><id>` from a task link or key in the text (the last number
 /// of a URL's path, `#project/123`, `ABC-123`, `#123`), else up to five ASCII words of its first line, else the date and time.
 /// The prefix is the one the user used last (Settings remember it), `task/` at first.

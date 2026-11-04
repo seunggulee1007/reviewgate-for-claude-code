@@ -327,3 +327,61 @@ describe("turn ownership by command uuid (§29, audit peer-03)", () => {
     await s.dispose();
   });
 });
+
+describe("§50 a message put into the running turn (steerUser)", () => {
+  it("folded into the turn (started after the tool call, completed before the result): one turn_end", async () => {
+    const { s, events, script } = session();
+    await s.start();
+    s.sendUser("Run the tests", "tree-A");
+    await until(() => script.sent.length === 1, "first message");
+    const first = script.sent[0]!.uuid!;
+    script.push(lifecycle(first, "queued"));
+    script.push(lifecycle(first, "started"));
+    s.steerUser("Also check the README");
+    await until(() => script.sent.length === 2, "the message put in");
+    const steered = script.sent[1]!;
+    expect(steered.message.content).toBe("Also check the README");
+    expect(steered.uuid).not.toBe(first);
+    script.push(lifecycle(steered.uuid!, "queued"));
+    script.push(lifecycle(steered.uuid!, "started"));
+    script.push(lifecycle(steered.uuid!, "completed"));
+    script.push(result(0.02, { user_message_uuids: [first, steered.uuid] }));
+    script.push(lifecycle(first, "completed"));
+    await until(() => ofType(events, "turn_end").length === 1, "turn_end");
+    expect(s.isTurnActive).toBe(false);
+    expect(() => s.steerUser("too late")).toThrow(/no turn/);
+    await s.dispose();
+  });
+
+  it("a turn that ended before the CLI took it runs it as its own command — still one review turn, usage summed", async () => {
+    const { s, events, script } = session();
+    await s.start();
+    s.sendUser("Run the tests", "tree-A");
+    await until(() => script.sent.length === 1, "first message");
+    const first = script.sent[0]!.uuid!;
+    script.push(lifecycle(first, "started"));
+    s.steerUser("Also check the README");
+    await until(() => script.sent.length === 2, "the message put in");
+    const second = script.sent[1]!.uuid!;
+    script.push(lifecycle(second, "queued"));
+    script.push(result(0.02));
+    script.push(lifecycle(first, "completed"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ofType(events, "turn_end")).toEqual([]);   // the message put in has not run yet: the turn waits for it
+    expect(s.isTurnActive).toBe(true);
+    script.push(lifecycle(second, "started"));
+    script.push(result(0.05));
+    script.push(lifecycle(second, "completed"));
+    await until(() => ofType(events, "turn_end").length === 1, "turn_end after the second command");
+    expect(ofType(events, "turn_end")[0]!.usage).toMatchObject({ inputTokens: 4, outputTokens: 6, costUsd: 0.05 });
+    expect(ofType(events, "unprompted_turn_end")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("without a turn it throws (the engine refuses before)", async () => {
+    const { s } = session();
+    await s.start();
+    expect(() => s.steerUser("hello")).toThrow(/no turn/);
+    await s.dispose();
+  });
+});

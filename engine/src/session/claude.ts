@@ -151,6 +151,11 @@ export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text. */
   sendUser(text: string, checkpointTree?: string, images?: readonly SessionImage[]): void;
+  /**
+   * §50: a message into the turn that runs — the CLI hands it to Claude once the current tool call is done, as in the
+   * terminal; a turn that ended meanwhile runs it as its own command, still one review turn. Absent on doubles without it.
+   */
+  steerUser?(text: string): void;
   interrupt(): Promise<void>;
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>): void;
   setBudget(budget: Budget): void;
@@ -303,6 +308,8 @@ export class ClaudeSession implements ClaudeSessionLike {
   private readonly ownCommands = new Set<string>();
   /** Held peer messages released into the current turn (`releasePeers`): that turn is ours. */
   private releasedPeers = new Set<string>();
+  /** §50: our messages put into the running turn (`steerUser`): like released peers, they belong to it. */
+  private steered = new Set<string>();
   /** Released peer messages whose command started / delivered its body this turn. */
   private peerStarted = new Set<string>();
   private peerDelivered = new Set<string>();
@@ -645,6 +652,25 @@ export class ClaudeSession implements ClaudeSessionLike {
       parent_tool_use_id: null,
       session_id: this.currentSessionId ?? "",
       origin: HUMAN_ORIGIN, // MARK: wave4d w4d-peers — §42.2: the user typed it (peers' messages carry their own origin)
+    });
+  }
+
+  /** §50: see `ClaudeSessionLike.steerUser`. Only while our turn runs: the turn's end waits for this command (`peerTurnWaits`). */
+  steerUser(text: string): void {
+    if (!this.q) throw new Error("session not started");
+    if (this.disposing) throw new Error("session closed");
+    if (!this.turnActive) throw new Error("no turn is running");
+    const uuid = randomUUID();
+    this.ownCommands.add(uuid);
+    if (this.ownCommands.size > MAX_OWN_COMMANDS) this.ownCommands.delete(this.ownCommands.values().next().value!);
+    this.steered.add(uuid);
+    this.inbox.push({
+      type: "user",
+      uuid,
+      message: { role: "user", content: text },
+      parent_tool_use_id: null,
+      session_id: this.currentSessionId ?? "",
+      origin: HUMAN_ORIGIN,
     });
   }
 
@@ -991,8 +1017,9 @@ export class ClaudeSession implements ClaudeSessionLike {
       toolWindows: [...(this.hookCtx.toolWindows?.values() ?? [])].filter((w) => w.end !== null).map((w) => ({ ...w })),
     });
     this.activity({ kind: "idle" });
-    // §29: released peer messages belong to the turn that ends here.
+    // §29: released peer messages belong to the turn that ends here (§50: so do messages put into it).
     this.releasedPeers = new Set();
+    this.steered = new Set();
     this.peerStarted = new Set();
     this.peerDelivered = new Set();
     this.takePeerTurnUsage();
@@ -1623,7 +1650,7 @@ export class ClaudeSession implements ClaudeSessionLike {
 
   /** Released peer messages whose command has not started yet: the review turn goes on through their results. */
   private peerTurnWaits(): boolean {
-    return this.sawLifecycle && [...this.releasedPeers].some((id) => !this.peerStarted.has(id));
+    return this.sawLifecycle && [...this.releasedPeers, ...this.steered].some((id) => !this.peerStarted.has(id));
   }
 
   private deferPeerResult(sessionId: string, subtype: string, totalCostUsd: number, inputTokens: number, outputTokens: number, durationMs: number, modelUsage?: Record<string, unknown>): void {
@@ -1666,7 +1693,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (state === "started") {
       if (this.ownCommands.has(id) || this.releasedPeers.has(id)) {
         this.ownRunning = id;
-        if (this.releasedPeers.has(id)) this.peerStarted.add(id);
+        if (this.releasedPeers.has(id) || this.steered.has(id)) this.peerStarted.add(id);
       } else if (!this.externalCommands.has(id)) {
         this.externalCommands.add(id);
         if (this.externalCommands.size === 1) this.emit({ type: "external_turn", running: true, commandUuid: id });
@@ -1677,7 +1704,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     // completed / cancelled (any terminal state)
     this.ownCommands.delete(id);
     if (this.ownRunning === id) this.ownRunning = null;
-    if (this.releasedPeers.has(id)) this.peerStarted.add(id); // folded into a running turn without a `started` of its own
+    if (this.releasedPeers.has(id) || this.steered.has(id)) this.peerStarted.add(id); // folded into a running turn without a `started` of its own
     if (this.externalCommands.delete(id) && this.externalCommands.size === 0) this.emit({ type: "external_turn", running: false, commandUuid: id });
     this.syncGuard();
     if (this.peerTurnDeferred && !this.peerTurnWaits()) this.finishDeferredPeerTurn();

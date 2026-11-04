@@ -410,6 +410,9 @@ public enum EngineCommand: Sendable, Equatable {
     /// M16: `acceptPending` accepts every pending (not changes-requested) file before sending.
     /// §23 / §24: `mentions` = repo-relative paths (≤ 20), `attachments` = images (≤ 5 × 5 MiB).
     case send(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [])
+    /// §50: a message into the turn that runs (as typing while Claude works in the terminal); refused
+    /// `steer_unavailable:<why>` when no turn of ours runs.
+    case steer(text: String, mentions: [String] = [])
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -646,6 +649,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .peerSet: "peer_set"
         case .send: "send"
         case .sendWithModel: "send"   // wave5 w5-model (§43.4)
+        case .steer: "steer"   // §50
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .permissionResponse: "permission_response"
@@ -921,6 +925,9 @@ extension EngineCommand: Encodable {
             if acceptPending { try c.encode(true, forKey: .acceptPending) }
             if !mentions.isEmpty { try c.encode(mentions, forKey: .mentions) }
             if !attachments.isEmpty { try c.encode(attachments, forKey: .attachments) }
+        case let .steer(text, mentions):   // §50
+            try c.encode(text, forKey: .text)
+            if !mentions.isEmpty { try c.encode(mentions, forKey: .mentions) }
         case let .sendWithModel(text, acceptPending, mentions, attachments, model):   // wave5 w5-model (§43.4)
             try c.encode(text, forKey: .text)
             if acceptPending { try c.encode(true, forKey: .acceptPending) }

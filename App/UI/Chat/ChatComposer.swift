@@ -294,6 +294,7 @@ struct ChatComposer: View {
                 } else if let reason = store.cannotSendReason {
                     Text(pendingToolPermission != nil && trimmedDraft.isEmpty
                          ? String(localized: "\(reason) — ⌘↩ allow · ⌘⌫ deny")
+                         : canSteer ? (returnSends ? String(localized: "\(reason) — ↩ sends it to Claude now") : String(localized: "\(reason) — ⌘↩ sends it to Claude now"))
                          : canQueue ? (returnSends ? String(localized: "\(reason) — ↩ queues your message") : String(localized: "\(reason) — ⌘↩ queues your message")) : reason)
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 } else {
@@ -344,7 +345,29 @@ struct ChatComposer: View {
                 }
                 NextMessageModelMenu()   // wave5 w5-model (§43.4): "이번엔 opus"
                 PermissionModePicker()
-                if canQueue {
+                if canSteer {
+                    // §50: while Claude works the message goes into the turn (primary, ↩ / ⌘↩) — as in the terminal; the menu
+                    // queues it for after the turn or stops the turn and sends it right after.
+                    Menu {
+                        Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
+                            .disabled(trimmedDraft.isEmpty)
+                            .accessibilityIdentifier("Add to queue")
+                        Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
+                            .disabled(trimmedDraft.isEmpty)
+                            .accessibilityIdentifier("Stop and send")
+                    } label: {
+                        Label("Send now", systemImage: "paperplane.fill")
+                    } primaryAction: {
+                        steerDraft()
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderedProminent)
+                    .fixedSize()
+                    .disabled(trimmedDraft.isEmpty)
+                    .help("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (↩). The menu queues it for after the turn or stops the turn first.")
+                    .accessibilityLabel("Send now")
+                    .accessibilityIdentifier("Send now")
+                } else if canQueue {
                     // While Claude works: queue (primary, ⌘↩) or stop the turn and send this right after it.
                     Menu {
                         Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
@@ -470,6 +493,9 @@ struct ChatComposer: View {
         returnSends ? String(localized: "↩ to send · ⇧↩ new line · ⌘/ commands") : String(localized: "⌘↩ to send · ⌘/ commands")
     }
     /// Busy in a way that ends by itself: a draft can be queued and goes out once the session takes it.
+    /// §50: the draft can go into the running turn (images wait for the turn: the CLI takes them only with a new message).
+    private var canSteer: Bool { canQueue && store.canSteer && composer.images.isEmpty }
+
     private var canQueue: Bool {
         // wave4b w4b-tabs: from another chat shown read-only a message never joins the running chat's queue
         store.viewingChat == nil
@@ -513,6 +539,23 @@ struct ChatComposer: View {
         composer.inputFocused = true
     }
 
+    /// §50 "바로 보내기": the draft goes into the running turn (refused by the engine, it waits in the queue).
+    private func steerDraft() {
+        guard !trimmedDraft.isEmpty else { return }
+        let text = composer.draft
+        let (mentions, _) = composer.takeInputs(history: store.promptHistory)
+        composer.draft = ""
+        composer.closePalette()
+        transcript.follow = true
+        composer.inputFocused = true
+        Task { await store.steer(text, mentions: mentions) }
+    }
+
+    /// While Claude works: into the turn when it can take it (§50), else the queue.
+    private func sendWhileWorking() {
+        if canSteer { steerDraft() } else { queueDraft() }
+    }
+
     private func queueDraft() {
         guard !trimmedDraft.isEmpty else { return }
         let (queuedMentions, queuedImages) = composer.takeInputs(history: store.promptHistory)
@@ -554,7 +597,7 @@ struct ChatComposer: View {
         }
         switch CardShortcuts.action(for: shortcut, focus: .composer(draft: composer.draft), target: pendingToolPermission) {
         case .sendDraft:
-            if store.canSend { send() } else if canQueue { queueDraft() } else { return false }
+            if store.canSend { send() } else if canQueue { sendWhileWorking() } else { return false }
         // MARK: wave4d w4d-windows (polish-08): ⌥⌘↩ with text — stop and send while Claude works (Windows' Ctrl+Alt+Enter).
         case .stopAndSendDraft:
             if store.canSend { send() } else if store.isRunning { stopAndSend() } else if canQueue { queueDraft() } else { return false }
@@ -579,7 +622,7 @@ struct ChatComposer: View {
         } else if store.canSend {
             send()
         } else if canQueue {
-            queueDraft()
+            sendWhileWorking()
         }
         return true
     }

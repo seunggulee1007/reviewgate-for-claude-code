@@ -594,6 +594,8 @@ export type EngineCommand =
   | Cmd<"pr_reload_comments">
   | Cmd<"accounts">
   | Cmd<"login_in_terminal", { host: string }>
+  /** §50: a message into the turn that runs (as typing while Claude works in the terminal); `steer_unavailable:<why>` otherwise. */
+  | Cmd<"steer", { text: string; mentions?: string[] }>
   | Cmd<"workbench_list">
   /** §36.12: `from` may be a remote branch (`origin/develop`), fetched first unless `fetch: false`; `setup` (default true) copies files and runs the setup command; §36.14 `fromPr`. */
   /** §49: `task` — the new workbench's window starts a fresh chat with this message (in `mode`), apart from this chat. */
@@ -1416,7 +1418,7 @@ export type FullFileContentEvent = {
 };
 export type PRCreatedEvent = { type: "pr_created"; id?: string; url: string; branch: string };
 export type CommittedEvent = { type: "committed"; id?: string; sha: string; shortSha: string; pushed: boolean; branch: string | null };
-export type UserMessageEvent = { type: "user_message"; text: string; turn: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice };
+export type UserMessageEvent = { type: "user_message"; text: string; turn: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice; /** §50: put into the running turn (`steer`) */ steered?: true };
 /** `unprompted`: Claude Code wrote it in a turn it ran on its own, outside any request (§18). */
 export type TextDeltaEvent = { type: "text_delta"; text: string; unprompted?: true };
 export type ToolUseEvent = {
@@ -1561,7 +1563,7 @@ export type TurnEndEvent = {
 };
 /** One persisted transcript row (`<gitdir>/reviewgate-transcript.ndjson`); `at` is ISO-8601, `turn` the engine's turn counter. */
 export type TranscriptItem = { at: string; turn: number } & (
-  | { kind: "user_message"; text: string; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model (§43.4) */ autoModel?: AutoModelChoice }
+  | { kind: "user_message"; text: string; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model (§43.4) */ autoModel?: AutoModelChoice; /** §50 */ steered?: true }
   | { kind: "assistant_text"; text: string; unprompted?: true }
   | { kind: "tool_use"; id: string; name: string; input: Record<string, unknown>; file?: string; parentToolUseId?: string; rationale?: string; rationaleSource?: RationaleSource; rationaleAge?: number; continues?: AgentContinuation; explore?: true /* MARK: wave4b w4b-tabs (§39.2) */ }
   /** §36.1: an Agent / Task result row also keeps the cleaned `report` (≤ 50 000 chars; never sent in `transcript_restore`, read with `agent_report`). */

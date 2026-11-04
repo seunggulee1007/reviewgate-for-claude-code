@@ -6128,7 +6128,7 @@ in sends nothing and keeps its context.
   name stays valid. After a create, the new window opens. The composer empties its draft if it still holds the text it
   handed over. `task_started` remembers the mode for the new workbench. With `sent: false`, the text goes into that
   window's composer (`AppState.taskForComposer`, taken once).
-- **Electron.** The same entry points, setting, dialog fields and fallback.
+- **Electron.** The same setting, dialog fields and fallback. The menu entry is File › "업무로 실행…" under "새 워크벤치…" (Electron has no Workbenches menu), plus the sidebar and the composer button. Electron keeps no per-project mode, so `task_started` only logs the mode: the engine remembers it for the worktree.
 
 ### 49.2 The chat column in a short window
 
@@ -6156,3 +6156,41 @@ window. The mode offer's explanation is two lines at most (the whole text in its
   `UI/Sidebar/WorkbenchSheets.swift`, `UI/Chat/ChatComposer.swift`, `UI/Chat/ChatView.swift`,
   `UI/Chat/DefaultModeOfferBanner.swift`, `UI/Settings/SettingsView.swift`, `UI/MenuCommands.swift`, `UI/MainWindow.swift`,
   `WorkbenchRegistry.swift`).
+
+## 50. Send now: a message into the turn that runs
+
+In the terminal, a message typed while Claude works reaches Claude as soon as the current tool call is done, in the same
+turn. The app only offered "Add to queue" (sent after the turn) and "Stop and send". Verified with CLI 2.1.318 over
+stream-json: a user message written while a `sleep` runs gets `command_lifecycle` frames `queued` → `started` (right after
+the tool result, with its replay) → `completed`, all before the turn's single `result` (`num_turns` 2). The reply answers
+both messages. `priority` makes no difference here (`next` and none behave alike).
+
+```ts
+// command: steer { text: string; mentions?: string[] }      // refused steer_unavailable:<why> (code steer_unavailable)
+// event:   user_message + steered?: true                      // the same `turn` as the message that started it
+```
+
+- **Engine.** `steer` is taken only while a turn of ours runs: `gate.running` and the session's turn active, not while
+  the review is being collected or reverted, and not during another session's command. The refusals are
+  `steer_unavailable:` `not_running`, `collecting`, `external_turn` or `no_session`. An empty text is `empty_message`.
+  The text, with the mentions as the send appends them (`Referenced files: @path`), goes to the CLI with a uuid of ours
+  (`ClaudeSession.steerUser`). Its row is recorded and emitted at once (`user_message {steered: true}`, this turn's
+  number), and the chat's `lastUserText` follows it. Nothing else of the turn changes: no new snapshot A, no new record,
+  and its changes are this turn's review.
+- **The race with the turn's end.** The message is tracked like a released peer message (§29). If the turn's `result`
+  comes before its command `started`, the CLI runs it as a command of its own. The turn's end then waits for it
+  (`peerTurnWaits`): one review turn, its usage summed. If the frames never come, the turn ends after the usual gap.
+- **Mac.** While Claude works and the message has no images, the primary button is "바로 보내기" (↩ / ⌘↩). Its menu has
+  "대기열에 추가" (after the turn, as before) and "중단하고 보내기". The hint reads "… — ↩로 바로 보내기". A refused
+  `steer` (the turn ended meanwhile, the review is being collected) puts the message in the queue instead, so it is never
+  lost. A message with images is queued: the CLI takes images only with a message of its own.
+- **Electron.** The same behavior.
+- **Verified.** Engine `session.peer.test.ts` (§50 block): folded into the turn (one `turn_end`), run as its own command
+  after the result (the turn waits, usage summed, no unprompted turn), refused without a turn. `w50.steer.test.ts`: the
+  session gets the text with the mentions, the row `steered` with the turn's number, refusals. Core `RunAsTaskTests`: the
+  command's JSON, a refusal queues. Real CLI: `sidecar/test/driver-steer.mjs` (haiku, CLI 2.1.318). It sends a `sleep 10`
+  request, then steers in a request for `note.txt` and a word in the reply. Observed: one `turn_end`, both rows turn 1
+  (the second `steered`), `note.txt` in the review, the word in the reply.
+- Owner: steer (engine `session/claude.ts` `steerUser`, `engine.ts` `steer`, `protocol.ts`; Core
+  `Session/AppState+Task.swift`, `Engine/EngineProtocol.swift`; App `UI/Chat/ChatComposer.swift`;
+  `sidecar/test/driver-steer.mjs`).

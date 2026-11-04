@@ -157,6 +157,22 @@
         }
       }
     },
+    "%@ — ↩ sends it to Claude now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — ↩ sends it to Claude now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — ↩로 바로 보내기"
+          }
+        }
+      }
+    },
     "%@ — ⌘↩ allow · ⌘⌫ deny": {
       "localizations": {
         "en": {
@@ -185,6 +201,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ — ⌘↩로 대기열에 추가"
+          }
+        }
+      }
+    },
+    "%@ — ⌘↩ sends it to Claude now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — ⌘↩ sends it to Claude now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — ⌘↩로 바로 보내기"
           }
         }
       }
@@ -18838,6 +18870,22 @@
         }
       }
     },
+    "Send now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바로 보내기"
+          }
+        }
+      }
+    },
     "Send or allow": {
       "localizations": {
         "en": {
@@ -19058,6 +19106,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "에이전트가 끝나면 보냄"
+          }
+        }
+      }
+    },
+    "Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (↩). The menu queues it for after the turn or stops the turn first.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (↩). The menu queues it for after the turn or stops the turn first."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지를 지금 Claude에게 보내요. 지금 하는 단계가 끝나는 대로 읽고, 그에 따른 변경은 이번 턴 리뷰에 합쳐져요 (↩). 메뉴에서 턴이 끝난 뒤로 대기열에 넣거나, 턴을 멈추고 보낼 수도 있어요."
           }
         }
       }

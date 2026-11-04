@@ -90,4 +90,28 @@ import Testing
         #expect(ChatColumnSplit.split(room: -40, cards: 120) == (0, 0))
         #expect(ChatColumnSplit.split(room: 200, cards: 0) == (200, 0))
     }
+
+    // MARK: §50 Send now
+
+    @Test func steerEncodesTextAndMentions() throws {
+        let sent = try json(.steer(text: "Also check README", mentions: ["README.md"]))
+        #expect(sent["type"] as? String == "steer")
+        #expect(sent["text"] as? String == "Also check README")
+        #expect(sent["mentions"] as? [String] == ["README.md"])
+        #expect(try json(.steer(text: "x"))["mentions"] == nil)
+    }
+
+    @Test func steerGoesToTheEngineAndARefusalQueuesIt() async {
+        let store = makeStore()
+        var sent: [EngineCommand] = []
+        store.requestSink = { sent.append($0) }
+        await store.steer("  Also check README  ", mentions: ["README.md"])
+        #expect(sent.count == 1)
+        if case let .steer(text, mentions) = sent.first { #expect(text == "Also check README" && mentions == ["README.md"]) } else { Issue.record("not steer") }
+        #expect(store.queuedMessages.isEmpty)
+        store.requestSink = { _ in throw EngineClientError.refused("steer_unavailable:collecting", code: "steer_unavailable") }
+        await store.steer("Then run the tests")
+        #expect(store.queuedMessages.map(\.text) == ["Then run the tests"])
+    }
 }
+
