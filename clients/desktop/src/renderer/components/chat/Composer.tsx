@@ -11,6 +11,8 @@
  * paste, drag-drop and the attach button (thumbnail chips) — both go out with the message (and wait with it in the queue).
  * MARK: §49 "Run as Task" (next to attach): the draft and its @ mentions start in a new workbench instead (the sheet); once
  * the task started there, the draft empties if it still holds that text (images stay here).
+ * MARK: §50 "바로 보내기": while a turn of ours runs and the draft has no images, the primary button (and ⌘↩) puts the
+ * message into that turn (src/renderer/sendNow.ts); its menu queues it for after the turn or stops the turn and sends it.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { FileItem } from "@reviewgate/engine";
@@ -48,6 +50,7 @@ import { isComposing, isEnter } from "../../ime";
 // MARK: wave4b w4b-tabs — §39.2 a send from another chat shown read-only switches there first
 import { sendInViewedChat, useViewing, viewingSendBlocker } from "../../viewedChat";
 import { ViewingChatBar } from "./ViewingChat";
+import { canSteerDraft, composerEnter, primarySend, workingHint } from "../../sendNow"; // MARK: §50
 
 export function Composer() {
   const state = useStore((s) => s.state);
@@ -60,6 +63,7 @@ export function Composer() {
   const restartSession = useStore((s) => s.restartSession);
   const enqueueMessage = useStore((s) => s.enqueueMessage);
   const interruptAndSend = useStore((s) => s.interruptAndSend);
+  const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
   const root = useStore((s) => s.state.project?.root ?? null);
   // MARK: wave1 desktop-session — §30 "세션 종료됨" offers a new chat too; polish-03 keeps the draft across a reload.
@@ -208,6 +212,10 @@ export function Composer() {
   /** The gate is closed but a project is open: the message waits in the queue instead. */
   const queueMode = !viewing && !canSend && state.project !== null;
   const hasText = draft.trim().length > 0;
+  /** §50: the draft can go into the running turn (a draft with images waits in the queue). */
+  const canSteer = canSteerDraft(state, { queueMode, viewing: viewing !== null, images: images.length });
+  const primary = primarySend({ canSend, queueMode, canSteer });
+  const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText);
 
   const token = slashToken(draft);
   const paletteVisible = canSend && !paletteDismissed && (paletteForced || token !== null);
@@ -406,6 +414,25 @@ export function Composer() {
     inputRef.current?.focus();
   };
 
+  /**
+   * §50 "바로 보내기": the draft goes into the running turn (refused by the engine, it waits in the queue — store `steer`).
+   * The one-message model stays for the next message of its own (a turn's model does not change midway).
+   */
+  const doSteer = () => {
+    setSplitOpen(false);
+    if (!canSteer || !hasText) return;
+    const text = draft;
+    const sentMentions = mentions;
+    setDraft("");
+    closePalette();
+    remember(text);
+    void steer(text, { mentions: sentMentions });
+    setMentions([]);
+    setMentionDirs({});
+    setAttachErrors([]);
+    inputRef.current?.focus();
+  };
+
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
@@ -500,14 +527,24 @@ export function Composer() {
       e.preventDefault();
       // wave4b w4b-tabs (§39.2): from another chat shown read-only only a plain ⌘↩ sends (there); nothing stops or queues
       // in the running chat from here.
-      if (viewing) {
-        if (!e.shiftKey && !e.altKey) doSend();
-        return;
+      // §50: while Claude works ⌘↩ puts the draft into the turn when it can take it, else into the queue.
+      switch (composerEnter(e, { viewing: viewing !== null, canSend, canSteer })) {
+        case "acceptAndSend":
+          doAcceptAndSend();
+          break;
+        case "send":
+          doSend();
+          break;
+        case "stopAndSend":
+          doStopAndSend();
+          break;
+        case "steer":
+          doSteer();
+          break;
+        case "queue":
+          doQueue();
+          break;
       }
-      if (e.shiftKey) doAcceptAndSend();
-      else if (canSend) doSend();
-      else if (e.altKey) doStopAndSend();
-      else doQueue();
       return;
     }
     if (e.key === "/" && (e.ctrlKey || e.metaKey) && !e.altKey) {
@@ -565,6 +602,15 @@ export function Composer() {
     }
   };
 
+  const queueItem = (
+    <div role="menuitem" className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? (setSplitOpen(false), doQueue()) : undefined)} data-testid="Queue item">
+      <span className="col" style={{ gap: 1 }}>
+        <span>{t("Add to queue")}</span>
+        <span className="tiny faint">{t("Sent in order when sending is possible")}</span>
+      </span>
+    </div>
+  );
+
   return (
     <div
       className={`composer ${dropping ? "dropping" : ""}`}
@@ -604,7 +650,9 @@ export function Composer() {
         value={draft}
         placeholder={
           running
-            ? t("Claude is working — type the next message; it is queued and sent when the turn ends.")
+            ? canSteer
+              ? t("Claude is working — type a message; ⌘↩ sends it to Claude now, into this turn.")
+              : t("Claude is working — type the next message; it is queued and sent when the turn ends.")
             : state.session.externalTurn && reason
               ? reason
               : queueMode && reason
@@ -626,7 +674,7 @@ export function Composer() {
       />
       <ComposerModeLine /* MARK: wave6 w6-terminal — §44.1 "⏵⏵ 자동 모드 (shift+tab 전환)" */ />
       <div className="footer">
-        <span className={`hint caption truncate ${reason ? "muted" : "faint"}`} title={reason ?? undefined} data-testid="Composer hint">{reason ?? t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus")}</span>
+        <span className={`hint caption truncate ${hint ? "muted" : "faint"}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus")}</span>
         <span className="caps" style={{ position: "relative", minWidth: 0 }}>
           <button
             type="button"
@@ -724,18 +772,32 @@ export function Composer() {
             ]}
           />
         )}
-        {queueMode ? (
+        {primary !== "send" ? (
           <div className="split-send" ref={splitRef} data-testid="Queue split">
-            <button
-              type="button"
-              className="primary split-main"
-              disabled={!hasText}
-              onClick={doQueue}
-              title={t("Queues the message; it is sent when Claude is done and a plain Send is allowed (⌘↩)")}
-              data-testid="Add to queue"
-            >
-              {t("Add to queue")}
-            </button>
+            {primary === "steer" ? (
+              // §50: as typing while Claude works in the terminal — the message goes into this turn (⌘↩).
+              <button
+                type="button"
+                className="primary split-main"
+                disabled={!hasText}
+                onClick={doSteer}
+                title={t("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (⌘↩). The menu queues it for after the turn or stops the turn first.")}
+                data-testid="Send now"
+              >
+                {t("Send now")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="primary split-main"
+                disabled={!hasText}
+                onClick={doQueue}
+                title={t("Queues the message; it is sent when Claude is done and a plain Send is allowed (⌘↩)")}
+                data-testid="Add to queue"
+              >
+                {t("Add to queue")}
+              </button>
+            )}
             <button
               type="button"
               className="primary split-chev"
@@ -747,7 +809,9 @@ export function Composer() {
               ▾
             </button>
             {splitOpen && (
+              // §50: with "Send now" first the menu offers the queue (after the turn) before stopping the turn, as on the Mac.
               <div className="menu right split-menu" role="menu">
+                {primary === "steer" && queueItem}
                 <div
                   role="menuitem"
                   className={`item ${!running || !hasText ? "disabled" : ""}`}
@@ -760,12 +824,7 @@ export function Composer() {
                     <span className="tiny faint">{running ? t("Interrupts the turn, then sends this first") : t("Only while Claude is working")}</span>
                   </span>
                 </div>
-                <div role="menuitem" className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? (setSplitOpen(false), doQueue()) : undefined)} data-testid="Queue item">
-                  <span className="col" style={{ gap: 1 }}>
-                    <span>{t("Add to queue")}</span>
-                    <span className="tiny faint">{t("Sent in order when sending is possible")}</span>
-                  </span>
-                </div>
+                {primary !== "steer" && queueItem}
               </div>
             )}
           </div>

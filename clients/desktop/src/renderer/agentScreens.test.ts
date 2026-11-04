@@ -305,8 +305,8 @@ describe("§36 agents (wave3 desktop-agents)", () => {
     const html = await render(Composer);
     expect(html).toMatch(/data-testid="Composer waiting">.*<span class="truncate">메인은 서브에이전트 2개를 기다리는 중 · executor 4분 1[23]초<\/span>/);
     expect(html).toContain('data-testid="Queue status">에이전트가 끝나면 보냄<');
-    // The footer's hint keeps the gate's reason; a permission still says so there and in the queue.
-    expect(html).toContain('data-testid="Composer hint">Claude가 작업 중…<');
+    // The footer's hint keeps the gate's reason (§50: and that ⌘↩ sends it now); a permission still says so there and in the queue.
+    expect(html).toContain('data-testid="Composer hint">Claude가 작업 중… — ⌘↩로 바로 보내기<');
     setState({ gate: gate({ ...running, blockedReason: "awaiting_permission" }) });
     const perm = await render(Composer);
     expect(perm).toContain('data-testid="Composer hint">권한 결정 대기 중<');
@@ -315,7 +315,7 @@ describe("§36 agents (wave3 desktop-agents)", () => {
     setState({ gate: gate(running), hud: { ...useStore.getState().state.hud, waitingOnAgents: undefined } });
     const old = await render(Composer);
     expect(old).not.toContain("Composer waiting");
-    expect(old).toContain('data-testid="Composer hint">Claude가 작업 중…<');
+    expect(old).toContain('data-testid="Composer hint">Claude가 작업 중… — ⌘↩로 바로 보내기<');
     expect(old).not.toContain("에이전트가 끝나면 보냄");
   });
 

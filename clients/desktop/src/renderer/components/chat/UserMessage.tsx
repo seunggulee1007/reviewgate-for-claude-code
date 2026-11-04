@@ -143,6 +143,8 @@ export function UserMessage({ item }: { item: UserItem }) {
         )}
       </div>
       <AutoModelSwitchLine choice={item.autoModel} />{/* MARK: wave5 w5-model */}
+      {/* §50: put into the turn that was running ("바로 보내기") — its changes are that turn's review */}
+      {item.steered && <div className="steered-caption tiny faint" data-testid="Steered caption">{t("Sent while Claude worked")}</div>}
     </div>
   );
 }

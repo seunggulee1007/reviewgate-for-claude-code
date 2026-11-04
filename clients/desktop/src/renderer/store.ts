@@ -105,7 +105,7 @@ export { isReviewLocked } from "./planLock";
 
 export type ChatItem =
   /** `turn`: the engine's turn number (§26 rewind target); `mentions` / `attachments`: §23 / §24. */
-  | { kind: "user"; id: number; text: string; turn?: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice }
+  | { kind: "user"; id: number; text: string; turn?: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice; /** §50: sent into the running turn ("바로 보내기") */ steered?: true }
   /** `unprompted`: written in a turn Claude Code ran on its own, outside any request (docs/PROTOCOL.md §18). */
   | { kind: "assistant"; id: number; text: string; streaming: boolean; unprompted?: true }
   | { kind: "toolUse"; id: number; toolUseId: string; name: string; file?: string; input: Record<string, unknown>; parentToolUseId?: string; rationale?: string } & RationaleMeta & AgentUseMeta & ExploreMeta /* MARK: wave4b w4b-tabs (§39.2) */
@@ -148,7 +148,7 @@ function transcriptItemsToChatItems(items: TranscriptItem[], budget: Budget): Ch
   for (const item of items) {
     switch (item.kind) {
       case "user_message":
-        out.push(userItem(item.text, item.turn, item.mentions, item.attachments, item.autoModel));
+        out.push(userItem(item.text, item.turn, item.mentions, item.attachments, item.autoModel, item.steered));
         break;
       case "assistant_text":
         out.push({ kind: "assistant", id: uid(), text: item.text, streaming: false, ...(item.unprompted ? { unprompted: true as const } : {}) });
@@ -204,7 +204,7 @@ function transcriptItemsToChatItems(items: TranscriptItem[], budget: Budget): Ch
 }
 
 /** A user row with only the extras it has (restored rows and live `user_message` events alike). */
-function userItem(text: string, turn: number | undefined, mentions: string[] | undefined, attachments: AttachmentRef[] | undefined, autoModel?: AutoModelChoice): ChatItem {
+function userItem(text: string, turn: number | undefined, mentions: string[] | undefined, attachments: AttachmentRef[] | undefined, autoModel?: AutoModelChoice, steered?: boolean): ChatItem {
   return {
     kind: "user",
     id: uid(),
@@ -213,6 +213,7 @@ function userItem(text: string, turn: number | undefined, mentions: string[] | u
     ...(mentions && mentions.length > 0 ? { mentions } : {}),
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
     ...(autoModel && typeof autoModel === "object" && typeof autoModel.reason === "string" ? { autoModel } : {}), // MARK: wave5 w5-model (§43.4)
+    ...(steered === true ? { steered: true as const } : {}), // §50: the same turn's number as the message that started it
   };
 }
 
@@ -465,6 +466,12 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Sessi
    * the engine's main lane. A refused send goes back to the front of the queue, paused with the reason.
    */
   interruptAndSend(text: string, extras?: QueuedExtras): void;
+  /**
+   * §50 "바로 보내기" (Mac `AppState.steer`): `steer` puts the message into the turn that runs — Claude reads it once the
+   * current step is done; its changes join this turn's review. Any refusal (the turn ended meanwhile, its review is being
+   * collected, another session's turn) queues it instead, so it is never lost. Resolves once it went in or was queued.
+   */
+  steer(text: string, extras?: Pick<QueuedExtras, "mentions">): Promise<void>;
   /**
    * "Always allow in this project" on the card of `requestId`: saves `pattern` (a Bash pattern or one of the request's
    * §33.6 `allowPatterns`) to this project's allow patterns, then allows that request. Never for a reason / SendMessage card.
@@ -1111,7 +1118,7 @@ export const useStore = create<Store>((set, get, api) => {
           apply(ev.state);
           break;
         case "user_message":
-          set((s) => ({ transcript: [...finishStreaming(s.transcript), userItem(ev.text, ev.turn, ev.mentions, ev.attachments, ev.autoModel)] }));
+          set((s) => ({ transcript: [...finishStreaming(s.transcript), userItem(ev.text, ev.turn, ev.mentions, ev.attachments, ev.autoModel, ev.steered)] }));
           break;
         case "text_delta":
           set((s) => ({ transcript: appendAssistant(s.transcript, ev.text, ev.unprompted === true) }));
@@ -1450,6 +1457,18 @@ export const useStore = create<Store>((set, get, api) => {
           if (paused) notice(paused, "session", r.code);
           else pumpQueue();
         });
+    },
+
+    async steer(text, extras = {}) {
+      const trimmed = text.trim();
+      if (!get().state.project || trimmed.length === 0) return;
+      const mentions = extras.mentions ?? [];
+      try {
+        await engineRequest({ type: "steer", text: trimmed, ...(mentions.length > 0 ? { mentions } : {}) });
+      } catch (e: unknown) {
+        appendLog(`[info] steer refused (${refusalOf(e).error}) — queued instead`);
+        get().enqueueMessage(trimmed, false, mentions.length > 0 ? { mentions } : {});
+      }
     },
 
     async allowAlwaysInProject(requestId, pattern) {
