@@ -9,6 +9,8 @@
  * says which one runs, Esc stops a running turn (after the palettes and the history had their Esc).
  * §23 `@` opens the file popover (mentions become chips, also dropped in from the review list); §24 images come from
  * paste, drag-drop and the attach button (thumbnail chips) — both go out with the message (and wait with it in the queue).
+ * MARK: §49 "Run as Task" (next to attach): the draft and its @ mentions start in a new workbench instead (the sheet); once
+ * the task started there, the draft empties if it still holds that text (images stay here).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { FileItem } from "@reviewgate/engine";
@@ -38,7 +40,8 @@ import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 deskto
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
 import { WaitingLine } from "../agents/AgentBits";
 // MARK: wave3 desktop-flow — §36.14 PR comments handed to the composer (desktop-agents' bridge, the same file)
-import { joinDraft, useComposerInsert } from "../../composerBridge";
+import { joinDraft, useComposerInsert, useTaskLeftComposer } from "../../composerBridge";
+import { composerTaskText, runAsTaskEnabled } from "../../runAsTask"; // MARK: §49
 // MARK: wave4 w4-safety — polish-12 a draft per chat, robustness-07 "Force restart"
 import { chatDraftKey, draftAfterKeyChange, isFirstIdentification, stashChips, takeChips } from "../../workSafety";
 import { isComposing, isEnter } from "../../ime";
@@ -62,6 +65,9 @@ export function Composer() {
   // MARK: wave1 desktop-session — §30 "세션 종료됨" offers a new chat too; polish-03 keeps the draft across a reload.
   const newChat = useStore((s) => s.newChat);
   const switchRefusal = useStore((s) => sessionSwitchRefusal(s.state));
+  // MARK: §49 Run as Task
+  const runAsTask = useStore((s) => runAsTaskEnabled(s.settings));
+  const openDialog = useStore((s) => s.openDialog);
   const keep = useMemo(() => windowStorage(), []);
 
   const [draft, setDraft] = useState(() => loadDraft(keep, chatDraftKey(root ? projectRootHash(root) : null, useStore.getState().state.sessions?.currentId)));
@@ -165,6 +171,14 @@ export function Composer() {
       el.selectionStart = el.selectionEnd = el.value.length;
       el.scrollTop = el.scrollHeight;
     });
+  });
+  // MARK: §49 — the task taken from here started in its workbench: its text leaves this composer (unless edited since).
+  useTaskLeftComposer((started) => {
+    if (composerTaskText(draft, mentions) !== started) return;
+    setNav(IDLE_NAV);
+    setDraft("");
+    setMentions([]);
+    setMentionDirs({});
   });
   useEffect(() => {
     if (!splitOpen) return;
@@ -646,6 +660,20 @@ export function Composer() {
           <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 4.5 5.8 9.2a1.5 1.5 0 0 0 2.1 2.1l5-5a3 3 0 0 0-4.2-4.2l-5.2 5.2a4.5 4.5 0 0 0 6.4 6.4L14 9.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {images.length > 0 && <span className="num">{images.length}</span>}
         </button>
+        {runAsTask && (
+          <button
+            type="button"
+            className="attach-btn plain"
+            disabled={state.project === null || viewing !== null}
+            onClick={() => openDialog({ kind: "newWorkbench", task: composerTaskText(draft, mentions) })}
+            title={t("Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is")}
+            aria-label={t("Run as Task")}
+            data-testid="Run as Task"
+          >
+            {/* §49: the Mac's arrow.triangle.branch */}
+            <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 14V2M4 2 2 4M4 2l2 2M4 10c0-3 8-2.5 8-6.5V2m0 0-2 2m2-2 2 2" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        )}
         <NextMessageModelMenu value={nextModel} onChange={setNextModel} models={state.session.availableModels ?? []} disabled={state.project === null} />
         <ModeMenu />
         {state.session.starting && <span className="caption muted" data-testid="Session starting">{t("Starting session…")}</span>}

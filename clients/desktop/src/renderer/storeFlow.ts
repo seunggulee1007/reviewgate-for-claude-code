@@ -22,8 +22,10 @@ import type {
   WorkbenchPreviewEvent,
   WorkbenchProgressEvent,
   WorkbenchSetup,
+  WorkbenchTask, // MARK: §49
 } from "@reviewgate/engine";
-import { insertIntoComposer } from "./composerBridge";
+import { insertIntoComposer, taskLeftComposer } from "./composerBridge";
+import { taskBranchPrefixOf } from "./runAsTask"; // MARK: §49
 import { engineRequest, refusalOf } from "./engineRequest";
 import { refusalMessage } from "./errorCodes";
 import { applyProgress, createdPathOf, flowRefusal, isUnknownCommand, setupReportOf, updateReason } from "./flowLogic";
@@ -48,7 +50,11 @@ export const previewKeyOf = (r: WorkbenchPreviewRequest): string => JSON.stringi
 /** A `workbench_create` with the §36.12 / §36.14 options (only sent to an engine that knows them). */
 export type WorkbenchCreateRequest = { branch: string; from?: string; fetch?: boolean; setup?: boolean; location?: WorkbenchLocation; fromPr?: WorkbenchFromPr
   /** MARK: wave4d w4d-plan — §42.1 [새 워크벤치에서 구현]: hand the pending plan to the new workbench (in this mode) before its window opens. */
-  planMode?: PermissionMode };
+  planMode?: PermissionMode;
+  /** MARK: §49 "Run as Task": the first message of the new workbench's fresh chat (its window's engine sends it). */
+  task?: WorkbenchTask;
+  /** §49: the text the composer handed over — it leaves the composer once the task started (unless edited since). */
+  handedTask?: string };
 
 /** §36.14: the PR the New Workbench sheet checks out ("Open as workbench"). */
 export type PRWorkbenchRequest = { number: number; headRef: string; baseRef: string; title: string };
@@ -291,6 +297,7 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
           ...(req.setup !== undefined ? { setup: req.setup } : {}),
           ...(req.location ? { location: req.location } : {}),
           ...(req.fromPr ? { fromPr: req.fromPr } : {}),
+          ...(req.task ? { task: req.task } : {}), // MARK: §49
         });
         await get().settle();
       } catch (e) {
@@ -302,6 +309,12 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         const d = get().dialog?.kind;
         if (d !== "newWorkbench" && d !== "newWorkbenchFromPr") set({ lastError: words, errorBanner: { message: words, scope: "git", fatal: false, code: r.code } });
         return null;
+      }
+      // MARK: §49: the next suggestion starts the way this branch did; the composer lets the task's text go.
+      if (req.task) {
+        const prefix = taskBranchPrefixOf(req.branch);
+        if (get().settings?.taskBranchPrefix !== prefix) void get().saveSettings({ taskBranchPrefix: prefix }).catch((e) => log(`[warn] taskBranchPrefix: ${e instanceof Error ? e.message : String(e)}`));
+        if (req.handedTask) taskLeftComposer(req.handedTask);
       }
       const progress = mine() ? get().flow.create!.progress : [];
       const find = () => get().state.workbenches.list.find((w) => w.branch === req.branch)?.path ?? null;

@@ -42,7 +42,7 @@ export function Dialogs() {
     case "lockConflict":
       return <LockConflictDialog />;
     case "newWorkbench":
-      return <NewWorkbenchDialog onClose={close} branch={dialog.branch} planMode={dialog.planMode} />; // MARK: wave4d w4d-plan
+      return <NewWorkbenchDialog onClose={close} branch={dialog.branch} planMode={dialog.planMode} task={dialog.task} />; // MARK: wave4d w4d-plan, §49 task
     // MARK: wave3 desktop-flow — §36.14 "Open as workbench" from the PR tab: the New Workbench sheet on the PR's head
     case "newWorkbenchFromPr":
       return <NewWorkbenchDialog onClose={close} fromPr={dialog.pr} />;

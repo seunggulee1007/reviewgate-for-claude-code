@@ -165,6 +165,12 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
         <h4>{t("Workbenches")}</h4>
         <TextField value={settings.worktreeRoot} placeholder={DEFAULT_WORKTREE_ROOT} onCommit={(v) => patch({ worktreeRoot: v })} testId="Worktree folder" />
         <div className="note">{t("New workbenches are created under this folder as <repo>-<hash>/<branch>. Never inside the repository.")}</div>
+        {/* MARK: §49 Run as Task — the composer's button, File › and the sidebar's "업무로 실행…" (default on) */}
+        <label className="check">
+          <input type="checkbox" checked={settings.runAsTaskEnabled !== false} onChange={(e) => patch({ runAsTaskEnabled: e.target.checked })} data-testid="Run as Task enabled" />
+          {t("Run as Task")}
+        </label>
+        <div className="note">{t("Adds \"Run as Task\" to the composer and the Workbenches menu: the message starts in a new workbench (its own branch, folder, window and chat), so this chat is left as it is.")}</div>
       </section>
       <section>
         <h4>{t("Commit")}</h4>

@@ -139,6 +139,34 @@ describe("§36.11–36.14 screens (wave3 desktop-flow)", () => {
     expect(out).not.toContain('data-testid="Workbench base"');
   });
 
+  // MARK: §49 Run as Task
+  it("§49 the sheet as 'Run as Task': the task, this chat's mode, the branch suggested from the task with the last prefix", async () => {
+    const { NewWorkbenchDialog } = await import("./components/dialogs/NewWorkbenchDialog");
+    setState({ settings: { taskBranchPrefix: "feature/acme/" } });
+    useStore.setState((s) => ({ state: { ...s.state, session: { ...s.state.session, permissionMode: "plan" } } }));
+    const out = html(createElement(NewWorkbenchDialog, { onClose: () => undefined, task: "장바구니 합계 오류 https://tasks.example.com/acme/4811\n\n@api/Cart.java" }));
+    expect(out).toContain(">Run as Task</h");
+    expect(out).toContain('data-testid="Run as Task text"');
+    expect(out).toContain("https://tasks.example.com/acme/4811");
+    expect(out).toContain('value="feature/acme/4811"');
+    expect(out).toMatch(/<option value="plan" selected="">Plan — /);
+    expect(out).toContain("its window sends the task in a fresh chat");
+    expect(out).toMatch(/<button type="button" class="primary"[^>]*>Run as Task<\/button>/);
+    expect(out).not.toMatch(/<button type="button" class="primary" disabled/);
+    useStore.setState((s) => ({ state: { ...s.state, session: { ...s.state.session, permissionMode: "default" } } }));
+  });
+
+  it("§49 from the menu: an empty task asks for one first (the date as the branch until then)", async () => {
+    const { NewWorkbenchDialog } = await import("./components/dialogs/NewWorkbenchDialog");
+    setState();
+    const out = html(createElement(NewWorkbenchDialog, { onClose: () => undefined, task: "" }));
+    expect(out).toContain('data-testid="New workbench hint">Describe the task</div>');
+    expect(out).toMatch(/value="task\/\d{8}-\d{4}"/);
+    expect(out).toMatch(/<button type="button" class="primary" disabled=""[^>]*>Run as Task<\/button>/);
+    // a plain New Workbench is unchanged
+    expect(html(createElement(NewWorkbenchDialog, { onClose: () => undefined }))).not.toContain("Run as Task");
+  });
+
   it("§36.12 the steps while creating, the latest log; a failed setup's banner in the new window", async () => {
     const { WorkbenchProgressView, WorkbenchSetupBanner } = await import("./components/flow/WorkbenchSetup");
     const p = (step: "fetch" | "create" | "setup", extra = {}) => ({ type: "workbench_progress" as const, path: "/w/acme-4790", branch: "b", step, ...extra });

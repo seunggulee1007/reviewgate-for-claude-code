@@ -41,6 +41,8 @@ export function buildMenu(opts: { newWindow: () => void; openInNewWindow: (path?
       { label: t("Switch Project…"), accelerator: "CmdOrCtrl+Shift+O", click: () => dispatch({ type: "switch_project" }, opts.newWindow) },
       { type: "separator" },
       { label: t("New Workbench…"), click: () => dispatch({ type: "new_workbench" }, opts.newWindow) },
+      // MARK: §49 — "Run as Task…" while Settings › Workbenches › "업무로 실행" is on (a settings change rebuilds the menu)
+      ...(loadSettings().runAsTaskEnabled !== false ? [{ label: t("Run as Task…"), click: () => dispatch({ type: "run_as_task" }, opts.newWindow) }] : []),
       { label: t("New Window"), click: () => opts.newWindow() },
       { type: "separator" },
       { label: t("Settings…"), accelerator: "CmdOrCtrl+,", click: () => dispatch({ type: "settings" }, opts.newWindow) },

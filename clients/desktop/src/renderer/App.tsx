@@ -81,6 +81,10 @@ export function App() {
         case "new_workbench":
           s.openDialog({ kind: "newWorkbench" });
           break;
+        // MARK: §49 — File › "업무로 실행…": the sheet as "Run as Task" with an empty task
+        case "run_as_task":
+          if (s.state.project) s.openDialog({ kind: "newWorkbench", task: "" });
+          break;
         case "settings":
           s.openDialog({ kind: "settings" });
           break;

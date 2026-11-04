@@ -51,6 +51,9 @@ export const DEFAULTS: AppSettings = {
   loadUserSettings: true,
   ghHost: DEFAULT_GH_HOST,
   worktreeRoot: "",
+  // MARK: §49 Run as Task
+  runAsTaskEnabled: true,
+  taskBranchPrefix: "task/",
   claudePath: "",
   ghPath: "",
   gitPath: "",

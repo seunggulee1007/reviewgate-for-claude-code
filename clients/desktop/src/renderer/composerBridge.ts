@@ -39,6 +39,27 @@ export function useComposerInsert(onInsert: Listener): void {
   }, []);
 }
 
+// MARK: §49 Run as Task — the task the composer handed over started in its workbench: the composer lets the text go.
+let taskListener: Listener | null = null;
+
+/** The task `text` (taken from the composer) started in its new workbench: the composer empties its draft if it still holds it. */
+export function taskLeftComposer(text: string): void {
+  if (text) taskListener?.(text);
+}
+
+/** The composer's side of `taskLeftComposer` (nothing waits: a composer that is not mounted has no draft to empty). */
+export function useTaskLeftComposer(onStarted: Listener): void {
+  const ref = useRef(onStarted);
+  ref.current = onStarted;
+  useEffect(() => {
+    const own: Listener = (text) => ref.current(text);
+    taskListener = own;
+    return () => {
+      if (taskListener === own) taskListener = null;
+    };
+  }, []);
+}
+
 /** The draft with `text` after it (a blank line between), or `text` alone in an empty box. */
 export function joinDraft(draft: string, text: string): string {
   const head = draft.replace(/\s+$/, "");

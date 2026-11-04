@@ -7,6 +7,8 @@
 .dialog .candidates li:hover { background: var(--accent-bg); }
 .dialog .message { white-space: pre-wrap; line-height: 1.45; }
 .dialog textarea.body { min-height: 100px; }
+/* §49 Run as Task: the task (the new workbench's first message). */
+.dialog textarea.wb-task { min-height: 72px; max-height: 160px; }
 .dialog input.mono { font-family: var(--mono); }
 /* Accept all summary (AcceptAllDialog): reuse the sidebar file rows inside a scrolling box. */
 .dialog .accept-all-list { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }

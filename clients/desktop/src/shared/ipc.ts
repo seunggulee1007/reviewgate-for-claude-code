@@ -55,6 +55,11 @@ export type AppSettings = {
   ghHost: string;
   /** "" → `~/.reviewgate/worktrees`. */
   worktreeRoot: string;
+  // MARK: §49 Run as Task
+  /** "업무로 실행" in the composer's tools, File › and the sidebar's workbench section (absent = on). */
+  runAsTaskEnabled?: boolean;
+  /** The branch prefix "Run as Task" suggests — the one the last task branch used (absent: `task/`). */
+  taskBranchPrefix?: string;
   claudePath: string;
   ghPath: string;
   gitPath: string;
@@ -172,6 +177,8 @@ export type MenuAction =
   | { type: "open_recent"; path: string }
   | { type: "switch_project" }
   | { type: "new_workbench" }
+  // MARK: §49 — File › "업무로 실행…": the New Workbench sheet as "Run as Task" with an empty task
+  | { type: "run_as_task" }
   | { type: "settings" }
   | { type: "toggle_sidebar" }
   | { type: "refresh" }

@@ -96,6 +96,7 @@ import { pagingOnRestore, summaryOfRow } from "./transcriptHistory";
 import type { FileWhy } from "@reviewgate/engine";
 // MARK: wave4b w4b-tabs — §39.2 the engine's exploration mark on tool rows (exploreFold.ts)
 import { exploreMetaOf, type ExploreMeta } from "./exploreFold";
+import { insertIntoComposer } from "./composerBridge"; // MARK: §49 a task the session could not take goes into the composer
 
 export { isReviewLocked } from "./planLock";
 
@@ -252,7 +253,9 @@ export type Dialog =
   | { kind: "gitInit" }
   | { kind: "lockConflict" }
   /** `branch`: prefilled (§33.4 `worktree_blocked` → "워크벤치로 열기"). */
-  | { kind: "newWorkbench"; branch?: string; planMode?: PermissionMode /* MARK: wave4d w4d-plan (§42.1: hand the pending plan to it) */ }
+  | { kind: "newWorkbench"; branch?: string; planMode?: PermissionMode /* MARK: wave4d w4d-plan (§42.1: hand the pending plan to it) */
+      /** MARK: §49 "Run as Task": the sheet starts the task in the new workbench (the composer's text; "" from the menus). */
+      task?: string }
   | { kind: "newBranch" }
   | { kind: "createPR" }
   | { kind: "settings"; tab?: "general" | "accounts" | "permissions" }
@@ -1165,6 +1168,13 @@ export const useStore = create<Store>((set, get, api) => {
             state: { ...s.state, session: { ...s.state.session, pendingPlan: null } },
             transcript: [...finishStreaming(s.transcript), { kind: "planApproved", id: uid(), mode: ev.mode, path: ev.path, ...(ev.into ? { line: planHandoffLine(ev) } : {}) /* MARK: wave4d w4d-plan */ }],
           }));
+          break;
+        // MARK: §49 Run as Task — a task handed to this worktree went out as the first message of a fresh chat (its
+        // `user_message` follows), or (`sent: false`) the session could not take it: it goes into the composer, once.
+        // The engine keeps the worktree's mode itself (this client has no per-project mode memory).
+        case "task_started":
+          appendLog(`[info] task from ${ev.from}: ${ev.sent ? "sent in a fresh chat" : "waiting in the composer"} (${ev.mode})`);
+          if (!ev.sent && ev.text) insertIntoComposer(ev.text);
           break;
         case "transcript_restore": {
           if (get().replaceTranscript) {

@@ -11,6 +11,7 @@ import { initI18n } from "./i18n";
 import { projectRootHash } from "../shared/hash";
 
 const inserted: string[] = [];
+const leftComposer: string[] = []; // MARK: §49 the task texts that left the composer
 vi.mock("./composerBridge", () => ({
   insertIntoComposer: (text: string) => {
     inserted.push(text);
@@ -18,6 +19,8 @@ vi.mock("./composerBridge", () => ({
   },
   joinDraft: (d: string, text: string) => (d ? `${d}\n\n${text}` : text),
   useComposerInsert: () => undefined,
+  taskLeftComposer: (text: string) => void leftComposer.push(text),
+  useTaskLeftComposer: () => undefined,
 }));
 
 type Reply = { ok: true; reply: unknown } | { ok: false; error: string; code?: string; paths?: string[] };
@@ -108,6 +111,7 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     opened.length = 0;
     composed.length = 0;
     inserted.length = 0;
+    leftComposer.length = 0;
     savedPatches = [];
     reports = {};
     windowFor = () => false;
@@ -205,6 +209,59 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     useStore.setState({ dialog: null });
     expect(await useStore.getState().createWorkbenchWith({ branch: "feature/y", from: "origin/develop", fetch: true })).toBeNull();
     expect(useStore.getState().errorBanner?.message).toBe("Could not fetch from the remote: fatal: couldn't find remote ref develop"); // the sheet was closed
+  });
+
+  // ---------------------------------------------------------------- §49 Run as Task
+
+  it("§49 the task goes out with workbench_create; once created the prefix is remembered and the composer lets the text go", async () => {
+    let finish: (() => void) | null = null;
+    respond = (c) => (c.type === "workbench_create" ? new Promise((r) => (finish = () => r({ ok: true, reply: { type: "result", ok: true } }))) : { ok: true, reply: { type: "result", ok: true } });
+    useStore.setState({ dialog: { kind: "newWorkbench", task: "Fix the cart https://tasks.example.com/acme/4801" } });
+    const created = useStore.getState().createWorkbenchWith({ branch: "feature/acme/4801", from: "develop", task: { text: "Fix the cart https://tasks.example.com/acme/4801", mode: "plan" }, handedTask: "Fix the cart https://tasks.example.com/acme/4801" });
+    await flush();
+    // The composer's text is the sheet's business: only the task goes on the wire.
+    expect(sent.find((c) => c.type === "workbench_create")).toEqual({ type: "workbench_create", branch: "feature/acme/4801", from: "develop", task: { text: "Fix the cart https://tasks.example.com/acme/4801", mode: "plan" } });
+    useStore.getState().handleEvent({ type: "workbench_progress", path: "/work/acme-4801", branch: "feature/acme/4801", step: "done" });
+    expect(leftComposer).toEqual([]); // not before it was created
+    finish!();
+    expect(await created).toBe("/work/acme-4801");
+    expect(savedPatches).toContainEqual({ taskBranchPrefix: "feature/acme/" });
+    expect(leftComposer).toEqual(["Fix the cart https://tasks.example.com/acme/4801"]);
+    expect(opened).toEqual([{ path: "/work/acme-4801", report: undefined }]);
+    expect(useStore.getState().dialog).toBeNull();
+    expect(inserted).toEqual([]); // nothing is sent or put back from here
+    expect(sent.some((c) => c.type === "send")).toBe(false);
+  });
+
+  it("§49 a task from the menu (nothing handed over) leaves the composer alone; a refused one keeps the text and remembers nothing", async () => {
+    useStore.setState({ dialog: { kind: "newWorkbench", task: "" } });
+    await useStore.getState().createWorkbenchWith({ branch: "hotfix-4802", task: { text: "ABC-4802" } });
+    expect(sent.find((c) => c.type === "workbench_create")).toEqual({ type: "workbench_create", branch: "hotfix-4802", task: { text: "ABC-4802" } });
+    expect(savedPatches).toContainEqual({ taskBranchPrefix: "" });
+    expect(leftComposer).toEqual([]);
+    savedPatches = [];
+    respond = (c) => (c.type === "workbench_create" ? { ok: false, error: "invalid_task", code: "invalid_task" } : { ok: true, reply: { type: "result", ok: true } });
+    useStore.setState({ dialog: { kind: "newWorkbench", task: "x" } });
+    expect(await useStore.getState().createWorkbenchWith({ branch: "task/4803", task: { text: " " }, handedTask: " " })).toBeNull();
+    expect(useStore.getState().flow.create).toMatchObject({ running: false, error: "Describe the task first (at most 100,000 characters)." });
+    respond = (c) => (c.type === "workbench_create" ? { ok: false, error: "task_handoff_failed:EACCES", code: "task_handoff_failed" } : { ok: true, reply: { type: "result", ok: true } });
+    expect(await useStore.getState().createWorkbenchWith({ branch: "task/4804", task: { text: "Fix it" }, handedTask: "Fix it" })).toBeNull();
+    expect(useStore.getState().flow.create?.error).toBe("The workbench was created, but the task could not be handed to it: EACCES");
+    expect(useStore.getState().dialog).toEqual({ kind: "newWorkbench", task: "x" }); // the sheet stays, with the text
+    expect(savedPatches).toEqual([]);
+    expect(leftComposer).toEqual([]);
+    expect(opened).toEqual([]);
+  });
+
+  it("§49 task_started: a task sent in a fresh chat stays out of the composer; one the session could not take goes into it, once", () => {
+    const h = useStore.getState().handleEvent;
+    h({ type: "task_started", text: "Fix the cart", mode: "plan", from: "/work/acme", sent: true });
+    expect(inserted).toEqual([]);
+    h({ type: "task_started", text: "Fix the cart", mode: "auto", from: "/work/acme", sent: false });
+    expect(inserted).toEqual(["Fix the cart"]);
+    h({ type: "task_started", text: "", mode: "default", from: "/work/acme", sent: false });
+    expect(inserted).toEqual(["Fix the cart"]);
+    expect(sent.some((c) => c.type === "send")).toBe(false);
   });
 
   it("§36.12 a new workbench's window takes its failed setup's report once its project opens", async () => {

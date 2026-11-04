@@ -13,6 +13,7 @@ import { PEER_MODES, peerModeLabel } from "../peer";
 import { TabStatusDot } from "./TabAttention";
 import { OtherSessionsSection } from "./OtherSessions"; // MARK: wave3 desktop-session
 import { removeRecent, useRecentEntries } from "../recentProjects"; // MARK: wave4 w4-install
+import { runAsTaskEnabled } from "../runAsTask"; // MARK: §49
 
 export function Sidebar() {
   const tab = useStore((s) => s.tab);
@@ -131,6 +132,7 @@ function ProjectSwitcher() {
   const chooseAndOpen = useStore((s) => s.chooseAndOpen);
   const closeProject = useStore((s) => s.closeProject);
   const openDialog = useStore((s) => s.openDialog);
+  const runAsTask = useStore((s) => runAsTaskEnabled(s.settings)); // MARK: §49
   const pruneWorkbenches = useStore((s) => s.pruneWorkbenches);
   const setPeerMode = useStore((s) => s.setPeerMode);
   const current = state.project?.path ?? state.gitInit?.path ?? null;
@@ -173,6 +175,8 @@ function ProjectSwitcher() {
   if (state.workbenches.list.length === 0) items.push({ kind: "item", label: t("No workbenches"), disabled: true });
   items.push(
     { kind: "item", label: t("New Workbench…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench" }), testId: "New Workbench…" },
+    // MARK: §49 — "업무로 실행…" starts with an empty task
+    ...(runAsTask ? [{ kind: "item" as const, label: t("Run as Task…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench", task: "" }), testId: "Run as Task…" }] : []),
     { kind: "item", label: t("Prune"), disabled: !state.project, onClick: () => void pruneWorkbenches() },
     { kind: "sep" },
     { kind: "item", label: t("Open Project…"), onClick: () => void chooseAndOpen("switch") },

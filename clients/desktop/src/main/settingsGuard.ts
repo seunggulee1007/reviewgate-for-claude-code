@@ -82,6 +82,9 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   loadUserSettings: bool,
   ghHost: host,
   worktreeRoot: folder,
+  // MARK: §49 Run as Task — the switch, and the prefix the last task branch used ("" or path parts ending in `/`)
+  runAsTaskEnabled: bool,
+  taskBranchPrefix: (v) => text(200, { singleLine: true })(v) && /^(?:[A-Za-z0-9._-]+\/)*$/.test(v as string),
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),
   commitPushByDefault: bool,
   commitTrailer: text(1000, { singleLine: true }),

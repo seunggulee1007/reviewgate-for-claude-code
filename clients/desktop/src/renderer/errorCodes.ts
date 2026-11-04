@@ -184,6 +184,9 @@ export const REFUSAL_CODES = [
   // MARK: wave3 desktop-session — §36.7–36.9
   "extensions_on",
   "cli_session_running",
+  // MARK: §49 Run as Task — `workbench_create {task}`
+  "invalid_task",
+  "task_handoff_failed",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -488,6 +491,11 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("Not a valid branch name: {0}", d);
     case "invalid_mode":
       return t("Not a permission mode: {0}", d);
+    // MARK: §49 Run as Task — nothing is created for an empty / too long task; a failed handoff leaves the worktree
+    case "invalid_task":
+      return t("Describe the task first (at most 100,000 characters).");
+    case "task_handoff_failed":
+      return t("The workbench was created, but the task could not be handed to it: {0}", d);
     case "locked_by_other_session":
       return t("Another ReviewGate session (pid {0}) has this project open.", d);
     case "no_hunks":
