@@ -215,6 +215,7 @@ import { dropIncoming, moveTarget, readIncoming, waitForExit, writeHandoff, type
 // MARK: wave4d w4d-plan — §42.1
 import { applyTaskTool, displayPlanPath, messageSteps, planCandidates, planFilesNamed, planStepBriefs, planView, readPlanFile, requestScope, resolvePlanPath, todoWriteSteps, type TaskItem } from "./review/planSources.js";
 import { implementPlanText, takePlanHandoff, writePlanHandoff, type PlanHandoff } from "./review/planHandoff.js";
+import { takeTaskHandoff, taskText, writeTaskHandoff, type TaskHandoff } from "./review/taskHandoff.js";
 import { sessionTranscriptPath } from "./review/sessions.js";
 import { turnRefs } from "./review/persist.js";
 import type { ChatMoveBaseline } from "./protocol.js";
@@ -524,6 +525,8 @@ export class ReviewEngine {
   private chatPlan: ChatPlanMemory | null = null;
   /** A plan another worktree handed here (`plan_response{into:"workbench"}`): implemented in a fresh chat once the session runs. */
   private receivedPlan: PlanHandoff | null = null;
+  /** §49: a task handed to this worktree (`workbench_create {task}` in another window), sent once the session runs. */
+  private receivedTask: TaskHandoff | null = null;
   /** Plan files `plan_follow` can choose from (read when the project opens and after every turn). */
   private planCandidateList: string[] = [];
   /**
@@ -1725,6 +1728,20 @@ export class ReviewEngine {
     void this.handle({ type: "send", text: got.text });
   }
 
+  /**
+   * §49: a task handed to this worktree: its text is the fresh chat's first message — a normal send through the gate — once
+   * the session runs; when it cannot take a message the client gets the text back for the composer (`sent: false`).
+   */
+  private afterTaskReceived(): void {
+    const got = this.receivedTask;
+    this.receivedTask = null;
+    if (!got) return;
+    const sent = canSend(this.slices());
+    this.log("info", `task from ${got.from.path}: ${sent ? "sent in a fresh chat" : "the session cannot take it yet — back to the composer"} (${this.sessionState.permissionMode})`);
+    this.emit({ type: "task_started", text: got.text, mode: this.sessionState.permissionMode, from: got.from.path, sent });
+    if (sent) void this.handle({ type: "send", text: got.text });
+  }
+
   /** `plan_follow {path}`: the plan file this chat's summaries follow (kept with the chat); null / "" = the automatic sources. */
   private planFollow(path: unknown): void {
     const root = this.project?.root;
@@ -2023,6 +2040,7 @@ export class ReviewEngine {
     else await this.startSession(path, null, current?.id ?? null);
     this.afterReceived(); // MARK: wave4b w4b-follow — §39.4 (nothing awaited after the start)
     this.afterPlanReceived(); // MARK: wave4d w4d-plan — §42.1
+    this.afterTaskReceived(); // §49
   }
 
   /**
@@ -2089,8 +2107,14 @@ export class ReviewEngine {
       this.receivedPlan = planIn;
       this.restoreMode(planIn.mode);
     }
+    // §49: a task started here from another window gets a fresh chat too (a moved chat or a plan comes first: it waits).
+    const taskIn = received || planIn ? null : takeTaskHandoff(dir);
+    if (taskIn) {
+      this.receivedTask = taskIn;
+      if (taskIn.mode) this.restoreMode(taskIn.mode);
+    }
     const existing = stored.sessionId ? idx.get(stored.sessionId) : undefined;
-    const current = received ?? (planIn ? idx.create() : undefined) ?? existing ?? idx.create();
+    const current = received ?? (planIn || taskIn ? idx.create() : undefined) ?? existing ?? idx.create();
     this.openTabIds = [...new Set(stored.openTabIds.filter((id) => idx.get(id) !== undefined))];
     this.bindSession(current);
     await this.side.load(current.id);
@@ -3641,6 +3665,10 @@ export class ReviewEngine {
   private async workbenchCreate(cmd: Extract<EngineCommand, { type: "workbench_create" }>): Promise<void> {
     const cp = this.requireProject();
     const name = cmd.branch.trim();
+    // §49: a task is checked before anything is created.
+    const task = cmd.task === undefined ? null : { text: taskText(cmd.task?.text), mode: cmd.task?.mode };
+    if (task && task.text === null) throw new CommandRefused("invalid_task");
+    if (task && task.mode !== undefined && !isPermissionMode(task.mode)) throw new CommandRefused("invalid_mode");
     if (!(await isValidBranchName(cp.root, name))) throw new CommandRefused(`invalid_branch_name:${cmd.branch}`);
     const [common, worktrees] = await Promise.all([commonDir(cp.root), listWorktrees(cp.root)]);
     const inUse = worktrees.find((w) => w.branch === name);
@@ -3688,10 +3716,27 @@ export class ReviewEngine {
     } finally {
       if (tempRef) await cp.git(["update-ref", "-d", tempRef], { allowFailure: true }).catch(() => undefined);
     }
+    if (task?.text) await this.handTaskTo(path, cp.root, task.text, task.mode);
     const setupExit = cmd.setup === false ? undefined : await this.prepareWorkbench(cp.root, path, ws, progress);
     progress("done", setupExit !== undefined ? { exitCode: setupExit } : {});
     await this.refreshBranches();
     await this.refreshWorkbenches(false);
+  }
+
+  /**
+   * §49: the task goes into the new worktree's git dir, where its window's engine takes it on `open_project`. A write that
+   * fails refuses the create (`task_handoff_failed`) — the worktree is there, the task text stays with the client.
+   */
+  private async handTaskTo(path: string, fromRoot: string, text: string, mode: PermissionMode | undefined): Promise<void> {
+    try {
+      const gitDir = await resolveGitDir(path);
+      await writeTaskHandoff(gitDir, { version: 1, from: { path: fromRoot, name: basename(fromRoot) }, text, ...(mode ? { mode } : {}), at: new Date().toISOString() });
+      this.log("info", `task handed to ${path}${mode ? ` (${mode})` : ""}`);
+    } catch (e) {
+      await this.refreshWorkbenches(false).catch(() => undefined);
+      this.log("warn", `workbench_create: handing the task to ${path} failed: ${errorMessage(e)}`);
+      throw new CommandRefused(`task_handoff_failed:${errorMessage(e)}`, { code: "task_handoff_failed" });
+    }
   }
 
   private async workbenchRemove(path: string, force: boolean): Promise<void> {

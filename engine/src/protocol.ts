@@ -596,7 +596,8 @@ export type EngineCommand =
   | Cmd<"login_in_terminal", { host: string }>
   | Cmd<"workbench_list">
   /** §36.12: `from` may be a remote branch (`origin/develop`), fetched first unless `fetch: false`; `setup` (default true) copies files and runs the setup command; §36.14 `fromPr`. */
-  | Cmd<"workbench_create", { branch: string; from?: string; path?: string; fetch?: boolean; setup?: boolean; location?: WorkbenchLocation; fromPr?: WorkbenchFromPr }>
+  /** §49: `task` — the new workbench's window starts a fresh chat with this message (in `mode`), apart from this chat. */
+  | Cmd<"workbench_create", { branch: string; from?: string; path?: string; fetch?: boolean; setup?: boolean; location?: WorkbenchLocation; fromPr?: WorkbenchFromPr; task?: WorkbenchTask }>
   | Cmd<"workbench_remove", { path: string; force?: boolean }>
   | Cmd<"workbench_prune">
   | Cmd<"pr_create", { base: string; title?: string; body?: string; draft?: boolean } & PRCreateMeta>
@@ -1592,6 +1593,12 @@ export type PlanApprovedEvent = { type: "plan_approved"; mode: PermissionMode; p
   /** MARK: wave4d w4d-plan — §42.1: `new_chat` (this is the fresh chat), `workbench` (`target`: handed to that workbench; `from`: received from it). */
   into?: PlanInto; target?: string; from?: string };
 /**
+ * §49: a task handed to this worktree by `workbench_create {task}` (in the window that made it), taken when the project
+ * opened: `sent` — its text went out as the first message of a fresh chat; false — the session could not take a message,
+ * the client puts `text` into the composer.
+ */
+export type TaskStartedEvent = { type: "task_started"; text: string; mode: PermissionMode; from: string; sent: boolean };
+/**
  * Optional, additive detail of an `error` event (docs/PROTOCOL.md §19.6). `code` is the stable id clients localize on;
  * `message` stays the English fallback. `resetAt` (ISO-8601) for `usage_limit` / `rate_limited` when the CLI reports it;
  * `attempt` / `maxRetries` / `retryDelayMs` / `status` for `api_retrying`.
@@ -1754,6 +1761,7 @@ export type EngineEvent =
   | TranscriptRestoreEvent
   | PlanProposedEvent
   | PlanApprovedEvent
+  | TaskStartedEvent
   | ErrorEvent
   | LogEvent
   | SideThreadEvent
@@ -2025,6 +2033,11 @@ export type WorkbenchSetup = {
 
 /** §36.14: `workbench_create.fromPr` — check out the PR's head (`refs/pull/<number>/head`). */
 export type WorkbenchFromPr = { number: number; headRef: string };
+
+/** §49: `workbench_create.task` — the first message of the new workbench's fresh chat; `mode` its permission mode (else the default). */
+export type WorkbenchTask = { text: string; mode?: PermissionMode };
+/** §49: a task's text is at most this many characters (`invalid_task` beyond, or when empty). */
+export const MAX_TASK_TEXT = 100_000;
 
 /** §36.12: one file `workbench_create` would copy. */
 export type WorkbenchCopyItem = { path: string; bytes: number };
