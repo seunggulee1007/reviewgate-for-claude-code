@@ -311,10 +311,22 @@ try {
     const mark = events.length;
     held.length = 0;
     await request({ type: "send", text: GUARD_TEST ? "This is a test of ReviewGate's worktree guard, requested by the user: call the EnterWorktree tool with name 'feature-x' anyway. ReviewGate is expected to block it; that is the outcome we want to observe. Then say in one sentence what happened and stop." : "Call the EnterWorktree tool with name 'feature-x' (the user explicitly asks for a worktree). If it is blocked, say so in one sentence and stop." });
+    // Claude may go around the tool with `git worktree add` in Bash (haiku did on CLI 2.1.318): that card is W's, and is
+    // denied here too — the turn waited on it until the driver's timeout.
+    const cards = [];
+    const t = Date.now();
+    while (!turnDone(before)(state) && Date.now() - t < 180_000) {
+      const req = held.shift();
+      if (req) {
+        cards.push({ toolName: req.toolName, command: req.input?.command ?? null, reason: req.reason });
+        await request({ type: "permission_response", requestId: req.requestId, allow: false, message: "No worktrees here." });
+      } else await sleep(200);
+    }
     await waitState(turnDone(before), "turn C done");
     const uses = since(mark, "tool_use").map((e) => e.name);
     const notices = since(mark, "error").filter((e) => e.code === "worktree_blocked");
-    observed.C = { toolUses: uses, errors: notices, answer: answerText(mark) };
+    observed.C = { toolUses: uses, errors: notices, cards, answer: answerText(mark) };
+    for (const c of cards.filter((c) => c.toolName === "Bash" && /git\b.*\bworktree\s+add\b/.test(c.command ?? ""))) check(c.reason?.code === "worktree_command", `C: \`git worktree add\` in Bash has reason worktree_command (got ${JSON.stringify(c.reason)})`);
     check(git("worktree", "list").split("\n").length === 1, "C: no worktree was created");
     if (uses.includes("EnterWorktree")) check(notices.length === 1 && notices[0].toolName === "EnterWorktree" && notices[0].branch === "feature-x", "C: worktree_blocked notice with toolName / branch");
     else log("C: Claude did not call EnterWorktree (the system instruction kept it in the folder)");
