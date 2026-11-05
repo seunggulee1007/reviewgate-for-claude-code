@@ -95,6 +95,8 @@ public final class FlowToolsStore {
     public var commitMessageDraft: String?
     /// A draft that finished — also after its sheet was closed — until a commit sheet takes it (`takeFinishedCommitDraft`).
     public private(set) var finishedCommitDraft: String?
+    /// §53: the last series "커밋 N개 만들기" made (the Changes banner names its commits while it shows the last of them).
+    public internal(set) var lastSeries: CommittedSeries?
     // §36.12
     public private(set) var preview: WorkbenchPreviewReply?
     /// What `preview` was asked for.
@@ -137,6 +139,7 @@ public final class FlowToolsStore {
         commitDraftError = nil
         commitMessageDraft = nil
         finishedCommitDraft = nil
+        lastSeries = nil
         preview = nil
         previewRequest = nil
         isLoadingPreview = false

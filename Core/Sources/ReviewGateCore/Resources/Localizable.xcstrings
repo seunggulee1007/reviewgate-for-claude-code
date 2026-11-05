@@ -65,6 +65,22 @@
         }
       }
     },
+    "%@ cannot be committed this way — it is not an accepted file, or the part is gone": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ cannot be committed this way — it is not an accepted file, or the part is gone"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@은(는) 이렇게 커밋할 수 없어요 — 수락한 파일이 아니거나 그 부분이 사라졌어요"
+          }
+        }
+      }
+    },
     "%@ changed (%@) — it may hold secrets, so its content is not kept and the change cannot be reverted.": {
       "localizations": {
         "en": {
@@ -125,6 +141,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@이(가) 이번 턴 전 상태로 돌아가요."
+          }
+        }
+      }
+    },
+    "%@ is in two commits — a part can only be in one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is in two commits — a part can only be in one"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 두 커밋에 들어 있어요 — 한 부분은 한 커밋에만 넣을 수 있어요"
           }
         }
       }
@@ -833,6 +865,22 @@
         }
       }
     },
+    "A commit has no message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A commit has no message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지가 비어 있는 커밋이 있어요"
+          }
+        }
+      }
+    },
     "A deleted file cannot be reverted part by part — reject the whole file instead": {
       "localizations": {
         "en": {
@@ -1069,6 +1117,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "심볼릭 링크는 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "Add a commit first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a commit first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋을 먼저 추가해 주세요"
           }
         }
       }
@@ -2417,6 +2481,38 @@
         }
       }
     },
+    "Claude could not split the changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not split the changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 변경을 나누지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude could not split the changes: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not split the changes: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 변경을 나누지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Claude went on by itself": {
       "localizations": {
         "en": {
@@ -3703,6 +3799,22 @@
         }
       }
     },
+    "Close this sheet — some commits were already made": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this sheet — some commits were already made"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창을 닫아 주세요 — 일부 커밋은 이미 만들어졌어요"
+          }
+        }
+      }
+    },
     "Closing stops this turn.": {
       "localizations": {
         "en": {
@@ -3843,6 +3955,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "명령은 Claude Code의 자동 판단으로 실행돼요. 파일 변경은 그대로 리뷰돼요."
+          }
+        }
+      }
+    },
+    "Commit %lld has no changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit %lld has no changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번째 커밋에 변경이 없어요"
+          }
+        }
+      }
+    },
+    "Commit %lld has no message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit %lld has no message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번째 커밋에 메시지가 없어요"
+          }
+        }
+      }
+    },
+    "Committing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Committing…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋하는 중…"
           }
         }
       }
@@ -5159,6 +5319,38 @@
         }
       }
     },
+    "git could not commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git could not commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git이 커밋하지 못했어요"
+          }
+        }
+      }
+    },
+    "git could not commit: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git could not commit: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git이 커밋하지 못했어요: %@"
+          }
+        }
+      }
+    },
     "GitHub CLI (gh) is not installed — install it or set its path in Settings": {
       "localizations": {
         "en": {
@@ -5927,6 +6119,22 @@
         }
       }
     },
+    "Loading…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "불러오는 중…"
+          }
+        }
+      }
+    },
     "Loads only in the Claude Code session that made it": {
       "localizations": {
         "en": {
@@ -6051,6 +6259,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "낮음"
+          }
+        }
+      }
+    },
+    "Made %lld commit(s): %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Made %lld commit(s): %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 %lld개를 만들었어요 (%@)"
           }
         }
       }
@@ -8199,6 +8423,22 @@
         }
       }
     },
+    "pushed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pushed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "푸시함"
+          }
+        }
+      }
+    },
     "Puts the proposal back on disk and in the review, pending": {
       "localizations": {
         "en": {
@@ -9695,6 +9935,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "스킬 %@"
+          }
+        }
+      }
+    },
+    "Splitting…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Splitting…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나누는 중…"
           }
         }
       }
@@ -11603,6 +11859,22 @@
         }
       }
     },
+    "then it stopped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "then it stopped"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그다음에 멈췄어요"
+          }
+        }
+      }
+    },
     "There are no pending changes by Claude to revert.": {
       "localizations": {
         "en": {
@@ -11615,6 +11887,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "되돌릴 Claude 변경이 없습니다."
+          }
+        }
+      }
+    },
+    "There are unresolved merge conflicts — resolve them first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There are unresolved merge conflicts — resolve them first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "풀지 않은 병합 충돌이 있어요 — 먼저 해결해 주세요"
           }
         }
       }
