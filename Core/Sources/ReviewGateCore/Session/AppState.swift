@@ -693,7 +693,7 @@ public final class AppState {
             nodeToolchain = await client.toolchain
             enginePID = await client.enginePID
             await settle()
-        } catch EngineClientError.refused(let message, _, _) where message.hasPrefix("locked_by_other_session") {
+        } catch EngineClientError.refused(let message, _, _, _) where message.hasPrefix("locked_by_other_session") {
             engineStarted = true
             nodeToolchain = await client.toolchain
             enginePID = await client.enginePID
@@ -1357,7 +1357,7 @@ public final class AppState {
         do {
             try await request(command)
         } catch let error as EngineClientError where error.refusalCode == "file_changed_since_review" {
-            guard case let .refused(message, _, paths) = error else { return }
+            guard case let .refused(message, _, paths, _) = error else { return }
             let edited = paths.isEmpty ? Self.pathsOfRefusal(message) : paths
             forceRejectRequest = ForceRejectRequest(command: command, paths: edited)
         } catch let error as EngineClientError {
@@ -1532,7 +1532,7 @@ public final class AppState {
             await settle()
             return lastCommit.flatMap { $0.sha == sha ? $0 : nil }
                 ?? LastCommit(sha: sha, shortSha: shortSha, message: message, branch: branch, pushed: pushed, files: paths ?? [])
-        } catch EngineClientError.refused(let code, _, _) {
+        } catch EngineClientError.refused(let code, _, _, _) {
             engineStarted = true
             lastError = code
             await settle()
@@ -1592,7 +1592,7 @@ public final class AppState {
             replaceTranscriptOnRestore = false
             appendLog("[warn] \(command.type): \(error.localizedDescription)")
             // A refusal (`session_busy`, `review_pending`, …) becomes a non-fatal error row so the user sees why.
-            if case EngineClientError.refused(let code, _, _) = error { fail(Self.sessionRefusalText(code), fatal: false) }
+            if case EngineClientError.refused(let code, _, _, _) = error { fail(Self.sessionRefusalText(code), fatal: false) }
             else { fail(error.localizedDescription, fatal: false) }
             return false
         }
@@ -1654,7 +1654,7 @@ public final class AppState {
             await settle()
             return true
         } catch {
-            if case EngineClientError.refused(let code, _, _) = error { lastError = Self.sessionRefusalText(code) } else { lastError = error.localizedDescription }
+            if case EngineClientError.refused(let code, _, _, _) = error { lastError = Self.sessionRefusalText(code) } else { lastError = error.localizedDescription }
             appendLog("[warn] session_delete: \(error.localizedDescription)")
             return false
         }
@@ -1746,7 +1746,7 @@ public final class AppState {
             try await request(command)
             await settle()
             return true
-        } catch let EngineClientError.refused(code, errorCode, paths) {
+        } catch let EngineClientError.refused(code, errorCode, paths, _) {
             // Every hunk of the file = a whole-file reject: parity with the other client, ask before discarding the user's edit.
             let allHunks = Set(wholeReviewDiff(path: file.path)?.diff.hunks.map(\.id) ?? [])
             if (errorCode ?? HunkRefusal.from(code).code) == "file_changed_since_review", !allHunks.isEmpty, Set(hunks) == allHunks {
@@ -1791,7 +1791,7 @@ public final class AppState {
             reviewHistory = entries
             currentReviewRound = current   // wave2 mac-flow (§34.4): the round in progress, on top of the list
             historyLoadError = nil
-        } catch EngineClientError.refused(let code, _, _) {
+        } catch EngineClientError.refused(let code, _, _, _) {
             historyLoadError = ReviewHistoryText.refusal(code)
             appendLog("[warn] review_history: \(code)")
         } catch {
@@ -1827,7 +1827,7 @@ public final class AppState {
             historyDiff = diff
             historyDiffTruncated = truncated
             historyWhy = why   // wave4 w4-history (§38.3)
-        } catch EngineClientError.refused(let code, _, _) {
+        } catch EngineClientError.refused(let code, _, _, _) {
             guard historySelection == selection else { return }
             historyDiffError = ReviewHistoryText.refusal(code)
         } catch {
@@ -2093,6 +2093,8 @@ public final class AppState {
         case .historyCleanup:   // MARK: wave4b w4b-bigturn — §39.1: consumed by `historyCleanup(keep:apply:)`
             break
         case .commitFormat, .prDraft, .prAiDraft, .taskOutput, .taskBackground:   // MARK: wave4c w4c-commit — §41.1 (§51, §52): replies, consumed by their requests
+            break
+        case .commitHunks, .commitSplitDraft, .committedSeries:   // §53: replies, consumed by their requests
             break
         case .fileLines, .fileImage:   // MARK: wave4c w4c-review — §41.3 replies, consumed by the request that asked
             break

@@ -611,6 +611,14 @@ public enum EngineCommand: Sendable, Equatable {
     /// §51: the PR sheet's title / description written by a read-only fork from the branch's commits and diff since `base`,
     /// the repository's PR template and the sheet's `title` / `body` → `.prAiDraft` (nothing is pushed or created).
     case prAiDraft(base: String, title: String, body: String)
+    // MARK: §53 commits in meaningful units
+    /// §53: the accepted files as hunks of `git diff HEAD` → `.commitHunks`. `paths` as `commit`.
+    case commitHunks(paths: [String]? = nil)
+    /// §53: Claude's proposal of the split, in a read-only fork (side lane) → `.commitSplitDraft`. `paths` as `commit`.
+    case commitSplitDraft(paths: [String]? = nil)
+    /// §53: the commits in order (the hooks run, the worktree untouched), then one push when `push` (nil: the engine's
+    /// default) → `.committedSeries`.
+    case commitSeries(commits: [CommitPlan], push: Bool? = nil)
     /// §41.1: `pr_create` with the assignee / labels / reviewers / projects (→ `.prCreated`).
     case prCreateMeta(base: String, title: String?, body: String?, draft: Bool?, meta: PRCreateMeta)
     // MARK: wave4c w4c-review
@@ -764,6 +772,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .commitFormat: "commit_format"   // wave4c w4c-commit
         case .prDraft: "pr_draft"
         case .prAiDraft: "pr_ai_draft"   // §51
+        case .commitHunks: "commit_hunks"   // §53
+        case .commitSplitDraft: "commit_split_draft"
+        case .commitSeries: "commit_series"
         case .prCreateMeta: "pr_create"
         case .historyFileLines: "history_file_lines"   // wave4c w4c-review
         case .prFileLines: "pr_file_lines"
@@ -1091,6 +1102,8 @@ extension EngineCommand: Encodable {
         // MARK: wave4c w4c-commit (§41.1)
         case .commitFormat, .prDraft, .prCreateMeta, .prAiDraft:
             try encodeTeamFormatFields(to: encoder)
+        case .commitHunks, .commitSplitDraft, .commitSeries:   // §53
+            try encodeCommitSeriesFields(to: encoder)
         case let .accept(paths), let .unaccept(paths):
             try c.encode(paths, forKey: .paths)
         case let .reject(paths, force):
@@ -2650,8 +2663,8 @@ public enum EngineEvent: Sendable, Equatable {
     case ready(id: String?, engineVersion: String, platform: String, protocolVersion: Int)
     case state(ReviewState)
     /// §19.6: `code` is the refusal's stable id (older engines omit it); `paths` the files it is about
-    /// (`file_changed_since_review`, §19.1).
-    case result(id: String, ok: Bool, error: String?, code: String? = nil, paths: [String]? = nil)
+    /// (`file_changed_since_review`, §19.1); `partial` the commits a `commit_series` made before it failed (§53).
+    case result(id: String, ok: Bool, error: String?, code: String? = nil, paths: [String]? = nil, partial: CommittedSeries? = nil)
     /// `endTree` (scope `.turn`): the `gate.turnEndTree` the diff was computed for — `reject_hunks.expectedEndTree` (§17).
     /// §34 `info`: the range shown, its old side and whether it was served while a turn runs (read-only).
     case fileDiff(id: String?, scope: DiffScope, path: String, diff: FileDiff, truncated: Bool, endTree: String? = nil, info: FileDiffInfo = FileDiffInfo())
@@ -2766,6 +2779,13 @@ public enum EngineEvent: Sendable, Equatable {
     case prDraft(PRDraftReply)
     /// §51: reply to `pr_ai_draft`.
     case prAiDraft(PRAiDraftReply)
+    // MARK: §53 commits in meaningful units
+    /// Reply to `commit_hunks`.
+    case commitHunks(CommitHunksReply)
+    /// Reply to `commit_split_draft`.
+    case commitSplitDraft(CommitSplitDraftReply)
+    /// Reply to `commit_series`.
+    case committedSeries(CommittedSeries)
     // MARK: §52 background work
     /// A turn Claude started itself (`turn` is its number); its row opens the turn.
     case autoTurn(turn: Int, info: AutoTurnInfo)
@@ -2812,7 +2832,7 @@ public enum EngineEvent: Sendable, Equatable {
              let .committed(id, _, _, _, _), let .toolOutput(id, _, _, _), let .reviewHistory(id, _, _, _),
              let .historyDiff(id, _, _, _, _, _), let .sideThread(id, _), let .sideThreads(id, _, _), let .sidePromoteDraft(id, _, _),
              let .mcpStatus(id, _, _), let .files(id, _, _), let .attachment(id, _, _, _), let .rewound(id, _, _, _, _, _): id
-        case let .result(id, _, _, _, _): id
+        case let .result(id, _, _, _, _, _): id
         case let .agentReport(reply): reply.id   // wave3 mac-agents
         case let .commitDraft(reply): reply.id   // wave3 mac-flow
         case let .workbenchPreview(reply): reply.id
@@ -2827,6 +2847,9 @@ public enum EngineEvent: Sendable, Equatable {
         case let .commitFormat(reply): reply.id   // wave4c w4c-commit
         case let .prDraft(reply): reply.id
         case let .prAiDraft(reply): reply.id   // §51
+        case let .commitHunks(reply): reply.id   // §53
+        case let .commitSplitDraft(reply): reply.id
+        case let .committedSeries(reply): reply.id
         case let .taskOutput(reply): reply.id   // §52
         case let .taskBackground(reply): reply.id
         case let .fileLines(reply): reply.id   // wave4c w4c-review
@@ -2871,6 +2894,7 @@ extension EngineEvent: Decodable {
         case current   // wave2 contract
         case cli   // wave3 mac-session
         case start, why   // wave4 w4-history
+        case partial   // §53
     }
 
     public init(from decoder: Decoder) throws {
@@ -2894,7 +2918,8 @@ extension EngineEvent: Decodable {
                 ok: try c.decodeIfPresent(Bool.self, forKey: .ok) ?? false,
                 error: try c.decodeIfPresent(String.self, forKey: .error),
                 code: try? c.decodeIfPresent(String.self, forKey: .code),
-                paths: try? c.decodeIfPresent([String].self, forKey: .paths))
+                paths: try? c.decodeIfPresent([String].self, forKey: .paths),
+                partial: try? c.decodeIfPresent(CommittedSeries.self, forKey: .partial))
         case "file_diff":
             self = .fileDiff(
                 id: try c.decodeIfPresent(String.self, forKey: .id),
@@ -3040,6 +3065,12 @@ extension EngineEvent: Decodable {
             self = .prDraft(try PRDraftReply(from: decoder))
         case "pr_ai_draft":   // §51
             self = .prAiDraft(try PRAiDraftReply(from: decoder))
+        case "commit_hunks":   // §53
+            self = .commitHunks(try CommitHunksReply(from: decoder))
+        case "commit_split_draft":
+            self = .commitSplitDraft(try CommitSplitDraftReply(from: decoder))
+        case "committed_series":
+            self = .committedSeries(try CommittedSeries(from: decoder))
         case "auto_turn":   // §52
             self = .autoTurn(turn: (try? c.decodeIfPresent(Int.self, forKey: .turn)) ?? 0, info: try AutoTurnInfo(from: decoder))
         case "task_output":

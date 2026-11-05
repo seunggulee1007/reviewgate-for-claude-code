@@ -172,7 +172,7 @@ public extension AppState {
             return .rewound(restoredFiles: restored)
         } catch let error as EngineClientError {
             replaceTranscriptOnRestore = false
-            guard case let .refused(message, code, paths) = error else { return .refused(error.userMessage) }
+            guard case let .refused(message, code, paths, _) = error else { return .refused(error.userMessage) }
             switch code ?? EngineMessages.codeWord(message) {
             case "file_changed_since_review":
                 forceRejectRequest = ForceRejectRequest(command: command, paths: paths.isEmpty ? Self.pathsOfRefusal(message) : paths)

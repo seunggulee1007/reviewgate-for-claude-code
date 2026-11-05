@@ -45,7 +45,7 @@ extension AppState {
             transcriptPaging.loading = false
             resolveJump()
             return added > 0
-        } catch EngineClientError.refused(let message, let code, _) {
+        } catch EngineClientError.refused(let message, let code, _, _) {
             transcriptPaging.loading = false
             transcriptPaging.error = code == "unknown_command" || message.hasPrefix("unknown command")
                 ? String(localized: "This engine cannot load earlier messages", bundle: .module)

@@ -362,7 +362,7 @@ public extension SideQuestionText {
 public enum FlowText {
     public static func refusal(_ error: Error) -> String {
         guard let error = error as? EngineClientError else { return error.localizedDescription }
-        guard case let .refused(message, code, _) = error else { return error.userMessage }
+        guard case let .refused(message, code, _, _) = error else { return error.userMessage }
         let word = code ?? EngineMessages.codeWord(message)
         return refusal(code: word, detail: EngineMessages.detail(of: message, code: word)) ?? error.userMessage
     }

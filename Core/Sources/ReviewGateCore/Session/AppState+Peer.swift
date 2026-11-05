@@ -113,7 +113,7 @@ public extension AppState {
     /// `gate_closed:*` → why it has to wait, anything else in the user's words.
     internal func applyPeerRefusal(_ error: EngineClientError, command: EngineCommand) {
         appendLog("[warn] \(command.type): \(error.localizedDescription)")
-        guard case let .refused(raw, _, _) = error else { peerNotice = error.localizedDescription; return }
+        guard case let .refused(raw, _, _, _) = error else { peerNotice = error.localizedDescription; return }
         switch error.refusalCode {
         case "peer_none":
             state.session.peerInbox = []

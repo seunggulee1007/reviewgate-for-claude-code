@@ -119,7 +119,7 @@ extension AppState {
             if let first = page.items.first?.at { viewedChat?.oldestAt = first }
             viewedChat?.loading = false
             viewedChat?.error = nil
-        } catch EngineClientError.refused(let message, let code, _) where code == "unknown_command" || message.hasPrefix("unknown command") {
+        } catch EngineClientError.refused(let message, let code, _, _) where code == "unknown_command" || message.hasPrefix("unknown command") {
             // An engine before §38.3 cannot read another chat: the tab switches as it always did.
             guard viewedChat?.id == id else { return }
             viewedChat = nil

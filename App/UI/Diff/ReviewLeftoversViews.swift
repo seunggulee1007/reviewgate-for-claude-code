@@ -283,7 +283,7 @@ struct ImagePreviewSection: View {
             } catch {
                 guard !Task.isCancelled else { return }
                 // An engine before §41.3: no preview, nothing to say (the sizes line stays).
-                if case let EngineClientError.refused(_, code, _) = error, code == "unknown_command" {
+                if case let EngineClientError.refused(_, code, _, _) = error, code == "unknown_command" {
                     loaded = (key, nil, false)
                 } else {
                     loaded = (key, nil, true)

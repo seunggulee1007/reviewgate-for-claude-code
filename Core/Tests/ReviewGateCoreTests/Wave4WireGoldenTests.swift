@@ -58,7 +58,7 @@ import Testing
         let g = try golden()
         let results = try #require(g["results"] as? [Any]).map { try decode(EngineEvent.self, $0) }
         let summary: [[String?]] = results.compactMap { event -> [String?]? in
-            guard case let .result(id, ok, _, code, _) = event else { return nil }
+            guard case let .result(id, ok, _, code, _, _) = event else { return nil }
             let row: [String?] = [id, ok ? "ok" : "refused", code]
             return row
         }

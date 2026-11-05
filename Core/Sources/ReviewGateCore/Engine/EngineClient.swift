@@ -7,20 +7,34 @@ public enum EngineClientError: Error, LocalizedError, Sendable, Equatable {
     case stopped
     /// The engine exited (or was stopped) while a reply was pending.
     case exited
-    /// `result{ok:false, error, code?, paths?}` — `code` is the stable id (§19.6), `paths` the files it is about (§19.1).
-    case refused(String, code: String? = nil, paths: [String] = [])
+    /// `result{ok:false, error, code?, paths?, partial?}` — `code` is the stable id (§19.6), `paths` the files it is about
+    /// (§19.1), `partial` the commits a `commit_series` made before it failed (§53).
+    case refused(String, code: String? = nil, paths: [String] = [], partial: CommittedSeries? = nil)
     /// A reply of a type the command does not produce.
     case unexpectedReply(String)
 
     /// A refusal's stable code: the wire's `code`, else the leading word of the text (older engines).
     public var refusalCode: String? {
-        guard case let .refused(message, code, _) = self else { return nil }
+        guard case let .refused(message, code, _, _) = self else { return nil }
         return code ?? EngineMessages.codeWord(message)
+    }
+
+    /// §53: the commits a refused `commit_series` made before it stopped (`result.partial`); nil for any other error.
+    public var partialSeries: CommittedSeries? {
+        guard case let .refused(_, _, _, partial) = self else { return nil }
+        return partial
+    }
+
+    /// The error a reply settles its request with: `result{ok:false}` → `refused` with every field the refusal carries;
+    /// nil for any other event (the request succeeds with it).
+    public static func refusal(of event: EngineEvent) -> EngineClientError? {
+        guard case let .result(_, ok, error, code, paths, partial) = event, !ok else { return nil }
+        return .refused(error ?? code ?? "refused", code: code, paths: paths ?? [], partial: partial)
     }
 
     /// A refusal in the user's words (`EngineMessages.refusal`); other errors as `localizedDescription`.
     public var userMessage: String {
-        if case let .refused(message, code, paths) = self { return EngineMessages.refusal(code: code, error: message, paths: paths) }
+        if case let .refused(message, code, paths, _) = self { return EngineMessages.refusal(code: code, error: message, paths: paths) }
         return localizedDescription
     }
 
@@ -29,7 +43,7 @@ public enum EngineClientError: Error, LocalizedError, Sendable, Equatable {
         case .nodeNotFound: String(localized: "Node.js (node) was not found. Install Node.js, or set its path in Settings › General › Toolchain overrides › node path, then reopen the project.", bundle: .module)
         case .stopped: String(localized: "engine was stopped", bundle: .module)
         case .exited: String(localized: "engine exited before replying", bundle: .module)
-        case .refused(let message, _, _): message
+        case .refused(let message, _, _, _): message
         case .unexpectedReply(let type): String(localized: "unexpected engine reply: \(type)", bundle: .module)
         }
     }
@@ -179,8 +193,8 @@ public actor EngineClient {
 
     private func dispatch(_ event: EngineEvent) {
         if let id = event.replyId, let slot = pending.removeValue(forKey: id) {
-            if case let .result(_, ok, error, code, paths) = event, !ok {
-                slot.settle(.failure(EngineClientError.refused(error ?? code ?? "refused", code: code, paths: paths ?? [])))
+            if let refusal = EngineClientError.refusal(of: event) {
+                slot.settle(.failure(refusal))
             } else {
                 slot.settle(.success(event))
             }
