@@ -52,7 +52,7 @@ extension AppState {
 
     #if DEBUG
     /// The screenshot tour's layout check (App/Debug/ScreenshotTour.swift): the mode offer card as a first open shows it.
-    public func debugShowDefaultModeOffer(_ mode: PermissionMode) { defaultModeOffer = mode }
+    public func debugShowDefaultModeOffer(_ mode: PermissionMode?) { defaultModeOffer = mode }
     #endif
 
     /// The chat took `taskForComposer` (it is never put there twice).

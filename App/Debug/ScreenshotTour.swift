@@ -184,12 +184,16 @@ private final class Tour {
         window.orderFrontRegardless()
         defer { window.level = .normal }
         AppSettings.setAppearance(.dark)
-        store.debugShowDefaultModeOffer(.auto)
-        for size in [NSSize(width: 1100, height: 752), NSSize(width: 1100, height: 640), NSSize(width: 1100, height: 572)] {
-            window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
-            try await Task.sleep(for: .milliseconds(1200))
-            log("frame \(NSStringFromRect(window.frame)), min \(NSStringFromSize(window.minSize))")
-            try write(try render(window), "layout-\(Int(size.width))x\(Int(size.height))")
+        // §49.2: a laptop screen's window (1000 × 637) and the smallest window (900 × 460 + the toolbar), with and without
+        // the mode offer above the composer.
+        for offer in [true, false] {
+            store.debugShowDefaultModeOffer(offer ? .auto : nil)
+            for size in [NSSize(width: 1100, height: 752), NSSize(width: 1000, height: 637), NSSize(width: 900, height: 512)] {
+                window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
+                try await Task.sleep(for: .milliseconds(1200))
+                log("frame \(NSStringFromRect(window.frame)), min \(NSStringFromSize(window.minSize))")
+                try write(try render(window), "layout-\(offer ? "offer-" : "")\(Int(size.width))x\(Int(size.height))")
+            }
         }
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1100, height: 752)), display: true)
         entry.model.runAsTask("Do the task at https://tasks.example.com/project/tasks/4821 — fix the cart total")

@@ -6145,6 +6145,12 @@ column is now laid out bottom up (`ChatColumnLayout`):
 The column's minimum height is the tab strip, the HUD and the composer. Nothing above the composer can push it out of the
 window. The mode offer's explanation is two lines at most (the whole text in its tooltip).
 
+The window's minimum is 900 × 460 pt (it was 1100 × 700). macOS fits a new window into the screen, so on a laptop screen it
+came out smaller than that minimum (1000 × 637 in the report). SwiftUI then drew the content at its minimum size, centred.
+That clipped all four sides: the tab strip, the HUD and the composer, and the left of the sidebar. None of it could be
+scrolled into view. Now a window that small lays out like any other. The layout check (`SHOTS_LAYOUT=1`) shoots 1100 × 752,
+1000 × 637 and 900 × 512, each with and without the mode offer.
+
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the
   first message sent in the task's mode, `task_started` sent: true, the file gone, a second open plain), no mode (the
   default), a session that cannot start (`sent: false`, nothing sent), refusals before anything is created, and

@@ -246,7 +246,7 @@ private struct WorkbenchWindow: View {
             .environment(entry.store)
             .environment(entry.store.pr)
             .environment(entry.model)
-            .frame(minWidth: 1100, minHeight: 520)   // §49.2: the chat column fits a short window (several stacked workbenches)
+            .frame(minWidth: 900, minHeight: 460)   // §49.2: fits a small screen — a window the screen makes smaller than this is clipped
             .background(WindowAttacher(entry: entry))
             .focusedSceneValue(\.workbenchWindow, entry)
             // wave3 mac-session: a folder handed to the app reaches an open window instead of a new empty one (also when
