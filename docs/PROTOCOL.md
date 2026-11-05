@@ -6205,3 +6205,62 @@ feature flag of its own, and on this machine both folded alike.
 - Owner: steer (engine `session/claude.ts` `steerUser`, `engine.ts` `steer`, `protocol.ts`; Core
   `Session/AppState+Task.swift`, `Engine/EngineProtocol.swift`; App `UI/Chat/ChatComposer.swift`;
   `sidecar/test/driver-steer.mjs`).
+
+## 51. The PR sheet: names on every field, and "AI로 채우기"
+
+Three faults in the PR sheet came in one report:
+
+- The assignee, label, reviewer and project fields showed only their placeholders ("쉼표로 구분"). Outside a Form, a
+  macOS text field shows no name, so nothing said what each field was for.
+- The title stayed empty, so `pr_create` went out with `--fill` and failed. The title field took focus and wrote back the
+  same empty text, which marked it as typed, so `pr_draft`'s title never came in. `--fill` itself failed because gh ran
+  outside the repository (§41.1).
+- The description could only be filled from the commit list.
+
+Now every field has its name on the left (`PRSheetRow`), and a write of unchanged text no longer counts as typing.
+"AI로 채우기" has Claude write the title and description.
+
+```ts
+// command: pr_ai_draft { base: string; title?: string; body?: string }   // side lane; → pr_ai_draft
+// reply:   pr_ai_draft { title: string; body: string }                    // title "" when the answer had none
+// refused: empty_base · pr_ai_draft_failed:<why> (code pr_ai_draft_failed)
+```
+
+- **Engine** (`review/prAiDraft.ts`, `engine.ts` `prAiDraft`). This is a read-only, one-shot fork of the main session,
+  like the commit draft (§36.11): no session file, no web, no thread, its cost on the side meter. It runs on the side
+  lane, never behind the PR lane's `gh` calls.
+- **The prompt** carries:
+  - the branch's whole commit messages since `origin/<base>` (else `<base>`), oldest first, up to 12,000 chars;
+  - `git diff --stat` and the diff of `<baseRef>...HEAD`, cut at 3,000 lines (the fork may read files for the rest);
+  - the sheet's title and body, with "keep the title's prefix and issue key";
+  - the repository's pull request template, up to 8,000 chars. It is looked for in `.github/`, the root and `docs/`, the
+    name in any case, then in the first `.md` of `.github/PULL_REQUEST_TEMPLATE/`. Its sections are filled in, with
+    their headings, checklists and order kept.
+- **The prompt's rules.** Write in the language of the commits and the template. Without a template, write a summary,
+  the changes and how it was checked. Invent nothing the commits, the diff or the conversation do not show. The answer
+  is `TITLE: …` then `BODY:` and the text. A fence around the answer and bold labels are read too.
+- **Refusals.** A base with no ref is `pr_ai_draft_failed:no <base> to compare with`. A branch with no commits since its
+  base is `pr_ai_draft_failed:no commits since <baseRef>`. A failed fork and an empty answer are refused the same way.
+  Nothing is committed, pushed or created.
+- **Mac** (`CreatePRSheet`, `PRMetaFields`, `PRSheetRow`).
+  - "AI로 채우기" sits under the description. It is greyed out without a base or without commits since the base, and its
+    tooltip says why.
+  - While Claude writes: "작성 중…", and Create PR waits.
+  - The answer replaces the title (only when it has one) and the description. "원래대로 되돌리기" puts back what was
+    there until a field is edited. A base picked afterwards keeps Claude's text.
+  - A failure is one orange line in the user's words (`FlowText`).
+  - The sheet is 560 pt wide.
+- **Electron.** `CreatePRDialog` gets the same button, its states and the names on every field.
+- **Verified.**
+  - Engine `w51.prAiDraft.test.ts`: the fork's options and prompt (commits oldest first, the template, the diff, the
+    sheet's draft), nothing committed, the cost on the side meter, every refusal; `parsePRAiDraft`, `findPRTemplate`'s
+    order, `cutPatch`.
+  - Core `PRAiDraftTests`: the command's JSON, the lenient reply, a refusal in words, a blank base not sent.
+  - Layout check: the sheet with every name (`create-pr.png`).
+  - Real CLI: `sidecar/test/driver-praidraft.mjs` (haiku, CLI 2.1.318). It used a branch `#acme/42: 장바구니 합계에
+    할인 반영` and a Korean template. Observed: the title kept `#acme/42`, the template's three sections were filled in
+    Korean, the missing tests were stated rather than invented, and HEAD and the worktree were unchanged.
+- Owner: pr-ai-draft (engine `review/prAiDraft.ts`, `engine.ts` `prAiDraft` / `branchCommits`, `protocol.ts`; Core
+  `Engine/CommitFormatProtocol.swift` `PRAiDraftReply`, `Engine/EngineProtocol.swift`, `Session/AppState+TeamFormat.swift`
+  `writePRDraft`, `Session/WorkflowLogic.swift`; App `UI/Sidebar/WorkbenchSheets.swift` `CreatePRSheet`,
+  `UI/Sidebar/TeamFormatViews.swift`; `sidecar/test/driver-praidraft.mjs`).

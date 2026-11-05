@@ -192,7 +192,8 @@ import { normalizeSideAnchor } from "./side/context.js";
 import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } from "@anthropic-ai/claude-agent-sdk";
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
-import type { CommitDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT_SYSTEM, prAiDraftPrompt } from "./review/prAiDraft.js";
 import { isAbsolute } from "node:path";
 import { PreReviewRunner } from "./review/prereview.js";
 import { copyFiles, copyLog, copyPatternsFor, fetchRef, filesToCopy, firstLogLine, matchingFiles, PREVIEW_MAX_ENTRIES, refExists, remoteNames, runSetupCommand, siblingPath, splitRemoteRef } from "./git/workbenchSetup.js";
@@ -1316,6 +1317,8 @@ export class ReviewEngine {
         return this.commitFormat();
       case "pr_draft":
         return this.prDraft(typeof cmd.base === "string" ? cmd.base : "");
+      case "pr_ai_draft": // §51
+        return this.prAiDraft(typeof cmd.base === "string" ? cmd.base : "", typeof cmd.title === "string" ? cmd.title : "", typeof cmd.body === "string" ? cmd.body : "");
       case "prereview_start":
         return this.prereviews.start(cmd.scope, cmd.paths, cmd.effort);
       case "prereview_cancel":
@@ -4505,6 +4508,43 @@ export class ReviewEngine {
     return { type: "commit_draft", message };
   }
 
+  /**
+   * §51 `pr_ai_draft`: a read-only fork of the main session (no thread) writes the PR sheet's title and description from
+   * the branch's commits and diff since `base`, the repository's PR template and what the sheet holds. Nothing is pushed.
+   */
+  private async prAiDraft(base: string, title: string, body: string): Promise<PRAiDraftEvent> {
+    const cp = this.requireProject();
+    const name = base.trim();
+    if (!name) throw new CommandRefused("empty base", { code: "empty_base" });
+    const fail = (why: string) => new CommandRefused(`pr_ai_draft_failed:${why}`, { code: "pr_ai_draft_failed" });
+    const { baseRef, commits } = await this.branchCommits(cp, name);
+    if (baseRef === null) throw fail(`no ${name} to compare with`);
+    if (commits.length === 0) throw fail(`no commits since ${baseRef}`);
+    const range = `${baseRef}...HEAD`;
+    const [branch, log, stat, diff, template] = await Promise.all([
+      cp.branchName(),
+      cp.git(["log", `-${PR_DRAFT_COMMITS}`, "--no-merges", "--reverse", "--format=%B%x1e", `${baseRef}..HEAD`, "--"], { allowFailure: true }).catch(() => null),
+      cp.git(["diff", "--no-color", "--no-ext-diff", "-M", "--stat=200,150", range, "--"], { allowFailure: true }).catch(() => null),
+      cp.git(["diff", "--no-color", "--no-ext-diff", "-M", range, "--"], { allowFailure: true }).catch(() => null),
+      findPRTemplate(cp.root),
+    ]);
+    const messages = log && log.status === 0 ? log.text.split("\x1e").map((m) => m.trim()).filter((m) => m.length > 0) : commits;
+    const run = await this.side.startDetached({
+      key: `pr_ai_draft:${randomUUID()}`,
+      prompt: prAiDraftPrompt({
+        branch: branch ?? "HEAD", baseRef, commits: messages, stat: stat?.status === 0 ? stat.text : "",
+        patch: cutPatch(diff?.status === 0 ? diff.text : "", PR_AI_DIFF_LINES), template, title, body,
+      }),
+      options: { persistSession: false, allowWeb: false, system: PR_AI_DRAFT_SYSTEM },
+    });
+    const result = await run.done;
+    if (result.stopReason === "interrupted") throw fail("cancelled");
+    if (result.error) throw fail(firstLineOf(result.error));
+    const draft = parsePRAiDraft(result.text);
+    if (!draft.title && !draft.body) throw fail("empty answer");
+    return { type: "pr_ai_draft", ...draft };
+  }
+
   // MARK: wave4c w4c-commit — §41.1 commits and PRs in the team's format
 
   /**
@@ -7083,6 +7123,7 @@ type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "wor
  * changes the main conversation / review: main lane.
  */
 function laneOf(cmd: EngineCommand): Lane {
+  if (cmd.type === "pr_ai_draft") return "side"; // §51: a read-only fork, never behind (or holding up) the PR lane
   if (isPrCommand(cmd.type)) return "pr";
   switch (cmd.type) {
     case "side_ask":
@@ -7203,6 +7244,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "side_promote":
     case "side_promote_draft":
     case "commit_draft": // MARK: wave3 engine-flow
+    case "pr_ai_draft": // §51
     case "prereview_start":
     case "prereview_cancel":
     case "prereview_dismiss":

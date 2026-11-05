@@ -712,6 +712,8 @@ export type EngineCommand =
   | Cmd<"commit_format">
   /** A PR title / body from the branch's commits since `base`, whether the branch has an upstream, whether `gh` is ready; replies `pr_draft`. */
   | Cmd<"pr_draft", { base: string }>
+  /** §51: the PR sheet's title / description written by a read-only fork from the branch's commits and diff since `base`, the repository's PR template and the sheet's `title` / `body`; replies `pr_ai_draft`. */
+  | Cmd<"pr_ai_draft", { base: string; title?: string; body?: string }>
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1790,6 +1792,7 @@ export type EngineEvent =
   | CliVersionsEvent
   | CliSessionsEvent
   | CommitDraftEvent
+  | PRAiDraftEvent
   | WorkbenchPreviewEvent
   | WorkbenchProgressEvent
   | PreReviewEvent
@@ -1835,6 +1838,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "cli_versions" } ? CliVersionsEvent
   : C extends { type: "cli_sessions" } ? CliSessionsEvent
   : C extends { type: "commit_draft" } ? CommitDraftEvent
+  : C extends { type: "pr_ai_draft" } ? PRAiDraftEvent
   : C extends { type: "workbench_preview" } ? WorkbenchPreviewEvent
   : C extends { type: "prereview_start" } ? PreReviewEvent
   : C extends { type: "transcript_page" } ? TranscriptPageEvent // MARK: wave4 w4-history (§38.3)
@@ -1854,7 +1858,7 @@ export type ReplyFor<C extends EngineCommand> =
 export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileContentEvent | PRCreatedEvent | CommittedEvent | ToolOutputEvent | ReviewHistoryEvent | HistoryDiffEvent
   | SideThreadEvent | SideThreadsEvent | SidePromoteDraftEvent | McpStatusEvent | FilesEvent | AttachmentEvent | RewoundEvent | PermissionRulesEvent
   | LiveChangesEvent
-  | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
+  | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | PRAiDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
   | TranscriptPageEvent | TranscriptSearchEvent // MARK: wave4 w4-history (§38.3)
   | HistoryCleanupEvent // MARK: wave4b w4b-bigturn (§39.1)
   | CommitFormatEvent | PRDraftEvent // MARK: wave4c w4c-commit (§41.1)
@@ -2015,6 +2019,8 @@ export type SideFork = {
 
 /** §36.11: reply to `commit_draft` — a message for the commit sheet's field (nothing is committed). */
 export type CommitDraftEvent = { type: "commit_draft"; id?: string; message: string };
+/** §51: reply to `pr_ai_draft` — for the PR sheet's fields (nothing is pushed or created); `title` "" when the answer had none. */
+export type PRAiDraftEvent = { type: "pr_ai_draft"; id?: string; title: string; body: string };
 
 /** §36.12: where a new workbench goes — `managed` (`settings.worktreeRoot`) or `sibling` (`<parent of the main worktree>/<repo>-<branch tail>`). */
 export type WorkbenchLocation = "managed" | "sibling";
