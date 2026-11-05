@@ -61,10 +61,13 @@ export function prCreateArgs(remote: RemoteRepo, opts: CreatePROptions): string[
   return args;
 }
 
-/** Runs `gh pr create …` and returns the PR URL printed on stdout. */
-export async function createPR(gh: ResolvedGH, remote: RemoteRepo, opts: CreatePROptions): Promise<string> {
+/**
+ * Runs `gh pr create …` in `cwd` (the worktree: gh reads git there — run elsewhere it says "not a git repository") and
+ * returns the PR URL printed on stdout.
+ */
+export async function createPR(gh: ResolvedGH, remote: RemoteRepo, opts: CreatePROptions, cwd: string): Promise<string> {
   const args = prCreateArgs(remote, opts);
-  const out = await exec(gh.path, args, { env: gh.env, timeoutMs: GH_TIMEOUT_MS });
+  const out = await exec(gh.path, args, { cwd, env: gh.env, timeoutMs: GH_TIMEOUT_MS });
   if (out.status !== 0) throw new GHError(out.status ?? -1, out.stderr, args, out.timedOut);
   const lines = out.stdout.toString("utf8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
   const url = [...lines].reverse().find((l) => /^https?:\/\//.test(l));

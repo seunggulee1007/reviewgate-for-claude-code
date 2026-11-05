@@ -3891,14 +3891,23 @@ export class ReviewEngine {
     if (!remoteURL) throw new CommandRefused("no_remote");
     const remote = parseRemoteURL(remoteURL);
     if (!remote) throw new CommandRefused(`unsupported_remote:${remoteURL}`);
+    // §41.1: no title — the one `pr_draft` gives (the branch's commits since the base), else the branch; no body then — the
+    // commits' list. `gh --fill` is never used: it reads git where gh runs and fails outside the repository.
+    let prTitle = title?.trim() ?? "";
+    let prBody = body;
+    if (!prTitle) {
+      const draft = prDraftFrom((await this.branchCommits(cp, baseName)).commits);
+      prTitle = draft.title || branch;
+      prBody ??= draft.body;
+    }
     const upstream = await cp.git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], { allowFailure: true });
     if (upstream.status !== 0) await cp.git(["push", "-u", "origin", branch], { userHooks: true }); // user-initiated: pre-push runs
     const gh = await this.resolveGH();
     const url = await createPR(gh, remote, {
-      branch, base: baseName, ...(title ? { title } : {}), ...(body !== null ? { body } : {}), draft,
+      branch, base: baseName, title: prTitle, body: prBody ?? "", draft,
       // MARK: wave4c w4c-commit — §41.1 (prCreateArgs keeps only well-formed values)
       assignees: prMetaValues(meta.assignees), labels: prMetaValues(meta.labels), reviewers: prMetaValues(meta.reviewers), projects: prMetaValues(meta.projects),
-    });
+    }, cp.root);
     this.pr.lastCreatedPR = { url, branch };
     this.touch();
     return { type: "pr_created", url, branch };
@@ -4544,18 +4553,24 @@ export class ReviewEngine {
    * `pr_draft {base}`: the PR sheet's title / body from the branch's commits since `origin/<base>` (else `<base>`), whether
    * `pr_create` would push first, and whether `gh` can create it (installed, an account for the remote's host). Pushes nothing.
    */
+  /** The ref a PR against `base` is compared with (`origin/<base>`, else `<base>`; null: neither) and the branch's commit subjects since it (oldest first, ≤ 50, merges left out). */
+  private async branchCommits(cp: GitCheckpoint, base: string): Promise<{ baseRef: string | null; commits: string[] }> {
+    const exists = async (ref: string) => (await cp.git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { allowFailure: true }).catch(() => null))?.status === 0;
+    const baseRef = !base.startsWith("-") && (await exists(`refs/remotes/origin/${base}`)) ? `origin/${base}` : !base.startsWith("-") && (await exists(base)) ? base : null;
+    const log = baseRef === null ? null : await cp.git(["log", `-${PR_DRAFT_COMMITS}`, "--no-merges", "--reverse", "--format=%s", `${baseRef}..HEAD`, "--"], { allowFailure: true }).catch(() => null);
+    const commits = log && log.status === 0 ? log.text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0) : [];
+    return { baseRef, commits };
+  }
+
   private async prDraft(base: string): Promise<PRDraftEvent> {
     const cp = this.requireProject();
     const name = base.trim();
     if (!name) throw new CommandRefused("empty base", { code: "empty_base" });
-    const exists = async (ref: string) => (await cp.git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { allowFailure: true }).catch(() => null))?.status === 0;
-    const baseRef = !name.startsWith("-") && (await exists(`refs/remotes/origin/${name}`)) ? `origin/${name}` : !name.startsWith("-") && (await exists(name)) ? name : null;
-    const [log, upstream, remoteURL] = await Promise.all([
-      baseRef === null ? null : cp.git(["log", `-${PR_DRAFT_COMMITS}`, "--no-merges", "--reverse", "--format=%s", `${baseRef}..HEAD`, "--"], { allowFailure: true }).catch(() => null),
+    const [{ baseRef, commits }, upstream, remoteURL] = await Promise.all([
+      this.branchCommits(cp, name),
       cp.git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], { allowFailure: true }).catch(() => null),
       cp.remoteURL(),
     ]);
-    const commits = log && log.status === 0 ? log.text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0) : [];
     const host = remoteURL ? (parseRemoteURL(remoteURL)?.host ?? null) : null;
     let gh: GHReadiness = "ok";
     if (!(await this.locate()).gh) gh = "not_found";

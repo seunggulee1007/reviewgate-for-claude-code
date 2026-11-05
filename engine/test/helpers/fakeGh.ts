@@ -50,6 +50,7 @@ export function makeFakeGh(dir: string, log: string, stdout: string): FakeExe {
     [
       'if (args[0] === "--version") { fs.writeSync(1, "gh version 2.0.0 (fake)\\n"); process.exit(0); }',
       `fs.writeFileSync(${JSON.stringify(log)}, args.map((a) => a + "\\n").join(""));`,
+      `fs.writeFileSync(${JSON.stringify(log + ".cwd")}, process.cwd());`,
       `fs.writeSync(1, ${JSON.stringify(stdout)});`,
     ].join("\n"),
   );

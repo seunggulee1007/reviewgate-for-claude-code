@@ -230,11 +230,22 @@ describe("ReviewEngine workbenches (docs/M10-WORKBENCHES.md)", () => {
     await h.settle();
     expect(h.engine.state.pr.lastCreatedPR).toEqual({ url: "https://github.example.com/acme/widgets/pull/7", branch: "feature/pr" });
 
-    // Without a title → --fill; upstream already set → no second push.
+    // gh runs in the worktree: it reads git where it runs (elsewhere: "not a git repository").
+    expect(realpathSync(readFileSync(`${log}.cwd`, "utf8"))).toBe(realpathSync(repo));
+
+    // Without a title → the one pr_draft gives (no `--fill`: gh would read git); upstream already set → no second push.
+    sh(repo, "update-ref", "refs/remotes/origin/main", "main");
+    writeFileSync(join(repo, "cart.txt"), "1\n");
+    sh(repo, "add", "cart.txt");
+    sh(repo, "commit", "-q", "-m", "#acme/42: fix the cart total");
     await h.engine.request({ type: "pr_create", base: "main" });
     expect(readFileSync(log, "utf8").split("\n").filter(Boolean)).toEqual([
-      "pr", "create", "--repo", "github.example.com/acme/widgets", "--head", "feature/pr", "--base", "main", "--fill",
+      "pr", "create", "--repo", "github.example.com/acme/widgets", "--head", "feature/pr", "--base", "main",
+      "--title", "#acme/42: fix the cart total", "--body", "- #acme/42: fix the cart total",
     ]);
+    // A body of the user's own stays; a base without a ref (no commits to read) → the branch is the title.
+    await h.engine.request({ type: "pr_create", base: "release", body: "Mine" });
+    expect(readFileSync(log, "utf8").split("\n").filter(Boolean).slice(-4)).toEqual(["--title", "feature/pr", "--body", "Mine"]);
 
     // No remote → refused before anything runs.
     const bareRepo = track(makeRepo());

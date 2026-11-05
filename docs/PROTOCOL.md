@@ -4386,6 +4386,10 @@ type GHReadiness = "ok" | "not_found" | "not_logged_in";
   when it is a non-blank string ≤ 200 chars without a line break, ≤ 20 per flag. `@me` is gh's own "the logged-in user".
   A `gh` failure (a label or project that does not exist, a token without the `project` scope) is the usual
   `result{ok:false}` with gh's words.
+- **`gh pr create` runs in the worktree.** A `pr_create` without a title used to pass `--fill`, and gh ran in the
+  engine's own folder. gh then failed with "could not compute title or body defaults: failed to run git: fatal: not a git
+  repository". Now gh runs in the project's folder, and `--fill` is never passed. A missing title is `pr_draft`'s title
+  (the branch's commits since the base), else the branch name. A missing body is then the commits' list.
 - **Clients — the commit sheet** (Mac `TeamFormatLineView` / `LearnedFormatRow` in `CommitDraftViews.swift`, Electron
   `TeamFormat.tsx` in `CommitDraft.tsx`; logic Core `TeamFormat`, Electron `commitFormat.ts`): `commit_format` when the sheet
   opens (and per branch); under "Write with Claude" one line "팀 형식: <the project's template, else the learned one, first
