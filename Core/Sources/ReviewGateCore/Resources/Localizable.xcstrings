@@ -2065,6 +2065,22 @@
         }
       }
     },
+    "Background task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업"
+          }
+        }
+      }
+    },
     "Background work is off (Settings › Session, or CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).": {
       "localizations": {
         "en": {
@@ -10127,22 +10143,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "시스템"
-          }
-        }
-      }
-    },
-    "Task": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Task"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "작업"
           }
         }
       }

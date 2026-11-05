@@ -129,7 +129,7 @@ public enum BackgroundText {
         case .bash: String(localized: "Command", bundle: .module)
         case .monitor: String(localized: "Monitor", bundle: .module)
         case .agent: String(localized: "Agent", bundle: .module)
-        case .other: String(localized: "Task", bundle: .module)
+        case .other: String(localized: "Background task", bundle: .module)
         }
     }
 
