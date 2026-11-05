@@ -5748,6 +5748,13 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   plan mode beside the diff pane and every review that began). It is anchored to the bottom only when it opens and while its
   rows are shorter than the view; a change of size keeps the offset, and while following, `TranscriptFollower` scrolls to the
   newest row (the bottom marker, which the stack makes) instead of an estimated end. The layout check (§49.2) shoots it.
+- **The chat is one view, the diff pane open or closed.** It was the split's trailing pane while the diff pane was open and
+  the window's own child while it was closed: two places, so SwiftUI made a new chat whenever a review began (the pane
+  opens) or the pane opened or closed (⌘⇧D), and the message being typed, its mentions and images, the composer's focus and
+  the transcript's place went with the old one. The split (`SplitPane(collapsed:)`) now leaves out only its leading pane;
+  the chat stays the same view. The composer's height follows a new width too (the text wraps anew; before, only a change
+  of the text resized it). The layout check (§49.2) types a message before the pane first opens and logs after every
+  toggle and review whether it is still in the same, focused composer.
 - **A new row places itself.** Core `TranscriptModel` keeps the row tree (agent groups), the folded exploration runs, the
   tool-call index, the row positions and each answer's turn up to date row by row; it rebuilds only for rows put in front
   (a restore, [이전 대화 더 보기]), replaced or removed, or a late row the full build would move (a result or a subagent row

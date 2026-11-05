@@ -219,7 +219,8 @@ private final class Tour {
     /// The transcript at the laptop size, through what changes the chat column around it: a long chat, a turn streamed in,
     /// the permission mode cycled as ⇧⇥ does, the diff pane opened (⌘⇧D) and the mode cycled beside it, turns that end into a
     /// review and reviews that end. `chat-<n>-<step>.png`, taken as they come (no width nudge); the log has the transcript's
-    /// scroll position and how much of it is drawn.
+    /// scroll position and how much of it is drawn, and whether the message typed before the diff pane first opened is still
+    /// in the same, focused composer ("LOST" / "NO" when not).
     private func transcriptShots(_ window: NSWindow) async throws {
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
         try await Task.sleep(for: .milliseconds(1200))
@@ -245,12 +246,28 @@ private final class Tour {
         store.debugShowGate(.idle)
         try await capture("streamed")
         try await cycleModes(4, "")
+        // A message being typed, in the focused composer: it, the composer and its focus survive the diff pane and reviews.
+        let draft = "Keep the receipt lines aligned when a discount applies (typed, not sent)"
+        let typedIn = composerView(window)
+        if let typedIn {
+            window.makeFirstResponder(typedIn)
+            typedIn.insertText(draft, replacementRange: NSRange(location: 0, length: (typedIn.string as NSString).length))
+        }
+        func checkDraft(_ step: String) {
+            let now = composerView(window)
+            let kept = now?.string == draft
+            log("composer after \(step): draft " + (kept ? "kept" : "LOST (now \"\(now?.string ?? "no composer")\")")
+                + ", same view " + (now != nil && now === typedIn ? "yes" : "NO")
+                + ", focused " + (now.map { window.firstResponder === $0 } == true ? "yes" : "no"))
+        }
         for round in 1...5 {
             entry.model.toggleDiffTick += 1   // ⌘⇧D
             try await capture("diff-open-\(round)")
+            checkDraft("diff-open-\(round)")
             try await cycleModes(4, "diff-")
             entry.model.toggleDiffTick += 1
             try await capture("diff-closed-\(round)")
+            checkDraft("diff-closed-\(round)")
         }
         // Turns that end into a review (running, rows streamed in, collecting, the summary and the files), and the review
         // ending (the files accepted).
@@ -264,9 +281,16 @@ private final class Tour {
             store.debugHandle([.turnSummary(TurnSummary(turn: turn, files: files.map { TurnSummary.File(path: $0.path, adds: $0.added, dels: $0.deleted) }))])
             store.debugShowGate(.reviewing, files: files)
             try await capture("review-\(turn)")
+            checkDraft("review-\(turn)")
             store.debugShowGate(.idle)
             try await capture("reviewed-\(turn)")
+            checkDraft("reviewed-\(turn)")
         }
+    }
+
+    /// The composer's text view (`ComposerTextView`).
+    private func composerView(_ window: NSWindow) -> NSTextView? {
+        (try? views(NSTextView.self, in: window, minSize: 0))?.first { $0.accessibilityIdentifier() == "Composer" }
     }
 
     /// Events one by one, as a turn sends them: the answer's text in small pieces.

@@ -7,6 +7,9 @@ struct SplitPane<Leading: View, Trailing: View>: View {
     @Binding var fraction: Double
     var minLeading: CGFloat = 200
     var minTrailing: CGFloat = 200
+    /// The leading pane is gone and the trailing one takes the width — the trailing view stays the same view (its state,
+    /// scroll position and focus survive opening and closing the leading pane).
+    var collapsed = false
     /// Called when a drag ends with the settled fraction.
     var onCommit: (Double) -> Void = { _ in }
     @ViewBuilder let leading: () -> Leading
@@ -19,16 +22,20 @@ struct SplitPane<Leading: View, Trailing: View>: View {
             let total = geo.size.width
             let width = clampedWidth(fraction * total, total: total)
             HStack(spacing: 0) {
-                leading()
-                    .frame(width: width)
-                    .clipped()
+                if !collapsed {
+                    leading()
+                        .frame(width: width)
+                        .clipped()
+                }
                 trailing()
-                    .frame(width: max(total - width, 0))
+                    .frame(width: collapsed ? total : max(total - width, 0))
                     .clipped()
             }
             .overlay(alignment: .leading) {
-                divider(total: total)
-                    .offset(x: width - 4)
+                if !collapsed {
+                    divider(total: total)
+                        .offset(x: width - 4)
+                }
             }
         }
     }

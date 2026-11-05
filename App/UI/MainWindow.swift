@@ -178,35 +178,33 @@ struct MainWindow: View {
                         if store.isReviewRestored || !store.changedOutside.isEmpty || !store.ignoredTouched.isEmpty || !store.filteredByPattern.isEmpty {
                             Divider()
                         }
-                        // The edge tab stays while the pane is open, so the way back (collapse) is where expand was.
+                        // The edge tab stays while the pane is open, so the way back (collapse) is where expand was. The
+                        // chat is the split's trailing pane open or closed: one view, so the message being typed, the
+                        // transcript's scroll position and the focus survive the diff pane opening (a review begins) or closing.
                         HStack(spacing: 0) {
                             diffEdgeTab
                             Divider()
-                            if diffCollapsed {
-                                ChatView()
-                            } else {
-                                SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 360,
-                                          onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
-                                    if store.codeBrowser.isOpen {
-                                        // MARK: code-browser (§47): a project file, read-only, until "Back to review".
-                                        ProjectFileView()
-                                    } else if tab == .history || store.historySelection != nil {
-                                        // §14: a past round's file, read-only, until "Back to current review".
-                                        HistoryDiffView { tab = .changes }
-                                    } else if store.liveSelection != nil {
-                                        // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
-                                        LiveDiffView()
-                                    } else {
-                                        // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
-                                        DiffView(
-                                            file: store.selectedFile,
-                                            diff: store.selectedDiff,
-                                            truncated: store.selectedDiffTruncated,
-                                            isReviewLocked: store.isReviewLocked)
-                                    }
-                                } trailing: {
-                                    ChatView()
+                            SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 360, collapsed: diffCollapsed,
+                                      onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
+                                if store.codeBrowser.isOpen {
+                                    // MARK: code-browser (§47): a project file, read-only, until "Back to review".
+                                    ProjectFileView()
+                                } else if tab == .history || store.historySelection != nil {
+                                    // §14: a past round's file, read-only, until "Back to current review".
+                                    HistoryDiffView { tab = .changes }
+                                } else if store.liveSelection != nil {
+                                    // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
+                                    LiveDiffView()
+                                } else {
+                                    // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
+                                    DiffView(
+                                        file: store.selectedFile,
+                                        diff: store.selectedDiff,
+                                        truncated: store.selectedDiffTruncated,
+                                        isReviewLocked: store.isReviewLocked)
                                 }
+                            } trailing: {
+                                ChatView()
                             }
                         }
                     }

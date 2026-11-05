@@ -207,6 +207,14 @@ final class ComposerNSTextView: NSTextView {
     weak var coordinator: ComposerTextView.Coordinator?
     var placeholder = "" { didSet { if oldValue != placeholder { needsDisplay = true } } }
 
+    /// A new width wraps the text anew (the window resized, the diff pane opened or closed beside the chat): the composer's
+    /// height follows it, as it follows the text.
+    override func setFrameSize(_ newSize: NSSize) {
+        let widthChanged = abs(newSize.width - frame.width) > 0.5
+        super.setFrameSize(newSize)
+        if widthChanged { coordinator?.reportHeight() }
+    }
+
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
         if ok { coordinator?.focusChanged(true) }
