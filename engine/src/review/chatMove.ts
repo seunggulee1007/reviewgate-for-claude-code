@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { isPermissionMode, type ChatMoveBaseline, type ChatMoveRef, type PermissionMode, type SessionMeta } from "../protocol.js";
-import type { GitWorktree } from "../git/worktrees.js";
+import { sameRepository, type GitWorktree } from "../git/worktrees.js";
 import { isInsidePath, realpathLenient, samePath } from "../platform/paths.js";
 import { readJSON, writeAtomicJSON } from "./persist.js";
 
@@ -95,6 +95,15 @@ export function dropIncoming(chat: IncomingChat): void {
 export type MoveTarget = { root: string; name: string; branch: string | null };
 /** Why `chat_move` refuses a path: none given, not on disk, not a worktree of this repository, this window's own. */
 export type MoveTargetRefusal = "path_not_found" | "not_a_worktree" | "same_worktree";
+
+/**
+ * §39.4: the refusal as the user should read it — a folder that is another repository's worktree is `other_repository`
+ * (a chat moves only between worktrees of one repository: the CLI's record of the conversation stays with it).
+ */
+export async function moveRefusal(refused: MoveTargetRefusal, requested: unknown, currentRoot: string): Promise<MoveTargetRefusal | "other_repository"> {
+  if (refused !== "not_a_worktree" || typeof requested !== "string" || !requested.trim()) return refused;
+  return (await sameRepository(resolve(currentRoot, requested.trim()), currentRoot)) === false ? "other_repository" : refused;
+}
 
 /**
  * §39.4: the worktree `requested` names — its root, also for a folder inside it (the deepest listed root wins, so a

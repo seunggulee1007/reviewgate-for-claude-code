@@ -286,6 +286,29 @@ describe("the moved chat's review baseline (§39.4)", () => {
     expect(s.disposed).toBe(false);
   });
 
+  it("another repository's worktree: chat_move says other_repository, and its card never follows (a plain allow)", async () => {
+    const main = realpathSync(makeRepo());
+    const other = realpathSync(makeRepo());
+    const wt = `${other}-issue-7`;
+    dirs.push(main, other, wt);
+    sh(other, "worktree", "add", "-q", "-b", "issue-7", wt);
+    const src = await opened(main);
+    await turn(src);
+    await expect(src.engine.request({ type: "chat_move", path: wt })).rejects.toThrow(/other_repository/);
+    await src.engine.handle({ type: "send", text: "make a worktree there" });
+    const s = src.session();
+    s.emit({ type: "permission_request", requestId: "r1", toolName: "Bash", input: { command: `cd ${other} && git worktree add -b issue-8 ${wt}-8` }, toolUseId: "b8",
+      reason: { code: "worktree_command", message: "creates a worktree of another repository", path: `${wt}-8`, otherRepository: true } });
+    await src.settle();
+    await src.engine.handle({ type: "permission_response", requestId: "r1", allow: true, follow: true });
+    sh(other, "worktree", "add", "-q", "-b", "issue-8", `${wt}-8`);
+    dirs.push(`${wt}-8`);
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b8", path: `${wt}-8`, reasonCode: "worktree_command" });
+    await src.waitFor(() => src.ofType("error").some((e) => e.code === "worktree_outside_review"), "the outside-the-review warning");
+    expect(src.ofType("chat_moved")).toEqual([]);
+    expect(src.ofType("error").filter((e) => e.code === "chat_move_failed")).toEqual([]);
+  });
+
   it("a followed command whose words name no usable path (a shell variable) follows the worktree it added", async () => {
     const main = realpathSync(makeRepo());
     const wt = `${main}-issue-42`;

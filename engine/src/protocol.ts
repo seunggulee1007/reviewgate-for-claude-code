@@ -58,6 +58,8 @@ export type PermissionReason = {
   message: string;
   /** The nested repository / worktree root concerned (absolute, native); for `claude_config` the settings file itself. */
   path?: string;
+  /** §39.4 `worktree_command`: the worktree is another repository's (the command `cd`s / `-C`s there) — no chat can follow it. */
+  otherRepository?: true;
 };
 
 export type PermissionRequest = {

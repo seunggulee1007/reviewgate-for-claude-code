@@ -214,7 +214,7 @@ import { diskChanged, readDiskSpace, SaveHealth } from "./review/storage.js";
 import { largeFileBytes, setLargeFileLimit } from "./git/largeFiles.js";
 import { applyCleanup, cleanupKeep, planCleanup } from "./review/cleanup.js";
 // MARK: wave4b w4b-follow — §39.4
-import { dropIncoming, moveTarget, readIncoming, waitForExit, writeHandoff, type ChatHandoff } from "./review/chatMove.js";
+import { dropIncoming, moveRefusal, moveTarget, readIncoming, waitForExit, writeHandoff, type ChatHandoff } from "./review/chatMove.js";
 // MARK: wave4d w4d-plan — §42.1
 import { applyTaskTool, displayPlanPath, messageSteps, planCandidates, planFilesNamed, planStepBriefs, planView, readPlanFile, requestScope, resolvePlanPath, todoWriteSteps, type TaskItem } from "./review/planSources.js";
 import { implementPlanText, takePlanHandoff, writePlanHandoff, type PlanHandoff } from "./review/planHandoff.js";
@@ -1028,7 +1028,8 @@ export class ReviewEngine {
           this.resolveCoveredPermissions();
         }
         // MARK: wave4b w4b-follow — §39.4 "허용하고 따라가기": once that worktree command ran, the chat moves into it.
-        if (cmd.allow && cmd.follow === true && pending.reason?.code === "worktree_command" && pending.toolUseId) {
+        // Not for another repository's worktree (§39.4): no chat of this window can go there — a plain allow.
+        if (cmd.allow && cmd.follow === true && pending.reason?.code === "worktree_command" && pending.reason.otherRepository !== true && pending.toolUseId) {
           this.followAfterTool.set(pending.toolUseId, { path: pending.reason.path ?? null, followUp: typeof cmd.followUp === "string" ? cmd.followUp : null });
         }
         this.touch();
@@ -1716,7 +1717,7 @@ export class ReviewEngine {
     const project = this.project;
     if (!cp || !project) throw new CommandRefused("no_project");
     const target = moveTarget(path, cp.root, await listWorktrees(cp.root));
-    if ("refused" in target) throw new CommandRefused(target.refused);
+    if ("refused" in target) throw new CommandRefused(await moveRefusal(target.refused, path, cp.root));
     const targetGitDir = await resolveGitDir(target.root).catch(() => null);
     if (!targetGitDir) throw new CommandRefused("not_a_worktree");
     const handoff: PlanHandoff = {
@@ -6488,7 +6489,7 @@ export class ReviewEngine {
     // A record has no conversation of its own here (the CLI lost it, or it moved already).
     if (meta.movedTo !== undefined || meta.resumeFailed === true || this.recordOnlyNext !== null) throw new CommandRefused("chat_is_record");
     const target = moveTarget(path, cp.root, await listWorktrees(cp.root));
-    if ("refused" in target) throw new CommandRefused(target.refused);
+    if ("refused" in target) throw new CommandRefused(await moveRefusal(target.refused, path, cp.root));
     const targetGitDir = await resolveGitDir(target.root).catch(() => null);
     if (!targetGitDir) throw new CommandRefused("not_a_worktree");
     this.guardMoveReview();
@@ -6692,7 +6693,7 @@ export class ReviewEngine {
           target = moveTarget(where, cp.root, list);
         }
       }
-      if ("refused" in target) refusal = target.refused;
+      if ("refused" in target) refusal = await moveRefusal(target.refused, where, cp.root);
       else {
         isWorktree = true;
         // A worktree that was there before the card (`git worktree add` refused, hidden by `| tail`) was not created by it:

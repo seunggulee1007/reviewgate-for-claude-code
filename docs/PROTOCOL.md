@@ -3954,6 +3954,13 @@ sends none of it and the engine behaves as before.
     worktree `git worktree list` shows now and did not show when the card came, if there is exactly one. So a variable
     the engine cannot know, `$(…)`, or a script still works. `detail` is the real refusal: `path_not_found` when nothing
     is at the path; before, every refusal read `not_a_worktree`. The clients put the reason in words after the line.
+  - **Another repository's worktree** (fixed after 0.5.9). A chat moves only between worktrees of one repository: the
+    CLI's record of the conversation stays with it. The Bash hook compares the repository the command's `git worktree
+    add` runs in (after its `cd`s and `-C`) with this one (`git rev-parse --git-common-dir`). When they differ, the
+    reason carries `otherRepository: true` with its own message, and the clients show no "허용하고 따라가기" on that card.
+    A `follow` sent anyway is a plain allow. `chat_move` (and a plan sent to a workbench) to such a folder is refused
+    `other_repository` instead of `not_a_worktree`. Seen in a real chat: a window on one repository's worktree, and
+    Claude ran `cd <another repository> && git worktree add …`.
 - **System instruction (§33.4, changed).** *"ReviewGate reviews every change you make in this folder (<cwd>). Work inside
   it; never use EnterWorktree. If the task needs its own git worktree, you may create it with `git worktree add`, but tell
   the user right away in one line: changes there are not reviewed until they move this chat into that worktree (ReviewGate

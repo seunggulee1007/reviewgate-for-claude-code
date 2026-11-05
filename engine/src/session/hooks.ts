@@ -12,7 +12,7 @@ import type { PermissionMode, PermissionReason } from "../protocol.js";
 import { openCheckpoint, type GitCheckpoint } from "../git/checkpoint.js";
 import { matchesIgnore } from "../git/ignore.js";
 import { isModsPath } from "../git/mods.js";
-import { commonDir, gitDir, listWorktrees } from "../git/worktrees.js";
+import { commonDir, gitDir, listWorktrees, sameRepository } from "../git/worktrees.js";
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
 import { isReadOnlyCommand, isRemembered, matchesAllowPattern } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
@@ -33,6 +33,8 @@ import {
   nestedRepoRoot,
   SCOPE_ASK_REASON,
   SCOPE_MESSAGES,
+  OTHER_REPO_WORKTREE_MESSAGE,
+  worktreeAddRepoDir,
   worktreeToolBlocked,
   type ScopeNotice,
 } from "./reviewScope.js";
@@ -709,7 +711,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs).
     const root = await containmentRoot(ctx);
     const cwd = hookCwd(input, ctx);
-    const scope = bashScopeReason(command, cwd, root, await otherWorktrees(ctx));
+    let scope = bashScopeReason(command, cwd, root, await otherWorktrees(ctx));
+    // §39.4: a worktree of another repository (the command `cd`s / `-C`s there) — no chat of this window can follow it.
+    if (scope?.code === "worktree_command") {
+      const repoDir = worktreeAddRepoDir(command, cwd);
+      if (repoDir && (await sameRepository(repoDir, root)) === false) scope = { ...scope, otherRepository: true, message: OTHER_REPO_WORKTREE_MESSAGE };
+    }
     if (scope && !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command))) {
       rememberScope(ctx, toolUseIdOf(input), scope);
       return askPre(SCOPE_ASK_REASON);

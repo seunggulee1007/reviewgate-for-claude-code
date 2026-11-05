@@ -138,6 +138,21 @@ describe("worktree tools (§33.4, audit market-01)", () => {
     expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: join(dirname(root), "feat-wt"), reasonCode: "worktree_command" }]);
   });
 
+  it("§39.4: a worktree of another repository (the command cds there) is marked otherRepository — no chat can follow it", async () => {
+    const root = repo();
+    const other = repo();
+    const c = ctx(root);
+    const target = join(dirname(other), "other-42");
+    const command = `cd ${other} && git fetch origin develop 2>&1 | tail -2 && git worktree add --no-track -b feature/acme/42 ${target} origin/develop 2>&1 | tail -3`;
+    expect((await pre(c, "Bash", { command }, root, "b1")).decision).toBe("ask");
+    expect(c.scopeReasons?.get("b1")).toMatchObject({ code: "worktree_command", path: target, otherRepository: true });
+    // The same command in this repository is followable.
+    const own = `cd ${root} && git worktree add -b feature/acme/43 ${join(dirname(root), "own-43")}`;
+    await pre(c, "Bash", { command: own }, root, "b2");
+    expect(c.scopeReasons?.get("b2")).toMatchObject({ code: "worktree_command" });
+    expect(c.scopeReasons?.get("b2")).not.toHaveProperty("otherRepository");
+  });
+
   it("a command that cds into a nested worktree, or runs while the shell sits in one, gets a card with the reason", async () => {
     const root = repo();
     const wt = join(root, ".claude", "worktrees", "wt1");

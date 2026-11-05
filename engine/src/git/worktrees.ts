@@ -3,7 +3,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { Settings } from "../protocol.js";
-import { compareKey, realpathLenient, toNativeAbs } from "../platform/paths.js";
+import { compareKey, realpathLenient, samePath, toNativeAbs } from "../platform/paths.js";
 import { runGit } from "./exec.js";
 
 /** One row of `git worktree list --porcelain` (docs/M10-WORKBENCHES.md). */
@@ -129,6 +129,23 @@ export async function commonDir(root: string): Promise<string> {
 }
 
 /** Absolute `git rev-parse --git-dir`; for a linked worktree this is `<common>/worktrees/<name>`. */
+/** §39.4: the repository's common git directory (shared by all its worktrees), real path; null outside a repository. */
+export async function gitCommonDir(dir: string): Promise<string | null> {
+  try {
+    const out = await runGit(dir, ["rev-parse", "--git-common-dir"], { allowFailure: true });
+    if (out.status !== 0 || !out.text.trim()) return null;
+    return realpathLenient(absoluteGitPath(dir, out.text.trim()));
+  } catch {
+    return null;
+  }
+}
+
+/** §39.4: whether `a` and `b` are in the same repository (any of its worktrees); null when either is in none. */
+export async function sameRepository(a: string, b: string): Promise<boolean | null> {
+  const [x, y] = await Promise.all([gitCommonDir(a), gitCommonDir(b)]);
+  return x === null || y === null ? null : samePath(x, y);
+}
+
 export async function gitDir(root: string): Promise<string> {
   const out = await runGit(root, ["rev-parse", "--git-dir"]);
   return absoluteGitPath(root, out.text.trim());

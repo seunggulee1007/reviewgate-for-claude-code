@@ -48,6 +48,10 @@ export function nestedRepoRoot(file: string, root: string): string | null {
 }
 
 /** English fallbacks of the §33 card reasons (clients localize on `code`); `claude_config` names its file (`claudeConfigMessage`). */
+/** §39.4: the `worktree_command` card of a worktree of another repository. */
+export const OTHER_REPO_WORKTREE_MESSAGE =
+  "This command creates a git worktree of another repository: work there is outside this window's review, and this chat cannot move there.";
+
 export const SCOPE_MESSAGES: Record<Exclude<PermissionReason["code"], "claude_config">, string> = {
   outside_project: "This edit is outside the project: the review does not show it.",
   nested_repository: "This location is inside a nested repository (submodule, worktree or clone): the review does not show changes there.",
@@ -417,6 +421,11 @@ const WORKTREE_ADD_WITH_VALUE = new Set(["-b", "-B", "--reason"]);
  * not a `git worktree add`, null when it is but names no path. `cwd` is where it runs (`-C` is applied).
  */
 export function gitWorktreeAddTarget(words: string[], cwd: string): string | null | undefined {
+  return parseWorktreeAdd(words, cwd)?.target;
+}
+
+/** `git … worktree add …`: the directory git runs in (`-C` applied) and the new worktree's path (null: none named). */
+function parseWorktreeAdd(words: string[], cwd: string): { base: string; target: string | null } | undefined {
   const w = commandWords(words);
   if (w.length === 0 || basename(w[0]!) !== "git") return undefined;
   let base = cwd;
@@ -431,13 +440,32 @@ export function gitWorktreeAddTarget(words: string[], cwd: string): string | nul
   if (w[i] !== "worktree" || w[i + 1] !== "add") return undefined;
   for (let j = i + 2; j < w.length; j++) {
     const a = w[j]!;
-    if (a === "--") return w[j + 1] !== undefined ? resolveDir(base, w[j + 1]!) : null;
+    if (a === "--") return { base, target: w[j + 1] !== undefined ? resolveDir(base, w[j + 1]!) : null };
     if (WORKTREE_ADD_WITH_VALUE.has(a)) {
       j++;
       continue;
     }
     if (a.startsWith("-")) continue;
-    return resolveDir(base, a);
+    return { base, target: resolveDir(base, a) };
+  }
+  return { base, target: null };
+}
+
+/**
+ * §39.4: the directory a command's `git worktree add` runs in (after its `cd`s and `-C`) — its repository is the one the
+ * new worktree belongs to. Null when the command adds no worktree.
+ */
+export function worktreeAddRepoDir(command: string, cwd: string): string | null {
+  let dir = cwd;
+  for (const words of segments(command)) {
+    const w = commandWords(words);
+    if (w[0] === "cd" || w[0] === "pushd") {
+      const arg = w.slice(1).find((a) => !a.startsWith("-"));
+      if (arg !== undefined) dir = resolveDir(dir, arg);
+      continue;
+    }
+    const add = parseWorktreeAdd(w, dir);
+    if (add) return add.base;
   }
   return null;
 }
