@@ -6419,3 +6419,51 @@ process:
   (`adoption`, `keepAgentsInTurn`), `engine.ts` (`onAutoTurnStart` / `adoptAutoTurn` / `task*`), `review/gate.ts`
   (`prepareAnswer(carry)`), `git/mods.ts`; Core `Engine/BackgroundProtocol.swift`, `Session/AppState+Background.swift`;
   App `UI/Chat/BackgroundViews.swift`; `sidecar/test/driver-background.mjs`).
+
+## 53. Commits in meaningful units
+
+`commit` turns the accepted files into **one** commit, whole files only. The user commits in minimal meaningful units
+(one behavior per commit, so any commit can be reverted or cherry-picked alone), and one file often holds changes of
+two units. Now the commit sheet can split the accepted changes into several commits, down to hunks. Claude can propose
+the split, the user adjusts it, and one command makes the commits in order. `commit` itself is unchanged.
+
+```ts
+type CommitHunk = { id: number; header: string; added: number; deleted: number; text: string };   // text ≤ 300 lines
+type CommitFile = { path: string; oldPath?: string; status: FileStatus; binary: boolean; hunks: CommitHunk[] };   // hunks [] → whole file only
+type CommitPart = { path: string; hunks?: number[] };          // no `hunks` = the whole file
+type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
+// command commit_hunks { paths? }            → reply commit_hunks { files: CommitFile[] }                       (git lane)
+// command commit_split_draft { paths? }      → reply commit_split_draft { commits: CommitPlan[]; unassigned: CommitPart[] }   (side lane)
+// command commit_series { commits: CommitPlan[]; push? } → reply committed_series { commits: { sha; shortSha; message; files: string[] }[]; branch; pushed }
+```
+
+- **Hunks** are those of `git diff HEAD -- <path>` (3 lines of context) — what a commit takes from the worktree — for
+  accepted paths only (`paths` as `commit`: default `commit.acceptedPaths`, refused `nothing_to_commit` for any other).
+  Ids are 0, 1, … in file order. An added, deleted, binary or renamed file, or one whose diff has a single hunk, can only
+  go whole (`hunks: []`).
+- **`commit_split_draft`** is a read-only fork like `commit_draft` (§36.11, the same fork rules, refusals and side lane;
+  `commit_split_failed:<why>`). It gets every hunk (path, id, header, text; cut at 3 000 lines in all, then the file list),
+  the last 20 commit subjects, the branch and `settings.commitTemplate`, and the conversation's context. It is asked for
+  the smallest meaningful commits in an order where each one builds: dependencies first, docs in the commit of the change
+  they describe, an unrelated fix or a regenerated file in its own commit, each message in the project's format. It
+  answers JSON. The engine keeps only valid parts (a known accepted path, known hunk ids, no hunk twice). What is left
+  over is `unassigned`. Nothing is committed.
+- **`commit_series`** makes the commits in order, then pushes once when `push` (default `settings.commitPushByDefault`).
+  - Refusals:
+    - like `commit`: `no_project`, `session_running`, `collect_failed`, `nothing_to_commit`, `empty_message` (any
+      commit), `git_identity_missing:…`, `merge_unresolved`;
+    - `invalid_part:<path>` (a path that is not accepted, an unknown hunk id, a whole-only file given hunks);
+    - `hunk_twice:<path>#<id>`;
+    - `commit_failed:<git's words>`.
+    A refusal before the first commit changes nothing.
+  - Each commit is made with git's own `commit` on a temporary index (`GIT_INDEX_FILE`) that starts from `HEAD`, so the
+    repository's hooks run as for `commit`. A file split by hunks gets HEAD's content with the hunks of this and the
+    earlier commits applied (computed from the one `git diff HEAD` taken before the first commit). A whole-file part
+    takes the worktree's content (or its deletion; a rename stages both paths). `settings.commitTrailer` is added as
+    `commit` adds it.
+  - The worktree is never written. The user's own index keeps everything except the committed paths, which are set to
+    the new HEAD, as `commit --only` leaves them. A failure in the middle stops there and reports
+    `commit_failed:<words>` with `committed_series` of what was made (`partial: true`).
+  - Afterwards A is rebuilt with the committed content of every touched path and B re-snapshotted, as after `commit`. A
+    file with hunks left uncommitted stays in the review, accepted, with only those hunks in its diff. A file fully
+    committed leaves it. `state.commit.lastCommit` is the last commit; each commit is a §38.3 history row.
