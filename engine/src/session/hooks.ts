@@ -197,11 +197,23 @@ export function writesFiles(command: string): boolean {
   return SHELL_MUTATING_RE.test(command.replace(HARMLESS_REDIRECT_RE, " "));
 }
 
-export function reviewGateReason(files: number, maxFiles: number, lines: number, maxLines: number): string {
-  // §54: a count without a limit (0) shows no "/0".
-  const count = (n: number, max: number): string => (max > 0 ? `${n}/${max}` : `${n}`);
+/** §54: "12/10", or "12" for a count without a limit (0). */
+const usedOf = (n: number, max: number): string => (max > 0 ? `${n}/${max}` : `${n}`);
+
+/**
+ * §54: what Claude is told after an edit once the opt-in budget is reached — the numbers and where the hard stop is, not
+ * "stop and report" (that made Claude stop at the soft limit, half way to the deny).
+ */
+export function budgetNote(files: number, maxFiles: number, lines: number, maxLines: number, hardMultiplier: number): string {
   return (
-    `REVIEW GATE: per-turn change budget exceeded (files ${count(files, maxFiles)}, lines ${count(lines, maxLines)}). ` +
+    `Budget note: ${usedOf(lines, maxLines)} lines, ${usedOf(files, maxFiles)} files used this turn — the user's change limit is reached; ` +
+    `edits past ${hardMultiplier}× it are denied.`
+  );
+}
+
+export function reviewGateReason(files: number, maxFiles: number, lines: number, maxLines: number): string {
+  return (
+    `REVIEW GATE: per-turn change budget exceeded (files ${usedOf(files, maxFiles)}, lines ${usedOf(lines, maxLines)}). ` +
     "Do NOT make further edits, do NOT work around this with shell commands. " +
     "Stop now and reply with a short report: (1) what you changed, (2) what remains, (3) exact next step."
   );
@@ -778,9 +790,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
-        additionalContext:
-          `Budget note: ${b.lines}/${b.budget.maxLines} lines, ${b.files.size}/${b.budget.maxFiles} files used this turn. ` +
-          "Finish only the current unit, then stop and report.",
+        additionalContext: budgetNote(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines, b.hardMultiplier),
       },
     };
   };

@@ -492,6 +492,22 @@ describe("§54: no change budget by default", () => {
     expect(decision(await preEdit(preToolUse("Edit", { file_path: join(root, "README.md"), old_string: "line1", new_string: "x" }, root), "e2", opts)).decision).toBe("deny");
   });
 
+  it("at the opt-in limit an edit's note gives the numbers and where the deny starts — it never says to stop", async () => {
+    const root = track(makeRepo());
+    const ctx = fakeCtx(root, { maxFiles: 2, maxLines: 4 });
+    const hooks = buildHooks(ctx);
+    const preEdit = hooks.PreToolUse![0]!.hooks[0]!;
+    const postEdit = hooks.PostToolUse![0]!.hooks[0]!;
+    const opts = { signal: new AbortController().signal };
+    const input = { file_path: join(root, "four.txt"), content: "1\n2\n3\n4\n" };
+    expect(await preEdit(preToolUse("Write", input, root), "w1", opts)).toEqual({});
+    const out = (await postEdit({ ...(preToolUse("Write", input, root) as object), hook_event_name: "PostToolUse", tool_response: {} } as unknown as HookInput, "w1", opts)) as {
+      hookSpecificOutput?: { additionalContext?: string };
+    };
+    expect(out.hookSpecificOutput?.additionalContext).toBe("Budget note: 4/4 lines, 1/2 files used this turn — the user's change limit is reached; edits past 1.5× it are denied.");
+    expect(out.hookSpecificOutput?.additionalContext).not.toMatch(/stop/i);
+  });
+
   it("writesFiles: a redirection into /dev/null or onto another stream writes nothing", () => {
     for (const c of ["npm test 2>&1", "cmd >/dev/null", "cmd 2> /dev/null", "cmd &>/dev/null", "cmd >>/dev/null 2>&1", "echo x >&2", "git log"]) expect(writesFiles(c), c).toBe(false);
     for (const c of ["echo x > f", "cmd > /dev/nullx", "cmd >> log.txt 2>&1", "tee out", "mkdir d", "cp a b", "npm install"]) expect(writesFiles(c), c).toBe(true);

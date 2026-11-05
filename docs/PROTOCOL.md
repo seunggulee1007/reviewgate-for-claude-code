@@ -6534,7 +6534,7 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
 
 - **Off** — both counts 0 (or below, or not a number); the default, so a `hello` without `budget` runs without one. The
   hooks count nothing (no pre-edit estimate, no post-Bash numstat — the post-Bash snapshot still attributes files, §31),
-  emit no `budget_event`, deny nothing and add no "Finish only the current unit, then stop and report." after an edit;
+  emit no `budget_event`, deny nothing and add no budget note after an edit;
   `state.budgetUsage` stays `{files: 0, lines: 0, denied: false}`. A budget turned off during a turn stops counting and
   denying at once.
 - **On** — the client sent a limit: §4 as before. A count of 0 next to a limit on the other is no limit on that count (the
@@ -6557,7 +6557,11 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   A message put into a running turn (§50 `steer`) joins that turn and so its budget: nothing resets it.
 - **No "stop after each unit" either.** An approved plan's follow-up (§11 `plan_response`, §42.1 into a new chat or
   workbench) said "Work in small units and stop after each unit for review.": Claude stopped after the first step of every
-  plan. It is now just "Implement the approved plan at <path>." (the variants as before).
+  plan. It is now just "Implement the approved plan at <path>." (the variants as before). With a budget on, the note after
+  an edit at 100 % no longer ends "Finish only the current unit, then stop and report." (Claude stopped at the soft limit,
+  half way to the deny); it reads `Budget note: 410/400 lines, 3/10 files used this turn — the user's change limit is
+  reached; edits past 2× it are denied.` The deny's own reason (§4) still asks for a short report: nothing more can be
+  edited then.
 - **Wire decision.** Off is `{maxFiles: 0, maxLines: 0}`, not `budget: null`: `state.budget` stays an object (an older
   client decodes every state) and `set_settings{budget}` keeps meaning "replace it". An older client always sends its own
   budget (10 / 400 / 2.0 unless changed) with an append that tells Claude those numbers, so it keeps its budget on a newer
