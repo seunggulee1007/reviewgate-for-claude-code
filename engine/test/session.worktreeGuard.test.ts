@@ -1,5 +1,6 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CanUseTool, HookCallback, HookInput, Options, Query, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { BudgetState } from "../src/session/budget.js";
@@ -117,6 +118,10 @@ describe("worktree tools (§33.4, audit market-01)", () => {
     expect(gitWorktreeAddTarget(["git", "-C", "/other", "worktree", "add", "--lock", "--reason", "why", "wt"], cwd)).toBe(resolve("/other/wt"));
     expect(gitWorktreeAddTarget(["git", "--no-pager", "worktree", "add", "--", "-odd"], cwd)).toBe(resolve("/repo/-odd"));
     expect(gitWorktreeAddTarget(["git", "worktree", "list"], cwd)).toBeUndefined();
+    // `$HOME` / `${HOME}` and other variables the environment defines are expanded; an unknown one stays as written.
+    expect(gitWorktreeAddTarget(["git", "worktree", "add", "$HOME/worktrees/acme-42"], cwd)).toBe(join(homedir(), "worktrees/acme-42"));
+    expect(gitWorktreeAddTarget(["git", "worktree", "add", "${HOME}/wt"], cwd)).toBe(join(homedir(), "wt"));
+    expect(gitWorktreeAddTarget(["git", "worktree", "add", "$RG_SURELY_UNSET_VAR/wt"], cwd)).toBe(resolve("/repo/$RG_SURELY_UNSET_VAR/wt"));
     expect(gitWorktreeAddTarget(["git", "status"], cwd)).toBeUndefined();
     expect(gitWorktreeAddTarget(["git", "worktree", "add"], cwd)).toBeNull();
   });

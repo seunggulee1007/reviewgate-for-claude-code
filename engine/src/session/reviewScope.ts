@@ -391,7 +391,17 @@ function commandWords(words: string[]): string[] {
   return words.slice(i);
 }
 
-function resolveDir(base: string, arg: string): string {
+/** `$NAME` / `${NAME}` the environment defines (`$HOME/worktrees/x`); an unknown one stays as written. */
+function expandVars(arg: string): string {
+  return arg.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (m, braced: string | undefined, bare: string | undefined) => {
+    const name = braced ?? bare ?? "";
+    const value = name === "HOME" ? homedir() : process.env[name];
+    return value !== undefined && value !== "" ? value : m;
+  });
+}
+
+function resolveDir(base: string, raw: string): string {
+  const arg = raw.includes("$") ? expandVars(raw) : raw;
   if (arg === "~") return homedir();
   if (arg.startsWith("~/")) return join(homedir(), arg.slice(2));
   return resolve(base, arg);
