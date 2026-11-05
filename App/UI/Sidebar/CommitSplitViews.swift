@@ -4,8 +4,8 @@ import ReviewGateCore
 // MARK: §53 commits in meaningful units
 // docs/PROTOCOL.md §53 on the Mac: the commit sheet's "나눠서 커밋" mode — the accepted changes as commit cards (a message
 // each, the files and their hunks, a → menu to move a file or a hunk to another card or to "커밋하지 않음", up / down /
-// delete), and "커밋 N개 만들기" (`commit_series`). The state and the words are Core's (`CommitSplitSession`,
-// `CommitSplitState`, `CommitSplitText`); this is the screen.
+// delete), "AI로 나누기" (`commit_split_draft`, with "원래대로 되돌리기") and "커밋 N개 만들기" (`commit_series`). The state and
+// the words are Core's (`CommitSplitSession`, `CommitSplitState`, `CommitSplitText`); this is the screen.
 
 /// The split mode under the commit sheet's mode picker, with its own actions (Cancel / Close, "커밋 N개 만들기").
 struct CommitSplitPanel: View {
@@ -17,6 +17,7 @@ struct CommitSplitPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            AIRow(session: session)
             if let line = session.loadError {
                 warning(line).accessibilityIdentifier("Split error")
             } else if session.files == nil {
@@ -78,6 +79,47 @@ struct CommitSplitPanel: View {
             }
         }
         .task(id: ObjectIdentifier(session)) { await session.load(store) }
+    }
+
+    /// "AI로 나누기", its progress, "원래대로 되돌리기" after a proposal, and why the last one failed (one line).
+    struct AIRow: View {
+        @Environment(AppState.self) private var store
+        @Bindable var session: CommitSplitSession
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await session.splitWithClaude(store) }
+                    } label: {
+                        Label("Split with Claude", systemImage: "sparkles")
+                    }
+                    .controlSize(.small)
+                    .disabled(!session.canSplit)
+                    .help("Claude proposes the smallest meaningful commits, in an order where each one builds — in a read-only side session; nothing is committed")
+                    .accessibilityIdentifier("Split with Claude")
+                    if session.isSplitting {
+                        ProgressView().controlSize(.small)
+                        Text(verbatim: CommitSplitText.splitting).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("Split progress")
+                    } else if session.state.canRestore {
+                        Button("Restore the previous split") { session.state.restore() }
+                            .buttonStyle(.link)
+                            .controlSize(.small)
+                            .disabled(session.isCommitting || session.stopped)
+                            .accessibilityIdentifier("Restore split")
+                    }
+                    Spacer(minLength: 0)
+                }
+                if let line = session.splitError, !session.isSplitting {
+                    Label(line, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .lineLimit(2)
+                        .help(line)
+                        .accessibilityIdentifier("Split with Claude error")
+                }
+            }
+        }
     }
 
     /// Why "커밋 N개 만들기" is off: the mode's own reason, else the sheet's (a turn, its collection, a revert, a failed

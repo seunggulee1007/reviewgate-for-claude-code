@@ -6490,6 +6490,9 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
     shows "k of n parts" when the card has only some of its hunks. A hunk shows `#id`, its header and +/−, and its lines
     (as the engine sent them) on a click. A file and each hunk have a → menu: the other cards, then "커밋하지 않음".
     "커밋 추가" adds an empty card; "커밋하지 않음" lists what stays in the review.
+  - "AI로 나누기" (`commit_split_draft`, side lane) shows "나누는 중…" while Claude works. Claude's cards replace the
+    user's, each with its why under the message, and what none took goes to "커밋하지 않음". "원래대로 되돌리기" puts back the
+    cards from before. A refusal is one orange line in words; an engine before §53 says to update ReviewGate.
   - "커밋 N개 만들기" (⌘↩; push as for one commit) says next to it why it is off: no card, a card without a message or
     changes, a turn running. A refusal is one red line in words. A series that stopped lists the commits it made (short
     sha, subject), then why; the button stays off ("이 창을 닫아 주세요 — …") and Cancel becomes Close.

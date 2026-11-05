@@ -4439,6 +4439,22 @@
         }
       }
     },
+    "Claude proposes the smallest meaningful commits, in an order where each one builds — in a read-only side session; nothing is committed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude proposes the smallest meaningful commits, in an order where each one builds — in a read-only side session; nothing is committed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 하나씩 빌드되는 순서로 가장 작은 의미 단위 커밋을 제안해요 — 읽기 전용 곁세션에서 하며 아무것도 커밋하지 않아요"
+          }
+        }
+      }
+    },
     "Claude writes the title and description from this branch's commits and diff, the repository's PR template and what is in the sheet — in a read-only side session; the main chat is untouched and nothing is pushed or created": {
       "localizations": {
         "en": {
@@ -17797,6 +17813,22 @@
         }
       }
     },
+    "Restore the previous split": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore the previous split"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원래대로 되돌리기"
+          }
+        }
+      }
+    },
     "Restore what I had": {
       "localizations": {
         "en": {
@@ -18898,6 +18930,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "마지막 64KB만 보여요."
+          }
+        }
+      }
+    },
+    "Split with Claude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split with Claude"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI로 나누기"
           }
         }
       }
