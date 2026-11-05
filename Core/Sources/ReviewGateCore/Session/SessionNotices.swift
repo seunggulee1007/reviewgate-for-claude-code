@@ -111,7 +111,7 @@ public enum SessionNotices {
     /// The user's words for the §30 / §33.4 / §29 codes; nil = not one of them (the caller falls back to `EngineMessages`).
     public static func errorText(message: String, detail: EngineErrorDetail) -> String? {
         if let text = LongWorkText.errorText(message: message, detail: detail) { return text }   // wave4 w4-longwork (§38.2)
-        if let text = ChatMoveText.noticeText(code: detail.code, path: detail.path, message: message) { return text }   // wave4b w4b-follow
+        if let text = ChatMoveText.noticeText(code: detail.code, path: detail.path, message: message, detail: detail.detail) { return text }   // wave4b w4b-follow
         if let text = AutoModeText.errorText(message: message, detail: detail) { return text }   // wave4b w4b-auto (§39.5)
         switch detail.code {
         case "session_start_failed": return String(localized: "Claude Code quit right after it started.", bundle: .module)

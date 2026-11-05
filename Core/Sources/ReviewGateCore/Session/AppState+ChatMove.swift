@@ -88,7 +88,7 @@ public enum ChatMoveText {
     public static var openThatWindow: String { String(localized: "Open That Window", bundle: .module) }
 
     /// The notices of §39.4 (`error` codes); nil for any other code.
-    public static func noticeText(code: String?, path: String?, message: String) -> String? {
+    public static func noticeText(code: String?, path: String?, message: String, detail: String? = nil) -> String? {
         let from = path.map { SessionNotices.abbreviatingHome($0) } ?? ""
         switch code {
         case "chat_moved_in":
@@ -97,7 +97,9 @@ public enum ChatMoveText {
             return String(localized: "This chat moved here from \(from). It is reviewed from here on; changes made here before the move are not in the review.", bundle: .module)
         case "chat_move_failed":
             let name = path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
-            return String(localized: "This chat could not move to \(name), so it stays here.", bundle: .module)
+            let line = String(localized: "This chat could not move to \(name), so it stays here.", bundle: .module)
+            // Why, in words (the engine's code stays the row's second line).
+            return detail.map { "\(line) \(refusal($0))" } ?? line
         default:
             return nil
         }

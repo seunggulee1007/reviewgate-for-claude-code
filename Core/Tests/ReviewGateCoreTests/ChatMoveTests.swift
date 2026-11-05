@@ -58,6 +58,9 @@ import Testing
         #expect(SessionNotices.isNotice(code: "chat_move_failed", fatal: false))
         let disk = SessionNotices.errorText(message: "m", detail: EngineErrorDetail(code: "chat_moved_in_disk", detail: nil, path: "/w/a"))
         #expect(disk != nil && disk != text)
+        // A failed follow says why in words (a missing folder is not "not a worktree").
+        let failed = SessionNotices.errorText(message: "m", detail: EngineErrorDetail(code: "chat_move_failed", detail: "path_not_found", path: "/w/acme-42"))
+        #expect(failed?.contains("acme-42") == true && failed?.hasSuffix(ChatMoveText.refusal("path_not_found")) == true)
         #expect(SessionNotices.bannerActions(code: "worktree_outside_review", repeats: 1, path: "/w/wt2", pathIsWorkbench: true) == [.moveChat, .openWorkbench])
         #expect(SessionNotices.bannerActions(code: "worktree_outside_review", repeats: 1, path: "/elsewhere", pathIsWorkbench: false) == [.openFolder])
         #expect(ChatMoveText.followUp(name: "acme-4176-17").contains("acme-4176-17"))
