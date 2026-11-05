@@ -915,6 +915,22 @@
         }
       }
     },
+    "%lld of %lld parts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld parts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld개 중 %1$lld개 부분"
+          }
+        }
+      }
+    },
     "%lld outdated comment(s) hidden": {
       "localizations": {
         "en": {
@@ -1645,6 +1661,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "업무 링크, ABC-123 같은 키, 또는 할 일 — 그곳의 첫 메시지로 보내요."
+          }
+        }
+      }
+    },
+    "Add commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 추가"
           }
         }
       }
@@ -6183,6 +6215,22 @@
         }
       }
     },
+    "Commit %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 %lld"
+          }
+        }
+      }
+    },
     "Commit Accepted…": {
       "localizations": {
         "en": {
@@ -6263,6 +6311,54 @@
         }
       }
     },
+    "Commit at once": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit at once"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번에 커밋"
+          }
+        }
+      }
+    },
+    "Commit in parts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit in parts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나눠서 커밋"
+          }
+        }
+      }
+    },
+    "Commit in parts: several commits from the ticked files, down to hunks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit in parts: several commits from the ticked files, down to hunks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나눠서 커밋: 체크한 파일을 부분 단위까지 여러 커밋으로 나눠요"
+          }
+        }
+      }
+    },
     "Commit message": {
       "localizations": {
         "en": {
@@ -6291,6 +6387,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "커밋 메시지 템플릿"
+          }
+        }
+      }
+    },
+    "Commit mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit mode"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 방식"
           }
         }
       }
@@ -7431,6 +7543,38 @@
         }
       }
     },
+    "Delete this commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 커밋 삭제"
+          }
+        }
+      }
+    },
+    "Delete this commit — its changes go to Not committed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this commit — its changes go to Not committed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 커밋 삭제 — 변경은 '커밋하지 않음'으로 가요"
+          }
+        }
+      }
+    },
     "DENIED": {
       "localizations": {
         "en": {
@@ -8563,6 +8707,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "그 밖의 알림 (오류·곁질문·다른 세션·서브에이전트)"
+          }
+        }
+      }
+    },
+    "Everything is in a commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything is in a commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 변경이 커밋에 들어 있어요"
           }
         }
       }
@@ -11632,6 +11792,22 @@
         }
       }
     },
+    "Make %lld commit(s)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make %lld commit(s)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 %lld개 만들기"
+          }
+        }
+      }
+    },
     "MCP servers": {
       "localizations": {
         "en": {
@@ -12112,6 +12288,38 @@
         }
       }
     },
+    "Move %@ to…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move %@ to…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 옮기기…"
+          }
+        }
+      }
+    },
+    "Move down": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move down"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래로"
+          }
+        }
+      }
+    },
     "Move Earlier": {
       "localizations": {
         "en": {
@@ -12176,6 +12384,22 @@
         }
       }
     },
+    "Move to another commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to another commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 커밋으로 옮기기"
+          }
+        }
+      }
+    },
     "Move to Applications Folder": {
       "localizations": {
         "en": {
@@ -12188,6 +12412,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "응용 프로그램 폴더로 옮기기"
+          }
+        }
+      }
+    },
+    "Move up": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move up"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "위로"
           }
         }
       }
@@ -12546,6 +12786,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "아니요"
+          }
+        }
+      }
+    },
+    "No changes in this commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No changes in this commit"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 커밋에 변경이 없어요"
           }
         }
       }
@@ -13426,6 +13682,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "내용 미수집"
+          }
+        }
+      }
+    },
+    "Not committed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not committed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋하지 않음"
           }
         }
       }
@@ -18598,6 +18870,22 @@
         }
       }
     },
+    "Show the change": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the change"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 내용 보기"
+          }
+        }
+      }
+    },
     "Showing the last 64 KB.": {
       "localizations": {
         "en": {
@@ -22690,6 +22978,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "실행 중인 채팅('%@')의 에이전트예요"
+          }
+        }
+      }
+    },
+    "These stay uncommitted and in the review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These stay uncommitted and in the review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋하지 않고 리뷰에 그대로 남아요"
           }
         }
       }

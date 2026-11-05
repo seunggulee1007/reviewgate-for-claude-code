@@ -6483,3 +6483,20 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
   - Afterwards A is rebuilt with the committed content of every touched path and B re-snapshotted, as after `commit`. A
     file with hunks left uncommitted stays in the review, accepted, with only those hunks in its diff. A file fully
     committed leaves it. `state.commit.lastCommit` is the last commit; each commit is a §38.3 history row.
+- **Mac** (`CommitSheet`, `CommitSplitPanel`; Core `CommitSplitState`, `CommitSplitSession`, `CommitSplitText`).
+  - "한 번에 커밋 / 나눠서 커밋" sits beside the sheet's title (off with no file ticked). "나눠서 커밋" takes the ticked files
+    (`commit_hunks`) and starts as one card with everything and the sheet's message. The sheet is then 640 pt wide.
+  - A card: "커밋 N" with ↑ / ↓ / ✕ (its parts go to "커밋하지 않음"), its message, then its files in diff order. A file
+    shows "k of n parts" when the card has only some of its hunks. A hunk shows `#id`, its header and +/−, and its lines
+    (as the engine sent them) on a click. A file and each hunk have a → menu: the other cards, then "커밋하지 않음".
+    "커밋 추가" adds an empty card; "커밋하지 않음" lists what stays in the review.
+  - "커밋 N개 만들기" (⌘↩; push as for one commit) says next to it why it is off: no card, a card without a message or
+    changes, a turn running. A refusal is one red line in words. A series that stopped lists the commits it made (short
+    sha, subject), then why; the button stays off ("이 창을 닫아 주세요 — …") and Cancel becomes Close.
+  - A refused push after every commit closes the sheet, and the Changes banner offers "Push now", as after `commit`. After
+    a series the banner's second line names its commits ("커밋 3개를 만들었어요 (…)").
+  - `result.partial` reaches the request as `EngineClientError.refused(…, partial:)`.
+- Owner (Mac): Core `Engine/CommitSeriesProtocol.swift`, `Engine/EngineClient.swift` (`refusal(of:)`),
+  `Session/CommitSplit.swift`, `Session/AppState+CommitSeries.swift`; App `UI/Sidebar/CommitSheet.swift`,
+  `UI/Sidebar/CommitSplitViews.swift`. Tests: `Core/Tests/ReviewGateCoreTests/CommitSeriesWireTests.swift`,
+  `CommitSplitTests.swift`.

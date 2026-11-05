@@ -771,6 +771,12 @@ struct MainWindow: View {
                         .font(.caption).foregroundStyle(.red)
                         .lineLimit(2).textSelection(.enabled)
                         .accessibilityIdentifier("Commit push error")
+                } else if let series = store.flow.lastSeries, series.commits.count > 1, series.commits.last?.sha == commit.sha {
+                    // §53: "커밋 N개 만들기" made these, the banner's commit the last of them.
+                    Text(verbatim: CommitSplitText.done(series.commits, pushed: false))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.tail)
+                        .accessibilityIdentifier("Commit banner series")
                 } else {
                     Text(verbatim: commit.message.split(whereSeparator: \.isNewline).first.map(String.init) ?? "")
                         .font(.caption).foregroundStyle(.secondary)
