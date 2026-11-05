@@ -785,8 +785,9 @@ The engine turns that into a proposal. Two CLI behaviors, both handled centrally
   - `approve: true` → `setPermissionMode(mode ?? "default")` (§44.1: without `mode`, back to `auto` when the chat came from
     auto mode), clears `pendingPlan`, emits **`plan_approved { mode, path }`** (the
     same nullable `path`) and then issues the follow-up instruction as a normal `send` (`message ?? "Implement the approved plan
-    at <path>. Work in small units and stop after each unit for review."`, or `"Implement the plan you just proposed. …"` when
-    `path` is `null`) — a normal send, so the review gate applies to the implementation turn.
+    at <path>."`, or `"Implement the plan you just proposed."` when `path` is `null`) — a normal send, so the review gate
+    applies to the implementation turn. §54: it no longer adds "Work in small units and stop after each unit for review.",
+    which made Claude stop after the first step of a plan.
   - `approve: false` → stays in plan mode, clears `pendingPlan` and sends `message ?? "Keep planning — revise the plan; do not
     implement yet."`.
   - Refusals: `no_session`, `session_busy` (a turn / start / collection / revert in flight), `no_plan` (nothing pending),
@@ -4725,8 +4726,8 @@ type PlanSourceState = { kind: PlanSourceKind | null; path?: string; chosen?: bo
 - **Implement in a new chat** (`into: "new_chat"`). Checked like `session_new` (`collect_failed`, `review_pending`,
   `notes_pending`, `session_busy`) and refused `invalid_mode` for `plan`, before anything changes. A fresh chat of this
   worktree starts with its CLI in the approved mode, the plan becomes its approved plan (its summaries follow it) and its
-  first message is *"Implement the approved plan at <path> (it was made in an earlier chat — read it first). Work in small
-  units and stop after each unit for review."* — the plan itself, fenced, when it only came through ExitPlanMode — a normal
+  first message is *"Implement the approved plan at <path> (it was made in an earlier chat — read it first)."* (§54: without
+  "Work in small units and stop after each unit for review.") — the plan itself, fenced, when it only came through ExitPlanMode — a normal
   send through the gate. `plan_approved {mode, path, into: "new_chat"}` is emitted in the fresh chat. A follow-up that does
   not go out leaves the plan pending there in the previous mode (`plan_followup_failed`, §19.5).
 - **Implement in a new workbench** (`into: "workbench", path`). The client creates the workbench first (the New Workbench
@@ -6554,6 +6555,9 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   Reads, searches, subagents and the to-do list are never counted or refused, and the turn is not interrupted: more than
   five tool calls of any kind after a deny used to stop it (`stopReason: "interrupted"`), and the clients' queue with it.
   A message put into a running turn (§50 `steer`) joins that turn and so its budget: nothing resets it.
+- **No "stop after each unit" either.** An approved plan's follow-up (§11 `plan_response`, §42.1 into a new chat or
+  workbench) said "Work in small units and stop after each unit for review.": Claude stopped after the first step of every
+  plan. It is now just "Implement the approved plan at <path>." (the variants as before).
 - **Wire decision.** Off is `{maxFiles: 0, maxLines: 0}`, not `budget: null`: `state.budget` stays an object (an older
   client decodes every state) and `set_settings{budget}` keeps meaning "replace it". An older client always sends its own
   budget (10 / 400 / 2.0 unless changed) with an append that tells Claude those numbers, so it keeps its budget on a newer

@@ -92,7 +92,7 @@ describe("§42.1 plans you can review (market-08)", () => {
     expect(h.sessions).toHaveLength(2);
     expect(h.session().opts.settings.permissionMode).toBe("acceptEdits");
     expect(h.sessions[0]!.sends).toHaveLength(1);
-    expect(h.session().sends.map((x) => x.text)).toEqual([`Implement the approved plan at ${file} (it was made in an earlier chat — read it first). Work in small units and stop after each unit for review.`]);
+    expect(h.session().sends.map((x) => x.text)).toEqual([`Implement the approved plan at ${file} (it was made in an earlier chat — read it first).`]);
     expect(h.ofType("plan_approved").at(-1)).toMatchObject({ mode: "acceptEdits", path: file, into: "new_chat" });
     expect(s.session.planSource).toMatchObject({ kind: "approved", path: file });
     // Its summary checks the plan.

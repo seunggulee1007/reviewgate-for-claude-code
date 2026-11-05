@@ -289,7 +289,7 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
     expect(approved[0]).toMatchObject({ mode: "default", path: file });
     const sent = h.session().sends.slice(sendsBefore);
     expect(sent).toHaveLength(1);
-    expect(sent[0]!.text).toBe(`Implement the approved plan at ${file}. Work in small units and stop after each unit for review.`);
+    expect(sent[0]!.text).toBe(`Implement the approved plan at ${file}.`);
     // The follow-up is a normal send: a turn is running and the review gate applies to it.
     expect(h.engine.state.gate.phase).toBe("running");
   });
@@ -402,7 +402,7 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
     await h.engine.request({ type: "plan_response", approve: true });
     expect(h.engine.state.session.permissionMode).toBe("default");
     expect(h.ofType("plan_approved")[0]).toMatchObject({ mode: "default", path: file });
-    expect(h.session().sends.slice(sendsBefore)[0]!.text).toBe(`Implement the approved plan at ${file}. Work in small units and stop after each unit for review.`);
+    expect(h.session().sends.slice(sendsBefore)[0]!.text).toBe(`Implement the approved plan at ${file}.`);
   });
 
   it("ExitPlanMode without a plan file proposes a pathless plan and approves with a generic follow-up", async () => {
@@ -430,7 +430,7 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
     const sendsBefore = h.session().sends.length;
     await h.engine.request({ type: "plan_response", approve: true });
     expect(h.ofType("plan_approved")[0]).toMatchObject({ mode: "default", path: null });
-    expect(h.session().sends.slice(sendsBefore)[0]!.text).toBe("Implement the plan you just proposed. Work in small units and stop after each unit for review.");
+    expect(h.session().sends.slice(sendsBefore)[0]!.text).toBe("Implement the plan you just proposed.");
   });
 
   it("ExitPlanMode with no plan text falls back to the plan file at turn_end", async () => {

@@ -72,7 +72,6 @@ export function takePlanHandoff(gitDir: string, now: number = Date.now()): PlanH
  * file's path — Claude reads it — or, for a plan that only came through ExitPlanMode, the plan itself.
  */
 export function implementPlanText(path: string | null, plan: string): string {
-  const units = "Work in small units and stop after each unit for review.";
-  if (path !== null) return `Implement the approved plan at ${path} (it was made in an earlier chat — read it first). ${units}`;
-  return `Implement this approved plan (it was made in an earlier chat). ${units}\n\n<plan>\n${plan}\n</plan>`;
+  if (path !== null) return `Implement the approved plan at ${path} (it was made in an earlier chat — read it first).`;
+  return `Implement this approved plan (it was made in an earlier chat).\n\n<plan>\n${plan}\n</plan>`;
 }

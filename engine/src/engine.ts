@@ -1594,8 +1594,8 @@ export class ReviewEngine {
       text =
         custom ??
         (pending.path !== null
-          ? `Implement the approved plan at ${pending.path}. Work in small units and stop after each unit for review.`
-          : "Implement the plan you just proposed. Work in small units and stop after each unit for review.");
+          ? `Implement the approved plan at ${pending.path}.`
+          : "Implement the plan you just proposed.");
     } else {
       this.sessionState.pendingPlan = null;
       this.touch();
