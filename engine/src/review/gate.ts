@@ -3,6 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { deriveFullFile, type FullFileView } from "../diff/fullfile.js";
 import { parseUnifiedDiff, type FileDiff } from "../diff/parse.js";
 import { HunkMismatchError, revertHunks } from "../diff/hunks.js";
+import { overlayTree } from "../git/series.js"; // §53
 import type { ChangedFile, GitCheckpoint, SkippedPath } from "../git/checkpoint.js";
 import { matchesIgnore } from "../git/ignore.js";
 import { isModsGroup, isModsPath, isStubContent, modsRisks } from "../git/mods.js";
@@ -1204,9 +1205,11 @@ export class ReviewGate {
    * After `paths` were committed (docs/M12-COMMIT.md): they leave the review list together with
    * their diff cache, patch hashes and notes; A is rebuilt with their current worktree content so a
    * follow-up turn (whose list is rebuilt from A) does not resurface them; B is re-snapshotted.
-   * §53: `commit` per path when a series made several (`commits`: how many HEAD moved by).
+   * §53 after a series (`series`): `commit` per path, HEAD moved by `series.commits`; A takes HEAD's content of every
+   * touched path (what was committed, not the worktree) and the files committed only partly (`series.kept`) stay in the
+   * review, accepted, with the rest of their hunks as their diff.
    */
-  async dropCommitted(paths: string[], commit?: HistoryCommit | ReadonlyMap<string, HistoryCommit>, commits = 1): Promise<void> {
+  async dropCommitted(paths: string[], commit?: HistoryCommit | ReadonlyMap<string, HistoryCommit>, series?: { commits: number; kept: string[] }): Promise<void> {
     const cp = this.requireCheckpoint();
     this.lastReject = null; // MARK: wave4c w4c-trust — §41.2: a commit moves A
     const prevEnd = this.turnEndTree;
@@ -1222,16 +1225,40 @@ export class ReviewGate {
     this.reviewNotes = this.reviewNotes.filter((n) => !set.has(n.path));
     for (const p of set) this.acceptedPatchHashes.delete(p);
     this.diffCache = new Map();
-    if (this.turnStartTree !== null) this.turnStartTree = await cp.overlayWorktree(this.turnStartTree, specs);
+    const kept = this.changedFiles.filter((f) => series?.kept.includes(f.path));
+    for (const f of kept) this.acceptedPatchHashes.delete(f.path); // its patch is the rest now
+    if (this.turnStartTree !== null) {
+      this.turnStartTree = series
+        ? await overlayTree(cp, this.turnStartTree, [...specs, ...kept.map((f) => f.path)], "HEAD")
+        : await cp.overlayWorktree(this.turnStartTree, specs);
+    }
     // A holds what the commit holds now: when HEAD moved by just this commit (a merge it concluded included; §53: these
     // commits), there is nothing of it left to carry. Any other move (a pull before it) is still carried by `followHead`.
     const before = this.baseHead;
     const now = await cp.head().catch(() => null);
+    const commits = series?.commits ?? 1;
     if (before?.sha && now?.sha && (await cp.firstParentChain(before.sha, now.sha, commits).catch(() => null))?.length === commits) {
       this.baseHead = now;
       if (!(await cp.mergeInProgress().catch(() => null))) this.baseMerge = null;
     }
     this.turnEndTree = await cp.snapshot(this.ignorePatterns());
+    if (kept.length > 0 && this.turnStartTree !== null) {
+      const rest = new Map((await cp.changes(this.turnStartTree, this.turnEndTree)).map((f) => [f.path, f]));
+      for (const f of kept) {
+        const now = rest.get(f.path);
+        if (!now) {
+          // Its remaining hunks were undone on disk meanwhile: nothing of it is left to review.
+          this.changedFiles = this.changedFiles.filter((x) => x !== f);
+          this.reviewNotes = this.reviewNotes.filter((n) => n.path !== f.path);
+          continue;
+        }
+        f.status = now.status;
+        f.added = now.added;
+        f.deleted = now.deleted;
+        f.isBinary = now.isBinary;
+        await recheckWhitespaceOnly(cp, f, this.turnStartTree, this.turnEndTree);
+      }
+    }
     await this.followB(cp, this.changedFiles, prevEnd, this.turnEndTree);
     this.completeRoundIfResolved();
     this.onChange();

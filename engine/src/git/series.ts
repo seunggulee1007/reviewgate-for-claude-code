@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { copyIndex, type GitCheckpoint } from "./checkpoint.js";
 import { nulSplit } from "./exec.js";
@@ -75,6 +76,22 @@ export async function entriesIn(cp: GitCheckpoint, tree: string, paths: readonly
     }
   }
   return lines;
+}
+
+/** `tree` with `paths` as `source` holds them (removed where it has none), built in a temporary index; no index of the user's is touched. */
+export async function overlayTree(cp: GitCheckpoint, tree: string, paths: readonly string[], source: string): Promise<string> {
+  if (paths.length === 0) return tree;
+  const index = join(tmpdir(), `rg-index-${randomUUID()}`);
+  const env = { GIT_INDEX_FILE: index };
+  try {
+    await cp.git(["read-tree", tree], { env });
+    const lines = await entriesIn(cp, source, paths);
+    await cp.git(["update-index", "-z", "--index-info"], { env, stdin: Buffer.from(lines.join("\0") + "\0") });
+    return (await cp.git(["write-tree"], { env })).text.trim();
+  } finally {
+    await rm(index, { force: true }).catch(() => undefined);
+    await rm(index + ".lock", { force: true }).catch(() => undefined);
+  }
 }
 
 /** The user's index entries of `paths` set to HEAD's (as `commit --only` leaves them); every other entry stays as it is. */

@@ -4135,7 +4135,7 @@ export class ReviewEngine {
   /**
    * §53 after the commits `made` (the first `planned`): the user's index entries of the committed paths follow HEAD, the last
    * commit is `state.commit.lastCommit`, every fully committed file leaves the review with the commit that took its last
-   * part (§38.3). Returns the branch.
+   * part (§38.3) and a file committed partly stays, accepted, with the rest of its hunks. Returns the branch.
    */
   private async afterSeries(cp: GitCheckpoint, planned: readonly PlannedCommit[], made: readonly SeriesCommit[], head: ReadonlyMap<string, HeadFile>): Promise<string | null> {
     const touched = [...new Set(planned.flatMap((c) => [...c.whole, ...c.blobs.map((b) => b.path)]))];
@@ -4160,8 +4160,9 @@ export class ReviewEngine {
       }
     }
     const full = [...taken.entries()].filter(([path, used]) => head.get(path)!.hunks.every((h) => used.has(h.id))).map(([path]) => path);
+    const kept = [...taken.keys()].filter((path) => !full.includes(path));
     try {
-      await this.gate.dropCommitted(full, tookLast, made.length);
+      await this.gate.dropCommitted(full, tookLast, { commits: made.length, kept });
     } catch (e) {
       this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
     }

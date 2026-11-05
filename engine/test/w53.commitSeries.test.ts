@@ -323,3 +323,30 @@ describe("§53 commit_series", () => {
     expect(h.ofType("committed_series")).toHaveLength(0);
   });
 });
+
+describe("§53 the review after a series", () => {
+  it("a file committed partly stays in the review, accepted, with only the rest of its hunks; A holds what was committed", async () => {
+    const dir = makeRepo();
+    const { h } = setup();
+    await h.hello();
+    await h.open(dir);
+    await everyKind(h, dir);
+    await h.engine.request({ type: "commit_series", commits: [{ message: "L2", parts: [{ path: "app.ts", hunks: [0] }, { path: "new.txt" }] }] });
+    const s = h.engine.state;
+    expect(s.changedFiles.map((f) => [f.path, f.state]).sort()).toEqual([["app.ts", "accepted"], ["gone.txt", "accepted"], ["moved.txt", "accepted"], ["pic.bin", "accepted"], ["single.txt", "accepted"]]);
+    expect(s.changedFiles.find((f) => f.path === "app.ts")).toMatchObject({ status: "M", added: 1, deleted: 1 });
+    expect(s.commit.acceptedPaths).toContain("app.ts");
+    expect(sh(dir, "cat-file", "-p", `${s.gate.turnStartTree}:app.ts`)).toBe(edited({ 2: "L2" }));
+    expect(sh(dir, "cat-file", "-p", `${s.gate.turnStartTree}:new.txt`)).toBe("new\n");
+    const diff = await h.engine.request({ type: "select_file", path: "app.ts" });
+    const lines = diff.diff.hunks.flatMap((x) => x.lines);
+    expect(lines.filter((l) => l.kind === "add").map((l) => l.text)).toEqual(["L18"]);
+    expect(lines.filter((l) => l.kind === "del").map((l) => l.text)).toEqual(["l18"]);
+    // One hunk is left: it goes whole now, and a plain commit takes it.
+    expect((await h.engine.request({ type: "commit_hunks", paths: ["app.ts"] })).files[0]!.hunks).toEqual([]);
+    await h.engine.request({ type: "commit", message: "L18", paths: ["app.ts"] });
+    expect(sh(dir, "show", "HEAD:app.ts")).toBe(edited({ 2: "L2", 18: "L18" }));
+    expect(h.engine.state.changedFiles.map((f) => f.path)).not.toContain("app.ts");
+    expect(h.ofType("error")).toHaveLength(0);
+  });
+});
