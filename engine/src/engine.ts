@@ -6934,7 +6934,8 @@ export class ReviewEngine {
       if (this.session !== source || this.closed) return;
       if (this.gate.running) {
         // A send slipped in before the input closed: the CLI's turn joins it — and the session waits for that message too.
-        while (this.gate.running && this.turnSent === null && this.session === source && Date.now() < deadline) await pause(20);
+        const joinBy = Math.min(deadline, Date.now() + AUTO_TURN_JOIN_MS);
+        while (this.gate.running && this.turnSent === null && this.session === source && Date.now() < joinBy) await pause(20);
         this.log("info", "a turn Claude started joins the turn of a message sent meanwhile");
         ok = this.gate.running;
         return;
@@ -7501,6 +7502,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
 
 /** §52.1: how long a turn Claude started waits for the collection / revert in flight before it is taken. */
 const AUTO_TURN_WAIT_MS = 60_000;
+/** §52.1: how long it waits for a message sent meanwhile to go out (its turn is the one it joins). */
+const AUTO_TURN_JOIN_MS = 5_000;
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** MARK: wave4c w4c-trust — §41.2: a file rejected in one of the last this-many review rounds is never auto-accepted. */
