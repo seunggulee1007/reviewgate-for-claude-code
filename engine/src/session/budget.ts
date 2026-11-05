@@ -20,7 +20,6 @@ export class BudgetState {
   files = new Set<string>();
   lines = 0;
   denied = false;
-  callsAfterDeny = 0;
   /** soft (100%) warning already emitted this turn */
   warned = false;
   budget: Budget;
@@ -33,7 +32,6 @@ export class BudgetState {
     this.files = new Set();
     this.lines = 0;
     this.denied = false;
-    this.callsAfterDeny = 0;
     this.warned = false;
   }
 

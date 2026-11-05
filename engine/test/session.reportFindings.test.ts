@@ -8,7 +8,7 @@ import { buildHooks, needsAsk, READ_ONLY_TOOLS, unpromptedBlocked, type HookCont
 /** docs/PROTOCOL.md §36.13: the main chat's ReportFindings is a read-only report — never a permission card. */
 
 function ctx(over: Partial<HookContext> = {}): HookContext {
-  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), interrupted: false, emit: () => {}, log: () => {}, ...over };
+  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), emit: () => {}, log: () => {}, ...over };
 }
 
 describe("ReportFindings in the main session", () => {

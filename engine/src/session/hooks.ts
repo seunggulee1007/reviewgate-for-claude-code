@@ -4,7 +4,6 @@ import type {
   HookEvent,
   HookInput,
   HookJSONOutput,
-  Query,
 } from "@anthropic-ai/claude-agent-sdk";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -45,7 +44,6 @@ export const EDIT_TOOLS_MATCHER = "Edit|Write|MultiEdit|NotebookEdit";
 const EDIT_TOOLS_RE = new RegExp(`^(${EDIT_TOOLS_MATCHER})$`);
 /** MCP tools (`mcp__<server>__<tool>`): their PostToolUse closes the execution window (§31). */
 export const MCP_TOOLS_MATCHER = "mcp__.*";
-export const MAX_CALLS_AFTER_DENY = 5;
 
 /**
  * Tools that only read state or bookkeeping; the CLI runs them without a prompt and so do we.
@@ -191,6 +189,13 @@ export function gitCommandReason(toolName: string, input: Record<string, unknown
 
 const SHELL_MUTATING_RE =
   /(>|>>|\btee\b|\bsed\s+-i|\brm\b|\bmv\b|\bcp\b|\btouch\b|\bmkdir\b|\bchmod\b|\bnpm\s+(i|install)\b|\bnpx\b|\bpip\s+install)/;
+/** Redirections that write no file: into /dev/null (`>/dev/null`, `2>> /dev/null`, `&>/dev/null`) or onto another stream (`2>&1`, `>&2`). */
+const HARMLESS_REDIRECT_RE = /(?:\d*|&)>>?\s*\/dev\/null\b|\d*>&\s*(?:\d+|-)/g;
+
+/** §54: after a budget deny, a Bash command that writes files is refused too — `npm test 2>&1 | tail` is not one. */
+export function writesFiles(command: string): boolean {
+  return SHELL_MUTATING_RE.test(command.replace(HARMLESS_REDIRECT_RE, " "));
+}
 
 export function reviewGateReason(files: number, maxFiles: number, lines: number, maxLines: number): string {
   // §54: a count without a limit (0) shows no "/0".
@@ -272,8 +277,6 @@ export type HookContext = {
   keepAgentsInTurn?: boolean;
   /** A tool call was blocked by the unprompted-turn guard (`unpromptedBlocked`). */
   onUnprompted?: (toolName: string) => void;
-  /** Set when the budget hook interrupted the turn; claude.ts reports `stopReason: "interrupted"`. */
-  interrupted: boolean;
   /** Settings.allowWorktreeIsolation (§33.4): Workflow / isolated agents get a card instead of a deny. */
   allowWorktreeIsolation?: boolean;
   /**
@@ -285,7 +288,6 @@ export type HookContext = {
   worktrees?: string[];
   /** §33.4: work outside this window's review was blocked / happened (EnterWorktree, isolated agents, worktree commands). */
   onScopeNotice?: (notice: ScopeNotice) => void;
-  query?: Query;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
@@ -543,19 +545,6 @@ function toolFile(input: Record<string, unknown>, cwd: string): string | undefin
   return typeof p === "string" && p.length > 0 ? resolveToolPath(p, cwd) : undefined;
 }
 
-async function countAfterDeny(ctx: HookContext): Promise<void> {
-  const b = ctx.budget;
-  if (!b.denied || !b.active) return;
-  b.callsAfterDeny++;
-  if (b.callsAfterDeny > MAX_CALLS_AFTER_DENY && ctx.query && !ctx.interrupted) {
-    ctx.log("warn", `budget: ${b.callsAfterDeny} tool calls after deny; interrupting`);
-    ctx.interrupted = true;
-    // Fire-and-forget: awaiting interrupt() inside a PreToolUse hook deadlocks (the CLI waits for
-    // the hook result before it can service the interrupt request).
-    void ctx.query.interrupt().catch((e) => ctx.log("warn", `interrupt failed: ${String(e)}`));
-  }
-}
-
 /** Numstat of a post-Bash snapshot `tree` vs `checkpointTree`: per file (absolute) and lines. */
 async function treeNumstat(
   cp: GitCheckpoint,
@@ -653,7 +642,6 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
 
       if (b.denied || b.wouldExceedHard(projectedFiles.size, projectedLines)) {
         b.denied = true;
-        await countAfterDeny(ctx);
         ctx.emit({
           type: "budget_event",
           kind: "deny",
@@ -703,10 +691,11 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
-    await countAfterDeny(ctx);
     const planDeny = planModeBlocked(input.tool_name, ti, ctx);
     if (planDeny) return denyPre(planDeny);
-    if (b.active && b.denied && SHELL_MUTATING_RE.test(command)) {
+    // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
+    // goes on (it is never interrupted): Claude reports what it did and what remains.
+    if (b.active && b.denied && writesFiles(command)) {
       return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
     }
     await bashBaseline(ctx);
@@ -742,7 +731,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     return askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input));
   };
 
-  /** Counts any other tool call after a deny (edit/bash hooks count themselves) and forces `ask` (needsAsk). */
+  /** Every other tool forces `ask` (needsAsk) — reads, subagents and the to-do list are never counted or refused by the budget (§54). */
   const preOther: HookCallback = async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allow();
     if (/^(Edit|Write|MultiEdit|NotebookEdit|Bash)$/.test(input.tool_name)) return allow();
@@ -750,7 +739,6 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const ti = toolInput(input);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
-    await countAfterDeny(ctx);
     const worktree = await guardWorktreeTools(input.tool_name, toolUseIdOf(input), ti, ctx);
     if (worktree) return worktree;
     // An MCP tool may write files (an IDE's MCP server, a filesystem server): its window attributes them (§31).

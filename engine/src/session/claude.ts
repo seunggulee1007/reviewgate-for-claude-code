@@ -429,7 +429,6 @@ export class ClaudeSession implements ClaudeSessionLike {
       plansDir: plansDir(),
       planFiles: new Set<string>(),
       scratchDirs: defaultScratchDirs(),
-      interrupted: false,
       turnActive: false,
       allowWorktreeIsolation: opts.settings.allowWorktreeIsolation === true,
       ...(opts.settings.userRules ? { userRules: opts.settings.userRules } : {}),
@@ -541,7 +540,6 @@ export class ClaudeSession implements ClaudeSessionLike {
         spawnClaudeCodeProcess: (o) => this.spawnClaude(o),
       },
     });
-    this.hookCtx.query = this.q;
     void this.runLoop(this.q);
     // MARK: wave3 engine-session — §36.7: the local settings' hooks / MCP servers can hang a start as well.
     this.watchInitialization(this.q, loadUserSettings || s.loadLocalSettings === true ? s.initTimeoutMs ?? 0 : 0);
@@ -995,12 +993,11 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.turnContextUsage = { contextTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
     this.turnCompacted = undefined; // MARK: wave4c w4c-commit
     this.interruptRequested = false;
-    this.hookCtx.interrupted = false;
   }
 
-  /** App-initiated interrupt or the budget hook's own interrupt (hooks.ts countAfterDeny). */
+  /** The app interrupted the turn (§54: the budget never does). */
   private wasInterrupted(): boolean {
-    return this.interruptRequested || this.hookCtx.interrupted;
+    return this.interruptRequested;
   }
 
   /** Plan files are excluded: they are bookkeeping, not part of the review or the budget (docs/M20-MODES.md). */

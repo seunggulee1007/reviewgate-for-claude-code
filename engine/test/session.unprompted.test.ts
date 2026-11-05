@@ -75,7 +75,6 @@ describe("unprompted-turn guard (hooks)", () => {
       root: "/tmp",
       ignorePatterns: [],
       autoAllowTools: new Set(["WebFetch"]),
-      interrupted: false,
       turnActive: false,
       onUnprompted: (t) => blocked.push(t),
       emit: (e) => events.push(e),

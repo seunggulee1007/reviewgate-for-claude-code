@@ -38,7 +38,6 @@ function ctx(root: string, over: Partial<HookContext> = {}): HookContext & { eve
     ignorePatterns: [],
     autoAllowTools: new Set(),
     autoAllowReadOnlyBash: true,
-    interrupted: false,
     emit: (e) => events.push(e),
     log: () => {},
     events,

@@ -14,7 +14,6 @@ function ctx(over: Partial<HookContext> = {}): HookContext {
     root: "/tmp",
     ignorePatterns: [],
     autoAllowTools: new Set(),
-    interrupted: false,
     emit: () => {},
     log: () => {},
     ...over,

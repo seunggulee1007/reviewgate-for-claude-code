@@ -149,7 +149,6 @@ describe("permission modes (docs/M20-MODES.md)", () => {
       root: dir,
       ignorePatterns: [],
       autoAllowTools: new Set(["Bash"]),
-      interrupted: false,
       emit: (e) => events.push(e),
       log: () => {},
     };

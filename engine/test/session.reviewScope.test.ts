@@ -37,7 +37,7 @@ function repoWithNested(): string {
 }
 
 function hookCtx(root: string): HookContext {
-  return { budget: new BudgetState({ maxFiles: 10, maxLines: 400 }), cwd: root, root, ignorePatterns: [], autoAllowTools: new Set(), interrupted: false, emit: () => {}, log: () => {} };
+  return { budget: new BudgetState({ maxFiles: 10, maxLines: 400 }), cwd: root, root, ignorePatterns: [], autoAllowTools: new Set(), emit: () => {}, log: () => {} };
 }
 
 function preToolUse(toolName: string, toolInput: Record<string, unknown>, cwd: string, toolUseId = "t1"): HookInput {

@@ -20,6 +20,7 @@ import {
   READ_ONLY_BASH_REASON,
   realpathLenient,
   REMEMBERED_REASON,
+  writesFiles,
   type HookContext,
 } from "../src/session/hooks.js";
 import { defaultScratchDirs, editScopeReason, isScratchPath } from "../src/session/reviewScope.js";
@@ -45,7 +46,6 @@ function fakeCtx(root: string, budget = { maxFiles: 5, maxLines: 200 }): HookCon
     root,
     ignorePatterns: [],
     autoAllowTools: new Set(),
-    interrupted: false,
     emit: (e) => events.push(e),
     log: () => {},
     events,
@@ -457,5 +457,43 @@ describe("§54: no change budget by default", () => {
     expect(reported).toEqual([["b1", ["mine.txt"]]]);
     expect(ctx.events.filter((e) => e.type === "budget_event")).toEqual([]);
     expect(ctx.budget.snapshot()).toEqual({ files: 0, lines: 0, denied: false });
+  });
+
+  it("after a deny of the opt-in budget only change attempts are refused; reads, subagents and the to-do list pass and the turn is never interrupted", async () => {
+    const root = track(makeRepo());
+    const ctx = fakeCtx(root, { maxFiles: 1, maxLines: 2 });
+    const hooks = buildHooks(ctx);
+    const preEdit = hooks.PreToolUse![0]!.hooks[0]!;
+    const preBash = hooks.PreToolUse![1]!.hooks[0]!;
+    const preOther = hooks.PreToolUse![2]!.hooks[0]!;
+    const opts = { signal: new AbortController().signal };
+    expect(decision(await preEdit(preToolUse("Write", { file_path: join(root, "big.txt"), content: "1\n2\n3\n4\n5\n6\n" }, root), "w1", opts)).decision).toBe("deny");
+    expect(ctx.budget.denied).toBe(true);
+    // Far more than the five calls that used to interrupt the turn: nothing of these is counted or refused.
+    for (let i = 0; i < 12; i++) {
+      for (const [tool, input] of [
+        ["Read", { file_path: join(root, "README.md") }],
+        ["Grep", { pattern: "x" }],
+        ["TodoWrite", { todos: [] }],
+        ["Agent", { description: "look", prompt: "look around", subagent_type: "Explore" }],
+      ] as const) {
+        expect(decision(await preOther(preToolUse(tool, input as Record<string, unknown>, root), `o${i}`, opts)).decision, tool).not.toBe("deny");
+      }
+      for (const command of ["npm test 2>&1 | tail -5", "ls >/dev/null 2>&1", "git status", "make build &>/dev/null", "echo done >&2"]) {
+        expect(decision(await preBash(preToolUse("Bash", { command }, root), `b${i}`, opts)).decision, command).not.toBe("deny");
+      }
+    }
+    // A command that writes files is still refused with the deny's words, and so is every further edit.
+    for (const command of ["echo x > notes.txt", "sed -i '' s/a/b/ README.md", "rm -f README.md", "cat a >> b 2>/dev/null"]) {
+      const out = decision(await preBash(preToolUse("Bash", { command }, root), "bw", opts));
+      expect(out.decision, command).toBe("deny");
+      expect(out.reason).toMatch(/^REVIEW GATE: per-turn change budget exceeded/);
+    }
+    expect(decision(await preEdit(preToolUse("Edit", { file_path: join(root, "README.md"), old_string: "line1", new_string: "x" }, root), "e2", opts)).decision).toBe("deny");
+  });
+
+  it("writesFiles: a redirection into /dev/null or onto another stream writes nothing", () => {
+    for (const c of ["npm test 2>&1", "cmd >/dev/null", "cmd 2> /dev/null", "cmd &>/dev/null", "cmd >>/dev/null 2>&1", "echo x >&2", "git log"]) expect(writesFiles(c), c).toBe(false);
+    for (const c of ["echo x > f", "cmd > /dev/nullx", "cmd >> log.txt 2>&1", "tee out", "mkdir d", "cp a b", "npm install"]) expect(writesFiles(c), c).toBe(true);
   });
 });

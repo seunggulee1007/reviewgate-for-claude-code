@@ -30,7 +30,6 @@ function ctxFor(root: string): HookContext & { events: SessionEvent[]; reported:
     root,
     ignorePatterns: [],
     autoAllowTools: new Set(),
-    interrupted: false,
     toolWindows: new Map(),
     // File timestamps vs this test's clock: no slack needed, the test sleeps between the steps.
     windowMarginMs: 0,

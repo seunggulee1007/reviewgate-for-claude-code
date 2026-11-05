@@ -128,7 +128,6 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
       permissionMode: "plan",
       plansDir: dir,
       planFiles: new Set<string>(),
-      interrupted: false,
       emit: () => {},
       log: () => {},
     };
@@ -164,7 +163,6 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
       permissionMode: "plan",
       plansDir: dir,
       planFiles: new Set<string>(),
-      interrupted: false,
       emit: () => {},
       log: () => {},
     };
@@ -222,7 +220,6 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
       permissionMode: "default",
       plansDir: dir,
       planFiles: new Set<string>(),
-      interrupted: false,
       emit: () => {},
       log: () => {},
     };

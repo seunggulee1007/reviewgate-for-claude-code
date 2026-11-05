@@ -149,11 +149,11 @@ test("BudgetState hard/soft thresholds and reset", () => {
   assert.equal(b.wouldExceedHard(0, 20), false);
   assert.equal(b.wouldExceedHard(0, 21), true);
   b.denied = true;
-  b.callsAfterDeny = 3;
+  b.warned = true;
   b.files.add("/x");
   b.reset();
   assert.deepEqual(b.snapshot(), { files: 0, lines: 0, denied: false });
-  assert.equal(b.callsAfterDeny, 0);
+  assert.equal(b.warned, false);
 });
 
 test("§54: a budget without limits (0, the default) is off; 0 on one count is no limit on that count", () => {

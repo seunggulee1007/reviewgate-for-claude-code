@@ -41,7 +41,7 @@ function decision(out: unknown): { decision?: string; reason?: string } {
 }
 
 function ctx(over: Partial<HookContext> = {}): HookContext {
-  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), interrupted: false, emit: () => {}, log: () => {}, ...over };
+  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), emit: () => {}, log: () => {}, ...over };
 }
 
 const USER_ALLOW = [

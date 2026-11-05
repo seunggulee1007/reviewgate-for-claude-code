@@ -15,7 +15,7 @@ const LIST_TOOLS = ["TaskCreate", "TaskUpdate", "TaskList", "TaskGet"] as const;
 const STILL_ASKED = ["TaskStop", "Task", "Agent"] as const;
 
 function ctx(over: Partial<HookContext> = {}): HookContext {
-  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), interrupted: false, emit: () => {}, log: () => {}, ...over };
+  return { budget: new BudgetState({ maxFiles: 5, maxLines: 200 }), cwd: "/tmp", root: "/tmp", ignorePatterns: [], autoAllowTools: new Set(), emit: () => {}, log: () => {}, ...over };
 }
 
 async function preOther(toolName: string, toolInput: Record<string, unknown>, over: Partial<HookContext> = {}): Promise<unknown> {

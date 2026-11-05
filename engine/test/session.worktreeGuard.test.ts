@@ -38,7 +38,6 @@ function ctx(root: string, over: Partial<HookContext> = {}): HookContext & { not
     root,
     ignorePatterns: [],
     autoAllowTools: new Set(),
-    interrupted: false,
     emit: () => {},
     log: () => {},
     onScopeNotice: (n) => notices.push(n),
