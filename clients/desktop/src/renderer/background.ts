@@ -153,6 +153,18 @@ export function canMoveToBackground(p: {
 export type KeyLike = { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean };
 
 /** Ctrl+B in the message box moves the running command to the background — only with an empty box, a running turn, the setting on. */
+/**
+ * Ctrl+B is also the View menu's "Toggle Sidebar" accelerator. The message box handles it first (preventDefault); should
+ * the menu still fire for the same press, its action is dropped (`backgroundKeyJustHandled`).
+ */
+let backgroundKeyAt = -Infinity;
+export function noteBackgroundKey(now = Date.now()): void {
+  backgroundKeyAt = now;
+}
+export function backgroundKeyJustHandled(now = Date.now()): boolean {
+  return now - backgroundKeyAt < 500;
+}
+
 export function isBackgroundKey(e: KeyLike, p: { draftEmpty: boolean; turnRunning: boolean; enabled: boolean; viewing?: boolean }): boolean {
   if (e.key.toLowerCase() !== "b" || !e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false;
   return p.draftEmpty && p.turnRunning && p.enabled && !p.viewing;

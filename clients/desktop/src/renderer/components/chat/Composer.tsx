@@ -27,7 +27,7 @@ import { t } from "../../i18n";
 import { draftOf, historyEscape, historyStep, IDLE_NAV, loadHistory, pushHistory, saveHistory, type HistoryNav } from "../../promptHistory";
 import { projectRootHash, sessionSwitchRefusal } from "../../sessions";
 import { loadDraft, saveDraft, windowStorage } from "../../sessionKeep";
-import { backgroundWorkOn, isBackgroundKey } from "../../background"; // MARK: §52
+import { backgroundWorkOn, isBackgroundKey, noteBackgroundKey } from "../../background"; // MARK: §52
 import { showToast } from "../../toast";
 import { cannotSendReason, capabilitiesOf, hasPendingReview, isRunning, useStore } from "../../store";
 import { Menu } from "../Menu";
@@ -507,6 +507,7 @@ export function Composer() {
     // Ctrl+B does what it did — toggles the sidebar).
     if (isBackgroundKey(e, { draftEmpty: draft.trim().length === 0, turnRunning: running, enabled: backgroundWorkOn(settings), viewing: viewing !== null })) {
       e.preventDefault();
+      noteBackgroundKey();
       void moveToBackground().then((why) => why && showToast(why));
       return;
     }

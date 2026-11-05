@@ -31,6 +31,7 @@ import { insertIntoComposer } from "./composerBridge"; // MARK: wave3 desktop-fl
 import { useNotificationNotices } from "./components/NotificationNotices"; // MARK: wave4b w4-notify
 import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
+import { backgroundKeyJustHandled } from "./background"; // §52
 
 declare global {
   interface Window {
@@ -89,7 +90,8 @@ export function App() {
           s.openDialog({ kind: "settings" });
           break;
         case "toggle_sidebar":
-          s.toggleSidebar();
+          // §52: the same Ctrl+B already sent the running command to the background from the message box.
+          if (!backgroundKeyJustHandled()) s.toggleSidebar();
           break;
         case "refresh":
           void s.refresh();

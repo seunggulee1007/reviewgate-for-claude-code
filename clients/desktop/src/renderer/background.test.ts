@@ -129,3 +129,12 @@ describe("§52 background work logic", () => {
     expect(backgroundRefusalText("other", "")).toBeNull();
   });
 });
+
+describe("§52 Ctrl+B and the Toggle Sidebar accelerator", () => {
+  it("the menu action right after the message box took Ctrl+B is dropped; later ones toggle again", async () => {
+    const { noteBackgroundKey, backgroundKeyJustHandled } = await import("./background");
+    noteBackgroundKey(1_000);
+    expect(backgroundKeyJustHandled(1_100)).toBe(true);
+    expect(backgroundKeyJustHandled(1_600)).toBe(false);
+  });
+});
