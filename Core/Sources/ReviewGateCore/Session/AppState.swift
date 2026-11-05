@@ -2088,7 +2088,7 @@ public final class AppState {
             break
         case .historyCleanup:   // MARK: wave4b w4b-bigturn — §39.1: consumed by `historyCleanup(keep:apply:)`
             break
-        case .commitFormat, .prDraft:   // MARK: wave4c w4c-commit — §41.1: replies, consumed by their requests
+        case .commitFormat, .prDraft, .prAiDraft:   // MARK: wave4c w4c-commit — §41.1 (§51): replies, consumed by their requests
             break
         case .fileLines, .fileImage:   // MARK: wave4c w4c-review — §41.3 replies, consumed by the request that asked
             break

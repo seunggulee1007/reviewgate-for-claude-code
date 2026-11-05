@@ -204,6 +204,23 @@ private final class Tour {
         frame.cacheDisplay(in: frame.bounds, to: rep)
         try write(rep, "run-as-task")
         entry.model.showNewWorkbench = false
+        try await Task.sleep(for: .milliseconds(800))
+        try await prSheetShot()
+    }
+
+    /// §51: the Create PR sheet — every field named on the left, "AI로 채우기" under the description.
+    private func prSheetShot() async throws {
+        let view = NSHostingView(rootView: CreatePRSheet().environment(store).environment(store.pr).environment(entry.model))
+        let panel = NSWindow(contentRect: NSRect(origin: .zero, size: view.fittingSize), styleMask: [.titled], backing: .buffered, defer: false)
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.contentView = view
+        panel.setFrameOrigin(NSPoint(x: entry.window?.frame.minX ?? 0, y: entry.window?.frame.minY ?? 0))
+        panel.orderFrontRegardless()
+        defer { panel.orderOut(nil) }
+        try await Task.sleep(for: .milliseconds(2500))   // the base is picked, then pr_draft fills the fields
+        panel.setContentSize(view.fittingSize)
+        try await Task.sleep(for: .milliseconds(500))
+        try write(try render(panel), "create-pr")
     }
 
     /// The chat's scroll view, found before the agent panel adds scroll views of its own.

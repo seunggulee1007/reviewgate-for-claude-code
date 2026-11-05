@@ -90,6 +90,29 @@ extension PRDraftReply: Decodable {
     }
 }
 
+/// §51: reply to `pr_ai_draft` — Claude's title ("" when the answer had none) and description for the PR sheet.
+public struct PRAiDraftReply: Sendable, Equatable {
+    public var id: String?
+    public var title: String
+    public var body: String
+
+    public init(id: String? = nil, title: String = "", body: String = "") {
+        self.id = id
+        self.title = title
+        self.body = body
+    }
+}
+
+extension PRAiDraftReply: Decodable {
+    private enum CodingKeys: String, CodingKey { case id, title, body }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: lenientValue(String.self, c, .id), title: lenientValue(String.self, c, .title) ?? "",
+                  body: lenientValue(String.self, c, .body) ?? "")
+    }
+}
+
 /// `pr_create`'s metadata: one `gh pr create` flag per value (`@me` = the logged-in user); empty lists are not sent.
 public struct PRCreateMeta: Sendable, Equatable {
     public var assignees: [String]
@@ -133,6 +156,10 @@ extension EngineCommand {
         switch self {
         case let .prDraft(base):
             try c.encode(base, forKey: .base)
+        case let .prAiDraft(base, title, body):   // §51
+            try c.encode(base, forKey: .base)
+            if !title.isEmpty { try c.encode(title, forKey: .title) }
+            if !body.isEmpty { try c.encode(body, forKey: .body) }
         case let .prCreateMeta(base, title, body, draft, meta):
             try c.encode(base, forKey: .base)
             try c.encodeIfPresent(title, forKey: .title)

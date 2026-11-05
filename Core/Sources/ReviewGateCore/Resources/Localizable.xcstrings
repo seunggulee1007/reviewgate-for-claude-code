@@ -2241,6 +2241,54 @@
         }
       }
     },
+    "Choose a base branch first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a base branch first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 베이스 브랜치를 고르세요"
+          }
+        }
+      }
+    },
+    "Claude could not fill in the PR": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not fill in the PR"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 PR을 채우지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude could not fill in the PR: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not fill in the PR: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 PR을 채우지 못했어요: %@"
+          }
+        }
+      }
+    },
     "CLI %@ pinned — restart the session to use it": {
       "localizations": {
         "en": {

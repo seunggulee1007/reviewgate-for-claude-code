@@ -376,6 +376,10 @@ public enum FlowText {
         case "commit_draft_failed":
             return detail.isEmpty ? String(localized: "Claude could not write a message", bundle: .module)
                 : String(localized: "Claude could not write a message: \(detail)", bundle: .module)
+        case "pr_ai_draft_failed":   // §51
+            return detail.isEmpty ? String(localized: "Claude could not fill in the PR", bundle: .module)
+                : String(localized: "Claude could not fill in the PR: \(detail)", bundle: .module)
+        case "empty_base": return String(localized: "Choose a base branch first", bundle: .module)
         case "fetch_failed":
             return detail.isEmpty ? String(localized: "Could not fetch from the remote", bundle: .module)
                 : String(localized: "Could not fetch from the remote: \(detail)", bundle: .module)

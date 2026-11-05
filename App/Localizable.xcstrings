@@ -4327,6 +4327,22 @@
         }
       }
     },
+    "Choose a base branch first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a base branch first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 베이스 브랜치를 고르세요"
+          }
+        }
+      }
+    },
     "CI": {
       "localizations": {
         "en": {
@@ -4339,6 +4355,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "CI"
+          }
+        }
+      }
+    },
+    "Claude writes the title and description from this branch's commits and diff, the repository's PR template and what is in the sheet — in a read-only side session; the main chat is untouched and nothing is pushed or created": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude writes the title and description from this branch's commits and diff, the repository's PR template and what is in the sheet — in a read-only side session; the main chat is untouched and nothing is pushed or created"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 이 브랜치의 커밋과 변경 내용, 저장소의 PR 템플릿, 지금 적힌 내용을 보고 제목과 본문을 써요. 읽기 전용 보조 세션에서 돌기 때문에 메인 대화는 그대로이고, 푸시나 PR 생성은 하지 않아요"
           }
         }
       }
@@ -7719,6 +7751,22 @@
         }
       }
     },
+    "Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Description"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "본문"
+          }
+        }
+      }
+    },
     "Details": {
       "localizations": {
         "en": {
@@ -8851,6 +8899,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 리뷰에서 diff를 열어 본 파일"
+          }
+        }
+      }
+    },
+    "Fill with Claude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fill with Claude"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI로 채우기"
           }
         }
       }
@@ -17285,6 +17349,22 @@
         }
       }
     },
+    "Restore what I had": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore what I had"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원래대로 되돌리기"
+          }
+        }
+      }
+    },
     "Restored from a previous session": {
       "localizations": {
         "en": {
@@ -22386,6 +22466,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "생각하는 중…"
+          }
+        }
+      }
+    },
+    "This branch has no commits since %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch has no commits since %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 이후 이 브랜치에 커밋이 없어요"
           }
         }
       }

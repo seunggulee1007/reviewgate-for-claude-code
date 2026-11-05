@@ -3,6 +3,11 @@ import Foundation
 // MARK: wave4c w4c-commit
 // docs/PROTOCOL.md §41.1: the requests behind the commit sheet's "팀 형식" line and the PR sheet's draft / metadata.
 
+/// §51: why Claude could not fill the PR sheet, in the user's words.
+public struct PRAiDraftFailure: Error, Equatable {
+    public let text: String
+}
+
 public extension AppState {
     /// `commit_format`; nil without a project, on an older engine (`unknown_command`) or a failure — the sheet then shows
     /// what it showed before.
@@ -28,6 +33,20 @@ public extension AppState {
         } catch {
             appendLog("[debug] pr_draft: \(error.localizedDescription)")
             return nil
+        }
+    }
+
+    /// §51 `pr_ai_draft`: Claude's title and description for the PR sheet from the branch since `base` and what the sheet
+    /// holds (`title` / `body`); a failure in the user's words (`FlowText.refusal`). Nothing is pushed or created.
+    func writePRDraft(base: String, title: String, body: String) async -> Result<PRAiDraftReply, PRAiDraftFailure> {
+        guard !base.isEmpty else { return .failure(PRAiDraftFailure(text: FlowText.refusal(code: "empty_base", detail: "") ?? "")) }
+        do {
+            let reply = try await reply(.prAiDraft(base: base, title: title, body: body))
+            guard case let .prAiDraft(draft) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
+            return .success(draft)
+        } catch {
+            appendLog("[warn] pr_ai_draft: \(error.localizedDescription)")
+            return .failure(PRAiDraftFailure(text: FlowText.refusal(error)))
         }
     }
 

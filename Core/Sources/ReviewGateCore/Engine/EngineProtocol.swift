@@ -599,6 +599,9 @@ public enum EngineCommand: Sendable, Equatable {
     case commitFormat
     /// §41.1: the PR sheet's title / body from the branch's commits since `base`, the push and `gh` readiness → `.prDraft`.
     case prDraft(base: String)
+    /// §51: the PR sheet's title / description written by a read-only fork from the branch's commits and diff since `base`,
+    /// the repository's PR template and the sheet's `title` / `body` → `.prAiDraft` (nothing is pushed or created).
+    case prAiDraft(base: String, title: String, body: String)
     /// §41.1: `pr_create` with the assignee / labels / reviewers / projects (→ `.prCreated`).
     case prCreateMeta(base: String, title: String?, body: String?, draft: Bool?, meta: PRCreateMeta)
     // MARK: wave4c w4c-review
@@ -748,6 +751,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .permissionFollow: "permission_response"
         case .commitFormat: "commit_format"   // wave4c w4c-commit
         case .prDraft: "pr_draft"
+        case .prAiDraft: "pr_ai_draft"   // §51
         case .prCreateMeta: "pr_create"
         case .historyFileLines: "history_file_lines"   // wave4c w4c-review
         case .prFileLines: "pr_file_lines"
@@ -1071,7 +1075,7 @@ extension EngineCommand: Encodable {
         case .permissionRules:   // wave1 mac-perms: no payload
             break
         // MARK: wave4c w4c-commit (§41.1)
-        case .commitFormat, .prDraft, .prCreateMeta:
+        case .commitFormat, .prDraft, .prCreateMeta, .prAiDraft:
             try encodeTeamFormatFields(to: encoder)
         case let .accept(paths), let .unaccept(paths):
             try c.encode(paths, forKey: .paths)
@@ -2739,6 +2743,8 @@ public enum EngineEvent: Sendable, Equatable {
     case commitFormat(CommitFormatReply)
     /// §41.1: reply to `pr_draft`.
     case prDraft(PRDraftReply)
+    /// §51: reply to `pr_ai_draft`.
+    case prAiDraft(PRAiDraftReply)
     // MARK: wave4c w4c-review
     /// §41.3: reply to `history_file_lines` / `pr_file_lines`.
     case fileLines(FileLinesReply)
@@ -2792,6 +2798,7 @@ public enum EngineEvent: Sendable, Equatable {
         case let .historyCleanup(reply): reply.id   // wave4b w4b-bigturn
         case let .commitFormat(reply): reply.id   // wave4c w4c-commit
         case let .prDraft(reply): reply.id
+        case let .prAiDraft(reply): reply.id   // §51
         case let .fileLines(reply): reply.id   // wave4c w4c-review
         case let .fileImage(reply): reply.id
         case let .claudeMd(reply): reply.id   // wave4d w4d-config
@@ -3001,6 +3008,8 @@ extension EngineEvent: Decodable {
             self = .commitFormat(try CommitFormatReply(from: decoder))
         case "pr_draft":
             self = .prDraft(try PRDraftReply(from: decoder))
+        case "pr_ai_draft":   // §51
+            self = .prAiDraft(try PRAiDraftReply(from: decoder))
         case "file_lines":   // wave4c w4c-review (§41.3)
             self = .fileLines(try FileLinesReply(from: decoder))
         case "file_image":

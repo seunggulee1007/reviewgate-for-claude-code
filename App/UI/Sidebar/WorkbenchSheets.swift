@@ -364,6 +364,7 @@ struct NewWorkbenchSheet: View {
 }
 
 /// "Create PR from this branch…" (M10.1): base picker, title, body, draft → `pr_create`; the URL lands in the header banner.
+/// §51: every field has its name on the left, and "AI로 채우기" has Claude write the title and description.
 struct CreatePRSheet: View {
     @Environment(AppState.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -378,34 +379,60 @@ struct CreatePRSheet: View {
     @State private var meta = PRMetaText.default
     @State private var typedTitle = false
     @State private var typedBody = false
+    // §51: Claude's title and description; what they replaced, until restored or edited.
+    @State private var writing = false
+    @State private var writeError: String?
+    @State private var replaced: PRSheetText?
     private var ghReason: String? { TeamFormat.ghBlocker(prDraft?.gh, host: prDraft?.host) }
 
     private var head: String { store.projectInfo?.branch ?? "HEAD" }
     private var bases: [BranchInfo] { store.branches.filter { !$0.isCurrent } }
+    /// §51: why "AI로 채우기" cannot run (nil: it can).
+    private var writeBlocker: String? {
+        if base.isEmpty { return String(localized: "Choose a base branch first") }
+        if let prDraft, prDraft.baseRef != nil, prDraft.commits.isEmpty {
+            return String(localized: "This branch has no commits since \(prDraft.baseRef ?? base)")
+        }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Create PR from \(head)").font(.headline)
-            Picker("Base", selection: $base) {
-                ForEach(bases) { Text(verbatim: $0.name).tag($0.name) }
-                if bases.isEmpty { Text("main").tag("main") }
+            PRSheetRow("Base") {
+                Picker("Base", selection: $base) {
+                    ForEach(bases) { Text(verbatim: $0.name).tag($0.name) }
+                    if bases.isEmpty { Text("main").tag("main") }
+                }
+                .labelsHidden()
+                .accessibilityIdentifier("PR base")
             }
-            .accessibilityIdentifier("PR base")
-            TextField("Title", text: Binding(get: { title }, set: { title = $0; typedTitle = true }), prompt: Text(verbatim: head))
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("PR title")
-            TextEditor(text: Binding(get: { body_ }, set: { body_ = $0; typedBody = true }))
-                .font(.body)
-                .frame(minHeight: 100)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
-                .accessibilityIdentifier("PR body")
-            if let prDraft, !prDraft.commits.isEmpty {
-                Text("Filled from the \(prDraft.commits.count) commit(s) of this branch since \(prDraft.baseRef ?? base)")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("PR draft source")
+            PRSheetRow("Title") {
+                // A write of the same text (the field taking focus) is not typing: the draft's title still comes in.
+                TextField("Title", text: Binding(get: { title }, set: { if $0 != title { title = $0; typedTitle = true; replaced = nil } }),
+                          prompt: Text(verbatim: head))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("PR title")
+            }
+            PRSheetRow("Description", alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextEditor(text: Binding(get: { body_ }, set: { if $0 != body_ { body_ = $0; typedBody = true; replaced = nil } }))
+                        .font(.body)
+                        .frame(minHeight: 120)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+                        .accessibilityIdentifier("PR body")
+                    if let prDraft, !prDraft.commits.isEmpty, replaced == nil, !writing {
+                        Text("Filled from the \(prDraft.commits.count) commit(s) of this branch since \(prDraft.baseRef ?? base)")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("PR draft source")
+                    }
+                    writeRow
+                }
             }
             PRMetaFields(meta: $meta)
             Toggle("Draft", isOn: $draft)
+                .padding(.leading, 84)   // under the fields, past the names column (PRSheetRow)
                 .accessibilityIdentifier("PR draft")
             if let prDraft, !prDraft.hasUpstream {
                 Text("\(head) is not on the remote yet — Create PR pushes it first, then runs `gh pr create` against \(base.isEmpty ? "main" : base).")
@@ -435,13 +462,13 @@ struct CreatePRSheet: View {
                 Button("Create PR", action: create)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return, modifiers: .command)   // ⌘↩: Return is a new line in the body (or ends the title)
-                    .disabled(base.isEmpty || creating || ghReason != nil)
+                    .disabled(base.isEmpty || creating || writing || ghReason != nil)
                     .help(ghReason ?? "⌘↩")
                     .accessibilityIdentifier("Create PR")
             }
         }
         .padding(20)
-        .frame(width: 480)
+        .frame(width: 560)
         .onAppear {
             if base.isEmpty {
                 let names = bases.map(\.name)
@@ -454,6 +481,66 @@ struct CreatePRSheet: View {
             prDraft = d
             if !typedTitle { title = d.title }
             if !typedBody { body_ = d.body }
+        }
+    }
+
+    /// §51: [AI로 채우기], "작성 중…" while Claude writes, [원래대로 되돌리기] after it replaced text, a failure in one line.
+    @ViewBuilder private var writeRow: some View {
+        HStack(spacing: 8) {
+            Button(action: writeWithClaude) {
+                Label("Fill with Claude", systemImage: "sparkles")
+            }
+            .controlSize(.small)
+            .disabled(writeBlocker != nil || writing || creating)
+            .help(writeBlocker ?? String(localized: "Claude writes the title and description from this branch's commits and diff, the repository's PR template and what is in the sheet — in a read-only side session; the main chat is untouched and nothing is pushed or created"))
+            .accessibilityIdentifier("Fill PR with Claude")
+            if writing {
+                ProgressView().controlSize(.small)
+                Text("Writing…").font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("PR fill progress")
+            } else if let replaced {
+                Button("Restore what I had") {
+                    title = replaced.title
+                    body_ = replaced.body
+                    self.replaced = nil
+                }
+                .buttonStyle(.link)
+                .controlSize(.small)
+                .accessibilityIdentifier("Restore PR text")
+            }
+            Spacer(minLength: 0)
+        }
+        if let writeError {
+            Label(writeError, systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(.orange)
+                .lineLimit(2)
+                .help(writeError)
+                .accessibilityIdentifier("PR fill error")
+        }
+    }
+
+    private func writeWithClaude() {
+        guard writeBlocker == nil, !writing else { return }
+        writing = true
+        writeError = nil
+        let before = PRSheetText(title: title, body: body_)
+        Task {
+            let result = await store.writePRDraft(base: base, title: before.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                  body: before.body.trimmingCharacters(in: .whitespacesAndNewlines))
+            writing = false
+            switch result {
+            case let .success(d):
+                // A title the answer did not have keeps the sheet's; what was there comes back with "Restore".
+                let filled = PRSheetText(title: d.title.isEmpty ? title : d.title, body: d.body.isEmpty ? body_ : d.body)
+                let current = PRSheetText(title: title, body: body_)
+                replaced = filled != current && !(current.title.isEmpty && current.body.isEmpty) ? current : nil
+                title = filled.title
+                body_ = filled.body
+                typedTitle = true   // a base picked now keeps Claude's text
+                typedBody = true
+            case let .failure(failure):
+                writeError = failure.text
+            }
         }
     }
 
