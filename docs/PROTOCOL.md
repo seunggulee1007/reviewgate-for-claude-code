@@ -6543,6 +6543,11 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
 - **Per turn, really.** The session's hooks get the turn's own start tree (§34.1), not A: a request-changes turn or a
   question keeps A for the review, and the post-Bash numstat used to count everything the review held since A — the
   earlier turns' lines too — against the new turn. A turn with no start of its own (no chat record) still gets A.
+- **Lines as git counts them.** The pre-edit estimate of an `Edit` / `MultiEdit` is the file's content before vs after the
+  edit(s), added + removed lines — it counted `old_string` and `new_string` whole, so the context they carry counted
+  twice (a turn git measured at +153 lines was charged 765). Without the file, or when an `old_string` is not in it, each
+  edit's own two strings are diffed (× occurrences with `replace_all`). A diff that takes over 500 ms counts both texts
+  whole. `Write` diffs the old content as before; `NotebookEdit` counts `new_source`.
 - **Wire decision.** Off is `{maxFiles: 0, maxLines: 0}`, not `budget: null`: `state.budget` stays an object (an older
   client decodes every state) and `set_settings{budget}` keeps meaning "replace it". An older client always sends its own
   budget (10 / 400 / 2.0 unless changed) with an append that tells Claude those numbers, so it keeps its budget on a newer

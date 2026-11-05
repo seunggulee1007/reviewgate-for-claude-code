@@ -102,6 +102,31 @@ test("MultiEdit sums edits", () => {
   });
 });
 
+test("Edit / MultiEdit count the lines that change, not the context the strings carry (§54: it was ~5× git's numstat)", () => {
+  withTmp((dir) => {
+    const lines = Array.from({ length: 20 }, (_, i) => `line ${i}`);
+    writeFileSync(join(dir, "f.txt"), lines.join("\n") + "\n");
+    // Five lines of context around one changed line: 1 removed + 1 added, as git counts it (the old estimate: 10).
+    const old5 = lines.slice(3, 8).join("\n");
+    const new5 = [...lines.slice(3, 5), "line 5 changed", ...lines.slice(6, 8)].join("\n");
+    assert.equal(estimateEditLines("Edit", { file_path: "f.txt", old_string: old5, new_string: new5 }, dir), 2);
+    // An added line inside the context: 1.
+    const grown = [...lines.slice(3, 5), "inserted", ...lines.slice(5, 8)].join("\n");
+    assert.equal(estimateEditLines("Edit", { file_path: "f.txt", old_string: old5, new_string: grown }, dir), 1);
+    // MultiEdit: the edits applied in order to the file, then one diff.
+    const multi = {
+      file_path: "f.txt",
+      edits: [
+        { old_string: "line 1\nline 2\nline 3", new_string: "line 1\nline TWO\nline 3" },
+        { old_string: "line 10\nline 11", new_string: "line 10\nline 11\nline 11b" },
+      ],
+    };
+    assert.equal(estimateEditLines("MultiEdit", multi, dir), 3);
+    // An old_string the file does not have: the strings' own diff — the shared context still counts nothing.
+    assert.equal(estimateEditLines("Edit", { file_path: "f.txt", old_string: "a\nb\nc", new_string: "a\nB\nc" }, dir), 2);
+  });
+});
+
 test("NotebookEdit counts new_source lines", () => {
   assert.equal(estimateEditLines("NotebookEdit", { notebook_path: "n.ipynb", new_source: "x\ny" }, "/"), 2);
 });

@@ -107,28 +107,73 @@ export function resolveToolPath(p: string, cwd: string): string {
   return resolvePath(cwd, p);
 }
 
-function estimateEdit(
-  edit: { old_string?: unknown; new_string?: unknown; replace_all?: unknown },
-  filePath: string | null,
-): number {
+/** How long one line diff of the estimate may take before the cruder count stands in (the hook runs before every edit). */
+const DIFF_TIMEOUT_MS = 500;
+
+/**
+ * Changed lines (added + removed) between two texts — what git's numstat counts. A diff that would take longer than
+ * `DIFF_TIMEOUT_MS` (a huge, very different text) counts both texts whole instead.
+ */
+function changedLines(before: string, after: string): number {
+  if (before === after) return 0;
+  const parts = diffLines(before, after, { timeout: DIFF_TIMEOUT_MS });
+  if (!parts) return countLines(before) + countLines(after);
+  let changed = 0;
+  for (const part of parts) {
+    if (part.added || part.removed) changed += part.count ?? countLines(part.value);
+  }
+  return changed;
+}
+
+type EditSpec = { old_string?: unknown; new_string?: unknown; replace_all?: unknown };
+
+/** `content` with one edit applied (the first occurrence, or every one with `replace_all`); null when `old_string` is not in it. */
+function applyEdit(content: string, edit: EditSpec): string | null {
   const oldS = str(edit.old_string);
   const newS = str(edit.new_string);
-  let base = countLines(oldS) + countLines(newS);
-  if (edit.replace_all === true && filePath) {
-    const content = readFileOrNull(filePath);
-    if (content !== null) {
-      const occ = countOccurrences(content, oldS);
-      if (occ > 1) base *= occ;
-    }
+  if (oldS.length === 0) return null;
+  const at = content.indexOf(oldS);
+  if (at === -1) return null;
+  if (edit.replace_all === true) return content.split(oldS).join(newS);
+  return content.slice(0, at) + newS + content.slice(at + oldS.length);
+}
+
+/**
+ * One edit without its file: the diff of the two strings (each ended by a newline, so a missing last newline is no
+ * change), the other string's lines when one is empty, × its occurrences with `replace_all`.
+ */
+function editWithoutFile(edit: EditSpec, content: string | null): number {
+  const oldS = str(edit.old_string);
+  const newS = str(edit.new_string);
+  const base = oldS.length === 0 || newS.length === 0 ? countLines(oldS) + countLines(newS) : changedLines(oldS + "\n", newS + "\n");
+  if (edit.replace_all === true && content !== null) {
+    const occ = countOccurrences(content, oldS);
+    if (occ > 1) return base * occ;
   }
   return base;
 }
 
 /**
- * Estimate the number of changed lines a file-editing tool call would produce.
- * Edit: lines(old)+lines(new) (× occurrences if replace_all).
- * Write: diffLines(existing, content) added+removed, or lines(content) for a new file.
- * MultiEdit: sum of edits. NotebookEdit: lines(new_source).
+ * The lines a list of edits changes in its file: the file's content before vs after them, so the context an edit carries
+ * in `old_string` / `new_string` is not counted (both strings counted whole made the estimate ~5× git's numstat). Without
+ * the file, or when an edit's `old_string` is not in it, each edit's own diff.
+ */
+function estimateEdits(edits: EditSpec[], filePath: string | null): number {
+  const content = filePath ? readFileOrNull(filePath) : null;
+  if (content !== null) {
+    let after: string | null = content;
+    for (const e of edits) {
+      after = after === null ? null : applyEdit(after, e);
+    }
+    if (after !== null) return changedLines(content, after);
+  }
+  return edits.reduce((n, e) => n + editWithoutFile(e, content), 0);
+}
+
+/**
+ * Estimate the number of changed lines a file-editing tool call would produce (added + removed, as git counts them).
+ * Edit / MultiEdit: the file's content before vs after the edits; without the file, each edit's diff (× occurrences with
+ * replace_all). Write: diffLines(existing, content), or lines(content) for a new file. NotebookEdit: lines(new_source).
  */
 export function estimateEditLines(
   toolName: string,
@@ -140,24 +185,16 @@ export function estimateEditLines(
 
   switch (toolName) {
     case "Edit":
-      return estimateEdit(input, filePath);
+      return estimateEdits([input], filePath);
     case "MultiEdit": {
-      const edits = Array.isArray(input.edits) ? input.edits : [];
-      let total = 0;
-      for (const e of edits) {
-        if (e && typeof e === "object") total += estimateEdit(e as Record<string, unknown>, filePath);
-      }
-      return total;
+      const edits = Array.isArray(input.edits) ? input.edits.filter((e): e is EditSpec => !!e && typeof e === "object") : [];
+      return estimateEdits(edits, filePath);
     }
     case "Write": {
       const content = str(input.content);
       const existing = filePath ? readFileOrNull(filePath) : null;
       if (existing === null) return countLines(content);
-      let changed = 0;
-      for (const part of diffLines(existing, content)) {
-        if (part.added || part.removed) changed += part.count ?? countLines(part.value);
-      }
-      return changed;
+      return changedLines(existing, content);
     }
     case "NotebookEdit":
       return countLines(str(input.new_source));
