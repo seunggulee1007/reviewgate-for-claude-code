@@ -77,3 +77,10 @@
   .hud .live-chip .long { display: none; }
   .hud .live-chip .short { display: inline; }
 }
+
+/* ---------------------------------------------------------------- §52 background work: the HUD chip and its list */
+.bg-popover .bg-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; }
+.bg-popover .bg-task { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--border); }
+.bg-popover .bg-title { font-size: 12px; }
+.bg-popover .bg-actions { display: flex; gap: 6px; }
+.bg-output { margin: 8px 0 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 11.5px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; user-select: text; }

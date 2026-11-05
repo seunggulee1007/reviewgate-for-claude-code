@@ -59,6 +59,8 @@ import { editQueued, EMPTY_QUEUE, enqueue, moveQueued, nextToSend, pauseReasonFo
 import { appendErrorRow, clearsOnReady, errorTone, factsOf, pausesQueue, requeuesSend, type ErrorFacts } from "./sessionErrors";
 import { peerRowOf, type PeerRow } from "./peer";
 import { createPeerSlice, type PeerSlice } from "./storePeer";
+import { autoTurnRowOf, type AutoTurnRow } from "./background"; // MARK: §52
+import { createBackgroundSlice, type BackgroundSlice } from "./storeBackground"; // MARK: §52
 import { showToast } from "./toast";
 // MARK: wave1 desktop-review
 import type { RejectOutcome } from "./rejectFlow";
@@ -119,6 +121,8 @@ export type ChatItem =
   | { kind: "error"; id: number; message: string; fatal: boolean; facts?: ErrorFacts; count?: number; lastAt?: number; scope?: ErrorScope | "client" }
   /** §29: a message from another Claude session, delivered (its turn's first row) or dropped. */
   | PeerRow
+  /** §52: a turn Claude started itself (a background command ended, /loop, /goal) — its first row. */
+  | AutoTurnRow
   | { kind: "turnEnd"; id: number; summary: string; compacted?: CompactedRowFacts /* wave4c w4c-commit (§41.1) */ }
   /** `turn_summary` (docs/PROTOCOL.md §15): what the turn changed, why, the commands it ran, plan vs actual. */
   | { kind: "turnSummary"; id: number; summary: TurnSummaryEvent }
@@ -190,6 +194,14 @@ function transcriptItemsToChatItems(items: TranscriptItem[], budget: Budget): Ch
       case "peer_message": {
         const row = peerRowOf(item, uid());
         if (row) out.push(row);
+        break;
+      }
+      // MARK: §52 — a turn Claude started itself: its first row (once per turn)
+      case "auto_turn": {
+        if (!out.some((r) => r.kind === "autoTurn" && r.turn === item.turn)) {
+          const row = autoTurnRowOf(item, uid());
+          if (row) out.push(row);
+        }
         break;
       }
       // MARK: wave4 w4-history — §38.3: the turn summary card comes back with the chat.
@@ -365,7 +377,7 @@ export const EMPTY_STATE = {
   sessions: EMPTY_SESSIONS,
 } as ReviewState;
 
-export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & SessionToolsSlice & SafetySlice & LongWorkSlice & AutoModeSlice & {
+export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & BackgroundSlice & SessionToolsSlice & SafetySlice & LongWorkSlice & AutoModeSlice & {
   state: ReviewState;
   transcript: ChatItem[];
   logs: string[];
@@ -1058,6 +1070,7 @@ export const useStore = create<Store>((set, get, api) => {
     ...createSideSlice(set, get, api),
     ...createComposerSlice(set, get, api),
     ...createPeerSlice(set, get, api),
+    ...createBackgroundSlice(set, get, api), // MARK: §52
     ...createReviewGateSlice(set, get, api), // MARK: wave1 desktop-review
     ...createReviewRoundSlice(set, get, api), // MARK: wave2 desktop-flow
     ...createSessionToolsSlice(set, get, api), // MARK: wave3 desktop-session
@@ -1219,6 +1232,10 @@ export const useStore = create<Store>((set, get, api) => {
         // MARK: wave1 desktop-session — §29
         case "peer_message":
           get().applyPeerMessage(ev.message);
+          break;
+        // MARK: §52 — the turn Claude started itself
+        case "auto_turn":
+          get().applyAutoTurn(ev);
           break;
         case "log":
           appendLog(`[${ev.level}] ${ev.message}`);

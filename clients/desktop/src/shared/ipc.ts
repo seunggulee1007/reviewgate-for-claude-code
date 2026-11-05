@@ -130,6 +130,9 @@ export type AppSettings = {
   modelMode?: "manual" | "auto";
   /** §43.4: how auto picks — "cost", "balanced" (absent / unknown), "quality"; live. */
   modelAutoPolicy?: "cost" | "balanced" | "quality";
+  // MARK: §52
+  /** §52: background commands and /loop as in the terminal (absent = on); the engine uses it at the next session start. */
+  backgroundWork?: boolean;
   // MARK: wave6 w6-statusline
   /** §44.2: the user's Claude Code status line under the composer (default true; live). */
   showStatusLine?: boolean;

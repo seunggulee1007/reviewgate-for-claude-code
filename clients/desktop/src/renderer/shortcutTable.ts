@@ -63,6 +63,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Commands", mac: "⌘/", win: "Ctrl+/" },
       { action: "Previous / next prompt", mac: "↑ / ↓", win: "↑ / ↓", note: "On the first / last line of the message box" },
       { action: "Switch the permission mode", mac: "⇧⇥", win: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto" },
+      { action: "Run the command in the background", mac: "⌃B", win: "Ctrl+B", note: "In an empty message box, while a command runs" }, // §52
     ],
   },
   {

@@ -141,6 +141,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   // MARK: wave6 w6-statusline — §44.2 the user's status line: the chat's width and whether it is on screen (a read; the
   // engine runs the user's own statusLine command, the one the terminal runs)
   "status_line",
+  // §52 background work: stop a task, Ctrl+B / [백그라운드로], a task's last 64 KB of output
+  "task_stop",
+  "task_background",
+  "task_output",
 ]);
 
 export type Validated = { ok: true; cmd: EngineCommand } | { ok: false; error: string };

@@ -84,6 +84,8 @@ export const DEFAULTS: AppSettings = {
   largeFileMB: 50,
   // MARK: wave6 w6-statusline — §44.2
   showStatusLine: true,
+  // MARK: §52
+  backgroundWork: true,
 };
 
 let cache: AppSettings | null = null;
@@ -262,6 +264,8 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     // MARK: wave6 w6-statusline — §44.2 the user's status line (live; on unless turned off) and this project's own command
     // when the user allowed that very one here ("" none; older engines ignore it)
     showStatusLine: s.showStatusLine !== false,
+    // MARK: §52 background commands and /loop (next session start; older engines ignore it)
+    backgroundWork: s.backgroundWork !== false,
     allowedProjectStatusLine: allowedProjectStatusLineFor(s.projectStatusLineAllowed, projectRoot),
     // MARK: wave3 desktop-session — §36.6 this project's "Load local settings" (next session start; older engines ignore it)
     loadLocalSettings: loadLocalSettingsFor(s.projectLoadLocalSettings, projectRoot),

@@ -117,6 +117,8 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   modelAutoPolicy: (v) => v === "cost" || v === "balanced" || v === "quality",
   // MARK: wave6 w6-statusline — §44.2
   showStatusLine: bool,
+  // MARK: §52
+  backgroundWork: bool,
   projectStatusLineAllowed: (v) => projectShas(v),
   // MARK: wave4b w4-notify — §39.6
   notifyWaiting: bool,

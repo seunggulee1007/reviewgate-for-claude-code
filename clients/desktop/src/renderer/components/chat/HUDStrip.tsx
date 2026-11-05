@@ -22,6 +22,7 @@ import { autoModelChipHelp, autoModelChipText } from "../../autoModel";
 import { StartingChip } from "./SessionChips";
 import { PeerTurnBadge, PermissionHudChip } from "./PermissionBits";
 import { InProgressChip } from "./InProgressChip"; // MARK: wave2 desktop-flow
+import { BackgroundChip } from "./BackgroundChip"; // MARK: §52
 import { AgentListButton } from "../agents/AgentBits"; // MARK: wave3 desktop-agents — §36.1 every agent → its details sheet
 import { ExtensionsOffChip } from "./ExtensionsChips"; // MARK: wave3 desktop-session
 import { UsageLimitChip } from "./LongWorkChips"; // MARK: wave4 w4-longwork
@@ -232,6 +233,8 @@ export function HUDStrip() {
       <span className="spacer" />
       {/* wave2 desktop-flow — §34.6: "진행 중: 파일 N개 · +A −D", opens the Changes tab's 진행 중 변경 */}
       <InProgressChip />
+      {/* §52: "백그라운드 N" — the commands Claude runs in the background, with their output and [중지] */}
+      <BackgroundChip />
       <StartingChip />
       {/* wave3 desktop-session — §36.7: "확장 꺼짐" after the init-timeout fallback, with "확장 켜고 다시 시도" */}
       <ExtensionsOffChip />

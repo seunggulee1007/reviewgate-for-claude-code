@@ -27,6 +27,8 @@ import { t } from "../../i18n";
 import { draftOf, historyEscape, historyStep, IDLE_NAV, loadHistory, pushHistory, saveHistory, type HistoryNav } from "../../promptHistory";
 import { projectRootHash, sessionSwitchRefusal } from "../../sessions";
 import { loadDraft, saveDraft, windowStorage } from "../../sessionKeep";
+import { backgroundWorkOn, isBackgroundKey } from "../../background"; // MARK: §52
+import { showToast } from "../../toast";
 import { cannotSendReason, capabilitiesOf, hasPendingReview, isRunning, useStore } from "../../store";
 import { Menu } from "../Menu";
 import { ConfirmDialog } from "../dialogs/ConfirmDialog";
@@ -57,6 +59,8 @@ export function Composer() {
   const cachedCapabilities = useStore((s) => s.cachedCapabilities);
   const send = useStore((s) => s.send);
   const interrupt = useStore((s) => s.interrupt);
+  const moveToBackground = useStore((s) => s.moveToBackground); // MARK: §52
+  const settings = useStore((s) => s.settings);
   const interruptStuck = useStore((s) => s.interruptStuck); // MARK: wave4 w4-safety
   const forceRestartStuckTurn = useStore((s) => s.forceRestartStuckTurn);
   const requestChanges = useStore((s) => s.requestChanges);
@@ -497,6 +501,13 @@ export function Composer() {
     if (isModeCycleKey(e)) {
       e.preventDefault();
       cyclePermissionMode();
+      return;
+    }
+    // MARK: §52 — Ctrl+B in an empty box while a turn runs: the running command goes on in the background (otherwise
+    // Ctrl+B does what it did — toggles the sidebar).
+    if (isBackgroundKey(e, { draftEmpty: draft.trim().length === 0, turnRunning: running, enabled: backgroundWorkOn(settings), viewing: viewing !== null })) {
+      e.preventDefault();
+      void moveToBackground().then((why) => why && showToast(why));
       return;
     }
     if (mentionVisible && mention && !e.metaKey && !e.ctrlKey && !e.altKey) {

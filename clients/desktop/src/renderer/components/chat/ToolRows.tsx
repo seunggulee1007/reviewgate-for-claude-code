@@ -20,6 +20,7 @@ import { segmentParts } from "../../diffSegments";
 import "./miniDiff.css";
 import { reportFindingsLine } from "../../chatFollowups"; // MARK: wave4 w4-check3
 import { labelDetail, ToolNameLabel } from "../agents/AgentGlanceBits"; // MARK: wave4b w4b-agents
+import { backgroundWorkOn, canMoveToBackground } from "../../background"; // MARK: §52
 
 /** Calls whose input carries the text they write. */
 const MINI_TOOLS = new Set(["Edit", "MultiEdit", "Write"]);
@@ -99,6 +100,13 @@ export function ToolUseRow({ item, result, root, nested }: { item: ToolUseItem; 
   // MARK: wave2 desktop-diff
   const mini = useMemo(() => (MINI_TOOLS.has(name) ? miniDiffOf(name, input) : null), [name, input]);
   const [miniOpen, setMiniOpen] = useState(false);
+  // MARK: §52 — "백그라운드로" on a main-thread Bash call that still runs (no result yet, our own turn, the setting on)
+  const turnRunning = useStore((s) => s.state.gate.phase === "running");
+  const externalTurn = useStore((s) => Boolean(s.state.session.externalTurn));
+  const backgroundOn = useStore((s) => backgroundWorkOn(s.settings));
+  const moveToBackground = useStore((s) => s.moveToBackground);
+  const [bgNote, setBgNote] = useState<string | null>(null);
+  const movable = canMoveToBackground({ name, parentToolUseId: item.parentToolUseId, hasResult: result !== undefined, turnRunning, externalTurn, enabled: backgroundOn });
   return (
     <div className={`tool-block ${nested ? "nested" : ""}`} data-tool-use-id={item.toolUseId}>
       <div
@@ -112,6 +120,21 @@ export function ToolUseRow({ item, result, root, nested }: { item: ToolUseItem; 
         <ToolNameLabel name={name} input={input} />
         <span className="detail mono">{detail}</span>
         {mini && <MiniDiffToggle mini={mini} open={miniOpen} onToggle={() => setMiniOpen((o) => !o)} />}
+        {movable && (
+          <button
+            type="button"
+            className="small bg-move"
+            title={t("Keep the command running in the background and let Claude go on (Ctrl+B)")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setBgNote(null);
+              void moveToBackground(item.toolUseId).then(setBgNote);
+            }}
+            data-testid="Run in background"
+          >
+            {t("Run in background")}
+          </button>
+        )}
         {name === "Bash" && <TestBadge outcome={result?.testOutcome} />}
         {files.length > 0 && (name === "Bash" ? (
           <span className="file-links">
@@ -147,6 +170,7 @@ export function ToolUseRow({ item, result, root, nested }: { item: ToolUseItem; 
         )}
       </div>
       {mini && miniOpen && <MiniDiffBlock mini={mini} />}
+      {bgNote && <div className="bg-note orange tiny" role="status" data-testid="Run in background note">{bgNote}</div>}
       {nested && item.rationale && (
         <div className="rationale" title={item.rationale}>
           {item.rationaleSource === "earlier" ? t("Earlier note: {0}", item.rationale) : item.rationale}

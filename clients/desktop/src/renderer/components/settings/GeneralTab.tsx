@@ -11,6 +11,7 @@ import { useStore } from "../../store";
 import { PeerInboundSection } from "./PeerSettings";
 import { TestCommandPatternsSection } from "./TestCommandPatterns";
 import { CliVersionSection } from "./CliVersions"; // MARK: wave3 desktop-session
+import { backgroundWorkOn } from "../../background"; // MARK: §52
 import { MAX_MAX_TURNS, MIN_MAX_TURNS, maxTurnsOf } from "../../longWork"; // MARK: wave4 w4-longwork
 import { StorageSettingsSection } from "./StorageSettings"; // MARK: wave4b w4b-bigturn
 import { isEnter } from "../../ime";
@@ -133,6 +134,12 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
           {t("Auto-restart session")}
         </label>
         <div className="note">{t("When the Claude session dies unexpectedly, restart it automatically (once per turn) instead of waiting for Restart.")}</div>
+        {/* MARK: §52 */}
+        <label className="check">
+          <input type="checkbox" checked={backgroundWorkOn(settings)} onChange={(e) => patch({ backgroundWork: e.target.checked })} data-testid="Background work" />
+          {t("Allow background tasks and /loop")}
+        </label>
+        <div className="note">{t("Like the terminal, Claude can run commands in the background (a dev server, a long build) and repeat the same request with /loop. When a background command ends or a scheduled run starts, Claude goes on, and that turn is reviewed like any other. Files a background command changed in the meantime join the next review. Takes effect when the session restarts.")}</div>
       </section>
       <section>
         <h4>{t("Side questions")}</h4>

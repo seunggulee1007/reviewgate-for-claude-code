@@ -27,6 +27,7 @@ import { TurnSummaryCard } from "./TurnSummaryCard";
 import { UserMessage } from "./UserMessage";
 import { ErrorNoticeRow } from "./ErrorNoticeRow";
 import { PeerMessageRow } from "./PeerMessageRow";
+import { AutoTurnRowView } from "./AutoTurnRow"; // MARK: §52
 // MARK: wave3 desktop-agents
 import { agentViewOf, continuationCounts } from "../../agentDetails";
 import { useAgentUi } from "../../agentUi";
@@ -246,6 +247,8 @@ function Row({ item, root, nested, result, toolName }: { item: ChatItem; root: s
       return <ErrorNoticeRow item={item} />;
     case "peer":
       return <PeerMessageRow item={item} />;
+    case "autoTurn":
+      return <AutoTurnRowView item={item} />; // MARK: §52
     case "turnEnd":
       return <TurnEndRow item={item} />; // wave4c w4c-commit: + "대화를 줄였어요" of a compacted turn (§41.1)
     case "turnSummary":
