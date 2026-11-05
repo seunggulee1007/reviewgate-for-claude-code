@@ -157,6 +157,7 @@ private final class Tour {
             try await settle(window)
             let image = try render(window)
             try write(image, "review-\(appearance.rawValue)")
+            logTranscript(image)
             let regions = try layout(window)
             try write(image, "why-\(appearance.rawValue)", crop: regions.why)
             try write(image, "budget-\(appearance.rawValue)", crop: regions.budget)
@@ -169,7 +170,9 @@ private final class Tour {
         for appearance in [Appearance.dark, .light] {
             AppSettings.setAppearance(appearance)
             try await settle(window)
-            try write(try render(window), "agents-\(appearance.rawValue)")
+            let image = try render(window)
+            try write(image, "agents-\(appearance.rawValue)")
+            logTranscript(image)
         }
         UserDefaults.standard.set(false, forKey: AgentPanel.storageKey)
     }
@@ -374,27 +377,14 @@ private final class Tour {
     /// The chat's scroll view, found before the agent panel adds scroll views of its own.
     private weak var transcript: NSScrollView?
 
-    /// Appearance, highlighting and layout settle. The chat's lazy rows streamed in during the turn draw nothing in a capture
-    /// until the column's width changes: a one-point wider window and back, then the transcript scrolled to its end.
+    /// Appearance, highlighting and layout settle. The transcript keeps its newest rows in view by itself (§45.1): no width
+    /// nudge, no scrolling here, so a blank transcript shows in the shots (and as BLANK in the log).
     private func settle(_ window: NSWindow) async throws {
         try await activate(window)
-        let frame = window.frame
-        window.setFrame(NSRect(origin: frame.origin, size: NSSize(width: frame.width + 1, height: frame.height)), display: true)
-        try await Task.sleep(for: .milliseconds(400))
-        window.setFrame(frame, display: true)
         if transcript?.window == nil {
             transcript = try scrollViews(window).max { $0.convert($0.bounds, to: nil).maxX < $1.convert($1.bounds, to: nil).maxX }
         }
-        for _ in 0..<2 {   // twice: the rows realized at the end change the content height
-            try await Task.sleep(for: .milliseconds(500))
-            if let chat = transcript, let document = chat.documentView {
-                let clip = chat.contentView
-                clip.scroll(to: NSPoint(x: clip.bounds.minX,
-                                        y: document.isFlipped ? max(0, document.frame.height - clip.bounds.height) : 0))
-                chat.reflectScrolledClipView(clip)
-            }
-        }
-        try await Task.sleep(for: .milliseconds(1500))
+        try await Task.sleep(for: .milliseconds(2900))
         log("settled: active \(NSApp.isActive), key \(window.isKeyWindow), visible \(window.occlusionState.contains(.visible)), "
             + "chat \(transcript.map { NSStringFromRect($0.contentView.bounds) + " of " + NSStringFromRect($0.documentView?.frame ?? .zero) } ?? "?")")
     }
