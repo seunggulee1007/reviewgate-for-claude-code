@@ -2,6 +2,7 @@ import { mkdirSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
+import type { ReviewGate } from "../src/review/gate.js";
 import { requestChangesMessage } from "../src/review/notes.js";
 import { FakeClaudeSession, makeHarness, testSettings, type Harness } from "./helpers/engine.js";
 import { fileExists, makeBranchRepo, makeTempDir, read, removeDir, renameWhenFree, sh, write } from "./helpers/repo.js";
@@ -245,7 +246,10 @@ describe("ReviewEngine review gate", () => {
       "",
       "please fix",
     ].join("\n");
-    expect(h.session().sends[1]).toEqual({ text: expected, checkpointTree: a }); // A is kept, not re-snapshotted
+    // A is kept for the review, not re-snapshotted; the session's hooks count the turn from its own start (§54).
+    const own = (h.engine as unknown as { gate: ReviewGate }).gate.runningTurnStart;
+    expect(own).not.toBe(a);
+    expect(h.session().sends[1]).toEqual({ text: expected, checkpointTree: own });
     s = h.engine.state;
     expect(s.gate.turnStartTree).toBe(a);
     expect(s.gate.turnEndTree).toBeNull();

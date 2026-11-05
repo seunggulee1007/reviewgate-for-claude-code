@@ -3251,8 +3251,9 @@ export class ReviewEngine {
       // §26: the turn's own start tree (A is the review's, kept across question turns).
       await this.startRecord(keptA ? null : tree);
       this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
-      this.turnSent = { text: outgoing, checkpointTree: tree, images: sessionImages };
-      session.sendUser(outgoing, tree, sessionImages);
+      const hookTree = this.turnHookTree(tree);
+      this.turnSent = { text: outgoing, checkpointTree: hookTree, images: sessionImages };
+      session.sendUser(outgoing, hookTree, sessionImages);
       if (budgetNote) this.toldBudget = budgetNumbers(this.settings.budget); // MARK: wave4 w4-longwork
     } catch (e) {
       // The session went away while the turn was being prepared (snapshot A had succeeded).
@@ -3324,8 +3325,9 @@ export class ReviewEngine {
     this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
     await this.noteTurnStartState();
     try {
-      this.turnSent = { text: prepared.message, checkpointTree: prepared.checkpointTree };
-      session.sendUser(prepared.message, prepared.checkpointTree);
+      const hookTree = this.turnHookTree(prepared.checkpointTree);
+      this.turnSent = { text: prepared.message, checkpointTree: hookTree };
+      session.sendUser(prepared.message, hookTree);
     } catch (e) {
       // Undo the marking so the user can retry (notes are kept).
       this.gate.undoRequestChanges(prepared.endTree);
@@ -3334,6 +3336,14 @@ export class ReviewEngine {
       this.fail(errorMessage(e), false, "session", { code: "send_failed" });
     }
     this.touch();
+  }
+
+  /**
+   * The tree the session's hooks count a turn from: the turn's own start (§34.1) — A only when the turn has none. A
+   * request-changes turn or a question keeps A for the review, but the opt-in budget is per turn (§54).
+   */
+  private turnHookTree(a: string): string {
+    return this.gate.runningTurnStart ?? a;
   }
 
   /** Transcript / HUD bookkeeping shared by `send` and `requestChanges` (and §29 `peer_accept`: no user message — the peer row comes with the body). */
@@ -5575,7 +5585,7 @@ export class ReviewEngine {
       await this.startRecord(keptA ? null : tree);
       this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
       this.turnSent = null;
-      const released = await session.releasePeers(held.map((m) => m.id), tree);
+      const released = await session.releasePeers(held.map((m) => m.id), this.turnHookTree(tree));
       for (const m of held) {
         const cur = this.peerInbox.get(m.id);
         if (cur && cur.state === "delivering" && !released.includes(m.id)) this.updatePeer({ ...cur, state: "held" });
@@ -7229,7 +7239,7 @@ export class ReviewEngine {
       }
     } finally {
       if (!ok) this.externalTurn = null;
-      if (this.session === source) source.autoTurnReady?.(ok, ok ? tree : undefined);
+      if (this.session === source) source.autoTurnReady?.(ok, ok && tree !== undefined ? this.turnHookTree(tree) : undefined);
       this.drainAdoptQueue();
       this.touch();
     }

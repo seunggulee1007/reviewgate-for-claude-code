@@ -1425,6 +1425,11 @@ export class ReviewGate {
     this.runningTurnBase = own ?? this.heldEndTree ?? this.turnStartTree;
   }
 
+  /** §34.1: the running turn's own start tree (null between turns) — what the opt-in budget counts from (§54). */
+  get runningTurnStart(): string | null {
+    return this.runningTurnBase;
+  }
+
   /**
    * §34.2: `accept` / `accept_all` while a turn runs on a standing review (or its collection failed): applied at once, with the
    * file's patch A → held B recorded like a file accepted before an answer turn — after the collection the file stays accepted

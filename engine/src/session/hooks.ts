@@ -208,7 +208,7 @@ export type HookContext = {
   cwd: string;
   /** Containment root for edit tools (the checkpoint root); resolved lazily from cwd when unset. */
   root?: string;
-  /** git tree SHA at turn start (from user_message.checkpointTree) */
+  /** git tree SHA at the turn's own start (§34.1; A only for a fresh turn): the budget's numstat base (§54), Bash attribution's fallback */
   checkpointTree?: string;
   /** Settings.ignorePatterns — paths skipped by the post-Bash numstat */
   ignorePatterns: string[];

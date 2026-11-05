@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { sessionTranscriptPath } from "../src/review/sessions.js";
 import type { BackgroundTask } from "../src/protocol.js";
+import type { ReviewGate } from "../src/review/gate.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
@@ -122,7 +123,10 @@ describe("§52.1 a turn Claude starts itself", () => {
     await h.waitFor(() => h.session().autoTurnAnswers.length === 1, "auto turn taken");
     const running = h.engine.state;
     expect(running.gate.phase).toBe("running");
-    expect(h.session().autoTurnAnswers).toEqual([{ ok: true, tree: running.gate.turnStartTree }]);
+    // §54: the session's hooks count the turn from its own start (the review keeps A: a.txt is still in it).
+    const own = (h.engine as unknown as { gate: ReviewGate }).gate.runningTurnStart;
+    expect(own).not.toBe(running.gate.turnStartTree);
+    expect(h.session().autoTurnAnswers).toEqual([{ ok: true, tree: own }]);
     expect(h.ofType("auto_turn")).toEqual([{ type: "auto_turn", turn: 2, trigger: "background", task: t }]);
     expect(running.session.externalTurn).toBeNull();
     write(dir, "c.txt", "fix\n");

@@ -142,6 +142,11 @@ describe("send {acceptPending} (M16 §3)", () => {
     await h.engine.handle({ type: "request_changes" });
     await h.waitFor((x) => x.gate.phase === "running" && x.gate.isRequestingChanges, "request_changes running");
     expect(h.engine.state.changedFiles.map((f) => [f.path, f.state])).toEqual([["README.md", "changesRequested"], ["new.txt", "pending"]]);
+    // §54: the follow-up keeps A for the review, but its hooks count the turn from its own start (the per-turn budget).
+    const own = (h.engine as unknown as { gate: ReviewGate }).gate.runningTurnStart;
+    expect(own).not.toBeNull();
+    expect(own).not.toBe(h.engine.state.gate.turnStartTree);
+    expect(h.session().sends.at(-1)!.checkpointTree).toBe(own);
     const sends = h.session().sends.length;
     await expect(h.engine.request({ type: "send", text: "x", acceptPending: true })).rejects.toThrow("gate_closed:running");
     expect(h.engine.state.changedFiles.map((f) => f.state)).toEqual(["changesRequested", "pending"]); // nothing accepted by the refused send
@@ -201,12 +206,16 @@ describe("send while reviewing = a question (review state untouched)", () => {
     expect(running.gate.pendingCount).toBe(2);
     expect(running.reviewNotes.map((n) => n.body)).toEqual(["why?"]);
     expect(running.gate.turnStartTree).toBe(a);
-    // The unsent note goes along as context ("메모 반영해줘" in the chat reaches it) and stays unsent.
+    // The unsent note goes along as context ("메모 반영해줘" in the chat reaches it) and stays unsent. The session's hooks
+    // count the turn from its own start (§54: the opt-in budget is per turn), not from the review's A.
+    const own = (h.engine as unknown as { gate: ReviewGate }).gate.runningTurnStart;
+    expect(own).not.toBeNull();
+    expect(own).not.toBe(a);
     expect(h.session().sends[sendsBefore]).toEqual({
       text:
         "why did you change line 2?\n\n[Review gate] Notes the user left on the diff, not sent yet (act on them only if the message above asks):" +
         "\n- README.md:2 (new) `line2 changed` — why?",
-      checkpointTree: a,
+      checkpointTree: own,
     });
     expect(running.reviewNotes[0]!.sent).toBeUndefined();
     expect(h.ofType("user_message").at(-1)).toMatchObject({ text: "why did you change line 2?" });
