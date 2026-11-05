@@ -106,12 +106,14 @@ describe("chat move (§39.4)", () => {
 
   it("the notices are worded and styled, the banner leads with the move", async () => {
     stubWindow();
-    const { chatMoveNoticeText } = await import("./chatMove");
+    const { chatMoveNoticeText, moveRefusalText } = await import("./chatMove");
     const { presentationOf } = await import("./errorCodes");
     const { sessionActions } = await import("./sessionErrors");
     expect(chatMoveNoticeText("chat_moved_in", "/Users/me/acme")).toContain("/Users/me/acme");
     expect(chatMoveNoticeText("chat_moved_in_disk", "/a")).not.toBe(chatMoveNoticeText("chat_moved_in", "/a"));
     expect(chatMoveNoticeText("chat_move_failed", "/w/acme-4176-17")).toContain("acme-4176-17");
+    // The reason in words follows (a missing folder is not "not a worktree").
+    expect(chatMoveNoticeText("chat_move_failed", "/w/acme-42", "path_not_found")).toBe(`${chatMoveNoticeText("chat_move_failed", "/w/acme-42")} ${moveRefusalText("path_not_found")}`);
     expect(chatMoveNoticeText("other", "/a")).toBeNull();
     expect(presentationOf("chat_moved_in")).toBe("info");
     expect(presentationOf("chat_moved_in_disk")).toBe("info");

@@ -75,14 +75,17 @@ export function moveRefusalText(code: string): string {
 }
 
 /** The §39.4 notices (`error` codes) in the user's words; null for any other code. */
-export function chatMoveNoticeText(code: string | undefined, path: string | undefined): string | null {
+export function chatMoveNoticeText(code: string | undefined, path: string | undefined, detail?: string): string | null {
   switch (code) {
     case "chat_moved_in":
       return t("This chat moved here from {0}. It is reviewed from here on, with what it changed here before the move.", path ?? "");
     case "chat_moved_in_disk":
       return t("This chat moved here from {0}. It is reviewed from here on; changes made here before the move are not in the review.", path ?? "");
-    case "chat_move_failed":
-      return t("This chat could not move to {0}, so it stays here.", path ? folderName(path) : "");
+    case "chat_move_failed": {
+      const line = t("This chat could not move to {0}, so it stays here.", path ? folderName(path) : "");
+      // Why, in words (the engine's code stays the row's second line).
+      return detail ? `${line} ${moveRefusalText(detail)}` : line;
+    }
     default:
       return null;
   }

@@ -427,7 +427,7 @@ export function errorEventText(ev: ErrorInfo, opts: { now?: Date; timeZone?: str
     case "chat_moved_in":
     case "chat_moved_in_disk":
     case "chat_move_failed":
-      return chatMoveNoticeText(ev.code, ev.path) ?? ev.message;
+      return chatMoveNoticeText(ev.code, ev.path, ev.detail) ?? ev.message;
     default:
       return ev.message;
   }

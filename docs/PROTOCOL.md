@@ -3953,7 +3953,7 @@ sends none of it and the engine behaves as before.
     environment defines are expanded. When that path names no worktree, the one the command added is followed: the
     worktree `git worktree list` shows now and did not show when the card came, if there is exactly one. So a variable
     the engine cannot know, `$(…)`, or a script still works. `detail` is the real refusal: `path_not_found` when nothing
-    is at the path; before, every refusal read `not_a_worktree`.
+    is at the path; before, every refusal read `not_a_worktree`. The clients put the reason in words after the line.
 - **System instruction (§33.4, changed).** *"ReviewGate reviews every change you make in this folder (<cwd>). Work inside
   it; never use EnterWorktree. If the task needs its own git worktree, you may create it with `git worktree add`, but tell
   the user right away in one line: changes there are not reviewed until they move this chat into that worktree (ReviewGate
