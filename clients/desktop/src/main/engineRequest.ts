@@ -3,18 +3,18 @@
  * a bare `Error(result.error)`, so the `code` / `paths` of the failed `result` are picked up from the
  * engine's own event stream (the engine emits the `result` synchronously right after rejecting).
  */
-import type { EngineCommand, EngineEvent, ReplyFor } from "@reviewgate/engine";
+import type { EngineCommand, EngineEvent, PartialSeries, ReplyFor } from "@reviewgate/engine";
 
 export type EngineLike = {
   request<C extends EngineCommand>(cmd: C): Promise<ReplyFor<C>>;
   on(listener: (ev: EngineEvent) => void): () => void;
 };
 
-/** What `rg:request` hands the preload: the reply, or `{__error, __code?, __paths?}`. */
-export type RequestFailure = { __error: string; __code?: string; __paths?: string[] };
+/** What `rg:request` hands the preload: the reply, or `{__error, __code?, __paths?, __partial?}`. */
+export type RequestFailure = { __error: string; __code?: string; __paths?: string[]; __partial?: PartialSeries };
 
 export async function requestWithDetails<C extends EngineCommand>(engine: EngineLike, cmd: C): Promise<ReplyFor<C> | RequestFailure> {
-  const failed: { error: string; code?: string; paths?: string[] }[] = [];
+  const failed: { error: string; code?: string; paths?: string[]; partial?: PartialSeries }[] = [];
   const off = engine.on((ev) => {
     if (ev.type === "result" && !ev.ok) failed.push(ev);
   });
@@ -28,6 +28,7 @@ export async function requestWithDetails<C extends EngineCommand>(engine: Engine
       __error: message,
       ...(hit?.code ? { __code: hit.code } : {}),
       ...(hit?.paths ? { __paths: [...hit.paths] } : {}),
+      ...(hit?.partial ? { __partial: hit.partial } : {}),
     };
   } finally {
     off();

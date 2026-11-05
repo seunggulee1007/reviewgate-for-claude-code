@@ -23,7 +23,7 @@ vi.mock("./composerBridge", () => ({
   useTaskLeftComposer: () => undefined,
 }));
 
-type Reply = { ok: true; reply: unknown } | { ok: false; error: string; code?: string; paths?: string[] };
+type Reply = { ok: true; reply: unknown } | { ok: false; error: string; code?: string; paths?: string[]; partial?: unknown };
 const sent: EngineCommand[] = [];
 let respond: (cmd: EngineCommand) => Reply | Promise<Reply> = () => ({ ok: true, reply: { type: "result", ok: true } });
 const opened: { path: string; report: unknown }[] = [];
@@ -176,7 +176,13 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     expect(await useStore.getState().splitCommitWithClaude()).toMatchObject({ ok: false, error: "commit_split_failed:the fork answered nothing", unsupported: false });
     respond = () => ({ ok: false, error: "commit_failed:hook failed", code: "commit_failed" });
     expect(await useStore.getState().commitSeries([{ message: "a", parts: [{ path: "a" }] }], false)).toEqual({ ok: false, error: "commit_failed:hook failed", made: [] });
-    useStore.getState().applyFlowEvent({ type: "committed_series", partial: true, commits: [{ sha: "s", shortSha: "s1", message: "m", files: ["a"] }], branch: "x", pushed: false } as never);
+    // §53: a series that stopped in the middle reports what it made on the refused result itself
+    const partial = { commits: [{ sha: "s", shortSha: "s1", message: "m", files: ["a"] }], branch: "x", pushed: false as const };
+    respond = () => ({ ok: false, error: "commit_failed:hook failed", code: "commit_failed", partial });
+    expect(await useStore.getState().commitSeries([{ message: "a", parts: [{ path: "a" }] }, { message: "b", parts: [{ path: "b" }] }], false)).toEqual({ ok: false, error: "commit_failed:hook failed", made: partial.commits });
+    // the next series does not inherit it
+    respond = () => ({ ok: false, error: "commit_failed:hook failed", code: "commit_failed" });
+    expect(await useStore.getState().commitSeries([{ message: "a", parts: [{ path: "a" }] }], false)).toMatchObject({ ok: false, made: [] });
     expect(useStore.getState().flow.splitting).toBe(false);
   });
 

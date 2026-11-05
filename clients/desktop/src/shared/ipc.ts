@@ -3,7 +3,7 @@
  * types); this file only adds the client-side settings shape, the `window.rg` bridge and the
  * menu → renderer messages.
  */
-import type { EngineCommand, EngineEvent, PeerInboundMode, PermissionMode, ReplyFor, SessionCapabilities } from "@reviewgate/engine";
+import type { EngineCommand, EngineEvent, PartialSeries, PeerInboundMode, PermissionMode, ReplyFor, SessionCapabilities } from "@reviewgate/engine";
 import type { PickedImage } from "./attachments.js";
 // MARK: wave3 desktop-flow
 import type { PreReviewEffort, WorkbenchSetup } from "@reviewgate/engine";
@@ -217,7 +217,7 @@ export type RGBridge = {
    * Like `request`, but a refusal resolves `{ok:false}` with the `result`'s `code` / `paths` (docs/PROTOCOL.md §19.6) —
    * an Error thrown across the context bridge keeps only its message. The renderer wraps it (src/renderer/engineRequest.ts).
    */
-  requestDetailed<C extends EngineCommand>(cmd: C): Promise<{ ok: true; reply: ReplyFor<C> } | { ok: false; error: string; code?: string; paths?: string[] }>;
+  requestDetailed<C extends EngineCommand>(cmd: C): Promise<{ ok: true; reply: ReplyFor<C> } | { ok: false; error: string; code?: string; paths?: string[]; partial?: PartialSeries }>;
   onEvent(cb: (ev: EngineEvent) => void): () => void;
   onMenu(cb: (action: MenuAction) => void): () => void;
   chooseDirectory(): Promise<string | null>;

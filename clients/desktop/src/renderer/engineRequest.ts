@@ -3,17 +3,20 @@
  * `EngineRefusal`: `message` is still the engine's `error` text (what older code parses), `code` the stable id
  * (the leading word of `error` when the engine sent none), `paths` the files a refusal is about.
  */
-import type { EngineCommand, ReplyFor } from "@reviewgate/engine";
+import type { EngineCommand, PartialSeries, ReplyFor } from "@reviewgate/engine";
 import type { RGBridge } from "../shared/ipc";
 
 export class EngineRefusal extends Error {
   readonly code: string;
   readonly paths?: string[];
-  constructor(message: string, code?: string, paths?: string[]) {
+  /** §53: what a `commit_series` that stopped in the middle made (on its `commit_failed` refusal). */
+  readonly partial?: PartialSeries;
+  constructor(message: string, code?: string, paths?: string[], partial?: PartialSeries) {
     super(message);
     this.name = "EngineRefusal";
     this.code = code ?? leadingCode(message);
     if (paths) this.paths = paths;
+    if (partial) this.partial = partial;
   }
 }
 
@@ -38,6 +41,6 @@ type Bridge = Pick<RGBridge, "request"> & Partial<Pick<RGBridge, "requestDetaile
 export async function engineRequest<C extends EngineCommand>(cmd: C, bridge: Bridge = window.rg): Promise<ReplyFor<C>> {
   if (typeof bridge.requestDetailed !== "function") return bridge.request(cmd);
   const r = await bridge.requestDetailed(cmd);
-  if (!r.ok) throw new EngineRefusal(r.error, r.code, r.paths);
+  if (!r.ok) throw new EngineRefusal(r.error, r.code, r.paths, r.partial);
   return r.reply;
 }

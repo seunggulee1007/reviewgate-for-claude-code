@@ -4,7 +4,7 @@
  * contextBridge / ipcRenderer and the sandbox's `process` subset (argv, platform) — no Node modules.
  */
 import { contextBridge, ipcRenderer } from "electron";
-import type { EngineCommand, EngineEvent } from "@reviewgate/engine";
+import type { EngineCommand, EngineEvent, PartialSeries } from "@reviewgate/engine";
 import type { AppSettings, EditorKind, ExecutableKind, MenuAction, NotifyRequest, ProjectUI, RGBridge } from "./shared/ipc.js";
 import type { NotificationClick } from "./shared/ipc.js"; // MARK: wave4b w4-notify
 import type { WorkbenchSetupReport } from "./shared/flowSettings.js"; // MARK: wave3 desktop-flow
@@ -35,9 +35,9 @@ const bridge: RGBridge = {
     return r as never;
   },
   requestDetailed: async (cmd: EngineCommand) => {
-    const r = (await ipcRenderer.invoke("rg:request", cmd)) as { __error?: string; __code?: string; __paths?: string[] };
+    const r = (await ipcRenderer.invoke("rg:request", cmd)) as { __error?: string; __code?: string; __paths?: string[]; __partial?: PartialSeries };
     if (r && typeof r === "object" && "__error" in r) {
-      return { ok: false as const, error: String(r.__error), ...(typeof r.__code === "string" ? { code: r.__code } : {}), ...(Array.isArray(r.__paths) ? { paths: r.__paths.map(String) } : {}) };
+      return { ok: false as const, error: String(r.__error), ...(typeof r.__code === "string" ? { code: r.__code } : {}), ...(Array.isArray(r.__paths) ? { paths: r.__paths.map(String) } : {}), ...(r.__partial && typeof r.__partial === "object" ? { partial: r.__partial } : {}) };
     }
     return { ok: true as const, reply: r as never };
   },

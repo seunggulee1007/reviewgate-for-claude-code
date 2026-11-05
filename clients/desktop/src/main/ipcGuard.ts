@@ -4,7 +4,6 @@
  * derived from `rg:setSettings` — a renderer forging either (e.g. `claudePath`) is refused.
  */
 import type { EngineCommand, EngineCommandType } from "@reviewgate/engine";
-import { COMMIT_SERIES_COMMANDS } from "../shared/commitSeries";
 
 const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandType>([
   "open_project",
@@ -64,7 +63,9 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   // MARK: wave3 desktop-flow — §36.11 commit draft, §36.12 workbench preview, §36.13 AI pre-review (read-only forks / reads)
   "commit_draft",
   // §53 commits in meaningful units: the accepted hunks (a read), Claude's proposed split (read-only fork), the commits in order
-  ...(COMMIT_SERIES_COMMANDS as unknown as EngineCommandType[]),
+  "commit_hunks",
+  "commit_split_draft",
+  "commit_series",
   "workbench_preview",
   "prereview_start",
   "prereview_cancel",

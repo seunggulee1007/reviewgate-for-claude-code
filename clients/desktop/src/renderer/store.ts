@@ -68,7 +68,7 @@ import { isExternalChange, planRejectAll, type GateNoticeKind, type GateNoticeMe
 import { createReviewGateSlice, type ReviewGateDialog } from "./storeReviewGate";
 // MARK: wave3 desktop-flow — §36.11–36.14 (storeFlow.ts)
 import type { PreReviewEffort, PreReviewFinding, PreReviewScope } from "@reviewgate/engine";
-import type { CommitPlan } from "../shared/commitSeries";
+import type { CommitPlan } from "@reviewgate/engine";
 import { createFlowSlice, type CommitHunksResult, type CommitSeriesResult, type CommitSplitResult, type FlowSettingsPatch, type FlowState, type PRFillResult, type PRSheetText, type PRWorkbenchRequest, type WorkbenchCreateRequest, type WorkbenchPreviewRequest } from "./storeFlow";
 import type { PRCommentThread } from "./prClaude";
 // MARK: wave2 check-clients

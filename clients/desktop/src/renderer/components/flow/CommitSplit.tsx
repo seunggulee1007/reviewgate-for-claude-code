@@ -9,7 +9,7 @@ import { useStore } from "../../store";
 import { showToast } from "../../toast";
 import { buildSeries, initialSplit, partKey, seriesBlocker, seriesDoneText, seriesFailureText, splitRefusalText, splitReducer, type SplitPart, type SplitTarget } from "../../commitSplit";
 import { updateReason } from "../../flowLogic";
-import type { CommitFile } from "../../../shared/commitSeries";
+import type { CommitFile } from "@reviewgate/engine";
 import "./flow.css";
 
 type Move = (from: SplitTarget, to: SplitTarget, part: SplitPart, wholeFile: boolean) => void;

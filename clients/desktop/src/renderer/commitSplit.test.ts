@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { initI18n } from "./i18n";
 import { allParts, buildSeries, initialSplit, partKey, seriesBlocker, seriesDoneText, seriesFailureText, splitReducer, splitRefusalText, type SplitState } from "./commitSplit";
-import type { CommitFile } from "../shared/commitSeries";
+import type { CommitFile } from "@reviewgate/engine";
 
 const hunk = (id: number) => ({ id, header: `@@ -${id},1 +${id},2 @@`, added: 1, deleted: 0, text: "+x" });
 const files: CommitFile[] = [

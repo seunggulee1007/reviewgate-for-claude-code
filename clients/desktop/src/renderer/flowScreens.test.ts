@@ -7,7 +7,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ChangedFileState, PRComment, PRDetail, PreReviewRun, ReviewState, WorkbenchInfo } from "@reviewgate/engine";
+import type { ChangedFileState, CommitFile, PRComment, PRDetail, PreReviewRun, ReviewState, WorkbenchInfo } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
 import { projectRootHash } from "../shared/hash";
 
@@ -75,7 +75,7 @@ describe("§36.11–36.14 screens (wave3 desktop-flow)", () => {
     const { CommitSplitPanel } = await import("./components/flow/CommitSplit");
     initI18n("ko", "win32");
     const hunk = (id: number) => ({ id, header: `@@ -${id},5 +${id},7 @@`, added: 2, deleted: 0, text: "+x" });
-    const preloaded = [
+    const preloaded: CommitFile[] = [
       { path: "api/Svc.java", status: "M", binary: false, hunks: [hunk(0), hunk(1)] },
       { path: "README.md", status: "A", binary: false, hunks: [] },
     ];

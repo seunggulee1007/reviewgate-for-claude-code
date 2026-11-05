@@ -32,6 +32,12 @@ describe("requestWithDetails", () => {
     expect(engine.listeners).toBe(0);
   });
 
+  it("passes the partial series of a commit_failed refusal", async () => {
+    const partial = { commits: [{ sha: "abc1234567", shortSha: "abc1234", message: "a", files: ["a.ts"] }], branch: "main", pushed: false as const };
+    const engine = fakeEngine(() => ({ type: "result", id: "1", ok: false, error: "commit_failed:hook failed", code: "commit_failed", partial }));
+    expect(await requestWithDetails(engine, { type: "commit_series", commits: [] })).toEqual({ __error: "commit_failed:hook failed", __code: "commit_failed", __partial: partial });
+  });
+
   it("works with an older engine that sends no code", async () => {
     const engine = fakeEngine(() => ({ type: "result", id: "1", ok: false, error: "session_running" }));
     expect(await requestWithDetails(engine, { type: "accept_all" })).toEqual({ __error: "session_running" });

@@ -26,7 +26,7 @@ import type {
 } from "@reviewgate/engine";
 import { insertIntoComposer, taskLeftComposer } from "./composerBridge";
 import { taskBranchPrefixOf } from "./runAsTask"; // MARK: §49
-import { engineRequest, refusalOf } from "./engineRequest";
+import { EngineRefusal, engineRequest, refusalOf } from "./engineRequest";
 import { refusalMessage } from "./errorCodes";
 import { applyProgress, createdPathOf, flowRefusal, flowRefusalText, isUnknownCommand, prAiDraftCommand, setupReportOf, updateReason, type PRSheetText } from "./flowLogic";
 import { applyRun, findingKey, headStatus, noteBody, normalizeRun, withoutFinding } from "./preReview";
@@ -41,7 +41,7 @@ import {
   type WorkbenchSetupReport,
 } from "../shared/flowSettings";
 import type { AppSettings } from "../shared/ipc";
-import type { CommitFile, CommitPlan, CommitPart, CommittedSeries, CommittedSeriesCommit } from "../shared/commitSeries";
+import type { CommitFile, CommitPart, CommitPlan, SeriesCommit } from "@reviewgate/engine";
 import type { Store } from "./store";
 
 /** The `workbench_preview` a reply belongs to. */
@@ -63,7 +63,7 @@ export type { PRSheetText };
 export type CommitHunksResult = { ok: true; files: CommitFile[] } | { ok: false; error: string; unsupported: boolean };
 export type CommitSplitResult = { ok: true; commits: CommitPlan[]; unassigned: CommitPart[] } | { ok: false; error: string; unsupported: boolean };
 /** `made`: the commits that exist (all of them on success; what stopped the series on a refusal in the middle). */
-export type CommitSeriesResult = { ok: true; made: CommittedSeriesCommit[]; pushed: boolean } | { ok: false; error: string; made: CommittedSeriesCommit[] };
+export type CommitSeriesResult = { ok: true; made: SeriesCommit[]; pushed: boolean } | { ok: false; error: string; made: SeriesCommit[] };
 
 /** §51 `pr_ai_draft`: Claude's text for the PR sheet, or the refusal in one line (`unsupported`: an engine before §51). */
 export type PRFillResult = { ok: true; title: string; body: string } | { ok: false; error: string; unsupported: boolean };
@@ -192,10 +192,6 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
   let lastSnapshotRuns: string | null = null;
   let previewTimer: ReturnType<typeof setTimeout> | null = null;
   let previewSeq = 0;
-  /** §53: the commits a `partial` series made before it stopped (set by its event, read by the refusal). */
-  let lastPartial: CommittedSeriesCommit[] = [];
-  // The §53 commands are not in the engine typings of an older build: they go through the same request with a cast.
-  const request53 = (cmd: object): Promise<Record<string, unknown>> => engineRequest(cmd as unknown as Parameters<typeof engineRequest>[0]) as unknown as Promise<Record<string, unknown>>;
   const hasWindow = () => typeof window !== "undefined" && typeof window.rg === "object" && window.rg !== null;
 
   return {
@@ -214,13 +210,10 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
           setFlow((f) => ({ runs: applyRun(f.runs, run) }));
           return true;
         }
-        case "committed_series" as EngineEvent["type"]: {
-          // §53: a series that stopped in the middle (`partial`) reports what it made here; its refusal only has the words.
-          const series = ev as unknown as CommittedSeries;
-          if (series.partial) lastPartial = series.commits ?? [];
-          return true;
-        }
         case "commit_draft":
+        case "committed_series": // §53
+        case "commit_hunks":
+        case "commit_split_draft":
         case "pr_ai_draft": // §51
         case "workbench_preview":
           // Replies: their request has them.
@@ -292,8 +285,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
 
     async loadCommitHunks(paths) {
       try {
-        const reply = await request53({ type: "commit_hunks", ...(paths ? { paths } : {}) });
-        return { ok: true, files: (reply.files as CommitFile[] | undefined) ?? [] };
+        const reply = await engineRequest({ type: "commit_hunks", ...(paths ? { paths } : {}) });
+        return { ok: true, files: reply.files ?? [] };
       } catch (e) {
         log(`[warn] commit_hunks: ${refusalOf(e).error}`);
         return { ok: false, error: refusalOf(e).error, unsupported: isUnknownCommand(e) };
@@ -304,8 +297,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
       if (get().flow.splitting) return { ok: false, error: "busy", unsupported: false };
       setFlow({ splitting: true });
       try {
-        const reply = await request53({ type: "commit_split_draft", ...(paths ? { paths } : {}) });
-        return { ok: true, commits: (reply.commits as CommitPlan[] | undefined) ?? [], unassigned: (reply.unassigned as CommitPart[] | undefined) ?? [] };
+        const reply = await engineRequest({ type: "commit_split_draft", ...(paths ? { paths } : {}) });
+        return { ok: true, commits: reply.commits ?? [], unassigned: reply.unassigned ?? [] };
       } catch (e) {
         log(`[warn] commit_split_draft: ${refusalOf(e).error}`);
         return { ok: false, error: refusalOf(e).error, unsupported: isUnknownCommand(e) };
@@ -316,9 +309,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
 
     async commitSeries(commits, push) {
       if (!get().state.project) return { ok: false, error: "no_project", made: [] };
-      lastPartial = [];
       try {
-        const reply = (await request53({ type: "commit_series", commits, push })) as unknown as CommittedSeries;
+        const reply = await engineRequest({ type: "commit_series", commits, push });
         await get().settle();
         set({ dismissedCommitAt: null });
         return { ok: true, made: reply.commits ?? [], pushed: reply.pushed === true };
@@ -326,7 +318,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         const r = refusalOf(e);
         log(`[warn] commit_series: ${r.error}`);
         await get().settle();
-        return { ok: false, error: r.error, made: lastPartial };
+        // §53: a series that stopped in the middle reports what it made on the refusal itself (no `partial` when the first commit failed).
+        return { ok: false, error: r.error, made: e instanceof EngineRefusal ? (e.partial?.commits ?? []) : [] };
       }
     },
 

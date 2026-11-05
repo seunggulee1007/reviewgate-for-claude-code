@@ -7,7 +7,7 @@ import { t } from "./i18n";
 import { leadingCode } from "./engineRequest";
 import { flowRefusalText } from "./flowLogic";
 import { refusalMessage } from "./errorCodes";
-import type { CommitFile, CommitPart, CommitPlan, CommittedSeriesCommit } from "../shared/commitSeries";
+import type { CommitFile, CommitPart, CommitPlan, SeriesCommit } from "@reviewgate/engine";
 
 /** `hunk`: a hunk id, or null = the whole (whole-only) file. */
 export type SplitPart = { path: string; hunk: number | null };
@@ -132,10 +132,10 @@ export function seriesBlocker(s: SplitState, busy: { splitting?: boolean; commit
   return null;
 }
 
-const shaList = (made: CommittedSeriesCommit[]): string => made.map((c) => c.shortSha).join(", ");
+const shaList = (made: SeriesCommit[]): string => made.map((c) => c.shortSha).join(", ");
 
 /** The success line: "커밋 3개를 만들었어요 (a1b2c3d, …)". */
-export function seriesDoneText(made: CommittedSeriesCommit[], pushed: boolean): string {
+export function seriesDoneText(made: SeriesCommit[], pushed: boolean): string {
   const line = t("Made {0} commit(s): {1}", made.length, shaList(made));
   return pushed ? `${line} · ${t("pushed")}` : line;
 }
@@ -167,7 +167,7 @@ export function splitRefusalText(error: string): string {
 }
 
 /** A series that stopped: what was made, then why. */
-export function seriesFailureText(error: string, made: CommittedSeriesCommit[]): string {
+export function seriesFailureText(error: string, made: SeriesCommit[]): string {
   const why = splitRefusalText(error);
   return made.length > 0 ? `${t("Made {0} commit(s): {1}", made.length, shaList(made))} — ${t("then it stopped")}: ${why}` : why;
 }
