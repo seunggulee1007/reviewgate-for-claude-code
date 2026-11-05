@@ -664,8 +664,11 @@ export class ReviewEngine {
   private readonly followAfterTool = new Map<string, { path: string | null; followUp: string | null }>();
   /** The handoff `loadSessions` took for the chat it made current: its baseline, notice and follow-up once the project is open. */
   private receivedMove: { meta: SessionMeta; handoff: ChatHandoff } | null = null;
-  /** A worktree command's card (tool_use id) → whether its path was a worktree already when the card came (then it created nothing). */
-  private readonly worktreeBeforeCommand = new Map<string, Promise<boolean>>();
+  /**
+   * A worktree command's card (tool_use id) → whether its path was a worktree already when the card came (then it created
+   * nothing), and every worktree there was then (the one the command adds is the new one, whatever its words said).
+   */
+  private readonly worktreeBeforeCommand = new Map<string, Promise<{ was: boolean; roots: string[] }>>();
   // MARK: wave2 engine-review
   /** §34.1: the range trees last pinned by `persistReview` (skip the git calls when unchanged). */
   private pinnedRangeKey = "";
@@ -6653,7 +6656,10 @@ export class ReviewEngine {
     if (!cp || !path || !request.toolUseId) return;
     this.worktreeBeforeCommand.set(
       request.toolUseId,
-      listWorktrees(cp.root).then((list) => !("refused" in moveTarget(path, cp.root, list)), () => false),
+      listWorktrees(cp.root).then(
+        (list) => ({ was: !("refused" in moveTarget(path, cp.root, list)), roots: list.map((w) => canonicalPath(w.path)) }),
+        () => ({ was: false, roots: [] }),
+      ),
     );
   }
 
@@ -6666,20 +6672,32 @@ export class ReviewEngine {
     const chat = this.currentSessionId;
     const follow = toolUseId ? this.followAfterTool.get(toolUseId) : undefined;
     if (toolUseId) this.followAfterTool.delete(toolUseId);
-    const where = path ?? follow?.path ?? null;
-    const before = toolUseId ? this.worktreeBeforeCommand.get(toolUseId) : undefined;
+    let where = path ?? follow?.path ?? null;
+    const beforeP = toolUseId ? this.worktreeBeforeCommand.get(toolUseId) : undefined;
     if (toolUseId) this.worktreeBeforeCommand.delete(toolUseId);
-    if (!cp || !chat || !where) return;
+    if (!cp || !chat) return;
+    const before = beforeP ? await beforeP : undefined;
     let isWorktree = false;
     let refusal = "not_a_worktree";
     try {
-      const target = moveTarget(where, cp.root, await listWorktrees(cp.root));
+      const list = await listWorktrees(cp.root);
+      let target = where ? moveTarget(where, cp.root, list) : ({ refused: "path_not_found" } as const);
+      // The command's words did not name the worktree it made (`"$WT"`, `$(…)`, a script): the one that appeared is it.
+      if ("refused" in target && before) {
+        const known = new Set(before.roots);
+        const added = list.filter((w) => !w.bare && !w.prunable && w.path && !known.has(canonicalPath(w.path)));
+        if (added.length === 1) {
+          this.log("info", `worktree command: ${where ?? "(no path)"} is no worktree; the one it added is ${added[0]!.path}`);
+          where = added[0]!.path;
+          target = moveTarget(where, cp.root, list);
+        }
+      }
       if ("refused" in target) refusal = target.refused;
       else {
         isWorktree = true;
         // A worktree that was there before the card (`git worktree add` refused, hidden by `| tail`) was not created by it:
         // the user's own changes there must not land in the review (its move reviews from the disk).
-        if (before && (await before)) this.log("info", `worktree command: ${target.root} was a worktree already (its review starts from the disk)`);
+        if (before?.was && path !== null && samePath(canonicalPath(where!), canonicalPath(path))) this.log("info", `worktree command: ${target.root} was a worktree already (its review starts from the disk)`);
         else {
           let roots = this.createdWorktrees.get(chat);
           if (!roots) this.createdWorktrees.set(chat, (roots = new Set()));
@@ -6698,13 +6716,14 @@ export class ReviewEngine {
       return;
     }
     const failed = (code: string) =>
-      this.fail(`This chat could not move to ${where} (${code}); it stays here.`, false, "session", { code: "chat_move_failed", path: where, detail: code });
-    if (!isWorktree) {
+      this.fail(`This chat could not move to ${where ?? "the new worktree"} (${code}); it stays here.`, false, "session", { code: "chat_move_failed", ...(where ? { path: where } : {}), detail: code });
+    if (!isWorktree || !where) {
       failed(refusal);
       return;
     }
+    const to = where;
     // On the main lane like a client's command; a refusal is said in the chat instead of a reply nobody waits for.
-    const run = this.lanes.main.then(() => (this.closed ? undefined : this.chatMove(where, true, follow.followUp)));
+    const run = this.lanes.main.then(() => (this.closed ? undefined : this.chatMove(to, true, follow.followUp)));
     this.lanes.main = run.catch((e: unknown) => {
       if (!this.closed) failed(errorMessage(e));
     });

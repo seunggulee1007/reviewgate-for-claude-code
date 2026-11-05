@@ -286,4 +286,24 @@ describe("the moved chat's review baseline (§39.4)", () => {
     expect(s.disposed).toBe(false);
   });
 
+  it("a followed command whose words name no usable path (a shell variable) follows the worktree it added", async () => {
+    const main = realpathSync(makeRepo());
+    const wt = `${main}-issue-42`;
+    dirs.push(main, wt);
+    const src = await opened(main);
+    await turn(src);
+    await src.engine.handle({ type: "send", text: "make a worktree" });
+    const s = src.session();
+    // What the card read from `WT=../x-issue-42 && git worktree add "$WT"`: a path that is no folder.
+    const parsed = join(main, "$WT");
+    s.emit({ type: "permission_request", requestId: "r1", toolName: "Bash", input: { command: `WT=${wt} && git worktree add -b issue-42 "$WT"` }, toolUseId: "b7", reason: { code: "worktree_command", message: "creates a worktree", path: parsed } });
+    await src.settle();
+    await src.engine.handle({ type: "permission_response", requestId: "r1", allow: true, follow: true });
+    sh(main, "worktree", "add", "-q", "-b", "issue-42", wt);
+    write(wt, "copied.txt", "copied\n");
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b7", path: parsed, reasonCode: "worktree_command" });
+    await src.waitFor(() => src.ofType("chat_moved").length > 0 || src.ofType("error").some((e) => e.code === "chat_move_failed"), "the followed move", 10_000);
+    expect(src.ofType("error").filter((e) => e.code === "chat_move_failed")).toEqual([]);
+    expect(src.ofType("chat_moved").at(-1)).toMatchObject({ path: wt, baseline: "head" });
+  });
 });
