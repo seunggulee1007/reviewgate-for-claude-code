@@ -9,6 +9,7 @@ import type { ToolWindow } from "./provenance.js";
 import type { ScopeNotice } from "./reviewScope.js";
 import type { RateLimitWindow } from "../protocol.js"; // MARK: wave4 w4-longwork
 import type { PermissionMode } from "../protocol.js"; // MARK: wave6 w6-terminal
+import type { AutoTurnInfo, BackgroundTask } from "../protocol.js"; // §52
 
 /**
  * A file the turn's tools touched: tool names plus the tool_use ids that touched it (edit tools by their
@@ -125,6 +126,13 @@ export type SessionEvent =
   | { type: "unprompted_denied"; toolName: string }
   /** A `result` arrived without an engine-started turn: not a turn_end — nothing to collect or count (§18). */
   | { type: "unprompted_turn_end"; sessionId: string }
+  /** §52: the live background tasks changed (REPLACE: the whole list, oldest first). */
+  | { type: "background_tasks"; tasks: BackgroundTask[] }
+  /**
+   * §52: the CLI started a turn itself (a background task ended, `/loop`, …). The session counts it as active; every tool
+   * call waits until the engine answers `autoTurnReady` (true: a review turn; false: §18 denies its changes).
+   */
+  | ({ type: "auto_turn_start"; commandUuid?: string } & AutoTurnInfo)
   /** §29: the CLI's `system/peer_message_hold` — a peer message parked (`held`), let through (`released`) or gone (`dropped` + `outcome`). */
   | { type: "peer_hold"; state: "held" | "released" | "dropped"; messageUuid: string; from: string; fromName?: string; cause?: string; outcome?: string }
   /**

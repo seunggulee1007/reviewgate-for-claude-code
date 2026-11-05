@@ -119,6 +119,42 @@ export class FakeClaudeSession implements ClaudeSessionLike {
     if (this.stopTaskResult) throw this.stopTaskResult;
   }
 
+  // §52 background work
+  backgroundWorkOn = true;
+  /** `autoTurnReady` answers, in order. */
+  readonly autoTurnAnswers: { ok: boolean; tree?: string }[] = [];
+  /** `backgroundTasks` calls (Ctrl+B), in order; `backgroundResult` is what it resolves with (an Error rejects). */
+  readonly backgroundCalls: (string | undefined)[] = [];
+  backgroundResult: boolean | Error = true;
+  /** task id → output file (`taskOutputFile`); live task ids (`isTaskLive`). */
+  readonly taskFiles = new Map<string, string>();
+  readonly liveTasks = new Set<string>();
+
+  /** Like the real session on a turn the CLI starts itself: the turn counts as active, its calls wait for the engine. */
+  emitAutoTurnStart(info: Omit<Extract<SessionEvent, { type: "auto_turn_start" }>, "type">): void {
+    this.turnActive = true;
+    this.emit({ type: "auto_turn_start", ...info });
+  }
+
+  autoTurnReady(ok: boolean, checkpointTree?: string): void {
+    this.autoTurnAnswers.push({ ok, ...(checkpointTree !== undefined ? { tree: checkpointTree } : {}) });
+    if (!ok) this.turnActive = false;
+  }
+
+  async backgroundTasks(toolUseId?: string): Promise<boolean> {
+    this.backgroundCalls.push(toolUseId);
+    if (this.backgroundResult instanceof Error) throw this.backgroundResult;
+    return this.backgroundResult;
+  }
+
+  taskOutputFile(taskId: string): string | null {
+    return this.taskFiles.get(taskId) ?? null;
+  }
+
+  isTaskLive(taskId: string): boolean {
+    return this.liveTasks.has(taskId);
+  }
+
   async dispose(): Promise<void> {
     this.disposed = true;
     this.turnActive = false;

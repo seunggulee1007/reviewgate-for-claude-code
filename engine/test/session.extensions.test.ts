@@ -215,22 +215,37 @@ describe("ClaudeSession extension options + init watchdog (faked SDK)", () => {
     expect(on.decisions.overBudget.decision).toBe("deny");
   });
 
-  it("turns the CLI's background tasks off so subagents finish inside the collected turn (CLI 2.1.303 backgrounds every Agent call)", async () => {
+  it("§52: background tasks on by default (Agent calls are kept in the turn by the hook); backgroundWork false turns them off; the environment wins", async () => {
     const prev = process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS;
     delete process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS;
     try {
       const sdk = fakeSdk();
       const s = session({}, sdk, []);
       await s.start();
-      expect(sdk.control.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe("1");
+      expect(sdk.control.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBeUndefined();
+      expect(s.backgroundWorkOn).toBe(true);
       await s.dispose();
+      // Off (the setting): as before §52 — CLI 2.1.303 backgrounds every Agent call otherwise.
+      const off = fakeSdk();
+      const o0 = session({ backgroundWork: false }, off, []);
+      await o0.start();
+      expect(off.control.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe("1");
+      expect(o0.backgroundWorkOn).toBe(false);
+      await o0.dispose();
       // An explicit value in the environment wins (developer override).
       process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = "0";
       const other = fakeSdk();
-      const o = session({}, other, []);
+      const o = session({ backgroundWork: false }, other, []);
       await o.start();
       expect(other.control.options?.env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).toBe("0");
+      expect(o.backgroundWorkOn).toBe(true);
       await o.dispose();
+      process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = "1";
+      const forced = fakeSdk();
+      const f = session({}, forced, []);
+      await f.start();
+      expect(f.backgroundWorkOn).toBe(false);
+      await f.dispose();
     } finally {
       if (prev === undefined) delete process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS;
       else process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS = prev;

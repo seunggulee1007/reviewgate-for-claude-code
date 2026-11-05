@@ -654,13 +654,15 @@ export class ReviewGate {
    * A plain `send` while files still await review: the user is asking a question, not reviewing, so
    * the review survives untouched. Records the patch hashes of the already-accepted files (same rule
    * as `prepareRequestChanges`) and marks the turn so A is kept and the list is merged, not replaced.
-   * A no-op when nothing is under review. Call before `beginSend()`.
+   * A no-op when nothing is under review (unless `carry`, §52). Call before `beginSend()`.
    */
-  async prepareAnswer(): Promise<void> {
+  async prepareAnswer(carry = false): Promise<void> {
     const cp = this.checkpoint;
     const start = this.turnStartTree;
     const end = this.turnEndTree;
-    if (!this.hasPendingReview || !cp || start === null || end === null) return;
+    // §52 `carry`: a background process may have written since B — the turn keeps A even with nothing pending, so what it
+    // wrote reaches this turn's review instead of a fresh A (accepted files whose patch is unchanged stay accepted).
+    if ((!this.hasPendingReview && !carry) || !cp || start === null || end === null) return;
     this.acceptedPatchHashes = await this.hashAccepted(cp, start, end);
     this.answerEndTree = end;
     this.heldEndTree = end; // §34.2: still what the review shows while the answer runs

@@ -259,6 +259,13 @@ export type HookContext = {
    * collects it into the review. Undefined counts as running (test contexts). docs/PROTOCOL.md §18.
    */
   turnActive?: boolean;
+  /**
+   * §52: set while the engine takes a turn the CLI started itself (snapshot A first): every call waits for it, then the
+   * guard decides with `turnActive` as the engine left it.
+   */
+  adoption?: Promise<void>;
+  /** §52: background work is on — Agent / Task calls get `run_in_background: false` so they finish inside the turn. */
+  keepAgentsInTurn?: boolean;
   /** A tool call was blocked by the unprompted-turn guard (`unpromptedBlocked`). */
   onUnprompted?: (toolName: string) => void;
   /** Set when the budget hook interrupted the turn; claude.ts reports `stopReason: "interrupted"`. */
@@ -281,6 +288,14 @@ export type HookContext = {
 
 function allow(): HookJSONOutput {
   return {};
+}
+
+const SUBAGENT_TOOLS_RE = /^(Agent|Task)$/;
+
+/** §52: the same decision, with the call's input replaced (no decision: the CLI's own permission flow, with this input). */
+function withUpdatedInput(out: HookJSONOutput, updatedInput: Record<string, unknown>): HookJSONOutput {
+  const spec = (out as { hookSpecificOutput?: Record<string, unknown> }).hookSpecificOutput;
+  return { ...out, hookSpecificOutput: { ...(spec ?? {}), hookEventName: "PreToolUse", updatedInput } } as HookJSONOutput;
 }
 
 function denyPre(reason: string): HookJSONOutput {
@@ -378,7 +393,9 @@ export function planModeBlocked(
 }
 
 /** Denies (and reports) a call made outside an engine-started turn; undefined when the guard does not apply. */
-function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext): HookJSONOutput | undefined {
+async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext): Promise<HookJSONOutput | undefined> {
+  // §52: a turn Claude started itself is being taken as a review turn — nothing runs before its snapshot A.
+  if (ctx.adoption) await ctx.adoption;
   if (!unpromptedBlocked(toolName, input, ctx)) return undefined;
   ctx.onUnprompted?.(toolName);
   return denyPre(UNPROMPTED_REASON);
@@ -605,7 +622,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const b = ctx.budget;
     const ti = toolInput(input);
-    const unprompted = guardUnprompted(input.tool_name, ti, ctx);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
     const file = toolFile(ti, ctx.cwd);
     // Never into git's own state (hooks, config, refs): checked before anything can allow it.
@@ -676,7 +693,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const b = ctx.budget;
     const ti = toolInput(input);
-    const unprompted = guardUnprompted(input.tool_name, ti, ctx);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
     await countAfterDeny(ctx);
@@ -719,12 +736,17 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (/^(Edit|Write|MultiEdit|NotebookEdit|Bash)$/.test(input.tool_name)) return allow();
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const ti = toolInput(input);
-    const unprompted = guardUnprompted(input.tool_name, ti, ctx);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
     await countAfterDeny(ctx);
     const worktree = await guardWorktreeTools(input.tool_name, toolUseIdOf(input), ti, ctx);
     if (worktree) return worktree;
     // An MCP tool may write files (an IDE's MCP server, a filesystem server): its window attributes them (§31).
+    // §52: with background work on, a subagent still finishes inside the turn that started it (its edits are that turn's
+    // review): the CLI backgrounds an Agent call unless its input says `run_in_background: false` (2.1.318).
+    if (ctx.keepAgentsInTurn && SUBAGENT_TOOLS_RE.test(input.tool_name) && ti.run_in_background !== false) {
+      return withUpdatedInput(askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input)), { ...ti, run_in_background: false });
+    }
     if (isMcpTool(input.tool_name)) {
       openWindow(ctx, input);
       // §33.9: a writing MCP call that names one of Claude Code's own settings files reaches the card with the reason.

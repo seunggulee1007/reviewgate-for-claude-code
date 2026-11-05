@@ -171,6 +171,7 @@
     "peerInbound": "ask",
     "peerInbox": [],
     "externalTurn": null,
+    "backgroundTasks": [],
     "peerTurn": null,
     "canRestart": true
   },

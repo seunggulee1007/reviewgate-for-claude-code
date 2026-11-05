@@ -6270,3 +6270,99 @@ Now every field has its name on the left (`PRSheetRow`), and a write of unchange
   `Engine/CommitFormatProtocol.swift` `PRAiDraftReply`, `Engine/EngineProtocol.swift`, `Session/AppState+TeamFormat.swift`
   `writePRDraft`, `Session/WorkflowLogic.swift`; App `UI/Sidebar/WorkbenchSheets.swift` `CreatePRSheet`,
   `UI/Sidebar/TeamFormatViews.swift`; `sidecar/test/driver-praidraft.mjs`).
+
+## 52. Background work and turns Claude starts itself
+
+In the terminal, Claude can run a command in the background (`run_in_background`, Ctrl+B, Monitor, `/tasks`). When the
+command ends, Claude goes on by itself. A `/loop` or cron job also starts turns on a schedule. The app turned all of this
+off (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, §13) and denied every change in a turn the CLI started itself (§18).
+Now it works as in the terminal, and the review still sees everything.
+
+Verified with CLI 2.1.318 over stream-json (haiku):
+
+- **Background Bash.** It gives `task_started {task_type: "local_bash", is_backgrounded: true}`, an immediate tool result
+  and the turn's `result`. When the command ends, the CLI sends `task_updated` → `task_notification` →
+  `background_tasks_changed`. Then it runs a turn of its own **without** `command_lifecycle` frames: `system/init`, text
+  and tools, then a `result` with `origin {kind: "task-notification"}`.
+- **`/loop 1m …`.** It creates a `CronCreate` job. Each run is `command_lifecycle started` of a command that is not ours,
+  with `wakeup_source: "schedule_wakeup"`, then `system/init`, the turn, `result` and `completed`.
+- **Agent calls.** Without the variable, the CLI runs an `Agent` call in the background unless its input says
+  `run_in_background: false`. A PreToolUse hook's `updatedInput` with that field keeps it in the turn
+  (`is_backgrounded: false`, one `result`).
+
+```ts
+type BackgroundTask = {
+  taskId: string;
+  kind: "bash" | "monitor" | "agent" | "other";  // task_type local_bash / *monitor* / local_agent / anything else
+  description: string;
+  toolUseId: string | null;     // the call that started it
+  turn: number | null;          // the transcript turn of that call
+  startedAt: string;            // ISO-8601
+  hasOutput: boolean;           // its output file is known (task_output)
+};
+type AutoTurnTrigger = "background" | "schedule" | "continue";
+// settings.backgroundWork?: boolean                       // default true
+// state.session.backgroundTasks: BackgroundTask[]         // the live ones, oldest first
+// commands: task_stop { taskId } · task_background { toolUseId? } → { moved: boolean } · task_output { taskId } → task_output
+// event / row: auto_turn { turn; trigger; task?: { taskId; description; status; summary? }; wakeupSource?: string }
+// reply: task_output { taskId; text; truncated: boolean; running: boolean }
+```
+
+- **`settings.backgroundWork`** (default on). It applies at the next session start.
+  - On: the session starts without `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`; an explicit value in the environment still
+    wins.
+  - Off: as before. The variable is `1`, and a turn the CLI starts is denied (§18).
+- **Agents stay in the turn.** With background work on, the PreToolUse hook gives every `Agent` / `Task` call
+  `updatedInput {…, run_in_background: false}` (main thread and subagents), so a subagent's edits stay in the review of
+  the turn that started it. An agent whose definition always runs in the background is still backgrounded. Its calls
+  after the turn's end are denied (§18).
+- **`state.session.backgroundTasks`** follows `background_tasks_changed`.
+  - Its `tasks` replace the list. `ambient` tasks are left out.
+  - `task_started` adds `toolUseId`, `kind` and `turn`. The output file comes from the Bash call's result ("Output is
+    being written to: …") or from `task_notification.output_file`.
+  - The list is emptied when the CLI process ends, because the CLI's tasks end with it.
+- **`task_stop {taskId}`** calls `Query.stopTask`. The task ends with `task_notification {status: "stopped"}`. It is
+  refused `no_session`, `task_unknown` (not in the list) or `task_stop_failed:<why>`.
+- **`task_background {toolUseId?}`** is Ctrl+B. It calls `Query.backgroundTasks(toolUseId)`: the running Bash call (all
+  foreground tasks without an id) returns at once and keeps running in the background. The reply is `{moved}`. It is
+  refused `no_session`, `background_off` (the setting, or the variable in the environment) or
+  `task_background_failed:<why>`.
+- **`task_output {taskId}`** replies with the last 64 KiB of the task's output file (`truncated` when cut;
+  `running: false` once it has ended). It is refused `task_unknown` or `no_output`. Only a file the CLI named for that
+  task is read.
+
+### 52.1 A turn Claude starts itself is a review turn
+
+With background work on, the engine takes such a turn as its own review turn, once a turn of ours has run in this CLI
+process:
+
+- **Detection** (`ClaudeSession`):
+  - `command_lifecycle started` of a command that is not ours, with `wakeup_source` → trigger **`schedule`** (`/loop`,
+    cron, ScheduleWakeup). The command becomes ours, so its `result` is the turn's end. If it starts while a turn of ours
+    runs, it joins that turn.
+  - `system/init` while no turn of ours runs and no other command runs → trigger **`background`** when a background
+    task's `task_notification` arrived since our last turn, otherwise **`continue`** (for example `/goal`).
+  - A peer message's command (§29) is never taken this way.
+- **Taking it.**
+  - The session marks the turn active at once, so its text is not `unprompted`.
+  - Every tool call waits in the PreToolUse hook (and `canUseTool`) until the engine is done.
+  - The engine waits for a collection or revert in flight, then runs `peer_accept`'s steps (§29): `followHeadMove`,
+    `prepareAnswer` (a standing review keeps A), snapshot A, `beginTurn` with no user message, the §31 / §32 turn-start
+    state and a §26 checkpoint. The prompt is `[auto] <label>`.
+  - It emits **`auto_turn`** and records its row, which opens the turn, like a peer message's row.
+  - From there it is an ordinary turn: cards, budget, `turn_end`, collection, `turn_summary`.
+  - When the gate cannot take it (a collection that failed, the snapshot failing, no checkpoint), the session falls
+    back to §18: its calls are denied with the usual notice.
+- **Changes between turns.** While a background task is live after a turn's collection (or one ran since), the next
+  turn of any kind keeps the last review's A (`prepareAnswer` even with nothing pending; accepted files whose patch is
+  unchanged stay accepted). So what a background process wrote after B shows in that turn's review as `external`
+  (§31.1), instead of becoming part of a fresh A. `finish_review` drops A, so a turn after it starts fresh.
+- **Labels.** `auto_turn.task` names the background task whose notification came last (description, `completed` /
+  `failed` / `stopped`, the CLI's summary). `wakeupSource` is the lifecycle frame's own value.
+- **Mac / Electron.**
+  - A "백그라운드 N" chip next to the HUD opens the list: each task with its description, kind and time, plus
+    [출력 보기] (`task_output`) and [중지] (`task_stop`).
+  - A running Bash row has [백그라운드로] (⌃B), which sends `task_background {toolUseId}`.
+  - The `auto_turn` row reads "백그라운드 작업이 끝나 Claude가 이어서 했어요 · <description>" / "예약된 작업이 실행됐어요
+    (/loop)" / "Claude가 이어서 작업했어요".
+  - Settings › 고급 has "백그라운드 작업과 /loop 허용". It takes effect when the session restarts.

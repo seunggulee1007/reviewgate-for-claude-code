@@ -61,6 +61,8 @@ import { autoModeDeniedNotice, autoModeRefusal, autoModeUnavailableNotice, type 
 import type { ModelCost } from "../protocol.js";
 import { modelCostDelta } from "./modelCost.js";
 import type { StatusUsage } from "../statusline/input.js"; // MARK: wave6 w6-statusline (§44.2)
+import type { AutoTurnInfo, BackgroundTask } from "../protocol.js"; // §52
+import { envTruthy, liveTasksOf, outputPathOf, taskKind } from "./background.js"; // §52
 
 /** What a session needs from the client settings (`Settings` minus the PR / toolchain fields). */
 export type SessionSettings = {
@@ -111,6 +113,8 @@ export type SessionSettings = {
   // MARK: wave4 w4-longwork
   /** §38.2: the CLI's `maxTurns` (round trips of one message; clamped to 10–1000, default 200). */
   maxTurns?: number;
+  /** §52: background tasks on (default) and turns Claude starts itself taken as review turns; false: the §18 behavior. */
+  backgroundWork?: boolean;
 };
 
 /** An image content block of a user message (§24). */
@@ -190,6 +194,19 @@ export interface ClaudeSessionLike {
   readonly mcpToolHints?: McpToolHints;
   /** MARK: wave3 engine-agents — §36.2: stops one running task (a subagent, by its task id); the turn goes on. */
   stopTask?(taskId: string): Promise<void>;
+  /** §52: Ctrl+B — `Query.backgroundTasks(toolUseId)`; true when a task moved. Rejects when background work is off. */
+  backgroundTasks?(toolUseId?: string): Promise<boolean>;
+  /** §52: the output file the CLI named for a background task (null: none known / not a task of this process). */
+  taskOutputFile?(taskId: string): string | null;
+  /** §52: whether that background task is still live. */
+  isTaskLive?(taskId: string): boolean;
+  /** §52: background work is on in this process (the setting, and no `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` in the environment). */
+  readonly backgroundWorkOn?: boolean;
+  /**
+   * §52: the engine's answer to `auto_turn_start` — true: the turn is a review turn (snapshot A taken; the calls waiting
+   * go on); false: §18 applies (its changes are denied).
+   */
+  autoTurnReady?(ok: boolean, checkpointTree?: string): void;
   /** MARK: wave6 w6-statusline — §44.2: what the status line's stdin takes from the live session (optional: test doubles). */
   readonly statusUsage?: SessionStatusUsage;
 }
@@ -374,6 +391,24 @@ export class ClaudeSession implements ClaudeSessionLike {
   private autoUnavailableNoticed = false;
   /** MARK: wave6 w6-terminal — §44.1: `setPermissionMode` is waiting for the CLI (its own mode report is no news). */
   private modeSwitching = false;
+  // ---- §52 background work
+  /** Background tasks on in this process (setting, environment). */
+  private bgOn = false;
+  /** The live background tasks (`background_tasks_changed`, oldest first) with what `task_started` added. */
+  private bgTasks = new Map<string, BackgroundTask>();
+  /** task id → its output file; Bash tool_use id → the output file its result named. */
+  private bgOutputFiles = new Map<string, string>();
+  private bgOutputByCall = new Map<string, string>();
+  /** task_started details that came before (or without) the list's entry. */
+  private bgStarted = new Map<string, { toolUseId: string | null }>();
+  /** task id → the tool call that started it (every `task_started`). */
+  private taskCalls = new Map<string, string | null>();
+  /** The last background task notification since our last turn ended (`auto_turn.task`). */
+  private bgNotice: NonNullable<AutoTurnInfo["task"]> | null = null;
+  /** A turn of ours has run in this process (a turn the CLI starts before that is never taken). */
+  private hadOwnTurn = false;
+  /** §52: the engine is taking a turn the CLI started (every call waits for `ready`). */
+  private adopting: { resolve: () => void; commandUuid: string | null } | null = null;
 
   constructor(opts: ClaudeSessionOptions) {
     this.opts = opts;
@@ -447,7 +482,11 @@ export class ClaudeSession implements ClaudeSessionLike {
     // after our turn_end never reach the review and the next send's snapshot A swallows them. Subagents
     // and Bash must run inside the turn the gate collects, so background tasks are off unless the
     // environment explicitly says otherwise (verified: is_backgrounded false, one result per send).
-    env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS ??= "1";
+    // §52: with background work on (the default) they run as in the terminal — the PreToolUse hook keeps Agent calls in the
+    // turn (`run_in_background: false`), and a turn the CLI starts itself afterwards is taken as a review turn.
+    if (s.backgroundWork === false) env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS ??= "1";
+    this.bgOn = !envTruthy(env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS);
+    this.hookCtx.keepAgentsInTurn = this.bgOn;
     // MARK: wave3 engine-flow — §36.13: `/code-review` in this chat reports its findings through ReportFindings (a
     // read-only tool, hooks.ts) and the engine shows them on the diff lines; an explicit value in the environment wins.
     env.CLAUDE_CODE_REPORT_FINDINGS ??= "1";
@@ -633,6 +672,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.hookBlockedThisTurn = false; // MARK: wave4 w4-longwork
     this.continuationBlock = null; // MARK: wave4c w4c-trust
     this.hookCtx.checkpointTree = checkpointTree;
+    this.hadOwnTurn = true;
+    this.bgNotice = null;
     this.setTurnActive(true);
     // Images first, then the text (the order the Messages API recommends); a text-only message stays a plain string.
     const content: SDKUserMessage["message"]["content"] = images.length === 0
@@ -645,6 +686,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     const uuid = randomUUID();
     this.ownCommands.add(uuid);
     if (this.ownCommands.size > MAX_OWN_COMMANDS) this.ownCommands.delete(this.ownCommands.values().next().value!);
+    // §52: a send that slipped in while a turn Claude started is being taken joins it — the turn waits for this command.
+    if (this.adopting) this.steered.add(uuid);
     this.inbox.push({
       type: "user",
       uuid,
@@ -851,6 +894,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.pendingPermissions.clear();
     for (const w of [...this.peerWaiters]) w.done();
     if (this.peerTurnTimer) clearTimeout(this.peerTurnTimer);
+    if (this.adopting) this.autoTurnReady(false); // §52: nothing waits on a session that is going away
     this.abortController.abort();
     const q = this.q;
     if (!q) return;
@@ -1036,7 +1080,7 @@ export class ClaudeSession implements ClaudeSessionLike {
 
   /** §29: the unprompted-turn guard is lifted for our turn only — not while a command of someone else runs in it. */
   private syncGuard(): void {
-    this.hookCtx.turnActive = this.turnActive && (this.externalCommands.size === 0 || this.ownRunning !== null);
+    this.hookCtx.turnActive = this.turnActive && this.adopting === null && (this.externalCommands.size === 0 || this.ownRunning !== null);
   }
 
   /** The unprompted-turn guard (hooks.ts `unpromptedBlocked`) denied a call: log it and tell the engine. */
@@ -1254,6 +1298,9 @@ export class ClaudeSession implements ClaudeSessionLike {
           return;
         }
         if (msg.subtype === "init") {
+          // §52: a CLI turn nobody asked for (no turn of ours, no command of someone else's): a background task ended
+          // (task-notification) or Claude goes on by itself (`/goal`) — taken as a review turn.
+          if (this.canAdopt() && !this.turnActive && this.externalCommands.size === 0) this.beginAutoTurn(this.bgNotice ? "background" : "continue", null);
           this.currentSessionId = msg.session_id;
           this.currentModel = msg.model;
           this.followCliMode(msg.permissionMode); // MARK: wave6 w6-terminal (§44.1)
@@ -1303,6 +1350,8 @@ export class ClaudeSession implements ClaudeSessionLike {
           this.turnCompacted = { trigger: meta?.trigger === "auto" ? "auto" : "manual", ...(typeof pre === "number" && pre >= 0 ? { preTokens: pre } : {}) };
           this.activity({ kind: "thinking", detail: "compacted" });
         } else if (msg.subtype === "task_started") {
+          this.taskCalls.set(msg.task_id, msg.tool_use_id ?? null);
+          if (msg.is_backgrounded === true) this.noteBackgroundStart(msg.task_id, msg.tool_use_id ?? null);
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1334,6 +1383,8 @@ export class ClaudeSession implements ClaudeSessionLike {
           });
         } else if (msg.subtype === "task_updated") {
           const p = msg.patch;
+          // §52: Ctrl+B (`backgroundTasks`) moved a foreground task to the background.
+          if (p.is_backgrounded === true) this.noteBackgroundStart(msg.task_id, this.taskCalls.get(msg.task_id) ?? null);
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1347,6 +1398,7 @@ export class ClaudeSession implements ClaudeSessionLike {
             },
           });
         } else if (msg.subtype === "task_notification") {
+          this.noteBackgroundEnd(msg as unknown as Record<string, unknown>);
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1358,6 +1410,8 @@ export class ClaudeSession implements ClaudeSessionLike {
               ...(msg.usage ? { usage: { tokens: msg.usage.total_tokens, toolUses: msg.usage.tool_uses, durationMs: msg.usage.duration_ms } } : {}),
             },
           });
+        } else if ((msg as { subtype?: string }).subtype === "background_tasks_changed") {
+          this.onBackgroundTasks((msg as { tasks?: unknown }).tasks); // §52
         } else if (msg.subtype === "commands_changed") {
           // MARK: wave3 engine-session — §36.5: the whole list again (skills found while working); it replaces the old one.
           this.emit({ type: "commands_info", commands: Array.isArray(msg.commands) ? msg.commands : [] });
@@ -1618,6 +1672,138 @@ export class ClaudeSession implements ClaudeSessionLike {
     }
   }
 
+  // ------------------------------------------------------------------ §52 background work
+
+  get backgroundWorkOn(): boolean {
+    return this.bgOn;
+  }
+
+  /** A turn the CLI starts itself may be taken: background work on, a turn of ours ran in this process, still alive. */
+  private canAdopt(): boolean {
+    return this.bgOn && this.hadOwnTurn && this.initialized && !this.disposing && this.adopting === null;
+  }
+
+  /**
+   * §52: the CLI runs a turn nobody asked for. It counts as active at once (its text is not `unprompted`), but every tool
+   * call waits (hooks / canUseTool) until the engine answers `autoTurnReady` — snapshot A comes first.
+   */
+  private beginAutoTurn(trigger: AutoTurnInfo["trigger"], commandUuid: string | null, wakeupSource?: string): void {
+    this.resetTurn();
+    this.reportedApiErrors = new Set();
+    this.hookBlockedThisTurn = false;
+    this.continuationBlock = null;
+    const task = trigger === "background" ? this.bgNotice : null;
+    this.bgNotice = null;
+    let resolve!: () => void;
+    this.hookCtx.adoption = new Promise<void>((r) => (resolve = r));
+    this.adopting = { resolve, commandUuid };
+    if (commandUuid) this.ownRunning = commandUuid;
+    this.setTurnActive(true);
+    this.opts.log("info", `Claude Code started a turn itself (${trigger}${wakeupSource ? `, ${wakeupSource}` : ""}): taking it as a review turn`);
+    this.emit({ type: "auto_turn_start", trigger, ...(commandUuid ? { commandUuid } : {}), ...(task ? { task: { ...task } } : {}), ...(wakeupSource ? { wakeupSource } : {}) });
+  }
+
+  autoTurnReady(ok: boolean, checkpointTree?: string): void {
+    const a = this.adopting;
+    if (!a) return;
+    this.adopting = null;
+    this.hookCtx.adoption = undefined;
+    if (ok) {
+      // The turn may already have ended (a short answer before the engine was ready): it stays ended.
+      this.hookCtx.checkpointTree = checkpointTree;
+      this.hadOwnTurn = true;
+      this.syncGuard();
+    } else {
+      // §18 as before: its changes are denied; a scheduled run is someone else's command again.
+      if (a.commandUuid) {
+        this.ownCommands.delete(a.commandUuid);
+        if (this.ownRunning === a.commandUuid) this.ownRunning = null;
+        if (!this.externalCommands.has(a.commandUuid)) {
+          this.externalCommands.add(a.commandUuid);
+          if (this.externalCommands.size === 1) this.emit({ type: "external_turn", running: true, commandUuid: a.commandUuid });
+        }
+      }
+      this.setTurnActive(false);
+    }
+    a.resolve();
+  }
+
+  async backgroundTasks(toolUseId?: string): Promise<boolean> {
+    if (!this.bgOn) throw new Error("background work is off");
+    const q = this.requireQuery() as Query & { backgroundTasks?: unknown };
+    if (typeof q.backgroundTasks !== "function") throw new Error("this Claude Agent SDK cannot move a task to the background");
+    return await (q.backgroundTasks as (id?: string) => Promise<boolean>).call(q, toolUseId);
+  }
+
+  taskOutputFile(taskId: string): string | null {
+    return this.bgOutputFiles.get(taskId) ?? null;
+  }
+
+  isTaskLive(taskId: string): boolean {
+    return this.bgTasks.has(taskId);
+  }
+
+  /** `background_tasks_changed`: the whole live set (REPLACE), ambient tasks left out. */
+  private onBackgroundTasks(raw: unknown): void {
+    const next = new Map<string, BackgroundTask>();
+    for (const t of liveTasksOf(raw)) {
+      const had = this.bgTasks.get(t.taskId);
+      const started = this.bgStarted.get(t.taskId);
+      const toolUseId = had?.toolUseId ?? started?.toolUseId ?? null;
+      next.set(t.taskId, {
+        taskId: t.taskId,
+        kind: taskKind(t.taskType),
+        description: t.description || had?.description || "",
+        toolUseId,
+        turn: had?.turn ?? null,
+        startedAt: had?.startedAt ?? new Date().toISOString(),
+        hasOutput: this.bgOutputFiles.has(t.taskId) || (toolUseId !== null && this.bgOutputByCall.has(toolUseId)),
+      });
+      if (toolUseId !== null && !this.bgOutputFiles.has(t.taskId)) {
+        const out = this.bgOutputByCall.get(toolUseId);
+        if (out) this.bgOutputFiles.set(t.taskId, out);
+      }
+    }
+    const same = next.size === this.bgTasks.size && [...next].every(([id, t]) => JSON.stringify(this.bgTasks.get(id)) === JSON.stringify(t));
+    this.bgTasks = next;
+    if (!same) this.emitBackgroundTasks();
+  }
+
+  private noteBackgroundStart(taskId: string, toolUseId: string | null): void {
+    this.bgStarted.set(taskId, { toolUseId });
+    const t = this.bgTasks.get(taskId);
+    if (t && t.toolUseId === null && toolUseId !== null) {
+      this.bgTasks.set(taskId, { ...t, toolUseId, hasOutput: t.hasOutput || this.bgOutputByCall.has(toolUseId) });
+      this.emitBackgroundTasks();
+    }
+  }
+
+  private noteBackgroundOutput(toolUseId: string, path: string): void {
+    this.bgOutputByCall.set(toolUseId, path);
+    for (const [id, t] of this.bgTasks) {
+      if (t.toolUseId !== toolUseId) continue;
+      this.bgOutputFiles.set(id, path);
+      if (!t.hasOutput) {
+        this.bgTasks.set(id, { ...t, hasOutput: true });
+        this.emitBackgroundTasks();
+      }
+    }
+  }
+
+  /** `task_notification` of a background task: its output file, and what the next turn Claude starts is about. */
+  private noteBackgroundEnd(m: Record<string, unknown>): void {
+    const id = typeof m.task_id === "string" ? m.task_id : "";
+    if (!id || !this.bgStarted.has(id)) return;
+    if (typeof m.output_file === "string" && m.output_file) this.bgOutputFiles.set(id, m.output_file);
+    const description = this.bgTasks.get(id)?.description ?? "";
+    const summary = typeof m.summary === "string" && m.summary ? m.summary : undefined;
+    this.bgNotice = { taskId: id, description, status: typeof m.status === "string" ? m.status : "completed", ...(summary ? { summary } : {}) };
+  }
+
+  private emitBackgroundTasks(): void {
+    this.emit({ type: "background_tasks", tasks: [...this.bgTasks.values()].map((t) => ({ ...t })) });
+  }
+
   // ------------------------------------------------------------------ §29 peer messages, turn ownership
 
   /**
@@ -1686,13 +1872,22 @@ export class ClaudeSession implements ClaudeSessionLike {
   }
 
   /** `command_lifecycle {command_uuid, state}`: queued → started → completed / cancelled. */
-  private onLifecycle(f: { command_uuid?: unknown; state?: unknown }): void {
+  private onLifecycle(f: { command_uuid?: unknown; state?: unknown; wakeup_source?: unknown }): void {
     const id = typeof f.command_uuid === "string" ? f.command_uuid : "";
     const state = typeof f.state === "string" ? f.state : "";
     if (!id || !state) return;
     this.sawLifecycle = true;
     if (state === "queued") return;
     if (state === "started") {
+      const wakeup = typeof f.wakeup_source === "string" && f.wakeup_source ? f.wakeup_source : null;
+      if (wakeup !== null && !this.ownCommands.has(id) && !this.releasedPeers.has(id) && this.canAdopt()) {
+        // §52: a scheduled run (`/loop`, cron, ScheduleWakeup) is ours: it joins the turn that runs, or becomes a review turn.
+        this.ownCommands.add(id);
+        if (!this.turnActive) {
+          this.beginAutoTurn("schedule", id, wakeup);
+          return;
+        }
+      }
       if (this.ownCommands.has(id) || this.releasedPeers.has(id)) {
         this.ownRunning = id;
         if (this.releasedPeers.has(id) || this.steered.has(id)) this.peerStarted.add(id);
@@ -1827,6 +2022,11 @@ export class ClaudeSession implements ClaudeSessionLike {
     const truncated = text.length > PREVIEW_CHARS;
     const bash = this.bashCalls.get(toolUseId);
     this.bashCalls.delete(toolUseId);
+    // §52: a Bash call that went to the background (run_in_background, Ctrl+B) names its output file.
+    if (bash && !isError) {
+      const out = outputPathOf(raw);
+      if (out) this.noteBackgroundOutput(toolUseId, out);
+    }
     const kept = bash && truncated ? keptOutput(text) : undefined;
     const testOutcome = bash ? detectTestOutcome(bash.command, isError, text, bash.background, this.opts.testCommandPatterns?.() ?? []) : undefined;
     // §34.8: what an Agent / Task call returns is its subagent's report — kept for the turn's `why` (never on the wire).
@@ -1850,6 +2050,7 @@ export class ClaudeSession implements ClaudeSessionLike {
   // ------------------------------------------------------------------ permissions
 
   private readonly canUseTool: CanUseTool = async (toolName, input, options) => {
+    if (this.hookCtx.adoption) await this.hookCtx.adoption; // §52: nothing runs before the engine took the turn
     // `ExitPlanMode` (CLI 2.1.275+) must never reach a permission card: allowing it lets the very
     // same turn leave plan mode and implement. We take its plan text, hand it to the engine as a
     // proposal and deny the tool, so the turn ends with the plan awaiting `plan_response`.

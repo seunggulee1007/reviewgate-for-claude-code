@@ -193,6 +193,8 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import type { AutoTurnInfo, BackgroundTask, TaskBackgroundEvent, TaskOutputEvent } from "./protocol.js"; // §52
+import { autoTurnPrompt, readTail } from "./session/background.js";
 import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT_SYSTEM, prAiDraftPrompt } from "./review/prAiDraft.js";
 import { isAbsolute } from "node:path";
 import { PreReviewRunner } from "./review/prereview.js";
@@ -637,6 +639,13 @@ export class ReviewEngine {
   private peerTurn: { messageIds: string[]; fromNames: string[] } | null = null;
   /** The unprompted turn running now delivered a peer message: a card says it, not the §18 banner. */
   private externalPeerEpisode = false;
+  // ---- §52 background work
+  /** Session events held while a turn Claude started is being taken (snapshot A first); replayed in order after it. */
+  private adoptQueue: { source: ClaudeSessionLike; ev: SessionEvent }[] | null = null;
+  /** A background task was live when the last turn was collected (or after): the next turn keeps A (§52.1). */
+  private bgCarry = false;
+  /** The collection of the turn that ended last (a turn Claude starts right after it waits for it). */
+  private collection: Promise<void> | null = null;
   /** An automatic `peer_accept` (mode auto) is queued on the main lane. */
   private peerAutoQueued = false;
   /** Held messages whose release failed once: `auto` leaves them to the user (no retry loop). */
@@ -1395,6 +1404,13 @@ export class ReviewEngine {
       case "stop_agent":
         await this.stopAgent(cmd.toolUseId);
         return;
+      case "task_stop": // §52
+        await this.taskStop(cmd.taskId);
+        return;
+      case "task_background":
+        return this.taskBackground(cmd.toolUseId);
+      case "task_output":
+        return this.taskOutput(cmd.taskId);
       // MARK: wave3 engine-session
       case "retry_extensions":
         await this.retryExtensions();
@@ -2942,6 +2958,7 @@ export class ReviewEngine {
           initTimeoutMs: initStallLimit(s.extensionsInitTimeoutMs ?? EXTENSIONS_INIT_TIMEOUT_MS, this.startHistory),
           systemPromptAppend: s.systemPromptAppend,
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
+          backgroundWork: s.backgroundWork !== false, // §52
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
           bashAllowPatterns: [...(s.bashAllowPatterns ?? [])],
@@ -3159,7 +3176,7 @@ export class ReviewEngine {
     const mentions = opts.mentions ?? [];
     const images = opts.images ?? [];
     await this.followHeadMove();
-    await this.gate.prepareAnswer();
+    await this.gate.prepareAnswer(this.takeBgCarry());
     // MARK: wave2 check-engine — snapshot A first, the gate closed meanwhile: a failure refuses the send with nothing
     // of it done (no user message row, the chat's title / lastUserText, the review-summary prefix, the notes and a
     // pending plan all stay), so the client keeps the message instead of dropping it on an `ok`.
@@ -5286,7 +5303,7 @@ export class ReviewEngine {
     const slices = this.slices();
     if (!canSend(slices)) throw new CommandRefused(`gate_closed:${this.closedReason(slices)}`);
     await this.followHeadMove();
-    await this.gate.prepareAnswer();
+    await this.gate.prepareAnswer(this.takeBgCarry());
     // MARK: wave2 check-engine — §35.8: snapshot A first, the gate closed meanwhile (like `send`, §35.1): a failure, or a
     // message held while it was taken, leaves nothing of the turn behind (turn counter, notes, round, per-turn banners).
     const keptA = this.gate.keepsTurnStart;
@@ -5418,6 +5435,7 @@ export class ReviewEngine {
 
   /** The session (and what its CLI held) is gone: held / running messages are discarded (rows), the external turn ends. */
   private endPeerState(): void {
+    this.endBackgroundState(); // §52: the CLI's tasks end with its process
     for (const m of [...this.peerInbox.values()]) {
       const gone: PeerMessage = { ...m, state: "dropped", outcome: "discarded" };
       this.recordPeer(gone);
@@ -5538,6 +5556,11 @@ export class ReviewEngine {
   private onSessionEvent(source: ClaudeSessionLike, ev: SessionEvent): void {
     if (this.session !== source || this.closed) {
       if (ev.type === "error" || ev.type === "closed") this.log("debug", `stale session ${ev.type} ignored`);
+      return;
+    }
+    // §52.1: while a turn Claude started is being taken, its events wait (in order) for the turn's start.
+    if (this.adoptQueue !== null && ev.type !== "closed" && !(ev.type === "error" && ev.fatal)) {
+      this.adoptQueue.push({ source, ev });
       return;
     }
     if (TURN_OUTPUT_EVENTS.has(ev.type)) {
@@ -5825,7 +5848,13 @@ export class ReviewEngine {
         this.proposePlan(ev.planFiles);
         this.proposedPlanKeys.clear();
         this.touch();
-        void this.finishTurn(ev.toolFiles, ev.stopReason, ev.usage, ev.toolWindows ?? []);
+        // §52: B is taken now — a background task still live may write after it (the next turn keeps A).
+        if ((this.sessionState.backgroundTasks ?? []).length > 0) this.bgCarry = true;
+        const collection = this.finishTurn(ev.toolFiles, ev.stopReason, ev.usage, ev.toolWindows ?? []);
+        this.collection = collection;
+        void collection.finally(() => {
+          if (this.collection === collection) this.collection = null;
+        });
         return;
       }
       case "activity": {
@@ -5851,6 +5880,12 @@ export class ReviewEngine {
           this.externalPeerEpisode = false;
         }
         this.touch();
+        return;
+      case "background_tasks": // §52
+        this.onBackgroundTasks(ev.tasks);
+        return;
+      case "auto_turn_start": // §52.1
+        this.onAutoTurnStart(source, ev);
         return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
@@ -6811,6 +6846,170 @@ export class ReviewEngine {
     return found;
   }
 
+  // ------------------------------------------------------------------ §52 background work
+
+  /** `task_stop {taskId}`: `Query.stopTask` for a live background task (its `task_notification` says `stopped`). */
+  private async taskStop(taskId: unknown): Promise<void> {
+    const session = this.session;
+    if (!session) throw new CommandRefused("no_session");
+    if (typeof taskId !== "string" || !(this.sessionState.backgroundTasks ?? []).some((t) => t.taskId === taskId)) throw new CommandRefused("task_unknown");
+    if (!session.stopTask) throw new CommandRefused("task_stop_failed:this Claude session cannot stop a task", { code: "task_stop_failed" });
+    try {
+      await withTimeout(session.stopTask(taskId), STOP_AGENT_TIMEOUT_MS, "stopTask");
+    } catch (e) {
+      throw new CommandRefused(`task_stop_failed:${firstLineOf(errorMessage(e))}`, { code: "task_stop_failed" });
+    }
+    this.log("info", `task_stop: background task ${taskId} stopped`);
+  }
+
+  /** `task_background {toolUseId?}`: Ctrl+B — the running call (all foreground tasks without an id) goes on in the background. */
+  private async taskBackground(toolUseId: unknown): Promise<TaskBackgroundEvent> {
+    const session = this.session;
+    if (!session) throw new CommandRefused("no_session");
+    if (!session.backgroundTasks || session.backgroundWorkOn === false) throw new CommandRefused("background_off");
+    const id = typeof toolUseId === "string" && toolUseId ? toolUseId : undefined;
+    let moved: boolean;
+    try {
+      moved = await withTimeout(session.backgroundTasks(id), STOP_AGENT_TIMEOUT_MS, "backgroundTasks");
+    } catch (e) {
+      throw new CommandRefused(`task_background_failed:${firstLineOf(errorMessage(e))}`, { code: "task_background_failed" });
+    }
+    this.log("info", `task_background${id ? ` ${id}` : ""}: ${moved ? "moved" : "nothing to move"}`);
+    return { type: "task_background", moved };
+  }
+
+  /** `task_output {taskId}`: the last 64 KiB of the file the CLI named for that task (only that file is read). */
+  private async taskOutput(taskId: unknown): Promise<TaskOutputEvent> {
+    const session = this.session;
+    if (typeof taskId !== "string" || !taskId || !session) throw new CommandRefused("task_unknown");
+    const path = session.taskOutputFile?.(taskId) ?? null;
+    if (!path) throw new CommandRefused(session.taskOutputFile ? "no_output" : "task_unknown");
+    let tail: { text: string; truncated: boolean };
+    try {
+      tail = await readTail(path);
+    } catch (e) {
+      throw new CommandRefused(`no_output:${firstLineOf(errorMessage(e))}`, { code: "no_output" });
+    }
+    return { type: "task_output", taskId, text: tail.text, truncated: tail.truncated, running: session.isTaskLive?.(taskId) === true };
+  }
+
+  /** The session's live background tasks: each named with the transcript turn of the call that started it. */
+  private onBackgroundTasks(tasks: BackgroundTask[]): void {
+    const turnOf = (id: string | null) => (id === null ? null : this.toolCalls.get(id)?.turn ?? null);
+    const before = this.sessionState.backgroundTasks ?? [];
+    this.sessionState.backgroundTasks = tasks.map((t) => ({ ...t, turn: t.turn ?? before.find((b) => b.taskId === t.taskId)?.turn ?? turnOf(t.toolUseId) }));
+    // §52.1: work in the background while no turn of ours runs reaches the next review (A is kept).
+    if (tasks.length > 0 && !this.gate.running) this.bgCarry = true;
+    this.touch();
+  }
+
+  /** §52.1: whether the next turn keeps A (consumed: the turn's own collection sets it again while tasks still run). */
+  private takeBgCarry(): boolean {
+    const carry = this.bgCarry || (this.sessionState.backgroundTasks ?? []).length > 0;
+    this.bgCarry = false;
+    return carry;
+  }
+
+  /**
+   * §52.1: the CLI started a turn itself. Its events wait (`adoptQueue`) while the engine takes it as `peer_accept` takes a
+   * peer message (§29): the collection in flight first, then A (kept with a standing review or work in the background),
+   * the turn's start and its `auto_turn` row — then the session lets its calls run. When the gate cannot take it, §18
+   * applies as before (its changes are denied).
+   */
+  private onAutoTurnStart(source: ClaudeSessionLike, ev: Extract<SessionEvent, { type: "auto_turn_start" }>): void {
+    this.adoptQueue = [];
+    // Clients hold their messages meanwhile (`gate_closed:external_turn`), as for any turn that is not ours.
+    this.externalTurn = { commandUuid: ev.commandUuid ?? null, since: new Date().toISOString(), peer: null };
+    this.touch();
+    void this.adoptAutoTurn(source, ev);
+  }
+
+  private async adoptAutoTurn(source: ClaudeSessionLike, ev: Extract<SessionEvent, { type: "auto_turn_start" }>): Promise<void> {
+    let ok = false;
+    let tree: string | undefined;
+    const deadline = Date.now() + AUTO_TURN_WAIT_MS;
+    try {
+      if (this.collection) await this.collection.catch(() => undefined);
+      while ((this.gate.collecting || this.gate.reverting) && this.session === source && Date.now() < deadline) await pause(50);
+      if (this.session !== source || this.closed) return;
+      if (this.gate.running) {
+        // A send slipped in before the input closed: the CLI's turn joins it — and the session waits for that message too.
+        while (this.gate.running && this.turnSent === null && this.session === source && Date.now() < deadline) await pause(20);
+        this.log("info", "a turn Claude started joins the turn of a message sent meanwhile");
+        ok = this.gate.running;
+        return;
+      }
+      this.externalTurn = null;
+      if (!this.gate.checkpoint || !canSend(this.slices())) {
+        this.log("warn", `a turn Claude started cannot be reviewed now (${this.closedReason(this.slices())}): its changes are denied`);
+        return;
+      }
+      await this.followHeadMove();
+      await this.gate.prepareAnswer(this.takeBgCarry());
+      const keptA = this.gate.keepsTurnStart;
+      this.gate.running = true;
+      try {
+        tree = await this.gate.snapshotStart();
+      } catch (e) {
+        this.gate.abortTurn();
+        tree = undefined;
+        this.log("warn", `a turn Claude started: snapshot A failed (${errorMessage(e)}); its changes are denied`);
+        return;
+      }
+      const skippedAtStart = this.gate.snapshotSkipped;
+      const info: AutoTurnInfo = { trigger: ev.trigger, ...(ev.task ? { task: { ...ev.task } } : {}), ...(ev.wakeupSource ? { wakeupSource: ev.wakeupSource } : {}) };
+      const display = autoTurnPrompt(info);
+      this.sessionState.pendingPlan = null;
+      this.proposedPlanKeys.clear();
+      // Nothing of ours goes out: the review summary waits for the user's next real message.
+      this.gate.beginSend(display, true);
+      await this.adoptRecordOnly();
+      const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+      if (meta) {
+        meta.updatedAt = new Date().toISOString();
+        this.persistSessions();
+      }
+      this.beginTurn(display, {}, true);
+      this.gate.snapshotSkipped = skippedAtStart;
+      this.record({ kind: "auto_turn", ...info });
+      this.emit({ type: "auto_turn", turn: this.turn, ...info });
+      // §31 / §32: a review turn — HEAD, settings.local.json and nested HEADs are compared at its end too.
+      await this.noteTurnStartState();
+      await this.startRecord(keptA ? null : tree);
+      this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
+      this.turnSent = null;
+      ok = true;
+      this.log("info", `turn ${this.turn}: Claude started it itself (${ev.trigger}); reviewed like any other`);
+    } catch (e) {
+      this.log("warn", `a turn Claude started could not be taken: ${errorMessage(e)}`);
+      if (this.gate.running && !ok) {
+        this.gate.abortTurn();
+        this.dropRecord();
+        this.hud.turnStartedAt = null;
+        this.setIdle();
+      }
+    } finally {
+      if (!ok) this.externalTurn = null;
+      if (this.session === source) source.autoTurnReady?.(ok, ok ? tree : undefined);
+      this.drainAdoptQueue();
+      this.touch();
+    }
+  }
+
+  /** The events held while a turn Claude started was being taken, in order (one may start the next such turn: it holds the rest). */
+  private drainAdoptQueue(): void {
+    const queued = this.adoptQueue;
+    this.adoptQueue = null;
+    for (const { source, ev } of queued ?? []) this.onSessionEvent(source, ev);
+  }
+
+  private endBackgroundState(): void {
+    this.sessionState.backgroundTasks = [];
+    const queued = this.adoptQueue;
+    this.adoptQueue = null;
+    if (queued && queued.length > 0) this.log("debug", `dropped ${queued.length} session event(s) of a turn being taken when the session ended`);
+  }
+
   /** §36.2 `stop_agent`: `query.stopTask` for that one subagent; the main turn and the other agents go on. */
   private async stopAgent(toolUseId: string): Promise<void> {
     const target = typeof toolUseId === "string" && toolUseId ? this.agents.stopTarget(toolUseId) : "unknown_agent";
@@ -6872,6 +7071,7 @@ export class ReviewEngine {
         peerInbound: this.peerMode(),
         peerInbox: [...this.peerInbox.values()].map((m) => ({ ...m })),
         externalTurn: this.externalTurn ? { ...this.externalTurn, peer: this.externalTurn.peer ? { ...this.externalTurn.peer } : null } : null,
+        backgroundTasks: (this.sessionState.backgroundTasks ?? []).map((t) => ({ ...t })), // §52
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,
         ...this.planSourceSlice(), // MARK: wave4d w4d-plan (§42.1)
       },
@@ -7148,6 +7348,9 @@ function laneOf(cmd: EngineCommand): Lane {
     // call, ≤ STOP_AGENT_TIMEOUT_MS).
     case "agent_report":
     case "stop_agent":
+    case "task_stop": // §52: one quick call each, never behind a send
+    case "task_background":
+    case "task_output":
     case "cli_versions": // MARK: wave3 engine-session (§36.8, §36.9)
     case "cli_sessions":
     case "transcript_page": // MARK: wave4 w4-history — §38.3 pure reads of the session files
@@ -7226,6 +7429,9 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     // MARK: wave3 engine-agents
     case "agent_report":
     case "stop_agent":
+    case "task_stop": // §52
+    case "task_background":
+    case "task_output":
     case "retry_extensions": // MARK: wave3 engine-session
     case "cli_sessions":
     case "cli_session_import":
@@ -7292,6 +7498,10 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
       return "engine";
   }
 }
+
+/** §52.1: how long a turn Claude started waits for the collection / revert in flight before it is taken. */
+const AUTO_TURN_WAIT_MS = 60_000;
+const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** MARK: wave4c w4c-trust — §41.2: a file rejected in one of the last this-many review rounds is never auto-accepted. */
 const HISTORY_REJECT_ROUNDS = 20;

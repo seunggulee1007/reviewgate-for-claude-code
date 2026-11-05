@@ -340,6 +340,11 @@ export type Settings = {
   // MARK: wave4 w4-longwork
   /** §38.2: the tool-call limit of one message (the CLI's `maxTurns`; 10–1000, default 200; next session start). */
   maxTurns?: number;
+  /**
+   * §52: background Bash / Monitor / Ctrl+B and turns Claude starts itself (a finished background task, `/loop`, cron)
+   * as review turns (default true; next session start). Off: `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` and §18.
+   */
+  backgroundWork?: boolean;
   // MARK: wave4b w4b-bigturn
   /** §39.1: an untracked file at least this large (MB) is kept out of snapshots as a stub (1–100000, default 50; live). */
   largeFileMB?: number;
@@ -596,6 +601,12 @@ export type EngineCommand =
   | Cmd<"login_in_terminal", { host: string }>
   /** §50: a message into the turn that runs (as typing while Claude works in the terminal); `steer_unavailable:<why>` otherwise. */
   | Cmd<"steer", { text: string; mentions?: string[] }>
+  /** §52: stops a background task (`Query.stopTask`). */
+  | Cmd<"task_stop", { taskId: string }>
+  /** §52: Ctrl+B — the running Bash call (all foreground tasks without an id) goes on in the background; replies `task_background`. */
+  | Cmd<"task_background", { toolUseId?: string }>
+  /** §52: the last 64 KiB of a background task's output; replies `task_output`. */
+  | Cmd<"task_output", { taskId: string }>
   | Cmd<"workbench_list">
   /** §36.12: `from` may be a remote branch (`origin/develop`), fetched first unless `fetch: false`; `setup` (default true) copies files and runs the setup command; §36.14 `fromPr`. */
   /** §49: `task` — the new workbench's window starts a fresh chat with this message (in `mode`), apart from this chat. */
@@ -901,6 +912,8 @@ export type SessionState = {
   peerInbox?: PeerMessage[];
   /** §29: a turn the CLI runs that is not ours; `canSend` is false meanwhile (`blockedReason: "running"`). */
   externalTurn?: ExternalTurn | null;
+  /** §52: the background tasks running now (Bash `run_in_background`, Monitor, …), oldest first. */
+  backgroundTasks?: BackgroundTask[];
   /** §29: the running review turn is accepted peer messages (badge the permission card / HUD with the senders). */
   peerTurn?: { messageIds: string[]; fromNames: string[] } | null;
   /** §36.8: the CLI this session runs and whether ReviewGate verified it; null without a session start. */
@@ -1577,6 +1590,8 @@ export type TranscriptItem = { at: string; turn: number } & (
   | ({ kind: "error"; message: string; fatal: boolean; scope: ErrorScope; code?: string; detail?: string } & ErrorRowDetails)
   /** §29: a peer message once it was delivered (its turn's first row) or dropped. */
   | { kind: "peer_message"; id: string; from: string; fromName?: string; verifiedPeerPid?: number; state: "delivered" | "dropped"; outcome?: string; body?: string; unprompted?: true }
+  /** §52: a turn Claude started itself (its first row). */
+  | ({ kind: "auto_turn" } & AutoTurnInfo)
   /** MARK: wave4 w4-history — §38.3: the turn's `turn_summary` (bounded; `truncated`: lists or texts were cut). */
   | ({ kind: "turn_summary" } & TurnSummaryRow)
 );
@@ -1685,6 +1700,38 @@ export type McpStatusEvent = {
 };
 /** §29: a peer message arrived or changed state (held → delivering → delivered, or dropped). */
 export type PeerMessageEvent = { type: "peer_message"; message: PeerMessage };
+
+// MARK: §52 background work
+/** §52: a background task of the session (`state.session.backgroundTasks`). */
+export type BackgroundTask = {
+  taskId: string;
+  /** `task_type` local_bash → bash, a monitor → monitor, local_agent → agent, anything else → other. */
+  kind: "bash" | "monitor" | "agent" | "other";
+  description: string;
+  /** The tool call that started it; null when the CLI did not say. */
+  toolUseId: string | null;
+  /** The transcript turn of that call; null when unknown. */
+  turn: number | null;
+  /** ISO-8601. */
+  startedAt: string;
+  /** Its output file is known (`task_output`). */
+  hasOutput: boolean;
+};
+/** §52: why Claude started a turn itself — a background task ended, a scheduled job (`/loop`, cron) ran, or anything else (`/goal`). */
+export type AutoTurnTrigger = "background" | "schedule" | "continue";
+export type AutoTurnInfo = {
+  trigger: AutoTurnTrigger;
+  /** `background`: the task whose notification came last. */
+  task?: { taskId: string; description: string; status: string; summary?: string };
+  /** `schedule`: the lifecycle frame's `wakeup_source` (`schedule_wakeup`, …). */
+  wakeupSource?: string;
+};
+/** §52: the turn `turn` was started by Claude itself; its row opens the turn. */
+export type AutoTurnEvent = { type: "auto_turn"; turn: number } & AutoTurnInfo;
+/** §52: reply to `task_background`. */
+export type TaskBackgroundEvent = { type: "task_background"; id?: string; moved: boolean };
+/** §52: reply to `task_output` — the last 64 KiB of the task's output (`truncated` when cut); `running: false` once it ended. */
+export type TaskOutputEvent = { type: "task_output"; id?: string; taskId: string; text: string; truncated: boolean; running: boolean };
 /**
  * §34.6: reply to `live_changes` — the running turn's changes so far: its own start tree (`baseTree`) → a snapshot taken now
  * (`liveTree`; reused for 2 s). Nothing here can be accepted. `running: false` (no turn): `files` is empty.
@@ -1782,6 +1829,9 @@ export type EngineEvent =
   | RewoundEvent
   | ContextWarningEvent
   | PeerMessageEvent
+  | AutoTurnEvent
+  | TaskBackgroundEvent
+  | TaskOutputEvent
   | HeadMovedEvent
   | ConcurrentClaudeEvent
   | LocalSettingsChangedEvent
@@ -1839,6 +1889,8 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "cli_sessions" } ? CliSessionsEvent
   : C extends { type: "commit_draft" } ? CommitDraftEvent
   : C extends { type: "pr_ai_draft" } ? PRAiDraftEvent
+  : C extends { type: "task_background" } ? TaskBackgroundEvent
+  : C extends { type: "task_output" } ? TaskOutputEvent
   : C extends { type: "workbench_preview" } ? WorkbenchPreviewEvent
   : C extends { type: "prereview_start" } ? PreReviewEvent
   : C extends { type: "transcript_page" } ? TranscriptPageEvent // MARK: wave4 w4-history (§38.3)
@@ -1859,6 +1911,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | SideThreadEvent | SideThreadsEvent | SidePromoteDraftEvent | McpStatusEvent | FilesEvent | AttachmentEvent | RewoundEvent | PermissionRulesEvent
   | LiveChangesEvent
   | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | PRAiDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
+  | TaskBackgroundEvent | TaskOutputEvent
   | TranscriptPageEvent | TranscriptSearchEvent // MARK: wave4 w4-history (§38.3)
   | HistoryCleanupEvent // MARK: wave4b w4b-bigturn (§39.1)
   | CommitFormatEvent | PRDraftEvent // MARK: wave4c w4c-commit (§41.1)

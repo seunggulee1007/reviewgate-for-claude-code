@@ -32,6 +32,7 @@ import type {
   ExtensionsWaitingOn,
 } from "./protocol.js";
 import type { RemoteBranchInfo } from "./protocol.js"; // MARK: wave3 engine-flow
+import type { BackgroundTask } from "./protocol.js"; // §52
 import type { StorageState } from "./protocol.js"; // MARK: wave4b w4b-bigturn
 import type { AutoModelChoice } from "./protocol.js"; // MARK: wave5 w5-model
 import { suggestCommitMessage } from "./review/commitMessage.js";
@@ -76,6 +77,8 @@ export type EngineSlices = {
     peerInbox?: PeerMessage[];
     externalTurn?: ExternalTurn | null;
     peerTurn?: { messageIds: string[]; fromNames: string[] } | null;
+    /** §52 (see protocol.ts SessionState). */
+    backgroundTasks?: BackgroundTask[];
     // MARK: wave3 engine-session (see protocol.ts SessionState)
     /** §36.7 */
     extensionsWaitingOn?: ExtensionsWaitingOn | null;
