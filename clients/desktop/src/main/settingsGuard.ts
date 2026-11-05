@@ -60,6 +60,7 @@ const pluginIds: Check = (v) => Array.isArray(v) && v.length <= 500 && v.every((
 /** Every key a renderer may write through `rg:setSettings`, with its check. */
 const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   appearance: oneOf("system", "light", "dark"),
+  budgetEnabled: bool, // §54
   budgetMaxFiles: int(1, 1000),
   budgetMaxLines: int(1, 100_000),
   systemPromptAppend: text(MAX_TEXT),

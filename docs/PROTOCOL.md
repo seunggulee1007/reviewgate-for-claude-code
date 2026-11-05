@@ -6590,7 +6590,11 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   window's engine. While off the HUD shows no change-limit chip and the chat's empty state names no limit ("Claude가 바꾼
   내용은 계속하기 전에 리뷰하게 됩니다."). With it on a warn row reads "변경 한도 도달: …" and a deny row "변경 한도 초과 — 편집
   거부됨 (…)". The append's "Reset to default" removes the stored text, and the app drops a stored earlier built-in text at
-  launch. The plan sheet's approve button no longer says "in small units" in its help.
+  launch. The plan sheet's approve button no longer says "in small units" in its help. Electron: `settings.budgetEnabled`
+  (absent: off; the renderer may write a boolean), main's `budgetOf` / `systemPromptOf`, the texts in
+  `src/shared/systemPrompt.ts`; the settings file now keeps "" for the built-in append (it kept a copy of every default, so
+  nearly every file holds the old text) and an earlier built-in text reads as "". Test:
+  `clients/desktop/src/main/changeLimitSettings.test.ts`.
 - Owner: engine `session/budget.ts` (`budgetIsOn`, `BudgetState.active`), `session/hooks.ts`, `session/longWork.ts`
   (`budgetChangeNote`). Tests: `engine/test/session.budget.test.ts`, `session.hooks.test.ts` (§54), `longWork.test.ts`,
   `engine.friction.test.ts` (the defaults).

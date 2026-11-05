@@ -15,6 +15,7 @@ import { testCommandPatternsOf } from "../shared/testCommands.js";
 import { EXECUTABLE_KEYS, validateExecutable, type ExecutableKind } from "./settingsGuard.js";
 import { resolveWindowsClaude, type WinFs } from "./winClaude.js";
 import { allowedProjectStatusLineFor, loadLocalSettingsFor } from "./sessionSettings.js"; // MARK: wave3 desktop-session, wave6 w6-statusline
+import { BUDGET_PROMPT_SENTENCE, DEFAULT_SYSTEM_PROMPT_APPEND, isLegacySystemPromptAppend, renderSystemPrompt } from "../shared/systemPrompt.js"; // §54
 import { isTransientProjectPath } from "./recentProjects.js"; // MARK: wave4 w4-install
 
 export const DEFAULT_WORKTREE_ROOT = "~/.reviewgate/worktrees";
@@ -25,18 +26,15 @@ export const DEFAULT_GH_HOST = "github.com";
 export const DEFAULT_IGNORE_PATTERNS = [".omc/", ".claude/settings.local.json"];
 export const MAX_RECENT_PROJECTS = 10;
 
-/** Placeholders `{maxFiles}` / `{maxLines}` are substituted at session start. */
-export const DEFAULT_SYSTEM_PROMPT_APPEND =
-  "You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. " +
-  "After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. " +
-  "Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — " +
-  "the app shows the user an approval card for each. If an edit is denied with 'REVIEW GATE', stop immediately and report.";
+export { DEFAULT_SYSTEM_PROMPT_APPEND, renderSystemPrompt };
 
 export const DEFAULTS: AppSettings = {
   appearance: "system",
+  budgetEnabled: false, // §54: the change limit is opt-in
   budgetMaxFiles: DEFAULT_MAX_FILES,
   budgetMaxLines: DEFAULT_MAX_LINES,
-  systemPromptAppend: DEFAULT_SYSTEM_PROMPT_APPEND,
+  // §54: "" is the built-in append (DEFAULT_SYSTEM_PROMPT_APPEND) — the file no longer keeps a copy of a default that changes.
+  systemPromptAppend: "",
   checkpointIgnorePatterns: DEFAULT_IGNORE_PATTERNS.join("\n"),
   autoAllowBash: false,
   autoAllowReadOnlyBash: true,
@@ -102,6 +100,8 @@ export function loadSettings(): AppSettings {
   } catch {
     stored = {};
   }
+  // §54: an earlier built-in append, stored because the file kept every default, is the built-in one now.
+  if (isLegacySystemPromptAppend(stored.systemPromptAppend)) stored.systemPromptAppend = "";
   cache = { ...DEFAULTS, ...stored, locale: app.getLocale() };
   // Executable overrides are spawned by main: a stored value that is not a valid tool path
   // (hand-edited, or written before the native-dialog flow) is ignored, not trusted.
@@ -165,7 +165,8 @@ export function expandTilde(p: string): string {
   return p.startsWith("~/") || p === "~" ? join(homedir(), p.slice(1)) : p;
 }
 
-export function budgetOf(s: AppSettings) {
+/** The change limit's numbers as set in Settings (10 / 400 until changed), whether the limit is on or not. */
+export function budgetLimitsOf(s: AppSettings) {
   return {
     maxFiles: s.budgetMaxFiles > 0 ? s.budgetMaxFiles : DEFAULT_MAX_FILES,
     maxLines: s.budgetMaxLines > 0 ? s.budgetMaxLines : DEFAULT_MAX_LINES,
@@ -173,12 +174,23 @@ export function budgetOf(s: AppSettings) {
   };
 }
 
+/** `settings.budget`: the limits while the change limit is on, else none — 0 / 0, the engine counts nothing (§54). */
+export function budgetOf(s: AppSettings) {
+  return s.budgetEnabled === true ? budgetLimitsOf(s) : { maxFiles: 0, maxLines: 0 };
+}
+
+/**
+ * The append as Claude gets it (§54): the user's own text, else the built-in one — followed by the limit's sentence while
+ * the limit is on — with `{maxFiles}` / `{maxLines}` replaced by the limit's numbers (on or off).
+ */
+export function systemPromptOf(s: AppSettings): string {
+  const own = typeof s.systemPromptAppend === "string" && s.systemPromptAppend.trim().length > 0 && !isLegacySystemPromptAppend(s.systemPromptAppend);
+  const template = own ? s.systemPromptAppend : s.budgetEnabled === true ? `${DEFAULT_SYSTEM_PROMPT_APPEND} ${BUDGET_PROMPT_SENTENCE}` : DEFAULT_SYSTEM_PROMPT_APPEND;
+  return renderSystemPrompt(template, budgetLimitsOf(s));
+}
+
 
 export const ignorePatternsOf = (s: AppSettings): string[] => linesOf(s.checkpointIgnorePatterns);
-
-export function renderSystemPrompt(template: string, budget: { maxFiles: number; maxLines: number }): string {
-  return template.replaceAll("{maxFiles}", String(budget.maxFiles)).replaceAll("{maxLines}", String(budget.maxLines));
-}
 
 const winFs: WinFs = {
   exists: existsSync,
@@ -218,12 +230,10 @@ function claudeFor(s: AppSettings): string | undefined {
  * project — its own allow patterns (`projectBashAllowPatterns`) are appended to the global ones.
  */
 export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: string | null): Settings {
-  const budget = budgetOf(s);
-  const prompt = s.systemPromptAppend.trim().length > 0 ? s.systemPromptAppend : DEFAULT_SYSTEM_PROMPT_APPEND;
   const opt = (v: string) => (v.trim().length > 0 ? v.trim() : undefined);
   // `commitPushByDefault` / `commitTrailer` (docs/M12-COMMIT.md) — the cast tolerates an engine without them yet.
   return {
-    budget,
+    budget: budgetOf(s),
     ignorePatterns: ignorePatternsOf(s),
     autoAllowTools: s.autoAllowBash ? ["Bash"] : [],
     autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
@@ -233,7 +243,7 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     applyUserAllowRules: s.applyUserAllowRules !== false,
     persistSessionAllows: s.persistSessionAllows === true,
     loadUserSettings: s.loadUserSettings,
-    systemPromptAppend: renderSystemPrompt(prompt, budget),
+    systemPromptAppend: systemPromptOf(s),
     claudePath: claudeFor(s),
     ghPath: opt(s.ghPath),
     gitPath: opt(s.gitPath),

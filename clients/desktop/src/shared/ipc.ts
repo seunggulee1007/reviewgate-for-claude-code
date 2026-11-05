@@ -16,8 +16,11 @@ export type Appearance = "system" | "light" | "dark";
 export type AppSettings = {
   /** M18: "system" | "light" | "dark" (default "system"); drives `nativeTheme.themeSource` and `<html data-theme>`. */
   appearance: Appearance;
+  /** §54: the change limit is on (absent / false: off — the engine gets no budget); the numbers apply only then. */
+  budgetEnabled?: boolean;
   budgetMaxFiles: number;
   budgetMaxLines: number;
+  /** "" = the built-in append (§54: an earlier built-in text stored here reads as "" too). */
   systemPromptAppend: string;
   /** One pattern per line. */
   checkpointIgnorePatterns: string;
