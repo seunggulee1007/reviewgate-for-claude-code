@@ -6444,9 +6444,9 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
 // command commit_hunks { paths? }            → reply commit_hunks { files: CommitFile[] }                       (git lane)
 // command commit_split_draft { paths? }      → reply commit_split_draft { commits: CommitPlan[]; unassigned: CommitPart[] }   (side lane)
 // command commit_series { commits: CommitPlan[]; push? } → reply committed_series { commits: { sha; shortSha; message; files: string[] }[]; branch; pushed }
+// a failure after ≥ 1 commit: result { ok: false, error: "commit_failed:<git's words>", code: "commit_failed", partial: { commits, branch, pushed: false } }
 ```
 
-// a failure after ≥ 1 commit: result { ok: false, error: "commit_failed:<git's words>", code: "commit_failed", partial: { commits, branch, pushed: false } }
 - **Hunks** are those of `git diff HEAD -- <path>` (3 lines of context) — what a commit takes from the worktree — for
   accepted paths only (`paths` as `commit`: default `commit.acceptedPaths`, refused `nothing_to_commit` for any other).
   Ids are 0, 1, … in file order. An added, deleted, binary or renamed file, or one whose diff has a single hunk, can only
@@ -6456,8 +6456,11 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
   the last 20 commit subjects, the branch and `settings.commitTemplate`, and the conversation's context. It is asked for
   the smallest meaningful commits in an order where each one builds: dependencies first, docs in the commit of the change
   they describe, an unrelated fix or a regenerated file in its own commit, each message in the project's format. It
-  answers JSON. The engine keeps only valid parts (a known accepted path, known hunk ids, no hunk twice). What is left
-  over is `unassigned`. Nothing is committed.
+  answers JSON (`{"commits":[{"message","why","parts":[{"path","hunks"}]}]}`; a code fence or a preamble around it is
+  fine). The engine keeps only valid parts (a known accepted path, known hunk ids, no hunk twice — a later repeat is
+  dropped; a whole-only file goes whole whatever hunks were named; a part naming every hunk is the whole file) and
+  commits with a message and a part left. What is left over is `unassigned`. Nothing is committed. Besides the fork's
+  own failure: `commit_split_failed:empty answer`, `…:no JSON plan in the answer`, `…:no valid commit in the answer`.
 - **`commit_series`** makes the commits in order, then pushes once when `push` (default `settings.commitPushByDefault`).
   - Refusals:
     - like `commit`: `no_project`, `session_running`, `collect_failed`, `nothing_to_commit` (also: no commits, a commit

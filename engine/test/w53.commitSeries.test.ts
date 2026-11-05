@@ -1,6 +1,8 @@
 import { chmodSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import type { CommitFile } from "../src/protocol.js";
+import { COMMIT_SPLIT_HEADER, COMMIT_SPLIT_SYSTEM, parseCommitSplit, validateSplit } from "../src/review/commitSplit.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { FakeSide, type SideScript } from "./helpers/fakeSide.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -348,5 +350,100 @@ describe("§53 the review after a series", () => {
     expect(sh(dir, "show", "HEAD:app.ts")).toBe(edited({ 2: "L2", 18: "L18" }));
     expect(h.engine.state.changedFiles.map((f) => f.path)).not.toContain("app.ts");
     expect(h.ofType("error")).toHaveLength(0);
+  });
+});
+
+describe("§53 commit_split_draft", () => {
+  it("a read-only fork gets every hunk, the whole files' diff, the subjects, the branch and the template; only valid parts are kept, the rest is unassigned", async () => {
+    const dir = makeRepo();
+    sh(dir, "commit", "-q", "--allow-empty", "-m", "#acme/41: [cart] totals - rounding");
+    sh(dir, "switch", "-q", "-c", "feature/acme/42");
+    const answer = "Here is the plan:\n\n```json\n" + JSON.stringify({ commits: [
+      { message: "#acme/42: L2 and the new file", why: "the first behavior", parts: [{ path: "app.ts", hunks: [0, 7] }, { path: "new.txt", hunks: [0] }, { path: "nope.txt" }] },
+      { message: "#acme/42: L18", parts: [{ path: "app.ts", hunks: [0, 1] }, { path: "gone.txt" }] },
+      { message: "  ", parts: [{ path: "single.txt" }] },
+      { message: "#acme/42: again", parts: [{ path: "gone.txt" }] },
+    ] }) + "\n```\n";
+    const { h, sides } = setup(() => ({ text: answer, cost: 0.003 }));
+    await h.hello({ commitTemplate: "#acme/{issue}: " });
+    await h.open(dir);
+    await everyKind(h, dir);
+    const base = headSha(dir);
+    const reply = await h.engine.request({ type: "commit_split_draft" });
+    expect(reply).toEqual({
+      type: "commit_split_draft", id: reply.id,
+      commits: [
+        { message: "#acme/42: L2 and the new file", why: "the first behavior", parts: [{ path: "app.ts", hunks: [0] }, { path: "new.txt" }] },
+        { message: "#acme/42: L18", parts: [{ path: "app.ts", hunks: [1] }, { path: "gone.txt" }] },
+      ],
+      unassigned: reply.unassigned,
+    });
+    expect(reply.unassigned.map((p) => p.path).sort()).toEqual(["moved.txt", "pic.bin", "single.txt"]);
+    const o = sides[0]!.opts;
+    expect(o.forkFrom).toBe("sess-1");
+    expect(o.persistSession).toBe(false);
+    expect(o.allowWeb).toBe(false);
+    expect(o.system).toBe(COMMIT_SPLIT_SYSTEM);
+    expect(o.prompt.startsWith(COMMIT_SPLIT_HEADER)).toBe(true);
+    expect(o.prompt).toContain("Branch: feature/acme/42");
+    expect(o.prompt).toContain('"#acme/42: "');
+    expect(o.prompt).toContain("- #acme/41: [cart] totals - rounding");
+    expect(o.prompt).toContain("### app.ts (M) — hunks 0, 1");
+    expect(o.prompt).toContain("hunk 0:\n```diff\n@@ -1,5 +1,5 @@\n l1\n-l2\n+L2");
+    expect(o.prompt).toContain("hunk 1:\n```diff\n@@ -15,6 +15,6 @@ l14\n");
+    expect(o.prompt).toContain("- new.txt (A) — whole file only");
+    expect(o.prompt).toContain("- moved.txt (R from tomove.txt) — whole file only");
+    expect(o.prompt).toContain("- pic.bin (M, binary) — whole file only");
+    expect(o.prompt).toContain("+new"); // the whole files' diff
+    expect(o.prompt).toContain("dependencies come first");
+    expect(o.prompt).toContain("lock files, generated i18n");
+    expect(o.prompt).toContain('{"commits":[{"message":"…","why":"…","parts":[{"path":"…","hunks":[0,2]}]}]}');
+    // Nothing committed; the plan goes straight into commit_series.
+    expect(headSha(dir)).toBe(base);
+    await h.engine.request({ type: "commit_series", commits: reply.commits });
+    expect(sh(dir, "log", "--format=%s", `${base}..HEAD`).trim().split("\n")).toEqual(["#acme/42: L18", "#acme/42: L2 and the new file"]);
+    expect(sh(dir, "show", "HEAD~1:app.ts")).toBe(edited({ 2: "L2" }));
+  });
+
+  it("refuses a failed fork, an empty answer, an answer without a plan or without a valid commit, and paths that are not accepted", async () => {
+    const dir = makeRepo();
+    let answer: { text: string; error?: string } = { text: "", error: "boom: the side session crashed\nmore" };
+    const { h } = setup(() => answer);
+    await h.hello();
+    await h.open(dir);
+    await turn(h, () => {
+      write(dir, "app.ts", edited({ 2: "L2", 18: "L18" }));
+      write(dir, "new.txt", "new\n");
+    });
+    await h.engine.request({ type: "accept", paths: ["app.ts"] });
+    await expect(h.engine.request({ type: "commit_split_draft" })).rejects.toThrow("commit_split_failed:boom: the side session crashed");
+    answer = { text: "   " };
+    await expect(h.engine.request({ type: "commit_split_draft" })).rejects.toThrow("commit_split_failed:empty answer");
+    answer = { text: "I would make two commits." };
+    await expect(h.engine.request({ type: "commit_split_draft" })).rejects.toThrow("commit_split_failed:no JSON plan in the answer");
+    answer = { text: '{"commits":[{"message":"x","parts":[{"path":"new.txt"}]}]}' };
+    await expect(h.engine.request({ type: "commit_split_draft" })).rejects.toThrow("commit_split_failed:no valid commit in the answer");
+    await expect(h.engine.request({ type: "commit_split_draft", paths: ["new.txt"] })).rejects.toThrow("nothing_to_commit");
+    answer = { text: '[{"message":"x","parts":[{"path":"app.ts","hunks":[1]}]}]' };
+    expect(await h.engine.request({ type: "commit_split_draft" })).toMatchObject({ commits: [{ message: "x", parts: [{ path: "app.ts", hunks: [1] }] }], unassigned: [{ path: "app.ts", hunks: [0] }] });
+  });
+
+  it("parses leniently and validates the plan", () => {
+    const files: CommitFile[] = [
+      { path: "a.ts", status: "M", binary: false, hunks: [0, 1, 2].map((id) => ({ id, header: `@@ -${id} @@`, added: 1, deleted: 0, text: "+x" })) },
+      { path: "b.md", status: "A", binary: false, hunks: [] },
+    ];
+    expect(parseCommitSplit('{"commits":[]}')).toEqual([]);
+    expect(parseCommitSplit('Sure! {"commits":[{"message":"m"}]} Hope it helps.')).toEqual([{ message: "m" }]);
+    expect(parseCommitSplit("```\n[1]\n```")).toEqual([1]);
+    expect(parseCommitSplit("no plan")).toBeNull();
+    expect(validateSplit([
+      { message: "one", parts: [{ path: "a.ts", hunks: [2, 0, 1] }] }, // every hunk → the whole file
+      { message: "two", parts: [{ path: "a.ts" }, { path: "b.md" }] },
+      "junk",
+    ], files)).toEqual({ commits: [{ message: "one", parts: [{ path: "a.ts" }] }, { message: "two", parts: [{ path: "b.md" }] }], unassigned: [] });
+    expect(validateSplit([
+      { message: "one", why: "  ", parts: [{ path: "a.ts", hunks: [1] }, { path: "a.ts", hunks: [2, "x"] }] },
+    ], files)).toEqual({ commits: [{ message: "one", parts: [{ path: "a.ts", hunks: [1, 2] }] }], unassigned: [{ path: "a.ts", hunks: [0] }, { path: "b.md" }] });
   });
 });

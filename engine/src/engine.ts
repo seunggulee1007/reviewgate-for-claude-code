@@ -193,7 +193,8 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
-import type { CommitHunksEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
+import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
+import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
 import { headHunks, splitContent, type HeadFile } from "./git/commitHunks.js"; // §53
 import { commitOnHead, indexToHead, SeriesCommitError, worktreeBlob, writeBlob, type SeriesBlob } from "./git/series.js";
 import type { AutoTurnInfo, BackgroundTask, TaskBackgroundEvent, TaskOutputEvent } from "./protocol.js"; // §52
@@ -1332,6 +1333,8 @@ export class ReviewEngine {
       // MARK: wave3 engine-flow — §36.11 commit message draft (side lane), §36.13 AI pre-review
       case "commit_draft":
         return this.commitDraft(Array.isArray(cmd.paths) ? cmd.paths : null);
+      case "commit_split_draft": // §53
+        return this.commitSplitDraft(Array.isArray(cmd.paths) ? cmd.paths : null);
       // MARK: wave4c w4c-commit — §41.1 the team's format (a read) and the PR draft (PR lane)
       case "commit_format":
         return this.commitFormat();
@@ -4706,6 +4709,42 @@ export class ReviewEngine {
   }
 
   /**
+   * §53 `commit_split_draft`: a read-only fork of the main session (no thread) proposes the smallest meaningful commits of
+   * the accepted `paths` (default every accepted file) from their hunks of `git diff HEAD`, the whole-only files' review
+   * diff, the last 20 subjects, the branch and the rendered `settings.commitTemplate`. Only valid parts are kept; what no
+   * commit took is `unassigned`. Nothing is committed.
+   */
+  private async commitSplitDraft(requested: unknown[] | null): Promise<CommitSplitDraftEvent> {
+    const cp = this.requireProject();
+    const fail = (why: string) => new CommandRefused(`commit_split_failed:${why}`, { code: "commit_split_failed" });
+    const files = this.commitFiles(requested);
+    const [format, head] = await Promise.all([this.teamFormat(cp), headHunks(cp, files)]);
+    const listed = head.map((f) => f.file);
+    const whole = files.filter((f) => !f.isBinary && listed.find((l) => l.path === f.path)!.hunks.length === 0);
+    const left = COMMIT_SPLIT_LINES - hunkLines(listed);
+    const start = this.gate.turnStartTree;
+    const end = this.gate.reviewEndTree;
+    const wholePatch = left > 0 && whole.length > 0 && start !== null && end !== null ? await roundPatch(cp, start, end, whole, left).catch(() => null) : null;
+    const run = await this.side.startDetached({
+      key: `commit_split_draft:${randomUUID()}`,
+      prompt: commitSplitPrompt({
+        branch: format.branch, template: format.effective, subjects: format.subjects.slice(0, COMMIT_DRAFT_SUBJECTS), files: listed, wholePatch,
+        ...(format.source ? { templateSource: format.source } : {}), examples: format.learned?.examples ?? [],
+      }),
+      options: { persistSession: false, allowWeb: false, system: COMMIT_SPLIT_SYSTEM },
+    });
+    const result = await run.done;
+    if (result.stopReason === "interrupted") throw fail("cancelled");
+    if (result.error) throw fail(firstLineOf(result.error));
+    if (!result.text.trim()) throw fail("empty answer");
+    const raw = parseCommitSplit(result.text);
+    if (raw === null) throw fail("no JSON plan in the answer");
+    const plan = validateSplit(raw, listed);
+    if (plan.commits.length === 0) throw fail("no valid commit in the answer");
+    return { type: "commit_split_draft", ...plan };
+  }
+
+  /**
    * §51 `pr_ai_draft`: a read-only fork of the main session (no thread) writes the PR sheet's title and description from
    * the branch's commits and diff since `base`, the repository's PR template and what the sheet holds. Nothing is pushed.
    */
@@ -7528,6 +7567,7 @@ function laneOf(cmd: EngineCommand): Lane {
     case "side_ask":
     case "side_promote_draft":
     case "commit_draft": // MARK: wave3 engine-flow — §36.11 / §36.13: read-only forks, never behind the main lane
+    case "commit_split_draft": // §53
     case "prereview_start":
       return "side";
     case "prereview_cancel": // MARK: wave3 engine-flow — never stuck behind a start
@@ -7649,6 +7689,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "side_promote":
     case "side_promote_draft":
     case "commit_draft": // MARK: wave3 engine-flow
+    case "commit_split_draft": // §53
     case "pr_ai_draft": // §51
     case "prereview_start":
     case "prereview_cancel":

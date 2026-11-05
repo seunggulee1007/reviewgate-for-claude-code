@@ -732,6 +732,8 @@ export type EngineCommand =
   | Cmd<"commit_hunks", { paths?: string[] }>
   /** §53: the commits in order (hooks run, the worktree untouched), then one push when `push` (default `settings.commitPushByDefault`); replies `committed_series`. */
   | Cmd<"commit_series", { commits: CommitPlan[]; push?: boolean }>
+  /** §53: Claude's proposal of the split in a read-only fork (side lane); replies `commit_split_draft`. `paths` as `commit`. */
+  | Cmd<"commit_split_draft", { paths?: string[] }>
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1852,6 +1854,7 @@ export type EngineEvent =
   | PRAiDraftEvent
   | CommitHunksEvent // §53
   | CommittedSeriesEvent
+  | CommitSplitDraftEvent
   | WorkbenchPreviewEvent
   | WorkbenchProgressEvent
   | PreReviewEvent
@@ -1900,6 +1903,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "pr_ai_draft" } ? PRAiDraftEvent
   : C extends { type: "commit_hunks" } ? CommitHunksEvent // §53
   : C extends { type: "commit_series" } ? CommittedSeriesEvent
+  : C extends { type: "commit_split_draft" } ? CommitSplitDraftEvent
   : C extends { type: "task_background" } ? TaskBackgroundEvent
   : C extends { type: "task_output" } ? TaskOutputEvent
   : C extends { type: "workbench_preview" } ? WorkbenchPreviewEvent
@@ -1922,7 +1926,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | SideThreadEvent | SideThreadsEvent | SidePromoteDraftEvent | McpStatusEvent | FilesEvent | AttachmentEvent | RewoundEvent | PermissionRulesEvent
   | LiveChangesEvent
   | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | PRAiDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
-  | CommitHunksEvent | CommittedSeriesEvent // §53
+  | CommitHunksEvent | CommittedSeriesEvent | CommitSplitDraftEvent // §53
   | TaskBackgroundEvent | TaskOutputEvent
   | TranscriptPageEvent | TranscriptSearchEvent // MARK: wave4 w4-history (§38.3)
   | HistoryCleanupEvent // MARK: wave4b w4b-bigturn (§39.1)
@@ -2103,6 +2107,8 @@ export type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
 export type SeriesCommit = { sha: string; shortSha: string; message: string; files: string[] };
 /** §53: reply to `commit_series`. */
 export type CommittedSeriesEvent = { type: "committed_series"; id?: string; commits: SeriesCommit[]; branch: string | null; pushed: boolean };
+/** §53: reply to `commit_split_draft` — the proposed commits (only valid parts) and what none of them took. Nothing is committed. */
+export type CommitSplitDraftEvent = { type: "commit_split_draft"; id?: string; commits: CommitPlan[]; unassigned: CommitPart[] };
 /** §53: what a `commit_series` that failed in the middle made — on its `commit_failed` refusal. */
 export type PartialSeries = { commits: SeriesCommit[]; branch: string | null; pushed: false };
 
