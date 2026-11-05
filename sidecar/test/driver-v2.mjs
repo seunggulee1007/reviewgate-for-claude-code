@@ -22,7 +22,7 @@
 // tool_use/tool_result for the intercepted call — the deny would otherwise render as a red "tool error" transcript row) and
 // state.session.pendingPlan, with the plan file absent from changedOutside/the review → plan_response {approve:true, mode:"default"}
 // → the follow-up turn creates CONTRIBUTING.md → asserts it is pending in the review and the mode switched.
-// Also asserts the budget defaults (hello without budget), gate.reviewSummary and the capabilities cache on the second open_project.
+// Also asserts the budget defaults (hello without budget: no change budget, §54), gate.reviewSummary and the capabilities cache on the second open_project.
 // Asserts no `claude`/sidecar orphans and prints the max `state` size and count.
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
@@ -222,7 +222,7 @@ function procs() {
 // ---------------------------------------------------------------- scenario
 async function main() {
   const settings = {
-    // no `budget`: the engine defaults (M16 §4: 10 / 400 / 2.0) apply
+    // no `budget`: the engine defaults apply — no change budget (§54: 0 / 0 / 2.0)
     ignorePatterns: [".omc/", ".claude/settings.local.json"],
     autoAllowTools: [],
     loadUserSettings: true,
@@ -236,7 +236,7 @@ async function main() {
   assert(ready.type === "ready" && ready.protocolVersion === 2, "hello → ready");
   log(`ready: engine ${ready.engineVersion} on ${ready.platform}`);
   let s = await waitState((x) => x.seq >= 1, "initial state");
-  assert(s.budget.maxFiles === 10 && s.budget.maxLines === 400 && s.budget.hardMultiplier === 2, `budget defaults without hello.budget: ${JSON.stringify(s.budget)}`);
+  assert(s.budget.maxFiles === 0 && s.budget.maxLines === 0 && s.budget.hardMultiplier === 2, `budget defaults without hello.budget: ${JSON.stringify(s.budget)}`);
   assert(s.session.capabilitiesCached === false && Array.isArray(s.session.rememberedAllows) && s.session.rememberedAllows.length === 0, `M16 session fields: ${JSON.stringify(s.session)}`);
 
   await request({ type: "open_project", path: REPO });

@@ -15,6 +15,10 @@ export type { FileOrigin, NoteAnchor, SkippedPath };
 
 export const PROTOCOL_VERSION = 2 as const;
 
+/**
+ * The per-turn change budget. §54: opt-in — 0 is no limit on that count, and the engine's default `{0, 0}` is no change
+ * budget at all (nothing counted, warned of or denied; Claude is told nothing).
+ */
 export type Budget = {
   maxFiles: number;
   maxLines: number;

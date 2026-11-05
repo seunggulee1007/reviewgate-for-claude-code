@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { matchesIgnore } from "../src/git/ignore.js";
-import { BudgetState, countLines, estimateEditLines } from "../src/session/budget.js";
+import { BudgetState, budgetIsOn, countLines, estimateEditLines } from "../src/session/budget.js";
 import { GIT_MUTATING_RE, READ_ONLY_TOOLS, needsAsk } from "../src/session/hooks.js";
 
 const assert = {
@@ -129,6 +129,25 @@ test("BudgetState hard/soft thresholds and reset", () => {
   b.reset();
   assert.deepEqual(b.snapshot(), { files: 0, lines: 0, denied: false });
   assert.equal(b.callsAfterDeny, 0);
+});
+
+test("§54: a budget without limits (0, the default) is off; 0 on one count is no limit on that count", () => {
+  assert.equal(budgetIsOn({ maxFiles: 0, maxLines: 0 }), false);
+  assert.equal(budgetIsOn({ maxFiles: -1, maxLines: Number.NaN }), false);
+  assert.equal(budgetIsOn({ maxFiles: 10, maxLines: 0 }), true);
+  const off = new BudgetState({ maxFiles: 0, maxLines: 0, hardMultiplier: 2 });
+  assert.equal(off.active, false);
+  assert.equal(off.wouldExceedHard(1000, 1_000_000), false);
+  off.lines = 1_000_000;
+  assert.equal(off.exceedsSoft(), false);
+  const linesOnly = new BudgetState({ maxFiles: 0, maxLines: 10, hardMultiplier: 2 });
+  assert.equal(linesOnly.active, true);
+  assert.equal(linesOnly.wouldExceedHard(500, 20), false);
+  assert.equal(linesOnly.wouldExceedHard(500, 21), true);
+  linesOnly.files.add("/a");
+  assert.equal(linesOnly.exceedsSoft(), false);
+  linesOnly.lines = 10;
+  assert.equal(linesOnly.exceedsSoft(), true);
 });
 
 test("matchesIgnore: prefix, leading slash, globs (same cases as CheckpointIgnoreTests)", () => {

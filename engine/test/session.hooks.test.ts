@@ -423,3 +423,39 @@ describe("post-Bash file attribution (change → cause linkage)", () => {
     expect([ctx.budget.files.size, ctx.budget.lines]).toEqual([1, 1]);
   });
 });
+
+describe("§54: no change budget by default", () => {
+  const postToolUse = (tool: string, toolInput: Record<string, unknown>, cwd: string, toolUseId: string): HookInput =>
+    ({ hook_event_name: "PostToolUse", tool_name: tool, tool_input: toolInput, tool_response: {}, session_id: "s", transcript_path: "", cwd, tool_use_id: toolUseId }) as unknown as HookInput;
+
+  it("without a limit nothing is counted, warned of, nudged or denied — a Bash call's files are still attributed", async () => {
+    const root = track(makeRepo());
+    const cp = await openCheckpoint(root);
+    const ctx = fakeCtx(root, { maxFiles: 0, maxLines: 0 });
+    ctx.checkpointTree = await cp.snapshot();
+    const reported: [string, string[]][] = [];
+    ctx.onBashFiles = (id, files) => reported.push([id, files.map((f) => basename(f))]);
+    const hooks = buildHooks(ctx);
+    const preEdit = hooks.PreToolUse![0]!.hooks[0]!;
+    const preBash = hooks.PreToolUse![1]!.hooks[0]!;
+    const postEdit = hooks.PostToolUse![0]!.hooks[0]!;
+    const postBash = hooks.PostToolUse![1]!.hooks[0]!;
+    const opts = { signal: new AbortController().signal };
+
+    // Thirty files of 100 lines each: far past any budget the app ever had (10 files / 400 lines, ×2).
+    const big = Array.from({ length: 100 }, (_, i) => `line ${i}`).join("\n") + "\n";
+    for (let i = 0; i < 30; i++) {
+      const input = { file_path: join(root, `f${i}.txt`), content: big };
+      expect(await preEdit(preToolUse("Write", input, root), `w${i}`, opts)).toEqual({});
+      write(root, `f${i}.txt`, big);
+      expect(await postEdit(postToolUse("Write", input, root, `w${i}`), `w${i}`, opts)).toEqual({});
+    }
+    // A shell write after all that is not refused either (only the usual card decides).
+    expect(decision(await preBash(preToolUse("Bash", { command: "echo x > mine.txt" }, root), "b1", opts)).decision).not.toBe("deny");
+    write(root, "mine.txt", "x\n");
+    await postBash(postToolUse("Bash", { command: "echo x > mine.txt" }, root, "b1"), "b1", opts);
+    expect(reported).toEqual([["b1", ["mine.txt"]]]);
+    expect(ctx.events.filter((e) => e.type === "budget_event")).toEqual([]);
+    expect(ctx.budget.snapshot()).toEqual({ files: 0, lines: 0, denied: false });
+  });
+});

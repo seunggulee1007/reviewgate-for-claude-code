@@ -5,6 +5,16 @@ import type { Budget } from "../protocol.js";
 
 export const DEFAULT_HARD_MULTIPLIER = 1.5;
 
+/** §54: a count's limit, or null for none — 0 (the default), a negative number or not a number. */
+function limitOf(n: number): number | null {
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** §54: whether the budget limits anything. The default `{maxFiles: 0, maxLines: 0}` does not: no change budget. */
+export function budgetIsOn(b: Budget): boolean {
+  return limitOf(b.maxFiles) !== null || limitOf(b.maxLines) !== null;
+}
+
 /** Per-turn change-budget state. Reset on every user_message / turn_end. */
 export class BudgetState {
   files = new Set<string>();
@@ -35,15 +45,24 @@ export class BudgetState {
     return this.budget.hardMultiplier ?? DEFAULT_HARD_MULTIPLIER;
   }
 
-  /** True if the given (projected) totals exceed the hard limit (budget × hardMultiplier). */
-  wouldExceedHard(files: number, lines: number): boolean {
-    const m = this.hardMultiplier;
-    return files > this.budget.maxFiles * m || lines > this.budget.maxLines * m;
+  /** §54: false for a budget without limits — nothing is counted, warned of or denied, and Claude is told nothing. */
+  get active(): boolean {
+    return budgetIsOn(this.budget);
   }
 
-  /** True if current totals are at/over 100% of the soft budget. */
+  /** True if the given (projected) totals exceed the hard limit (budget × hardMultiplier) of a count that has one. */
+  wouldExceedHard(files: number, lines: number): boolean {
+    const m = this.hardMultiplier;
+    const maxFiles = limitOf(this.budget.maxFiles);
+    const maxLines = limitOf(this.budget.maxLines);
+    return (maxFiles !== null && files > maxFiles * m) || (maxLines !== null && lines > maxLines * m);
+  }
+
+  /** True if current totals are at/over 100% of the soft budget of a count that has one. */
   exceedsSoft(): boolean {
-    return this.files.size >= this.budget.maxFiles || this.lines >= this.budget.maxLines;
+    const maxFiles = limitOf(this.budget.maxFiles);
+    const maxLines = limitOf(this.budget.maxLines);
+    return (maxFiles !== null && this.files.size >= maxFiles) || (maxLines !== null && this.lines >= maxLines);
   }
 
   snapshot(): { files: number; lines: number; denied: boolean } {

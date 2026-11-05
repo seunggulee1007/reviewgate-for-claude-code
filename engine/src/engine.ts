@@ -340,7 +340,8 @@ const PEER_NAME_MAX = 64;
 const PEER_NAME_TOPIC_MIN = 8;
 
 export const DEFAULT_SETTINGS: Settings = {
-  budget: { maxFiles: 10, maxLines: 400, hardMultiplier: 2.0 },
+  // §54: no change budget unless the client sends one (0 = no limit on that count).
+  budget: { maxFiles: 0, maxLines: 0, hardMultiplier: 2.0 },
   ignorePatterns: [],
   autoAllowTools: [],
   loadUserSettings: true,

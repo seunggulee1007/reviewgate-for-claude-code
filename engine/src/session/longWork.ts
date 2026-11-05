@@ -188,18 +188,35 @@ export function rateLimitChanges(list: readonly RateLimitWindow[], w: RateLimitW
   return !same || same.status !== w.status || same.percent !== w.percent || same.utilization !== w.utilization || same.resetsAt !== w.resetsAt;
 }
 
-/** The numbers of a budget the instruction text names. */
+/** The numbers of a budget the instruction text names; 0 = no limit on that count (§54). */
 export type BudgetNumbers = { maxFiles: number; maxLines: number };
 
+const limitNumber = (n: number): number => (Number.isFinite(n) && n > 0 ? n : 0);
+
 export function budgetNumbers(b: Budget): BudgetNumbers {
-  return { maxFiles: b.maxFiles, maxLines: b.maxLines };
+  return { maxFiles: limitNumber(b.maxFiles), maxLines: limitNumber(b.maxLines) };
+}
+
+/** "at most 10 files and about 400 changed lines": the counts that have a limit. */
+function limitWords(b: BudgetNumbers): string {
+  const words: string[] = [];
+  if (b.maxFiles > 0) words.push(`at most ${b.maxFiles} files`);
+  if (b.maxLines > 0) words.push(`about ${b.maxLines} changed lines`);
+  return words.join(" and ");
 }
 
 /**
  * daily-18: the line put before the next message when the budget differs from the one Claude was last told about (the
- * system prompt the session started with, or an earlier note); null when it is the same.
+ * system prompt the session started with, or an earlier note); null when it is the same. §54: a budget turned on tells
+ * Claude its numbers, one turned off tells Claude the limit is gone.
  */
 export function budgetChangeNote(told: BudgetNumbers | null, now: Budget): string | null {
-  if (told === null || (told.maxFiles === now.maxFiles && told.maxLines === now.maxLines)) return null;
-  return `[Review gate] The change budget is now at most ${now.maxFiles} files and about ${now.maxLines} changed lines per reply (this replaces the numbers in your instructions).`;
+  if (told === null) return null;
+  const n = budgetNumbers(now);
+  if (told.maxFiles === n.maxFiles && told.maxLines === n.maxLines) return null;
+  if (n.maxFiles === 0 && n.maxLines === 0) {
+    return "[Review gate] The change budget is off: there is no limit on files or changed lines per reply (this replaces the numbers in your instructions).";
+  }
+  if (told.maxFiles === 0 && told.maxLines === 0) return `[Review gate] The user set a change budget: ${limitWords(n)} per reply.`;
+  return `[Review gate] The change budget is now ${limitWords(n)} per reply (this replaces the numbers in your instructions).`;
 }

@@ -19,7 +19,7 @@ export { suggestCommitMessage, COMMIT_SUBJECT_MAX } from "./review/commitMessage
 export { acquireLock, releaseLock, readLock, isPidAlive, isForeignLiveLock, lockPath, LOCK_FILE, type LockInfo, type LockOwner, type AcquireResult } from "./review/lock.js";
 export { ClaudeSession, resolveClaudeExecutable, activityDetail, type ClaudeSessionLike, type ClaudeSessionOptions, type SessionSettings, type PermissionSettings } from "./session/claude.js";
 export type { SessionEvent, SessionInfoEvent, SessionLog, ToolFileEntry } from "./session/events.js";
-export { BudgetState, countLines, estimateEditLines, resolveToolPath, DEFAULT_HARD_MULTIPLIER } from "./session/budget.js";
+export { BudgetState, budgetIsOn, countLines, estimateEditLines, resolveToolPath, DEFAULT_HARD_MULTIPLIER } from "./session/budget.js";
 export { buildHooks, needsAsk, autoAllowReason, reviewGateReason, EDIT_TOOLS_MATCHER, READ_ONLY_TOOLS, GIT_MUTATING_RE, ASK_REASON, READ_ONLY_BASH_REASON, ALLOW_PATTERN_REASON, REMEMBERED_REASON, MAX_CALLS_AFTER_DENY, type HookContext } from "./session/hooks.js";
 export { isReadOnlyCommand, isRemembered, matchesAllowPattern, rememberKey, scanCommand } from "./session/bashClass.js";
 export { AsyncQueue } from "./session/queue.js";

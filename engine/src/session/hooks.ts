@@ -193,8 +193,10 @@ const SHELL_MUTATING_RE =
   /(>|>>|\btee\b|\bsed\s+-i|\brm\b|\bmv\b|\bcp\b|\btouch\b|\bmkdir\b|\bchmod\b|\bnpm\s+(i|install)\b|\bnpx\b|\bpip\s+install)/;
 
 export function reviewGateReason(files: number, maxFiles: number, lines: number, maxLines: number): string {
+  // §54: a count without a limit (0) shows no "/0".
+  const count = (n: number, max: number): string => (max > 0 ? `${n}/${max}` : `${n}`);
   return (
-    `REVIEW GATE: per-turn change budget exceeded (files ${files}/${maxFiles}, lines ${lines}/${maxLines}). ` +
+    `REVIEW GATE: per-turn change budget exceeded (files ${count(files, maxFiles)}, lines ${count(lines, maxLines)}). ` +
     "Do NOT make further edits, do NOT work around this with shell commands. " +
     "Stop now and reply with a short report: (1) what you changed, (2) what remains, (3) exact next step."
   );
@@ -543,7 +545,7 @@ function toolFile(input: Record<string, unknown>, cwd: string): string | undefin
 
 async function countAfterDeny(ctx: HookContext): Promise<void> {
   const b = ctx.budget;
-  if (!b.denied) return;
+  if (!b.denied || !b.active) return;
   b.callsAfterDeny++;
   if (b.callsAfterDeny > MAX_CALLS_AFTER_DENY && ctx.query && !ctx.interrupted) {
     ctx.log("warn", `budget: ${b.callsAfterDeny} tool calls after deny; interrupting`);
@@ -554,19 +556,19 @@ async function countAfterDeny(ctx: HookContext): Promise<void> {
   }
 }
 
-/** Numstat of the current worktree vs `checkpointTree` through the checkpoint's temporary index: per file (absolute) and lines. */
-async function worktreeNumstat(
+/** Numstat of a post-Bash snapshot `tree` vs `checkpointTree`: per file (absolute) and lines. */
+async function treeNumstat(
   cp: GitCheckpoint,
   checkpointTree: string,
+  tree: string,
   ignorePatterns: string[],
-): Promise<{ entries: { file: string; lines: number }[]; tree: string }> {
-  const tree = await cp.snapshot();
+): Promise<{ file: string; lines: number }[]> {
   const entries: { file: string; lines: number }[] = [];
   for (const f of await cp.changes(checkpointTree, tree)) {
     if (matchesIgnore(f.path, ignorePatterns) && !isModsPath(f.path)) continue;
     entries.push({ file: resolveToolPath(f.path, cp.root), lines: f.added + f.deleted });
   }
-  return { entries, tree };
+  return entries;
 }
 
 /** Starts the execution window of a Bash / MCP call (§31); finished by `finishWindow` in PostToolUse(Failure). */
@@ -641,43 +643,46 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // Claude's own memory (~/.claude/projects/<project>/memory) is not in the review: the budget neither counts nor blocks
     // it (a turn over budget can still note what it learned); it keeps the outside-the-project card.
     if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return askPre(OUTSIDE_REASON);
-    const est = estimateEditLines(input.tool_name, ti, ctx.cwd);
+    // §54: the change budget is opt-in — without one (the default) an edit is neither counted nor denied.
+    if (b.active) {
+      const est = estimateEditLines(input.tool_name, ti, ctx.cwd);
 
-    const projectedFiles = new Set(b.files);
-    if (file) projectedFiles.add(file);
-    const projectedLines = b.lines + est;
+      const projectedFiles = new Set(b.files);
+      if (file) projectedFiles.add(file);
+      const projectedLines = b.lines + est;
 
-    if (b.denied || b.wouldExceedHard(projectedFiles.size, projectedLines)) {
-      b.denied = true;
-      await countAfterDeny(ctx);
-      ctx.emit({
-        type: "budget_event",
-        kind: "deny",
-        toolName: input.tool_name,
-        file,
-        files: projectedFiles.size,
-        lines: projectedLines,
-        budget: b.budget,
-      });
-      return denyPre(
-        reviewGateReason(projectedFiles.size, b.budget.maxFiles, projectedLines, b.budget.maxLines),
-      );
-    }
+      if (b.denied || b.wouldExceedHard(projectedFiles.size, projectedLines)) {
+        b.denied = true;
+        await countAfterDeny(ctx);
+        ctx.emit({
+          type: "budget_event",
+          kind: "deny",
+          toolName: input.tool_name,
+          file,
+          files: projectedFiles.size,
+          lines: projectedLines,
+          budget: b.budget,
+        });
+        return denyPre(
+          reviewGateReason(projectedFiles.size, b.budget.maxFiles, projectedLines, b.budget.maxLines),
+        );
+      }
 
-    if (file) b.files.add(file);
-    b.lines = projectedLines;
+      if (file) b.files.add(file);
+      b.lines = projectedLines;
 
-    if (!b.warned && b.exceedsSoft()) {
-      b.warned = true;
-      ctx.emit({
-        type: "budget_event",
-        kind: "warn",
-        toolName: input.tool_name,
-        file,
-        files: b.files.size,
-        lines: b.lines,
-        budget: b.budget,
-      });
+      if (!b.warned && b.exceedsSoft()) {
+        b.warned = true;
+        ctx.emit({
+          type: "budget_event",
+          kind: "warn",
+          toolName: input.tool_name,
+          file,
+          files: b.files.size,
+          lines: b.lines,
+          budget: b.budget,
+        });
+      }
     }
     // Path containment: an edit outside the checkpoint root (or through a symlink escaping it) is
     // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card.
@@ -701,7 +706,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     await countAfterDeny(ctx);
     const planDeny = planModeBlocked(input.tool_name, ti, ctx);
     if (planDeny) return denyPre(planDeny);
-    if (b.denied && SHELL_MUTATING_RE.test(command)) {
+    if (b.active && b.denied && SHELL_MUTATING_RE.test(command)) {
       return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
     }
     await bashBaseline(ctx);
@@ -781,7 +786,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   const postEdit: HookCallback = async (input) => {
     if (input.hook_event_name !== "PostToolUse") return allow();
     const b = ctx.budget;
-    if (!b.exceedsSoft()) return allow();
+    if (!b.active || !b.exceedsSoft()) return allow();
     return {
       hookSpecificOutput: {
         hookEventName: "PostToolUse",
@@ -810,21 +815,23 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     try {
       if (!ctx.checkpoint) ctx.checkpoint = await openCheckpoint(ctx.cwd);
       const cp = ctx.checkpoint;
-      const stat = await worktreeNumstat(cp, ctx.checkpointTree, ctx.ignorePatterns);
+      const tree = await cp.snapshot();
       const base = ctx.bashBaseTree ?? ctx.checkpointTree;
-      ctx.bashBaseTree = stat.tree;
+      ctx.bashBaseTree = tree;
       // §46: what a git command changed (a merge brings in another branch's files) is not Claude's: no budget, no attribution.
       const git = GIT_MUTATING_RE.test(String(toolInput(input).command ?? ""));
-      const changed = git ? [] : await changedBetween(cp, base, stat.tree, ctx.ignorePatterns);
+      const changed = git ? [] : await changedBetween(cp, base, tree, ctx.ignorePatterns);
       const attributed = window ? await changedWithin(changed, window, cp.root, ctx.windowMarginMs ?? WINDOW_MARGIN_MS) : changed;
       if (attributed.length > 0) ctx.onBashFiles?.(input.tool_use_id, attributed);
-      ctx.onBashSnapshot?.(input.tool_use_id, stat.tree, cp.root);
-      {
+      ctx.onBashSnapshot?.(input.tool_use_id, tree, cp.root);
+      // §54: without a budget (the default) nothing is counted — and the turn's numstat is not even taken.
+      if (b.active) {
         for (const f of attributed) b.files.add(f);
         // numstat is cumulative for the whole turn; take the larger of the two measures so edits already
         // counted by the pre-edit estimate are not double-counted. Only Claude's files count (§31).
+        const entries = await treeNumstat(cp, ctx.checkpointTree, tree, ctx.ignorePatterns);
         const mine = new Set([...b.files].map((f) => normalizeForCompare(f)));
-        const lines = stat.entries.reduce((n, e) => (mine.has(normalizeForCompare(e.file)) ? n + e.lines : n), 0);
+        const lines = entries.reduce((n, e) => (mine.has(normalizeForCompare(e.file)) ? n + e.lines : n), 0);
         if (lines > b.lines) b.lines = lines;
         if (!b.warned && b.exceedsSoft()) {
           b.warned = true;
@@ -839,7 +846,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
         }
       }
     } catch (e) {
-      ctx.log("debug", `numstat after Bash failed: ${String(e)}`);
+      ctx.log("debug", `snapshot after Bash failed: ${String(e)}`);
     }
     return allow();
   };

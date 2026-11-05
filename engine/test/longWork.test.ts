@@ -4,6 +4,7 @@ import { ClaudeSession } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
 import {
   budgetChangeNote,
+  budgetNumbers,
   clampMaxTurns,
   DEFAULT_MAX_TURNS,
   hookFailureNotice,
@@ -133,6 +134,22 @@ describe("pure rules", () => {
     expect(budgetChangeNote({ maxFiles: 10, maxLines: 400 }, { maxFiles: 20, maxLines: 1200 })).toBe(
       "[Review gate] The change budget is now at most 20 files and about 1200 changed lines per reply (this replaces the numbers in your instructions).",
     );
+  });
+
+  it("§54 budget note: turned on, Claude gets the numbers; turned off, Claude is told the limit is gone; 0 and below are the same", () => {
+    expect(budgetChangeNote({ maxFiles: 0, maxLines: 0 }, { maxFiles: 0, maxLines: 0, hardMultiplier: 2 })).toBeNull();
+    expect(budgetChangeNote({ maxFiles: 0, maxLines: 0 }, { maxFiles: -1, maxLines: Number.NaN })).toBeNull();
+    expect(budgetChangeNote({ maxFiles: 0, maxLines: 0 }, { maxFiles: 10, maxLines: 400 })).toBe(
+      "[Review gate] The user set a change budget: at most 10 files and about 400 changed lines per reply.",
+    );
+    expect(budgetChangeNote({ maxFiles: 10, maxLines: 400 }, { maxFiles: 0, maxLines: 0 })).toBe(
+      "[Review gate] The change budget is off: there is no limit on files or changed lines per reply (this replaces the numbers in your instructions).",
+    );
+    // One count without a limit is left out of the words.
+    expect(budgetChangeNote({ maxFiles: 10, maxLines: 400 }, { maxFiles: 0, maxLines: 300 })).toBe(
+      "[Review gate] The change budget is now about 300 changed lines per reply (this replaces the numbers in your instructions).",
+    );
+    expect(budgetNumbers({ maxFiles: -3, maxLines: 400 })).toEqual({ maxFiles: 0, maxLines: 400 });
   });
 });
 
@@ -307,6 +324,25 @@ describe("ReviewEngine (§38.2)", () => {
     await endTurn(h);
     await h.engine.request({ type: "send", text: "third" });
     expect(h.session().sends[2]!.text).toBe("third");
+  });
+
+  it("§54: without a budget nothing is said; turning one on and off again tells the running session each time", async () => {
+    const h = harness();
+    await h.hello({ budget: { maxFiles: 0, maxLines: 0 }, systemPromptAppend: "no budget words" });
+    await h.open(makeRepo());
+    await h.engine.request({ type: "send", text: "first" });
+    expect(h.session().sends[0]!.text).toBe("first");
+    await endTurn(h);
+    await h.engine.handle({ type: "set_settings", settings: { budget: { maxFiles: 10, maxLines: 400, hardMultiplier: 2 } } });
+    await h.engine.request({ type: "send", text: "second" });
+    expect(h.session().sends[1]!.text).toBe("[Review gate] The user set a change budget: at most 10 files and about 400 changed lines per reply.\n\nsecond");
+    await endTurn(h);
+    await h.engine.handle({ type: "set_settings", settings: { budget: { maxFiles: 0, maxLines: 0, hardMultiplier: 2 } } });
+    await h.engine.request({ type: "send", text: "third" });
+    expect(h.session().sends[2]!.text.startsWith("[Review gate] The change budget is off: there is no limit")).toBe(true);
+    await endTurn(h);
+    await h.engine.request({ type: "send", text: "fourth" });
+    expect(h.session().sends[3]!.text).toBe("fourth");
   });
 
   it("daily-18: a prompt re-rendered with the new budget (Electron) still tells the running session; a new session needs no note", async () => {

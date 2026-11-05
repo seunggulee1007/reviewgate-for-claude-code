@@ -52,17 +52,17 @@ async function reviewedTurn(h: Harness, dir: string): Promise<void> {
   await h.settle();
 }
 
-describe("budget defaults (M16 §4)", () => {
-  it("DEFAULT_SETTINGS carry 10 / 400 / 2.0 and a hello without a budget uses them", async () => {
-    expect(DEFAULT_SETTINGS.budget).toEqual({ maxFiles: 10, maxLines: 400, hardMultiplier: 2.0 });
+describe("budget defaults (M16 §4, §54)", () => {
+  it("DEFAULT_SETTINGS carry no change budget (0 / 0) and a hello without a budget runs without one", async () => {
+    expect(DEFAULT_SETTINGS.budget).toEqual({ maxFiles: 0, maxLines: 0, hardMultiplier: 2.0 });
     expect(DEFAULT_SETTINGS.autoAllowReadOnlyBash).toBe(true);
     expect(DEFAULT_SETTINGS.bashAllowPatterns).toEqual([]);
     const h = harness();
     const { budget: _omitted, ...withoutBudget } = testSettings;
     await h.engine.handle({ type: "hello", protocolVersion: 2, client: "test", settings: withoutBudget as unknown as Settings });
     await h.settle();
-    expect(h.engine.state.budget).toEqual({ maxFiles: 10, maxLines: 400, hardMultiplier: 2.0 });
-    // An explicit budget still wins.
+    expect(h.engine.state.budget).toEqual({ maxFiles: 0, maxLines: 0, hardMultiplier: 2.0 });
+    // An explicit budget still wins (an older client always sends its 10 / 400: it keeps its budget).
     await h.engine.handle({ type: "set_settings", settings: { budget: { maxFiles: 3, maxLines: 30 } } });
     await h.settle();
     expect(h.engine.state.budget).toEqual({ maxFiles: 3, maxLines: 30 });
