@@ -43,7 +43,8 @@ export function movedChatOf(s: ReviewState, id: string | null | undefined): Chat
 
 /** A card that can follow: a worktree-creating command whose target the engine named. */
 export function canFollow(req: PermissionRequest): boolean {
-  return req.reason?.code === "worktree_command" && typeof req.reason.path === "string" && req.reason.path.length > 0 && typeof req.toolUseId === "string";
+  // §39.4: never into another repository's worktree (a chat moves only between worktrees of one repository).
+  return req.reason?.code === "worktree_command" && req.reason.otherRepository !== true && typeof req.reason.path === "string" && req.reason.path.length > 0 && typeof req.toolUseId === "string";
 }
 
 /** One line on why a move was refused (the engine's code). */
@@ -53,6 +54,8 @@ export function moveRefusalText(code: string): string {
       return t("Claude is still working. Try again once the turn has ended.");
     case "not_a_worktree":
       return t("That folder is not a worktree of this repository.");
+    case "other_repository":
+      return t("That folder belongs to another repository, so this chat cannot move there. Open it in ReviewGate and go on in a new chat.");
     case "same_worktree":
       return t("This chat already works in that folder.");
     case "path_not_found":

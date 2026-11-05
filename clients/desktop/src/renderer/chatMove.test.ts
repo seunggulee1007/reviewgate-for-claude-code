@@ -68,6 +68,7 @@ describe("chat move (§39.4)", () => {
     expect(canFollow(card({ code: "worktree_command", message: "m", path: "/w/wt2" }))).toBe(true);
     expect(canFollow(card({ code: "worktree_command", message: "m" }))).toBe(false);
     expect(canFollow(card({ code: "other_worktree", message: "m", path: "/w/wt2" }))).toBe(false);
+    expect(canFollow(card({ code: "worktree_command", message: "m", path: "/w/other-7", otherRepository: true }))).toBe(false); // §39.4
     expect(canFollow(card({ code: "worktree_command", message: "m", path: "/w/wt2" }, null))).toBe(false);
     expect(canFollow(card(undefined))).toBe(false);
   });
@@ -115,6 +116,8 @@ describe("chat move (§39.4)", () => {
     // The reason in words follows (a missing folder is not "not a worktree").
     expect(chatMoveNoticeText("chat_move_failed", "/w/acme-42", "path_not_found")).toBe(`${chatMoveNoticeText("chat_move_failed", "/w/acme-42")} ${moveRefusalText("path_not_found")}`);
     expect(chatMoveNoticeText("other", "/a")).toBeNull();
+    // §39.4: another repository's worktree has its own reason, and its card never follows.
+    expect(moveRefusalText("other_repository")).not.toBe(moveRefusalText("not_a_worktree"));
     expect(presentationOf("chat_moved_in")).toBe("info");
     expect(presentationOf("chat_moved_in_disk")).toBe("info");
     expect(presentationOf("chat_move_failed")).toBe("warning");

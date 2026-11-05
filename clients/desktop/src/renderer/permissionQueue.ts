@@ -140,7 +140,7 @@ export type ReasonView = { code: string; text: string; tone: ReasonTone; path: s
  * `claude_config`). `code` is read as a string so a code a later engine adds still shows: the engine's English `message`.
  * `file` stands in for a missing `reason.path` (an edit's target).
  */
-export function reasonView(reason: { code: string; message: string; path?: string } | undefined, file?: string): ReasonView | null {
+export function reasonView(reason: { code: string; message: string; path?: string; otherRepository?: true } | undefined, file?: string): ReasonView | null {
   if (!reason) return null;
   const code: string = reason.code;
   const path = reason.path ?? file ?? null;
@@ -156,6 +156,10 @@ export function reasonView(reason: { code: string; message: string; path?: strin
     case "other_worktree":
       return view(short ? t("A location in another worktree ({0}) — this window's review does not capture it", short) : t("A location in another worktree — this window's review does not capture it"), "orange");
     case "worktree_command":
+      // §39.4: another repository's worktree — this chat cannot follow it there.
+      if (reason.otherRepository) {
+        return view(short ? t("Creates a git worktree of another repository ({0}) — this chat cannot move there; open that folder in ReviewGate to work there with a review", short) : t("Creates a git worktree of another repository — this chat cannot move there; open that folder in ReviewGate to work there with a review"), "red");
+      }
       return view(short ? t("Creates a new git worktree ({0}) — work inside it is outside this window's review", short) : t("Creates a new git worktree — work inside it is outside this window's review"), "red");
     case "worktree_isolation":
       return view(t("This agent works outside this folder (an isolated worktree, …) — its changes are not in this window's review"), "red");
