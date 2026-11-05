@@ -174,8 +174,8 @@ private final class Tour {
         UserDefaults.standard.set(false, forKey: AgentPanel.storageKey)
     }
 
-    /// §49.2 (`SHOTS_LAYOUT=1`): no turn — the chat column in short windows with the mode offer card up, and the
-    /// "Run as Task" sheet. `layout-<w>x<h>.png`, `run-as-task.png`.
+    /// §49.2 (`SHOTS_LAYOUT=1`): no turn — the chat column in short windows with the mode offer card up, the "Run as Task"
+    /// sheet, and the transcript as the column around it changes (§45.1). `layout-<w>x<h>.png`, `run-as-task.png`, `chat-*.png`.
     private func layoutShots() async throws {
         try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
         guard let window = entry.window else { throw TourError("no window") }
@@ -208,6 +208,131 @@ private final class Tour {
         entry.model.showNewWorkbench = false
         try await Task.sleep(for: .milliseconds(800))
         try await prSheetShot()
+        try await transcriptShots(window)
+    }
+
+    /// The transcript at the laptop size, through what changes the chat column around it: a long chat, a turn streamed in,
+    /// the permission mode cycled as ⇧⇥ does, the diff pane opened (⌘⇧D) and the mode cycled beside it, turns that end into a
+    /// review and reviews that end. `chat-<n>-<step>.png`, taken as they come (no width nudge); the log has the transcript's
+    /// scroll position and how much of it is drawn.
+    private func transcriptShots(_ window: NSWindow) async throws {
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1200))
+        var shot = 0
+        func capture(_ step: String) async throws {
+            try await Task.sleep(for: .milliseconds(1200))
+            shot += 1
+            let image = try render(window)
+            try write(image, "chat-\(shot)-\(step)")
+            logTranscript(image)
+        }
+        func cycleModes(_ times: Int, _ prefix: String) async throws {
+            for _ in 0..<times {
+                store.cyclePermissionMode()   // ⇧⇥ in the message box
+                try await capture("\(prefix)mode-\(store.permissionMode.rawValue)")
+            }
+        }
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        store.debugHandle((1...20).flatMap { Self.turnEvents($0, root: root) })   // a long chat
+        try await capture("long-chat")
+        store.debugShowGate(.running)
+        try await stream(Self.turnEvents(21, root: root))
+        store.debugShowGate(.idle)
+        try await capture("streamed")
+        try await cycleModes(4, "")
+        for round in 1...5 {
+            entry.model.toggleDiffTick += 1   // ⌘⇧D
+            try await capture("diff-open-\(round)")
+            try await cycleModes(4, "diff-")
+            entry.model.toggleDiffTick += 1
+            try await capture("diff-closed-\(round)")
+        }
+        // Turns that end into a review (running, rows streamed in, collecting, the summary and the files), and the review
+        // ending (the files accepted).
+        let files = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false),
+                     ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        for turn in 22...24 {
+            store.debugShowGate(.running)
+            try await stream(Self.turnEvents(turn, root: root))
+            store.debugShowGate(.collecting)
+            try await Task.sleep(for: .milliseconds(300))
+            store.debugHandle([.turnSummary(TurnSummary(turn: turn, files: files.map { TurnSummary.File(path: $0.path, adds: $0.added, dels: $0.deleted) }))])
+            store.debugShowGate(.reviewing, files: files)
+            try await capture("review-\(turn)")
+            store.debugShowGate(.idle)
+            try await capture("reviewed-\(turn)")
+        }
+    }
+
+    /// Events one by one, as a turn sends them: the answer's text in small pieces.
+    private func stream(_ events: [EngineEvent]) async throws {
+        for event in events {
+            store.debugHandle([event])
+            if case .textDelta = event { try await Task.sleep(for: .milliseconds(20)) } else { try await Task.sleep(for: .milliseconds(150)) }
+        }
+    }
+
+    /// One turn of a made-up chat about the demo project: the request, a read, an edit, a test run and the answers.
+    private static func turnEvents(_ turn: Int, root: String) -> [EngineEvent] {
+        let file = "\(root)/src/\(turn % 2 == 0 ? "cart" : "pricing").ts"
+        let read = "toolu_read_\(turn)", edit = "toolu_edit_\(turn)", test = "toolu_test_\(turn)"
+        func answer(_ text: String) -> [EngineEvent] {
+            text.split(separator: " ", omittingEmptySubsequences: false).enumerated().map { i, word in .textDelta(text: (i == 0 ? "" : " ") + word) }
+        }
+        return [.userMessage(text: "Step \(turn): make the discount codes stack in the order they were entered, and keep the tests green.", turn: turn)]
+            + answer("I'll read the pricing code first to see how a code is applied today.")
+            + [.toolUse(id: read, name: "Read", input: .object(["file_path": .string(file)]), file: file),
+               .toolResult(toolUseId: read, isError: false, preview: (1...12).map { "\($0)\texport const line\($0) = \($0 * 10);" }.joined(separator: "\n"))]
+            + answer("""
+            The codes are applied one by one, but **SAVE10** is taken off the subtotal after shipping. I'll change \
+            `applyCodes` so that:
+
+            1. percentage codes come first, in the order entered;
+            2. `FREESHIP` only zeroes the shipping line;
+            3. an unknown code throws `UnknownCodeError` with the code in its message.
+            """)
+            + [.toolUse(id: edit, name: "Edit", input: .object(["file_path": .string(file), "old_string": .string("const total = subtotal + shipping;"),
+                                                                 "new_string": .string("const total = applyCodes(subtotal, codes) + shippingFor(codes);")]), file: file),
+               .toolResult(toolUseId: edit, isError: false, preview: "The file \(file) has been updated."),
+               .toolUse(id: test, name: "Bash", input: .object(["command": .string("npm test"), "description": .string("Run the tests")]), file: nil),
+               .toolResult(toolUseId: test, isError: false, preview: "✔ applies SAVE10 (2ms)\n✔ FREESHIP removes shipping (1ms)\n✔ rejects unknown codes (1ms)\nℹ tests 12\nℹ pass 12")]
+            + answer("Step \(turn) is done: the codes stack in order and all 12 tests pass.")
+    }
+
+    /// The transcript's scroll view in `image`: what it shows of its content, and how much of that is drawn ("BLANK": nothing).
+    private func logTranscript(_ image: NSBitmapImageRep) {
+        if transcript?.window == nil, let window = entry.window {
+            transcript = (try? scrollViews(window))?.max { $0.convert($0.bounds, to: nil).maxX < $1.convert($1.bounds, to: nil).maxX }
+        }
+        guard let chat = transcript else { return log("chat: no scroll view") }
+        let frame = chat.convert(chat.bounds, to: nil)
+        let ink = Self.ink(image, in: frame)
+        log("chat: shows \(NSStringFromRect(chat.contentView.bounds)) of \(NSStringFromRect(chat.documentView?.frame ?? .zero)), "
+            + "frame \(NSStringFromRect(frame)), ink \(String(format: "%.1f", ink * 100)) %" + (ink < 0.01 ? " — BLANK" : ""))
+    }
+
+    /// The share of `rect`'s pixels (window points, bottom-left origin) that differ from its most common colour.
+    private static func ink(_ rep: NSBitmapImageRep, in rect: NSRect) -> Double {
+        let scale = CGFloat(rep.pixelsWide) / rep.size.width
+        let crop = CGRect(x: rect.minX * scale, y: (rep.size.height - rect.maxY) * scale,
+                          width: rect.width * scale, height: rect.height * scale).integral
+        guard let image = rep.cgImage?.cropping(to: crop) else { return 1 }
+        let (w, h) = (image.width, image.height)
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        px.withUnsafeMutableBytes { buffer in
+            CGContext(data: buffer.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)?
+                .draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        var counts: [Int: Int] = [:]
+        for i in stride(from: 0, to: px.count, by: 4) { counts[Int(px[i]) << 16 | Int(px[i + 1]) << 8 | Int(px[i + 2]), default: 0] += 1 }
+        guard let background = counts.max(by: { $0.value < $1.value })?.key else { return 1 }
+        let (r, g, b) = (background >> 16 & 255, background >> 8 & 255, background & 255)
+        var ink = 0
+        for i in stride(from: 0, to: px.count, by: 4) where abs(Int(px[i]) - r) + abs(Int(px[i + 1]) - g) + abs(Int(px[i + 2]) - b) > 40 {
+            ink += 1
+        }
+        return Double(ink) / Double(max(w * h, 1))
     }
 
     /// §52: the chat with two background tasks (the HUD chip) and the row of a turn Claude started after one ended, at the

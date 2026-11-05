@@ -6166,7 +6166,9 @@ The window's minimum is 900 × 460 pt (it was 1100 × 700). macOS fits a new win
 came out smaller than that minimum (1000 × 637 in the report). SwiftUI then drew the content at its minimum size, centred.
 That clipped all four sides: the tab strip, the HUD and the composer, and the left of the sidebar. None of it could be
 scrolled into view. Now a window that small lays out like any other. The layout check (`SHOTS_LAYOUT=1`) shoots 1100 × 752,
-1000 × 637 and 900 × 512, each with and without the mode offer.
+1000 × 637 and 900 × 512, each with and without the mode offer. At 1000 × 637 it then fills the transcript with a long chat
+and shoots it after every change around it: ⇧⇥ through the modes, the diff pane opened and closed (⌘⇧D), turns that end
+into a review and reviews that end (`chat-*.png`; the log says how much of the transcript is drawn, `BLANK` for nothing).
 
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the
   first message sent in the task's mode, `task_started` sent: true, the file gone, a second open plain), no mode (the

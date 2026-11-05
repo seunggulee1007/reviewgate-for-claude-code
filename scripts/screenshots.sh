@@ -20,7 +20,8 @@
 #   DEMO_DIR       the demo project (default /Users/Shared/acme-shop; not under /tmp, where the app shows a banner)
 #   SHOTS_PROMPT   the prompt (default: the tour's own)       SHOTS_MODEL    default haiku
 #   SHOTS_WIDTH    image width in pixels (default 1600)        SHOTS_TIMEOUT  seconds for the tour (default 600)
-#   SHOTS_LAYOUT   1: no turn — the chat column in short windows and the "Run as Task" sheet, PNGs left in SHOTS_DIR/raw
+#   SHOTS_LAYOUT   1: no turn — the chat column in short windows, the "Run as Task" sheet and the transcript through
+#                  ⇧⇥ and reviews (made-up rows), PNGs left in SHOTS_DIR/raw
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
