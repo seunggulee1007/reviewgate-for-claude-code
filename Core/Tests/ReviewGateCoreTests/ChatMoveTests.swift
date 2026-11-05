@@ -48,6 +48,20 @@ import Testing
         #expect(back.movedTo == meta.movedTo && back.movedFrom == meta.movedFrom)
     }
 
+    @Test func anotherRepositorysWorktreeIsNeverFollowed() throws {
+        let store = makeState()
+        let own = PermissionRequest(requestId: "r1", toolName: "Bash", input: .object([:]), file: nil, toolUseId: "b1",
+                                    reason: PermissionReason(code: .worktreeCommand, path: "/w/acme-42"))
+        let other = PermissionRequest(requestId: "r2", toolName: "Bash", input: .object([:]), file: nil, toolUseId: "b2",
+                                      reason: PermissionReason(code: .worktreeCommand, path: "/w/other-42", otherRepository: true))
+        #expect(store.canFollow(own))
+        #expect(!store.canFollow(other))
+        #expect(PermissionReasonText.line(other.reason!) != PermissionReasonText.line(own.reason!))
+        let decoded = try NDJSON.decode(PermissionReason.self, from: #"{"code":"worktree_command","message":"m","path":"/w/x","otherRepository":true}"#)
+        #expect(decoded.otherRepository)
+        #expect(ChatMoveText.refusal("other_repository") != ChatMoveText.refusal("not_a_worktree"))
+    }
+
     @Test func noticesAreWordedAndStyled() {
         let detail = EngineErrorDetail(code: "chat_moved_in", detail: nil, path: "/Users/me/acme")
         let text = SessionNotices.errorText(message: "m", detail: detail)

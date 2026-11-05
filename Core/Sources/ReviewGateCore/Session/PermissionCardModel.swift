@@ -163,6 +163,10 @@ public enum PermissionReasonText {
         case .otherWorktree:
             if let path { return String(localized: "Works in another worktree (\(path)) — this window's review does not see it", bundle: .module) }
             return String(localized: "Works in another worktree — this window's review does not see it", bundle: .module)
+        case .worktreeCommand where reason.otherRepository:
+            // §39.4: another repository's worktree — this chat cannot follow it there.
+            if let path { return String(localized: "Creates a git worktree of another repository (\(path)) — this chat cannot move there; open that folder in ReviewGate to work there with a review", bundle: .module) }
+            return String(localized: "Creates a git worktree of another repository — this chat cannot move there; open that folder in ReviewGate to work there with a review", bundle: .module)
         case .worktreeCommand:
             if let path { return String(localized: "Creates a new git worktree (\(path)) — work inside it is outside this window's review", bundle: .module) }
             return String(localized: "Creates a new git worktree — work inside it is outside this window's review", bundle: .module)

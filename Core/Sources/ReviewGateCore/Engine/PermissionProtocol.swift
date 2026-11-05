@@ -89,22 +89,26 @@ public struct PermissionReason: Sendable, Equatable, Hashable {
     public var message: String
     /// The nested repository / worktree root / settings file concerned (absolute, native).
     public var path: String?
+    /// §39.4 `worktree_command`: the worktree belongs to another repository — no chat of this window can follow it.
+    public var otherRepository = false
 
-    public init(code: Code, message: String = "", path: String? = nil) {
+    public init(code: Code, message: String = "", path: String? = nil, otherRepository: Bool = false) {
         self.code = code
         self.message = message
         self.path = path
+        self.otherRepository = otherRepository
     }
 }
 
 extension PermissionReason: Codable {
-    private enum CodingKeys: String, CodingKey { case code, message, path }
+    private enum CodingKeys: String, CodingKey { case code, message, path, otherRepository }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(code: Code(rawValue: (try? c.decodeIfPresent(String.self, forKey: .code)) ?? ""),
                   message: (try? c.decodeIfPresent(String.self, forKey: .message)) ?? "",
-                  path: try? c.decodeIfPresent(String.self, forKey: .path))
+                  path: try? c.decodeIfPresent(String.self, forKey: .path),
+                  otherRepository: ((try? c.decodeIfPresent(Bool.self, forKey: .otherRepository)) ?? nil) ?? false)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -112,6 +116,7 @@ extension PermissionReason: Codable {
         try c.encode(code.rawValue, forKey: .code)
         try c.encode(message, forKey: .message)
         try c.encodeIfPresent(path, forKey: .path)
+        if otherRepository { try c.encode(true, forKey: .otherRepository) }
     }
 }
 

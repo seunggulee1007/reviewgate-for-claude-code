@@ -4423,6 +4423,38 @@
         }
       }
     },
+    "Creates a git worktree of another repository (%@) — this chat cannot move there; open that folder in ReviewGate to work there with a review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creates a git worktree of another repository (%@) — this chat cannot move there; open that folder in ReviewGate to work there with a review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 저장소의 git 워크트리를 만들어요 (%@) — 이 채팅은 거기로 옮길 수 없어요. 그 폴더를 ReviewGate로 열면 리뷰를 받으며 작업할 수 있어요"
+          }
+        }
+      }
+    },
+    "Creates a git worktree of another repository — this chat cannot move there; open that folder in ReviewGate to work there with a review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creates a git worktree of another repository — this chat cannot move there; open that folder in ReviewGate to work there with a review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 저장소의 git 워크트리를 만들어요 — 이 채팅은 거기로 옮길 수 없어요. 그 폴더를 ReviewGate로 열면 리뷰를 받으며 작업할 수 있어요"
+          }
+        }
+      }
+    },
     "Creates a new git worktree (%@) — work inside it is outside this window's review": {
       "localizations": {
         "en": {
@@ -10239,6 +10271,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "그 지적은 이미 없습니다"
+          }
+        }
+      }
+    },
+    "That folder belongs to another repository, so this chat cannot move there. Open it in ReviewGate and go on in a new chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That folder belongs to another repository, so this chat cannot move there. Open it in ReviewGate and go on in a new chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그 폴더는 다른 저장소라서 이 채팅을 옮길 수 없어요. 그 폴더를 ReviewGate로 열어 새 채팅으로 이어가세요."
           }
         }
       }

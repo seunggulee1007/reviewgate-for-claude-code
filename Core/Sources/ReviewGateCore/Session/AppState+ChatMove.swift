@@ -116,6 +116,7 @@ public enum ChatMoveText {
         case "not_a_worktree": String(localized: "That folder is not a worktree of this repository.", bundle: .module)
         case "same_worktree": String(localized: "This chat already works in that folder.", bundle: .module)
         case "path_not_found": String(localized: "That folder does not exist.", bundle: .module)
+        case "other_repository": String(localized: "That folder belongs to another repository, so this chat cannot move there. Open it in ReviewGate and go on in a new chat.", bundle: .module)
         case "notes_pending": String(localized: "Send or remove the review notes first: they belong to this chat.", bundle: .module)
         case "review_pending": String(localized: "Changes are being requested in this chat. Finish that round first.", bundle: .module)
         case "collect_failed": String(localized: "Collecting this turn's changes failed. Retry it first.", bundle: .module)
@@ -193,7 +194,8 @@ extension AppState {
 
     /// A card that can follow: a worktree-creating command whose target the engine named.
     public func canFollow(_ request: PermissionRequest) -> Bool {
-        request.reason?.code == .worktreeCommand && !(request.reason?.path ?? "").isEmpty && request.toolUseId != nil
+        // §39.4: never into another repository's worktree (a chat moves only between worktrees of one repository).
+        request.reason?.code == .worktreeCommand && request.reason?.otherRepository != true && !(request.reason?.path ?? "").isEmpty && request.toolUseId != nil
     }
 
     /// §39.4 `chat_receive`: this window takes the chat handed to it (a window that already had the worktree open).
