@@ -118,7 +118,7 @@ type NameStatusEntry = {
  * as the index file itself ("racy git"), so a copy stamped now hid a same-size edit made in the second the index was
  * written (an IDE's refresh, then Claude's edit). Best effort, like the copy itself.
  */
-async function copyIndex(from: string, to: string): Promise<void> {
+export async function copyIndex(from: string, to: string): Promise<void> {
   try {
     await copyFile(from, to);
     const st = await stat(from);

@@ -6437,6 +6437,7 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
 // command commit_series { commits: CommitPlan[]; push? } → reply committed_series { commits: { sha; shortSha; message; files: string[] }[]; branch; pushed }
 ```
 
+// a failure after ≥ 1 commit: result { ok: false, error: "commit_failed:<git's words>", code: "commit_failed", partial: { commits, branch, pushed: false } }
 - **Hunks** are those of `git diff HEAD -- <path>` (3 lines of context) — what a commit takes from the worktree — for
   accepted paths only (`paths` as `commit`: default `commit.acceptedPaths`, refused `nothing_to_commit` for any other).
   Ids are 0, 1, … in file order. An added, deleted, binary or renamed file, or one whose diff has a single hunk, can only
@@ -6450,10 +6451,11 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
   over is `unassigned`. Nothing is committed.
 - **`commit_series`** makes the commits in order, then pushes once when `push` (default `settings.commitPushByDefault`).
   - Refusals:
-    - like `commit`: `no_project`, `session_running`, `collect_failed`, `nothing_to_commit`, `empty_message` (any
-      commit), `git_identity_missing:…`, `merge_unresolved`;
-    - `invalid_part:<path>` (a path that is not accepted, an unknown hunk id, a whole-only file given hunks);
-    - `hunk_twice:<path>#<id>`;
+    - like `commit`: `no_project`, `session_running`, `collect_failed`, `nothing_to_commit` (also: no commits, a commit
+      without parts), `empty_message` (any commit), `git_identity_missing:…`, `merge_unresolved` (any merge in progress:
+      a series cannot conclude it — `commit` does);
+    - `invalid_part:<path>` (a path that is not accepted, an unknown hunk id, `hunks: []`, a whole-only file given hunks);
+    - `hunk_twice:<path>#<id>` (a whole file includes every hunk; a whole-only file twice: `hunk_twice:<path>`);
     - `commit_failed:<git's words>`.
     A refusal before the first commit changes nothing.
   - Each commit is made with git's own `commit` on a temporary index (`GIT_INDEX_FILE`) that starts from `HEAD`, so the
@@ -6462,8 +6464,10 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
     takes the worktree's content (or its deletion; a rename stages both paths). `settings.commitTrailer` is added as
     `commit` adds it.
   - The worktree is never written. The user's own index keeps everything except the committed paths, which are set to
-    the new HEAD, as `commit --only` leaves them. A failure in the middle stops there and reports
-    `commit_failed:<words>` with `committed_series` of what was made (`partial: true`).
+    the new HEAD, as `commit --only` leaves them. A failure in the middle stops there and is refused
+    `commit_failed:<words>`; when at least one commit was made, the refusal's `result` carries them as `partial`
+    (`{ commits, branch, pushed: false }`, the shape of `committed_series`) and nothing is pushed. No
+    `committed_series` event goes out then.
   - Afterwards A is rebuilt with the committed content of every touched path and B re-snapshotted, as after `commit`. A
     file with hunks left uncommitted stays in the review, accepted, with only those hunks in its diff. A file fully
     committed leaves it. `state.commit.lastCommit` is the last commit; each commit is a §38.3 history row.

@@ -193,8 +193,9 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
-import type { CommitHunksEvent } from "./protocol.js"; // §53
-import { headHunks } from "./git/commitHunks.js"; // §53
+import type { CommitHunksEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
+import { headHunks, splitContent, type HeadFile } from "./git/commitHunks.js"; // §53
+import { commitOnHead, indexToHead, SeriesCommitError, worktreeBlob, writeBlob, type SeriesBlob } from "./git/series.js";
 import type { AutoTurnInfo, BackgroundTask, TaskBackgroundEvent, TaskOutputEvent } from "./protocol.js"; // §52
 import { autoTurnPrompt, readTail } from "./session/background.js";
 import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT_SYSTEM, prAiDraftPrompt } from "./review/prAiDraft.js";
@@ -1232,6 +1233,8 @@ export class ReviewEngine {
         return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true);
       case "commit_hunks": // §53
         return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
+      case "commit_series":
+        return this.commitSeries(cmd.commits, cmd.push ?? this.settings.commitPushByDefault === true);
       case "push":
         return this.pushLastCommit();
       case "refresh":
@@ -4015,6 +4018,157 @@ export class ReviewEngine {
     const cp = this.requireProject();
     const files = this.commitFiles(requested);
     return { type: "commit_hunks", files: (await headHunks(cp, files)).map((f) => f.file) };
+  }
+
+  /**
+   * §53 `commit_series`: the commits in order, each git's own `commit` on a temporary index from HEAD (the hooks run as for
+   * `commit`): a whole file as the worktree holds it, a file split by hunks as HEAD's content with the hunks of this and the
+   * earlier commits applied (from the one `git diff HEAD` taken before the first). Everything is checked first, so a refusal
+   * before the first commit changes nothing. The worktree is never written; the user's index keeps everything but the
+   * committed paths, which follow HEAD. A failure in the middle stops there (`commit_failed` + `partial`). One push at the end.
+   */
+  private async commitSeries(rawCommits: unknown, push: boolean): Promise<CommittedSeriesEvent> {
+    const cp = this.requireProject();
+    if (this.gate.running || this.gate.collecting || this.gate.reverting) throw new CommandRefused("session_running");
+    if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
+    const accepted = acceptedPaths(this.gate);
+    const raw: unknown[] = Array.isArray(rawCommits) ? rawCommits : [];
+    const shape = raw.map((c) => (c && typeof c === "object" ? (c as { message?: unknown; parts?: unknown }) : {}));
+    if (accepted.length === 0 || shape.length === 0 || shape.some((c) => !Array.isArray(c.parts) || c.parts.length === 0)) throw new CommandRefused("nothing_to_commit");
+    const trailer = (this.settings.commitTrailer ?? "").trim();
+    const messages = shape.map((c) => {
+      let message = typeof c.message === "string" ? c.message.trim() : "";
+      if (!message) throw new CommandRefused("empty_message");
+      if (trailer && !message.split(/\r?\n/).some((l) => l.trim() === trailer)) message += `\n\n${trailer}`;
+      return message;
+    });
+    // Every part: an accepted path, whole (no `hunks`) or a non-empty list of hunk ids.
+    const parts = shape.map((c) => (c.parts as unknown[]).map((p) => {
+      const part = p && typeof p === "object" ? (p as { path?: unknown; hunks?: unknown }) : {};
+      const path = typeof part.path === "string" ? part.path : String(part.path);
+      if (!accepted.includes(path)) throw new CommandRefused(`invalid_part:${path}`, { code: "invalid_part" });
+      if (part.hunks === undefined || part.hunks === null) return { path, hunks: null };
+      if (!Array.isArray(part.hunks) || part.hunks.length === 0 || part.hunks.some((id) => !Number.isInteger(id))) throw new CommandRefused(`invalid_part:${path}`, { code: "invalid_part" });
+      return { path, hunks: part.hunks as number[] };
+    }));
+    const files = this.commitFiles([...new Set(parts.flat().map((p) => p.path))]);
+    const head = new Map((await headHunks(cp, files)).map((f) => [f.file.path, f]));
+    // Known hunk ids only, a whole-only file given whole, no hunk (or whole-only file) twice.
+    const taken = new Map<string, Set<number>>();
+    for (const part of parts.flat()) {
+      const hf = head.get(part.path)!;
+      const ids = hf.hunks.length === 0 ? [-1] : part.hunks ?? hf.hunks.map((h) => h.id);
+      if (part.hunks !== null && (hf.hunks.length === 0 || part.hunks.some((id) => !hf.hunks.some((h) => h.id === id)))) throw new CommandRefused(`invalid_part:${part.path}`, { code: "invalid_part" });
+      const used = taken.get(part.path) ?? new Set<number>();
+      taken.set(part.path, used);
+      for (const id of ids) {
+        if (used.has(id)) throw new CommandRefused(id < 0 ? `hunk_twice:${part.path}` : `hunk_twice:${part.path}#${id}`, { code: "hunk_twice" });
+        used.add(id);
+      }
+    }
+    const identity = await gitIdentity(cp.root);
+    this.commitSlice.identity = identity;
+    this.touch();
+    const missing = [identity.name === null ? "user.name" : null, identity.email === null ? "user.email" : null].filter((k) => k !== null);
+    if (missing.length > 0) throw new CommandRefused(`git_identity_missing:${missing.join(" and ")} not set (git config --global ${missing[0]} …)`);
+    // A series cannot conclude a merge (§46): its first commit would leave out what the merge brings in.
+    if (await cp.mergeInProgress().catch(() => null)) throw new CommandRefused("merge_unresolved:a merge is in progress — conclude it with one commit (commit)", { code: "merge_unresolved" });
+    // The content of each part split by hunks, computed now from the one diff above: nothing is committed if any fails.
+    const planned = await this.planSeries(cp, messages, parts, head);
+    const made: SeriesCommit[] = [];
+    let failure: string | null = null;
+    for (const c of planned) {
+      try {
+        const sha = await commitOnHead(cp, c.message, c.whole, c.blobs);
+        made.push({ sha, shortSha: sha.slice(0, 7), message: c.message, files: c.files });
+      } catch (e) {
+        failure = e instanceof SeriesCommitError ? e.message : errorMessage(e);
+        break;
+      }
+    }
+    if (failure !== null) this.fail(`Failed to commit: ${failure}`, false, "git", { code: "commit_failed" });
+    if (made.length === 0) throw new CommandRefused(`commit_failed:${failure}`, { code: "commit_failed" });
+    const branch = await this.afterSeries(cp, planned.slice(0, made.length), made, head);
+    if (failure !== null) throw new CommandRefused(`commit_failed:${failure}`, { code: "commit_failed", partial: { commits: made, branch, pushed: false } });
+    if (push) await this.pushLastCommit();
+    return { type: "committed_series", commits: made, branch, pushed: this.commitSlice.lastCommit?.pushed === true };
+  }
+
+  /** §53: each commit's message, its whole paths (a rename's both) and its blobs; refused `commit_failed` when a split file's diff no longer matches it. */
+  private async planSeries(cp: GitCheckpoint, messages: string[], parts: { path: string; hunks: number[] | null }[][], head: ReadonlyMap<string, HeadFile>): Promise<PlannedCommit[]> {
+    const sides = new Map<string, { head: Buffer; work: Buffer; mode: string }>();
+    const applied = new Map<string, Set<number>>();
+    const planned: PlannedCommit[] = [];
+    for (const [k, list] of parts.entries()) {
+      const c: PlannedCommit = { message: messages[k]!, whole: [], blobs: [], files: [], parts: list };
+      for (const part of list) {
+        if (!c.files.includes(part.path)) c.files.push(part.path);
+        const hf = head.get(part.path)!;
+        if (part.hunks === null) {
+          c.whole.push(part.path);
+          if (hf.file.oldPath) c.whole.push(hf.file.oldPath);
+          continue;
+        }
+        let side = sides.get(part.path);
+        if (!side) {
+          const [h, w, mode] = await Promise.all([cp.fileContent(part.path, "HEAD"), worktreeBlob(cp, part.path), cp.treeMode("HEAD", part.path)]);
+          side = { head: h, work: w.content, mode: mode ?? "100644" };
+          sides.set(part.path, side);
+        }
+        const done = applied.get(part.path) ?? new Set<number>();
+        applied.set(part.path, done);
+        for (const id of part.hunks) done.add(id);
+        let content: Buffer;
+        try {
+          content = splitContent(side.head, side.work, hf.hunks, done);
+        } catch (e) {
+          throw new CommandRefused(`commit_failed:${part.path} changed while the commits were prepared (${errorMessage(e)})`, { code: "commit_failed" });
+        }
+        const blob = { path: part.path, mode: side.mode, sha: await writeBlob(cp, content) };
+        c.blobs = [...c.blobs.filter((b) => b.path !== part.path), blob];
+      }
+      planned.push(c);
+    }
+    return planned;
+  }
+
+  /**
+   * §53 after the commits `made` (the first `planned`): the user's index entries of the committed paths follow HEAD, the last
+   * commit is `state.commit.lastCommit`, every fully committed file leaves the review with the commit that took its last
+   * part (§38.3). Returns the branch.
+   */
+  private async afterSeries(cp: GitCheckpoint, planned: readonly PlannedCommit[], made: readonly SeriesCommit[], head: ReadonlyMap<string, HeadFile>): Promise<string | null> {
+    const touched = [...new Set(planned.flatMap((c) => [...c.whole, ...c.blobs.map((b) => b.path)]))];
+    try {
+      await indexToHead(cp, touched);
+    } catch (e) {
+      this.fail(`Failed to update the index after the commits: ${errorMessage(e)}`, false, "git", { code: "commit_failed" });
+    }
+    const branch = await cp.branchName();
+    const last = made[made.length - 1]!;
+    this.commitSlice.lastCommit = { sha: last.sha, shortSha: last.shortSha, message: last.message, branch, pushed: false, pushError: null, files: last.files, at: new Date().toISOString() };
+    this.touch();
+    const taken = new Map<string, Set<number>>();
+    const tookLast = new Map<string, HistoryCommit>();
+    for (const [k, c] of planned.entries()) {
+      for (const part of c.parts) {
+        const all = head.get(part.path)!.hunks.map((h) => h.id);
+        const used = taken.get(part.path) ?? new Set<number>();
+        taken.set(part.path, used);
+        for (const id of part.hunks ?? all) used.add(id);
+        tookLast.set(part.path, { sha: made[k]!.sha, subject: firstLineOf(made[k]!.message).slice(0, 200) });
+      }
+    }
+    const full = [...taken.entries()].filter(([path, used]) => head.get(path)!.hunks.every((h) => used.has(h.id))).map(([path]) => path);
+    try {
+      await this.gate.dropCommitted(full, tookLast, made.length);
+    } catch (e) {
+      this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
+    }
+    this.touch();
+    await this.refreshBranches();
+    await this.refreshWorkbenches(false);
+    return branch;
   }
 
   /** `git push` for the last commit (`push -u origin <branch>` without an upstream); refused with `no_remote` / `push_failed:<line>`. */
@@ -7524,6 +7678,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "workbench_prune":
     case "commit":
     case "commit_hunks": // §53
+    case "commit_series":
     case "push":
     case "refresh":
     case "rewind":
@@ -7543,6 +7698,9 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
       return "engine";
   }
 }
+
+/** §53: one commit of a series as it will be made. */
+type PlannedCommit = { message: string; whole: string[]; blobs: SeriesBlob[]; files: string[]; parts: { path: string; hunks: number[] | null }[] };
 
 /** §52.1: how long a turn Claude started waits for the collection / revert in flight before it is taken. */
 const AUTO_TURN_WAIT_MS = 60_000;

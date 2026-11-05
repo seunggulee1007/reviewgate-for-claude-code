@@ -1204,26 +1204,30 @@ export class ReviewGate {
    * After `paths` were committed (docs/M12-COMMIT.md): they leave the review list together with
    * their diff cache, patch hashes and notes; A is rebuilt with their current worktree content so a
    * follow-up turn (whose list is rebuilt from A) does not resurface them; B is re-snapshotted.
+   * §53: `commit` per path when a series made several (`commits`: how many HEAD moved by).
    */
-  async dropCommitted(paths: string[], commit?: HistoryCommit): Promise<void> {
+  async dropCommitted(paths: string[], commit?: HistoryCommit | ReadonlyMap<string, HistoryCommit>, commits = 1): Promise<void> {
     const cp = this.requireCheckpoint();
     this.lastReject = null; // MARK: wave4c w4c-trust — §41.2: a commit moves A
     const prevEnd = this.turnEndTree;
     const set = new Set(paths);
     const files = this.changedFiles.filter((f) => set.has(f.path));
     // MARK: wave4 w4-history — §38.3: the round's file keeps the commit it left with (`commit`).
-    for (const f of files) setVerdict(this.round, f.path, "accepted", { committed: true, ...(commit ? { commit } : {}) });
+    for (const f of files) {
+      const took = commit instanceof Map ? commit.get(f.path) : (commit as HistoryCommit | undefined);
+      setVerdict(this.round, f.path, "accepted", { committed: true, ...(took ? { commit: took } : {}) });
+    }
     const specs = [...new Set(files.flatMap((f) => (f.oldPath !== null && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path])))];
     this.changedFiles = this.changedFiles.filter((f) => !set.has(f.path));
     this.reviewNotes = this.reviewNotes.filter((n) => !set.has(n.path));
     for (const p of set) this.acceptedPatchHashes.delete(p);
     this.diffCache = new Map();
     if (this.turnStartTree !== null) this.turnStartTree = await cp.overlayWorktree(this.turnStartTree, specs);
-    // A holds what the commit holds now: when HEAD moved by just this commit (a merge it concluded included), there is
-    // nothing of it left to carry. Any other move (a pull before it) is still carried by `followHead`.
+    // A holds what the commit holds now: when HEAD moved by just this commit (a merge it concluded included; §53: these
+    // commits), there is nothing of it left to carry. Any other move (a pull before it) is still carried by `followHead`.
     const before = this.baseHead;
     const now = await cp.head().catch(() => null);
-    if (before?.sha && now?.sha && (await cp.firstParentChain(before.sha, now.sha, 1).catch(() => null))?.length === 1) {
+    if (before?.sha && now?.sha && (await cp.firstParentChain(before.sha, now.sha, commits).catch(() => null))?.length === commits) {
       this.baseHead = now;
       if (!(await cp.mergeInProgress().catch(() => null))) this.baseMerge = null;
     }

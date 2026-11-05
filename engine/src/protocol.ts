@@ -730,6 +730,8 @@ export type EngineCommand =
   // §53 commits in meaningful units
   /** §53: the accepted files as hunks of `git diff HEAD` (what a commit takes from the worktree); replies `commit_hunks`. `paths` as `commit`. */
   | Cmd<"commit_hunks", { paths?: string[] }>
+  /** §53: the commits in order (hooks run, the worktree untouched), then one push when `push` (default `settings.commitPushByDefault`); replies `committed_series`. */
+  | Cmd<"commit_series", { commits: CommitPlan[]; push?: boolean }>
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1396,7 +1398,7 @@ export type StateEvent = { type: "state"; state: ReviewState };
  * `code`: the stable refusal / failure id (docs/PROTOCOL.md "Error and refusal codes"), always set on `ok:false` from this
  * engine; `paths`: the files a refusal is about (`file_changed_since_review` from `reject` / `reject_all`).
  */
-export type ResultEvent = { type: "result"; id: string; ok: true } | { type: "result"; id: string; ok: false; error: string; code?: string; paths?: string[] };
+export type ResultEvent = { type: "result"; id: string; ok: true } | { type: "result"; id: string; ok: false; error: string; code?: string; paths?: string[]; partial?: PartialSeries };
 /**
  * `endTree` (scope `turn`): the B the diff was computed for (`gate.reviewEndTree`) — what `reject_hunks.expectedEndTree` must
  * echo (§17); scope `live`: the live snapshot. §34: `since` echoes the range (absent = `review`), `baseTree` is the old side
@@ -1849,6 +1851,7 @@ export type EngineEvent =
   | CommitDraftEvent
   | PRAiDraftEvent
   | CommitHunksEvent // §53
+  | CommittedSeriesEvent
   | WorkbenchPreviewEvent
   | WorkbenchProgressEvent
   | PreReviewEvent
@@ -1896,6 +1899,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "commit_draft" } ? CommitDraftEvent
   : C extends { type: "pr_ai_draft" } ? PRAiDraftEvent
   : C extends { type: "commit_hunks" } ? CommitHunksEvent // §53
+  : C extends { type: "commit_series" } ? CommittedSeriesEvent
   : C extends { type: "task_background" } ? TaskBackgroundEvent
   : C extends { type: "task_output" } ? TaskOutputEvent
   : C extends { type: "workbench_preview" } ? WorkbenchPreviewEvent
@@ -1918,7 +1922,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | SideThreadEvent | SideThreadsEvent | SidePromoteDraftEvent | McpStatusEvent | FilesEvent | AttachmentEvent | RewoundEvent | PermissionRulesEvent
   | LiveChangesEvent
   | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | PRAiDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
-  | CommitHunksEvent // §53
+  | CommitHunksEvent | CommittedSeriesEvent // §53
   | TaskBackgroundEvent | TaskOutputEvent
   | TranscriptPageEvent | TranscriptSearchEvent // MARK: wave4 w4-history (§38.3)
   | HistoryCleanupEvent // MARK: wave4b w4b-bigturn (§39.1)
@@ -2091,6 +2095,16 @@ export type CommitHunk = { id: number; header: string; added: number; deleted: n
 export type CommitFile = { path: string; oldPath?: string; status: ChangeStatus; binary: boolean; hunks: CommitHunk[] };
 /** §53: reply to `commit_hunks`. */
 export type CommitHunksEvent = { type: "commit_hunks"; id?: string; files: CommitFile[] };
+/** §53: one part of a planned commit — a file whole (no `hunks`) or the hunks of `commit_hunks` it takes, by id. */
+export type CommitPart = { path: string; hunks?: number[] };
+/** §53: one planned commit; `why` (from `commit_split_draft`) says why its parts belong together. */
+export type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
+/** §53: a commit `commit_series` made (`message` with `settings.commitTrailer`; `files` the parts' paths). */
+export type SeriesCommit = { sha: string; shortSha: string; message: string; files: string[] };
+/** §53: reply to `commit_series`. */
+export type CommittedSeriesEvent = { type: "committed_series"; id?: string; commits: SeriesCommit[]; branch: string | null; pushed: boolean };
+/** §53: what a `commit_series` that failed in the middle made — on its `commit_failed` refusal. */
+export type PartialSeries = { commits: SeriesCommit[]; branch: string | null; pushed: false };
 
 /** §36.12: where a new workbench goes — `managed` (`settings.worktreeRoot`) or `sibling` (`<parent of the main worktree>/<repo>-<branch tail>`). */
 export type WorkbenchLocation = "managed" | "sibling";
