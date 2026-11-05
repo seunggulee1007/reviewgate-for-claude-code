@@ -917,5 +917,21 @@
   "Allow background tasks and /loop": "백그라운드 작업과 /loop 허용",
   "Like the terminal, Claude can run commands in the background (a dev server, a long build) and repeat the same request with /loop. When a background command ends or a scheduled run starts, Claude goes on, and that turn is reviewed like any other. Files a background command changed in the meantime join the next review. Takes effect when the session restarts.": "터미널처럼 Claude가 명령을 백그라운드로 돌리고(dev 서버, 긴 빌드) /loop로 같은 요청을 반복할 수 있어요. 백그라운드 명령이 끝나거나 예약 실행이 시작되면 Claude가 이어서 작업하고, 그 턴도 다른 턴처럼 리뷰해요. 그사이 백그라운드 명령이 바꾼 파일은 다음 리뷰에 들어가요. 세션을 다시 시작하면 적용돼요.",
   "Run the command in the background": "명령을 백그라운드로",
-  "In an empty message box, while a command runs": "빈 입력창에서, 명령이 실행 중일 때"
+  "In an empty message box, while a command runs": "빈 입력창에서, 명령이 실행 중일 때",
+  "Splitting…": "나누는 중…",
+  "Committing…": "커밋하는 중…",
+  "Add a commit first": "커밋을 먼저 추가해 주세요",
+  "Commit {0} has no message": "{0}번째 커밋에 메시지가 없어요",
+  "Commit {0} has no changes": "{0}번째 커밋에 변경이 없어요",
+  "Made {0} commit(s): {1}": "커밋 {0}개를 만들었어요 ({1})",
+  "pushed": "푸시함",
+  "then it stopped": "그다음에 멈췄어요",
+  "Claude could not split the changes: {0}": "Claude가 변경을 나누지 못했어요: {0}",
+  "Claude could not split the changes": "Claude가 변경을 나누지 못했어요",
+  "{0} cannot be committed this way — it is not an accepted file, or the part is gone": "{0}은(는) 이렇게 커밋할 수 없어요 — 수락한 파일이 아니거나 그 부분이 사라졌어요",
+  "{0} is in two commits — a part can only be in one": "{0}이(가) 두 커밋에 들어 있어요 — 한 부분은 한 커밋에만 넣을 수 있어요",
+  "A commit has no message": "메시지가 비어 있는 커밋이 있어요",
+  "There are unresolved merge conflicts — resolve them first": "풀지 않은 병합 충돌이 있어요 — 먼저 해결해 주세요",
+  "git could not commit: {0}": "git이 커밋하지 못했어요: {0}",
+  "git could not commit": "git이 커밋하지 못했어요"
 }
