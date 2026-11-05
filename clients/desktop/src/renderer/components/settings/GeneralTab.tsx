@@ -18,6 +18,7 @@ import { isEnter } from "../../ime";
 import { NotificationGroupsSection } from "../NotificationNotices"; // MARK: wave4b w4-notify
 import { SideModelPicker, SideWebSetting } from "./SideSettings"; // MARK: wave4b w4b-side
 import { StatusLineSettingsSection } from "./StatusLineSettings"; // MARK: wave6 w6-statusline
+import { DEFAULT_SYSTEM_PROMPT_APPEND } from "../../../shared/systemPrompt"; // §54
 
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
@@ -96,10 +97,19 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
         <NotificationGroupsSection settings={settings} patch={patch} />
       </section>
       <section>
-        <h4>{t("Per-turn budget")}</h4>
-        <Stepper label={t("Max files")} value={settings.budgetMaxFiles} min={1} max={100} step={1} onChange={(v) => patch({ budgetMaxFiles: v })} testId="Max files" />
-        <Stepper label={t("Max changed lines")} value={settings.budgetMaxLines} min={10} max={5000} step={10} onChange={(v) => patch({ budgetMaxLines: v })} testId="Max changed lines" />
-        <div className="note">{t("Hard stop at ×{0} — edits beyond it are denied by the sidecar. Applies live to the open session.", HARD_MULTIPLIER.toFixed(1))}</div>
+        <h4>{t("Limits")}</h4>
+        {/* §54: off by default — Claude works through a task as in the terminal; the numbers apply only while it is on */}
+        <label className="check">
+          <input type="checkbox" checked={settings.budgetEnabled === true} onChange={(e) => patch({ budgetEnabled: e.target.checked })} data-testid="Limit changes per reply" />
+          {t("Limit changes per reply")}
+        </label>
+        <Stepper label={t("Max files")} value={settings.budgetMaxFiles} min={1} max={100} step={1} disabled={settings.budgetEnabled !== true} onChange={(v) => patch({ budgetMaxFiles: v })} testId="Max files" />
+        <Stepper label={t("Max changed lines")} value={settings.budgetMaxLines} min={10} max={5000} step={10} disabled={settings.budgetEnabled !== true} onChange={(v) => patch({ budgetMaxLines: v })} testId="Max changed lines" />
+        <div className="note">
+          {settings.budgetEnabled === true
+            ? t("Hard stop at ×{0} — edits beyond it are denied by the sidecar. Applies live to the open session.", HARD_MULTIPLIER.toFixed(1))
+            : t("Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.")}
+        </div>
         {/* MARK: wave4 w4-longwork — §38.2 */}
         <Stepper label={t("Tool calls per message")} value={maxTurnsOf(settings.maxTurns)} min={MIN_MAX_TURNS} max={MAX_MAX_TURNS} step={10} onChange={(v) => patch({ maxTurns: v })} testId="Max tool calls per message" />
         <div className="note">{t("Claude stops after this many tool calls for one message; Continue goes on from there. Takes effect in a new chat or after restarting the session.")}</div>
@@ -110,7 +120,7 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
           <input type="checkbox" checked={settings.autoAllowBash} onChange={(e) => patch({ autoAllowBash: e.target.checked })} data-testid="Auto-allow Bash" />
           {t("Auto-allow Bash")}
         </label>
-        <div className="note">{t("Off: every shell command asks for permission in the chat. Edits are always auto-allowed (the budget still applies). Takes effect on the next Open Project.")}</div>
+        <div className="note">{t("Off: every shell command asks for permission in the chat. Edits are always auto-allowed (within the change limit, when it is on). Takes effect on the next Open Project.")}</div>
         <label className="check">
           <input type="checkbox" checked={settings.autoAllowReadOnlyBash} onChange={(e) => patch({ autoAllowReadOnlyBash: e.target.checked })} data-testid="Auto-allow read-only Bash" />
           {t("Auto-allow read-only Bash")}
@@ -164,7 +174,7 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
       <TestCommandPatternsSection settings={settings} />{/* wave3 check-clients — §34.9 */}
       <section>
         <h4>{t("System prompt append")}</h4>
-        <TextArea value={settings.systemPromptAppend} rows={6} onCommit={(v) => patch({ systemPromptAppend: v })} testId="System prompt append" />
+        <TextArea value={settings.systemPromptAppend} rows={6} placeholder={DEFAULT_SYSTEM_PROMPT_APPEND} onCommit={(v) => patch({ systemPromptAppend: v })} testId="System prompt append" />
         <div className="note">{t("Placeholders {maxFiles} and {maxLines} are substituted. Empty uses the built-in prompt. Takes effect on the next Open Project.")}</div>
         <div><button type="button" className="small" onClick={() => patch({ systemPromptAppend: "" })}>{t("Reset to default")}</button></div>
       </section>
@@ -252,15 +262,15 @@ function ToolRow({ name, path, version }: { name: string; path: string | null; v
   );
 }
 
-function Stepper(props: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; testId: string }) {
+function Stepper(props: { label: string; value: number; min: number; max: number; step: number; disabled?: boolean; onChange: (v: number) => void; testId: string }) {
   const clamp = (v: number) => Math.min(props.max, Math.max(props.min, Math.round(v)));
   return (
-    <div className="stepper">
+    <div className={props.disabled ? "stepper muted" : "stepper"}>
       <span style={{ width: 130 }}>{props.label}</span>
-      <input type="number" value={props.value} min={props.min} max={props.max} step={props.step} data-testid={props.testId}
+      <input type="number" value={props.value} min={props.min} max={props.max} step={props.step} disabled={props.disabled} data-testid={props.testId}
         onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== props.value) props.onChange(clamp(v)); }} />
-      <button type="button" className="small" onClick={() => props.onChange(clamp(props.value - props.step))}>−</button>
-      <button type="button" className="small" onClick={() => props.onChange(clamp(props.value + props.step))}>+</button>
+      <button type="button" className="small" disabled={props.disabled} onClick={() => props.onChange(clamp(props.value - props.step))}>−</button>
+      <button type="button" className="small" disabled={props.disabled} onClick={() => props.onChange(clamp(props.value + props.step))}>+</button>
     </div>
   );
 }
@@ -273,10 +283,10 @@ function TextField(props: { value: string; placeholder?: string; onCommit: (v: s
   return <input type="text" className="mono" value={draft} placeholder={props.placeholder} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => isEnter(e) && commit()} data-testid={props.testId} />;
 }
 
-function TextArea(props: { value: string; rows: number; mono?: boolean; onCommit: (v: string) => void; testId: string }) {
+function TextArea(props: { value: string; rows: number; mono?: boolean; placeholder?: string; onCommit: (v: string) => void; testId: string }) {
   const [draft, setDraft] = useState(props.value);
   useEffect(() => setDraft(props.value), [props.value]);
-  return <textarea className={props.mono ? "mono" : ""} rows={props.rows} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== props.value && props.onCommit(draft)} data-testid={props.testId} />;
+  return <textarea className={props.mono ? "mono" : ""} rows={props.rows} value={draft} placeholder={props.placeholder} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== props.value && props.onCommit(draft)} data-testid={props.testId} />;
 }
 
 /** The side-question model: saved on blur / Enter (not on every keystroke — each save restarts nothing but re-sends settings). */

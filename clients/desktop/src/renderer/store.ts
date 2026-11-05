@@ -350,7 +350,7 @@ export const EMPTY_STATE = {
   },
   changedFiles: [],
   reviewNotes: [],
-  budget: { maxFiles: 10, maxLines: 400, hardMultiplier: 2.0 },
+  budget: { maxFiles: 0, maxLines: 0 }, // §54: no change budget until Settings turns the limit on
   budgetUsage: { files: 0, lines: 0, denied: false },
   hud: { contextTokens: 0, contextWindow: null, sessionCostUSD: 0, turnCount: 0, lastTurnMs: 0, activity: { kind: "idle" }, subagentDepth: 0, agents: [], turnStartedAt: null },
   branches: { list: [], isWorktreeDirty: false, switchBlocker: null },
@@ -1298,7 +1298,9 @@ export const useStore = create<Store>((set, get, api) => {
     async saveSettings(patch) {
       const s = await rg().setSettings(patch);
       setAppearance(s.appearance);
-      set({ settings: s, state: { ...get().state, budget: { maxFiles: s.budgetMaxFiles, maxLines: s.budgetMaxLines, hardMultiplier: 2.0 } } });
+      // §54: mirrors main's `budgetOf` — the limits while the change limit is on, else none.
+      const budget = s.budgetEnabled === true ? { maxFiles: s.budgetMaxFiles, maxLines: s.budgetMaxLines, hardMultiplier: 2.0 } : { maxFiles: 0, maxLines: 0 };
+      set({ settings: s, state: { ...get().state, budget } });
     },
 
     // ------------------------------------------------------------ lifecycle

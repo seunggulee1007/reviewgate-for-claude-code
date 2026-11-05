@@ -6594,7 +6594,10 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   (absent: off; the renderer may write a boolean), main's `budgetOf` / `systemPromptOf`, the texts in
   `src/shared/systemPrompt.ts`; the settings file now keeps "" for the built-in append (it kept a copy of every default, so
   nearly every file holds the old text) and an earlier built-in text reads as "". Test:
-  `clients/desktop/src/main/changeLimitSettings.test.ts`.
+  `clients/desktop/src/main/changeLimitSettings.test.ts`. Its renderer does what the Mac does — Settings › 한도 with the
+  switch and greyed-out steppers, the append box showing the built-in text as its placeholder, no HUD chip and no limit in
+  the empty chat while off, the rows' 변경 한도 words, the plan dialog's title without "in small units" (test:
+  `clients/desktop/src/renderer/changeLimitView.test.ts`).
 - Owner: engine `session/budget.ts` (`budgetIsOn`, `BudgetState.active`), `session/hooks.ts`, `session/longWork.ts`
   (`budgetChangeNote`). Tests: `engine/test/session.budget.test.ts`, `session.hooks.test.ts` (§54), `longWork.test.ts`,
   `engine.friction.test.ts` (the defaults).

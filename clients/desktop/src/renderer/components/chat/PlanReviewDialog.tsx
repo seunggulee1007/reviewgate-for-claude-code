@@ -127,7 +127,7 @@ export function PlanApproveButtons({ busy, handoffBlocker, answers }: { busy: bo
         {t("Approve & auto-accept edits")}
       </button>
       <button type="button" className="primary" disabled={busy} onClick={() => answers.approve(runMode)}
-        title={runMode === "auto" ? t("Approve the plan, go back to auto mode and implement it in small units") : t("Approve the plan, leave plan mode and implement it in small units")} data-testid="Approve plan">
+        title={runMode === "auto" ? t("Approve the plan, go back to auto mode and implement it") : t("Approve the plan, leave plan mode and implement it")} data-testid="Approve plan">
         {runMode === "auto" ? t("Approve & run in auto mode") : t("Approve & run")}
       </button>
     </>

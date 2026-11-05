@@ -320,7 +320,7 @@ export function BudgetRow({ event, root }: { event: BudgetEventEvent; root: stri
       <span>{deny ? "⛔" : "⚠"}</span>
       <div className="col" style={{ gap: 2 }}>
         <span className="bold">
-          {deny ? t("Budget exceeded — edit denied ({0}). Claude was told to stop and report.", counts) : t("Budget: {0} — Claude was asked to finish the current unit", counts)}
+          {deny ? t("Change limit exceeded — edit denied ({0}). Claude was told to stop and report.", counts) : t("Change limit reached: {0}", counts)}
         </span>
         <span className="target">{target}</span>
       </div>

@@ -23,6 +23,7 @@ import { AwaitingPermissionBadge } from "./PermissionBits";
 import { PermissionCard } from "./PermissionCard";
 import { QuestionCard } from "./QuestionCard";
 import { BudgetRow, ToolResultRow, ToolUseRow } from "./ToolRows";
+import { budgetIsOn } from "./BudgetBadge"; // §54
 import { TurnSummaryCard } from "./TurnSummaryCard";
 import { UserMessage } from "./UserMessage";
 import { ErrorNoticeRow } from "./ErrorNoticeRow";
@@ -276,7 +277,11 @@ export function EmptyTranscript() {
   return (
     <div className="chat-empty" data-testid="Chat empty state">
       <span className="title">✨ {t("Ask Claude to make a change.")}</span>
-      <span className="muted">{t("Each reply is limited to {0} files / {1} lines; you'll review the diff before continuing.", budget.maxFiles, budget.maxLines)}</span>
+      <span className="muted">
+        {budgetIsOn(budget)
+          ? t("Each reply is limited to {0} files / {1} lines; you'll review the diff before continuing.", budget.maxFiles, budget.maxLines)
+          : t("You'll review what Claude changed before you continue.")}
+      </span>
     </div>
   );
 }

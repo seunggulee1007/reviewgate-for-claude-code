@@ -12,7 +12,7 @@ import { retryChipText } from "../../errorCodes";
 import { rememberedAllowsOf } from "../../friction";
 import { t } from "../../i18n";
 import { isRunning, useStore } from "../../store";
-import { BudgetBadge } from "./BudgetBadge";
+import { BudgetBadge, budgetIsOn } from "./BudgetBadge";
 import { HudModeChip } from "./ModeMenu"; // MARK: wave4b w4b-auto — §39.5 the mode pill is the mode menu
 import { contextColor, contextLevel, currentModelOption } from "../../hudModel";
 import { formatElapsed } from "../../elapsed";
@@ -255,7 +255,7 @@ export function HUDStrip() {
           <button type="button" className="plain tiny" onClick={forgetAllows} title={t("Forget session allows")} aria-label={t("Forget session allows")} data-testid="Forget allows">✕</button>
         </span>
       )}
-      <BudgetBadge usage={state.budgetUsage} budget={state.budget} />
+      {budgetIsOn(state.budget) && <BudgetBadge usage={state.budgetUsage} budget={state.budget} />}
     </div>
   );
 }
