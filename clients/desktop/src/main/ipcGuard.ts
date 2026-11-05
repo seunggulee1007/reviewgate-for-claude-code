@@ -123,6 +123,8 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   // MARK: wave4c w4c-commit — §41.1 the team's commit format (a read), the PR sheet's draft
   "commit_format",
   "pr_draft",
+  // §51 the PR sheet's "Fill with Claude": a read-only fork writes the title / description (nothing is pushed or created)
+  "pr_ai_draft",
   // MARK: wave4c w4c-review — §41.3 reads: a past / PR diff's new side ("20줄 더 보기"), an image's two sides
   "history_file_lines",
   "pr_file_lines",

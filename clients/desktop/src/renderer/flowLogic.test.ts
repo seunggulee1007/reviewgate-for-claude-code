@@ -5,18 +5,22 @@
 import { describe, expect, it } from "vitest";
 import type { WorkbenchProgressEvent } from "@reviewgate/engine";
 import { EngineRefusal } from "./engineRequest";
-import { t } from "./i18n";
+import { initI18n, t } from "./i18n";
 import {
   applyProgress,
   commitIssue,
   createdPathOf,
   defaultWorkbenchBase,
+  EMPTY_PR_SHEET,
   flowRefusal,
   flowRefusalText,
   formatBytes,
   isUnknownCommand,
   latestLog,
+  prAiDraftCommand,
   preReviewFailure,
+  prFillBlocker,
+  prSheetReduce,
   renderCommitTemplate,
   setupFailedOf,
   setupReportOf,
@@ -134,5 +138,89 @@ describe("flow refusals in words", () => {
     expect(preReviewFailure("side_limit")).toBe("Too many side sessions are running — wait for one to finish");
     expect(preReviewFailure("the CLI exited with 1")).toBe("the CLI exited with 1");
     expect(preReviewFailure("interrupted (ReviewGate was closed)")).toBe("Interrupted — ReviewGate was closed or the chat changed");
+  });
+});
+
+describe("§51 the PR sheet's Fill with Claude", () => {
+  it("the refusals in words (English and Korean); an engine before §51 says to update", () => {
+    expect(flowRefusalText("pr_ai_draft_failed", "no commits since origin/main")).toBe("Claude could not fill in the PR: no commits since origin/main");
+    expect(flowRefusalText("pr_ai_draft_failed", "")).toBe("Claude could not fill in the PR");
+    expect(flowRefusal(new EngineRefusal("pr_ai_draft_failed:cancelled", "pr_ai_draft_failed"))).toBe("Claude could not fill in the PR: cancelled");
+    expect(flowRefusal(new EngineRefusal("empty base", "empty_base"))).toBe("Choose a base branch first");
+    expect(flowRefusal(new EngineRefusal("unknown command: pr_ai_draft", "unknown_command"))).toBe(updateReason());
+    initI18n("ko", "win32");
+    try {
+      expect(flowRefusal(new EngineRefusal("pr_ai_draft_failed:empty answer", "pr_ai_draft_failed"))).toBe("Claude가 PR을 채우지 못했어요: empty answer");
+      expect(flowRefusalText("pr_ai_draft_failed", " ")).toBe("Claude가 PR을 채우지 못했어요");
+      expect(flowRefusal(new EngineRefusal("empty base", "empty_base"))).toBe("먼저 베이스 브랜치를 고르세요");
+      expect(t("Fill with Claude")).toBe("AI로 채우기");
+      expect(t("Writing…")).toBe("작성 중…");
+      expect(t("Restore what I had")).toBe("원래대로 되돌리기");
+      // every field of the sheet has a Korean name
+      expect(["Base", "Title", "Body", "Assignees", "Labels", "Reviewers", "Projects"].map((k) => t(k))).toEqual(["베이스", "제목", "본문", "담당자", "라벨", "리뷰어", "프로젝트"]);
+    } finally {
+      initI18n("en", "darwin");
+    }
+  });
+
+  it("the command carries the sheet's title / description only when they hold something", () => {
+    expect(prAiDraftCommand("develop", { title: "", body: "  \n" })).toEqual({ type: "pr_ai_draft", base: "develop" });
+    expect(prAiDraftCommand(" main ", { title: " #acme/42: 재고 동기화 ", body: "" })).toEqual({ type: "pr_ai_draft", base: "main", title: "#acme/42: 재고 동기화" });
+    expect(prAiDraftCommand("main", { title: "x", body: "- 중복 차감 방지\n" })).toEqual({ type: "pr_ai_draft", base: "main", title: "x", body: "- 중복 차감 방지" });
+  });
+
+  it("off with a reason: no base, gh not ready, no commits, an engine before §51", () => {
+    expect(prFillBlocker({ base: "main", ghReason: null, unsupported: false })).toBeNull();
+    expect(prFillBlocker({ base: "main", ghReason: null, unsupported: false, baseRef: "origin/main", commits: 3 })).toBeNull();
+    expect(prFillBlocker({ base: " ", ghReason: null, unsupported: false })).toBe("Choose a base branch first");
+    expect(prFillBlocker({ base: "main", ghReason: "gh is not logged in to ghe.example.com", unsupported: false })).toBe("gh is not logged in to ghe.example.com");
+    expect(prFillBlocker({ base: "main", ghReason: null, unsupported: false, baseRef: "origin/main", commits: 0 })).toBe("This branch has no commits since origin/main");
+    // no base to compare with (`baseRef` null): the engine says why
+    expect(prFillBlocker({ base: "main", ghReason: null, unsupported: false, baseRef: null, commits: 0 })).toBeNull();
+    expect(prFillBlocker({ base: "main", ghReason: null, unsupported: true })).toBe(updateReason());
+  });
+});
+
+describe("§51 the PR sheet's text (typed flags, Claude's fill, restore)", () => {
+  const commits = { kind: "commits", title: "#acme/42: 재고 동기화", body: "- 중복 차감 방지" } as const;
+
+  it("the commits' draft fills a field until the user changes it — the same text written back is not typing", () => {
+    // the Mac's bug: the field wrote its unchanged text on focus, which marked it typed and the draft's title never came
+    let s = prSheetReduce(EMPTY_PR_SHEET, { kind: "edit", field: "title", value: "" });
+    expect(s).toBe(EMPTY_PR_SHEET);
+    s = prSheetReduce(s, commits);
+    expect(s).toMatchObject({ title: "#acme/42: 재고 동기화", body: "- 중복 차감 방지", typedTitle: false, typedBody: false });
+    expect(prSheetReduce(s, { kind: "edit", field: "body", value: "- 중복 차감 방지" })).toBe(s);
+    // a real edit: another base's draft leaves that field alone, fills the other
+    s = prSheetReduce(s, { kind: "edit", field: "title", value: "#acme/42: 재고 동기화 수정" });
+    expect(s.typedTitle).toBe(true);
+    s = prSheetReduce(s, { kind: "commits", title: "other", body: "- other" });
+    expect(s).toMatchObject({ title: "#acme/42: 재고 동기화 수정", body: "- other", typedBody: false });
+    // emptying a field is an edit too
+    s = prSheetReduce(s, { kind: "edit", field: "body", value: "" });
+    expect(prSheetReduce(s, commits).body).toBe("");
+  });
+
+  it("Claude's text replaces the fields; an empty title keeps the sheet's; what was there comes back with Restore", () => {
+    const filled = prSheetReduce(EMPTY_PR_SHEET, commits);
+    const s = prSheetReduce(filled, { kind: "claude", title: "", body: "## 요약\n- 재고 동기화" });
+    expect(s).toMatchObject({ title: "#acme/42: 재고 동기화", body: "## 요약\n- 재고 동기화", typedTitle: true, typedBody: true });
+    expect(s.replaced).toEqual({ title: "#acme/42: 재고 동기화", body: "- 중복 차감 방지" });
+    // a base picked now keeps Claude's text
+    expect(prSheetReduce(s, { kind: "commits", title: "other", body: "- other" })).toBe(s);
+    const restored = prSheetReduce(s, { kind: "restore" });
+    expect(restored).toMatchObject({ title: "#acme/42: 재고 동기화", body: "- 중복 차감 방지", replaced: null });
+    expect(prSheetReduce(restored, { kind: "restore" })).toBe(restored);
+  });
+
+  it("no Restore when the sheet was empty or nothing changed; an edit drops it", () => {
+    expect(prSheetReduce(EMPTY_PR_SHEET, { kind: "claude", title: "t", body: "b" })).toMatchObject({ title: "t", body: "b", replaced: null });
+    const same = prSheetReduce(prSheetReduce(EMPTY_PR_SHEET, commits), { kind: "claude", title: "#acme/42: 재고 동기화", body: "- 중복 차감 방지" });
+    expect(same.replaced).toBeNull();
+    const s = prSheetReduce(prSheetReduce(EMPTY_PR_SHEET, commits), { kind: "claude", title: "new", body: "new body" });
+    expect(s.replaced).not.toBeNull();
+    expect(prSheetReduce(s, { kind: "edit", field: "body", value: "new body!" }).replaced).toBeNull();
+    // an input event with the unchanged text keeps the link
+    expect(prSheetReduce(s, { kind: "edit", field: "title", value: "new" }).replaced).not.toBeNull();
   });
 });

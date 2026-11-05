@@ -138,4 +138,8 @@ describe("the flow commands pass main's guard", () => {
       expect(validateCommand({ type }).ok).toBe(true);
     }
   });
+
+  it("§51 pr_ai_draft (the PR sheet's Fill with Claude)", () => {
+    expect(validateCommand({ type: "pr_ai_draft", base: "develop", title: "#acme/42: 재고 동기화" })).toEqual({ ok: true, cmd: { type: "pr_ai_draft", base: "develop", title: "#acme/42: 재고 동기화" } });
+  });
 });

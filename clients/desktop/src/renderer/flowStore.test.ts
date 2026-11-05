@@ -149,6 +149,41 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     expect(useStore.getState().errorBanner).toBeNull();
   });
 
+  // ---------------------------------------------------------------- §51
+
+  it("§51 Fill with Claude sends pr_ai_draft with the sheet's title / description only when non-empty; the reply comes back trimmed", async () => {
+    respond = (c) => (c.type === "pr_ai_draft" ? { ok: true, reply: { type: "pr_ai_draft", id: "p1", title: " #acme/42: 재고 동기화 ", body: "\n## 요약\n- 중복 차감 방지\n" } } : { ok: true, reply: { type: "result", ok: true } });
+    expect(await useStore.getState().fillPRWithClaude("develop", { title: "#acme/42: 재고", body: "  " })).toEqual({ ok: true, title: "#acme/42: 재고 동기화", body: "## 요약\n- 중복 차감 방지" });
+    expect(await useStore.getState().fillPRWithClaude("develop", { title: "", body: "- 메모" })).toMatchObject({ ok: true });
+    expect(await useStore.getState().fillPRWithClaude("main", { title: "", body: "" })).toMatchObject({ ok: true });
+    expect(sent.filter((c) => c.type === "pr_ai_draft")).toEqual([
+      { type: "pr_ai_draft", base: "develop", title: "#acme/42: 재고" },
+      { type: "pr_ai_draft", base: "develop", body: "- 메모" },
+      { type: "pr_ai_draft", base: "main" },
+    ]);
+    // nothing is pushed or created, the main chat is untouched
+    expect(sent.some((c) => c.type === "pr_create" || c.type === "send")).toBe(false);
+    expect(useStore.getState().transcript).toEqual([]);
+    // an answer without a title: "" (the sheet keeps its own)
+    respond = () => ({ ok: true, reply: { type: "pr_ai_draft", title: "", body: "- 재고 동기화" } });
+    expect(await useStore.getState().fillPRWithClaude("develop", { title: "", body: "" })).toEqual({ ok: true, title: "", body: "- 재고 동기화" });
+  });
+
+  it("§51 a refusal is one line; no base is said without asking; an engine before §51 is unsupported", async () => {
+    respond = () => ({ ok: false, error: "pr_ai_draft_failed:no commits since origin/main", code: "pr_ai_draft_failed" });
+    expect(await useStore.getState().fillPRWithClaude("main", { title: "", body: "" })).toEqual({ ok: false, error: "Claude could not fill in the PR: no commits since origin/main", unsupported: false });
+    respond = () => ({ ok: true, reply: { type: "pr_ai_draft", title: " ", body: "" } });
+    expect(await useStore.getState().fillPRWithClaude("main", { title: "", body: "" })).toEqual({ ok: false, error: "Claude could not fill in the PR", unsupported: false });
+    respond = () => ({ ok: false, error: "empty base", code: "empty_base" });
+    expect(await useStore.getState().fillPRWithClaude("main", { title: "", body: "" })).toEqual({ ok: false, error: "Choose a base branch first", unsupported: false });
+    sent.length = 0;
+    expect(await useStore.getState().fillPRWithClaude("  ", { title: "x", body: "" })).toEqual({ ok: false, error: "Choose a base branch first", unsupported: false });
+    expect(sent).toEqual([]);
+    respond = () => ({ ok: false, error: "unknown command: pr_ai_draft", code: "unknown_command" });
+    expect(await useStore.getState().fillPRWithClaude("main", { title: "", body: "" })).toEqual({ ok: false, error: "This engine does not support it yet — update ReviewGate", unsupported: true });
+    expect(useStore.getState().errorBanner).toBeNull();
+  });
+
   // ---------------------------------------------------------------- §36.12
 
   it("§36.12 the preview answers its own request; an older answer never replaces a newer one", async () => {

@@ -66,7 +66,7 @@ import { isExternalChange, planRejectAll, type GateNoticeKind, type GateNoticeMe
 import { createReviewGateSlice, type ReviewGateDialog } from "./storeReviewGate";
 // MARK: wave3 desktop-flow — §36.11–36.14 (storeFlow.ts)
 import type { PreReviewEffort, PreReviewFinding, PreReviewScope } from "@reviewgate/engine";
-import { createFlowSlice, type FlowSettingsPatch, type FlowState, type PRWorkbenchRequest, type WorkbenchCreateRequest, type WorkbenchPreviewRequest } from "./storeFlow";
+import { createFlowSlice, type FlowSettingsPatch, type FlowState, type PRFillResult, type PRSheetText, type PRWorkbenchRequest, type WorkbenchCreateRequest, type WorkbenchPreviewRequest } from "./storeFlow";
 import type { PRCommentThread } from "./prClaude";
 // MARK: wave2 check-clients
 import { restoredErrorFacts } from "./sessionErrors";
@@ -631,6 +631,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Sessi
   resetFlow(): void;
   /** §36.11 `commit_draft` → the message for the commit sheet's field, or null (`flow.draftError` says why). Nothing is committed. */
   draftCommitMessage(paths?: string[]): Promise<string | null>;
+  /** §51 `pr_ai_draft` → Claude's title / description for the PR sheet, or why not in one line. Nothing is pushed or created. */
+  fillPRWithClaude(base: string, sheet: PRSheetText): Promise<PRFillResult>;
   /** §36.12 `workbench_preview`, debounced (an older answer never replaces a newer one). */
   requestWorkbenchPreview(req: WorkbenchPreviewRequest, delayMs?: number): void;
   /** §36.12 / §36.14 `workbench_create` with its steps; the new window opens when it is ready (also after the sheet closed). */

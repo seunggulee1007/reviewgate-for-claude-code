@@ -6250,12 +6250,18 @@ Now every field has its name on the left (`PRSheetRow`), and a write of unchange
     there until a field is edited. A base picked afterwards keeps Claude's text.
   - A failure is one orange line in the user's words (`FlowText`).
   - The sheet is 560 pt wide.
-- **Electron.** `CreatePRDialog` gets the same button, its states and the names on every field.
+- **Electron** (`CreatePRDialog`; logic `flowLogic.ts` `prSheetReduce` / `prAiDraftCommand` / `prFillBlocker`, store
+  `fillPRWithClaude`). The same button and states. Its fields already showed their names; each row is now a `<label>`,
+  so the name also names the field. React's `onChange` fires only on a real edit, so the empty-title fault never
+  happened there; the reducer states the same rule anyway.
 - **Verified.**
   - Engine `w51.prAiDraft.test.ts`: the fork's options and prompt (commits oldest first, the template, the diff, the
     sheet's draft), nothing committed, the cost on the side meter, every refusal; `parsePRAiDraft`, `findPRTemplate`'s
     order, `cutPatch`.
   - Core `PRAiDraftTests`: the command's JSON, the lenient reply, a refusal in words, a blank base not sent.
+  - Electron (1,145 tests): the command (title / body only when non-empty), the reply applied (an empty title keeps the
+    sheet's), the refusal texts, the reducer (`pr_draft` fills only untouched fields, Claude's text survives a base
+    change, an edit drops "Restore"), and the names on the fields in Korean.
   - Layout check: the sheet with every name (`create-pr.png`).
   - Real CLI: `sidecar/test/driver-praidraft.mjs` (haiku, CLI 2.1.318). It used a branch `#acme/42: 장바구니 합계에
     할인 반영` and a Korean template. Observed: the title kept `#acme/42`, the template's three sections were filled in

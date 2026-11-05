@@ -28,7 +28,7 @@ import { insertIntoComposer, taskLeftComposer } from "./composerBridge";
 import { taskBranchPrefixOf } from "./runAsTask"; // MARK: §49
 import { engineRequest, refusalOf } from "./engineRequest";
 import { refusalMessage } from "./errorCodes";
-import { applyProgress, createdPathOf, flowRefusal, isUnknownCommand, setupReportOf, updateReason } from "./flowLogic";
+import { applyProgress, createdPathOf, flowRefusal, flowRefusalText, isUnknownCommand, prAiDraftCommand, setupReportOf, updateReason, type PRSheetText } from "./flowLogic";
 import { applyRun, findingKey, headStatus, noteBody, normalizeRun, withoutFinding } from "./preReview";
 import { prCommentsDraft, respondCommand, type PRCommentThread } from "./prClaude";
 import {
@@ -55,6 +55,11 @@ export type WorkbenchCreateRequest = { branch: string; from?: string; fetch?: bo
   task?: WorkbenchTask;
   /** §49: the text the composer handed over — it leaves the composer once the task started (unless edited since). */
   handedTask?: string };
+
+export type { PRSheetText };
+
+/** §51 `pr_ai_draft`: Claude's text for the PR sheet, or the refusal in one line (`unsupported`: an engine before §51). */
+export type PRFillResult = { ok: true; title: string; body: string } | { ok: false; error: string; unsupported: boolean };
 
 /** §36.14: the PR the New Workbench sheet checks out ("Open as workbench"). */
 export type PRWorkbenchRequest = { number: number; headRef: string; baseRef: string; title: string };
@@ -130,6 +135,7 @@ export type FlowSlice = Pick<
   | "flowSnapshotApplied"
   | "resetFlow"
   | "draftCommitMessage"
+  | "fillPRWithClaude"
   | "requestWorkbenchPreview"
   | "createWorkbenchWith"
   | "startPreReview"
@@ -192,6 +198,7 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
           return true;
         }
         case "commit_draft":
+        case "pr_ai_draft": // §51
         case "workbench_preview":
           // Replies: their request has them.
           return true;
@@ -255,6 +262,24 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         const unsupported = isUnknownCommand(e);
         setFlow((f) => ({ drafting: false, draftError: flowRefusal(e), draftSupported: unsupported ? false : f.draftSupported }));
         return null;
+      }
+    },
+
+    // ------------------------------------------------------------ §51
+
+    async fillPRWithClaude(base, sheet) {
+      const cmd = prAiDraftCommand(base, sheet);
+      // The engine refuses an empty base too (`empty_base`); the sheet says it without asking.
+      if (!cmd.base) return { ok: false, error: flowRefusalText("empty_base", "")!, unsupported: false };
+      try {
+        const reply = await engineRequest(cmd);
+        const title = (reply.title ?? "").trim();
+        const body = (reply.body ?? "").trim();
+        if (!title && !body) return { ok: false, error: flowRefusalText("pr_ai_draft_failed", "")!, unsupported: false };
+        return { ok: true, title, body };
+      } catch (e) {
+        log(`[warn] pr_ai_draft: ${refusalOf(e).error}`);
+        return { ok: false, error: flowRefusal(e), unsupported: isUnknownCommand(e) };
       }
     },
 

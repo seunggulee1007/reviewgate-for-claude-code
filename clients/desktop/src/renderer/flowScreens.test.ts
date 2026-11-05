@@ -339,4 +339,21 @@ describe("§36.11–36.14 screens (wave3 desktop-flow)", () => {
     const out = html(createElement(PreReviewCards, { items: findingsOfFile(useStore.getState().flow.runs, "api/Svc.java"), excerpt: "x" }));
     expect(out).toMatch(/disabled="" title="Claude is working…"[^>]*data-testid="Pre-review add as note"/);
   });
+
+  // ---------------------------------------------------------------- §51
+
+  it("§51 the PR sheet: every field has its name on screen (a <label>), 'Fill with Claude' under the body with its help", async () => {
+    const { CreatePRDialog } = await import("./components/dialogs/CreatePRDialog");
+    const out = html(createElement(CreatePRDialog, { onClose: () => undefined }));
+    for (const [name, id] of [["Base", "PR base"], ["Title", "PR title"], ["Body", "PR body"], ["Assignees", "PR assignees"], ["Labels", "PR labels"], ["Reviewers", "PR reviewers"], ["Projects", "PR projects"]]) {
+      expect(out).toMatch(new RegExp(`<label class="field(?:-row)?"><span>${name}</span><(?:select|input|textarea)[^>]*data-testid="${id}"`));
+    }
+    expect(out.indexOf('data-testid="PR body"')).toBeLessThan(out.indexOf('data-testid="Fill PR with Claude"'));
+    expect(out.indexOf('data-testid="Fill PR with Claude"')).toBeLessThan(out.indexOf('data-testid="PR assignees"'));
+    expect(out).toContain("Fill with Claude");
+    expect(out).not.toMatch(/disabled=""[^>]*data-testid="Fill PR with Claude"/);
+    expect(out).toContain("in a read-only side session; the main chat is untouched and nothing is pushed or created");
+    expect(out).not.toContain('data-testid="PR fill progress"');
+    expect(out).not.toContain('data-testid="Restore PR text"');
+  });
 });

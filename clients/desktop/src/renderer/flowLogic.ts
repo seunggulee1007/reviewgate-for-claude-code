@@ -34,6 +34,67 @@ export function firstLine(text: string): string {
   return i < 0 ? text : text.slice(0, i);
 }
 
+// ---------------------------------------------------------------- §51 the PR sheet's title / description
+
+/** The PR sheet's title and description. */
+export type PRSheetText = { title: string; body: string };
+
+/**
+ * The PR sheet's text: what is in the fields, whether the user changed each one (then a later `pr_draft` — another base —
+ * leaves it alone) and what Claude's fill replaced (for "Restore what I had", until the user edits a field).
+ */
+export type PRSheetState = PRSheetText & { typedTitle: boolean; typedBody: boolean; replaced: PRSheetText | null };
+
+export const EMPTY_PR_SHEET: PRSheetState = { title: "", body: "", typedTitle: false, typedBody: false, replaced: null };
+
+export type PRSheetAction =
+  /** The field's input: only a change of its text is the user's typing (the Mac's field wrote the same text back on focus). */
+  | { kind: "edit"; field: "title" | "body"; value: string }
+  /** `pr_draft` (from the branch's commits): fills each field the user has not changed. */
+  | { kind: "commits"; title: string; body: string }
+  /** `pr_ai_draft`: Claude's text replaces the fields (an empty title / body keeps the sheet's); a base picked later keeps it. */
+  | { kind: "claude"; title: string; body: string }
+  /** "Restore what I had". */
+  | { kind: "restore" };
+
+export function prSheetReduce(s: PRSheetState, a: PRSheetAction): PRSheetState {
+  switch (a.kind) {
+    case "edit":
+      if (a.value === s[a.field]) return s;
+      return a.field === "title" ? { ...s, title: a.value, typedTitle: true, replaced: null } : { ...s, body: a.value, typedBody: true, replaced: null };
+    case "commits": {
+      const title = s.typedTitle ? s.title : a.title;
+      const body = s.typedBody ? s.body : a.body;
+      return title === s.title && body === s.body ? s : { ...s, title, body };
+    }
+    case "claude": {
+      const current: PRSheetText = { title: s.title, body: s.body };
+      const filled: PRSheetText = { title: a.title.trim() ? a.title : s.title, body: a.body.trim() ? a.body : s.body };
+      const changed = filled.title !== current.title || filled.body !== current.body;
+      const hadText = current.title.trim() !== "" || current.body.trim() !== "";
+      return { ...filled, typedTitle: true, typedBody: true, replaced: changed && hadText ? current : null };
+    }
+    case "restore":
+      return s.replaced ? { ...s, ...s.replaced, replaced: null } : s;
+  }
+}
+
+/** The `pr_ai_draft` for the sheet: its title / description only when they hold something (trimmed). */
+export function prAiDraftCommand(base: string, sheet: PRSheetText): { type: "pr_ai_draft"; base: string; title?: string; body?: string } {
+  const title = sheet.title.trim();
+  const body = sheet.body.trim();
+  return { type: "pr_ai_draft", base: base.trim(), ...(title ? { title } : {}), ...(body ? { body } : {}) };
+}
+
+/** Why "Fill with Claude" cannot run now (null: it can) — no base, `gh` not ready (what turns Create PR off), no commits. */
+export function prFillBlocker(o: { base: string; ghReason: string | null; unsupported: boolean; baseRef?: string | null; commits?: number | null }): string | null {
+  if (o.unsupported) return updateReason();
+  if (!o.base.trim()) return t("Choose a base branch first");
+  if (o.ghReason) return o.ghReason;
+  if (o.baseRef && o.commits === 0) return t("This branch has no commits since {0}", o.baseRef);
+  return null;
+}
+
 // ---------------------------------------------------------------- §36.12 workbench setup
 
 /**
@@ -193,6 +254,10 @@ export function flowRefusalText(code: string, detail: string): string | null {
       return t("Too many side sessions are running — wait for one to finish");
     case "commit_draft_failed":
       return d ? t("Claude could not write a message: {0}", d) : t("Claude could not write a message");
+    case "pr_ai_draft_failed": // §51
+      return d ? t("Claude could not fill in the PR: {0}", d) : t("Claude could not fill in the PR");
+    case "empty_base": // §51 (the PR sheet's Fill with Claude; the app's own words elsewhere)
+      return t("Choose a base branch first");
     case "fetch_failed":
       return d ? t("Could not fetch from the remote: {0}", d) : t("Could not fetch from the remote");
     case "no_review":
