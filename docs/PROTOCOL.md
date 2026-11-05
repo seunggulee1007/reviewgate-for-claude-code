@@ -5741,6 +5741,13 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   row draws plain text (no attributed string per delta; markdown once finished, the same final look), and
   `TranscriptFollower` follows the bottom per new row as before and, while an answer streams, at most every 80 ms (once
   more after the last burst).
+- **The rows stay in view when the transcript's room changes.** ⇧⇥ (the HUD's mode badge is 2 pt taller), a card above
+  the composer, the review notice and the diff pane give the transcript more or less room. Anchored to its bottom for those
+  changes too (`defaultScrollAnchor(.bottom)`), the lazy stack re-estimated the height of the rows it had not made, and the
+  view moved to a bottom where it had made none: a blank transcript until the next scroll or resize (at 1000 × 637, ⇧⇥ into
+  plan mode beside the diff pane and every review that began). It is anchored to the bottom only when it opens and while its
+  rows are shorter than the view; a change of size keeps the offset, and while following, `TranscriptFollower` scrolls to the
+  newest row (the bottom marker, which the stack makes) instead of an estimated end. The layout check (§49.2) shoots it.
 - **A new row places itself.** Core `TranscriptModel` keeps the row tree (agent groups), the folded exploration runs, the
   tool-call index, the row positions and each answer's turn up to date row by row; it rebuilds only for rows put in front
   (a restore, [이전 대화 더 보기]), replaced or removed, or a late row the full build would move (a result or a subagent row

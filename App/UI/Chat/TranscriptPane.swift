@@ -153,7 +153,12 @@ struct TranscriptPane: View {
                     break
                 }
             }
-            .defaultScrollAnchor(.bottom)
+            // It opens at the newest row, and a short chat sits at the bottom. A change of size keeps the offset; while
+            // following, `TranscriptFollower` brings the newest row back. Anchored to the bottom for size changes too, the
+            // lazy stack re-estimated the height of the rows it had not made and moved to a bottom where it made none — a
+            // blank transcript after ⇧⇥ (the HUD's mode badge is 2 pt taller) or when a review began (§45.1).
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .defaultScrollAnchor(.bottom, for: .alignment)
             .onAppear {
                 // A window that opens on an existing transcript starts at its end.
                 view.seenCount = store.transcript.count
@@ -379,6 +384,14 @@ private struct TranscriptFollower: View {
     var body: some View {
         Color.clear
             .onChange(of: store.transcriptRevision) { _, _ in follow() }
+            // The transcript's room changed (the HUD's mode badge, a card, the review notice, the diff pane): the newest row
+            // stays in view while following — scrolled to that row, which the lazy stack makes, not to an estimated bottom.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in keepBottom() }
+    }
+
+    private func keepBottom() {
+        guard view.follow, !view.userScrolling, view.flashToolUseId == nil else { return }
+        proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom)
     }
 
     private func follow() {
