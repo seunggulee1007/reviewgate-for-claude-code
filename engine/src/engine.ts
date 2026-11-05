@@ -123,7 +123,7 @@ import { acquireLock, isPidAlive, readLock, releaseLock, type LockOwner } from "
 import { findConcurrentClaude } from "./review/concurrent.js";
 import { isModsPath, LOCAL_SETTINGS, localSettingsChange, localSettingsDigest, type LocalSettingsDigest } from "./git/mods.js";
 import { nestedChanges, worktreeHeads } from "./review/nested.js";
-import { clearReview, loadCapabilities, loadReview, loadSessionState, refNamespace, refPrefix, saveCapabilities, saveReview, saveSession, staleWorktreeNamespaces, type PersistedReview } from "./review/persist.js";
+import { clearReview, loadCapabilities, loadReview, loadSessionState, refNamespace, refPrefix, saveCapabilities, saveReview, saveSession, siblingWorktreeMode, staleWorktreeNamespaces, type PersistedReview } from "./review/persist.js";
 import { NEW_CHAT_TITLE, SessionIndex, sessionTitle } from "./review/sessions.js";
 import { TRANSCRIPT_RESTORE_ROWS, type TranscriptStore } from "./review/transcript.js";
 // MARK: wave4 w4-history — §38.3
@@ -2130,8 +2130,10 @@ export class ReviewEngine {
     const dir = this.projectGitDir;
     if (!dir) return null;
     const stored = await loadSessionState(dir);
-    // The stored mode is restored as-is, `plan` included (docs/M20-MODES.md): the user may have parked here.
-    this.restoreMode(stored.permissionMode ?? this.settings.permissionMode ?? "default");
+    // The stored mode is restored as-is, `plan` included (docs/M20-MODES.md): the user may have parked here. A worktree
+    // without one (a new workbench) starts as its repository's other worktrees ran last, then as the client says (§11).
+    const sibling = stored.permissionMode === null && this.projectCommonDir ? await siblingWorktreeMode(dir, this.projectCommonDir) : null;
+    this.restoreMode(stored.permissionMode ?? sibling ?? this.settings.permissionMode ?? "default");
     this.modelChoice = { ...(stored.model !== undefined ? { model: stored.model } : {}), ...(stored.effort !== undefined ? { effort: stored.effort } : {}) };
     this.peerChoice = stored.peerInbound;
     const idx = await SessionIndex.open(dir, stored.sessionId, (m) => this.log("warn", m));

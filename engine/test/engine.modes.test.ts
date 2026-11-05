@@ -167,3 +167,48 @@ describe("permission modes (docs/M20-MODES.md)", () => {
     expect(ctx.budget.denied).toBe(true);
   });
 });
+
+describe("§11: a worktree without a mode of its own starts as its repository's other worktrees ran last", () => {
+  const writeSession = (gitDir: string, mode: PermissionMode, savedAt: string): void => {
+    write(gitDir, SESSION_FILE, JSON.stringify({ version: 1, sessionId: `s-${mode}`, permissionMode: mode, savedAt }));
+  };
+
+  it("a new workbench takes the newest sibling's mode (plan skipped) before the client's; its own record still wins", async () => {
+    const main = track(makeRepo());
+    const parent = track(realpathSync(makeTempDir("rg-modes-wt")));
+    const older = join(parent, "older");
+    const fresh = join(parent, "fresh");
+    sh(main, "worktree", "add", "-q", "-b", "older", older);
+    sh(main, "worktree", "add", "-q", "-b", "fresh", fresh);
+    const common = join(main, ".git");
+    // The main checkout ran in auto mode most recently, an older workbench in acceptEdits; a third sits in plan mode.
+    writeSession(common, "auto", "2026-11-05T10:00:00.000Z");
+    writeSession(join(common, "worktrees", "older"), "acceptEdits", "2026-11-04T10:00:00.000Z");
+    const parked = join(parent, "parked");
+    sh(main, "worktree", "add", "-q", "-b", "parked", parked);
+    writeSession(join(common, "worktrees", "parked"), "plan", "2026-11-06T10:00:00.000Z");
+
+    const h = harness();
+    await h.hello({ permissionMode: "default" } as Partial<Settings>);
+    await h.open(fresh);
+    expect(h.engine.state.session.permissionMode).toBe("auto");
+    expect(h.session().opts.settings.permissionMode).toBe("auto");
+    await h.engine.dispose();
+
+    // Its own record (here: older's acceptEdits) wins over every sibling.
+    const b = harness();
+    await b.hello({ permissionMode: "default" } as Partial<Settings>);
+    await b.open(older);
+    expect(b.engine.state.session.permissionMode).toBe("acceptEdits");
+  });
+
+  it("a repository whose other worktrees never ran in ReviewGate starts in the client's mode", async () => {
+    const main = track(makeRepo());
+    const wt = join(track(realpathSync(makeTempDir("rg-modes-wt"))), "wt");
+    sh(main, "worktree", "add", "-q", "-b", "wt", wt);
+    const h = harness();
+    await h.hello({ permissionMode: "acceptEdits" } as Partial<Settings>);
+    await h.open(wt);
+    expect(h.engine.state.session.permissionMode).toBe("acceptEdits");
+  });
+});

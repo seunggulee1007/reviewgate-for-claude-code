@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { samePath } from "../platform/paths.js";
 import type { ChangedFile } from "../git/checkpoint.js";
@@ -223,6 +223,32 @@ export async function loadSessionState(gitDir: string): Promise<SessionFileState
     ...(o.effort === null || isEffortLevel(o.effort) ? { effort: o.effort } : {}),
     ...(isPeerInboundMode(o.peerInbound) ? { peerInbound: o.peerInbound } : {}),
   };
+}
+
+/**
+ * §11: the permission mode the repository's other worktrees ran in last, for a worktree without a mode of its own (a new
+ * workbench): the most recently saved `reviewgate-session.json` of the main worktree (`<common>/`) and the linked ones
+ * (`<common>/worktrees/<name>/`), this worktree's own and plan mode left out. Null when no other worktree has one.
+ */
+export async function siblingWorktreeMode(gitDir: string, commonDir: string): Promise<PermissionMode | null> {
+  const real = (p: string): Promise<string> => realpath(p).catch(() => p);
+  const own = await real(gitDir);
+  const dirs = [commonDir];
+  try {
+    for (const name of await readdir(join(commonDir, "worktrees"))) dirs.push(join(commonDir, "worktrees", name));
+  } catch {
+    // no linked worktree
+  }
+  let best: { mode: PermissionMode; at: number } | null = null;
+  for (const dir of dirs) {
+    if (samePath(await real(dir), own)) continue;
+    const o = await readJSON<Partial<PersistedSession>>(sessionFilePath(dir));
+    if (!o || o.version !== 1 || !isPermissionMode(o.permissionMode) || o.permissionMode === "plan") continue;
+    const at = typeof o.savedAt === "string" ? Date.parse(o.savedAt) : Number.NaN;
+    const t = Number.isFinite(at) ? at : 0;
+    if (!best || t > best.at) best = { mode: o.permissionMode, at: t };
+  }
+  return best?.mode ?? null;
 }
 
 export async function clearSession(gitDir: string): Promise<void> {

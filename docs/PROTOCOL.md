@@ -748,7 +748,11 @@ docs/M20-MODES.md, engine part. Additive: one optional setting, one command, one
   `session_busy` while a turn, a session start, a collection or a revert is in flight.
 - **Persistence.** The mode is stored in `<gitdir>/reviewgate-session.json` (`permissionMode`, next to `sessionId`/`openTabIds`)
   and restored by `open_project` **as-is, `plan` included** — a project parked in plan mode reopens in plan mode. A missing or
-  unknown value falls back to `settings.permissionMode`, then `"default"`. `session_new` / `session_open` keep the project's mode.
+  unknown value falls back to the mode the repository's other worktrees ran in last — the most recently saved
+  `reviewgate-session.json` of the main worktree (`<common>/`) and the linked ones (`<common>/worktrees/<name>/`), plan mode
+  skipped — so a new workbench of a repository worked in auto mode starts in auto mode instead of asking for every
+  command; then to `settings.permissionMode`, then `"default"`. `session_new` / `session_open` keep the project's mode.
+  (A task's or an approved plan's mode, §49 / §42.1, still wins: it is applied after the restore.)
 - **Deny still wins.** The mode never reaches the PreToolUse hooks: the budget returns `deny` before the CLI evaluates any
   mode, so `auto` and `acceptEdits` cannot bypass the review gate, and a git command that changes the repository gets the
   card (`git_command`, §46) in those modes too (§10, engine/test/engine.modes.test.ts).
