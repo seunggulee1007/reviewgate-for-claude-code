@@ -1094,7 +1094,8 @@ and leaves the rest under review. Accept semantics are unchanged (`accept` takes
 ## 18. Unprompted turns (review-gate bypass guard)
 
 Claude Code can run a turn by itself — e.g. a background subagent finishes after the main turn's `result` and the CLI
-continues without a user message. Nothing collects such a turn: its edits would land outside any A → B window and the
+continues without a user message. (§52: with background work on — the default since 0.5.9 — such a turn is taken as a review
+turn; this guard is what applies when it cannot be, and when background work is off.) Nothing collects such a turn: its edits would land outside any A → B window and the
 next `send`'s snapshot A would absorb them unreviewed. `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (§13) avoids the known
 trigger; this guard is the defense in depth, and the only protection when the user's environment explicitly sets the
 variable to a falsy value (`??=` keeps their value).
@@ -6359,10 +6360,50 @@ process:
   (§31.1), instead of becoming part of a fresh A. `finish_review` drops A, so a turn after it starts fresh.
 - **Labels.** `auto_turn.task` names the background task whose notification came last (description, `completed` /
   `failed` / `stopped`, the CLI's summary). `wakeupSource` is the lifecycle frame's own value.
-- **Mac / Electron.**
-  - A "백그라운드 N" chip next to the HUD opens the list: each task with its description, kind and time, plus
-    [출력 보기] (`task_output`) and [중지] (`task_stop`).
-  - A running Bash row has [백그라운드로] (⌃B), which sends `task_background {toolUseId}`.
-  - The `auto_turn` row reads "백그라운드 작업이 끝나 Claude가 이어서 했어요 · <description>" / "예약된 작업이 실행됐어요
-    (/loop)" / "Claude가 이어서 작업했어요".
-  - Settings › 고급 has "백그라운드 작업과 /loop 허용". It takes effect when the session restarts.
+- **Claude Code's own files.** `/loop` writes `.claude/scheduled_tasks.lock`. The CLI lists its runtime files in
+  `.git/info/exclude` (`scheduled_tasks.lock` / `.json`, `checkpoints/`, `mailbox/`, `routines/.state/`,
+  `agent-registry.json`, `agent-memory-local`, `first-run`, `assistant-daemon-state.json`), but the §32 mods capture
+  force-added them, so the lock showed in the review. They are never mods now (`git/mods.ts` `isCliRuntimePath`).
+- **Mac.**
+  - A "백그라운드 N" chip in the HUD opens the list. Each task shows its description, kind, turn and time, with
+    [출력 보기] (a sheet with the last 64 KB and 새로고침) and [중지].
+  - A main-thread Bash row that still runs has [백그라운드로], which sends `task_background {toolUseId}`.
+  - ⌃B in an empty message box while Claude works sends `task_background` without an id. With text typed, ⌃B still
+    moves the caret back, as everywhere on the Mac. The row is in Help › Keyboard Shortcuts and docs/SHORTCUTS.md.
+  - The `auto_turn` row sits where a user message would. Its title is one of "백그라운드 작업이 끝나 Claude가 이어서
+    했어요" (실패해 / 멈춰 for the other statuses), "예약된 작업이 실행됐어요 (/loop)" or "Claude가 이어서 작업했어요".
+    The task's description and the CLI's summary follow.
+  - Settings › 세션 has "백그라운드 작업과 /loop 허용". It takes effect when the session restarts.
+- **Electron.** The same chip, list, output dialog, row, button, Ctrl+B and setting.
+- **Verified.**
+  - Engine `w52.session.test.ts`, with the frames CLI 2.1.318 sends:
+    - the task listed with its call and output file;
+    - the notification turn taken, its calls waiting for the engine, its result a `turn_end`;
+    - a `/loop` run offered, and when refused, §18 applies and it is someone else's command;
+    - a short answer that ends before the engine is ready stays ended;
+    - nothing taken before a turn of ours or with the setting off;
+    - a dispose releases the waiting calls;
+    - Agent calls get `run_in_background: false`.
+  - Engine `w52.background.test.ts`:
+    - the list with the turn of its call;
+    - `task_stop`, `task_background` and `task_output`, with their refusals;
+    - an auto turn whose held text belongs to it, with `b.txt` (written by the build after B) `external` in its review and
+      the accepted `a.txt` still accepted;
+    - a scheduled run waiting for the collection;
+    - a refused one;
+    - a fresh A without background work.
+  - Engine `git.mods.test.ts`: the runtime files are not mods.
+  - Core `BackgroundWorkTests`: the lenient list, the commands' JSON, the replies and refusals in words, the event and the
+    row (live once per turn, restored), the setting going out with `hello`.
+  - Real CLI: `sidecar/test/driver-background.mjs`, with `RG_LOOP=1` (haiku, CLI 2.1.318).
+    - The background `sleep 8; echo built > built.txt` was listed while it ran (kind `bash`, its call, turn 1).
+      `task_output` answered.
+    - The turn after it ended was `auto_turn {background}`. Its review held `after.txt` (`bash`) and `built.txt`
+      (`external`). No unprompted text.
+    - A `/loop 1m` run was `auto_turn {schedule}` with `tick.txt` in its review and no `.claude/` file.
+  - Layout check at 1000 × 637: the chip and the auto-turn row (`background-1000x637.png`), the list
+    (`background-tasks.png`).
+- Owner: background-work (engine `session/background.ts`, `session/claude.ts` (§52 block), `session/hooks.ts`
+  (`adoption`, `keepAgentsInTurn`), `engine.ts` (`onAutoTurnStart` / `adoptAutoTurn` / `task*`), `review/gate.ts`
+  (`prepareAnswer(carry)`), `git/mods.ts`; Core `Engine/BackgroundProtocol.swift`, `Session/AppState+Background.swift`;
+  App `UI/Chat/BackgroundViews.swift`; `sidecar/test/driver-background.mjs`).

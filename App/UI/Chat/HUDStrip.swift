@@ -64,6 +64,7 @@ struct HUDStrip: View {
             }
             activityItem(measuring: measuring)
             LiveChangesChip()   // wave2 mac-flow (§34.6): "진행 중: 파일 N개 · +A −D" → the list
+            BackgroundTasksChip()   // §52: "백그라운드 N" → the tasks, their output, [중지]
             if let notice = store.transientNotice {
                 transientChip(notice)
             }

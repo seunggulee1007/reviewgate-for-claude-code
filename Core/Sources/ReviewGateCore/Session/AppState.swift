@@ -218,6 +218,8 @@ public final class AppState {
     public internal(set) var isLoadingPermissionRules = false
     /// §2.8: the terminal's default mode, offered once when a project is opened ("터미널처럼 auto 모드로 시작할까요?").
     public internal(set) var defaultModeOffer: PermissionMode?
+    /// §52: the screenshot tour's background tasks (DEBUG only; nil = the engine's).
+    var debugBackgroundTasks: [BackgroundTaskInfo]?
     /// §49: a task handed to this worktree that the session could not take — the chat puts it into the composer (once per id).
     public internal(set) var taskForComposer: TaskComposerText?
     /// The UserDefaults this window's settings live in (the extensions in other files cannot see `defaults`).
@@ -2053,6 +2055,8 @@ public final class AppState {
         case let .peerMessage(message):
             if message.state == .delivered || message.state == .dropped { finishStreamingAssistant() }
             handlePeerMessage(message)
+        case let .autoTurn(turn, info):   // §52.1
+            handleAutoTurn(turn: turn, info: info)
         case let .sideThread(_, thread):
             side.upsert(thread)
         case let .sideThreads(_, mainSessionId, threads):
@@ -2088,7 +2092,7 @@ public final class AppState {
             break
         case .historyCleanup:   // MARK: wave4b w4b-bigturn — §39.1: consumed by `historyCleanup(keep:apply:)`
             break
-        case .commitFormat, .prDraft, .prAiDraft:   // MARK: wave4c w4c-commit — §41.1 (§51): replies, consumed by their requests
+        case .commitFormat, .prDraft, .prAiDraft, .taskOutput, .taskBackground:   // MARK: wave4c w4c-commit — §41.1 (§51, §52): replies, consumed by their requests
             break
         case .fileLines, .fileImage:   // MARK: wave4c w4c-review — §41.3 replies, consumed by the request that asked
             break
@@ -2379,6 +2383,8 @@ public final class AppState {
                 SessionNotices.appendError(to: &rows, id: id, message: restored.text, fatal: fatal, info: restored.info)
             case let .peerMessage(message):
                 rows.append(.peerMessage(id: id, message: message))
+            case let .autoTurn(info):   // §52.1
+                rows.append(.autoTurn(id: id, turn: item.turn, info: info))
             // MARK: wave4 w4-history — §38.3: the turn summary card comes back with the chat (as live: none without files).
             case let .turnSummary(summary):
                 if !summary.files.isEmpty { rows.append(.turnSummary(id: id, summary: summary)) }
@@ -2413,7 +2419,7 @@ public final class AppState {
 
     /// The streaming row gets its whole text and is finished — also when a row was put after it (an error row, a lock
     /// notice): the next delta starts a new message anyway, and a row left streaming stays raw text without Copy.
-    private func finishStreamingAssistant() {
+    func finishStreamingAssistant() {
         if let live = liveText.rowID {
             let text = liveText.take()
             livePublishScheduled = false   // the row change below tells the readers

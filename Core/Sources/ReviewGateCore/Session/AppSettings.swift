@@ -225,6 +225,7 @@ public enum AppSettings {
         // MARK: wave3 check-clients — §34.9 the user's test commands (TestCommandSettings.swift)
         settings.testCommandPatterns = testCommandPatterns(defaults: defaults)
         settings.maxTurns = maxTurns(defaults: defaults)   // MARK: wave4 w4-longwork (§38.2, LongWork.swift)
+        settings.backgroundWork = backgroundWork(defaults: defaults)   // §52 (AppState+Background.swift)
         settings.largeFileMB = largeFileMB(defaults: defaults)   // MARK: wave4b w4b-bigturn (§39.1, BigTurn.swift)
         // MARK: wave4b w4b-side — §40.3 (SideTrust.swift): the web is off unless chosen; an older engine reads sideAllowWeb.
         settings.sideWeb = sideWeb(defaults: defaults).rawValue

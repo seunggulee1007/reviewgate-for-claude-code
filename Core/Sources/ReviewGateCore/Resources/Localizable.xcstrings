@@ -769,6 +769,54 @@
         }
       }
     },
+    "A background task failed — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background task failed — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업이 실패해 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
+    "A background task finished — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background task finished — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업이 끝나 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
+    "A background task was stopped — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background task was stopped — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업이 멈춰 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
     "A build is running": {
       "localizations": {
         "en": {
@@ -929,6 +977,22 @@
         }
       }
     },
+    "A scheduled task ran (/loop)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A scheduled task ran (/loop)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "예약된 작업이 실행됐어요 (/loop)"
+          }
+        }
+      }
+    },
     "A server with this name already exists": {
       "localizations": {
         "en": {
@@ -1005,6 +1069,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "심볼릭 링크는 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "Agent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트"
           }
         }
       }
@@ -1969,6 +2049,38 @@
         }
       }
     },
+    "Background %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 %lld"
+          }
+        }
+      }
+    },
+    "Background work is off (Settings › Session, or CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background work is off (Settings › Session, or CLAUDE_CODE_DISABLE_BACKGROUND_TASKS)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업이 꺼져 있어요 (설정 › 세션, 또는 CLAUDE_CODE_DISABLE_BACKGROUND_TASKS)."
+          }
+        }
+      }
+    },
     "Balanced": {
       "localizations": {
         "en": {
@@ -2285,6 +2397,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 PR을 채우지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude went on by itself": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude went on by itself"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 이어서 작업했어요"
           }
         }
       }
@@ -3635,6 +3763,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 턴의 변경을 모으지 못했어요. 먼저 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "Command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령"
           }
         }
       }
@@ -5431,6 +5575,22 @@
         }
       }
     },
+    "Its changes are reviewed like any other turn.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its changes are reviewed like any other turn."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 턴의 변경도 다른 턴처럼 리뷰해요."
+          }
+        }
+      }
+    },
     "Its changes join the current review": {
       "localizations": {
         "en": {
@@ -6231,6 +6391,22 @@
         }
       }
     },
+    "Monitor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모니터"
+          }
+        }
+      }
+    },
     "More lines are not available: the file is too large or binary": {
       "localizations": {
         "en": {
@@ -6547,6 +6723,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 창으로 옮겨 온 채팅이 없어요."
+          }
+        }
+      }
+    },
+    "No Claude session is running.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude session is running."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 Claude 세션이 없어요."
           }
         }
       }
@@ -9907,6 +10099,22 @@
         }
       }
     },
+    "Task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업"
+          }
+        }
+      }
+    },
     "Terminal": {
       "localizations": {
         "en": {
@@ -10111,6 +10319,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "사전 리뷰 요청이 올바르지 않습니다"
+          }
+        }
+      }
+    },
+    "That task is no longer running.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That task is no longer running."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그 작업은 이미 끝났어요."
           }
         }
       }
@@ -12175,6 +12399,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 곁질문은 더 이상 없습니다"
+          }
+        }
+      }
+    },
+    "This task has no output to show yet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This task has no output to show yet."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 작업은 아직 보여 줄 출력이 없어요."
           }
         }
       }

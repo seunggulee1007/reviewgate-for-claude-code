@@ -40,6 +40,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.commitPushByDefault) private var commitPushByDefault = false
     @AppStorage(AppSettings.Key.commitTrailer) private var commitTrailer = ""
     @AppStorage(AppSettings.Key.autoRestartSession) private var autoRestartSession = true
+    @AppStorage(AppSettings.backgroundWorkKey) private var backgroundWork = true   // §52
     // M16 permissions
     @AppStorage(AppSettings.Key.autoAllowReadOnlyBash) private var autoAllowReadOnlyBash = true
     @AppStorage(AppSettings.Key.bashAllowPatterns) private var bashAllowPatterns = ""
@@ -142,6 +143,11 @@ private struct GeneralSettingsView: View {
                     .accessibilityIdentifier("Auto-restart session")
                 Text("Starts a new Claude session once when the current one dies unexpectedly. The review list is kept either way; off, the chat shows \"Session ended — Restart\".")
                     .font(.caption).foregroundStyle(.secondary)
+                // §52: background commands, Ctrl+B, /loop — and the turns Claude then starts itself, reviewed like any other.
+                Toggle("Allow background work and /loop", isOn: $backgroundWork)
+                    .accessibilityIdentifier("Allow background work")
+                Text("As in the terminal: Claude can run a command in the background (a dev server, a long build) and /loop can repeat a prompt. When a background command ends or a scheduled run starts, Claude goes on by itself — that turn is reviewed like any other, and files a background command changed in between go into the next review. Takes effect when the session restarts.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             StatusLineSettingsSection()   // MARK: wave6 w6-statusline (§44.2)
             Section("Side questions") {
@@ -225,6 +231,7 @@ private struct GeneralSettingsView: View {
         .onChange(of: maxFiles) { _, _ in pushBudget() }
         .onChange(of: maxLines) { _, _ in pushBudget() }
         .onChange(of: maxTurns) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // wave4 w4-longwork
+        .onChange(of: backgroundWork) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushBackgroundWork() } }   // §52
         .onChange(of: worktreeRoot) { _, _ in
             let root = AppSettings.worktreeRoot()
             for store in WorkbenchRegistry.shared.allStores { store.updateWorktreeRoot(root) }

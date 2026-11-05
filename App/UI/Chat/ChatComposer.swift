@@ -755,11 +755,16 @@ struct ChatComposer: View {
             case .escape:
                 composer.mentionDismissed = true
                 return true
-            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab:
+            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB:
                 break
             }
         }
         switch key {
+        case .controlB:
+            // §52: as in the terminal — while Claude works, the running command goes on in the background.
+            guard store.isRunning, store.backgroundWorkEnabled else { return false }
+            Task { _ = await store.moveToBackground() }
+            return true
         case .backtab:
             // MARK: wave6 w6-terminal — §44.1: ⇧⇥ cycles the mode like the terminal (default → accept edits → plan → auto).
             store.cyclePermissionMode()

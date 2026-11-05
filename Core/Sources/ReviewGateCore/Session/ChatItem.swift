@@ -22,13 +22,15 @@ public enum ChatItem: Identifiable, Sendable, Equatable {
     /// §29 (wave1 mac-session): a message from another Claude session — delivered (its turn's first row), dropped, or
     /// read by the CLI without being held (`unprompted`).
     case peerMessage(id: UUID, message: PeerMessage)
+    /// §52.1: a turn Claude started itself (a background task ended, `/loop`, …) — the turn's first row.
+    case autoTurn(id: UUID, turn: Int, info: AutoTurnInfo)
 
     public var id: UUID {
         switch self {
         case .user(let id, _, _), .assistant(let id, _, _, _), .toolUse(let id, _, _, _, _, _),
              .toolResult(let id, _, _, _, _), .permission(let id, _, _),
              .budgetEvent(let id, _, _, _, _, _, _), .error(let id, _, _, _), .turnEnd(let id, _),
-             .plan(let id, _, _, _), .turnSummary(let id, _), .peerMessage(let id, _):
+             .plan(let id, _, _, _), .turnSummary(let id, _), .peerMessage(let id, _), .autoTurn(let id, _, _):
             return id
         }
     }

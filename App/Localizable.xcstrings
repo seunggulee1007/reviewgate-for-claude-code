@@ -2625,6 +2625,22 @@
         }
       }
     },
+    "Allow background work and /loop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow background work and /loop"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업과 /loop 허용"
+          }
+        }
+      }
+    },
     "Allow for session": {
       "localizations": {
         "en": {
@@ -3277,6 +3293,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "보관"
+          }
+        }
+      }
+    },
+    "As in the terminal: Claude can run a command in the background (a dev server, a long build) and /loop can repeat a prompt. When a background command ends or a scheduled run starts, Claude goes on by itself — that turn is reviewed like any other, and files a background command changed in between go into the next review. Takes effect when the session restarts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As in the terminal: Claude can run a command in the background (a dev server, a long build) and /loop can repeat a prompt. When a background command ends or a scheduled run starts, Claude goes on by itself — that turn is reviewed like any other, and files a background command changed in between go into the next review. Takes effect when the session restarts."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널처럼 Claude가 명령을 백그라운드로 돌리고(dev 서버, 긴 빌드) /loop로 같은 요청을 반복할 수 있어요. 백그라운드 명령이 끝나거나 예약 실행이 시작되면 Claude가 이어서 작업하고, 그 턴도 다른 턴처럼 리뷰해요. 그사이 백그라운드 명령이 바꾼 파일은 다음 리뷰에 들어가요. 세션을 다시 시작하면 적용돼요."
           }
         }
       }
@@ -4355,6 +4387,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "CI"
+          }
+        }
+      }
+    },
+    "Claude goes on by itself when one ends. Changes they make are reviewed in the next turn.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude goes on by itself when one ends. Changes they make are reviewed in the next turn."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "하나가 끝나면 Claude가 이어서 작업해요. 그사이 바뀐 파일은 다음 리뷰에 들어가요."
           }
         }
       }
@@ -6067,6 +6115,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "커맨드"
+          }
+        }
+      }
+    },
+    "Commands Claude started in the background. What they change goes into the next review.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commands Claude started in the background. What they change goes into the next review."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 백그라운드로 실행한 명령이에요. 이 명령이 바꾼 파일은 다음 리뷰에 들어가요."
           }
         }
       }
@@ -8295,6 +8359,22 @@
         }
       }
     },
+    "Ended": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끝남"
+          }
+        }
+      }
+    },
     "Engine": {
       "localizations": {
         "en": {
@@ -10368,6 +10448,22 @@
         }
       }
     },
+    "In an empty message box, while a command runs": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In an empty message box, while a command runs"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "빈 입력창에서, 명령이 실행 중일 때"
+          }
+        }
+      }
+    },
     "In MEMORY.md but no file: %lld": {
       "localizations": {
         "en": {
@@ -10716,6 +10812,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 턴이 끝나면 보여요."
+          }
+        }
+      }
+    },
+    "It can't be moved to the background.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It can't be moved to the background."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드로 옮길 수 없어요."
           }
         }
       }
@@ -11132,6 +11244,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 처리"
+          }
+        }
+      }
+    },
+    "Let this command keep running in the background (⌃B) — Claude goes on now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Let this command keep running in the background (⌃B) — Claude goes on now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 명령은 백그라운드에서 계속 돌고, Claude는 바로 다음 작업으로 넘어가요 (⌃B)"
           }
         }
       }
@@ -12454,6 +12582,22 @@
         }
       }
     },
+    "No output yet.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No output yet."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 출력이 없어요."
+          }
+        }
+      }
+    },
     "No PRs awaiting your review": {
       "localizations": {
         "en": {
@@ -13640,6 +13784,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 worktree에는 워크벤치 준비 패턴에 맞는 파일이 없습니다."
+          }
+        }
+      }
+    },
+    "Nothing is running in the background.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing is running in the background."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행 중인 작업이 없어요."
           }
         }
       }
@@ -15051,6 +15211,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "기타…"
+          }
+        }
+      }
+    },
+    "Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 보기"
           }
         }
       }
@@ -18214,6 +18390,38 @@
         }
       }
     },
+    "Run in background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run in background"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드로"
+          }
+        }
+      }
+    },
+    "Run the command in the background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the command in the background"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령을 백그라운드로"
+          }
+        }
+      }
+    },
     "Run this project's status line": {
       "localizations": {
         "en": {
@@ -18274,6 +18482,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "macOS 가 만든 임시 사본에서 실행 중이에요. 응용 프로그램 폴더로 옮겨야 Claude 연결이 유지돼요."
+          }
+        }
+      }
+    },
+    "Running in the background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running in the background"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행 중"
           }
         }
       }
@@ -18370,6 +18594,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트에서 앞으로 묻지 않고 실행합니다. 설정 → 일반 → 권한에서 지울 수 있습니다."
+          }
+        }
+      }
+    },
+    "Showing the last 64 KB.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the last 64 KB."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마지막 64KB만 보여요."
           }
         }
       }

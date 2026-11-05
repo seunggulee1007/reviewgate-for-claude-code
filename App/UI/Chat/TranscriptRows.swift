@@ -268,11 +268,13 @@ struct TranscriptRowView: View, Equatable {
             if let continues = info.continues {
                 AgentContinuationRow(continues: continues, input: input) { actions?.revealAgentGroup(continues.agentToolUseId) }
             }
-        case let .toolUse(rowID, _, name, file, input, info):
+        case let .toolUse(rowID, toolUseId, name, file, input, info):
             ToolUseRow(rowID: rowID, name: name, file: file, input: input, info: info, root: facts.rootURL,
                        linkedFiles: facts.linked,
                        flashing: flashing,
                        sideAnchor: facts.sideAnchor,
+                       // §52: a main-thread Bash call that still runs can go on in the background (⌃B).
+                       backgroundToolUseId: name == "Bash" && info.parentToolUseId == nil && !facts.viewing ? toolUseId : nil,
                        onOpenFile: { actions?.openDiff($0) })
         case let .toolResult(rowID, toolUseId, isError, preview, info):
             ToolResultRow(rowID: rowID, toolUseId: toolUseId, toolName: facts.toolName,
@@ -315,6 +317,8 @@ struct TranscriptRowView: View, Equatable {
             TurnSummaryCard(rowID: rowID, summary: summary, showsBasis: !facts.viewing && facts.latestSummary, askable: !facts.viewing)
         case let .peerMessage(_, message):
             PeerMessageRow(message: message)
+        case let .autoTurn(_, _, info):   // §52.1
+            AutoTurnRow(info: info)
         }
     }
 }

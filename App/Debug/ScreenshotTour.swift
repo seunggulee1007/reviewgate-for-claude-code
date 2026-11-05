@@ -195,6 +195,8 @@ private final class Tour {
                 try write(try render(window), "layout-\(offer ? "offer-" : "")\(Int(size.width))x\(Int(size.height))")
             }
         }
+        store.debugShowDefaultModeOffer(nil)
+        try await backgroundShots(window)
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1100, height: 752)), display: true)
         entry.model.runAsTask("Do the task at https://tasks.example.com/project/tasks/4821 — fix the cart total")
         try await Task.sleep(for: .milliseconds(1500))
@@ -206,6 +208,27 @@ private final class Tour {
         entry.model.showNewWorkbench = false
         try await Task.sleep(for: .milliseconds(800))
         try await prSheetShot()
+    }
+
+    /// §52: the chat with two background tasks (the HUD chip) and the row of a turn Claude started after one ended, at the
+    /// laptop size; then the chip's list on its own.
+    private func backgroundShots(_ window: NSWindow) async throws {
+        store.debugShowBackgroundWork()
+        defer { store.debugHideBackgroundWork() }
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1500))
+        try write(try render(window), "background-1000x637")
+        let view = NSHostingView(rootView: BackgroundTasksPopover().environment(store))
+        let panel = NSWindow(contentRect: NSRect(origin: .zero, size: view.fittingSize), styleMask: [.titled], backing: .buffered, defer: false)
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.contentView = view
+        panel.setFrameOrigin(NSPoint(x: window.frame.minX, y: window.frame.minY))
+        panel.orderFrontRegardless()
+        defer { panel.orderOut(nil) }
+        try await Task.sleep(for: .milliseconds(800))
+        panel.setContentSize(view.fittingSize)
+        try await Task.sleep(for: .milliseconds(300))
+        try write(try render(panel), "background-tasks")
     }
 
     /// §51: the Create PR sheet — every field named on the left, "AI로 채우기" under the description.

@@ -336,6 +336,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     // MARK: wave4 w4-longwork
     /// §38.2: the tool-call limit of one message (engine default 200, 10–1000; next session start).
     public var maxTurns: Int?
+    /// §52: background commands, Ctrl+B and turns Claude starts itself as review turns (engine default true; next session start).
+    public var backgroundWork: Bool?
     // MARK: wave4b w4b-bigturn
     /// §39.1: an untracked file at least this large (MB) is a stub in snapshots (engine default 50; live).
     public var largeFileMB: Int?
@@ -468,6 +470,13 @@ public enum EngineCommand: Sendable, Equatable {
     case agentReport(toolUseId: String)
     /// §36.2: stops that one subagent (`result`); the main turn and the other agents go on.
     case stopAgent(toolUseId: String)
+    // MARK: §52 background work
+    /// Stops a background task (`result`).
+    case taskStop(taskId: String)
+    /// Ctrl+B: the running call (all foreground tasks with nil) goes on in the background → `.taskBackground`.
+    case taskBackground(toolUseId: String?)
+    /// The end of a background task's output → `.taskOutput`.
+    case taskOutput(taskId: String)
     case branches
     case switchBranch(name: String)
     case createBranch(name: String, from: String? = nil)
@@ -680,6 +689,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .toolOutput: "tool_output"
         case .agentReport: "agent_report"   // wave3 mac-agents
         case .stopAgent: "stop_agent"
+        case .taskStop: "task_stop"   // §52
+        case .taskBackground: "task_background"
+        case .taskOutput: "task_output"
         case .branches: "branches"
         case .switchBranch: "switch_branch"
         case .createBranch: "create_branch"
@@ -842,6 +854,8 @@ extension EngineCommand: Encodable {
             try c.encode(toolUseId, forKey: .toolUseId)
         case let .agentReport(toolUseId), let .stopAgent(toolUseId):   // wave3 mac-agents
             try c.encode(toolUseId, forKey: .toolUseId)
+        case .taskStop, .taskBackground, .taskOutput:   // §52
+            try encodeBackgroundFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
              .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges:
@@ -1230,6 +1244,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var peerInbox: [PeerMessage] = []
     /// §29: a turn the CLI runs that is not ours; `canSend` is false meanwhile.
     public var externalTurn: ExternalTurn?
+    /// §52: the background tasks running now, oldest first (empty on older engines).
+    public var backgroundTasks: [BackgroundTaskInfo] = []
     // MARK: wave3 mac-session
     /// §36.8: the CLI this session runs and whether ReviewGate verified it; nil without a session start / on older engines.
     public var cli: CliInfo?
@@ -1306,6 +1322,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         decodePlanReviewFields(from: decoder)   // wave4d w4d-plan: planSource
         autoModel = AutoModelWire.choice(from: decoder)   // wave5 w5-model (§43.4)
         prePlanMode = TerminalModeWire.prePlanMode(from: decoder)   // wave6 w6-terminal (§44.1)
+        backgroundTasks = BackgroundWire.tasks(from: decoder)   // §52
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
@@ -2511,6 +2528,8 @@ public struct TranscriptItem: Sendable, Equatable {
         case error(message: String, fatal: Bool, scope: ErrorScope, code: String?, detail: String?, facts: EngineErrorDetail = EngineErrorDetail())
         /// §29: a peer message once it was delivered (its turn's first row) or dropped.
         case peerMessage(PeerMessage)
+        /// §52.1: a turn Claude started itself (its first row).
+        case autoTurn(AutoTurnInfo)
         // MARK: wave4 w4-history
         /// §38.3: the turn's summary card, kept as a row (a row that does not read stays `.other`).
         case turnSummary(TurnSummary)
@@ -2562,6 +2581,8 @@ extension TranscriptItem: Decodable {
                           code: try? c.decodeIfPresent(String.self, forKey: .code),
                           detail: try? c.decodeIfPresent(String.self, forKey: .detail),
                           facts: facts)
+        case "auto_turn":   // §52.1
+            kind = .autoTurn(try AutoTurnInfo(from: decoder))
         case "peer_message":
             var message = try PeerMessage(from: decoder)
             if message.receivedAt.isEmpty { message.receivedAt = (try? c.decodeIfPresent(String.self, forKey: .at)) ?? "" }
@@ -2745,6 +2766,13 @@ public enum EngineEvent: Sendable, Equatable {
     case prDraft(PRDraftReply)
     /// §51: reply to `pr_ai_draft`.
     case prAiDraft(PRAiDraftReply)
+    // MARK: §52 background work
+    /// A turn Claude started itself (`turn` is its number); its row opens the turn.
+    case autoTurn(turn: Int, info: AutoTurnInfo)
+    /// Reply to `task_output`.
+    case taskOutput(TaskOutputReply)
+    /// Reply to `task_background`.
+    case taskBackground(TaskBackgroundReply)
     // MARK: wave4c w4c-review
     /// §41.3: reply to `history_file_lines` / `pr_file_lines`.
     case fileLines(FileLinesReply)
@@ -2799,6 +2827,8 @@ public enum EngineEvent: Sendable, Equatable {
         case let .commitFormat(reply): reply.id   // wave4c w4c-commit
         case let .prDraft(reply): reply.id
         case let .prAiDraft(reply): reply.id   // §51
+        case let .taskOutput(reply): reply.id   // §52
+        case let .taskBackground(reply): reply.id
         case let .fileLines(reply): reply.id   // wave4c w4c-review
         case let .fileImage(reply): reply.id
         case let .claudeMd(reply): reply.id   // wave4d w4d-config
@@ -3010,6 +3040,12 @@ extension EngineEvent: Decodable {
             self = .prDraft(try PRDraftReply(from: decoder))
         case "pr_ai_draft":   // §51
             self = .prAiDraft(try PRAiDraftReply(from: decoder))
+        case "auto_turn":   // §52
+            self = .autoTurn(turn: (try? c.decodeIfPresent(Int.self, forKey: .turn)) ?? 0, info: try AutoTurnInfo(from: decoder))
+        case "task_output":
+            self = .taskOutput(try TaskOutputReply(from: decoder))
+        case "task_background":
+            self = .taskBackground(try TaskBackgroundReply(from: decoder))
         case "file_lines":   // wave4c w4c-review (§41.3)
             self = .fileLines(try FileLinesReply(from: decoder))
         case "file_image":

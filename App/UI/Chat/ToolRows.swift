@@ -19,6 +19,8 @@ struct ToolUseRow: View {
     var flashing = false
     /// §21: Edit / Write / Bash rows offer "Why?" (a side question on this call).
     var sideAnchor: SideAnchor?
+    /// §52: a Bash call of the main thread — [백그라운드로] while it runs.
+    var backgroundToolUseId: String?
     let onOpenFile: (ChangedFile) -> Void
     @State private var hovering = false
 
@@ -71,6 +73,9 @@ struct ToolUseRow: View {
             }
             if !isEdit, !linkedFiles.isEmpty {
                 changedChips
+            }
+            if let backgroundToolUseId {
+                MoveToBackgroundButton(toolUseId: backgroundToolUseId).padding(.leading, 22)
             }
             // wave2 mac-diff (§34.6): what the edit changed, folded, from its input — readable while the turn runs.
             if isEdit, let preview = TranscriptRowCache.editPreview(row: rowID, name: name, input: input) {

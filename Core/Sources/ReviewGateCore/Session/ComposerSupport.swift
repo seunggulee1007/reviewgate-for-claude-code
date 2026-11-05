@@ -212,6 +212,7 @@ public enum TranscriptSearch {
         case let .error(_, message, _, info): return [message, info.secondary ?? ""].joined(separator: "\n")
         case let .plan(_, _, plan, _): return plan
         case let .peerMessage(_, message): return [message.senderName, message.body ?? ""].joined(separator: "\n")
+        case let .autoTurn(_, _, info): return [BackgroundText.autoTurnTitle(info), BackgroundText.autoTurnDetail(info) ?? ""].joined(separator: "\n")
         case .budgetEvent, .turnEnd, .turnSummary: return nil
         }
     }

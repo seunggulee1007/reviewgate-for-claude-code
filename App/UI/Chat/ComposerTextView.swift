@@ -27,6 +27,9 @@ enum ComposerKey: Equatable {
     case optionCommandEnter
     /// ⌘⌫ — deny the oldest card (empty draft only; otherwise the text view deletes to the line start).
     case commandDelete
+    /// §52: ⌃B in an empty message box — the running command goes on in the background (as in the terminal); with text
+    /// typed it moves the caret back, as everywhere on the Mac.
+    case controlB
 }
 
 /// What a paste or a drop brought into the composer (§23 mentions / §24 images).
@@ -156,6 +159,7 @@ struct ComposerTextView: NSViewRepresentable {
             case #selector(NSResponder.insertTab(_:)): .tab
             case #selector(NSResponder.insertBacktab(_:)): .backtab   // wave6 w6-terminal (§44.1)
             case #selector(NSResponder.cancelOperation(_:)): .escape
+            case #selector(NSResponder.moveBackward(_:)) where textView.string.isEmpty: .controlB   // §52
             default: nil
             }
             guard let key else { return false }

@@ -205,6 +205,8 @@ extension AppState {
                 SessionNotices.appendError(to: &rows, id: id, message: restored.text, fatal: fatal, info: restored.info)
             case let .peerMessage(message):
                 rows.append(.peerMessage(id: id, message: message))
+            case let .autoTurn(info):   // §52.1
+                rows.append(.autoTurn(id: id, turn: item.turn, info: info))
             case let .turnSummary(summary):
                 if !summary.files.isEmpty { rows.append(.turnSummary(id: id, summary: summary)) }
             case .other:
