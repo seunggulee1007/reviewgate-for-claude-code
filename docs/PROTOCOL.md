@@ -6499,6 +6499,9 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
   - A refused push after every commit closes the sheet, and the Changes banner offers "Push now", as after `commit`. After
     a series the banner's second line names its commits ("커밋 3개를 만들었어요 (…)").
   - `result.partial` reaches the request as `EngineClientError.refused(…, partial:)`.
+  - Layout check at 1000 × 637 (`SHOTS_LAYOUT=1`): the sheet on the window with the user's cards and a hunk open
+    (`commit-split-cards.png`), Claude's split (`commit-split-ai.png`), a series that stopped after its first commit
+    (`commit-split-stopped.png`), and "한 번에 커밋" with the mode picker (`commit-single.png`).
 - Owner (Mac): Core `Engine/CommitSeriesProtocol.swift`, `Engine/EngineClient.swift` (`refusal(of:)`),
   `Session/CommitSplit.swift`, `Session/AppState+CommitSeries.swift`; App `UI/Sidebar/CommitSheet.swift`,
   `UI/Sidebar/CommitSplitViews.swift`. Tests: `Core/Tests/ReviewGateCoreTests/CommitSeriesWireTests.swift`,

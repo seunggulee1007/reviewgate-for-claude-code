@@ -178,7 +178,8 @@ private final class Tour {
     }
 
     /// §49.2 (`SHOTS_LAYOUT=1`): no turn — the chat column in short windows with the mode offer card up, the "Run as Task"
-    /// sheet, and the transcript as the column around it changes (§45.1). `layout-<w>x<h>.png`, `run-as-task.png`, `chat-*.png`.
+    /// sheet, the commit sheet's "나눠서 커밋" (§53), and the transcript as the column around it changes (§45.1).
+    /// `layout-<w>x<h>.png`, `run-as-task.png`, `commit-split-*.png`, `chat-*.png`.
     private func layoutShots() async throws {
         try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
         guard let window = entry.window else { throw TourError("no window") }
@@ -211,6 +212,7 @@ private final class Tour {
         entry.model.showNewWorkbench = false
         try await Task.sleep(for: .milliseconds(800))
         try await prSheetShot()
+        try await commitSplitShots(window)
         try await transcriptShots(window)
     }
 
@@ -373,6 +375,135 @@ private final class Tour {
         try await Task.sleep(for: .milliseconds(500))
         try write(try render(panel), "create-pr")
     }
+
+    /// §53: the commit sheet's "나눠서 커밋" on the laptop-size window — the user's cards with a hunk open (`cards`), Claude's
+    /// split (`ai`) and a series that stopped after its first commit (`stopped`), then "한 번에 커밋" (`commit-single`).
+    /// `commit-split-<step>.png` is the window with the sheet on it as the user sees it (a sheet taller than the window is cut
+    /// there, and the log says so); `commit-split-<step>-sheet.png` the sheet alone.
+    private func commitSplitShots(_ window: NSWindow) async throws {
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1200))
+        let files = Self.splitFiles
+        let paths = files.map(\.path)
+        var mine = CommitSplitState(files: files, message: "feat(cart): discount codes SAVE10 and FREESHIP")
+        let tests = mine.addCard()
+        mine.setMessage("test(cart): the discount codes", card: tests)
+        mine.moveFile("test/cart.test.ts", from: .card(1), to: .card(tests), files: files)
+        mine.movePart(SplitPart(path: "src/cart.ts", hunk: 2), from: .card(1), to: .card(tests), files: files)
+        mine.moveFile("src/format.ts", from: .card(1), to: .notCommitted, files: files)
+        let cards = CommitSplitSession(paths: paths, files: files, state: mine)
+        cards.toggleExpanded(SplitPart(path: "src/pricing.ts", hunk: 0), in: .card(1))
+
+        var proposed = mine
+        proposed.propose(files: files, commits: [
+            CommitPlan(message: "feat(pricing): discount codes SAVE10 and FREESHIP",
+                       parts: [CommitPart(path: "src/pricing.ts")],
+                       why: "The codes and their rule come first; the cart builds on them."),
+            CommitPlan(message: "feat(cart): apply a discount code to the totals",
+                       parts: [CommitPart(path: "src/cart.ts"), CommitPart(path: "test/cart.test.ts"), CommitPart(path: "README.md")],
+                       why: "The cart applies the codes; its test and the README describe this change."),
+            CommitPlan(message: "fix(format): a minus sign for negative amounts",
+                       parts: [CommitPart(path: "src/format.ts")],
+                       why: "An unrelated fix found on the way, in its own commit."),
+        ])
+        let ai = CommitSplitSession(paths: paths, files: files, state: proposed)
+
+        let stopped = CommitSplitSession(paths: paths, files: files, state: proposed)
+        let made = [SeriesCommit(sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", message: "feat(pricing): discount codes SAVE10 and FREESHIP",
+                                 files: ["src/pricing.ts"])]
+        stopped.debugShow(made: made, commitError: CommitSplitText.failure(
+            EngineClientError.refused("commit_failed:pre-commit hook rejected the commit (npm test: 1 failing)", code: "commit_failed"), made: made))
+
+        for (step, session) in [("cards", cards), ("ai", ai), ("stopped", stopped)] {
+            try await sheetShot("commit-split-\(step)", on: window, CommitSheet(splitPreview: session))
+        }
+        try await sheetShot("commit-single", on: window, CommitSheet())   // the mode picker beside the title, 520 pt wide
+    }
+
+    /// `content` as a sheet on `window`: the window with the sheet where AppKit puts it, and the sheet alone.
+    private func sheetShot(_ name: String, on window: NSWindow, _ content: some View) async throws {
+        let controller = NSHostingController(rootView: content.environment(store).environment(store.pr).environment(entry.model))
+        controller.sizingOptions = [.preferredContentSize]
+        let sheet = NSWindow(contentViewController: controller)
+        sheet.appearance = NSAppearance(named: .darkAqua)
+        window.beginSheet(sheet, completionHandler: nil)
+        defer { window.endSheet(sheet) }
+        try await Task.sleep(for: .milliseconds(1500))
+        let (outer, inner) = (window.frame, sheet.frame)
+        log("\(name): sheet \(NSStringFromRect(inner)) on window \(NSStringFromRect(outer))"
+            + (inner.minY < outer.minY || inner.maxY > outer.maxY ? " — TALLER THAN THE WINDOW" : ""))
+        let back = try render(window)
+        let front = try render(sheet)
+        try write(front, "\(name)-sheet")
+        let scale = CGFloat(back.pixelsWide) / back.size.width
+        guard let backImage = back.cgImage, let frontImage = front.cgImage,
+              let context = CGContext(data: nil, width: backImage.width, height: backImage.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { throw TourError("no composite for \(name)") }
+        context.draw(backImage, in: CGRect(x: 0, y: 0, width: backImage.width, height: backImage.height))
+        context.setFillColor(NSColor.black.withAlphaComponent(0.25).cgColor)   // the window behind a sheet
+        context.fill(CGRect(x: 0, y: 0, width: backImage.width, height: backImage.height))
+        context.draw(frontImage, in: CGRect(x: (inner.minX - outer.minX) * scale, y: (inner.minY - outer.minY) * scale,
+                                            width: inner.width * scale, height: inner.height * scale))
+        guard let composite = context.makeImage() else { throw TourError("no composite for \(name)") }
+        try write(NSBitmapImageRep(cgImage: composite), name)
+    }
+
+    /// The demo project's discount-code change as `commit_hunks` sends it: two files split by hunks, three whole-only ones.
+    private static let splitFiles: [CommitFile] = [
+        CommitFile(path: "src/pricing.ts", hunks: [
+            CommitHunk(id: 0, header: "@@ -1,5 +1,11 @@", added: 6, deleted: 0, text: """
+             /** Flat shipping per order, in cents. */
+             export const FLAT_SHIPPING = 599;
+            +/** Discount codes: a share of the subtotal off, or free shipping. */
+            +export const DISCOUNT_CODES = {
+            +  SAVE10: { percentOff: 10 },
+            +  FREESHIP: { freeShipping: true },
+            +} as const;
+            +export type DiscountCode = keyof typeof DISCOUNT_CODES;
+             /** Orders from this subtotal ship free, in cents. */
+             export const FREE_SHIPPING_FROM = 5000;
+            """),
+            CommitHunk(id: 1, header: "@@ -14,3 +20,8 @@ export function taxFor(amount: number): number {", added: 5, deleted: 0, text: """
+               return Math.round(amount * TAX_RATE);
+             }
+            +
+            +export function discountFor(code: DiscountCode, subtotal: number): number {
+            +  const rule = DISCOUNT_CODES[code];
+            +  return "percentOff" in rule ? Math.round((subtotal * rule.percentOff) / 100) : 0;
+            +}
+            """),
+        ]),
+        CommitFile(path: "src/cart.ts", hunks: [
+            CommitHunk(id: 0, header: "@@ -1,4 +1,4 @@", added: 1, deleted: 1, text: """
+            -import { shippingFor, taxFor } from "./pricing.ts";
+            +import { DISCOUNT_CODES, discountFor, shippingFor, taxFor, type DiscountCode } from "./pricing.ts";
+             import { formatPrice } from "./format.ts";
+            """),
+            CommitHunk(id: 1, header: "@@ -19,6 +19,15 @@ export interface Totals {", added: 9, deleted: 0, text: """
+             export class Cart {
+               private readonly items = new Map<string, LineItem>();
+            +  private readonly codes: DiscountCode[] = [];
+            +
+            +  applyCode(code: string): void {
+            +    if (!(code in DISCOUNT_CODES)) throw new RangeError(`unknown discount code: ${code}`);
+            +    this.codes.push(code as DiscountCode);
+            +  }
+            """),
+            CommitHunk(id: 2, header: "@@ -38,9 +47,11 @@ export class Cart {", added: 3, deleted: 2, text: """
+               totals(): Totals {
+                 const subtotal = this.lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+            -    const shipping = shippingFor(subtotal);
+            -    const tax = taxFor(subtotal);
+            +    const discount = this.codes.reduce((sum, code) => sum + discountFor(code, subtotal), 0);
+            +    const shipping = this.codes.includes("FREESHIP") ? 0 : shippingFor(subtotal);
+            +    const tax = taxFor(subtotal - discount);
+            """),
+        ]),
+        CommitFile(path: "test/cart.test.ts"),
+        CommitFile(path: "README.md"),
+        CommitFile(path: "src/format.ts"),
+    ]
 
     /// The chat's scroll view, found before the agent panel adds scroll views of its own.
     private weak var transcript: NSScrollView?
