@@ -12,6 +12,7 @@ import { commitPaths } from "../../reviewGate";
 import { commitOf, refusalText, useStore } from "../../store";
 import { Modal } from "../Menu";
 import { CommitDraftRow } from "../flow/CommitDraft"; // MARK: wave3 desktop-flow
+import { CommitSplitPanel } from "../flow/CommitSplit"; // §53
 import "./dialogs.css";
 import { isEnter } from "../../ime";
 
@@ -26,6 +27,8 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   const [push, setPush] = useState(() => settings?.commitPushByDefault === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** §53: "나눠서 커밋" — the accepted changes as several commits (the files are fixed while it is open). */
+  const [split, setSplit] = useState(false);
 
   const identityMissing = !commit.identity.name || !commit.identity.email;
   const paths = candidates.paths.filter((p) => selected.has(p));
@@ -53,6 +56,15 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title={t("Commit accepted ({0})…", candidates.paths.length)} onClose={busy ? undefined : onClose} wide testId="Commit dialog">
+      <div className="row" style={{ gap: 6 }} role="group" aria-label={t("Commit mode")}>
+        <button type="button" className={`small ${split ? "" : "primary"}`} aria-pressed={!split} disabled={busy} onClick={() => setSplit(false)} data-testid="Commit mode single">
+          {t("Commit at once")}
+        </button>
+        <button type="button" className={`small ${split ? "primary" : ""}`} aria-pressed={split} disabled={busy || paths.length === 0} onClick={() => setSplit(true)} data-testid="Commit mode split">
+          {t("Commit in parts")}
+        </button>
+      </div>
+      {!split && (<>
       <label className="field">
         <span>{t("Commit message")}</span>
         <textarea
@@ -68,12 +80,13 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
       </label>
       {/* MARK: wave3 desktop-flow — §36.11: Claude drafts the message (read-only); it only fills the field above. */}
       <CommitDraftRow message={message} onMessage={setMessage} paths={paths} disabled={busy} />
+      </>)}
       <div className="field">
         <span>{t("Files ({0} of {1})", paths.length, candidates.paths.length)}</span>
         <ul className="candidates" data-testid="Commit files">
           {candidates.paths.map((p) => (
-            <li key={p} onClick={() => toggle(p)} title={p}>
-              <input type="checkbox" checked={selected.has(p)} onChange={() => toggle(p)} onClick={(e) => e.stopPropagation()} data-testid={`Commit file ${p}`} />
+            <li key={p} onClick={() => !split && toggle(p)} title={p}>
+              <input type="checkbox" checked={selected.has(p)} disabled={split} onChange={() => toggle(p)} onClick={(e) => e.stopPropagation()} data-testid={`Commit file ${p}`} />
               <span className="mono truncate">{p}</span>
             </li>
           ))}
@@ -94,20 +107,21 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
           {t("Git identity is not configured (user.name / user.email).{0}", "")} {t("Set it with `git config user.name` / `git config user.email`.")}
         </div>
       )}
-      {error && (
+      {split && <CommitSplitPanel paths={paths} push={push} initialMessage={message} onClose={onClose} />}
+      {!split && error && (
         <div className="hint error" data-testid="Commit error">
           {refusalText(error)}
           {refusalText(error) !== error && <div className="tiny muted mono">{error}</div>}
         </div>
       )}
-      <div className="actions">
+      {!split && <div className="actions">
         {busy && <span className="spinner" />}
         <span className="spacer" />
         <button type="button" disabled={busy} onClick={onClose}>{t("Cancel")}</button>
         <button type="button" className="primary" disabled={!canSubmit} onClick={() => void submit()} data-testid="Commit">
           {push ? t("Commit & push") : t("Commit")}
         </button>
-      </div>
+      </div>}
     </Modal>
   );
 }

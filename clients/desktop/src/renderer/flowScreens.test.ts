@@ -69,6 +69,34 @@ describe("§36.11–36.14 screens (wave3 desktop-flow)", () => {
   });
   beforeEach(() => setState());
 
+  // ---------------------------------------------------------------- §53
+
+  it("§53 the split sheet: a card with its message, hunk chips and a whole-only file, 커밋하지 않음, the button's reason", async () => {
+    const { CommitSplitPanel } = await import("./components/flow/CommitSplit");
+    initI18n("ko", "win32");
+    const hunk = (id: number) => ({ id, header: `@@ -${id},5 +${id},7 @@`, added: 2, deleted: 0, text: "+x" });
+    const preloaded = [
+      { path: "api/Svc.java", status: "M", binary: false, hunks: [hunk(0), hunk(1)] },
+      { path: "README.md", status: "A", binary: false, hunks: [] },
+    ];
+    const out = html(createElement(CommitSplitPanel, { paths: ["api/Svc.java", "README.md"], push: false, initialMessage: "", onClose: () => undefined, preloaded }));
+    expect(out).toContain('data-testid="Split card 1"');
+    expect(out).toContain('data-testid="Split hunk api/Svc.java#0"');
+    expect(out).toContain("@@ -1,5 +1,7 @@");
+    expect(out).toContain('data-testid="Split file README.md"');
+    expect(out).toContain('data-testid="Split not committed"');
+    expect(out).toContain("커밋하지 않음");
+    expect(out).toContain('data-testid="Split with Claude"');
+    expect(out).toContain("AI로 나누기");
+    // an empty message: the button is off and says why
+    expect(out).toContain('data-testid="Split blocker"');
+    expect(out).toContain("1번째 커밋에 메시지가 없어요");
+    const filled = html(createElement(CommitSplitPanel, { paths: ["api/Svc.java"], push: true, initialMessage: "#acme/1: 재고", onClose: () => undefined, preloaded }));
+    expect(filled).not.toContain('data-testid="Split blocker"');
+    expect(filled).toContain("커밋 1개 만들기");
+    initI18n("en", "darwin");
+  });
+
   // ---------------------------------------------------------------- §36.11
 
   it("§36.11 'Write with Claude' under the message; the template's first line rendered on this branch", async () => {

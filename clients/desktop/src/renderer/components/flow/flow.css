@@ -113,3 +113,16 @@
 .pr-claude { display: inline-flex; align-items: center; gap: 6px; flex: none; }
 .pr-claude .count { font-size: 10px; font-weight: 650; padding: 0 5px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); margin-left: 4px; }
 .note-bubble .send-claude { font-size: 11.5px; }
+
+/* §53 the commit sheet's "나눠서 커밋" mode */
+.commit-split { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.split-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.split-card, .split-none { border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); min-width: 0; }
+.split-card textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.split-parts, .split-hunks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.split-hunks { padding-left: 14px; }
+.split-path { flex: 1 1 auto; min-width: 0; }
+.split-chip { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-hunk-text { margin: 4px 0; padding: 6px; max-height: 200px; overflow: auto; font-size: 11px; line-height: 1.4; background: var(--bg-2, var(--bg)); border: 1px solid var(--border); border-radius: 4px; white-space: pre; }
+.split-move { font-size: 11.5px; padding: 1px 4px; }
+.split-blocker { overflow-wrap: anywhere; min-width: 0; }

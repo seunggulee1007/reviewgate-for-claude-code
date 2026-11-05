@@ -39,6 +39,7 @@ export function initialSplit(files: CommitFile[], message = ""): SplitState {
 }
 
 export type SplitAction =
+  | { type: "init"; files: CommitFile[]; message: string }
   | { type: "message"; card: number; message: string }
   /** `hunk` undefined = every part of `path` that is in `from`. */
   | { type: "move"; files: CommitFile[]; from: SplitTarget; to: SplitTarget; path: string; hunk?: number | null }
@@ -52,6 +53,8 @@ const snapshotOf = (s: SplitState): SplitSnapshot => ({ cards: s.cards, unassign
 
 export function splitReducer(s: SplitState, a: SplitAction): SplitState {
   switch (a.type) {
+    case "init":
+      return initialSplit(a.files, a.message);
     case "message":
       return { ...s, cards: s.cards.map((c) => (c.id === a.card ? { ...c, message: a.message } : c)) };
     case "move": {
