@@ -6428,7 +6428,7 @@ two units. Now the commit sheet can split the accepted changes into several comm
 the split, the user adjusts it, and one command makes the commits in order. `commit` itself is unchanged.
 
 ```ts
-type CommitHunk = { id: number; header: string; added: number; deleted: number; text: string };   // text ≤ 300 lines
+type CommitHunk = { id: number; header: string; added: number; deleted: number; text: string };   // text: the lines after the header (+/-/space), ≤ 300
 type CommitFile = { path: string; oldPath?: string; status: FileStatus; binary: boolean; hunks: CommitHunk[] };   // hunks [] → whole file only
 type CommitPart = { path: string; hunks?: number[] };          // no `hunks` = the whole file
 type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
@@ -6440,7 +6440,7 @@ type CommitPlan = { message: string; parts: CommitPart[]; why?: string };
 - **Hunks** are those of `git diff HEAD -- <path>` (3 lines of context) — what a commit takes from the worktree — for
   accepted paths only (`paths` as `commit`: default `commit.acceptedPaths`, refused `nothing_to_commit` for any other).
   Ids are 0, 1, … in file order. An added, deleted, binary or renamed file, or one whose diff has a single hunk, can only
-  go whole (`hunks: []`).
+  go whole (`hunks: []`); so can a symlink, a submodule, a file whose mode changed and any file on an unborn branch.
 - **`commit_split_draft`** is a read-only fork like `commit_draft` (§36.11, the same fork rules, refusals and side lane;
   `commit_split_failed:<why>`). It gets every hunk (path, id, header, text; cut at 3 000 lines in all, then the file list),
   the last 20 commit subjects, the branch and `settings.commitTemplate`, and the conversation's context. It is asked for

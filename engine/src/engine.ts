@@ -193,6 +193,8 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import type { CommitHunksEvent } from "./protocol.js"; // §53
+import { headHunks } from "./git/commitHunks.js"; // §53
 import type { AutoTurnInfo, BackgroundTask, TaskBackgroundEvent, TaskOutputEvent } from "./protocol.js"; // §52
 import { autoTurnPrompt, readTail } from "./session/background.js";
 import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT_SYSTEM, prAiDraftPrompt } from "./review/prAiDraft.js";
@@ -1228,6 +1230,8 @@ export class ReviewEngine {
         return this.prCreate(cmd.base, cmd.title ?? null, cmd.body ?? null, cmd.draft === true, cmd); // wave4c w4c-commit: + §41.1 meta
       case "commit":
         return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true);
+      case "commit_hunks": // §53
+        return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
       case "push":
         return this.pushLastCommit();
       case "refresh":
@@ -3994,6 +3998,23 @@ export class ReviewEngine {
     await this.refreshWorkbenches(false);
     if (push) await this.pushLastCommit();
     return this.committedEvent();
+  }
+
+  // §53 commits in meaningful units
+
+  /** `paths` as `commit` takes them (default every accepted file) as their review files; refused `nothing_to_commit`. */
+  private commitFiles(requested: readonly unknown[] | null): ChangedFile[] {
+    const accepted = acceptedPaths(this.gate);
+    const paths = requested === null ? accepted : [...new Set(requested)];
+    if (paths.length === 0 || paths.some((p) => typeof p !== "string" || !accepted.includes(p))) throw new CommandRefused("nothing_to_commit");
+    return (paths as string[]).map((p) => this.gate.changedFiles.find((f) => f.path === p)).filter((f): f is ChangedFile => f !== undefined);
+  }
+
+  /** §53 `commit_hunks`: the accepted files as hunks of `git diff HEAD` — what a commit takes from the worktree. Reads only. */
+  private async commitHunks(requested: unknown[] | null): Promise<CommitHunksEvent> {
+    const cp = this.requireProject();
+    const files = this.commitFiles(requested);
+    return { type: "commit_hunks", files: (await headHunks(cp, files)).map((f) => f.file) };
   }
 
   /** `git push` for the last commit (`push -u origin <branch>` without an upstream); refused with `no_remote` / `push_failed:<line>`. */
@@ -7502,6 +7523,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "workbench_remove":
     case "workbench_prune":
     case "commit":
+    case "commit_hunks": // §53
     case "push":
     case "refresh":
     case "rewind":

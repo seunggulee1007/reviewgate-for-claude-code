@@ -727,6 +727,9 @@ export type EngineCommand =
   | Cmd<"pr_draft", { base: string }>
   /** §51: the PR sheet's title / description written by a read-only fork from the branch's commits and diff since `base`, the repository's PR template and the sheet's `title` / `body`; replies `pr_ai_draft`. */
   | Cmd<"pr_ai_draft", { base: string; title?: string; body?: string }>
+  // §53 commits in meaningful units
+  /** §53: the accepted files as hunks of `git diff HEAD` (what a commit takes from the worktree); replies `commit_hunks`. `paths` as `commit`. */
+  | Cmd<"commit_hunks", { paths?: string[] }>
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1845,6 +1848,7 @@ export type EngineEvent =
   | CliSessionsEvent
   | CommitDraftEvent
   | PRAiDraftEvent
+  | CommitHunksEvent // §53
   | WorkbenchPreviewEvent
   | WorkbenchProgressEvent
   | PreReviewEvent
@@ -1891,6 +1895,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "cli_sessions" } ? CliSessionsEvent
   : C extends { type: "commit_draft" } ? CommitDraftEvent
   : C extends { type: "pr_ai_draft" } ? PRAiDraftEvent
+  : C extends { type: "commit_hunks" } ? CommitHunksEvent // §53
   : C extends { type: "task_background" } ? TaskBackgroundEvent
   : C extends { type: "task_output" } ? TaskOutputEvent
   : C extends { type: "workbench_preview" } ? WorkbenchPreviewEvent
@@ -1913,6 +1918,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | SideThreadEvent | SideThreadsEvent | SidePromoteDraftEvent | McpStatusEvent | FilesEvent | AttachmentEvent | RewoundEvent | PermissionRulesEvent
   | LiveChangesEvent
   | AgentReportEvent | CliVersionsEvent | CliSessionsEvent | CommitDraftEvent | PRAiDraftEvent | WorkbenchPreviewEvent | PreReviewEvent
+  | CommitHunksEvent // §53
   | TaskBackgroundEvent | TaskOutputEvent
   | TranscriptPageEvent | TranscriptSearchEvent // MARK: wave4 w4-history (§38.3)
   | HistoryCleanupEvent // MARK: wave4b w4b-bigturn (§39.1)
@@ -2076,6 +2082,15 @@ export type SideFork = {
 export type CommitDraftEvent = { type: "commit_draft"; id?: string; message: string };
 /** §51: reply to `pr_ai_draft` — for the PR sheet's fields (nothing is pushed or created); `title` "" when the answer had none. */
 export type PRAiDraftEvent = { type: "pr_ai_draft"; id?: string; title: string; body: string };
+
+// ---------------------------------------------------------------- §53 commits in meaningful units
+
+/** §53: one hunk of `git diff HEAD -- <path>` (3 lines of context); `text` = its lines after the header (`+` / `-` / ` `), ≤ 300. */
+export type CommitHunk = { id: number; header: string; added: number; deleted: number; text: string };
+/** §53: an accepted file as a commit takes it from the worktree; `hunks` [] → it can only go whole. */
+export type CommitFile = { path: string; oldPath?: string; status: ChangeStatus; binary: boolean; hunks: CommitHunk[] };
+/** §53: reply to `commit_hunks`. */
+export type CommitHunksEvent = { type: "commit_hunks"; id?: string; files: CommitFile[] };
 
 /** §36.12: where a new workbench goes — `managed` (`settings.worktreeRoot`) or `sibling` (`<parent of the main worktree>/<repo>-<branch tail>`). */
 export type WorkbenchLocation = "managed" | "sibling";
