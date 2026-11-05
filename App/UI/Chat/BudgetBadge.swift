@@ -30,6 +30,6 @@ struct BudgetBadge: View {
         .foregroundStyle(usage.denied ? Color.white : tint)
         .padding(.horizontal, 8).padding(.vertical, 3)
         .background(usage.denied ? Self.deniedFill : tint.wash(colorScheme, light: 0.12, dark: 0.16), in: Capsule())
-        .help("Per-turn change budget: files / lines")
+        .help("Change limit per reply: files / lines")
     }
 }

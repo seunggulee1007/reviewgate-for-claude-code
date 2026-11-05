@@ -26,6 +26,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.confirmCloseWhileWorking) private var confirmCloseWhileWorking = true
     @AppStorage(ExploreFold.detailDefaultsKey) private var showExploreDetail = false   // MARK: wave4b w4b-tabs (§39.2)
     @AppStorage(AppSettings.Key.returnSends) private var returnSends = true
+    @AppStorage(AppSettings.Key.budgetEnabled) private var budgetEnabled = false   // §54: the change limit is opt-in
     @AppStorage(AppSettings.Key.budgetMaxFiles) private var maxFiles = AppSettings.defaultMaxFiles
     @AppStorage(AppSettings.Key.budgetMaxLines) private var maxLines = AppSettings.defaultMaxLines
     @AppStorage(AppSettings.maxTurnsKey) private var maxTurns = AppSettings.defaultMaxTurns   // wave4 w4-longwork
@@ -95,11 +96,21 @@ private struct GeneralSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 NotificationSettingsRows()   // MARK: wave4b w4-notify — macOS turned them off? one switch per group
             }
-            Section("Per-turn budget") {
+            Section("Limits") {
+                // §54: off by default — Claude works through a task as in the terminal; the numbers apply only while it is on.
+                Toggle("Limit changes per reply", isOn: $budgetEnabled)
+                    .accessibilityIdentifier("Limit changes per reply")
                 Stepper("Max files: \(maxFiles)", value: $maxFiles, in: 1...100)
+                    .disabled(!budgetEnabled)
                 Stepper("Max changed lines: \(maxLines)", value: $maxLines, in: 10...5000, step: 10)
-                Text("Hard stop at ×\(AppSettings.hardMultiplier, specifier: "%.1f") — edits beyond it are denied by the sidecar. Applies live to the open session.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .disabled(!budgetEnabled)
+                if budgetEnabled {
+                    Text("Hard stop at ×\(AppSettings.hardMultiplier, specifier: "%.1f") — edits beyond it are denied by the sidecar. Applies live to the open session.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 // MARK: wave4 w4-longwork (§38.2)
                 Stepper(LongWorkText.settingsStepper(maxTurns), value: $maxTurns, in: AppSettings.maxTurnsRange, step: 10)
                     .accessibilityIdentifier("Max tool calls per message")
@@ -114,7 +125,7 @@ private struct GeneralSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Auto-allow Bash", isOn: $autoAllowBash)
                     .accessibilityIdentifier("Auto-allow Bash")
-                Text("Off: every shell command asks for permission in the chat. Edits are always auto-allowed (the budget still applies). Takes effect on the next Open Project.")
+                Text("Off: every shell command asks for permission in the chat. Edits are always auto-allowed (within the change limit, when it is on). Takes effect on the next Open Project.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Allow patterns").font(.subheadline.weight(.semibold))   // wave1 mac-perms: not only Bash any more
                 TextEditor(text: $bashAllowPatterns)
@@ -179,7 +190,8 @@ private struct GeneralSettingsView: View {
                     .frame(minHeight: 120)
                 Text("Placeholders {maxFiles} and {maxLines} are substituted. Takes effect on the next Open Project.")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Reset to default") { systemPrompt = AppSettings.defaultSystemPromptAppend }
+                // §54: removes the stored text, so a later version's default reaches this Mac too.
+                Button("Reset to default") { UserDefaults.standard.removeObject(forKey: AppSettings.Key.systemPromptAppend) }
             }
             Section("Workbenches") {
                 TextField("Worktree folder", text: $worktreeRoot, prompt: Text(verbatim: AppSettings.defaultWorktreeRoot))
@@ -228,6 +240,7 @@ private struct GeneralSettingsView: View {
             AppVersionFooter()   // MARK: wave4 w4-install — "0.2.3 (610)", as in About and Copy Diagnostics
         }
         .formStyle(.grouped)
+        .onChange(of: budgetEnabled) { _, _ in pushBudget() }
         .onChange(of: maxFiles) { _, _ in pushBudget() }
         .onChange(of: maxLines) { _, _ in pushBudget() }
         .onChange(of: maxTurns) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // wave4 w4-longwork
@@ -307,8 +320,10 @@ private struct GeneralSettingsView: View {
         nodeVersion = await toolchain.nodeVersion()
     }
 
+    /// `set_settings{budget}` to every open window's engine: the limits while the switch is on, else none (§54).
     private func pushBudget() {
-        store.updateBudget(Budget(maxFiles: maxFiles, maxLines: maxLines, hardMultiplier: AppSettings.hardMultiplier))
+        let budget = AppSettings.budget()
+        for store in WorkbenchRegistry.shared.allStores { store.updateBudget(budget) }
     }
 
     /// M16: `set_settings{autoAllowReadOnlyBash, bashAllowPatterns}` to every open window's engine.

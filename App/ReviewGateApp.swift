@@ -130,6 +130,10 @@ struct ReviewGateApp: App {
     @State private var recentProjects: [URL] = AppSettings.recentProjects()
     @State private var registry = WorkbenchRegistry.shared
 
+    init() {
+        AppSettings.forgetLegacySystemPromptAppend()   // §54: an earlier built-in append stored by "Reset to default"
+    }
+
     var body: some Scene {
         // One window per workbench (docs/M10-WORKBENCHES.md): the value is the worktree folder the window was
         // opened for (nil for the initial / ⌘N window, which shows the empty state).

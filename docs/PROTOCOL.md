@@ -6582,7 +6582,12 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   store the text itself. An append of the user's own is untouched; its `{maxFiles}` / `{maxLines}` get the limit's numbers,
   on or off. Mac: Core `AppSettings` (`budgetEnabled`, `budget` — `Budget.off` while off —, `budgetLimits`,
   `renderedSystemPromptAppend`, `forgetLegacySystemPromptAppend` — it removes a stored earlier built-in text), `Budget.isOn`;
-  tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`.
+  tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`. Mac UI: Settings › 한도 has "응답당 변경 한도 두기" (off) above
+  the two steppers, which are greyed out while it is off, and a note on what off means; a change goes to every open
+  window's engine. While off the HUD shows no change-limit chip and the chat's empty state names no limit ("Claude가 바꾼
+  내용은 계속하기 전에 리뷰하게 됩니다."). With it on a warn row reads "변경 한도 도달: …" and a deny row "변경 한도 초과 — 편집
+  거부됨 (…)". The append's "Reset to default" removes the stored text, and the app drops a stored earlier built-in text at
+  launch. The plan sheet's approve button no longer says "in small units" in its help.
 - Owner: engine `session/budget.ts` (`budgetIsOn`, `BudgetState.active`), `session/hooks.ts`, `session/longWork.ts`
   (`budgetChangeNote`). Tests: `engine/test/session.budget.test.ts`, `session.hooks.test.ts` (§54), `longWork.test.ts`,
   `engine.friction.test.ts` (the defaults).

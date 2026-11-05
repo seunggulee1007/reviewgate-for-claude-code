@@ -359,10 +359,16 @@ struct TranscriptPane: View {
         VStack(alignment: .leading, spacing: 6) {
             Label("Ask Claude to make a change.", systemImage: "sparkles")
                 .font(.callout.weight(.medium))
-            Text("Each reply is limited to \(store.budget.maxFiles) files / \(store.budget.maxLines) lines; you'll review the diff before continuing.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if store.budget.isOn {
+                    Text("Each reply is limited to \(store.budget.maxFiles) files / \(store.budget.maxLines) lines; you'll review the diff before continuing.")
+                } else {
+                    Text("You'll review what Claude changed before you continue.")   // §54: no limit to name
+                }
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -287,8 +287,8 @@ struct TranscriptRowView: View, Equatable {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(kind == .deny
-                         ? String(localized: "Budget exceeded — edit denied (\(counts)). Claude was told to stop and report.")
-                         : String(localized: "Budget: \(counts) — Claude was asked to finish the current unit"))
+                         ? String(localized: "Change limit exceeded — edit denied (\(counts)). Claude was told to stop and report.")
+                         : String(localized: "Change limit reached: \(counts)"))
                         .fontWeight(.semibold)
                     Text(target).font(.caption).foregroundStyle(.secondary)
                 }

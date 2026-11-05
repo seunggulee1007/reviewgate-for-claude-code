@@ -4391,6 +4391,54 @@
         }
       }
     },
+    "Change limit exceeded — edit denied (%@). Claude was told to stop and report.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change limit exceeded — edit denied (%@). Claude was told to stop and report."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 한도 초과 — 편집 거부됨 (%@). Claude에게 중단하고 보고하도록 지시했습니다."
+          }
+        }
+      }
+    },
+    "Change limit per reply: files / lines": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change limit per reply: files / lines"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "응답당 변경 한도: 파일 / 줄"
+          }
+        }
+      }
+    },
+    "Change limit reached: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change limit reached: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 한도 도달: %@"
+          }
+        }
+      }
+    },
     "Choose a base branch first": {
       "localizations": {
         "en": {
@@ -11376,6 +11424,38 @@
         }
       }
     },
+    "Leaves plan mode and asks Claude to implement the plan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leaves plan mode and asks Claude to implement the plan"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계획 모드를 나와 Claude에게 계획을 구현하도록 요청합니다"
+          }
+        }
+      }
+    },
+    "Leaves plan mode back into auto mode and asks Claude to implement the plan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leaves plan mode back into auto mode and asks Claude to implement the plan"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계획 모드를 나와 자동 모드로 돌아가고, Claude에게 계획을 구현하게 해요"
+          }
+        }
+      }
+    },
     "Leaves plan mode back into auto mode and asks Claude to implement the plan in small units": {
       "localizations": {
         "en": {
@@ -11436,6 +11516,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 명령은 백그라운드에서 계속 돌고, Claude는 바로 다음 작업으로 넘어가요 (⌃B)"
+          }
+        }
+      }
+    },
+    "Limit changes per reply": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit changes per reply"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "응답당 변경 한도 두기"
+          }
+        }
+      }
+    },
+    "Limits": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limits"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한도"
           }
         }
       }
@@ -14168,6 +14280,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "뒤에 있는 창에 확인할 일이 생기면 알림"
+          }
+        }
+      }
+    },
+    "Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끄면(기본값) 한 번의 응답이 바꾸는 파일·줄 수에 한도가 없습니다 — Claude가 터미널에서처럼 작업을 끝까지 하고, 바뀐 내용은 그다음에 리뷰합니다."
+          }
+        }
+      }
+    },
+    "Off: every shell command asks for permission in the chat. Edits are always auto-allowed (within the change limit, when it is on). Takes effect on the next Open Project.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off: every shell command asks for permission in the chat. Edits are always auto-allowed (within the change limit, when it is on). Takes effect on the next Open Project."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끄면 모든 셸 명령이 채팅에서 권한을 요청합니다. 편집은 항상 자동 허용됩니다 (변경 한도를 켰다면 그 안에서). 다음에 프로젝트를 열 때 적용됩니다."
           }
         }
       }
@@ -25218,6 +25362,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 후 아래 파일을 직접 수정했습니다. 되돌리면 Claude 턴 이전 내용으로 복원되고 직접 수정한 내용은 사라집니다:"
+          }
+        }
+      }
+    },
+    "You'll review what Claude changed before you continue.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You'll review what Claude changed before you continue."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 바꾼 내용은 계속하기 전에 리뷰하게 됩니다."
           }
         }
       }

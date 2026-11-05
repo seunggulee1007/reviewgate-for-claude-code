@@ -87,8 +87,10 @@ struct HUDStrip: View {
             if !store.rememberedAllows.isEmpty {
                 rememberedChip(measuring: measuring)
             }
-            BudgetBadge(usage: store.budgetUsage, budget: store.budget)
-                .fixedSize().layoutPriority(1)
+            if store.budget.isOn {   // §54: no chip without a change limit
+                BudgetBadge(usage: store.budgetUsage, budget: store.budget)
+                    .fixedSize().layoutPriority(1)
+            }
         }
     }
 

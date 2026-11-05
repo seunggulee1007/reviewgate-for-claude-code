@@ -209,8 +209,8 @@ struct PlanApproveMenu: View {
         .menuStyle(.borderlessButton)
         .fixedSize()
         .disabled(isLocked)
-        .help(runMode == .auto ? String(localized: "Leaves plan mode back into auto mode and asks Claude to implement the plan in small units")
-              : String(localized: "Leaves plan mode and asks Claude to implement the plan in small units"))
+        .help(runMode == .auto ? String(localized: "Leaves plan mode back into auto mode and asks Claude to implement the plan")
+              : String(localized: "Leaves plan mode and asks Claude to implement the plan"))
         .accessibilityLabel("Approve plan")
         .accessibilityIdentifier("Approve plan")
     }
