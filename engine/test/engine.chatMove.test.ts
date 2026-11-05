@@ -280,8 +280,10 @@ describe("the moved chat's review baseline (§39.4)", () => {
     await src.engine.handle({ type: "permission_response", requestId: "r1", allow: true, follow: true });
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b9", path: wt, reasonCode: "worktree_command" });
     await src.waitFor(() => src.ofType("error").some((e) => e.code === "chat_move_failed"), "the failure notice");
-    expect(src.ofType("error").find((e) => e.code === "chat_move_failed")).toMatchObject({ fatal: false, path: wt, detail: "not_a_worktree" });
+    // The real reason: nothing is at that path (before, every refusal read "not_a_worktree").
+    expect(src.ofType("error").find((e) => e.code === "chat_move_failed")).toMatchObject({ fatal: false, path: wt, detail: "path_not_found" });
     expect(src.ofType("chat_moved")).toEqual([]);
     expect(s.disposed).toBe(false);
   });
+
 });

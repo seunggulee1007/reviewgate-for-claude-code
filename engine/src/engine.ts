@@ -6671,9 +6671,11 @@ export class ReviewEngine {
     if (toolUseId) this.worktreeBeforeCommand.delete(toolUseId);
     if (!cp || !chat || !where) return;
     let isWorktree = false;
+    let refusal = "not_a_worktree";
     try {
       const target = moveTarget(where, cp.root, await listWorktrees(cp.root));
-      if (!("refused" in target)) {
+      if ("refused" in target) refusal = target.refused;
+      else {
         isWorktree = true;
         // A worktree that was there before the card (`git worktree add` refused, hidden by `| tail`) was not created by it:
         // the user's own changes there must not land in the review (its move reviews from the disk).
@@ -6698,7 +6700,7 @@ export class ReviewEngine {
     const failed = (code: string) =>
       this.fail(`This chat could not move to ${where} (${code}); it stays here.`, false, "session", { code: "chat_move_failed", path: where, detail: code });
     if (!isWorktree) {
-      failed("not_a_worktree");
+      failed(refusal);
       return;
     }
     // On the main lane like a client's command; a refusal is said in the chat instead of a reply nobody waits for.

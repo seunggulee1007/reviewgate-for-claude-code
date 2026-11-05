@@ -3950,7 +3950,8 @@ sends none of it and the engine behaves as before.
   detail: <refusal code>}`. A command that ran without `follow` lists the new worktree in `state.workbenches` at once, so
   the warning can offer the move mid-turn.
   - **Which worktree** (fixed after 0.5.9). The card's path is read from the command's words. `$HOME` / `${NAME}` that the
-    environment defines are expanded.
+    environment defines are expanded. `detail` is the real refusal: `path_not_found` when nothing is at the path; before,
+    every refusal read `not_a_worktree`.
 - **System instruction (§33.4, changed).** *"ReviewGate reviews every change you make in this folder (<cwd>). Work inside
   it; never use EnterWorktree. If the task needs its own git worktree, you may create it with `git worktree add`, but tell
   the user right away in one line: changes there are not reviewed until they move this chat into that worktree (ReviewGate
