@@ -21,6 +21,21 @@ export const MODS_MAX_BYTES = 256 * 1024;
 export const MODS_MAX_FILES = 1000;
 export const MODS_STUB_PREFIX = "[ReviewGate] mods file not captured";
 
+/**
+ * §52: Claude Code's own runtime state under `.claude/` — `/loop`'s lock and jobs, its checkpoints, mailbox, … (CLI
+ * 2.1.318 writes these to `.git/info/exclude`, "ensureClaudeRuntimeFilesExcluded"). Nobody's change to review: never mods.
+ */
+const CLI_RUNTIME_FILES: ReadonlySet<string> = new Set([
+  ".claude/scheduled_tasks.lock", ".claude/scheduled_tasks.json", ".claude/agent-registry.json", ".claude/agent-memory-local",
+  ".claude/first-run", ".claude/assistant-daemon-state.json",
+]);
+const CLI_RUNTIME_DIRS: readonly string[] = [".claude/routines/.state/", ".claude/checkpoints/", ".claude/mailbox/", ".claude/agent-memory-local/"];
+
+/** §52: a file of Claude Code's own runtime state (`CLI_RUNTIME_FILES` / `CLI_RUNTIME_DIRS`). */
+export function isCliRuntimePath(rel: string): boolean {
+  return CLI_RUNTIME_FILES.has(rel) || CLI_RUNTIME_DIRS.some((d) => rel.startsWith(d));
+}
+
 /** Directories never descended into: Claude Code's own worktrees and dependency / repository folders. */
 const SKIP_DIRS: ReadonlySet<string> = new Set(["node_modules", ".git"]);
 const BINARY_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -33,7 +48,7 @@ const BINARY_EXTENSIONS: ReadonlySet<string> = new Set([
 export function isModsPath(rel: string): boolean {
   if (MODS_ROOT_FILES.includes(rel)) return true;
   if (!rel.startsWith(`${MODS_DIR}/`) || rel === LOCAL_SETTINGS) return false;
-  if (rel.startsWith(`${MODS_DIR}/worktrees/`)) return false;
+  if (rel.startsWith(`${MODS_DIR}/worktrees/`) || isCliRuntimePath(rel)) return false;
   return !rel.split("/").some((c) => SKIP_DIRS.has(c));
 }
 

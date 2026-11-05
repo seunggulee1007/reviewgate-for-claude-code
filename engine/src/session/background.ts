@@ -17,12 +17,13 @@ export function taskKind(taskType: unknown): BackgroundTask["kind"] {
   return "other";
 }
 
-/** A background Bash call's result names its output file: "… Output is being written to: <path>" (CLI 2.1.318). */
+/**
+ * A background Bash call's result names its output file: "… Output is being written to: <path>.output. You will be
+ * notified when it completes. …" (CLI 2.1.318 — the sentence goes on after the path).
+ */
 export function outputPathOf(resultText: string): string | null {
-  const m = /Output is being written to:\s*(\S[^\n]*?)\s*(?:\n|$)/.exec(resultText);
-  if (!m) return null;
-  const path = m[1]!.replace(/[.,;]+$/, "");
-  return path.length > 0 ? path : null;
+  const m = /Output is being written to:\s*(.+?\.output)(?=$|[\s.,;)])/m.exec(resultText);
+  return m ? m[1]! : null;
 }
 
 /** One entry of `background_tasks_changed.tasks` (ambient ones are not activity: left out). */

@@ -119,6 +119,9 @@ describe("§52 helpers", () => {
     expect([taskKind("local_bash"), taskKind("local_agent"), taskKind("monitor_mcp"), taskKind("workflow"), taskKind(undefined)]).toEqual(["bash", "agent", "monitor", "other", "other"]);
     expect(outputPathOf(`Command running in background with ID: b35tmk0c1. Output is being written to: ${OUT}`)).toBe(OUT);
     expect(outputPathOf("hello")).toBeNull();
+    // CLI 2.1.318 goes on after the path on the same line.
+    expect(outputPathOf(`Command running in background with ID: bm80i4svq. Output is being written to: ${OUT}. You will be notified when it completes. To check interim output, use Read.`)).toBe(OUT);
+    expect(outputPathOf("Output is being written to: /tmp/My Folder/tasks/b1.output\nmore")).toBe("/tmp/My Folder/tasks/b1.output");
   });
 });
 

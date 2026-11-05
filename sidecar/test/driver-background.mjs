@@ -51,6 +51,7 @@ let state = null;
 const events = [];
 const replies = new Map();
 const maxTasks = { count: 0, kinds: [] };
+let lastTasks = [];
 let next = 1;
 const send = (cmd) => child.stdin.write(JSON.stringify(cmd) + "\n");
 createInterface({ input: child.stdout }).on("line", (line) => {
@@ -63,7 +64,8 @@ createInterface({ input: child.stdout }).on("line", (line) => {
   if (ev.type === "state") {
     state = ev.state;
     const tasks = state.session.backgroundTasks ?? [];
-    if (tasks.length > maxTasks.count) Object.assign(maxTasks, { count: tasks.length, kinds: tasks.map((t) => t.kind), sample: tasks[0] });
+    if (tasks.length > maxTasks.count) Object.assign(maxTasks, { count: tasks.length, kinds: tasks.map((t) => t.kind) });
+    if (tasks.length > 0) lastTasks = tasks;
   } else events.push(ev);
   if (ev.type === "permission_request") send({ type: "permission_response", requestId: ev.requestId, allow: true });
   if (ev.id && replies.has(ev.id)) replies.get(ev.id)(ev);
@@ -110,8 +112,8 @@ try {
   });
   await waitFor(() => events.some((e) => e.type === "turn_end"), "turn 1 end");
   await waitFor(settled, "turn 1 collected");
-  observed.tasksWhileRunning = { ...maxTasks };
-  const taskId = maxTasks.sample?.taskId;
+  observed.tasksWhileRunning = { ...maxTasks, last: lastTasks[0] ?? null };
+  const taskId = lastTasks[0]?.taskId;
   if (taskId) {
     const out = await request({ type: "task_output", taskId }).catch((e) => ({ error: String(e) }));
     observed.taskOutput = out.type === "task_output" ? { running: out.running, truncated: out.truncated, chars: out.text.length } : out.error ?? out;
@@ -125,6 +127,7 @@ try {
   observed.tasksAfter = (state?.session.backgroundTasks ?? []).length;
   observed.unpromptedText = events.some((e) => e.type === "text_delta" && e.unprompted === true);
   const okA = maxTasks.count >= 1 && maxTasks.kinds.includes("bash") && observed.autoTurn?.trigger === "background"
+    && observed.tasksWhileRunning.last?.toolUseId && observed.tasksWhileRunning.last?.hasOutput === true && typeof observed.taskOutput === "object"
     && observed.afterAutoTurn.some((f) => f.path === "built.txt") && observed.afterAutoTurn.some((f) => f.path === "after.txt")
     && observed.tasksAfter === 0 && !observed.unpromptedText;
   observed.checkA = okA;
@@ -140,7 +143,8 @@ try {
     await waitFor(() => events.filter((e) => e.type === "turn_end").length >= 4, "the scheduled run's end");
     await waitFor(settled, "the scheduled run collected");
     observed.afterLoop = filesOf();
-    const okB = observed.loopTurn?.trigger === "schedule" && observed.afterLoop.some((f) => f.path === "tick.txt");
+    const okB = observed.loopTurn?.trigger === "schedule" && observed.afterLoop.some((f) => f.path === "tick.txt")
+      && !observed.afterLoop.some((f) => f.path.startsWith(".claude/"));
     observed.checkB = okB;
     if (!okB) failed = true;
   }

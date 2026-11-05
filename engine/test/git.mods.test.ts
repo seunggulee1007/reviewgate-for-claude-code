@@ -106,6 +106,9 @@ describe("mods paths are in every snapshot, gitignored or not (§32)", () => {
   it("path rules and risks", () => {
     expect([".claude/hooks/x.sh", ".mcp.json", "CLAUDE.md", ".claude/agents/a.md"].every(isModsPath)).toBe(true);
     expect([".claude/settings.local.json", ".claude/worktrees/w/x", ".claude/s/node_modules/a.js", "docs/CLAUDE.md", "src/a.ts"].some(isModsPath)).toBe(false);
+    // §52: Claude Code's own runtime state (`/loop`'s lock and jobs, checkpoints, mailbox — CLI 2.1.318) is never mods.
+    expect([".claude/scheduled_tasks.lock", ".claude/scheduled_tasks.json", ".claude/checkpoints/c1.json", ".claude/mailbox/m", ".claude/routines/.state/x", ".claude/agent-memory-local/a.md"].some(isModsPath)).toBe(false);
+    expect(isModsPath(".claude/scheduled_tasks.md")).toBe(true);
     expect(isModsGroup("docs/CLAUDE.md")).toBe(true);
     expect(isModsGroup(".claude/settings.local.json")).toBe(true);
     expect(isModsGroup("src/a.ts")).toBe(false);
