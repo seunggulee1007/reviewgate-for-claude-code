@@ -149,6 +149,37 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     expect(useStore.getState().errorBanner).toBeNull();
   });
 
+  // ---------------------------------------------------------------- §53
+
+  it("§53 commit_hunks / commit_split_draft / commit_series: commands as sent, replies as the split sheet reads them", async () => {
+    respond = (c) => {
+      if (c.type === ("commit_hunks" as string)) return { ok: true, reply: { type: "commit_hunks", files: [{ path: "a.ts", status: "M", binary: false, hunks: [] }] } };
+      if (c.type === ("commit_split_draft" as string)) return { ok: true, reply: { type: "commit_split_draft", commits: [{ message: "a", parts: [{ path: "a.ts" }], why: "w" }], unassigned: [{ path: "b.ts" }] } };
+      return { ok: true, reply: { type: "committed_series", commits: [{ sha: "abc1234567", shortSha: "abc1234", message: "a", files: ["a.ts"] }], branch: "main", pushed: true } };
+    };
+    expect(await useStore.getState().loadCommitHunks(["a.ts"])).toMatchObject({ ok: true, files: [{ path: "a.ts" }] });
+    expect(await useStore.getState().splitCommitWithClaude(["a.ts"])).toMatchObject({ ok: true, unassigned: [{ path: "b.ts" }] });
+    expect(useStore.getState().flow.splitting).toBe(false);
+    const plan = [{ message: "a", parts: [{ path: "a.ts" }] }];
+    expect(await useStore.getState().commitSeries(plan, true)).toMatchObject({ ok: true, pushed: true, made: [{ shortSha: "abc1234" }] });
+    expect(sent.filter((c) => String(c.type).startsWith("commit_")).slice(-3)).toEqual([
+      { type: "commit_hunks", paths: ["a.ts"] },
+      { type: "commit_split_draft", paths: ["a.ts"] },
+      { type: "commit_series", commits: plan, push: true },
+    ]);
+  });
+
+  it("§53 refusals keep their words; an engine before §53 is unsupported; a partial series reports what it made", async () => {
+    respond = () => ({ ok: false, error: "unknown command: commit_hunks", code: "unknown_command" });
+    expect(await useStore.getState().loadCommitHunks()).toEqual({ ok: false, error: "unknown command: commit_hunks", unsupported: true });
+    respond = () => ({ ok: false, error: "commit_split_failed:the fork answered nothing", code: "commit_split_failed" });
+    expect(await useStore.getState().splitCommitWithClaude()).toMatchObject({ ok: false, error: "commit_split_failed:the fork answered nothing", unsupported: false });
+    respond = () => ({ ok: false, error: "commit_failed:hook failed", code: "commit_failed" });
+    expect(await useStore.getState().commitSeries([{ message: "a", parts: [{ path: "a" }] }], false)).toEqual({ ok: false, error: "commit_failed:hook failed", made: [] });
+    useStore.getState().applyFlowEvent({ type: "committed_series", partial: true, commits: [{ sha: "s", shortSha: "s1", message: "m", files: ["a"] }], branch: "x", pushed: false } as never);
+    expect(useStore.getState().flow.splitting).toBe(false);
+  });
+
   // ---------------------------------------------------------------- §51
 
   it("§51 Fill with Claude sends pr_ai_draft with the sheet's title / description only when non-empty; the reply comes back trimmed", async () => {

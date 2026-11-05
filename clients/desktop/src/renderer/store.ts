@@ -68,7 +68,8 @@ import { isExternalChange, planRejectAll, type GateNoticeKind, type GateNoticeMe
 import { createReviewGateSlice, type ReviewGateDialog } from "./storeReviewGate";
 // MARK: wave3 desktop-flow — §36.11–36.14 (storeFlow.ts)
 import type { PreReviewEffort, PreReviewFinding, PreReviewScope } from "@reviewgate/engine";
-import { createFlowSlice, type FlowSettingsPatch, type FlowState, type PRFillResult, type PRSheetText, type PRWorkbenchRequest, type WorkbenchCreateRequest, type WorkbenchPreviewRequest } from "./storeFlow";
+import type { CommitPlan } from "../shared/commitSeries";
+import { createFlowSlice, type CommitHunksResult, type CommitSeriesResult, type CommitSplitResult, type FlowSettingsPatch, type FlowState, type PRFillResult, type PRSheetText, type PRWorkbenchRequest, type WorkbenchCreateRequest, type WorkbenchPreviewRequest } from "./storeFlow";
 import type { PRCommentThread } from "./prClaude";
 // MARK: wave2 check-clients
 import { restoredErrorFacts } from "./sessionErrors";
@@ -643,6 +644,12 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   resetFlow(): void;
   /** §36.11 `commit_draft` → the message for the commit sheet's field, or null (`flow.draftError` says why). Nothing is committed. */
   draftCommitMessage(paths?: string[]): Promise<string | null>;
+  /** §53 `commit_hunks` → the hunks of the accepted paths (the split sheet). */
+  loadCommitHunks(paths?: string[]): Promise<CommitHunksResult>;
+  /** §53 `commit_split_draft` → Claude's proposed split (read-only fork; nothing is committed). */
+  splitCommitWithClaude(paths?: string[]): Promise<CommitSplitResult>;
+  /** §53 `commit_series` → the commits in order (then one push when `push`). */
+  commitSeries(commits: CommitPlan[], push: boolean): Promise<CommitSeriesResult>;
   /** §51 `pr_ai_draft` → Claude's title / description for the PR sheet, or why not in one line. Nothing is pushed or created. */
   fillPRWithClaude(base: string, sheet: PRSheetText): Promise<PRFillResult>;
   /** §36.12 `workbench_preview`, debounced (an older answer never replaces a newer one). */

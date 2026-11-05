@@ -41,6 +41,7 @@ import {
   type WorkbenchSetupReport,
 } from "../shared/flowSettings";
 import type { AppSettings } from "../shared/ipc";
+import type { CommitFile, CommitPlan, CommitPart, CommittedSeries, CommittedSeriesCommit } from "../shared/commitSeries";
 import type { Store } from "./store";
 
 /** The `workbench_preview` a reply belongs to. */
@@ -57,6 +58,12 @@ export type WorkbenchCreateRequest = { branch: string; from?: string; fetch?: bo
   handedTask?: string };
 
 export type { PRSheetText };
+
+/** §53: the answers of the split sheet's three commands (`error` = the engine's refusal text, `code:detail`). */
+export type CommitHunksResult = { ok: true; files: CommitFile[] } | { ok: false; error: string; unsupported: boolean };
+export type CommitSplitResult = { ok: true; commits: CommitPlan[]; unassigned: CommitPart[] } | { ok: false; error: string; unsupported: boolean };
+/** `made`: the commits that exist (all of them on success; what stopped the series on a refusal in the middle). */
+export type CommitSeriesResult = { ok: true; made: CommittedSeriesCommit[]; pushed: boolean } | { ok: false; error: string; made: CommittedSeriesCommit[] };
 
 /** §51 `pr_ai_draft`: Claude's text for the PR sheet, or the refusal in one line (`unsupported`: an engine before §51). */
 export type PRFillResult = { ok: true; title: string; body: string } | { ok: false; error: string; unsupported: boolean };
@@ -86,6 +93,8 @@ export type FlowState = {
   draftError: string | null;
   /** False once the engine answered `unknown_command` (the button stays off with the reason). */
   draftSupported: boolean;
+  /** §53: "AI로 나누기" is running (the split sheet's commit button waits). */
+  splitting: boolean;
   // §36.12
   preview: WorkbenchPreviewEvent | null;
   /** `previewKeyOf` of the request `preview` answers. */
@@ -111,6 +120,7 @@ export const EMPTY_FLOW: FlowState = {
   drafting: false,
   draftError: null,
   draftSupported: true,
+  splitting: false,
   preview: null,
   previewKey: null,
   previewLoading: false,
@@ -136,6 +146,9 @@ export type FlowSlice = Pick<
   | "resetFlow"
   | "draftCommitMessage"
   | "fillPRWithClaude"
+  | "loadCommitHunks"
+  | "splitCommitWithClaude"
+  | "commitSeries"
   | "requestWorkbenchPreview"
   | "createWorkbenchWith"
   | "startPreReview"
@@ -179,6 +192,10 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
   let lastSnapshotRuns: string | null = null;
   let previewTimer: ReturnType<typeof setTimeout> | null = null;
   let previewSeq = 0;
+  /** §53: the commits a `partial` series made before it stopped (set by its event, read by the refusal). */
+  let lastPartial: CommittedSeriesCommit[] = [];
+  // The §53 commands are not in the engine typings of an older build: they go through the same request with a cast.
+  const request53 = (cmd: object): Promise<Record<string, unknown>> => engineRequest(cmd as unknown as Parameters<typeof engineRequest>[0]) as unknown as Promise<Record<string, unknown>>;
   const hasWindow = () => typeof window !== "undefined" && typeof window.rg === "object" && window.rg !== null;
 
   return {
@@ -195,6 +212,12 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         case "prereview": {
           const { type: _type, id: _id, ...run } = ev;
           setFlow((f) => ({ runs: applyRun(f.runs, run) }));
+          return true;
+        }
+        case "committed_series" as EngineEvent["type"]: {
+          // §53: a series that stopped in the middle (`partial`) reports what it made here; its refusal only has the words.
+          const series = ev as unknown as CommittedSeries;
+          if (series.partial) lastPartial = series.commits ?? [];
           return true;
         }
         case "commit_draft":
@@ -262,6 +285,48 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         const unsupported = isUnknownCommand(e);
         setFlow((f) => ({ drafting: false, draftError: flowRefusal(e), draftSupported: unsupported ? false : f.draftSupported }));
         return null;
+      }
+    },
+
+    // ------------------------------------------------------------ §53
+
+    async loadCommitHunks(paths) {
+      try {
+        const reply = await request53({ type: "commit_hunks", ...(paths ? { paths } : {}) });
+        return { ok: true, files: (reply.files as CommitFile[] | undefined) ?? [] };
+      } catch (e) {
+        log(`[warn] commit_hunks: ${refusalOf(e).error}`);
+        return { ok: false, error: refusalOf(e).error, unsupported: isUnknownCommand(e) };
+      }
+    },
+
+    async splitCommitWithClaude(paths) {
+      if (get().flow.splitting) return { ok: false, error: "busy", unsupported: false };
+      setFlow({ splitting: true });
+      try {
+        const reply = await request53({ type: "commit_split_draft", ...(paths ? { paths } : {}) });
+        return { ok: true, commits: (reply.commits as CommitPlan[] | undefined) ?? [], unassigned: (reply.unassigned as CommitPart[] | undefined) ?? [] };
+      } catch (e) {
+        log(`[warn] commit_split_draft: ${refusalOf(e).error}`);
+        return { ok: false, error: refusalOf(e).error, unsupported: isUnknownCommand(e) };
+      } finally {
+        setFlow({ splitting: false });
+      }
+    },
+
+    async commitSeries(commits, push) {
+      if (!get().state.project) return { ok: false, error: "no_project", made: [] };
+      lastPartial = [];
+      try {
+        const reply = (await request53({ type: "commit_series", commits, push })) as unknown as CommittedSeries;
+        await get().settle();
+        set({ dismissedCommitAt: null });
+        return { ok: true, made: reply.commits ?? [], pushed: reply.pushed === true };
+      } catch (e) {
+        const r = refusalOf(e);
+        log(`[warn] commit_series: ${r.error}`);
+        await get().settle();
+        return { ok: false, error: r.error, made: lastPartial };
       }
     },
 

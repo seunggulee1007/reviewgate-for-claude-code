@@ -139,6 +139,11 @@ describe("the flow commands pass main's guard", () => {
     }
   });
 
+  it("§53 commit_hunks, commit_split_draft, commit_series (the commit sheet's split mode)", () => {
+    for (const type of ["commit_hunks", "commit_split_draft"]) expect(validateCommand({ type, paths: ["a.ts"] }).ok).toBe(true);
+    expect(validateCommand({ type: "commit_series", commits: [{ message: "m", parts: [{ path: "a.ts", hunks: [0] }] }], push: false }).ok).toBe(true);
+  });
+
   it("§51 pr_ai_draft (the PR sheet's Fill with Claude)", () => {
     expect(validateCommand({ type: "pr_ai_draft", base: "develop", title: "#acme/42: 재고 동기화" })).toEqual({ ok: true, cmd: { type: "pr_ai_draft", base: "develop", title: "#acme/42: 재고 동기화" } });
   });
