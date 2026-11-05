@@ -160,15 +160,15 @@ public enum AppSettings {
 
     // MARK: Permission mode (M20, docs/M20-MODES.md)
 
-    /// The mode stored for `root` (a `projectKey`), else the last mode used anywhere, else `.default`.
+    /// The mode stored for `root` (a `projectKey`), else Settings › 시작 모드, else the last mode used anywhere — 자동 included
+    /// (§40.1: keeping it out started every new worktree of a repository worked in auto mode in 기본, a card for every
+    /// command) — else `.default`. A worktree whose repository's other worktrees ran in ReviewGate starts as they ran last:
+    /// the engine applies that before this value (§11).
     public static func permissionMode(root: String? = nil, defaults: UserDefaults = .standard) -> PermissionMode {
         let modes = permissionModes(defaults: defaults)
         if let root, let mode = modes[root].flatMap(PermissionMode.init(rawValue:)) { return mode }
         if let start = startPermissionMode(defaults: defaults) { return start }   // wave4b w4b-auto (§39.5)
-        // MARK: wave4b w4b-check4 — §40.1: 자동 never reaches another project as "the last mode used anywhere" (it runs
-        // commands without a card): only that project's own pick or Settings › 시작 모드.
-        let last = modes["*"].flatMap(PermissionMode.init(rawValue:)) ?? .default
-        return last == .auto ? .default : last
+        return modes["*"].flatMap(PermissionMode.init(rawValue:)) ?? .default
     }
 
     // MARK: wave4b w4b-auto (§39.5)

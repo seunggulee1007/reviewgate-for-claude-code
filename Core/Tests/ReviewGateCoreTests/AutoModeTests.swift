@@ -141,17 +141,19 @@ import Testing
         #expect(AppSettings.permissionMode(root: "/b", defaults: d) == .default)
     }
 
-    /// MARK: wave4b w4b-check4 — §40.1: 자동 picked in one project never reaches another one through "the last mode used
-    /// anywhere" (a new project, another repository's worktree): only that project's own pick or Settings › 시작 모드 = 자동.
-    @Test func autoPickedInOneProjectDoesNotSpreadToANewOne() {
+    /// §40.1 (reversed): 자동, the last mode used anywhere, seeds a project opened for the first time like every other mode —
+    /// a new worktree of a repository worked in auto mode no longer starts in 기본 and asks for every command. Settings ›
+    /// 시작 모드 still comes first; the engine puts the repository's own other worktrees before both (§11).
+    @Test func autoUsedLastSeedsANewProjectLikeAnyOtherMode() {
         let d = defaults()
-        AppSettings.setPermissionMode(.auto, root: "/acme-4176-17", defaults: d)
-        #expect(AppSettings.permissionMode(root: "/acme-4176-17", defaults: d) == .auto)   // that project keeps it
-        #expect(AppSettings.permissionMode(root: "/other-repo", defaults: d) == .default)   // a project opened for the first time
-        #expect(AppSettings.permissionMode(defaults: d) == .default)   // what `hello` carries
-        AppSettings.setPermissionMode(.acceptEdits, root: "/a", defaults: d)
-        #expect(AppSettings.permissionMode(root: "/new", defaults: d) == .acceptEdits)   // other modes follow as before
-        AppSettings.setStartPermissionMode(.auto, defaults: d)   // chosen in Settings: every new project starts in 자동
-        #expect(AppSettings.permissionMode(root: "/other-repo", defaults: d) == .auto)
+        AppSettings.setPermissionMode(.auto, root: "/work/acme-4176-17", defaults: d)
+        #expect(AppSettings.permissionMode(root: "/work/acme-4176-17", defaults: d) == .auto)   // that project keeps it
+        #expect(AppSettings.permissionMode(root: "/work/acme-4176-18", defaults: d) == .auto)   // a new worktree starts in it
+        #expect(AppSettings.permissionMode(defaults: d) == .auto)   // what `hello` carries
+        AppSettings.setPermissionMode(.acceptEdits, root: "/work/a", defaults: d)
+        #expect(AppSettings.permissionMode(root: "/work/new", defaults: d) == .acceptEdits)   // other modes follow as before
+        AppSettings.setStartPermissionMode(.default, defaults: d)   // chosen in Settings: it wins over the last mode
+        #expect(AppSettings.permissionMode(root: "/work/other", defaults: d) == .default)
+        #expect(AppSettings.permissionMode(root: "/work/acme-4176-17", defaults: d) == .auto)   // a project's own pick still wins
     }
 }

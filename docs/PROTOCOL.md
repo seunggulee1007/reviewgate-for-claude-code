@@ -4025,7 +4025,8 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   then) waits and is sent when the turn ends — the picker shows "기본 → 자동", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면
   모드가 바뀌어요"; another project or a closed session drops it. Settings › Permissions has "시작 모드" (the mode a project
   opened for the first time starts in, auto included; a pick in a project stays that project's: Mac
-  `AppSettings.startPermissionMode` — unset, the last mode used anywhere as before —, Electron `settings.permissionMode`). The
+  `AppSettings.startPermissionMode` — unset, the last mode used anywhere as before —, Electron `settings.permissionMode`; a
+  worktree of a repository whose other worktrees ran in ReviewGate starts as they ran last, before either, §11). The
   terminal's `permissions.defaultMode: "auto"` is offered as before (§2.8, "터미널처럼 자동 모드로 시작할까요?").
   `bypassPermissions` / `dontAsk` stay unoffered.
 - Verified with CLI 2.1.309 / SDK 0.3.270 (haiku, `canUseTool` set, hooks returning no decision): in auto mode `mvn -v`,
@@ -4137,9 +4138,11 @@ rules. Every field stays optional; an older engine or client behaves as before.
   own commit included), gets the card (`ask`, the plain reason) instead of the classifier. The app's own rules answer
   first as before (a `Bash(git push:*)` pattern still allows; `git log`, `cat .git/HEAD` still run without a card); the
   other modes are unchanged (they already asked); `.gitignore` / `.github/` are not `.git`.
-- **자동 does not spread to other projects** (Mac `AppSettings.permissionMode(root:)`). The last mode used anywhere (`"*"`,
-  also what `hello` carries) seeds a project opened for the first time; it no longer seeds 자동 (→ 기본): only that
-  project's own pick or Settings › 시작 모드 = 자동 starts a project in auto mode. Electron had no such fallback
+- **자동 spreads like any other mode** (Mac `AppSettings.permissionMode(root:)`; reversed after 0.5.6). The last mode used
+  anywhere (`"*"`, also what `hello` carries) seeds a project opened for the first time, 자동 included — keeping 자동 out
+  (→ 기본) started every new worktree of a repository worked in auto mode in 기본, with a card for every command and MCP
+  call. A project opened for the first time now starts in: the mode its repository's other worktrees ran in last (engine,
+  §11), else Settings › 시작 모드, else the last mode used anywhere. Electron has no last-mode fallback
   (`settings.permissionMode` is the 시작 모드 only); a moved chat still takes its mode along (§39.4, same repository).
 - **A hook that blocked is not a failure** (engine `session/longWork.ts` `hookFailureNotice`). `system/hook_response`
   with `exit_code: 2` (Claude Code's blocking exit code; the reason is stderr's first line), or `exit_code: 0` with a JSON
