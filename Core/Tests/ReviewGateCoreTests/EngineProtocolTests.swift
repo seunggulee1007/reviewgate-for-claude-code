@@ -598,8 +598,8 @@ import Testing
         d.set(false, forKey: AppSettings.Key.loadUserSettings)
         d.set("ghe.example", forKey: PRStore.hostDefaultsKey)
         let s = AppSettings.engineSettings(defaults: d)
-        #expect(s.budget == Budget(maxFiles: 7, maxLines: 400, hardMultiplier: 2.0))   // M16 defaults 10/400/×2
-        #expect(s.systemPromptAppend == "Limit 7/400")
+        #expect(s.budget == .off)   // §54: the change limit is off until Settings turns it on
+        #expect(s.systemPromptAppend == "Limit 7/400")   // placeholders get the limit's numbers, on or off
         #expect(s.ignorePatterns == [".omc/", "*.log"])
         #expect(s.autoAllowTools == ["Bash"])
         #expect(s.loadUserSettings == false)
@@ -608,6 +608,8 @@ import Testing
         #expect(s.worktreeRoot == NSString(string: "~/.reviewgate/worktrees").expandingTildeInPath)
         d.set("~/wb ", forKey: AppSettings.Key.worktreeRoot)
         #expect(AppSettings.engineSettings(defaults: d).worktreeRoot == NSString(string: "~/wb").expandingTildeInPath)
+        d.set(true, forKey: AppSettings.Key.budgetEnabled)
+        #expect(AppSettings.engineSettings(defaults: d).budget == Budget(maxFiles: 7, maxLines: 400, hardMultiplier: 2.0))   // M16 defaults 10/400/×2
     }
 
     // MARK: M16 friction (docs/M16-FRICTION.md)
@@ -634,7 +636,7 @@ import Testing
 
         let d = UserDefaults(suiteName: "EngineProtocolTests.m16.\(UUID().uuidString)")!
         let defaults = AppSettings.engineSettings(defaults: d)
-        #expect(defaults.budget == Budget(maxFiles: 10, maxLines: 400, hardMultiplier: 2.0))
+        #expect(defaults.budget == .off)   // §54
         #expect(defaults.autoAllowReadOnlyBash == true && defaults.bashAllowPatterns == [])
         d.set(false, forKey: AppSettings.Key.autoAllowReadOnlyBash)
         d.set("Bash(npm test:*)\n# comment\n\n  Bash(git *)  \n", forKey: AppSettings.Key.bashAllowPatterns)

@@ -16,6 +16,12 @@ public struct Budget: Codable, Sendable, Equatable {
         self.maxLines = maxLines
         self.hardMultiplier = hardMultiplier
     }
+
+    /// §54: no change budget — 0 is no limit on that count, and the engine's default is 0 on both.
+    public static let off = Budget(maxFiles: 0, maxLines: 0)
+
+    /// §54: the budget limits something (files or lines).
+    public var isOn: Bool { maxFiles > 0 || maxLines > 0 }
 }
 
 /// `TurnUsage` on the wire.
@@ -2388,7 +2394,7 @@ public struct ReviewState: Codable, Sendable, Equatable {
                        pendingCount: 0, changesRequestedCount: 0, isRequestingChanges: false, turnStartTree: nil,
                        turnEndTree: nil, lastReviewSummary: nil),
         changedFiles: [], reviewNotes: [],
-        budget: Budget(maxFiles: 5, maxLines: 200), budgetUsage: BudgetUsage(files: 0, lines: 0, denied: false),
+        budget: .off, budgetUsage: BudgetUsage(files: 0, lines: 0, denied: false),
         hud: HUDWire(contextTokens: 0, contextWindow: nil, sessionCostUSD: 0, turnCount: 0, lastTurnMs: 0,
                      activity: HUDActivity(kind: .idle, toolName: nil, detail: nil), subagentDepth: 0, turnStartedAt: nil),
         branches: BranchesInfo(list: [], isWorktreeDirty: false, switchBlocker: nil),

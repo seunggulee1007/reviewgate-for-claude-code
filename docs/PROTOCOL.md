@@ -6571,6 +6571,18 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   budget (10 / 400 / 2.0 unless changed) with an append that tells Claude those numbers, so it keeps its budget on a newer
   engine — what Claude is told and what the hook enforces stay the same. A newer client never runs an older engine (both
   clients bundle theirs); an older engine would read `{0, 0}` as "deny every edit".
+- **Clients.** The change limit is a switch, off by default; its numbers (files and lines, 10 / 400 until changed) reach
+  the engine only while it is on — off, the clients send `{maxFiles: 0, maxLines: 0}`. The default append is now "You are
+  working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash,
+  …) only when the user asks — the app shows the user an approval card for each." — nothing about small units, stopping,
+  waiting or 'REVIEW GATE'. With the limit on it goes on "The user set a change limit of {maxFiles} files and about
+  {maxLines} changed lines per reply: plan each reply to fit it. If an edit is denied with 'REVIEW GATE', report what you
+  changed and what remains." A stored append equal to an earlier built-in one (the one before, or the one with "Never run
+  git commit/checkout/reset/stash/clean"; surrounding whitespace aside) is the default: Settings' "Reset to default" used to
+  store the text itself. An append of the user's own is untouched; its `{maxFiles}` / `{maxLines}` get the limit's numbers,
+  on or off. Mac: Core `AppSettings` (`budgetEnabled`, `budget` — `Budget.off` while off —, `budgetLimits`,
+  `renderedSystemPromptAppend`, `forgetLegacySystemPromptAppend` — it removes a stored earlier built-in text), `Budget.isOn`;
+  tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`.
 - Owner: engine `session/budget.ts` (`budgetIsOn`, `BudgetState.active`), `session/hooks.ts`, `session/longWork.ts`
   (`budgetChangeNote`). Tests: `engine/test/session.budget.test.ts`, `session.hooks.test.ts` (§54), `longWork.test.ts`,
   `engine.friction.test.ts` (the defaults).

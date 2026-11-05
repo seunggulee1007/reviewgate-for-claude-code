@@ -21,6 +21,8 @@ public enum AppSettings {
     public enum Key {
         public static let budgetMaxFiles = "budgetMaxFiles"
         public static let budgetMaxLines = "budgetMaxLines"
+        /// §54: the change limit is on (Bool, unset → off); only then do `budgetMaxFiles` / `budgetMaxLines` reach the engine.
+        public static let budgetEnabled = "budgetEnabled"
         public static let systemPromptAppend = "systemPromptAppend"
         public static let nodePath = "nodePath"
         public static let claudePath = "claudePath"
@@ -88,17 +90,37 @@ public enum AppSettings {
     public static let defaultIgnorePatterns = [".omc/", ".claude/settings.local.json"]
     public static var defaultIgnorePatternsText: String { defaultIgnorePatterns.joined(separator: "\n") }
 
-    /// Placeholders `{maxFiles}` / `{maxLines}` are substituted at session start.
+    /// The append Claude gets unless the user wrote their own. §54: nothing about small units, stopping or waiting.
     public static let defaultSystemPromptAppend = """
-    You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each. If an edit is denied with 'REVIEW GATE', stop immediately and report.
+    You are working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each.
     """
 
-    public static func budget(defaults: UserDefaults = .standard) -> Budget {
+    /// §54: what the default append adds while the change limit is on; `{maxFiles}` / `{maxLines}` are substituted.
+    public static let budgetPromptSentence = "The user set a change limit of {maxFiles} files and about {maxLines} changed lines per reply: plan each reply to fit it. If an edit is denied with 'REVIEW GATE', report what you changed and what remains."
+
+    /// §54: the built-in appends of earlier versions (Settings' "Reset to default" stored one). A stored copy is the default now.
+    static let legacySystemPromptAppends: Set<String> = [
+        "You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each. If an edit is denied with 'REVIEW GATE', stop immediately and report.",
+        "You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. Never run git commit/checkout/reset/stash/clean — the app manages git. If an edit is denied with 'REVIEW GATE', stop immediately and report.",
+    ]
+
+    /// §54: Settings' change-limit switch (unset → off).
+    public static func budgetEnabled(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: Key.budgetEnabled)
+    }
+
+    /// The change limit's numbers as set in Settings (10 / 400 until changed), whether the limit is on or not.
+    public static func budgetLimits(defaults: UserDefaults = .standard) -> Budget {
         let files = defaults.integer(forKey: Key.budgetMaxFiles)
         let lines = defaults.integer(forKey: Key.budgetMaxLines)
         return Budget(maxFiles: files > 0 ? files : defaultMaxFiles,
                       maxLines: lines > 0 ? lines : defaultMaxLines,
                       hardMultiplier: hardMultiplier)
+    }
+
+    /// `Settings.budget`: the limits while the switch is on, else `Budget.off` — no change budget (§54).
+    public static func budget(defaults: UserDefaults = .standard) -> Budget {
+        budgetEnabled(defaults: defaults) ? budgetLimits(defaults: defaults) : .off
     }
 
     /// Stored as one pattern per line under `Key.checkpointIgnorePatterns`; unset → `defaultIgnorePatterns`.
@@ -184,9 +206,31 @@ public enum AppSettings {
         defaults.set(appearance.rawValue, forKey: Key.appearance)
     }
 
+    /// The stored append — the default when unset, empty or a copy of an earlier built-in text (§54).
     public static func systemPromptAppend(defaults: UserDefaults = .standard) -> String {
-        let raw = defaults.string(forKey: Key.systemPromptAppend)
-        return (raw?.isEmpty == false) ? raw! : defaultSystemPromptAppend
+        guard let raw = defaults.string(forKey: Key.systemPromptAppend), !raw.isEmpty, !isLegacySystemPromptAppend(raw) else {
+            return defaultSystemPromptAppend
+        }
+        return raw
+    }
+
+    static func isLegacySystemPromptAppend(_ text: String) -> Bool {
+        legacySystemPromptAppends.contains(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// §54, at launch: a stored copy of an earlier built-in append is removed, so Settings shows — and the app sends — the
+    /// current one. A text of the user's own stays.
+    public static func forgetLegacySystemPromptAppend(defaults: UserDefaults = .standard) {
+        guard let raw = defaults.string(forKey: Key.systemPromptAppend), isLegacySystemPromptAppend(raw) else { return }
+        defaults.removeObject(forKey: Key.systemPromptAppend)
+    }
+
+    /// The append as Claude gets it: the stored or default text — the default one followed by `budgetPromptSentence` while
+    /// the change limit is on — with `{maxFiles}` / `{maxLines}` replaced by the limit's numbers (§54).
+    public static func renderedSystemPromptAppend(defaults: UserDefaults = .standard) -> String {
+        var template = systemPromptAppend(defaults: defaults)
+        if template == defaultSystemPromptAppend && budgetEnabled(defaults: defaults) { template += " " + budgetPromptSentence }
+        return renderSystemPrompt(template, budget: budgetLimits(defaults: defaults))
     }
 
     public static func renderSystemPrompt(_ template: String, budget: Budget) -> String {
@@ -198,13 +242,12 @@ public enum AppSettings {
     /// The `hello` / `set_settings` payload: rendered prompt, parsed ignore patterns, tool auto-allow list,
     /// user-settings flag, toolchain overrides and the PR browser host.
     public static func engineSettings(defaults: UserDefaults = .standard) -> EngineSettings {
-        let budget = budget(defaults: defaults)
         var settings = EngineSettings(
-            budget: budget,
+            budget: budget(defaults: defaults),
             ignorePatterns: ignorePatterns(defaults: defaults),
             autoAllowTools: autoAllowTools(defaults: defaults),
             loadUserSettings: loadUserSettings(defaults: defaults),
-            systemPromptAppend: renderSystemPrompt(systemPromptAppend(defaults: defaults), budget: budget),
+            systemPromptAppend: renderedSystemPromptAppend(defaults: defaults),
             claudePath: claudePathOverride(defaults: defaults),
             ghHost: PRStore.storedHost(defaults: defaults),
             worktreeRoot: worktreeRoot(defaults: defaults),

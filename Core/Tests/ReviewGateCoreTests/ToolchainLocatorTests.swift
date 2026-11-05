@@ -61,8 +61,8 @@ import Testing
     }
 
     @Test func rendersPromptPlaceholders() {
-        let s = AppSettings.renderSystemPrompt(AppSettings.defaultSystemPromptAppend, budget: Budget(maxFiles: 3, maxLines: 150))
-        #expect(s.contains("at most 3 files and about 150 changed lines"))
+        let s = AppSettings.renderSystemPrompt(AppSettings.budgetPromptSentence, budget: Budget(maxFiles: 3, maxLines: 150))
+        #expect(s.contains("a change limit of 3 files and about 150 changed lines"))
     }
 
     @Test func ignorePatternsSkipBlankAndCommentLines() {
