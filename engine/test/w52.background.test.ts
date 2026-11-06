@@ -277,11 +277,11 @@ describe("§52.2 a subagent working in the background", () => {
     h.session().emit({ type: "permission_request", requestId: "r-agent", toolName: "Bash", input: { command: "touch sub.txt" }, toolUseId: "toolu_sub", agent: { agentId: "a1" } });
     h.session().emit({ type: "permission_request", requestId: "r-main", toolName: "Bash", input: { command: "npm test" }, toolUseId: "toolu_main" });
     await h.settle();
-    expect(h.engine.state.session.pendingPermissions.map((p) => p.requestId)).toEqual(["r-agent", "r-main"]);
+    expect((h.engine.state.session.pendingPermissions ?? []).map((p) => p.requestId)).toEqual(["r-agent", "r-main"]);
     write(dir, "a.txt", "a\n");
     h.session().emitTurnEnd({ sessionId: id });
     await h.waitFor((s) => s.gate.phase === "reviewing", "turn 1 collected");
-    expect(h.engine.state.session.pendingPermissions.map((p) => [p.requestId, p.agent?.agentToolUseId])).toEqual([["r-agent", "toolu_agent"]]);
+    expect((h.engine.state.session.pendingPermissions ?? []).map((p) => [p.requestId, p.agent?.agentToolUseId])).toEqual([["r-agent", "toolu_agent"]]);
     await h.engine.request({ type: "permission_response", requestId: "r-agent", allow: true });
     expect(h.session().permissionResponses).toEqual([{ requestId: "r-agent", allow: true, message: undefined }]);
     expect(h.engine.state.session.pendingPermissions).toEqual([]);
