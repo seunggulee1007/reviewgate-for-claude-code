@@ -6864,6 +6864,13 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   back after a restart); Core `BackgroundWorkTests` (the setting off by default, with `hello` and the toggle; the agent's
   auto turn and its titles; the launch is no result, the end is); Electron `background.test.ts`, `agentDetails.test.ts`,
   `backgroundSettings.test.ts` (the same).
+  - Real CLI: `sidecar/test/driver-background.mjs` with `RG_AGENT=1 RG_ONLY=agent RG_MODE=auto RG_MODEL=sonnet` (CLI 2.1.318).
+    The Agent call went to the background (Claude's own `run_in_background: true`; `agentLaunched`). "2+2" sent meanwhile was
+    answered in 1.5 s with the agent still live (`backgroundTasks` `[agent]`). The subagent's Read of `big.txt`, denied by
+    the project's read-budget hook, came back as `hookDenied {hook: "PreToolUse:Read"}` and no notice; it read in parts,
+    slept 20 s and wrote `agent.txt` between turns — no §18 deny, no unprompted text, no peer card. Its end was the call's
+    result with its hand-back report; the turn after it was `auto_turn {background}` with `task.kind: agent` and the report;
+    `agent.txt` was in that review as `tool`, the agent's Write its cause.
 
 ## 53. Commits in meaningful units
 
