@@ -223,6 +223,15 @@ extension AppState {
     }
 }
 
+// MARK: r1-composer M14 — the slash palette while Claude works
+
+extension AppState {
+    /// M14: the composer's `/` palette (and ⌘/) works whenever a project is open — while Claude works or the session starts
+    /// too (the cached list, or "Starting session…"), as in the terminal. A pick only goes into the draft; ↩ then sends,
+    /// steers (§50) or queues it like any message.
+    public var canUseSlashPalette: Bool { projectInfo != nil }
+}
+
 /// §49: the branch "Run as Task" suggests for a task — `<prefix><id>` from a task link or key in the text (the last number
 /// of a URL's path, `#project/123`, `ABC-123`, `#123`), else up to five ASCII words of its first line, else the date and time.
 /// The prefix is the one the user used last (Settings remember it), `task/` at first.

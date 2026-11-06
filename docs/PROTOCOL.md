@@ -2958,6 +2958,12 @@ The palette shows what each command does and what it takes, right after the sess
   `session.starting` also read "Starting session…" (never "enable user settings").
 - Owners: engine-session (`session/claude.ts`, the capability cache in `engine.ts`); screens mac-/desktop-session (name,
   one-line description, dimmed argument hint; groups built-in / mine / project / each plugin / MCP; recently used first).
+- **While Claude works (r1-composer M14).** The palette (`/` at the start of the box, ⌘/) opened only while a message could
+  be sent, so the next skill had to be typed from memory while Claude worked or the session started. It now works whenever
+  a project is open (Core `AppState.canUseSlashPalette`): the session's commands, the cache, or "Starting session…" while
+  the CLI starts. A pick only goes into the draft; ↩ then sends it, puts it into the running turn (§50 — the CLI expands a
+  command sent that way) or queues it, like any message. Verified: Core `ComposerPaletteTests` (running, starting, no
+  project).
 
 ### 36.6 Local settings (SME-01)
 
