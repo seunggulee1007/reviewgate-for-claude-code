@@ -1455,7 +1455,19 @@ export type FullFileContentEvent = {
   endTree?: string;
 };
 export type PRCreatedEvent = { type: "pr_created"; id?: string; url: string; branch: string };
-export type CommittedEvent = { type: "committed"; id?: string; sha: string; shortSha: string; pushed: boolean; branch: string | null };
+export type CommittedEvent = {
+  type: "committed";
+  id?: string;
+  sha: string;
+  shortSha: string;
+  pushed: boolean;
+  branch: string | null;
+  /**
+   * MARK: r1-git — §46: paths that had no change against HEAD any more (Claude's own commit holds them): not staged again,
+   * they left the review as committed. When every path was one, no commit was made and `sha` is HEAD's.
+   */
+  alreadyCommitted?: string[];
+};
 export type UserMessageEvent = { type: "user_message"; text: string; turn: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice; /** §50: put into the running turn (`steer`) */ steered?: true };
 /** `unprompted`: Claude Code wrote it in a turn it ran on its own, outside any request (§18). */
 export type TextDeltaEvent = { type: "text_delta"; text: string; unprompted?: true };

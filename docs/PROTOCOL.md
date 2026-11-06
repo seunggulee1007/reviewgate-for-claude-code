@@ -1251,7 +1251,8 @@ the CLI did not let the held messages through; they are still held), `lfs_missin
 `worktree_blocked` / `worktree_outside_review` (+ `toolName`, `path?`, `branch?`; §33.4), `cli_version_changed` (non-fatal
 notice + `cli {from, to, verified}`; §36.8), `git_stashed` (non-fatal notice, a gray row; `detail`: the files a `git stash`
 of Claude's took out of the working tree; §46), `claude_committed` / `claude_moved_head` (non-fatal notices, gray rows;
-`detail`: the short shas / "from → to"; a HEAD move Claude's own git commands made, §31.3).
+`detail`: the short shas / "from → to"; a HEAD move Claude's own git commands made, §31.3), `reject_committed` (non-fatal
+notice; `detail`: "path (sha)" of rejected files a commit of Claude's still holds; §46).
 
 **Refusal codes** (`result{ok:false, code}`; the leading word of `error`, or the listed explicit code where `error` is
 English): `binary_file`, `branch_in_use`, `cannot_remove_current`, `cannot_remove_main`, `collect_failed`, `commit_failed`,
@@ -5985,8 +5986,11 @@ the terminal's auto mode asked for none).
   way and a commit Claude's amend replaced (`amended`) not taken out. Any failure keeps today's fallback (the whole move;
   `headMoved`). A listed file one of Claude's commits changed (the newest still in HEAD's history) carries
   `committedIn: "<short sha>"` (`state.changedFiles[]`, set at every collection, refresh and restore). Rejecting it reverts
-  the working tree to A as for any file — the commit stays, the file now differs from HEAD. Tests:
-  `engine/test/gitResult.test.ts`.
+  the working tree to A as for any file — the commit stays, the file now differs from HEAD — and a gray row says so:
+  `reject_committed` (`detail`: "App.java (abc1234)"). The app's `commit` of accepted paths leaves out a path with no change
+  against HEAD any more (both names of a rename; `git status --porcelain`): it is not staged again (`git commit --only` of
+  nothing fails) but leaves the review as committed in its own commit, and the reply says `alreadyCommitted: [paths]`; with
+  nothing else to commit no commit is made and `sha` is HEAD's. Tests: `engine/test/gitResult.test.ts`.
 - **A stash** (r1-git). Before a Bash call whose git command puts work away (`git stash`, `stash push` / `save`, `stash -u`, …;
   not `pop` / `apply` / `list`) the hook reads `git status --porcelain` of the checkpoint root; after it (PostToolUse or
   PostToolUseFailure — `postGitCommand`, next to `postBash`) again. The files that were dirty and are no longer are on no
@@ -6014,8 +6018,9 @@ the terminal's auto mode asked for none).
   to run them only when the user asks (Mac `AppSettings.defaultSystemPromptAppend`, Electron `DEFAULT_SYSTEM_PROMPT_APPEND`).
 - **Compatibility.** One new `PermissionReason.code`; a client that does not know it shows `message` on an orange line
   (Electron, until it localizes it). The persisted review gains an optional `baseMerge`. r1-git: optional
-  `changedFiles[].committedIn`, `head_moved.explainedBy` / `commits`, the persisted `ownCommits`, three notice codes
-  (`git_stashed`, `claude_committed`, `claude_moved_head`) — an older client shows their English `message`.
+  `changedFiles[].committedIn`, `head_moved.explainedBy` / `commits`, `committed.alreadyCommitted`, the persisted
+  `ownCommits`, four notice codes (`git_stashed`, `claude_committed`, `claude_moved_head`, `reject_committed`) — an older
+  client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
   substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, the hook in auto
   and default mode, a remembered `Bash:git push` against a force push),

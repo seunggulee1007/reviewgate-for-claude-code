@@ -220,6 +220,24 @@ describe("the engine: Claude's own commit keeps its files in the review (§46)",
     expect(h.ofType("head_moved")[0]?.explainedBy).toBeUndefined();
   });
 
+  it("rejecting a committed file reverts the working tree to A (the commit stays) and says so in a row", async () => {
+    const { h, root, commit } = await turnThatCommits();
+    await h.engine.handle({ type: "reject", paths: ["App.java"] });
+    await h.settle();
+    expect(read(root, "App.java")).toBeNull(); // A had no App.java
+    expect(head(root)).toBe(commit);
+    expect(h.ofType("error").filter((e) => e.code === "reject_committed")).toEqual([expect.objectContaining({ detail: `App.java (${commit.slice(0, 7)})` })]);
+  });
+
+  it("the app's commit of an accepted file Claude already committed answers alreadyCommitted instead of failing", async () => {
+    const { h, root, commit } = await turnThatCommits();
+    await h.engine.handle({ type: "accept", paths: ["App.java"] });
+    const reply = await h.engine.request({ type: "commit", message: "fix: App", push: false });
+    expect(reply).toMatchObject({ type: "committed", sha: commit, alreadyCommitted: ["App.java"] });
+    expect(head(root)).toBe(commit); // no empty commit on top
+    expect(h.engine.state.changedFiles).toEqual([]);
+  });
+
   it("an amend in a later turn keeps both changes in the review, on the amended commit", async () => {
     const { h, root, a, commit } = await turnThatCommits();
     await h.engine.handle({ type: "send", text: "also add a field and amend" });

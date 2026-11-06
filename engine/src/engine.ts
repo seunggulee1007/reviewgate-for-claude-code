@@ -3684,6 +3684,8 @@ export class ReviewEngine {
    */
   private async reject(paths: string[], force = false): Promise<void> {
     if (this.gate.reverting) throw new CommandRefused("reverting");
+    // MARK: r1-git — §46: a file Claude committed is reverted on disk like any other; its commit stays — a row says so.
+    const committed = this.gate.changedFiles.filter((f) => f.committedIn && paths.includes(f.path)).map((f) => `${f.path} (${f.committedIn})`);
     const run = this.gate.reject(paths, force);
     this.touch();
     try {
@@ -3694,6 +3696,11 @@ export class ReviewEngine {
         throw e;
       }
       this.fail(errorMessage(e), false, "git", { code: "revert_failed" });
+      return;
+    }
+    if (committed.length > 0) {
+      const detail = committed.join(", ");
+      this.notice(`Reverted on disk; Claude's commit still holds the change (git reset --soft or git revert undoes it): ${detail}`, "session", { code: "reject_committed", detail });
     }
     this.touch();
   }
@@ -4058,20 +4065,30 @@ export class ReviewEngine {
       const open = [...new Set([...(await cp.indexPaths("unmerged")).filter((p) => !chosen.has(p)), ...unreviewed])];
       if (open.length > 0) throw new CommandRefused(`merge_unresolved:${open.slice(0, 5).join(", ")}${open.length > 5 ? ", …" : ""}`, { code: "merge_unresolved", paths: open });
     }
+    // MARK: r1-git — §46: a path with no change against HEAD (Claude's own commit holds it) is not staged again — `git commit
+    // --only` of nothing fails; it leaves the review as committed in that commit. Nothing else left: no commit at all.
+    const already = merging ? [] : await this.unchangedSinceHead(cp, paths);
+    const rest = paths.filter((p) => !already.includes(p));
     let sha: string;
     try {
-      // `--only`: entries the user staged for other paths stay staged and out of this commit.
-      const specs = await stagePaths(cp.root, paths, this.gate.changedFiles);
-      sha = await gitCommit(cp.root, message, merging ? null : specs);
+      if (rest.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
+      else {
+        // `--only`: entries the user staged for other paths stay staged and out of this commit.
+        const specs = await stagePaths(cp.root, rest, this.gate.changedFiles);
+        sha = await gitCommit(cp.root, message, merging ? null : specs);
+      }
     } catch (e) {
       this.fail(`Failed to commit: ${errorMessage(e)}`, false, "git", { code: "commit_failed" });
       throw new CommandRefused(errorMessage(e), { code: "commit_failed" });
     }
     const branch = await cp.branchName();
+    const made: HistoryCommit = { sha, subject: firstLineOf(message).slice(0, 200) };
+    if (rest.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
     this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files: paths, at: new Date().toISOString() };
     this.touch();
     try {
-      await this.gate.dropCommitted(paths, { sha, subject: firstLineOf(message).slice(0, 200) }); // MARK: wave4 w4-history (§38.3)
+      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 ? made : null) : null;
+      await this.gate.dropCommitted(paths, by ?? made); // MARK: wave4 w4-history (§38.3)
     } catch (e) {
       this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
     }
@@ -4079,7 +4096,33 @@ export class ReviewEngine {
     await this.refreshBranches();
     await this.refreshWorkbenches(false);
     if (push) await this.pushLastCommit();
-    return this.committedEvent();
+    return { ...this.committedEvent(), ...(already.length > 0 ? { alreadyCommitted: already } : {}) };
+  }
+
+  /** MARK: r1-git — §46: the review `paths` whose file (both names of a rename) has no change against HEAD — committed already. */
+  private async unchangedSinceHead(cp: GitCheckpoint, paths: readonly string[]): Promise<string[]> {
+    const files = paths.map((p) => this.gate.changedFiles.find((f) => f.path === p)).filter((f): f is ChangedFile => f !== undefined && f.ignored !== true);
+    if (files.length === 0) return [];
+    const specs = [...new Set(files.flatMap((f) => (f.oldPath !== null && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path])))];
+    const out = await cp.git(["--no-optional-locks", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", ...specs], { allowFailure: true }).catch(() => null);
+    if (!out || out.status !== 0) return [];
+    const dirty = new Set(out.stdout.toString("utf8").split("\0").filter((e) => e.length > 3).map((e) => e.slice(3)));
+    return files.filter((f) => !dirty.has(f.path) && (f.oldPath === null || !dirty.has(f.oldPath))).map((f) => f.path);
+  }
+
+  /** The commit each already-committed path is in (its `committedIn`, else HEAD's), `made` for the others; per path. */
+  private async commitsHolding(cp: GitCheckpoint, already: readonly string[], made: HistoryCommit | null): Promise<Map<string, HistoryCommit>> {
+    const by = new Map<string, HistoryCommit>();
+    for (const f of this.gate.changedFiles) {
+      if (!already.includes(f.path)) {
+        if (made) by.set(f.path, made);
+        continue;
+      }
+      const out = await cp.git(["log", "-1", "--format=%H%x00%s", f.committedIn ?? "HEAD"], { allowFailure: true }).catch(() => null);
+      const [full, subject] = out && out.status === 0 ? out.text.trim().split("\0") : [];
+      if (full) by.set(f.path, { sha: full, subject: (subject ?? "").slice(0, 200) });
+    }
+    return by;
   }
 
   // §53 commits in meaningful units
