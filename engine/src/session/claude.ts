@@ -864,9 +864,9 @@ export class ClaudeSession implements ClaudeSessionLike {
    * Only the way into plan mode is followed: leaving it stays the user's (plan approval, the mode menu) — an engine that
    * kept plan mode where the CLI left it only denies more — and auto ↔ default is the CLI's fallback for a model without
    * auto mode (§39.5: the notice; the user's mode stays). Only while a turn of ours runs: Claude can call EnterPlanMode only
-   * then (outside one the unprompted-turn guard denies it), and the engine switches modes only between turns — so a late
-   * report of the engine's own switch is never taken for Claude's (a conversation resumed in plan mode says so at the next
-   * turn's init).
+   * then (outside one the unprompted-turn guard denies it), and the engine switches into plan mode only between turns (a
+   * switch during a turn is among default / acceptEdits / auto, §39.5) — so a late report of the engine's own switch is
+   * never taken for Claude's (a conversation resumed in plan mode says so at the next turn's init).
    */
   private followCliMode(reported: unknown): void {
     if (reported !== "plan" || this.modeSwitching || this.disposing || !this.turnActive) return;

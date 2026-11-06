@@ -745,7 +745,8 @@ docs/M20-MODES.md, engine part. Additive: one optional setting, one command, one
   changes through `set_permission_mode`.
 - **`set_permission_mode { mode }`** calls `query.setPermissionMode(mode)` on the running session, mirrors it into
   `state.session.permissionMode` and persists it. It is refused with `no_session` when no session is open and with
-  `session_busy` while a turn, a session start, a collection or a revert is in flight.
+  `session_busy` while a session start, a collection or a revert is in flight — and while a turn runs only for a switch into
+  or out of `plan`: default / acceptEdits / auto switch during a turn too, from the CLI's next tool call (§39.5).
 - **Persistence.** The mode is stored in `<gitdir>/reviewgate-session.json` (`permissionMode`, next to `sessionId`/`openTabIds`)
   and restored by `open_project` **as-is, `plan` included** — a project parked in plan mode reopens in plan mode. A missing or
   unknown value falls back to the mode the repository's other worktrees ran in last — the most recently saved
@@ -4024,6 +4025,13 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   `code: "auto_mode_unavailable", detail: "<the CLI's mode>"` ("이 모델에서는 자동 모드를 쓸 수 없어서(또는 꺼져 있어서) 명령마다
   물어봐요", gray). `set_permission_mode {mode: "auto"}` that the CLI rejects for the model is refused with the new refusal
   code `auto_mode_unavailable` (the mode stays; the clients put the previous mode back and say why).
+- **A mode picked while Claude works.** `set_permission_mode` during a turn switches among `default` / `acceptEdits` /
+  `auto` at once: the CLI applies it from its next tool call, as Shift+Tab does in the terminal, the hooks follow
+  (`HookContext.permissionMode`) and the mode is stored as between turns. Cards already open stay the user's. Refused
+  `session_busy`: a switch into or out of `plan` while a turn runs (plan mode changes what the turn may do and how its plan
+  is proposed), and any switch while a session starts or a turn's changes are collected / reverted. Nothing of the review
+  depends on it: files are collected at the turn's end in every mode, and the git card (§40.1, §46) is the same in every
+  mode.
 - **Clients.** The mode help of 자동: "명령은 Claude Code의 자동 판단으로 실행돼요. 파일 변경은 그대로 리뷰돼요." The HUD's mode
   chip is the mode menu (one click picks a mode). A pick while a turn runs (`set_permission_mode` is refused `session_busy`
   then) waits and is sent when the turn ends — the picker shows "기본 → 자동", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면
@@ -5507,8 +5515,8 @@ changed default.
   followed: leaving it stays the user's (plan approval, the mode menu) — an engine that kept plan mode where the CLI left it
   only denies more — and `auto` ↔ `default` stays §39.5's fallback (the notice, the user's mode). And only while a turn of
   ours runs: Claude can call EnterPlanMode only then (outside one the unprompted-turn guard, §18, denies it) and the engine
-  switches modes only between turns, so a report of the engine's own switch (`set_permission_mode`, plan approval) — even a
-  late one — is never taken for Claude's; a conversation resumed in plan mode says so at the next turn's init. From then on everything of §11 /
+  switches into plan mode only between turns (a switch during a turn is among default / acceptEdits / auto, §39.5), so a
+  report of the engine's own switch (`set_permission_mode`, plan approval) — even a late one — is never taken for Claude's; a conversation resumed in plan mode says so at the next turn's init. From then on everything of §11 /
   §19.4 holds: no edits but the plan file under `~/.claude/plans/` (allowed, kept out of the review and the budget),
   read-only commands only, ExitPlanMode → `plan_proposed` → the card; `state.session.permissionMode` is `"plan"` (the chip
   and the mode line say 계획) and `prePlanMode` the mode before. A turn's init in plan mode no longer raises

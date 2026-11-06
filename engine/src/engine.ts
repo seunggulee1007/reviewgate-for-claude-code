@@ -1489,16 +1489,19 @@ export class ReviewEngine {
 
   /**
    * `set_permission_mode` (docs/M20-MODES.md): switches the live session's mode and persists it per
-   * project. Refused while a turn / start / collection is in flight; our PreToolUse rules (the budget
-   * deny, the git card of §46) run before mode evaluation, so they still apply in every mode.
+   * project. Refused (`session_busy`) while a session starts or a turn's changes are collected / reverted. While a turn
+   * runs (§39.5) a switch among default / acceptEdits / auto goes to the CLI at once and applies from its next tool call,
+   * as Shift+Tab in the terminal (cards already open stay the user's); one into or out of plan mode waits for the turn's
+   * end (`session_busy`). Files are collected at the turn's end in every mode, and our PreToolUse rules (the budget deny,
+   * the git card of §46) run before mode evaluation, so they still apply in every mode.
    */
   private async setPermissionMode(mode: PermissionMode): Promise<void> {
     if (!isPermissionMode(mode)) throw new CommandRefused("invalid_mode");
     const session = this.session;
     if (!session) throw new CommandRefused("no_session");
-    if (this.sessionState.starting || this.gate.running || this.gate.collecting || this.gate.reverting || session.isTurnActive) {
-      throw new CommandRefused("session_busy");
-    }
+    if (this.sessionState.starting || this.gate.collecting || this.gate.reverting) throw new CommandRefused("session_busy");
+    const turnRuns = this.gate.running || session.isTurnActive;
+    if (turnRuns && (mode === "plan" || this.sessionState.permissionMode === "plan")) throw new CommandRefused("session_busy");
     const before = this.sessionState.permissionMode;
     await session.setPermissionMode(mode);
     // MARK: wave6 w6-terminal — §44.1: into plan mode the mode before it is kept (approving the plan can go back to it).
