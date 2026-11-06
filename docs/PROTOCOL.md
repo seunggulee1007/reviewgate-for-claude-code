@@ -1214,6 +1214,11 @@ mode §19.4, side questions §21, the unprompted-turn guard §18). `isReadOnlyCo
   Any other `cd` — elsewhere, bare `cd`, `cd -`, `cd ~user`, `pushd +N`, a folder that is not there (CDPATH would decide where
   the shell goes) — makes the line not read-only: a foreign repository's config can run an fsmonitor or a pager on
   `git status`. Without a context neither `cd` nor `git -C` is read-only, as before.
+- **Who judges with the context.** The Bash hook (the hook input's `cwd`, the checkpoint root, `git worktree list` minus
+  the root, cached per turn), `canUseTool` (the session's folder), the plan-mode and unprompted-turn guards (§19.4, §18), the
+  settings-file check (§33.9) and side questions (§21: the project folder, no other worktrees). So `cd ../acme-42 && git log`
+  or `git -C ../acme-42 status` runs without the §33.4 card (a read-only command never got it), in plan mode and in a side
+  question. The queue the engine answers after a remembered allow (§33.1) still judges without it.
 
 ### 19.4 Plan mode does not edit
 
@@ -2094,7 +2099,8 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   new worktree>}`; a command that runs in — or `cd` / `pushd` / `git -C` into — a nested repository or another worktree
   gets `nested_repository` / `other_worktree` with that path. "Runs in" uses the CLI's current directory from the hook
   input (the Bash shell's directory after an earlier `cd`). These never ride on `bashAllowPatterns`, a remembered key or
-  the user's rules; a read-only command (§10) still runs without a card. After an approved one ran:
+  the user's rules; a read-only command (§10, §19.3: a `cd` / `git -C` into a worktree of this repository included) still
+  runs without a card. After an approved one ran:
   `worktree_outside_review`. The worktree list is re-read after any command mentioning `worktree`.
 - **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?}` with an English `message`:
   `worktree_blocked` (a deny above: `toolName` = `EnterWorktree` / `Workflow` / `Agent` / `Task`, `branch` = EnterWorktree's

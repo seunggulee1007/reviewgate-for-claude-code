@@ -12,7 +12,8 @@ import {
   type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { Platform } from "../platform/index.js";
-import { isReadOnlyCommand } from "../session/bashClass.js";
+import { isReadOnlyCommand, type ReadOnlyContext } from "../session/bashClass.js";
+import { readOnlyContext } from "../session/reviewScope.js";
 import { resolveClaudeExecutable } from "../session/claude.js";
 import type { SessionLog } from "../session/events.js";
 import { AsyncQueue } from "../session/queue.js";
@@ -76,7 +77,7 @@ export const SIDE_SYSTEM_PROMPT =
  * Why the side policy refuses `toolName`, or `undefined` when it may run (no permission card ever). §36.13 (wave3
  * engine-flow): `extraTools` names tools that only report (the pre-review fork's `ReportFindings`); nothing else widens.
  */
-export function sideToolDenyReason(toolName: string, input: Record<string, unknown>, opts: { allowWeb: boolean; extraTools?: readonly string[]; webAllowed?: SideWebAllowed }): string | undefined {
+export function sideToolDenyReason(toolName: string, input: Record<string, unknown>, opts: { allowWeb: boolean; extraTools?: readonly string[]; webAllowed?: SideWebAllowed; readOnly?: ReadOnlyContext }): string | undefined {
   if (SIDE_READ_TOOLS.has(toolName)) return undefined;
   if (opts.extraTools?.includes(toolName) && SIDE_REPORT_TOOLS.has(toolName)) return undefined;
   // §40.3: any site with the web on; with `rules` only what the user's allow rules allow; else none.
@@ -84,7 +85,7 @@ export function sideToolDenyReason(toolName: string, input: Record<string, unkno
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
     if (input.run_in_background === true) return SIDE_READ_ONLY_REASON;
-    return isReadOnlyCommand(command) ? undefined : SIDE_READ_ONLY_REASON;
+    return isReadOnlyCommand(command, opts.readOnly) ? undefined : SIDE_READ_ONLY_REASON;
   }
   return SIDE_READ_ONLY_REASON;
 }
@@ -177,7 +178,9 @@ export class SideQuery {
     const pre: HookCallback = async (input) => {
       if (input.hook_event_name !== "PreToolUse") return {};
       const ti = (input.tool_input && typeof input.tool_input === "object" ? input.tool_input : {}) as Record<string, unknown>;
-      const reason = sideToolDenyReason(input.tool_name, ti, { allowWeb: o.allowWeb, ...(o.extraTools ? { extraTools: o.extraTools } : {}), ...(o.webAllowed ? { webAllowed: o.webAllowed } : {}) });
+      // §19.3: a `cd` / `git -C` inside the project stays read-only (the shell's directory is the hook input's).
+      const where = typeof input.cwd === "string" && input.cwd ? input.cwd : o.cwd;
+      const reason = sideToolDenyReason(input.tool_name, ti, { allowWeb: o.allowWeb, ...(o.extraTools ? { extraTools: o.extraTools } : {}), ...(o.webAllowed ? { webAllowed: o.webAllowed } : {}), readOnly: readOnlyContext(where, o.cwd, []) });
       if (reason) {
         o.emit({ type: "denied", toolName: input.tool_name });
         return deny(reason);
@@ -214,7 +217,7 @@ export class SideQuery {
   }
 
   private readonly canUseTool: CanUseTool = async (toolName, input) => {
-    const reason = sideToolDenyReason(toolName, input, { allowWeb: this.opts.allowWeb, ...(this.opts.extraTools ? { extraTools: this.opts.extraTools } : {}), ...(this.opts.webAllowed ? { webAllowed: this.opts.webAllowed } : {}) });
+    const reason = sideToolDenyReason(toolName, input, { allowWeb: this.opts.allowWeb, ...(this.opts.extraTools ? { extraTools: this.opts.extraTools } : {}), ...(this.opts.webAllowed ? { webAllowed: this.opts.webAllowed } : {}), readOnly: readOnlyContext(this.opts.cwd, this.opts.cwd, []) });
     if (reason) {
       this.opts.emit({ type: "denied", toolName });
       return { behavior: "deny", message: reason };

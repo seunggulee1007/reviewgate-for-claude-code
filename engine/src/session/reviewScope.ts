@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { PermissionReason } from "../protocol.js";
-import { HOST_FLAVOR, isInside, parseAbs, realpathLenient, relativeInside, toRepoRelative } from "../platform/paths.js";
-import { scanCommand } from "./bashClass.js";
+import { HOST_FLAVOR, isInside, parseAbs, realpathLenient, relativeInside, samePath, toRepoRelative } from "../platform/paths.js";
+import { scanCommand, type ReadOnlyContext } from "./bashClass.js";
 
 /**
  * What the review of this window can see (docs/PROTOCOL.md §33.3–33.4): the snapshot is `git add -A` of the checkpoint
@@ -45,6 +45,26 @@ export function nestedRepoRoot(file: string, root: string): string | null {
     if (submodules.has(relDir) || existsSync(join(dir, ".git"))) return dir;
   }
   return null;
+}
+
+/**
+ * §19.3: a folder inside the root or one of the repository's other `worktrees` that lies in a nested repository of its own
+ * (a clone, a submodule) — its config is not the repository's. A nested worktree of the repository itself is not foreign.
+ */
+export function foreignRepoDir(dir: string, root: string, worktrees: readonly string[]): boolean {
+  // The deepest of the root and the worktrees holding `dir` is where a nested repository starts.
+  let base: string | null = null;
+  for (const b of [root, ...worktrees]) {
+    if (isInside(dir, b) && (base === null || realpathLenient(b).length > realpathLenient(base).length)) base = b;
+  }
+  if (base === null) return false;
+  const nested = nestedRepoRoot(join(dir, "_"), base);
+  return nested !== null && !worktrees.some((w) => samePath(realpathLenient(w), nested));
+}
+
+/** §19.3: the read-only classifier's context for a command run in `cwd`: the root, the repository's other worktrees. */
+export function readOnlyContext(cwd: string, root: string, worktrees: readonly string[]): ReadOnlyContext {
+  return { cwd, root, sameRepoDirs: worktrees, foreignDir: (dir) => foreignRepoDir(dir, root, worktrees) };
 }
 
 /** English fallbacks of the §33 card reasons (clients localize on `code`); `claude_config` names its file (`claudeConfigMessage`). */

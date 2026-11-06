@@ -35,6 +35,7 @@ import {
   otherWorktrees,
   planModeBlocked,
   plansDir,
+  readOnlyContextOf,
   UNPROMPTED_REASON,
   unpromptedBlocked,
   type HookContext,
@@ -2048,11 +2049,15 @@ export class ClaudeSession implements ClaudeSessionLike {
 
   private readonly canUseTool: CanUseTool = async (toolName, input, options) => {
     if (this.hookCtx.adoption) await this.hookCtx.adoption; // §52: nothing runs before the engine took the turn
+    // §19.3: a Bash command is judged where it runs (the session's folder; `cd` / `git -C` into the repository's worktrees) —
+    // only a command that moves at all needs the repository's worktrees.
+    const moves = toolName === "Bash" && typeof input.command === "string" && /\b(?:cd|pushd)\b|-C\b/.test(input.command);
+    const ro = moves ? await readOnlyContextOf(this.hookCtx, this.hookCtx.cwd) : undefined;
     // `ExitPlanMode` (CLI 2.1.275+) must never reach a permission card: allowing it lets the very
     // same turn leave plan mode and implement. We take its plan text, hand it to the engine as a
     // proposal and deny the tool, so the turn ends with the plan awaiting `plan_response`.
     // Outside an engine-started turn nothing may change (the PreToolUse hooks already deny; safety net).
-    if (unpromptedBlocked(toolName, input, this.hookCtx)) {
+    if (unpromptedBlocked(toolName, input, this.hookCtx, ro)) {
       this.onUnprompted(toolName);
       return { behavior: "deny", message: UNPROMPTED_REASON };
     }
@@ -2078,7 +2083,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       return { behavior: "allow", updatedInput: input };
     }
     // Plan mode: no edits (except the plan file above) and no non-read-only Bash — same rule as the PreToolUse hooks.
-    const planDeny = planModeBlocked(toolName, input, this.hookCtx);
+    const planDeny = planModeBlocked(toolName, input, this.hookCtx, ro);
     if (planDeny) return { behavior: "deny", message: planDeny };
     // Only edit tools and the worktree tools need the containment root (resolved lazily through git).
     const needsRoot = (AUTO_ALLOW_RE.test(toolName) && file !== undefined) || WORKTREE_TOOLS_RE.test(toolName);
@@ -2100,7 +2105,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       (toolUseId ? this.hookCtx.scopeReasons?.get(toolUseId) : undefined) ??
       (AUTO_ALLOW_RE.test(toolName) && file !== undefined ? editScopeReason(file, root, isOutsideRoot, outsideRoot ? await otherWorktrees(this.hookCtx) : [], this.hookCtx.scratchDirs) : null) ??
       (isolatedCall(toolName, input, root) ? { code: "worktree_isolation", message: SCOPE_MESSAGES.worktree_isolation } : null) ??
-      configScopeReason(toolName, input, this.hookCtx.cwd, root, this.hookCtx) ??
+      configScopeReason(toolName, input, this.hookCtx.cwd, root, this.hookCtx, ro) ??
       gitCommandReason(toolName, input);
     const outside = scope !== null;
     // An approved edit the snapshot never sees goes to changedOutside (§8); a settings file is the review's own business
@@ -2111,7 +2116,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     }
     // Same rules as the PreToolUse hooks (read-only Bash, allow patterns, session-remembered allows):
     // a hook `allow` normally skips this callback, but never re-ask should the CLI still reach it.
-    if (!outside && autoAllowReason(toolName, input, this.hookCtx)) {
+    if (!outside && autoAllowReason(toolName, input, this.hookCtx, ro)) {
       return { behavior: "allow", updatedInput: input };
     }
     // §33.6: what "always allow in this project" may store for this call (never for a call outside the review).

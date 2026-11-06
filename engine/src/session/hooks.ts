@@ -13,7 +13,7 @@ import { matchesIgnore } from "../git/ignore.js";
 import { isModsPath } from "../git/mods.js";
 import { commonDir, gitDir, listWorktrees, sameRepository } from "../git/worktrees.js";
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
-import { isReadOnlyCommand, isRemembered, matchesAllowPattern } from "./bashClass.js";
+import { isReadOnlyCommand, isRemembered, matchesAllowPattern, type ReadOnlyContext } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
 import type { SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
@@ -33,6 +33,7 @@ import {
   SCOPE_ASK_REASON,
   SCOPE_MESSAGES,
   OTHER_REPO_WORKTREE_MESSAGE,
+  readOnlyContext,
   worktreeAddRepoDir,
   worktreeToolBlocked,
   type ScopeNotice,
@@ -348,19 +349,20 @@ function allowPre(reason: string): HookJSONOutput {
 
 /**
  * Why `toolName`/`input` is allowed without a prompt (docs/M16-FRICTION.md §1–2), or undefined when it
- * must ask: a read-only Bash command (`autoAllowReadOnlyBash !== false`), a `bashAllowPatterns` match
- * (for other tools its MCP / WebFetch / WebSearch / Agent forms, §33.6), a key the user remembered for this
- * session, or the user's own Claude Code allow rule for a tool that cannot change files (§33.5). Consulted by
- * the PreToolUse hooks and by canUseTool.
+ * must ask: a read-only Bash command (`autoAllowReadOnlyBash !== false`; judged where it runs with `ro`, §19.3), a
+ * `bashAllowPatterns` match (for other tools its MCP / WebFetch / WebSearch / Agent forms, §33.6), a key the user
+ * remembered for this session, or the user's own Claude Code allow rule for a tool that cannot change files (§33.5).
+ * Consulted by the PreToolUse hooks and by canUseTool.
  */
 export function autoAllowReason(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "autoAllowReadOnlyBash" | "bashAllowPatterns" | "rememberedAllows" | "userRules" | "mcpToolHints">,
+  ro?: ReadOnlyContext,
 ): string | undefined {
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    if (ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command)) return READ_ONLY_BASH_REASON;
+    if (ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro)) return READ_ONLY_BASH_REASON;
     if ((ctx.bashAllowPatterns ?? []).some((p) => matchesAllowPattern(p, command))) return ALLOW_PATTERN_REASON;
   } else if ((ctx.bashAllowPatterns ?? []).some((p) => matchesToolPattern(p, toolName, input))) {
     return ALLOW_PATTERN_REASON;
@@ -372,18 +374,19 @@ export function autoAllowReason(
 
 /**
  * True when `toolName` must be denied because no engine-started turn is running (`ctx.turnActive === false`):
- * everything except the read-only tools and a read-only Bash command that is auto-allowed anyway.
+ * everything except the read-only tools and a read-only Bash command that is auto-allowed anyway (`ro`: where it runs).
  */
 export function unpromptedBlocked(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "turnActive" | "autoAllowReadOnlyBash">,
+  ro?: ReadOnlyContext,
 ): boolean {
   if (ctx.turnActive !== false) return false;
   if (READ_ONLY_TOOLS.has(toolName)) return false;
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    return !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command));
+    return !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro));
   }
   return true;
 }
@@ -397,6 +400,7 @@ export function planModeBlocked(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "permissionMode" | "plansDir" | "cwd">,
+  ro?: ReadOnlyContext,
 ): string | undefined {
   if (ctx.permissionMode !== "plan") return undefined;
   if (EDIT_TOOLS_RE.test(toolName)) {
@@ -405,16 +409,16 @@ export function planModeBlocked(
   }
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    return isReadOnlyCommand(command) ? undefined : PLAN_MODE_BASH_REASON;
+    return isReadOnlyCommand(command, ro) ? undefined : PLAN_MODE_BASH_REASON;
   }
   return undefined;
 }
 
 /** Denies (and reports) a call made outside an engine-started turn; undefined when the guard does not apply. */
-async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext): Promise<HookJSONOutput | undefined> {
+async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro?: ReadOnlyContext): Promise<HookJSONOutput | undefined> {
   // §52: a turn Claude started itself is being taken as a review turn — nothing runs before its snapshot A.
   if (ctx.adoption) await ctx.adoption;
-  if (!unpromptedBlocked(toolName, input, ctx)) return undefined;
+  if (!unpromptedBlocked(toolName, input, ctx, ro)) return undefined;
   ctx.onUnprompted?.(toolName);
   return denyPre(UNPROMPTED_REASON);
 }
@@ -442,6 +446,11 @@ export async function otherWorktrees(ctx: HookContext): Promise<string[]> {
     ctx.worktrees = [];
   }
   return ctx.worktrees;
+}
+
+/** §19.3: the read-only classifier's context for a command run in `cwd` — the root and the worktrees (both cached per turn). */
+export async function readOnlyContextOf(ctx: HookContext, cwd: string): Promise<ReadOnlyContext> {
+  return readOnlyContext(cwd, await containmentRoot(ctx), await otherWorktrees(ctx));
 }
 
 /** Notes why a call goes on a card (§33.3–33.4) for `canUseTool` and the post-tool notice. */
@@ -509,10 +518,11 @@ export function configScopeReason(
   cwd: string,
   root: string,
   ctx: Pick<HookContext, "mcpToolHints">,
+  ro?: ReadOnlyContext,
 ): PermissionReason | null {
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    if (isReadOnlyCommand(command)) return null;
+    if (isReadOnlyCommand(command, ro)) return null;
     const target = bashClaudeConfigTarget(command, cwd, root);
     return target ? claudeConfigReason(target, root) : null;
   }
@@ -528,9 +538,9 @@ export function configScopeReason(
  * `permission_mode`: in auto mode (§39.5) a call no app rule allows is left to the CLI's rules and classifier instead of
  * the card — the reason cards (§33.3–33.4, §33.9) were decided before this, too.
  */
-function askOrAllow(toolName: string, input: Record<string, unknown>, ctx: HookContext, cliMode?: unknown): HookJSONOutput {
+function askOrAllow(toolName: string, input: Record<string, unknown>, ctx: HookContext, cliMode?: unknown, ro?: ReadOnlyContext): HookJSONOutput {
   if (!needsAsk(toolName, ctx.autoAllowTools)) return allow();
-  const reason = autoAllowReason(toolName, input, ctx);
+  const reason = autoAllowReason(toolName, input, ctx, ro);
   if (reason) return allowPre(reason);
   // MARK: wave4b w4b-auto (§39.5); input: w4b-check4 (§40.1); prePlanMode / hints: wave6 w6-terminal (§44.1)
   if (autoModeDecides(toolName, ctx.permissionMode, cliMode, input, ctx.prePlanMode, ctx.mcpToolHints)) return allow();
@@ -700,10 +710,13 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const b = ctx.budget;
     const ti = toolInput(input);
-    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
+    // §19.3: a command is judged where it runs — a `cd` / `git -C` into the repository's own worktrees stays read-only.
+    const cwd = hookCwd(input, ctx);
+    const ro = await readOnlyContextOf(ctx, cwd);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
-    const planDeny = planModeBlocked(input.tool_name, ti, ctx);
+    const planDeny = planModeBlocked(input.tool_name, ti, ctx, ro);
     if (planDeny) return denyPre(planDeny);
     // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
     // goes on (it is never interrupted): Claude reports what it did and what remains.
@@ -715,20 +728,19 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     openWindow(ctx, input, command);
     // §33.4: a command that creates a worktree, or runs in / `cd`s into another worktree or a nested repository, reaches
     // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs).
-    const root = await containmentRoot(ctx);
-    const cwd = hookCwd(input, ctx);
-    let scope = bashScopeReason(command, cwd, root, await otherWorktrees(ctx));
+    const root = ro.root;
+    let scope = bashScopeReason(command, cwd, root, ro.sameRepoDirs);
     // §39.4: a worktree of another repository (the command `cd`s / `-C`s there) — no chat of this window can follow it.
     if (scope?.code === "worktree_command") {
       const repoDir = worktreeAddRepoDir(command, cwd);
       if (repoDir && (await sameRepository(repoDir, root)) === false) scope = { ...scope, otherRepository: true, message: OTHER_REPO_WORKTREE_MESSAGE };
     }
-    if (scope && !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command))) {
+    if (scope && !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro))) {
       rememberScope(ctx, toolUseIdOf(input), scope);
       return askPre(SCOPE_ASK_REASON);
     }
     // §33.9: so does a command naming one of Claude Code's own settings files (reading one still runs).
-    const config = configScopeReason(input.tool_name, ti, cwd, root, ctx);
+    const config = configScopeReason(input.tool_name, ti, cwd, root, ctx, ro);
     if (config) {
       rememberScope(ctx, toolUseIdOf(input), config);
       return askPre(CLAUDE_CONFIG_ASK_REASON);
@@ -740,7 +752,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       rememberScope(ctx, toolUseIdOf(input), git);
       return askPre(GIT_ASK_REASON);
     }
-    return askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input));
+    return askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input), ro);
   };
 
   /** Every other tool forces `ask` (needsAsk) — reads, subagents and the to-do list are never counted or refused by the budget (§54). */
