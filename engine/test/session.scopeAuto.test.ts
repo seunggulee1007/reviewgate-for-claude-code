@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HookCallback, HookInput, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -433,6 +433,17 @@ describe("§39.5: edits the review does not see, in auto mode — no card, liste
     const userSettings = join(home, ".claude", "settings.json");
     expect(await edit(c, "Edit", { file_path: userSettings, old_string: "{", new_string: "{ " }, root, "e6", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
     expect(await edit(c, "Write", { file_path: join(lib, ".claude", "settings.json"), content: "{}" }, root, "e7", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    // So do the CLI's own ~/.claude.json (user and local MCP servers) and a plugin's hooks — they run from the next session
+    // on, before any review — and a settings file reached through a symlink in Claude's memory.
+    const cliConfig = join(home, ".claude.json");
+    const pluginHooks = join(home, ".claude", "plugins", "cache", "acme", "acme-tools", "1.0.0", "hooks", "hooks.json");
+    expect(await edit(c, "Edit", { file_path: cliConfig, old_string: '"mcpServers": {}', new_string: '"mcpServers": {"x": {}}' }, root, "e9", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    expect(await edit(c, "Write", { file_path: pluginHooks, content: "{}" }, root, "e10", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    write(home, ".claude/settings.json", "{}\n");
+    mkdirSync(dirname(memory), { recursive: true });
+    symlinkSync(userSettings, join(dirname(memory), "prefs.json"));
+    expect(await edit(c, "Write", { file_path: join(dirname(memory), "prefs.json"), content: "{}" }, root, "e11", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    expect(listed).toHaveLength(4); // none of them ran
     // git's own state is still denied.
     expect(await edit(c, "Write", { file_path: join(sibling, ".git"), content: "x" }, root, "e8", auto)).toMatchObject({ decision: "deny" });
   });

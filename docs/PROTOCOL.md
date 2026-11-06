@@ -576,7 +576,8 @@ The review boundary is path-aware and the gate outlives the engine process. Ever
   **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) such an edit — and
   one into Claude's own memory (`~/.claude/projects/<key>/memory/…`, which asked in every mode before) — gets no card: the
   hook returns no decision and the CLI's own rules decide, as in the terminal. Claude Code's own settings files still ask
-  (`~/.claude/settings.json` included, checked first; §33.9), and git's own state stays denied. Every such edit that ran is
+  (`~/.claude/settings.json`, `~/.claude.json` and an installed plugin's `hooks.json` / `plugin.json` included, checked
+  first — a settings file through a symlink in the memory folder too; §33.9), and git's own state stays denied. Every such edit that ran is
   listed in `changedOutside` all the same: a PostToolUse hook records it (in default mode the approved card did). Memory
   files are listed by their path; clients recognise them and label them (`메모리에 기록`).
 - **Ignored writes (`ignoredTouched`, `filteredByPattern`).** After the collection the turn's tool-touched paths under the
@@ -2276,8 +2277,16 @@ message: string;   // "Changes Claude Code's own settings (<path, project-relati
 
 - **Which files.** A path whose last component is `.mcp.json`, or `settings.json` / `settings.local.json` in a folder named
   `.claude` — at the project root or anywhere below it (`modules/api/.claude/settings.json`: the CLI may be started there) —
-  compared case-insensitively (on Windows trailing dots / spaces dropped). Other mods paths (§32: hook scripts, agents,
-  commands, skills, `CLAUDE.md`) keep today's flow: auto-allowed, reviewed, revertible.
+  compared case-insensitively (on Windows trailing dots / spaces dropped). Also the CLI's own `.claude.json`
+  (`~/.claude.json`, `$CLAUDE_CONFIG_DIR/.claude.json`: user and local MCP servers, a project's enabled `.mcp.json`
+  servers) and an installed plugin's `hooks/hooks.json` / `.claude-plugin/plugin.json` (its hooks and MCP servers) under
+  Claude Code's plugins folder (`~/.claude/plugins/…`, `$CLAUDE_CONFIG_DIR/plugins/…`; a plugin written in a project is
+  not one) — before, in auto mode an `Edit` of `~/.claude.json`'s `mcpServers` or a plugin's `hooks.json` ran without a
+  card (§39.5 left edits outside the project to the CLI), to start a server or a hook at the next session that no review
+  can undo. A Bash word that resolves to one of them counts too (`jq … ~/.claude.json > x && mv x ~/.claude.json`). The
+  edit hook looks for a settings file before Claude's memory folder (§8), so one reached through a symlink there asks too.
+  Other mods paths (§32: hook scripts, agents, commands, skills, `CLAUDE.md`) keep today's flow: auto-allowed, reviewed,
+  revertible.
 - **Edit tools** (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`) on such a file: the PreToolUse hook answers `ask` (reason
   `ReviewGate: changes Claude Code's own settings (hooks, permissions, MCP servers) — needs approval`) and `canUseTool` raises
   the card with the reason. A location reason comes first: a settings file outside the root is `outside_project` /

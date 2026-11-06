@@ -146,15 +146,30 @@ export function isScratchPath(file: string, scratchDirs: readonly string[] | und
 
 /**
  * True when `p` names one of Claude Code's own settings files: `settings.json` / `settings.local.json` in a `.claude`
- * folder, or `.mcp.json` — at the project root or in any folder below it (a module the CLI may be started in). They decide
- * which hooks run, which tools are allowed (§33.5 applies the local file's allow rules) and which MCP servers start.
- * Lexical and case-insensitive (macOS / Windows file systems are); on Windows trailing dots / spaces are dropped first.
+ * folder, or `.mcp.json` — at the project root or in any folder below it (a module the CLI may be started in) —, the CLI's
+ * own `.claude.json` (`~/.claude.json`, `$CLAUDE_CONFIG_DIR/.claude.json`: user and local MCP servers, a project's enabled
+ * `.mcp.json` servers), and a plugin's `hooks/hooks.json` or `.claude-plugin/plugin.json` (hooks, MCP servers) under
+ * Claude Code's plugins folder (`~/.claude/plugins/…`, `$CLAUDE_CONFIG_DIR/plugins/…`). They decide which hooks run, which
+ * tools are allowed (§33.5 applies the local file's allow rules) and which MCP servers start — from the next tool call or
+ * session on, before the review could undo anything. Lexical and case-insensitive (macOS / Windows file systems are); on
+ * Windows trailing dots / spaces are dropped first.
  */
 export function isClaudeConfigPath(p: string): boolean {
-  const parts = parseAbs(resolve(p), HOST_FLAVOR).parts;
-  const name = parts[parts.length - 1]?.toLowerCase();
-  if (name === ".mcp.json") return true;
-  return (name === "settings.json" || name === "settings.local.json") && parts[parts.length - 2]?.toLowerCase() === ".claude";
+  const abs = resolve(p);
+  const parts = parseAbs(abs, HOST_FLAVOR).parts.map((x) => x.toLowerCase());
+  const name = parts[parts.length - 1];
+  const parent = parts[parts.length - 2];
+  if (name === ".mcp.json" || name === ".claude.json") return true;
+  if ((name === "settings.json" || name === "settings.local.json") && parent === ".claude") return true;
+  if ((name === "hooks.json" && parent === "hooks") || (name === "plugin.json" && parent === ".claude-plugin")) return inClaudePlugins(abs, parts);
+  return false;
+}
+
+/** `abs` (its lower-cased `parts`) is under Claude Code's plugins folder: `.claude/plugins/`, or `$CLAUDE_CONFIG_DIR/plugins/`. */
+function inClaudePlugins(abs: string, parts: readonly string[]): boolean {
+  if (parts.some((x, k) => x === "plugins" && parts[k - 1] === ".claude")) return true;
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  return !!configDir && relativeInside(abs, join(resolve(configDir), "plugins")) !== null;
 }
 
 /** The settings file (§33.9) an edit tool's target is — as named, else through symlinks (absolute, native) — or null. */
@@ -188,8 +203,11 @@ export function claudeConfigReason(abs: string, root: string): PermissionReason 
   return { code: "claude_config", message: claudeConfigMessage(displayPath(abs, root)), path: abs };
 }
 
-/** Anything that may be a settings file's name, `--file=` / `>` / quotes / brackets around it left out. */
-const CONFIG_WORD_RE = /[^\s"'`<>|&;()=,]*(?:settings(?:\.local)?\.json|\.mcp\.json)(?![\w.-])/gi;
+/**
+ * Anything that may be a settings file's name, `--file=` / `>` / quotes / brackets around it left out (`.claude.json`, a
+ * plugin's `hooks.json` / `plugin.json` too: `isClaudeConfigPath` decides once the word is resolved).
+ */
+const CONFIG_WORD_RE = /[^\s"'`<>|&;()=,]*(?:settings(?:\.local)?\.json|\.mcp\.json|\.claude\.json|hooks\.json|plugin\.json)(?![\w.-])/gi;
 /** The names a command mentioning counts as touching the project's own file, however it builds the path (a script, …). */
 const CONFIG_MENTION_RE = /(?<![\w-])(?:settings\.local\.json|\.claude[\\/]+settings\.json|\.mcp\.json)(?![\w-])/i;
 /**
@@ -236,7 +254,7 @@ function mentionedConfig(text: string, root: string): string | null {
  * `settings.json` elsewhere (`.vscode/`, the project root) is not one.
  */
 export function bashClaudeConfigTarget(command: string, cwd: string, root: string): string | null {
-  if (!spellings(command).some((t) => /settings(?:\.local)?\.json|\.mcp\.json/i.test(t))) return null;
+  if (!spellings(command).some((t) => /settings(?:\.local)?\.json|\.mcp\.json|\.claude\.json|hooks\.json|plugin\.json/i.test(t))) return null;
   let dir = cwd;
   for (const words of segments(command)) {
     const w = commandWords(words);

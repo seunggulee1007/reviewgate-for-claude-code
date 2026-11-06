@@ -833,8 +833,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // CLI's call, as in the terminal, and listed after the turn (postEditScope) — Claude Code's own settings keep their card.
     const cliDecides = scopeCliDecides(ctx, input);
     // Claude's own memory (~/.claude/projects/<project>/memory) is not in the review: the budget neither counts nor blocks
-    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card (not in auto mode).
-    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return cliDecides ? allow() : askPre(OUTSIDE_REASON);
+    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card (not in auto mode) —
+    // unless the file is one of Claude Code's settings through a symlink there (§33.9: checked first, as named or resolved).
+    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) {
+      if (claudeConfigFile(file)) return askPre(CLAUDE_CONFIG_ASK_REASON);
+      return cliDecides ? allow() : askPre(OUTSIDE_REASON);
+    }
     // §54: the change budget is opt-in — without one (the default) an edit is neither counted nor denied.
     if (b.active) {
       const est = estimateEditLines(input.tool_name, ti, ctx.cwd);

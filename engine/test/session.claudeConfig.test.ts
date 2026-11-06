@@ -89,6 +89,31 @@ describe("which files are Claude Code's own settings (§33.9)", () => {
     }
   });
 
+  it("the CLI's own .claude.json and a plugin's hooks.json / plugin.json under Claude Code's plugins folder", () => {
+    const home = "/Users/dev";
+    for (const rel of [".claude.json", ".Claude.JSON", ".claude/plugins/cache/acme/acme-tools/1.0.0/hooks/hooks.json", ".claude/plugins/marketplaces/acme/plugins/acme-tools/.claude-plugin/plugin.json"]) {
+      expect(isClaudeConfigPath(join(home, rel)), rel).toBe(true);
+    }
+    // A plugin being written in a project is not installed: its hooks run nowhere yet.
+    for (const rel of [".claude.json.backup", "work/acme-plugin/hooks/hooks.json", "work/acme-plugin/.claude-plugin/plugin.json", ".claude/plugins/cache/acme/acme-tools/1.0.0/hooks/run.sh", ".claude/hooks/hooks.json"]) {
+      expect(isClaudeConfigPath(join(home, rel)), rel).toBe(false);
+    }
+    const saved = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = "/Users/dev/.config/claude";
+    try {
+      expect(isClaudeConfigPath("/Users/dev/.config/claude/plugins/acme-tools/hooks/hooks.json")).toBe(true);
+      expect(isClaudeConfigPath("/Users/dev/.config/claude/.claude.json")).toBe(true);
+      expect(isClaudeConfigPath("/Users/dev/.config/other/plugins/acme-tools/hooks/hooks.json")).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = saved;
+    }
+    // Named by a Bash command: a word that resolves to one.
+    expect(bashClaudeConfigTarget("jq '.mcpServers.acme = {}' ~/.claude.json > /tmp/c.json && mv /tmp/c.json ~/.claude.json", "/repo", "/repo")).toBe(join(homedir(), ".claude.json"));
+    expect(bashClaudeConfigTarget("sed -i '' 's/a/b/' ~/.claude/plugins/cache/acme/t/1.0.0/hooks/hooks.json", "/repo", "/repo")).toBe(join(homedir(), ".claude", "plugins", "cache", "acme", "t", "1.0.0", "hooks", "hooks.json"));
+    expect(bashClaudeConfigTarget("cp hooks.template.json hooks/hooks.json", "/repo", "/repo")).toBeNull();
+  });
+
   it("an edit target is one as named or through a symlink", () => {
     const root = repo();
     write(root, ".claude/settings.local.json", "{}\n");
