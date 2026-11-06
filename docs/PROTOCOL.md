@@ -6896,7 +6896,9 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   turn of ours runs, the files its calls change (edit tools by their `file_path`, Bash by the post-Bash snapshot) are kept
   (`idleToolFiles`) and become the next turn's — the user's next message or the turn the CLI runs when the agent ends —
   whose review keeps A (§52.1), so they are in it with the agent's call as the cause (`origin: tool` / `bash`). A failed
-  edit is no cause. `finish_review` while background work runs (or ran since B) keeps that B for the next turn
+  edit is no cause. An edit the review does not see — outside the project, in a nested repository or in Claude's memory
+  (§8, §39.5: no card in auto mode) — made while no turn of ours runs is kept the same way (`idleChangedOutside`) and
+  listed in the next turn's `changedOutside`; before, the turn's start dropped it. `finish_review` while background work runs (or ran since B) keeps that B for the next turn
   (`ReviewGate.finishReview(keepBase)`, `prepareAnswer(carry)`): what the agent writes after it is reviewed, not taken
   into a fresh A. That B keeps what the review knew of HEAD (§46: `baseHead`, a merge under way, Claude's own commits):
   when it becomes the next turn's A, what git brought in since — the user's pull, a commit outside the app — goes into it

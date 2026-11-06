@@ -451,6 +451,8 @@ export class ClaudeSession implements ClaudeSessionLike {
    * turn, whose review holds them (A is kept, §52.1) — with these calls as their cause.
    */
   private idleToolFiles = new Map<string, TouchedFile>();
+  /** Edits the review does not see (§8, `changedOutside`) made while no turn of ours ran — a background subagent's: the next turn's. */
+  private idleChangedOutside = new Set<string>();
   /**
    * Every call whose result has not come yet: its name and the agent call it runs under (null on the main thread) — a
    * subagent's call can end after its turn did, and only a subagent works on while no turn of ours runs.
@@ -487,7 +489,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       mcpToolHints: this.mcpToolHints,
       scopeReasons: new Map(),
       onScopeNotice: (notice) => this.emit({ type: "scope_notice", ...notice }),
-      onOutsideEdit: (file) => this.turnChangedOutside.add(file), // §8 / §39.5: an edit the review does not see
+      onOutsideEdit: (file) => this.noteOutside(file), // §8 / §39.5: an edit the review does not see
       onUnprompted: (toolName) => this.onUnprompted(toolName),
       onBashFiles: (toolUseId, files) => this.attributeBashFiles(toolUseId, files),
       onBashSnapshot: (toolUseId, tree, root) => this.emit({ type: "bash_snapshot", toolUseId, tree, root }),
@@ -819,7 +821,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       return;
     }
     if (allow) {
-      if (pending.outsideFile) this.turnChangedOutside.add(pending.outsideFile);
+      if (pending.outsideFile) this.noteOutside(pending.outsideFile);
       pending.resolve({ behavior: "allow", ...(updatedInput ? { updatedInput } : {}) });
     } else pending.resolve({ behavior: "deny", message: message ?? "Denied by user" });
   }
@@ -1110,6 +1112,13 @@ export class ClaudeSession implements ClaudeSessionLike {
       this.turnToolFiles.set(key, entry);
     }
     this.idleToolFiles = new Map();
+    for (const file of this.idleChangedOutside) this.turnChangedOutside.add(file);
+    this.idleChangedOutside = new Set();
+  }
+
+  /** An edit the review does not see (§8): this turn's, or the next one's while no turn of ours runs (§52.2: a background subagent). */
+  private noteOutside(file: string): void {
+    (this.turnActive ? this.turnChangedOutside : this.idleChangedOutside).add(file);
   }
 
   /** Post-Bash snapshot (hooks.ts): files changed since the previous one that no edit tool explains. */

@@ -232,6 +232,25 @@ describe("§52.2 subagents run as in the terminal", () => {
     await t.s.dispose();
   });
 
+  it("an edit outside the project it makes while no turn runs is listed with the next turn (changedOutside)", async () => {
+    const t = await withBackgroundAgent({ permissionMode: "auto" });
+    await endFirstTurn(t);
+    // The subagent writes a note outside the project (auto mode: no card); PostToolUse lists it.
+    const outside = "/opt/acme-notes/todo.md";
+    const post = { hook_event_name: "PostToolUse", tool_name: "Write", tool_input: { file_path: outside, content: "x" }, tool_response: {}, session_id: "s", transcript_path: "", cwd: "/tmp", tool_use_id: "toolu_o", agent_id: AGENT, agent_type: "general-purpose" } as unknown as HookInput;
+    for (const m of t.script.options!.hooks!.PostToolUse!) {
+      if (m.matcher && !new RegExp(`^(${m.matcher})$`).test("Write")) continue;
+      for (const h of m.hooks) await (h as HookCallback)(post, "toolu_o", opts);
+    }
+    const second = await send(t, "2+2는?", "tree-1");
+    t.script.push(lifecycle(second, "started"));
+    t.script.push(result(0.02, { user_message_uuid: second }));
+    await until(() => ofType(t.events, "turn_end").length === 2, "turn 2 ends");
+    expect(ofType(t.events, "turn_end")[0]!.changedOutside ?? []).toEqual([]);
+    expect(ofType(t.events, "turn_end")[1]!.changedOutside).toEqual([outside]);
+    await t.s.dispose();
+  });
+
   it("its end: the call's own result is its report (once); the hand-back is no peer message; the turn the CLI runs is ours, with the agent named", async () => {
     const t = await withBackgroundAgent();
     await endFirstTurn(t);
