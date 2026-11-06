@@ -101,7 +101,9 @@ export type AppSettings = {
   /** §34.9: the user's own test commands, one glob per line (`*` any run, `?` one char); live through `set_settings`. */
   testCommandPatterns?: string;
   // MARK: wave4 w4-longwork
-  /** §38.2: the tool-call limit of one message (10–1000, default 200; the engine uses it at the next session start). */
+  /** §38.2: the tool-call limit is on (absent / false: off — no limit, the engine gets 0); `maxTurns` applies only then. */
+  maxTurnsLimit?: boolean;
+  /** §38.2: the tool-call limit's number (10–1000, default 200; kept while off; the engine uses it at the next session start). */
   maxTurns?: number;
   // MARK: wave4b w4b-bigturn
   /** §39.1: untracked files at least this large (MB, 1–100000, default 50) are stubs in snapshots; live. */

@@ -29,6 +29,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.budgetEnabled) private var budgetEnabled = false   // §54: the change limit is opt-in
     @AppStorage(AppSettings.Key.budgetMaxFiles) private var maxFiles = AppSettings.defaultMaxFiles
     @AppStorage(AppSettings.Key.budgetMaxLines) private var maxLines = AppSettings.defaultMaxLines
+    @AppStorage(AppSettings.maxTurnsLimitKey) private var maxTurnsLimit = false   // §38.2: no tool-call limit by default
     @AppStorage(AppSettings.maxTurnsKey) private var maxTurns = AppSettings.defaultMaxTurns   // wave4 w4-longwork
     @AppStorage(AppSettings.Key.systemPromptAppend) private var systemPrompt = AppSettings.defaultSystemPromptAppend
     @AppStorage(AppSettings.Key.nodePath) private var nodePath = ""
@@ -111,10 +112,13 @@ private struct GeneralSettingsView: View {
                     Text("Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                // MARK: wave4 w4-longwork (§38.2)
+                // MARK: wave4 w4-longwork (§38.2): no tool-call limit by default — the number applies only while it is on
+                Toggle(LongWorkText.settingsToggle, isOn: $maxTurnsLimit)
+                    .accessibilityIdentifier("Limit tool calls per message")
                 Stepper(LongWorkText.settingsStepper(maxTurns), value: $maxTurns, in: AppSettings.maxTurnsRange, step: 10)
+                    .disabled(!maxTurnsLimit)
                     .accessibilityIdentifier("Max tool calls per message")
-                Text(verbatim: LongWorkText.settingsNote)
+                Text(verbatim: maxTurnsLimit ? LongWorkText.settingsNote : LongWorkText.settingsOffNote)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Permissions") {
@@ -244,6 +248,7 @@ private struct GeneralSettingsView: View {
         .onChange(of: maxFiles) { _, _ in pushBudget() }
         .onChange(of: maxLines) { _, _ in pushBudget() }
         .onChange(of: maxTurns) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // wave4 w4-longwork
+        .onChange(of: maxTurnsLimit) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // §38.2
         .onChange(of: backgroundWork) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushBackgroundWork() } }   // §52
         .onChange(of: worktreeRoot) { _, _ in
             let root = AppSettings.worktreeRoot()

@@ -94,10 +94,15 @@ public enum LongWorkText {
 
     static func percentText(_ percent: Int) -> String { "\(percent)%" }
 
-    /// Settings › Per-turn budget.
+    /// Settings › Limits: the tool-call limit (§38.2) — off by default.
+    public static var settingsToggle: String { String(localized: "Limit tool calls per message", bundle: .module) }
     public static func settingsStepper(_ n: Int) -> String { String(localized: "Tool calls per message: \(n)", bundle: .module) }
     public static var settingsNote: String {
         String(localized: "Claude stops after this many tool calls for one message; Continue goes on from there. Takes effect in a new chat or after restarting the session.", bundle: .module)
+    }
+    /// The note while the limit is off.
+    public static var settingsOffNote: String {
+        String(localized: "Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session.", bundle: .module)
     }
 }
 
@@ -156,15 +161,28 @@ public enum UsageMeter {
 // MARK: Settings
 
 public extension AppSettings {
-    /// §38.2: the tool-call limit of one message (`settings.maxTurns`); the engine's default and range.
+    /// §38.2: the tool-call limit of one message (`settings.maxTurns`) — off by default (`maxTurnsLimitKey` unset): a message
+    /// runs until Claude is done or the user stops it, as in the terminal. The number stays stored for when it is turned on.
+    static let maxTurnsLimitKey = "maxTurnsLimit"
     static let maxTurnsKey = "maxTurns"
+    /// The number while none was set (what turning the limit on starts at).
     static let defaultMaxTurns = 200
     static let maxTurnsRange = 10...1000
 
-    /// Unset / out of range → 200.
-    static func maxTurns(defaults: UserDefaults = .standard) -> Int {
+    /// The limit is on (Settings › "메시지당 도구 호출 수 제한하기").
+    static func maxTurnsLimitEnabled(defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: maxTurnsLimitKey) }
+
+    static func setMaxTurnsLimitEnabled(_ on: Bool, defaults: UserDefaults = .standard) { defaults.set(on, forKey: maxTurnsLimitKey) }
+
+    /// The number of the limit (on or off): unset / out of range → 200.
+    static func maxTurnsNumber(defaults: UserDefaults = .standard) -> Int {
         let raw = defaults.integer(forKey: maxTurnsKey)
         return maxTurnsRange.contains(raw) ? raw : defaultMaxTurns
+    }
+
+    /// What the engine gets (`settings.maxTurns`): the number while the limit is on, else 0 — no limit.
+    static func maxTurns(defaults: UserDefaults = .standard) -> Int {
+        maxTurnsLimitEnabled(defaults: defaults) ? maxTurnsNumber(defaults: defaults) : 0
     }
 
     static func setMaxTurns(_ n: Int, defaults: UserDefaults = .standard) {

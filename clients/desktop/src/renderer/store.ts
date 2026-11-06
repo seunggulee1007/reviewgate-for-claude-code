@@ -56,7 +56,7 @@ import { canAllowBeyondOnce, hasPermissionRow, markPermissionRow, pendingPermiss
 import { importPatch, type ImportTarget } from "./terminalRules";
 import { editQueued, EMPTY_QUEUE, enqueue, moveQueued, nextToSend, pauseReasonForTurnEnd, removeQueued, sendExtras, type QueuedExtras, type QueueState } from "./sendQueue";
 // MARK: wave1 desktop-session
-import { appendErrorRow, clearsOnReady, errorTone, factsOf, pausesQueue, requeuesSend, type ErrorFacts } from "./sessionErrors";
+import { appendErrorRow, clearsOnReady, errorTone, factsOf, queueRetryDelayMs, queueStopOf, requeuesSend, type ErrorFacts, type QueueStop } from "./sessionErrors";
 import { peerRowOf, type PeerRow } from "./peer";
 import { createPeerSlice, type PeerSlice } from "./storePeer";
 import { autoTurnRowOf, type AutoTurnRow } from "./background"; // MARK: §52
@@ -90,7 +90,7 @@ import { createSafetySlice, type SafetySlice } from "./storeSafety";
 import { TurnStopTracker } from "./workSafety";
 import { createLongWorkSlice, type LongWorkSlice } from "./storeLongWork"; // MARK: wave4 w4-longwork
 import { createAutoModeSlice, type AutoModeSlice } from "./storeAutoMode"; // MARK: wave4b w4b-auto
-import { longWorkRowFacts } from "./longWork"; // MARK: wave4 w4-longwork
+import { longWorkRowFacts, RESUME_DELAY_MS } from "./longWork"; // MARK: wave4 w4-longwork
 import { stopReasonWords } from "./stopWords"; // MARK: wave4b w4b-check4 (§40.1)
 import { compactedField, type CompactedRowFacts } from "./commitFormat"; // MARK: wave4c w4c-commit (§41.1)
 import type { PRCreateMeta } from "@reviewgate/engine";
@@ -507,9 +507,10 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   /**
    * M20 `set_permission_mode`: switches the live session's mode → null, or the refusal code (`session_busy`, `no_session`,
    * `invalid_mode`). `force` (wave6 w6-terminal, §44.1): also when the snapshot already shows `mode` — another switch may
-   * still be on its way (Shift+Tab pressed again before the engine's state came back).
+   * still be on its way (Shift+Tab pressed again before the engine's state came back). `busyWaits` (§39.5): a `session_busy`
+   * refusal shows no banner — the caller makes the pick wait for the turn's end.
    */
-  setPermissionMode(mode: PermissionMode, opts?: { force?: boolean }): Promise<string | null>;
+  setPermissionMode(mode: PermissionMode, opts?: { force?: boolean; busyWaits?: boolean }): Promise<string | null>;
   /** M20 `plan_response{approve:true}`: leaves plan mode in `mode` (default `"default"`) and lets the engine send the follow-up. */
   approvePlan(mode?: PermissionMode): Promise<string | null>;
   /** M20 `plan_response{approve:false}`: stays in plan mode with an optional note for the next planning turn. */
@@ -789,8 +790,8 @@ export const useStore = create<Store>((set, get, api) => {
   const notCapturedNotice = (paths: string[]) =>
     notice(refusalMessage({ code: "not_captured", error: `not_captured:${paths.join(", ")}`, detail: paths.join(", "), paths }), "git", "not_captured");
 
-  /** M20 `set_permission_mode` / `plan_response`: null on success, else the engine's refusal code (also shown in the banner). */
-  const planCommand = async (cmd: EngineCommand): Promise<string | null> => {
+  /** M20 `set_permission_mode` / `plan_response`: null on success, else the engine's refusal code (also shown in the banner — not a `session_busy` the caller waits out, §39.5). */
+  const planCommand = async (cmd: EngineCommand, opts: { busyWaits?: boolean } = {}): Promise<string | null> => {
     const isAnswer = cmd.type === "plan_response";
     if (isAnswer) {
       if (get().planAnswering) return "session_busy";
@@ -814,7 +815,7 @@ export const useStore = create<Store>((set, get, api) => {
         const plan = r.code === "plan_followup_failed" ? planAfterFollowupFailure(current, get().answeredPlan) : current;
         set((s) => ({ planAnswering: false, answeredPlan: null, planNotice: plan ? words : null, state: { ...s.state, session: { ...s.state.session, pendingPlan: plan } } }));
         if (!plan) notice(words, "session", r.code);
-      } else notice(words, "session", r.code);
+      } else if (!(opts.busyWaits === true && r.code === "session_busy")) notice(words, "session", r.code);
       await get().settle();
       return r.error;
     }
@@ -909,6 +910,30 @@ export const useStore = create<Store>((set, get, api) => {
   };
 
   const setQueue = (patch: Partial<QueueState>) => set((s) => ({ queue: { ...s.queue, ...patch } }));
+  // §50.1: a queue the API or the usage limit stopped goes on by itself at `resumeAt` (unless resumed / cleared / stopped again).
+  let queueResumeTimer: ReturnType<typeof setTimeout> | null = null;
+  const pauseQueueUntil = (patch: Partial<QueueState> & { paused: string }, resumeAt: number | null) => {
+    if (queueResumeTimer) clearTimeout(queueResumeTimer);
+    queueResumeTimer = null;
+    setQueue({ ...patch, resumeAt, afterStop: false });
+    if (resumeAt === null) return;
+    queueResumeTimer = setTimeout(() => {
+      queueResumeTimer = null;
+      const q = get().queue;
+      if (q.paused !== null && q.resumeAt === resumeAt) get().resumeQueue();
+    }, Math.max(0, resumeAt - Date.now()));
+  };
+  /** §50.1: what an `error` does to a queue with messages in it (`queueStopOf`): nothing, a stop until Resume, or one that ends by itself. */
+  const stopQueue = (stop: QueueStop, reason: string, resetAt: string | undefined) => {
+    if (stop === "none") return;
+    if (stop === "pause") return pauseQueueUntil({ paused: reason }, null);
+    if (stop === "retry") {
+      const retries = (get().queue.retries ?? 0) + 1;
+      return pauseQueueUntil({ paused: reason, retries }, Date.now() + queueRetryDelayMs(retries));
+    }
+    const reset = resetAt ? Date.parse(resetAt) : Number.NaN;
+    pauseQueueUntil({ paused: reason }, Number.isFinite(reset) ? reset + RESUME_DELAY_MS : null);
+  };
   /** Sends the first queued message when the gate allows a plain send (same rule as the Send button). */
   const pumpQueue = () => {
     const s = get();
@@ -1167,10 +1192,13 @@ export const useStore = create<Store>((set, get, api) => {
           const summary = turnEndSummary(ev);
           set((s) => ({ transcript: [...finishStreaming(s.transcript), { kind: "turnEnd", id: uid(), summary, ...compactedField(ev.usage) }] }));
           {
+            // A pause already set (an error of this turn, §50.1) keeps its reason and its own resume time. After the user's
+            // Stop the queue waits with "멈춤 — 다음 메시지 대기 중" and [보내기]; a turn the queue went on after resets the API backoff.
             const q = get().queue;
             const why = pauseReasonForTurnEnd(ev.stopReason, q.skipInterruptPause);
-            const paused = q.items.length > 0 && why ? (why === "interrupted" ? t("The turn was stopped") : t("The turn ended with an error")) : q.paused;
-            setQueue({ awaitingTurn: false, skipInterruptPause: false, paused });
+            const stops = q.paused === null && q.items.length > 0 && why !== null;
+            const paused = stops ? (why === "interrupted" ? t("Stopped — the next message waits") : t("The turn ended with an error")) : q.paused;
+            setQueue({ awaitingTurn: false, skipInterruptPause: false, paused, ...(stops ? { afterStop: why === "interrupted", resumeAt: null } : {}), ...(paused === null ? { retries: 0 } : {}) });
           }
           break;
         }
@@ -1233,8 +1261,9 @@ export const useStore = create<Store>((set, get, api) => {
           get().noteLongWorkError(ev); // MARK: wave4 w4-longwork — §38.2 the usage limit's reset
           if (ev.code === "auto_mode_unavailable") get().noteAutoModeUnavailable(); // MARK: wave6 w6-terminal — §44.1 Shift+Tab skips auto
           handleErrorEvent(ev);
-          // §2.9 (M4): notices — resume, worktree, peer release, the §29 fallback — never stop the queue.
-          if (get().queue.items.length > 0 && pausesQueue(ev)) setQueue({ paused: errorEventText(ev) });
+          // §2.9 (M4) / §50.1: only the message's own failure, its session, a login or the API stop the queue — never a
+          // notice, a failing PR list, a refresh or a commit (their banner says it).
+          if (get().queue.items.length > 0) stopQueue(queueStopOf(ev), errorEventText(ev), ev.resetAt);
           break;
         // MARK: wave1 desktop-session — §29
         case "peer_message":
@@ -1447,11 +1476,15 @@ export const useStore = create<Store>((set, get, api) => {
       set((s) => ({ queue: { ...s.queue, items: moveQueued(s.queue.items, id, dir) } }));
     },
     resumeQueue() {
-      setQueue({ paused: null, awaitingTurn: false });
+      if (queueResumeTimer) clearTimeout(queueResumeTimer);
+      queueResumeTimer = null;
+      setQueue({ paused: null, awaitingTurn: false, resumeAt: null, afterStop: false });
       pumpQueue();
     },
     clearQueue() {
-      setQueue({ items: [], paused: null });
+      if (queueResumeTimer) clearTimeout(queueResumeTimer);
+      queueResumeTimer = null;
+      setQueue({ items: [], paused: null, resumeAt: null, afterStop: false });
     },
 
     interruptAndSend(text, extras = {}) {
@@ -1583,7 +1616,7 @@ export const useStore = create<Store>((set, get, api) => {
     async setPermissionMode(mode, opts) {
       if (!get().state.session.open) return "no_session";
       if (!opts?.force && permissionMode(get().state) === mode) return null;
-      return await planCommand({ type: "set_permission_mode", mode });
+      return await planCommand({ type: "set_permission_mode", mode }, { busyWaits: opts?.busyWaits === true });
     },
 
     async approvePlan(mode) {

@@ -2625,6 +2625,22 @@
         }
       }
     },
+    "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 고른 모드는 다음 단계부터 적용돼요 (계획 모드는 이번 턴이 끝나면)"
+          }
+        }
+      }
+    },
     "Claude went on by itself": {
       "localizations": {
         "en": {
@@ -6167,6 +6183,22 @@
         }
       }
     },
+    "Limit tool calls per message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit tool calls per message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지당 도구 호출 수 제한하기"
+          }
+        }
+      }
+    },
     "Line breaks and control characters are not allowed": {
       "localizations": {
         "en": {
@@ -7731,6 +7763,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "꺼짐"
+          }
+        }
+      }
+    },
+    "Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끔(기본): 제한 없음 — Claude가 터미널에서처럼 메시지 하나를 끝날 때까지 이어서 하고, 언제든 [중지]로 멈출 수 있어요. 새 채팅이나 세션 다시 시작부터 적용돼요."
           }
         }
       }
@@ -9731,6 +9779,22 @@
         }
       }
     },
+    "Send it now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send it now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 보내기"
+          }
+        }
+      }
+    },
     "Send or delete your review notes first": {
       "localizations": {
         "en": {
@@ -9791,6 +9855,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "계속하려면 변경 요청(파일 %lld개)을 보내세요"
+          }
+        }
+      }
+    },
+    "Sends again at %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends again at %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 다시 보내요"
           }
         }
       }

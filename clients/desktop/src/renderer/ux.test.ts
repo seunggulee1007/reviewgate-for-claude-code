@@ -166,9 +166,10 @@ describe("send queue", () => {
     expect(enqueue(items, "   ")).toBe(items);
   });
 
-  it("pauses on a stopped or failed turn, except the one Stop & send interrupted", () => {
+  it("pauses on a stopped or failed turn, except the one Stop & send interrupted and the tool-call limit (§38.2)", () => {
     expect(pauseReasonForTurnEnd("ended", false)).toBeNull();
     expect(pauseReasonForTurnEnd("success", false)).toBeNull();
+    expect(pauseReasonForTurnEnd("error_max_turns", false)).toBeNull();
     expect(pauseReasonForTurnEnd("interrupted", false)).toBe("interrupted");
     expect(pauseReasonForTurnEnd("interrupted", true)).toBeNull();
     expect(pauseReasonForTurnEnd("error_during_execution", false)).toBe("error");

@@ -1,8 +1,9 @@
 /**
  * MARK: wave4b w4b-auto
  * Store slice for docs/PROTOCOL.md §39.5 (as on the Mac, AppState+AutoMode.swift): a mode picked from the menu or the HUD
- * chip switches now, or — while Claude works (the engine refuses `set_permission_mode` with `session_busy` then) — when the
- * turn ends. A refused switch (auto mode the model cannot run) keeps the banner `setPermissionMode` already shows.
+ * chip switches now — while Claude works too, from its next step — except plan mode during a turn (into or out of it) and
+ * anything while the turn's changes are collected: those wait for the turn's end, as does a switch the engine refused
+ * `session_busy`. A refused switch (auto mode the model cannot run) keeps the banner `setPermissionMode` already shows.
  * MARK: wave6 w6-terminal — §44.1: Shift+Tab in the composer cycles the mode like the terminal (`cyclePermissionMode`),
  * skipping auto where the engine said it cannot run (`autoModeUnavailable`).
  * Spread into `useStore` (store.ts).
@@ -14,9 +15,9 @@ import type { Store } from "./store";
 import { autoModeMayRunAgain, nextPermissionMode } from "./terminalMode";
 
 export type AutoModeSlice = {
-  /** The mode picked while Claude works; sent when the turn ends (null: none waiting). */
+  /** The mode picked while the engine takes no switch (plan mode during a turn, a collection); sent when the turn ends (null: none waiting). */
   scheduledPermissionMode: PermissionMode | null;
-  /** The mode menu / HUD chip: switch now when idle, else wait for the turn's end. */
+  /** The mode menu / HUD chip: switch now when the engine takes it (`modeSwitchesNow`), else wait for the turn's end. */
   pickPermissionMode(mode: PermissionMode): void;
   /** After every snapshot: send the waiting mode once idle; drop it when the session closed or the project changed. */
   stepScheduledMode(previous: ReviewState, snapshot: ReviewState): void;
@@ -30,9 +31,20 @@ export type AutoModeSlice = {
   cyclePermissionMode(): void;
 };
 
-/** `set_permission_mode` is refused (`session_busy`) while a session starts, a turn runs or its changes are collected / reverted. */
+/** A session starts, a turn runs or its changes are collected / reverted: not every switch goes out now (`modeSwitchesNow`). */
 export function modeBusy(s: ReviewState): boolean {
   return s.session.starting === true || s.gate.phase === "starting" || s.gate.phase === "running" || s.gate.phase === "collecting" || s.gate.phase === "reverting";
+}
+
+/**
+ * §39.5: the engine takes a switch from `current` to `mode` now — idle, or while a turn runs one that neither enters nor
+ * leaves plan mode (the CLI applies it from its next tool call). Never while a session starts or a turn's changes are
+ * collected / reverted (`session_busy`).
+ */
+export function modeSwitchesNow(s: ReviewState, mode: PermissionMode, current: PermissionMode): boolean {
+  if (!modeBusy(s)) return true;
+  if (s.session.starting === true || s.gate.phase !== "running") return false;
+  return mode !== "plan" && current !== "plan";
 }
 
 const modeOf = (s: ReviewState): PermissionMode => s.session.permissionMode ?? "default";
@@ -42,15 +54,17 @@ export const createAutoModeSlice: StateCreator<Store, [], [], AutoModeSlice> = (
   let sent = 0;
   /**
    * Switches now (forced: a switch still on its way may differ from the snapshot's mode); while it is on its way the next
-   * pick goes on from it. Auto taken clears `autoModeUnavailable` (a refusal sets it in the store's `planCommand`).
+   * pick goes on from it. Auto taken clears `autoModeUnavailable` (a refusal sets it in the store's `planCommand`). Refused
+   * `session_busy` (the turn's changes began to be collected meanwhile): no banner — the pick waits for the turn's end.
    */
   const send = (mode: PermissionMode): void => {
     const mine = ++sent;
     set({ requestedPermissionMode: mode });
-    void get().setPermissionMode(mode, { force: true }).then((refusal) => {
+    void get().setPermissionMode(mode, { force: true, busyWaits: true }).then((refusal) => {
       if (mine === sent) set({ requestedPermissionMode: null });
       if (refusal?.startsWith("auto_mode_unavailable")) set({ autoModeUnavailable: true });
       else if (refusal === null && mode === "auto") set({ autoModeUnavailable: false });
+      if (refusal?.startsWith("session_busy") && get().scheduledPermissionMode === null) set({ scheduledPermissionMode: mode });
     });
   };
   /** The mode a pick goes on from: the one on its way, else the engine's. */
@@ -62,7 +76,8 @@ export const createAutoModeSlice: StateCreator<Store, [], [], AutoModeSlice> = (
 
     pickPermissionMode(mode) {
       const s = get().state;
-      const r = pickMode(mode, { open: s.session.open, busy: modeBusy(s), current: currentOf(s) });
+      const current = currentOf(s);
+      const r = pickMode(mode, { open: s.session.open, busy: !modeSwitchesNow(s, mode, current), current });
       set({ scheduledPermissionMode: r.scheduled });
       if (r.send) send(r.send);
     },

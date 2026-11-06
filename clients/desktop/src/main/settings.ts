@@ -76,7 +76,8 @@ export const DEFAULTS: AppSettings = {
   testCommandPatterns: "",
   // MARK: wave4 w4-safety — daily-12
   confirmCloseWhileWorking: true,
-  // MARK: wave4 w4-longwork — §38.2
+  // MARK: wave4 w4-longwork — §38.2 (no limit unless turned on; the number is kept for then)
+  maxTurnsLimit: false,
   maxTurns: 200,
   // MARK: wave4b w4b-bigturn — §39.1
   largeFileMB: 50,
@@ -174,6 +175,15 @@ export function budgetLimitsOf(s: AppSettings) {
   };
 }
 
+/**
+ * §38.2 `settings.maxTurns`: the number (10–1000, else 200) while the tool-call limit is on, else 0 — no limit (the
+ * default; a file from before the switch has no `maxTurnsLimit`, and its stored 200 was only the old default).
+ */
+export function maxTurnsOf(s: Pick<AppSettings, "maxTurnsLimit" | "maxTurns">): number {
+  if (s.maxTurnsLimit !== true) return 0;
+  return typeof s.maxTurns === "number" && Number.isFinite(s.maxTurns) ? Math.min(1000, Math.max(10, Math.round(s.maxTurns))) : 200;
+}
+
 /** `settings.budget`: the limits while the change limit is on, else none — 0 / 0, the engine counts nothing (§54). */
 export function budgetOf(s: AppSettings) {
   return s.budgetEnabled === true ? budgetLimitsOf(s) : { maxFiles: 0, maxLines: 0 };
@@ -262,8 +272,8 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     ...(isPeerInboundMode(s.peerInbound) ? { peerInbound: s.peerInbound } : {}),
     // MARK: wave3 check-clients — §34.9 the user's test commands (live; [] clears them)
     testCommandPatterns: testCommandPatternsOf(typeof s.testCommandPatterns === "string" ? s.testCommandPatterns : ""),
-    // MARK: wave4 w4-longwork — §38.2 the tool-call limit (next session start; older engines keep 60)
-    maxTurns: typeof s.maxTurns === "number" && Number.isFinite(s.maxTurns) ? Math.min(1000, Math.max(10, Math.round(s.maxTurns))) : 200,
+    // MARK: wave4 w4-longwork — §38.2 the tool-call limit (next session start): 0 — none — unless turned on
+    maxTurns: maxTurnsOf(s),
     // MARK: wave4b w4b-bigturn — §39.1 the large-file limit (live; older engines ignore it)
     largeFileMB: typeof s.largeFileMB === "number" && Number.isFinite(s.largeFileMB) ? Math.min(100_000, Math.max(1, Math.round(s.largeFileMB))) : 50,
     // MARK: wave4b w4b-side — §40.3 side questions on the web (absent / unknown: off; `sideAllowWeb` no longer turns it on)

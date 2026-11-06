@@ -2,9 +2,11 @@ import SwiftUI
 import ReviewGateCore
 
 /// Messages queued while Claude is busy, as chips above the composer: click to edit, move earlier / later, remove.
-/// A status line says when they go out — or why they stopped (an error; "Resume" restarts).
+/// A status line says when they go out — or why they stopped (an error; "Resume" restarts). §50.1: a stop that goes on by
+/// itself (the API, the usage limit) says when, with "지금 보내기".
 struct ComposerQueueBar: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var store
     let messages: [QueuedMessage]
     let stopAndSend: String?
     let pausedReason: String?
@@ -28,10 +30,21 @@ struct ComposerQueueBar: View {
                     } icon: {
                         Image(systemName: "pause.circle.fill")
                     }
-                    .foregroundStyle(.red)
-                    Button("Resume", action: onResume)
-                        .controlSize(.small)
-                        .accessibilityIdentifier("Resume queue")
+                    .foregroundStyle(store.queueResumesAt == nil ? Color.red : Color.orange)
+                    if let resumesAt = store.queueResumesAt {
+                        Text(verbatim: QueueStop.resumesText(resumesAt))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .accessibilityIdentifier("Queue resumes at")
+                        Button(QueueStop.sendNowTitle, action: onResume)
+                            .controlSize(.small)
+                            .accessibilityIdentifier("Send queue now")
+                    } else {
+                        Button("Resume", action: onResume)
+                            .controlSize(.small)
+                            .accessibilityIdentifier("Resume queue")
+                    }
                 } else if let holdReason {
                     Label(holdReason, systemImage: "hourglass").foregroundStyle(.orange).lineLimit(1)
                 } else if waitingOnAgents {

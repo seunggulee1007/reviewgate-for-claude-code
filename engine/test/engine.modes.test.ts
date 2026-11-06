@@ -1,10 +1,11 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookInput, Query } from "@anthropic-ai/claude-agent-sdk";
 import type { PermissionMode, Settings } from "../src/protocol.js";
 import { SESSION_FILE, type PersistedSession } from "../src/review/persist.js";
 import { BudgetState } from "../src/session/budget.js";
+import { ClaudeSession } from "../src/session/claude.js";
 import { buildHooks, type HookContext } from "../src/session/hooks.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -93,7 +94,7 @@ describe("permission modes (docs/M20-MODES.md)", () => {
     expect(h.engine.state.session.permissionMode).toBe("plan");
   });
 
-  it("refused while a turn is running (session_busy) and without a session (no_session)", async () => {
+  it("while a turn runs (§39.5): default / acceptEdits / auto switch at once — the turn goes on; into or out of plan mode waits (session_busy)", async () => {
     const h0 = harness();
     await h0.hello();
     await expect(h0.engine.request({ type: "set_permission_mode", mode: "auto" })).rejects.toThrow("no_session");
@@ -104,14 +105,92 @@ describe("permission modes (docs/M20-MODES.md)", () => {
     await h.open(dir);
     await h.engine.handle({ type: "send", text: "do it" });
     await h.waitFor((s) => s.gate.phase === "running", "turn running");
-    await expect(h.engine.request({ type: "set_permission_mode", mode: "auto" })).rejects.toThrow("session_busy");
-    expect(h.session().permissionModes).toEqual([]);
-    expect(h.engine.state.session.permissionMode).toBe("default");
+    await h.engine.request({ type: "set_permission_mode", mode: "auto" });
+    expect(h.session().permissionModes).toEqual(["auto"]);
+    expect(h.engine.state.session.permissionMode).toBe("auto");
+    expect(h.engine.state.gate.phase).toBe("running");
+    await waitForSessionFile(dir, (o) => o.permissionMode === "auto", "persisted mode");
+    await h.engine.request({ type: "set_permission_mode", mode: "acceptEdits" });
+    await expect(h.engine.request({ type: "set_permission_mode", mode: "plan" })).rejects.toThrow("session_busy");
+    expect(h.session().permissionModes).toEqual(["auto", "acceptEdits"]);
+    expect(h.engine.state.session.permissionMode).toBe("acceptEdits");
 
     h.session().emitTurnEnd();
     await h.waitFor((s) => s.gate.phase !== "running" && s.gate.phase !== "collecting", "turn collected");
+    await h.engine.request({ type: "set_permission_mode", mode: "plan" });
+    await h.engine.handle({ type: "send", text: "plan it" });
+    await h.waitFor((s) => s.gate.phase === "running", "plan turn running");
+    // Out of plan mode while its turn runs waits for the turn's end as well.
+    await expect(h.engine.request({ type: "set_permission_mode", mode: "auto" })).rejects.toThrow("session_busy");
+    expect(h.session().permissionModes).toEqual(["auto", "acceptEdits", "plan"]);
+    expect(h.engine.state.session.permissionMode).toBe("plan");
+  });
+
+  it("refused (session_busy) while the turn's changes are collected or reverted, whatever the mode", async () => {
+    const dir = track(makeRepo());
+    const h = harness();
+    await h.hello();
+    await h.open(dir);
+    const gate = (h.engine as unknown as { gate: { collecting: boolean; reverting: boolean } }).gate;
+    gate.collecting = true;
+    await expect(h.engine.request({ type: "set_permission_mode", mode: "auto" })).rejects.toThrow("session_busy");
+    gate.collecting = false;
+    gate.reverting = true;
+    await expect(h.engine.request({ type: "set_permission_mode", mode: "auto" })).rejects.toThrow("session_busy");
+    gate.reverting = false;
+    expect(h.session().permissionModes).toEqual([]);
     await h.engine.request({ type: "set_permission_mode", mode: "auto" });
     expect(h.session().permissionModes).toEqual(["auto"]);
+  });
+
+  it("a switch during a turn reaches the live session's hooks: the next Bash call after 'auto' gets no card of ours (§39.5)", async () => {
+    const queryFn = (): Query => {
+      let done: () => void = () => {};
+      const ended = new Promise<void>((r) => (done = r));
+      return {
+        async next() {
+          await ended;
+          return { done: true, value: undefined };
+        },
+        async return() {
+          done();
+          return { done: true, value: undefined };
+        },
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+        initializationResult: () => new Promise(() => {}),
+        setPermissionMode: async () => undefined,
+      } as unknown as Query;
+    };
+    const dir = track(makeRepo());
+    const s = new ClaudeSession({
+      cwd: dir,
+      settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", permissionMode: "default" },
+      claudePath: "/nonexistent/claude",
+      env: {},
+      platform: { killTree: async () => undefined, isWindows: false },
+      emit: () => undefined,
+      log: () => {},
+      queryFn: queryFn as never,
+    });
+    try {
+      await s.start();
+      (s as unknown as { setTurnActive(a: boolean): void }).setTurnActive(true);
+      const ctx = (s as unknown as { hookCtx: HookContext }).hookCtx;
+      const preBash = buildHooks(ctx).PreToolUse![1]!.hooks[0]!;
+      const opts = { signal: new AbortController().signal };
+      const call = (cliMode: string): HookInput =>
+        ({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "npm run build" }, session_id: "s", transcript_path: "", cwd: dir, tool_use_id: "t1", permission_mode: cliMode }) as unknown as HookInput;
+      const decision = (out: unknown): string | undefined =>
+        (out as { hookSpecificOutput?: { permissionDecision?: string } }).hookSpecificOutput?.permissionDecision;
+      expect(decision(await preBash(call("default"), "t1", opts))).toBe("ask");
+      await s.setPermissionMode("auto");
+      expect(ctx.permissionMode).toBe("auto");
+      expect(decision(await preBash(call("auto"), "t2", opts))).toBeUndefined();
+    } finally {
+      await s.dispose().catch(() => undefined);
+    }
   });
 
   it("the mode is persisted in the session file and restored (plan as-is) by another engine on open_project", async () => {

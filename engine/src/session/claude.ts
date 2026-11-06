@@ -55,7 +55,7 @@ import { toolLabel } from "./toolLabel.js"; // MARK: wave4b w4b-agents
 import { StallWatchdog } from "./startWatch.js";
 import type { StartProgress } from "./events.js";
 // MARK: wave4 w4-longwork
-import { clampMaxTurns, hookFailureNotice, hookTerminalNotice, informationalNotice, maxTurnsNotice, rateLimitWindowsOf, type LongWorkNotice } from "./longWork.js";
+import { clampMaxTurns, hookFailureNotice, hookTerminalNotice, informationalNotice, maxTurnsNotice, maxTurnsOption, rateLimitWindowsOf, type LongWorkNotice } from "./longWork.js";
 // MARK: wave4b w4b-auto
 import { autoModeDeniedNotice, autoModeRefusal, autoModeUnavailableNotice, type AutoModeNotice } from "./autoMode.js";
 // MARK: wave4d w4d-agents2 — §42.4
@@ -112,7 +112,7 @@ export type SessionSettings = {
   /** MARK: wave3 engine-session — §36.6: `settingSources` + "local" (`.claude/settings.local.json`, local-scope MCP servers). */
   loadLocalSettings?: boolean;
   // MARK: wave4 w4-longwork
-  /** §38.2: the CLI's `maxTurns` (round trips of one message; clamped to 10–1000, default 200). */
+  /** §38.2: the CLI's `maxTurns` (round trips of one message; 0 / unset = no limit, the default; else clamped to 10–1000). */
   maxTurns?: number;
   /** §52: background tasks on (default) and turns Claude starts itself taken as review turns; false: the §18 behavior. */
   backgroundWork?: boolean;
@@ -530,7 +530,7 @@ export class ClaudeSession implements ClaudeSessionLike {
         // §34.8: a subagent's text (and thinking) blocks arrive as assistant messages with parent_tool_use_id — the
         // rationale of its own calls and its report; without it only its tool_use / tool_result blocks do. Never streamed.
         forwardSubagentText: true,
-        maxTurns: clampMaxTurns(s.maxTurns), // MARK: wave4 w4-longwork — §38.2 (was a fixed 60)
+        ...maxTurnsOption(s.maxTurns), // MARK: wave4 w4-longwork — §38.2 (was a fixed 60; none — no cap — unless the user sets one)
         // MARK: wave4 w4-longwork — §38.2: every hook's started / response, so a failing hook reaches the chat (SessionStart's come anyway).
         includeHookEvents: true,
         hooks: buildHooks(this.hookCtx),
@@ -870,9 +870,9 @@ export class ClaudeSession implements ClaudeSessionLike {
    * Only the way into plan mode is followed: leaving it stays the user's (plan approval, the mode menu) — an engine that
    * kept plan mode where the CLI left it only denies more — and auto ↔ default is the CLI's fallback for a model without
    * auto mode (§39.5: the notice; the user's mode stays). Only while a turn of ours runs: Claude can call EnterPlanMode only
-   * then (outside one the unprompted-turn guard denies it), and the engine switches modes only between turns — so a late
-   * report of the engine's own switch is never taken for Claude's (a conversation resumed in plan mode says so at the next
-   * turn's init).
+   * then (outside one the unprompted-turn guard denies it), and the engine switches into plan mode only between turns (a
+   * switch during a turn is among default / acceptEdits / auto, §39.5) — so a late report of the engine's own switch is
+   * never taken for Claude's (a conversation resumed in plan mode says so at the next turn's init).
    */
   private followCliMode(reported: unknown): void {
     if (reported !== "plan" || this.modeSwitching || this.disposing || !this.turnActive) return;

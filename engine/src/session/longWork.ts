@@ -10,15 +10,25 @@ import type { Budget, RateLimitWindow } from "../protocol.js";
 import { firstLineOf, isoFromEpoch } from "./apiErrors.js";
 import { redactDetail } from "./cliRecords.js";
 
-/** The CLI's `maxTurns` when the settings carry none: model round trips (≈ tool calls) of one message. */
-export const DEFAULT_MAX_TURNS = 200;
+/**
+ * The limit on model round trips (≈ tool calls) of one message when the settings carry none: 0 = no limit — a message runs
+ * until Claude is done or the user stops it, as in the terminal (the interactive CLI has no cap; `--max-turns` is a
+ * `--print` flag).
+ */
+export const DEFAULT_MAX_TURNS = 0;
 export const MIN_MAX_TURNS = 10;
 export const MAX_MAX_TURNS = 1000;
 
-/** `settings.maxTurns` → the limit a session starts with: a whole number in [10, 1000]; anything else → 200. */
+/** `settings.maxTurns` → the limit a session starts with: 0 (no limit) when unset, 0 or not a positive number; else a whole number in [10, 1000]. */
 export function clampMaxTurns(v: unknown): number {
-  if (typeof v !== "number" || !Number.isFinite(v)) return DEFAULT_MAX_TURNS;
+  if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return DEFAULT_MAX_TURNS;
   return Math.min(MAX_MAX_TURNS, Math.max(MIN_MAX_TURNS, Math.round(v)));
+}
+
+/** The query option for `settings.maxTurns`: `{maxTurns: N}` for a limit, `{}` for none (the CLI then has no cap). */
+export function maxTurnsOption(v: unknown): { maxTurns?: number } {
+  const n = clampMaxTurns(v);
+  return n > 0 ? { maxTurns: n } : {};
 }
 
 /** The `error` codes of §38.2: notices (no `state.lastError`, never a stopped queue). */
@@ -38,8 +48,9 @@ export type LongWorkNotice = {
   exitCode?: number | null;
 };
 
-/** `result{subtype: "error_max_turns"}`: Claude stopped at the limit before it finished. */
+/** `result{subtype: "error_max_turns"}`: Claude stopped at the limit before it finished (no number when none was set). */
 export function maxTurnsNotice(limit: number): LongWorkNotice {
+  if (!(limit > 0)) return { code: "max_turns", message: 'Claude stopped at the tool-call limit before it finished; send "continue" to go on.' };
   return { code: "max_turns", message: `Claude stopped at the tool-call limit (${limit} calls) before it finished; send "continue" to go on.`, maxTurns: limit };
 }
 

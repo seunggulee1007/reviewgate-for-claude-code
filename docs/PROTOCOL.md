@@ -754,7 +754,8 @@ docs/M20-MODES.md, engine part. Additive: one optional setting, one command, one
   changes through `set_permission_mode`.
 - **`set_permission_mode { mode }`** calls `query.setPermissionMode(mode)` on the running session, mirrors it into
   `state.session.permissionMode` and persists it. It is refused with `no_session` when no session is open and with
-  `session_busy` while a turn, a session start, a collection or a revert is in flight.
+  `session_busy` while a session start, a collection or a revert is in flight — and while a turn runs only for a switch into
+  or out of `plan`: default / acceptEdits / auto switch during a turn too, from the CLI's next tool call (§39.5).
 - **Persistence.** The mode is stored in `<gitdir>/reviewgate-session.json` (`permissionMode`, next to `sessionId`/`openTabIds`)
   and restored by `open_project` **as-is, `plan` included** — a project parked in plan mode reopens in plan mode. A missing or
   unknown value falls back to the mode the repository's other worktrees ran in last — the most recently saved
@@ -3427,10 +3428,14 @@ Hand PR comments to Claude, ask about a PR hunk, open a PR as a workbench.
   `refs/reviewgate/pr-fetch/<n>` (deleted once the worktree exists), so a concurrent fetch in the user's terminal cannot
   swap `FETCH_HEAD` under it. A `fromPr.number` that is not a positive integer is refused `invalid_pr_number`.
 - *Engine notes (`send`):* a message whose first word is one of the session's slash commands or skills
-  (`capabilities.slashCommands` / `skills`, e.g. the `prRespondCommand` draft or `/code-review low` for §36.13) goes out
-  as that command, like `/compact` (§27): the "[Review gate] …" summary prefix waits for the next real message (a
-  prefixed text no longer starts with `/`, so the CLI never ran the command) and the text is not the commit sheet's
-  suggestion source. Text that only starts with `/` (a path) is sent as before.
+  (`capabilities.slashCommands` / `skills`, e.g. the `prRespondCommand` draft or `/code-review low` for §36.13) — or a
+  name or alias of `capabilities.commands` (a plugin skill typed by its short name: `/review-respond 12` for
+  `acme-plugin:review-respond`, whose `aliases` hold `review-respond`) — goes out as that command, like `/compact` (§27):
+  the "[Review gate] …" summary prefix waits for the next real message (a prefixed text no longer starts with `/`, so the
+  CLI never ran the command: a `disable-model-invocation` skill failed outright, the others ran sideways through the Skill
+  tool) and the text is not the commit sheet's suggestion source. While no list is known yet — a fresh worktree whose CLI
+  has not answered initialize, no cache — any `/word` counts as a command (the summary waits a message rather than break
+  one). Text that only starts with `/` (a path: a second `/` in its first word) is sent as before.
 
 ## 37. 0.2.3 engine follow-ups
 
@@ -3603,11 +3608,18 @@ robustness-08, SME-10 in part, daily-18). Every field is optional; an older engi
 as before.
 
 - **Tool-call limit.** `settings.maxTurns` (new, optional): the CLI's `maxTurns` — model round trips of one message (≈ tool
-  calls). A whole number in 10–1000, default **200** (was a fixed 60); it applies at the next session start (`--max-turns`
-  is a flag of the CLI process). A turn that stops there (`result.subtype: "error_max_turns"`) sends the notice
-  `error{fatal: false, scope: "session", code: "max_turns", maxTurns: N}` before its `turn_end` (whose `stopReason` stays
-  `error_max_turns`). The clients' row "도구 호출 한도(N회)에 닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the
-  same chat by the composer's queue rules (the limit counts per message: the CLI starts counting again).
+  calls). **No limit by default** (absent or `0`: the session passes no `maxTurns`, so a long skill or migration runs until
+  Claude is done or the user stops it, as in the terminal, whose interactive CLI has no cap — `--max-turns` is a `--print`
+  flag); a limit the user sets is a whole number in 10–1000 (0.5.x defaulted to 200, earlier engines to a fixed 60). It
+  applies at the next session start (`--max-turns` is a flag of the CLI process). A turn that stops at a limit
+  (`result.subtype: "error_max_turns"`) sends the notice `error{fatal: false, scope: "session", code: "max_turns",
+  maxTurns: N}` before its `turn_end` (whose `stopReason` stays `error_max_turns`). The clients' row "도구 호출 한도(N회)에
+  닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the same chat by the composer's queue rules (the limit counts
+  per message: the CLI starts counting again). Settings › 제한 has "메시지당 도구 호출 수 제한하기", off by default — the
+  clients send `maxTurns: 0` until it is turned on (Mac `maxTurnsLimit`, Electron `settings.maxTurnsLimit`); the number
+  (10–1000, 200 until changed) stays stored for then, its stepper greyed out while off, the note "끔(기본): 제한 없음 —
+  Claude가 터미널에서처럼 메시지 하나를 끝날 때까지 이어서 하고, 언제든 [중지]로 멈출 수 있어요". A number stored before
+  the switch (Electron's file kept the old default 200) limits nothing until the limit is turned on.
 - **Hooks and CLI words.** The session sets `includeHookEvents: true`. These become notices
   (`error{fatal: false, scope: "session"}`, a transcript row like every notice, §30; never `state.lastError`, never a
   stopped queue; repeats merge on `code` + `detail`, ×N):
@@ -4124,10 +4136,19 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   `code: "auto_mode_unavailable", detail: "<the CLI's mode>"` ("이 모델에서는 자동 모드를 쓸 수 없어서(또는 꺼져 있어서) 명령마다
   물어봐요", gray). `set_permission_mode {mode: "auto"}` that the CLI rejects for the model is refused with the new refusal
   code `auto_mode_unavailable` (the mode stays; the clients put the previous mode back and say why).
+- **A mode picked while Claude works.** `set_permission_mode` during a turn switches among `default` / `acceptEdits` /
+  `auto` at once: the CLI applies it from its next tool call, as Shift+Tab does in the terminal, the hooks follow
+  (`HookContext.permissionMode`) and the mode is stored as between turns. Cards already open stay the user's. Refused
+  `session_busy`: a switch into or out of `plan` while a turn runs (plan mode changes what the turn may do and how its plan
+  is proposed), and any switch while a session starts or a turn's changes are collected / reverted. Nothing of the review
+  depends on it: files are collected at the turn's end in every mode, and the git card (§40.1, §46) is the same in every
+  mode.
 - **Clients.** The mode help of 자동: "명령은 Claude Code의 자동 판단으로 실행돼요. 파일 변경은 그대로 리뷰돼요." The HUD's mode
-  chip is the mode menu (one click picks a mode). A pick while a turn runs (`set_permission_mode` is refused `session_busy`
-  then) waits and is sent when the turn ends — the picker shows "기본 → 자동", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면
-  모드가 바뀌어요"; another project or a closed session drops it. Settings › Permissions has "시작 모드" (the mode a project
+  chip is the mode menu (one click picks a mode). While Claude works a pick of 기본 / 편집 바로 허용 / 자동 goes out at once
+  (above) — the menu's last line says "Claude가 작업 중이에요 — 고른 모드는 다음 단계부터 적용돼요 (계획 모드는 이번 턴이
+  끝나면)"; a pick the engine would refuse then (into or out of 계획, a collection) — or did refuse `session_busy` — waits and
+  is sent when the turn ends: the picker shows "기본 → 계획", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면 모드가
+  바뀌어요"; another project or a closed session drops it. Settings › Permissions has "시작 모드" (the mode a project
   opened for the first time starts in, auto included; a pick in a project stays that project's: Mac
   `AppSettings.startPermissionMode` — unset, the last mode used anywhere as before —, Electron `settings.permissionMode`; a
   worktree of a repository whose other worktrees ran in ReviewGate starts as they ran last, before either, §11). The
@@ -4139,7 +4160,10 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   (§46, r1-git: the `git_command` card, in every mode; a plain push is the classifier's), a `cd` / `git -C` outside the project still gets its reason card, and judging the rest is the classifier's, as
   in the terminal; an `autoMode.soft_deny` rule against `mvn` gave `permission_denied{decision_reason: "[Security Weaken]"}` and no
   `can_use_tool`; `claude-haiku-4-5` and auto mode turned off by settings started in `default` with a `can_use_tool` per
-  command; `setPermissionMode("auto")` between turns took effect on the next turn.
+  command; `setPermissionMode("auto")` between turns took effect on the next turn. During a turn (CLI 2.1.318, sonnet,
+  `sidecar/test/driver-modeswitch.mjs`): a default-mode chat asked for three commands that write files; the first one's card
+  was allowed and `set_permission_mode auto` went out while it ran — the other two ran with no `can_use_tool` and no
+  `auto_mode_denied`, and all three files were in the turn's review.
 - Compatibility: an older engine keeps the cards in auto mode and sends none of the codes; an older client shows the notices
   with their English `message` and the refusal as a generic one.
 - Owner: w4b-auto (engine `session/autoMode.ts`, `session/hooks.ts` `askOrAllow`, `session/claude.ts`; Mac `AutoMode.swift`,
@@ -5617,8 +5641,8 @@ changed default.
   followed: leaving it stays the user's (plan approval, the mode menu) — an engine that kept plan mode where the CLI left it
   only denies more — and `auto` ↔ `default` stays §39.5's fallback (the notice, the user's mode). And only while a turn of
   ours runs: Claude can call EnterPlanMode only then (outside one the unprompted-turn guard, §18, denies it) and the engine
-  switches modes only between turns, so a report of the engine's own switch (`set_permission_mode`, plan approval) — even a
-  late one — is never taken for Claude's; a conversation resumed in plan mode says so at the next turn's init. From then on everything of §11 /
+  switches into plan mode only between turns (a switch during a turn is among default / acceptEdits / auto, §39.5), so a
+  report of the engine's own switch (`set_permission_mode`, plan approval) — even a late one — is never taken for Claude's; a conversation resumed in plan mode says so at the next turn's init. From then on everything of §11 /
   §19.4 holds: no edits but the plan file under `~/.claude/plans/` (allowed, kept out of the review and the budget),
   read-only commands only, ExitPlanMode → `plan_proposed` → the card; `state.session.permissionMode` is `"plan"` (the chip
   and the mode line say 계획) and `prePlanMode` the mode before. A turn's init in plan mode no longer raises
@@ -5658,7 +5682,8 @@ changed default.
 - **⇧⇥ / Shift+Tab** in the message box cycles the mode as the terminal does: 기본 → 편집 바로 허용 → 계획 → 자동 → 기본, through
   `set_permission_mode` (plan mode included, as the mode menu). Auto is skipped once the engine said it cannot run here —
   the `auto_mode_unavailable` notice or refusal — until another project, another model (`selectedModel`) or auto taken after
-  all; while Claude works a pick waits for the turn's end (§39.5) and the next ⇧⇥ goes on from it, and a ⇧⇥ pressed again
+  all; while Claude works a pick goes out at once unless plan mode is involved (§39.5) — that one waits for the turn's end
+  and the next ⇧⇥ goes on from it (기본 → 편집 바로 허용 now → 계획 waiting → 자동 now) —, and a ⇧⇥ pressed again
   before the engine's state came back goes on from the mode on its way (Mac: shown at once; Electron
   `requestedPermissionMode`), so the same mode is never sent twice. Only the message box
   takes the key: everywhere else Shift+Tab still moves the focus back (Mac `ComposerKey.backtab` from `insertBacktab:`,
@@ -6436,6 +6461,34 @@ feature flag of its own, and on this machine both folded alike.
 - Owner: steer (engine `session/claude.ts` `steerUser`, `engine.ts` `steer`, `protocol.ts`; Core
   `Session/AppState+Task.swift`, `Engine/EngineProtocol.swift`; App `UI/Chat/ChatComposer.swift`;
   `sidecar/test/driver-steer.mjs`).
+
+### 50.1 The queue keeps going
+
+Messages queued while Claude works used to stop at almost any error — a failing PR list, a refresh, a commit, a file list:
+"대기열 중지됨" and nothing ran until [재개], so coming back after a break nothing had happened. Client rules (Mac and
+Electron the same); nothing changes on the wire, and a queued message passes the same gate as ever when it goes out.
+
+- **What stops it.** Only an `error` about the queued message's own send or its session: `send_failed` / `lfs_missing`
+  (the message goes back to the front, §35.1), `session_crashed`, `session_start_failed`, `session_id_in_use`,
+  `cli_not_found` / `cli_not_executable`, `extensions_init_timeout`, `auth_required`, and any fatal error. It waits for
+  [재개] as before. Everything else — `command_failed` (a PR list, a commit draft, a side question …), `refresh_failed`,
+  `commit_failed`, `branch_failed`, `workbench_failed`, `revert_failed`, `mcp_failed`, `plan_followup_failed`, an error
+  without a code — shows its banner and the queue goes on (a failed collection closes the gate by itself; a plan or a
+  card waiting holds the queue as before). Notices never stopped it (§2.9, §30, §38.2, §39.5).
+- **The API.** `api_error` / `rate_limited` (after the CLI's own retries) stop it for a while: it goes on by itself after
+  30 s, then after 2 min while the API keeps failing; a turn the queue went on after starts over at 30 s. The queue bar
+  says "대기열 중지됨: <이유> · 14:03에 다시 보내요" with [지금 보내기] (sends now).
+- **The usage limit.** `usage_limit` stops it until a minute after its `resetAt` (§38.2's "풀리면 이어서 하기" delay); without
+  `resetAt` it waits for [재개].
+- **The tool-call limit.** A turn that stopped at the limit (§38.2) does not stop the queue (Electron stopped it at
+  `stopReason: "error_max_turns"`).
+- **Stop.** After the user's Stop the Mac's queue goes on as before; Electron's keeps its pause, now worded "멈춤 — 다음 메시지
+  대기 중" with [보내기] (sends the next one), and still pauses after a turn that ended with another error (`stopReason`
+  `error_…`, "턴이 오류로 끝났습니다"). A pause already set in the turn (an error above) keeps its reason and time.
+- Code: Core `QueueStop` (`Session/SessionNotices.swift`), `AppState+QueueStop.swift`, `AppState.swift` `handleError` /
+  `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`; Electron `sessionErrors.ts` `queueStopOf`, `sendQueue.ts`
+  (`resumeAt`, `retries`, `afterStop`), the queue part of `store.ts`, `components/chat/QueueBar.tsx`. Tests: Core
+  `QueueStopTests`; Electron `queueStopStore.test.ts`, `sessionErrors.test.ts`.
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 

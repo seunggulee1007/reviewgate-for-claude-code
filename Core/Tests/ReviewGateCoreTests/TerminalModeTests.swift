@@ -40,14 +40,20 @@ import Testing
         for _ in 0..<4 { store.cyclePermissionMode() }
         #expect(sent == [.setPermissionMode(mode: .acceptEdits), .setPermissionMode(mode: .plan), .setPermissionMode(mode: .auto),
                          .setPermissionMode(mode: .default)])
-        // While Claude works the pick waits for the turn's end, and the next ⇧⇥ goes on from it.
+        // While Claude works a pick goes out at once (§39.5) — but plan mode waits for the turn's end, and the next ⇧⇥ goes
+        // on from it.
         sent = []
         store.handle(.state(snapshot(seq: 2, phase: .running)))
         store.cyclePermissionMode()
+        #expect(sent == [.setPermissionMode(mode: .acceptEdits)])
         store.cyclePermissionMode()
-        #expect(sent.isEmpty)
+        #expect(sent == [.setPermissionMode(mode: .acceptEdits)])
         #expect(store.scheduledPermissionMode == .plan)
-        #expect(store.composerModeLine.text == "Default mode · From the next turn: Plan (shift+tab to switch)")
+        #expect(store.composerModeLine.text == "⏵⏵ Accept edits mode · From the next turn: Plan (shift+tab to switch)")
+        store.cyclePermissionMode()
+        #expect(sent == [.setPermissionMode(mode: .acceptEdits), .setPermissionMode(mode: .auto)])
+        #expect(store.scheduledPermissionMode == nil)
+        #expect(store.permissionMode == .auto)
     }
 
     @Test func autoIsSkippedWhereTheCLICannotRunIt() {

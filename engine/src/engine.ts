@@ -1492,16 +1492,19 @@ export class ReviewEngine {
 
   /**
    * `set_permission_mode` (docs/M20-MODES.md): switches the live session's mode and persists it per
-   * project. Refused while a turn / start / collection is in flight; our PreToolUse rules (the budget
-   * deny, the git card of §46) run before mode evaluation, so they still apply in every mode.
+   * project. Refused (`session_busy`) while a session starts or a turn's changes are collected / reverted. While a turn
+   * runs (§39.5) a switch among default / acceptEdits / auto goes to the CLI at once and applies from its next tool call,
+   * as Shift+Tab in the terminal (cards already open stay the user's); one into or out of plan mode waits for the turn's
+   * end (`session_busy`). Files are collected at the turn's end in every mode, and our PreToolUse rules (the budget deny,
+   * the git card of §46) run before mode evaluation, so they still apply in every mode.
    */
   private async setPermissionMode(mode: PermissionMode): Promise<void> {
     if (!isPermissionMode(mode)) throw new CommandRefused("invalid_mode");
     const session = this.session;
     if (!session) throw new CommandRefused("no_session");
-    if (this.sessionState.starting || this.gate.running || this.gate.collecting || this.gate.reverting || session.isTurnActive) {
-      throw new CommandRefused("session_busy");
-    }
+    if (this.sessionState.starting || this.gate.collecting || this.gate.reverting) throw new CommandRefused("session_busy");
+    const turnRuns = this.gate.running || session.isTurnActive;
+    if (turnRuns && (mode === "plan" || this.sessionState.permissionMode === "plan")) throw new CommandRefused("session_busy");
     const before = this.sessionState.permissionMode;
     await session.setPermissionMode(mode);
     // MARK: wave6 w6-terminal — §44.1: into plan mode the mode before it is kept (approving the plan can go back to it).
@@ -4983,13 +4986,20 @@ export class ReviewEngine {
 
   /**
    * The text starts with one of the session's slash commands or skills (`/code-review low`, the client's
-   * `prRespondCommand`): `send` then keeps the review-summary prefix for the next real message — a prefixed text no longer
-   * starts with "/" and the CLI would never run the command. A path like `/Users/x` is no command.
+   * `prRespondCommand`) — by its full name or by an alias the CLI lists for it (`capabilities.commands[].aliases`: a plugin
+   * skill typed by its short name, `/review-respond 12` for `acme-plugin:review-respond`): `send` then keeps the
+   * review-summary prefix for the next real message — a prefixed text no longer starts with "/" and the CLI would never
+   * run the command. While no list is known yet (a fresh worktree before the CLI answered, no cache) any `/word` counts:
+   * the summary waits a message rather than break a command. A path like `/Users/x` is no command.
    */
   private isSessionSlashCommand(text: unknown): boolean {
     const m = typeof text === "string" ? /^\/([^\s/]+)(?:\s|$)/.exec(text.trim()) : null;
+    if (!m) return false;
+    const word = m[1]!;
     const caps = this.sessionState.capabilities ?? this.cachedCapabilities;
-    return !!m && !!caps && (caps.slashCommands.includes(m[1]!) || caps.skills.includes(m[1]!));
+    const commands = caps?.commands ?? [];
+    if (!caps || (caps.slashCommands.length === 0 && caps.skills.length === 0 && commands.length === 0)) return true;
+    return caps.slashCommands.includes(word) || caps.skills.includes(word) || commands.some((c) => c.name === word || (c.aliases ?? []).includes(word));
   }
 
   /** A ReportFindings `file` as the review names it: repo-relative (`./x`, `x\\y` normalized), an outside path as given. */
