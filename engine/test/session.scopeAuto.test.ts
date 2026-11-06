@@ -245,3 +245,49 @@ describe("§33.4: what a command changed in another worktree or a nested reposit
     expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "n1", path: lib, files: ["lib.txt"], reasonCode: "nested_repository" }]);
   });
 });
+
+describe("§39.5: in auto mode a command in another worktree or a nested repository is the CLI's call", () => {
+  const auto = { permission_mode: "auto" };
+
+  it("no card and no reason: the hook leaves it to the CLI; the row after it lists what changed there", async () => {
+    const { root, sibling, lib } = repoWithSibling();
+    const c = ctx(root, { permissionMode: "auto" });
+    const build = `cd ../${basename(sibling)} && ./mvnw -q compile`;
+    expect(await preBash(c, build, root, "a1", auto)).toEqual({});
+    expect(c.scopeReasons?.has("a1") ?? false).toBe(false);
+    write(sibling, "target/x.class", "x"); // what the command did
+    await postBash(c, build, root, "a1", auto);
+    expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "a1", path: sibling, files: ["target/x.class"], reasonCode: "other_worktree" }]);
+    // A nested repository too.
+    expect(await preBash(c, "cd vendor/lib && make", root, "a2", auto)).toEqual({});
+    await postBash(c, "cd vendor/lib && make", root, "a2", auto);
+    expect(c.notices).toHaveLength(1); // nothing changed in vendor/lib
+    expect(lib).toBeTruthy();
+  });
+
+  it("the same command keeps its card in default mode, and in auto mode when the CLI runs another mode", async () => {
+    const { root, sibling } = repoWithSibling();
+    const build = `cd ${sibling} && ./mvnw -q compile`;
+    const def = ctx(root);
+    expect(await preBash(def, build, root, "d1", { permission_mode: "default" })).toMatchObject({ decision: "ask" });
+    expect(def.scopeReasons?.get("d1")).toMatchObject({ code: "other_worktree", path: sibling });
+    const cliDefault = ctx(root, { permissionMode: "auto" });
+    expect(await preBash(cliDefault, build, root, "d2", { permission_mode: "default" })).toMatchObject({ decision: "ask" });
+    expect(cliDefault.scopeReasons?.get("d2")?.code).toBe("other_worktree");
+  });
+
+  it("the checks after the scope still apply: a git command that changes the repository and a settings file keep their card", async () => {
+    const { root, sibling } = repoWithSibling();
+    const c = ctx(root, { permissionMode: "auto" });
+    const reset = `cd ${sibling} && git reset --hard`;
+    expect(await preBash(c, reset, root, "g1", auto)).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("g1")?.code).toBe("git_command");
+    await postBash(c, reset, root, "g1", auto); // approved; it ran and left that worktree as it was: no row
+    expect(c.scopeReasons?.has("g1")).toBe(false);
+    expect(c.notices).toEqual([]);
+    mkdirSync(join(sibling, ".claude"), { recursive: true });
+    const config = `cd ${sibling} && echo '{}' > .claude/settings.json`;
+    expect(await preBash(c, config, root, "c1", auto)).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("c1")?.code).toBe("claude_config");
+  });
+});

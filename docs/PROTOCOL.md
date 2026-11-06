@@ -2104,8 +2104,15 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   gets `nested_repository` / `other_worktree` with that path. "Runs in" uses the CLI's current directory from the hook
   input (the Bash shell's directory after an earlier `cd`). These never ride on `bashAllowPatterns`, a remembered key or
   the user's rules; a read-only command (§10, §19.3: a `cd` / `git -C` into a worktree of this repository included) still
-  runs without a card. After an approved one ran:
-  `worktree_outside_review`. The worktree list is re-read after any command mentioning `worktree`.
+  runs without a card. After one ran:
+  `worktree_outside_review` (for a command in another worktree or a nested repository: only when it changed something
+  there, with `files`, below). The worktree list is re-read after any command mentioning `worktree`.
+  **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) a command in another
+  worktree of the repository or in a nested repository gets **no card**: the hook reads those folders' state for the
+  after-notice and goes on to the settings-file (§33.9) and git (§46) checks — a command there that changes Claude Code's
+  settings or the repository keeps that card — and then leaves it to the CLI's own rules and classifier, as in the terminal.
+  Those files were never in this window's review; the row after the call lists what changed, and that worktree's own window
+  reviews it.
 - **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?, files?}` with an English `message`:
   `worktree_blocked` (a deny above: `toolName` = `EnterWorktree` / `Workflow` / `Agent` / `Task`, `branch` = EnterWorktree's
   `name`, `path` = its `path`; at most once per turn per tool, path and branch; it sets `state.lastError` like any error) and
@@ -2124,10 +2131,9 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   `workbench_create {branch}` for a blocked EnterWorktree (prefilled with `branch`), and `worktree_outside_review` with
   the same action — open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
 - **System instruction.** The engine appends its own paragraph after `settings.systemPromptAppend` (separated by a blank
-  line): *"ReviewGate reviews every change you make in this folder (<cwd>). Work only inside it: do not create or enter git
-  worktrees (EnterWorktree, `git worktree add`) and do not `cd` into another worktree or a nested repository to change files
-  there. …"* plus whether isolation is blocked or allowed, and *"If parallel work on another branch is needed, say so: the
-  user opens a separate ReviewGate workbench for it."*
+  line): *"ReviewGate reviews every change you make in this folder (<cwd>). …"* — the current wording is in §39.4 — plus
+  whether isolation is blocked or allowed, and *"If parallel work on another branch is needed, say so: the user opens a
+  separate ReviewGate workbench for it."*
 
 ### 33.5 The user's Claude Code allow rules (audit daily-04, SME-04, market-14)
 
@@ -4029,9 +4035,10 @@ sends none of it and the engine behaves as before.
 - **System instruction (§33.4, changed).** *"ReviewGate reviews every change you make in this folder (<cwd>). Work inside
   it; never use EnterWorktree. If the task needs its own git worktree, you may create it with `git worktree add`, but tell
   the user right away in one line: changes there are not reviewed until they move this chat into that worktree (ReviewGate
-  offers it), so do not change files there before that. Do not `cd` into another worktree or a nested repository to change
-  files there."* `EnterWorktree` stays denied (it moves the whole session out of the review); the `worktree_command` card
-  stays.
+  offers it), so do not change files there before that. Commands may run in this repository's other worktrees; ReviewGate
+  lists what they changed after the call, and that worktree's own window reviews it."* (2026-11: it said *"Do not `cd`
+  into another worktree or a nested repository to change files there."* — in auto mode such a command is the CLI's call,
+  §33.4.) `EnterWorktree` stays denied (it moves the whole session out of the review); the `worktree_command` card stays.
 - **Clients** (Mac and Electron the same, same i18n keys). The `worktree_outside_review` banner leads with **[이 채팅을
   거기로 옮기기]** when `path` is in `state.workbenches.list` ([워크벤치로 열기] stays; off with a one-line reason on a
   record). While Claude works (a turn, a card / question / plan, a start) it asks "Claude가 작업 중이에요 — 멈추고 옮길까요?"
@@ -4061,7 +4068,9 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   decide. It applies only while the hook input's `permission_mode` is `auto` too (absent — an older CLI — counts as the
   engine's mode); a CLI that runs another mode keeps the cards. Unchanged in every mode, because they are decided first: the
   git guard and budget denies, `EnterWorktree`, the Workflow / isolated-agent rules (§33.4), the reason cards (§33.3:
-  `outside_project`, `nested_repository`, `other_worktree`, `worktree_command`, `worktree_isolation`, `claude_config`),
+  `outside_project`, `nested_repository`, `other_worktree`, `worktree_command`, `worktree_isolation`, `claude_config`)
+  — except, since 2026-11, a Bash command in another worktree of the repository or in a nested repository (§33.4: the
+  CLI's call, listed after it) —
   the edit budget hook and the review of every file a call changed (a Bash command that writes a project file is caught by
   the post-Bash snapshot and lands in the review, as before). `SendMessage`, `AskUserQuestion`, `EnterPlanMode` and
   `ExitPlanMode` keep their card (§44.1: EnterPlanMode no longer — it only restricts Claude). What the classifier hands to

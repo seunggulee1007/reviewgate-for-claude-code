@@ -505,6 +505,17 @@ async function guardWorktreeTools(toolName: string, toolUseId: string | undefine
   return askPre(SCOPE_ASK_REASON);
 }
 
+/**
+ * §39.5: the engine runs in auto mode and the CLI says so too (the hook input's `permission_mode`; absent — an older CLI —
+ * is the engine's word). There work outside this window's review (another worktree of the repository, a nested
+ * repository) is the CLI's call, as in the terminal, and listed after it instead of a card.
+ */
+function scopeCliDecides(ctx: HookContext, input: HookInput): boolean {
+  if (ctx.permissionMode !== "auto") return false;
+  const cli = hookPermissionMode(input);
+  return cli === undefined || cli === null || cli === "auto";
+}
+
 /** §33.4: before a command that runs in another worktree / a nested repository, the state of each of those folders. */
 async function watchOutside(ctx: HookContext, toolUseId: string | undefined, command: string, cwd: string, root: string, worktrees: readonly string[]): Promise<void> {
   if (!toolUseId) return;
@@ -777,7 +788,9 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // §31: the window opens before any card — `duration_ms` at its end leaves the wait for the user out.
     openWindow(ctx, input, command);
     // §33.4: a command that creates a worktree, or runs in / `cd`s into another worktree or a nested repository, reaches
-    // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs).
+    // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs). §39.5: in auto
+    // mode another worktree of the repository and a nested repository are the CLI's call (no card; the row after the call
+    // lists what changed there) — the settings-file and git checks below still apply, so this never returns early then.
     const root = ro.root;
     let scope = bashScopeReason(command, cwd, root, ro.sameRepoDirs);
     // §39.4: a worktree of another repository (the command `cd`s / `-C`s there) — no chat of this window can follow it.
@@ -788,8 +801,11 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (scope && !(ctx.autoAllowReadOnlyBash !== false && readOnly)) {
       // §33.4: what it changes in the other worktrees / nested repositories it runs in is listed after the call.
       if (scope.code !== "worktree_command") await watchOutside(ctx, toolUseId, command, cwd, root, ro.sameRepoDirs);
-      rememberScope(ctx, toolUseId, scope);
-      return askPre(SCOPE_ASK_REASON);
+      const cliDecides = scopeCliDecides(ctx, input) && (scope.code === "other_worktree" || scope.code === "nested_repository");
+      if (!cliDecides) {
+        rememberScope(ctx, toolUseId, scope);
+        return askPre(SCOPE_ASK_REASON);
+      }
     }
     // §33.9: so does a command naming one of Claude Code's own settings files (reading one still runs).
     const config = configScopeReason(input.tool_name, ti, cwd, root, ctx, ro);

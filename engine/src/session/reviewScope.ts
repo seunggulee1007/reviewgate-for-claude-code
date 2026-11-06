@@ -377,7 +377,8 @@ export function scopeInstruction(cwd: string, allowIsolation: boolean): string {
     `ReviewGate reviews every change you make in this folder (${cwd}). Work inside it; never use EnterWorktree. ` +
     "If the task needs its own git worktree, you may create it with `git worktree add`, but tell the user right away in one line: " +
     "changes there are not reviewed until they move this chat into that worktree (ReviewGate offers it), so do not change files " +
-    "there before that. Do not `cd` into another worktree or a nested repository to change files there. " +
+    "there before that. Commands may run in this repository's other worktrees; ReviewGate lists what they changed after " +
+    "the call, and that worktree's own window reviews it. " +
     (allowIsolation
       ? "Agents with `isolation: \"worktree\"` and the Workflow tool are allowed by the user, but their changes are outside this window's review — prefer working here. "
       : "Agents with `isolation` and the Workflow tool are not available: their changes would be outside the review, so ReviewGate blocks them. ") +
