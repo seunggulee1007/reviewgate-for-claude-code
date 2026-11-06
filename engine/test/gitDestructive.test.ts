@@ -260,6 +260,37 @@ describe("destructiveGitReason: checkout / restore over files", () => {
   });
 });
 
+describe("destructiveGitReason: calling off a merge, rebase, cherry-pick, revert or am", () => {
+  it("asks while the tree holds work — a conflict Claude resolved and left unstaged — and runs once nothing is left", async () => {
+    const root = realpathSync(makeRepo());
+    dirs.push(root);
+    const main = sh(root, "rev-parse", "--abbrev-ref", "HEAD").trim();
+    write(root, "App.java", "class App { int a; }\n");
+    sh(root, "add", "App.java");
+    sh(root, "commit", "-qm", "base");
+    sh(root, "checkout", "-q", "-b", "develop");
+    write(root, "App.java", "class App { int dev; }\n");
+    sh(root, "commit", "-qam", "develop");
+    sh(root, "checkout", "-q", main);
+    write(root, "App.java", "class App { int main; }\n");
+    sh(root, "commit", "-qam", "main");
+    expect(() => sh(root, "merge", "-q", "develop")).toThrow(); // the conflict
+    write(root, "App.java", "class App { int main; int dev; }\n"); // Claude's resolution, not added
+    const run = (command: string, reviewPaths: string[]) => destructiveGitReason(command, { cwd: root, root, reviewPaths: new Set(reviewPaths) });
+    const callOff = ["git merge --abort", "git rebase --abort", "git rebase --skip", "git cherry-pick --abort", "git cherry-pick --skip", "git revert --abort", "git revert --skip", "git am --abort", "git am --skip"];
+    for (const command of callOff) {
+      expect(await run(command, ["App.java"]), command).toMatchObject({ code: "git_command" });
+      expect(await run(command, []), command).toMatchObject({ code: "git_command" }); // unmerged and changed: work all the same
+    }
+    // Going on keeps what was done; so does a merge of its own (and `--quit`, which leaves the tree as it is).
+    for (const command of ["git merge --continue", "git rebase --continue", "git cherry-pick --quit", "git merge --quit", "git merge develop", "git merge --no-edit develop"]) {
+      expect(await run(command, ["App.java"]), command).toBeNull();
+    }
+    sh(root, "merge", "--abort");
+    for (const command of callOff) expect(await run(command, []), command).toBeNull(); // nothing to lose (untracked files stay)
+  });
+});
+
 describe("gitInvocations / shellCommands", () => {
   it("reads only commands — never the words of echo, grep or a here-document", () => {
     expect(shellCommands("echo \"git reset --hard\" >> NOTES && git status")).toEqual([["echo", "git reset --hard"], ["git", "status"]]);
@@ -357,6 +388,18 @@ describe("the PreToolUse Bash hook (§46)", () => {
       expect(decision(await preBash(command, id)), command).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
       expect(ctx.scopeReasons?.get(id)?.code).toBe("git_command");
     }
+  });
+
+  it("a remembered `Bash:git merge` never answers `git merge --abort` while the tree holds work: the reason comes first", async () => {
+    const root = repo();
+    write(root, "README.md", "a resolution in progress\n");
+    const { preBash, ctx } = hook(root, { permissionMode: "default", rememberedAllows: new Set(["Bash:git merge"]) });
+    expect(decision(await preBash("git merge develop", "m1"))).toEqual({ decision: "allow", reason: REMEMBERED_REASON });
+    expect(decision(await preBash("git merge --abort", "m2"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    expect(ctx.scopeReasons?.get("m2")?.code).toBe("git_command");
+    const auto = hook(root, { permissionMode: "auto" });
+    expect(decision(await auto.preBash("git rebase --abort", "m3", "auto"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    expect(await auto.preBash("git rebase --continue", "m4", "auto")).toEqual({});
   });
 
   it("checkout over a file under review asks; the review's paths come from the engine", async () => {

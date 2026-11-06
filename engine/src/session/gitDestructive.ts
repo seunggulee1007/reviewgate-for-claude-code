@@ -596,7 +596,9 @@ export function gitCommandCardReason(): PermissionReason {
  * else null. Always: `reset --hard|--merge`; `checkout` / `switch` with `-f` / `--force` / `--discard-changes`; `clean`
  * unless `-n` / `--dry-run`; `branch -D` / `-M` / `-C` or any forced branch change; `stash drop|clear`; `push` with
  * `--force` / `-f` / `--force-with-lease` / `--force-if-includes` / `--mirror` / `--delete` / `-d` / `--prune` or a refspec
- * starting with `+` or `:`; `worktree remove --force`. Only when its files hold work: `checkout [<tree-ish>] -- <paths>`,
+ * starting with `+` or `:`; `worktree remove --force`. Only when the working tree holds work (a file under review, an
+ * uncommitted or unmerged one): `merge --abort`, `rebase` / `cherry-pick` / `revert` / `am` `--abort` or `--skip` — the
+ * resolutions made so far go. Only when its files hold work: `checkout [<tree-ish>] -- <paths>`,
  * `checkout .`, `checkout <path>` (an existing path that is no commit), `checkout --ours|--theirs <paths>` and `restore`
  * of the working tree — when a target covers a file still under review or a file with an uncommitted change. A target only
  * the run knows (`$(git diff --name-only)`, `"$f"`, `{a,b}.txt`, what `xargs` / `find -exec` hand on) is the whole tree.
@@ -646,6 +648,14 @@ async function destroys(inv: GitInvocation, opts: DestructiveOptions, probe: Git
       return checkoutDestroys(inv, opts, probe);
     case "restore":
       return restoreDestroys(inv, opts, probe);
+    case "merge":
+    case "rebase":
+    case "cherry-pick":
+    case "revert":
+    case "am":
+      // Calling off an operation in progress: `--abort` puts the tree back where it began (`reset --merge`), `--skip` drops
+      // the step being resolved — the resolutions made so far go with them.
+      return hasLong(readOptions(args), ...(inv.verb === "merge" ? ["abort"] : ["abort", "skip"])) && targetsHoldWork(inv, [WHOLE_TREE], false, opts, probe);
     default:
       return false;
   }

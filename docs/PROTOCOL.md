@@ -6066,7 +6066,12 @@ the terminal's auto mode asked for none).
   config deletes without `-f`); `branch -D` / `-M` / `-C` or any forced branch change (`-df`, `--delete --force`,
   `branch -f x y`); `stash drop|clear`; `push` with `--force`, `-f` (also inside a cluster: `-uf`), `--force-with-lease`,
   `--force-if-includes`, `--mirror`, `--delete`, `-d`, `--prune` or a refspec starting with `+` or `:`; `worktree remove`
-  with `--force` / `-f`. Long options count by any prefix git accepts (`--har`); `--no-…` forms never. Only when the targets
+  with `--force` / `-f`. Long options count by any prefix git accepts (`--har`); `--no-…` forms never. Only when the
+  working tree holds work — a file under review, or an uncommitted or unmerged one anywhere in it (`git status -- :/`):
+  `merge --abort` (`reset --merge`) and `rebase` / `cherry-pick` / `revert` / `am` with `--abort` or `--skip` — a conflict
+  Claude resolved and left uncommitted (as the instruction below asks) goes with them; `--continue` / `--quit` keep it.
+  Before, `GIT_MUTATING_RE` gave these the card; r1-git had let them through, and a remembered `Bash:git merge` even answered
+  `git merge --abort` in the default mode — the reason is decided first, so no key does now. Only when the targets
   hold work: `checkout [<tree-ish>] -- <paths>`, `checkout .`, `checkout <x>` when `<x>` is an existing path (or a glob) and
   not a commit (`git rev-parse --verify --quiet <x>^{commit}`), `checkout --ours|--theirs|-p <paths>`, `checkout <commit>
   <paths>`, and `restore` of the working tree (no `--staged` / `-S`, or with `--worktree` / `-W`) — when a pathspec (`.`,
@@ -6181,8 +6186,9 @@ the terminal's auto mode asked for none).
   client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
   substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, paths only the
-  run knows (`$(…)`, `"$f"`, `{a,b}`, xargs, find -exec) asking with work and running without, the hook in auto
-  and default mode, a remembered `Bash:git push` against a force push), `engine/test/gitResult.test.ts` (the stash row,
+  run knows (`$(…)`, `"$f"`, `{a,b}`, xargs, find -exec) asking with work and running without, `--abort` / `--skip` over a
+  resolved conflict and after it, the hook in auto and default mode, a remembered `Bash:git push` against a force push and
+  `Bash:git merge` against `git merge --abort`), `engine/test/gitResult.test.ts` (the stash row,
   Claude's own commits, amend, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
   (real CLI 2.1.318 on sonnet in auto mode, a scratch repository with a local bare origin outside /tmp: "branch
   feature/acme-7, fix App.java, commit, push -u" asked nothing, the branch reached origin, App.java stayed pending with
