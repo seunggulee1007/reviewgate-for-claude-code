@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { PermissionReason } from "../protocol.js";
-import { HOST_FLAVOR, isInside, parseAbs, realpathLenient, relativeInside, toRepoRelative } from "../platform/paths.js";
-import { scanCommand } from "./bashClass.js";
+import type { GitWorktree } from "../git/worktrees.js";
+import { HOST_FLAVOR, isInside, parseAbs, realpathLenient, relativeInside, samePath, toRepoRelative } from "../platform/paths.js";
+import { scanCommand, type ReadOnlyContext } from "./bashClass.js";
 
 /**
  * What the review of this window can see (docs/PROTOCOL.md §33.3–33.4): the snapshot is `git add -A` of the checkpoint
@@ -45,6 +46,26 @@ export function nestedRepoRoot(file: string, root: string): string | null {
     if (submodules.has(relDir) || existsSync(join(dir, ".git"))) return dir;
   }
   return null;
+}
+
+/**
+ * §19.3: a folder inside the root or one of the repository's other `worktrees` that lies in a nested repository of its own
+ * (a clone, a submodule) — its config is not the repository's. A nested worktree of the repository itself is not foreign.
+ */
+export function foreignRepoDir(dir: string, root: string, worktrees: readonly string[]): boolean {
+  // The deepest of the root and the worktrees holding `dir` is where a nested repository starts.
+  let base: string | null = null;
+  for (const b of [root, ...worktrees]) {
+    if (isInside(dir, b) && (base === null || realpathLenient(b).length > realpathLenient(base).length)) base = b;
+  }
+  if (base === null) return false;
+  const nested = nestedRepoRoot(join(dir, "_"), base);
+  return nested !== null && !worktrees.some((w) => samePath(realpathLenient(w), nested));
+}
+
+/** §19.3: the read-only classifier's context for a command run in `cwd`: the root, the repository's other worktrees. */
+export function readOnlyContext(cwd: string, root: string, worktrees: readonly string[]): ReadOnlyContext {
+  return { cwd, root, sameRepoDirs: worktrees, foreignDir: (dir) => foreignRepoDir(dir, root, worktrees) };
 }
 
 /** English fallbacks of the §33 card reasons (clients localize on `code`); `claude_config` names its file (`claudeConfigMessage`). */
@@ -297,6 +318,16 @@ export type ScopeNotice = {
   branch?: string;
   /** MARK: wave4b w4b-follow — §39.4: why the call was on a card (`worktree_command`: it created `path`); engine-internal. */
   reasonCode?: PermissionReason["code"];
+  /**
+   * §33.4: a command run in another worktree or a nested repository — the files it changed there (relative to `path`,
+   * POSIX, sorted, at most 100): what that folder's `git status` shows differently after the call.
+   */
+  files?: string[];
+  /**
+   * §39.5: a worktree command left to the CLI in auto mode (no card): the repository's worktrees before it ran — what the
+   * engine reads at a card otherwise (§39.4: did this chat make it?); engine-internal.
+   */
+  worktreesBefore?: GitWorktree[];
 };
 
 /** English fallback of a notice's `error.message` (clients localize on `code`). */
@@ -305,12 +336,19 @@ export function scopeNoticeMessage(n: ScopeNotice): string {
     const what = n.toolName === "EnterWorktree" ? `a git worktree${n.branch ? ` ("${n.branch}")` : ""}` : `${n.toolName} outside this folder`;
     return `Claude tried to work in ${what}; ReviewGate blocked it because this window's review would not see that work. For parallel work, open a separate workbench.`;
   }
-  return `${n.toolName} worked outside this window's review${n.path ? ` (${n.path})` : ""}: those changes are not reviewed here. Open it as a workbench to review them.`;
+  const text = `${n.toolName} worked outside this window's review${n.path ? ` (${n.path})` : ""}: those changes are not reviewed here. Open it as a workbench to review them.`;
+  return n.files?.length ? `${text} Changed: ${n.files.join(", ")}` : text;
 }
 
-export const ENTER_WORKTREE_REASON =
-  "ReviewGate: EnterWorktree is not available here — this window reviews only this folder, and a worktree's changes would bypass that review. " +
-  "Keep working in this folder. If the work needs its own branch or worktree, tell the user: they open a separate ReviewGate workbench for it.";
+/**
+ * §33.4 / §39.4: EnterWorktree would move the whole session out of this window's review; the way to a worktree of its own
+ * is `git worktree add` (this chat can follow it there). Worded so that a skill that starts its work in a worktree does not
+ * fall back to switching this checkout's branch.
+ */
+const WORKTREE_WAY =
+  "To work in a separate worktree run `git worktree add ../<repo>-<name> -b <branch>` (never under /tmp) and continue there; " +
+  "ReviewGate offers to move this chat into it. Do not switch this checkout's branch to start new work unless the user asked.";
+export const ENTER_WORKTREE_REASON = `ReviewGate: EnterWorktree is not available in ReviewGate. ${WORKTREE_WAY}`;
 export const ISOLATION_REASON =
   "ReviewGate: agents run in this folder only — `isolation`, an Agent `cwd` outside the project and the Workflow tool put their changes outside " +
   "this window's review, so they are blocked. Run the agent again without `isolation` / `cwd`, or do the work here. If a separate worktree is " +
@@ -342,20 +380,20 @@ export function worktreeToolBlocked(toolName: string, input: Record<string, unkn
 }
 
 /**
- * The engine's own system instruction (appended after the client's): work in this folder. MARK: wave4b w4b-follow — §39.4:
- * a team that makes a worktree per issue may let Claude create one, said at once; the user moves the chat there (the
- * review follows). EnterWorktree stays denied: it would move the whole session out of the review.
+ * The engine's own system instruction (appended after the client's). MARK: wave4b w4b-follow — §39.4: a team that makes a
+ * worktree per issue lets Claude create one with `git worktree add` and work there; the user moves the chat there (the
+ * review follows). EnterWorktree stays denied: it would move the whole session out of the review. §39.5 (2026-11): commands
+ * in the repository's other worktrees are listed after the call; the way to a worktree is said, so a worktree-first skill
+ * does not switch this checkout's branch instead.
  */
 export function scopeInstruction(cwd: string, allowIsolation: boolean): string {
   return (
-    `ReviewGate reviews every change you make in this folder (${cwd}). Work inside it; never use EnterWorktree. ` +
-    "If the task needs its own git worktree, you may create it with `git worktree add`, but tell the user right away in one line: " +
-    "changes there are not reviewed until they move this chat into that worktree (ReviewGate offers it), so do not change files " +
-    "there before that. Do not `cd` into another worktree or a nested repository to change files there. " +
+    `ReviewGate reviews every change you make in this folder (${cwd}). EnterWorktree is not available in ReviewGate. ${WORKTREE_WAY} ` +
+    "Commands may run in this repository's other worktrees; ReviewGate lists what they changed after " +
+    "the call, and that worktree's own window reviews it. " +
     (allowIsolation
-      ? "Agents with `isolation: \"worktree\"` and the Workflow tool are allowed by the user, but their changes are outside this window's review — prefer working here. "
-      : "Agents with `isolation` and the Workflow tool are not available: their changes would be outside the review, so ReviewGate blocks them. ") +
-    "If parallel work on another branch is needed, say so: the user opens a separate ReviewGate workbench for it."
+      ? "Agents with `isolation: \"worktree\"` and the Workflow tool are allowed by the user, but their changes are outside this window's review — prefer working here."
+      : "Agents with `isolation` and the Workflow tool are not available: their changes would be outside the review, so ReviewGate blocks them.")
   );
 }
 
@@ -515,6 +553,19 @@ export function bashScopeReason(command: string, cwd: string, root: string, work
     if (reason) return reason;
   }
   return null;
+}
+
+/**
+ * §33.4: the other worktrees and nested repositories a Bash command runs in (`bashWorkDirs`: the shell's directory, its
+ * `cd`s and `git -C`s), each once, in order — the folders its after-notice compares.
+ */
+export function bashOutsideDirs(command: string, cwd: string, root: string, worktrees: readonly string[]): PermissionReason[] {
+  const out: PermissionReason[] = [];
+  for (const d of bashWorkDirs(command, cwd)) {
+    const reason = dirScopeReason(d, root, worktrees);
+    if (reason?.path && !out.some((r) => r.path === reason.path)) out.push(reason);
+  }
+  return out;
 }
 
 /** `worktreePath` / `worktreeBranch` of an isolated agent's tool response, when the CLI reports them. */

@@ -1,5 +1,7 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { sessionTranscriptPath } from "../src/review/sessions.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeRepo, removeDir } from "./helpers/repo.js";
 
@@ -37,7 +39,8 @@ describe("worktree notices (§33.4)", () => {
     expect(errors[0]!.message).toMatch(/workbench/i);
     expect(errors[1]).toMatchObject({ fatal: false, scope: "session", code: "worktree_outside_review", toolName: "Bash", path: "/elsewhere/wt" });
     expect(errors[1]!.message).toContain("/elsewhere/wt");
-    expect(h.engine.state.lastError).toBe(errors[1]!.message);
+    // What already ran outside the review is a chat row: it never becomes the session's last error (a blocked call does).
+    expect(h.engine.state.lastError).toBe(errors[0]!.message);
 
     // The next turn reports them again.
     s.emitTurnEnd();
@@ -46,6 +49,26 @@ describe("worktree notices (§33.4)", () => {
     s.emit({ type: "scope_notice", code: "worktree_blocked", toolName: "EnterWorktree", toolUseId: "t3", branch: "feature-x" });
     await h.settle();
     expect(h.ofType("error").filter((e) => e.code === "worktree_blocked")).toHaveLength(2);
+  });
+
+  it("a command's changes in another worktree: a row per call naming only the files no row of the turn named yet, with them on the row", async () => {
+    const h = await started();
+    const s = h.session();
+    const wt = "/work/acme-42";
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: wt, files: ["made.txt"], reasonCode: "other_worktree" });
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b2", path: wt, files: ["made.txt", "src/b.ts"], reasonCode: "other_worktree" });
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b3", path: wt, files: ["made.txt"], reasonCode: "other_worktree" });
+    await h.settle();
+    const rows = h.ofType("error").filter((e) => e.code === "worktree_outside_review");
+    expect(rows.map((e) => e.files)).toEqual([["made.txt"], ["src/b.ts"]]);
+    expect(rows[0]).toMatchObject({ fatal: false, scope: "session", toolName: "Bash", path: wt });
+    expect(rows[1]!.message).toContain("Changed: src/b.ts");
+    expect(h.engine.state.lastError).toBeNull();
+    // The transcript rows keep the files (§35.3), so a restored chat reads the same.
+    const dir = dirs.at(-1)!;
+    const id = h.engine.state.sessions.currentId!;
+    const kept = readFileSync(sessionTranscriptPath(join(dir, ".git"), id), "utf8").trim().split("\n").map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(kept.filter((r) => r.kind === "error" && r.code === "worktree_outside_review").map((r) => r.files)).toEqual([["made.txt"], ["src/b.ts"]]);
   });
 
   it("settings.allowWorktreeIsolation reaches the session (default off)", async () => {

@@ -11,20 +11,23 @@ import type { PermissionMode, PermissionReason } from "../protocol.js";
 import { openCheckpoint, type GitCheckpoint } from "../git/checkpoint.js";
 import { matchesIgnore } from "../git/ignore.js";
 import { isModsPath } from "../git/mods.js";
-import { commonDir, gitDir, listWorktrees, sameRepository } from "../git/worktrees.js";
+import { commonDir, gitDir, listWorktrees, sameRepository, type GitWorktree } from "../git/worktrees.js";
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
-import { isReadOnlyCommand, isRemembered, matchesAllowPattern } from "./bashClass.js";
+import { isReadOnlyCommand, isRemembered, matchesAllowPattern, type ReadOnlyContext } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
 import type { SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
+import { changedPaths, dirState, type DirState } from "./outsideWatch.js";
 import {
   bashClaudeConfigTarget,
+  bashOutsideDirs,
   bashScopeReason,
   CLAUDE_CONFIG_ASK_REASON,
   claudeConfigFile,
   claudeConfigReason,
+  editScopeReason,
   inputClaudeConfigTarget,
   isolatedCall,
   isolatedResult,
@@ -33,6 +36,7 @@ import {
   SCOPE_ASK_REASON,
   SCOPE_MESSAGES,
   OTHER_REPO_WORKTREE_MESSAGE,
+  readOnlyContext,
   worktreeAddRepoDir,
   worktreeToolBlocked,
   type ScopeNotice,
@@ -263,6 +267,11 @@ export type HookContext = {
   /** Tree of the previous post-Bash snapshot this turn (the next one diffs against it); reset per turn. */
   bashBaseTree?: string;
   /**
+   * §31: tool_use ids of the turn's Bash calls judged read-only at their PreToolUse (not run in the background): their
+   * PostToolUse takes no snapshot and leaves `bashBaseTree` as it is. Reset per turn.
+   */
+  readOnlyBash?: Set<string>;
+  /**
    * Files (absolute) a Bash call changed: the diff between the previous post-Bash snapshot and this one, narrowed
    * to what changed inside the call's execution window (§31) when the window is known.
    */
@@ -296,12 +305,33 @@ export type HookContext = {
    * tool_use id — `canUseTool` puts it on the `permission_request`, the post-tool hook raises the notice. Reset per turn.
    */
   scopeReasons?: Map<string, PermissionReason>;
+  /**
+   * §33.4: Bash calls that run in another worktree or a nested repository, by tool_use id — each folder with its `git status`
+   * before the call; after it, a notice lists what changed there (none when nothing did). Reset per turn.
+   */
+  scopeWatches?: Map<string, ScopeWatch>;
   /** The repository's other worktrees (absolute; `git worktree list` minus the root), cached per turn by `otherWorktrees`. */
   worktrees?: string[];
   /** §33.4: work outside this window's review was blocked / happened (EnterWorktree, isolated agents, worktree commands). */
   onScopeNotice?: (notice: ScopeNotice) => void;
+  /**
+   * §8 / §39.5: an edit tool changed a file this window's review does not see (outside the root, in a nested repository,
+   * Claude's memory; not a throwaway file in a temporary folder, a plan file or a settings file the review lists): it
+   * goes to `changedOutside`.
+   */
+  onOutsideEdit?: (file: string) => void;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
+};
+
+/**
+ * §33.4: a Bash call's folders outside this window's review, with their state before it ran (null: git did not answer);
+ * §39.5 `worktree`: a worktree command left to the CLI in auto mode — the path it names and the repository's worktrees
+ * before it ran (null: git did not answer), for the engine's §39.4 bookkeeping.
+ */
+export type ScopeWatch = {
+  targets: { code: PermissionReason["code"]; path: string; before: DirState | null }[];
+  worktree?: { path?: string; before: GitWorktree[] | null };
 };
 
 function allow(): HookJSONOutput {
@@ -348,19 +378,20 @@ function allowPre(reason: string): HookJSONOutput {
 
 /**
  * Why `toolName`/`input` is allowed without a prompt (docs/M16-FRICTION.md §1–2), or undefined when it
- * must ask: a read-only Bash command (`autoAllowReadOnlyBash !== false`), a `bashAllowPatterns` match
- * (for other tools its MCP / WebFetch / WebSearch / Agent forms, §33.6), a key the user remembered for this
- * session, or the user's own Claude Code allow rule for a tool that cannot change files (§33.5). Consulted by
- * the PreToolUse hooks and by canUseTool.
+ * must ask: a read-only Bash command (`autoAllowReadOnlyBash !== false`; judged where it runs with `ro`, §19.3), a
+ * `bashAllowPatterns` match (for other tools its MCP / WebFetch / WebSearch / Agent forms, §33.6), a key the user
+ * remembered for this session, or the user's own Claude Code allow rule for a tool that cannot change files (§33.5).
+ * Consulted by the PreToolUse hooks and by canUseTool.
  */
 export function autoAllowReason(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "autoAllowReadOnlyBash" | "bashAllowPatterns" | "rememberedAllows" | "userRules" | "mcpToolHints">,
+  ro?: ReadOnlyContext,
 ): string | undefined {
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    if (ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command)) return READ_ONLY_BASH_REASON;
+    if (ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro)) return READ_ONLY_BASH_REASON;
     if ((ctx.bashAllowPatterns ?? []).some((p) => matchesAllowPattern(p, command))) return ALLOW_PATTERN_REASON;
   } else if ((ctx.bashAllowPatterns ?? []).some((p) => matchesToolPattern(p, toolName, input))) {
     return ALLOW_PATTERN_REASON;
@@ -372,18 +403,19 @@ export function autoAllowReason(
 
 /**
  * True when `toolName` must be denied because no engine-started turn is running (`ctx.turnActive === false`):
- * everything except the read-only tools and a read-only Bash command that is auto-allowed anyway.
+ * everything except the read-only tools and a read-only Bash command that is auto-allowed anyway (`ro`: where it runs).
  */
 export function unpromptedBlocked(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "turnActive" | "autoAllowReadOnlyBash">,
+  ro?: ReadOnlyContext,
 ): boolean {
   if (ctx.turnActive !== false) return false;
   if (READ_ONLY_TOOLS.has(toolName)) return false;
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    return !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command));
+    return !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro));
   }
   return true;
 }
@@ -397,6 +429,7 @@ export function planModeBlocked(
   toolName: string,
   input: Record<string, unknown>,
   ctx: Pick<HookContext, "permissionMode" | "plansDir" | "cwd">,
+  ro?: ReadOnlyContext,
 ): string | undefined {
   if (ctx.permissionMode !== "plan") return undefined;
   if (EDIT_TOOLS_RE.test(toolName)) {
@@ -405,16 +438,16 @@ export function planModeBlocked(
   }
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    return isReadOnlyCommand(command) ? undefined : PLAN_MODE_BASH_REASON;
+    return isReadOnlyCommand(command, ro) ? undefined : PLAN_MODE_BASH_REASON;
   }
   return undefined;
 }
 
 /** Denies (and reports) a call made outside an engine-started turn; undefined when the guard does not apply. */
-async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext): Promise<HookJSONOutput | undefined> {
+async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro?: ReadOnlyContext): Promise<HookJSONOutput | undefined> {
   // §52: a turn Claude started itself is being taken as a review turn — nothing runs before its snapshot A.
   if (ctx.adoption) await ctx.adoption;
-  if (!unpromptedBlocked(toolName, input, ctx)) return undefined;
+  if (!unpromptedBlocked(toolName, input, ctx, ro)) return undefined;
   ctx.onUnprompted?.(toolName);
   return denyPre(UNPROMPTED_REASON);
 }
@@ -442,6 +475,11 @@ export async function otherWorktrees(ctx: HookContext): Promise<string[]> {
     ctx.worktrees = [];
   }
   return ctx.worktrees;
+}
+
+/** §19.3: the read-only classifier's context for a command run in `cwd` — the root and the worktrees (both cached per turn). */
+export async function readOnlyContextOf(ctx: HookContext, cwd: string): Promise<ReadOnlyContext> {
+  return readOnlyContext(cwd, await containmentRoot(ctx), await otherWorktrees(ctx));
 }
 
 /** Notes why a call goes on a card (§33.3–33.4) for `canUseTool` and the post-tool notice. */
@@ -482,6 +520,51 @@ async function guardWorktreeTools(toolName: string, toolUseId: string | undefine
 }
 
 /**
+ * §39.5: the engine runs in auto mode and the CLI says so too (the hook input's `permission_mode`; absent — an older CLI —
+ * is the engine's word). There work outside this window's review (another worktree of the repository, a nested
+ * repository) is the CLI's call, as in the terminal, and listed after it instead of a card.
+ */
+function scopeCliDecides(ctx: HookContext, input: HookInput): boolean {
+  if (ctx.permissionMode !== "auto") return false;
+  const cli = hookPermissionMode(input);
+  return cli === undefined || cli === null || cli === "auto";
+}
+
+/** §33.4: before a command that runs in another worktree / a nested repository, the state of each of those folders. */
+async function watchOutside(ctx: HookContext, toolUseId: string | undefined, command: string, cwd: string, root: string, worktrees: readonly string[]): Promise<void> {
+  if (!toolUseId) return;
+  const targets = await Promise.all(bashOutsideDirs(command, cwd, root, worktrees).map(async (r) => ({ code: r.code, path: r.path!, before: await dirState(r.path!) })));
+  if (targets.length === 0) return;
+  if (!ctx.scopeWatches) ctx.scopeWatches = new Map();
+  ctx.scopeWatches.set(toolUseId, { targets });
+}
+
+/**
+ * §33.4: after a Bash call that ran in another worktree or a nested repository — one notice per folder it changed, with
+ * the changed files (none when nothing changed there; no list when git could not tell). Any other call: `noticeAfterTool`.
+ */
+async function noticeAfterBash(input: HookInput, ctx: HookContext): Promise<void> {
+  const toolUseId = toolUseIdOf(input);
+  const watch = toolUseId ? ctx.scopeWatches?.get(toolUseId) : undefined;
+  if (!toolUseId || !watch) {
+    noticeAfterTool("Bash", input, ctx);
+    return;
+  }
+  ctx.scopeWatches!.delete(toolUseId);
+  ctx.scopeReasons?.delete(toolUseId); // its card (if any) was answered
+  if (watch.worktree) {
+    const w = watch.worktree;
+    ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "Bash", toolUseId, ...(w.path ? { path: w.path } : {}), reasonCode: "worktree_command", ...(w.before ? { worktreesBefore: w.before } : {}) });
+  }
+  for (const t of watch.targets) {
+    const after = t.before ? await dirState(t.path) : null;
+    const files = t.before && after ? changedPaths(t.before, after) : undefined;
+    if (files && files.length === 0) continue;
+    ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "Bash", toolUseId, path: t.path, ...(files ? { files } : {}), reasonCode: t.code });
+  }
+}
+
+/**
  * After a call the hooks put on a card for working outside the review ran (it was approved): the warning stays (§33.4).
  * A changed settings file (§33.9) is no such place — the review lists it (mods group) or `local_settings_changed` reports it.
  */
@@ -509,10 +592,11 @@ export function configScopeReason(
   cwd: string,
   root: string,
   ctx: Pick<HookContext, "mcpToolHints">,
+  ro?: ReadOnlyContext,
 ): PermissionReason | null {
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
-    if (isReadOnlyCommand(command)) return null;
+    if (isReadOnlyCommand(command, ro)) return null;
     const target = bashClaudeConfigTarget(command, cwd, root);
     return target ? claudeConfigReason(target, root) : null;
   }
@@ -528,9 +612,9 @@ export function configScopeReason(
  * `permission_mode`: in auto mode (§39.5) a call no app rule allows is left to the CLI's rules and classifier instead of
  * the card — the reason cards (§33.3–33.4, §33.9) were decided before this, too.
  */
-function askOrAllow(toolName: string, input: Record<string, unknown>, ctx: HookContext, cliMode?: unknown): HookJSONOutput {
+function askOrAllow(toolName: string, input: Record<string, unknown>, ctx: HookContext, cliMode?: unknown, ro?: ReadOnlyContext): HookJSONOutput {
   if (!needsAsk(toolName, ctx.autoAllowTools)) return allow();
-  const reason = autoAllowReason(toolName, input, ctx);
+  const reason = autoAllowReason(toolName, input, ctx, ro);
   if (reason) return allowPre(reason);
   // MARK: wave4b w4b-auto (§39.5); input: w4b-check4 (§40.1); prePlanMode / hints: wave6 w6-terminal (§44.1)
   if (autoModeDecides(toolName, ctx.permissionMode, cliMode, input, ctx.prePlanMode, ctx.mcpToolHints)) return allow();
@@ -608,8 +692,9 @@ async function changedBetween(cp: GitCheckpoint, a: string, b: string, ignorePat
 }
 
 /**
- * Before the turn's first Bash call: the tree its post-Bash snapshot is diffed against, so Bash file
- * attribution never picks up what earlier turns left on disk (a request-changes turn keeps the old A).
+ * Before the turn's first Bash call that may write (§31: a read-only one takes none): the tree its post-Bash snapshot is
+ * diffed against, so Bash file attribution never picks up what earlier turns left on disk (a request-changes turn keeps
+ * the old A).
  */
 async function bashBaseline(ctx: HookContext): Promise<void> {
   if (!ctx.onBashFiles || !ctx.checkpointTree || ctx.bashBaseTree !== undefined) return;
@@ -641,9 +726,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // A throwaway file in a temporary folder (Claude Code's scratchpad, /tmp) outside any repository: not the user's code,
     // so neither the budget nor the outside-the-project card.
     if (file && ctx.scratchDirs && isOutsideRoot(file, await containmentRoot(ctx)) && isScratchPath(file, ctx.scratchDirs)) return allow();
+    // §39.5: in auto mode an edit the review does not see (Claude's memory, outside the project, a nested repository) is the
+    // CLI's call, as in the terminal, and listed after the turn (postEditScope) — Claude Code's own settings keep their card.
+    const cliDecides = scopeCliDecides(ctx, input);
     // Claude's own memory (~/.claude/projects/<project>/memory) is not in the review: the budget neither counts nor blocks
-    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card.
-    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return askPre(OUTSIDE_REASON);
+    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card (not in auto mode).
+    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return cliDecides ? allow() : askPre(OUTSIDE_REASON);
     // §54: the change budget is opt-in — without one (the default) an edit is neither counted nor denied.
     if (b.active) {
       const est = estimateEditLines(input.tool_name, ti, ctx.cwd);
@@ -685,10 +773,17 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       }
     }
     // Path containment: an edit outside the checkpoint root (or through a symlink escaping it) is
-    // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card.
-    if (file && isOutsideRoot(file, await containmentRoot(ctx))) return askPre(OUTSIDE_REASON);
+    // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card. §39.5: in auto mode it is the
+    // CLI's call — unless it is one of Claude Code's own settings files (`~/.claude/settings.json`), checked first.
+    if (file && isOutsideRoot(file, await containmentRoot(ctx))) {
+      if (!cliDecides) return askPre(OUTSIDE_REASON);
+      return claudeConfigFile(file) ? askPre(CLAUDE_CONFIG_ASK_REASON) : allow();
+    }
     // §33.3: inside the root but in a nested repository (submodule, worktree, clone) the snapshot only sees a gitlink.
-    if (file && nestedRepoRoot(file, await containmentRoot(ctx))) return askPre(NESTED_REASON);
+    if (file && nestedRepoRoot(file, await containmentRoot(ctx))) {
+      if (!cliDecides) return askPre(NESTED_REASON);
+      return claudeConfigFile(file) ? askPre(CLAUDE_CONFIG_ASK_REASON) : allow();
+    }
     // §33.9: Claude Code's own settings (hooks, permission rules, MCP servers) never change without the card — in every
     // permission mode: this `ask` reaches canUseTool in acceptEdits / auto too (CLI 2.1.308).
     if (file && claudeConfigFile(file)) return askPre(CLAUDE_CONFIG_ASK_REASON);
@@ -700,35 +795,56 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const b = ctx.budget;
     const ti = toolInput(input);
-    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
+    // §19.3: a command is judged where it runs — a `cd` / `git -C` into the repository's own worktrees stays read-only.
+    const cwd = hookCwd(input, ctx);
+    const ro = await readOnlyContextOf(ctx, cwd);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
-    const planDeny = planModeBlocked(input.tool_name, ti, ctx);
+    const planDeny = planModeBlocked(input.tool_name, ti, ctx, ro);
     if (planDeny) return denyPre(planDeny);
     // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
     // goes on (it is never interrupted): Claude reports what it did and what remains.
     if (b.active && b.denied && writesFiles(command)) {
       return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
     }
-    await bashBaseline(ctx);
+    const readOnly = isReadOnlyCommand(command, ro);
+    // §31: a read-only command (not one run in the background) changes nothing — no baseline before it, no snapshot after.
+    const toolUseId = toolUseIdOf(input);
+    if (readOnly && ti.run_in_background !== true && toolUseId) (ctx.readOnlyBash ??= new Set()).add(toolUseId);
+    else await bashBaseline(ctx);
     // §31: the window opens before any card — `duration_ms` at its end leaves the wait for the user out.
     openWindow(ctx, input, command);
     // §33.4: a command that creates a worktree, or runs in / `cd`s into another worktree or a nested repository, reaches
-    // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs).
-    const root = await containmentRoot(ctx);
-    const cwd = hookCwd(input, ctx);
-    let scope = bashScopeReason(command, cwd, root, await otherWorktrees(ctx));
+    // the card with the reason — never an allow pattern or a remembered key (a read-only one still runs). §39.5: in auto
+    // mode another worktree of the repository and a nested repository are the CLI's call (no card; the row after the call
+    // lists what changed there) — the settings-file and git checks below still apply, so this never returns early then.
+    const root = ro.root;
+    let scope = bashScopeReason(command, cwd, root, ro.sameRepoDirs);
     // §39.4: a worktree of another repository (the command `cd`s / `-C`s there) — no chat of this window can follow it.
     if (scope?.code === "worktree_command") {
       const repoDir = worktreeAddRepoDir(command, cwd);
       if (repoDir && (await sameRepository(repoDir, root)) === false) scope = { ...scope, otherRepository: true, message: OTHER_REPO_WORKTREE_MESSAGE };
     }
-    if (scope && !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command))) {
-      rememberScope(ctx, toolUseIdOf(input), scope);
-      return askPre(SCOPE_ASK_REASON);
+    if (scope && !(ctx.autoAllowReadOnlyBash !== false && readOnly)) {
+      // §33.4: what it changes in the other worktrees / nested repositories it runs in is listed after the call.
+      if (scope.code !== "worktree_command") await watchOutside(ctx, toolUseId, command, cwd, root, ro.sameRepoDirs);
+      // §39.5: a worktree of this repository may be made without a card too (another repository's keeps it: no chat can
+      // follow there); the engine is told once it ran, with the worktrees there were before, and offers to move the chat.
+      const cliDecides = scopeCliDecides(ctx, input) && !scope.otherRepository;
+      if (cliDecides && scope.code === "worktree_command" && toolUseId) {
+        const before = await listWorktrees(root).catch(() => null);
+        if (!ctx.scopeWatches) ctx.scopeWatches = new Map();
+        const prior = ctx.scopeWatches.get(toolUseId);
+        ctx.scopeWatches.set(toolUseId, { targets: prior?.targets ?? [], worktree: { ...(scope.path ? { path: scope.path } : {}), before } });
+      }
+      if (!cliDecides) {
+        rememberScope(ctx, toolUseId, scope);
+        return askPre(SCOPE_ASK_REASON);
+      }
     }
     // §33.9: so does a command naming one of Claude Code's own settings files (reading one still runs).
-    const config = configScopeReason(input.tool_name, ti, cwd, root, ctx);
+    const config = configScopeReason(input.tool_name, ti, cwd, root, ctx, ro);
     if (config) {
       rememberScope(ctx, toolUseIdOf(input), config);
       return askPre(CLAUDE_CONFIG_ASK_REASON);
@@ -740,7 +856,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       rememberScope(ctx, toolUseIdOf(input), git);
       return askPre(GIT_ASK_REASON);
     }
-    return askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input));
+    return askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input), ro);
   };
 
   /** Every other tool forces `ask` (needsAsk) — reads, subagents and the to-do list are never counted or refused by the budget (§54). */
@@ -796,18 +912,37 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   };
 
   /**
+   * §8 / §39.5: after an edit the review does not see — outside the root, in a nested repository, in Claude's memory (the
+   * locations `editScopeReason` names; not a settings file of the review's own, a throwaway file or a plan file) — the
+   * file goes to `changedOutside` (in auto mode no card listed it).
+   */
+  const postEditScope: HookCallback = async (input) => {
+    if (input.hook_event_name !== "PostToolUse" || !ctx.onOutsideEdit) return allow();
+    const file = toolFile(toolInput(input), ctx.cwd);
+    if (!file || isPlanFile(file, ctx)) return allow();
+    const reason = editScopeReason(file, await containmentRoot(ctx), isOutsideRoot, [], ctx.scratchDirs);
+    if (reason && reason.code !== "claude_config") ctx.onOutsideEdit(file);
+    return allow();
+  };
+
+  /**
    * After a Bash call — PostToolUse, or PostToolUseFailure for a command that exited non-zero (CLI 2.1.308) — the
    * worktree is snapshotted: the files changed since the previous snapshot that also changed inside this call's
    * execution window are the call's (§31); a change made between calls (the IDE, another session, `git pull`) is
-   * nobody's and stays out of the budget, which counts the turn's edit-tool and Bash files only.
+   * nobody's and stays out of the budget, which counts the turn's edit-tool and Bash files only. Not after a read-only
+   * command (§31).
    */
   const postBash: HookCallback = async (input) => {
     if (input.hook_event_name !== "PostToolUse" && input.hook_event_name !== "PostToolUseFailure") return allow();
     const window = finishWindow(ctx, input);
     // §33.4: an approved command outside the review ran (a failing one too: it may have written before it failed).
-    noticeAfterTool(input.tool_name, input, ctx);
+    await noticeAfterBash(input, ctx);
     // A worktree may have been added / moved / removed: list them again for the next call (§33.4).
     if (/\bworktree\b/.test(String(toolInput(input).command ?? ""))) ctx.worktrees = undefined;
+    // §31: a read-only command (judged at its PreToolUse) wrote nothing — no snapshot, no diff, the base tree stays. A file
+    // one wrote all the same still reaches the review at the turn's end (snapshot B), without this call as its cause.
+    const toolUseId = toolUseIdOf(input);
+    if (toolUseId && ctx.readOnlyBash?.delete(toolUseId)) return allow();
     if (!ctx.checkpointTree) return allow();
     const b = ctx.budget;
     try {
@@ -856,7 +991,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       { hooks: [preOther] },
     ],
     PostToolUse: [
-      { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit] },
+      { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit, postEditScope] },
       { matcher: "Bash", hooks: [postBash] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
       { matcher: "Agent|Task|Workflow", hooks: [postIsolated] },

@@ -131,9 +131,12 @@ public extension AppState {
         let secondary = detail.flatMap { SessionNotices.secondaryLine(message: engineMessage ?? text, detail: $0) }
         var rows = transcript
         let restored = restoredTranscriptIDs
+        // r1-scope (§33.4): a command's changes outside the review — the files on the row, its folder for the row's actions.
+        let info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail?.detail, secondary: secondary, scope: scope, lastAt: Date()),
+                                     detail: detail)
         let count = SessionNotices.appendError(
             to: &rows, message: text, fatal: fatal,
-            info: ErrorRowInfo(code: code, detail: detail?.detail, secondary: secondary, scope: scope, lastAt: Date()),
+            info: info,
             mergeable: { !restored.contains($0) })
         transcript = rows
         var line = "[error] \(code.map { "\($0): " } ?? "")\(engineMessage ?? text)"
@@ -149,6 +152,7 @@ public extension AppState {
         if LongWorkText.isRowOnly(code) { return }   // wave4 w4-longwork (§38.2): hook / CLI words are chat rows only
         if code == "auto_mode_unavailable" { noteAutoModeUnavailable() }   // wave6 w6-terminal (§44.1): shift+tab skips auto
         if AutoModeText.isRowOnly(code) { return }   // wave4b w4b-auto (§39.5): what auto mode blocked is a gray row
+        if ScopeText.isRowOnly(code) { return }   // r1-scope (§33.4): what already ran outside the review is a row with its actions
         var banner = ErrorBanner(message: text, scope: scope, fatal: fatal, code: code,
                                  actions: SessionNotices.bannerActions(code: code, repeats: count, path: detail?.path,
                                                                        pathIsWorkbench: isWorkbenchPath(detail?.path)))
@@ -166,8 +170,8 @@ public extension AppState {
                                 facts: EngineErrorDetail = EngineErrorDetail()) -> (text: String, info: ErrorRowInfo) {
         let full = SessionNotices.restoredDetail(code: code, detail: detail, message: message, facts: facts)
         let text = EngineMessages.error(message: message, detail: full)
-        let info = ErrorRowInfo(code: code, detail: detail, secondary: SessionNotices.secondaryLine(message: message, detail: full),
-                                scope: scope, lastAt: Self.isoDate(at))
+        let info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail, secondary: SessionNotices.secondaryLine(message: message, detail: full),
+                                                  scope: scope, lastAt: Self.isoDate(at)), detail: full)   // r1-scope (§33.4)
         return (text, info)
     }
 

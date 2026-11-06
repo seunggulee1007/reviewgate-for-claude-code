@@ -203,9 +203,14 @@ describe("PreToolUse hooks in auto mode", () => {
     const { preBash, preEdit, preOther } = hooksFor(c);
     expect(decision(await preBash(pre("Bash", { command: "cp x.json .claude/settings.local.json" }, root, "auto", "b1"), "b1", opts))).toEqual({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
     expect(c.scopeReasons?.get("b1")?.code).toBe("claude_config");
-    expect(decision(await preBash(pre("Bash", { command: "git worktree add ../wt2" }, root, "auto", "b2"), "b2", opts))).toEqual({ decision: "ask", reason: SCOPE_ASK_REASON });
-    expect(c.scopeReasons?.get("b2")?.code).toBe("worktree_command");
-    expect(decision(await preEdit(pre("Edit", { file_path: join(makeTempDir("rg-auto-out-"), "x.txt"), old_string: "a", new_string: "b" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: OUTSIDE_REASON });
+    // r1-scope (§39.5): a worktree of this repository is made without a card in auto mode (the row after it offers the move).
+    expect(decision(await preBash(pre("Bash", { command: "git worktree add ../wt2" }, root, "auto", "b2"), "b2", opts))).toEqual({});
+    expect(c.scopeReasons?.get("b2")).toBeUndefined();
+    // r1-scope (§8, §39.5): an edit outside the project is the CLI's call in auto mode (listed in changedOutside after it);
+    // Claude Code's own settings keep their card.
+    expect(decision(await preEdit(pre("Edit", { file_path: join(makeTempDir("rg-auto-out-"), "x.txt"), old_string: "a", new_string: "b" }, root, "auto"), "t1", opts))).toEqual({});
+    expect(decision(await preEdit(pre("Edit", { file_path: join(makeTempDir("rg-auto-out-"), ".claude", "settings.json"), old_string: "a", new_string: "b" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    expect(decision(await preEdit(pre("Edit", { file_path: join(makeTempDir("rg-auto-out-"), "x.txt"), old_string: "a", new_string: "b" }, root, "default"), "t1", opts))).toEqual({ decision: "ask", reason: OUTSIDE_REASON });
     const isolated = hooksFor(ctx(root, { permissionMode: "auto", allowWorktreeIsolation: true }));
     expect(decision(await isolated.preOther(pre("Agent", { description: "d", prompt: "p", isolation: "worktree" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: SCOPE_ASK_REASON });
     void preOther;

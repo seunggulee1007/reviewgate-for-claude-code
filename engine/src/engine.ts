@@ -6005,16 +6005,19 @@ export class ReviewEngine {
         // MARK: wave4b w4b-follow — §39.4: a worktree command that ran: the chat made that worktree; a followed card moves it.
         if (ev.code === "worktree_outside_review" && ev.reasonCode === "worktree_command") {
           const followed = ev.toolUseId !== undefined && this.followAfterTool.has(ev.toolUseId);
-          void this.afterWorktreeCommand(ev.path ?? null, ev.toolUseId ?? null);
+          // §39.5: one the CLI ran in auto mode had no card — the worktrees before it came with the notice.
+          if (ev.worktreesBefore && ev.toolUseId) this.noteWorktreesBefore(ev.toolUseId, ev.path ?? null, ev.worktreesBefore);
+          const made = this.afterWorktreeCommand(ev.path ?? null, ev.toolUseId ?? null);
           if (followed) return; // the chat follows: no "outside the review" warning for it
+          if (ev.worktreesBefore) {
+            // Said once it is there and listed (its row offers to move this chat into it); nothing when it was not made.
+            void made.then((root) => {
+              if (root !== null && !this.closed) this.scopeNotice({ ...ev, path: root });
+            });
+            return;
+          }
         }
-        // §33.4: once per turn and kind; the client's banner offers "open a workbench".
-        const key = `${ev.code}|${ev.toolName}|${ev.path ?? ""}|${ev.branch ?? ""}`;
-        if (this.scopeNoticed.has(key)) return;
-        this.scopeNoticed.add(key);
-        const { type: _type, toolUseId: _id, reasonCode: _why, ...notice } = ev;
-        this.log("warn", `${ev.code}: ${ev.toolName}${ev.path ? ` ${ev.path}` : ""}`);
-        this.fail(scopeNoticeMessage(notice), false, "session", notice);
+        this.scopeNotice(ev);
         return;
       }
       case "budget_event":
@@ -6878,6 +6881,41 @@ export class ReviewEngine {
     if (text) void this.handle({ type: "send", text });
   }
 
+  /**
+   * §33.4: a scope notice as the clients get it — once per turn and kind; a command's changes in another worktree / nested
+   * repository: a row per call that changed something there, naming only the files no row of this turn named yet. What
+   * already ran outside the review is a chat row (no `state.lastError`, never a stopped queue); a blocked call keeps its
+   * banner ("open a workbench").
+   */
+  private scopeNotice(ev: Extract<SessionEvent, { type: "scope_notice" }>): void {
+    const key = `${ev.code}|${ev.toolName}|${ev.path ?? ""}|${ev.branch ?? ""}`;
+    let files = ev.files;
+    if (files) {
+      files = files.filter((f) => !this.scopeNoticed.has(`${key}|${f}`));
+      if (files.length === 0) return;
+      for (const f of files) this.scopeNoticed.add(`${key}|${f}`);
+    } else {
+      if (this.scopeNoticed.has(key)) return;
+      this.scopeNoticed.add(key);
+    }
+    const { type: _type, toolUseId: _id, reasonCode: _why, files: _files, worktreesBefore: _before, ...rest } = ev;
+    const notice = { ...rest, ...(files ? { files } : {}) };
+    this.log("warn", `${ev.code}: ${ev.toolName}${ev.path ? ` ${ev.path}` : ""}${files ? ` (${files.length} files)` : ""}`);
+    if (ev.code === "worktree_outside_review") this.notice(scopeNoticeMessage(notice), "session", notice);
+    else this.fail(scopeNoticeMessage(notice), false, "session", notice);
+  }
+
+  /**
+   * §39.5: a worktree command the CLI ran in auto mode had no card, so `noteWorktreeBeforeCommand` never read the worktrees;
+   * the hook did, before it ran. `path` was a worktree already when one of those holds it (`moveTarget` against them).
+   */
+  private noteWorktreesBefore(toolUseId: string, path: string | null, before: readonly GitWorktree[]): void {
+    const cp = this.gate.checkpoint;
+    if (!cp || this.worktreeBeforeCommand.has(toolUseId)) return;
+    const was = path !== null && !("refused" in moveTarget(path, cp.root, before));
+    this.worktreeBeforeCommand.set(toolUseId, Promise.resolve({ was, roots: before.map((w) => canonicalPath(w.path)) }));
+  }
+
   /** A worktree command's card: whether its path is a worktree already, read now (before the command can run). */
   private noteWorktreeBeforeCommand(request: PermissionRequest): void {
     const cp = this.gate.checkpoint;
@@ -6895,8 +6933,9 @@ export class ReviewEngine {
   /**
    * A worktree command of this chat ran: when its path is now a worktree of this repository, the chat created it (its move
    * there reviews from HEAD). A card answered "허용하고 따라가기" moves the chat there now (the running turn is stopped).
+   * Resolves with the root of the worktree it created (listed in `state.workbenches` by then), null for none.
    */
-  private async afterWorktreeCommand(path: string | null, toolUseId: string | null): Promise<void> {
+  private async afterWorktreeCommand(path: string | null, toolUseId: string | null): Promise<string | null> {
     const cp = this.gate.checkpoint;
     const chat = this.currentSessionId;
     const follow = toolUseId ? this.followAfterTool.get(toolUseId) : undefined;
@@ -6904,9 +6943,10 @@ export class ReviewEngine {
     let where = path ?? follow?.path ?? null;
     const beforeP = toolUseId ? this.worktreeBeforeCommand.get(toolUseId) : undefined;
     if (toolUseId) this.worktreeBeforeCommand.delete(toolUseId);
-    if (!cp || !chat) return;
+    if (!cp || !chat) return null;
     const before = beforeP ? await beforeP : undefined;
     let isWorktree = false;
+    let made: string | null = null;
     let refusal = "not_a_worktree";
     try {
       const list = await listWorktrees(cp.root);
@@ -6931,6 +6971,7 @@ export class ReviewEngine {
           let roots = this.createdWorktrees.get(chat);
           if (!roots) this.createdWorktrees.set(chat, (roots = new Set()));
           roots.add(canonicalPath(target.root));
+          made = target.root;
         }
       }
     } catch (e) {
@@ -6942,13 +6983,13 @@ export class ReviewEngine {
         await this.refreshWorkbenches(false);
         this.touch();
       }
-      return;
+      return made;
     }
     const failed = (code: string) =>
       this.fail(`This chat could not move to ${where ?? "the new worktree"} (${code}); it stays here.`, false, "session", { code: "chat_move_failed", ...(where ? { path: where } : {}), detail: code });
     if (!isWorktree || !where) {
       failed(refusal);
-      return;
+      return null;
     }
     const to = where;
     // On the main lane like a client's command; a refusal is said in the chat instead of a reply nobody waits for.
@@ -6956,6 +6997,7 @@ export class ReviewEngine {
     this.lanes.main = run.catch((e: unknown) => {
       if (!this.closed) failed(errorMessage(e));
     });
+    return made;
   }
 
   /** §36.7: idle = a ready session, no turn / start / collection / revert, no open card, no turn the CLI runs on its own. */

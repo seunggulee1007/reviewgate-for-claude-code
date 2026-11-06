@@ -28,15 +28,18 @@ public struct ErrorRowInfo: Sendable, Equatable {
     public var count: Int
     /// When it was reported last; nil = unknown.
     public var lastAt: Date?
+    /// MARK: r1-scope — §33.4 `worktree_outside_review`: the folder the row's actions open or move this chat to.
+    public var path: String?
 
     public init(code: String? = nil, detail: String? = nil, secondary: String? = nil, scope: ErrorScope? = nil, count: Int = 1,
-                lastAt: Date? = nil) {
+                lastAt: Date? = nil, path: String? = nil) {
         self.code = code
         self.detail = detail
         self.secondary = secondary
         self.scope = scope
         self.count = count
         self.lastAt = lastAt
+        self.path = path
     }
 }
 
@@ -72,6 +75,7 @@ public enum SessionNotices {
         case "cli_notice": return .info   // wave4 w4-longwork (§38.2): the CLI's gray notice
         case "chat_moved_in", "chat_moved_in_disk": return .info   // wave4b w4b-follow (§39.4)
         case "auto_mode_denied", "auto_mode_unavailable": return .info   // wave4b w4b-auto (§39.5): gray rows
+        case "worktree_outside_review": return .info   // r1-scope (§33.4): what already ran outside the review — a row, not a warning
         default: return .warning
         }
     }
@@ -113,6 +117,7 @@ public enum SessionNotices {
         if let text = LongWorkText.errorText(message: message, detail: detail) { return text }   // wave4 w4-longwork (§38.2)
         if let text = ChatMoveText.noticeText(code: detail.code, path: detail.path, message: message, detail: detail.detail) { return text }   // wave4b w4b-follow
         if let text = AutoModeText.errorText(message: message, detail: detail) { return text }   // wave4b w4b-auto (§39.5)
+        if let text = ScopeText.errorText(message: message, detail: detail) { return text }   // r1-scope (§33.4)
         switch detail.code {
         case "session_start_failed": return String(localized: "Claude Code quit right after it started.", bundle: .module)
         case "session_crashed": return String(localized: "The Claude session ended unexpectedly.", bundle: .module)

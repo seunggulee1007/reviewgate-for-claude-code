@@ -16,7 +16,8 @@ describe("session errors (docs/PROTOCOL.md §29 / §30 / §33.4, M4)", () => {
     expect(errorTone("resume_not_found", false)).toBe("info");
     expect(errorTone("resume_failed", false)).toBe("info");
     expect(errorTone("worktree_blocked", false)).toBe("warning");
-    expect(errorTone("worktree_outside_review", false)).toBe("warning");
+    // r1-scope (§33.4): what already ran outside the review is a row (information), never a banner.
+    expect(errorTone("worktree_outside_review", false)).toBe("info");
     expect(errorTone("peer_release_failed", false)).toBe("warning");
     expect(errorTone("unprompted_blocked", false)).toBe("warning");
     expect(errorTone("session_start_failed", true)).toBe("fatal");

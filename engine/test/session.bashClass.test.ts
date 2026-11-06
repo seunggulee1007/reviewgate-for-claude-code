@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { isReadOnlyCommand, isRemembered, matchesAllowPattern, rememberKey, scanCommand } from "../src/session/bashClass.js";
+import { mkdirSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import { isReadOnlyCommand, isRemembered, matchesAllowPattern, rememberKey, scanCommand, type ReadOnlyContext } from "../src/session/bashClass.js";
+import { makeTempDir, removeDir } from "./helpers/repo.js";
 
 /** Read-only Bash classifier (docs/M16-FRICTION.md §1). */
 describe("isReadOnlyCommand", () => {
@@ -90,6 +94,66 @@ describe("isReadOnlyCommand", () => {
     "cat *.ts",
     "echo $HOME",
     "file -b x",
+    // §19.3: a redirection into /dev/null or onto another stream writes no file
+    "ls 2>&1",
+    "ls 2>/dev/null",
+    "grep -rn X src 2>/dev/null | head",
+    "cat a 2>&1 | tail",
+    "git status >/dev/null 2>&1",
+    "ls &>/dev/null",
+    "ls 2>> /dev/null",
+    "echo done >&2",
+    "ls 1>&2 | cat",
+    "ls>/dev/null",
+    // §19.3: git reads beyond the first set
+    "git grep -n TODO -- src",
+    "git ls-tree -r HEAD --name-only",
+    "git merge-base HEAD origin/main",
+    "git rev-list --count HEAD",
+    "git show-ref --heads",
+    "git for-each-ref --format='%(refname:short)' refs/heads",
+    "git cat-file -p HEAD:README.md",
+    "git cat-file -t HEAD",
+    "git stash list",
+    "git stash show -p stash@{0}",
+    "git worktree list --porcelain",
+    "git config --get user.email",
+    "git config --get-all remote.origin.fetch",
+    "git config --get-regexp '^remote\\.'",
+    "git config --list",
+    "git config -l --show-origin",
+    "git config --global user.email",
+    "git config user.email",
+    "git config -f .gitmodules --get submodule.lib.path",
+    "git config get user.email",
+    "git config list",
+    // §19.3: tests, no-ops, GitHub reads, xargs into a command whose options are all harmless
+    "test -f .git/hooks/pre-push && echo y",
+    "[ -d src ] && ls src",
+    "test -n x || echo empty",
+    "true",
+    "false || echo no",
+    "gh pr view 42",
+    "gh pr view 42 --comments --json body",
+    "gh pr list --state open",
+    "gh pr diff 42",
+    "gh pr checks 42",
+    "gh pr status",
+    "gh issue view 7",
+    "gh issue list --label bug",
+    "gh repo view acme/acme",
+    "gh run view 1234 --log",
+    "gh run list -L 5",
+    "gh api repos/o/r/pulls/1/comments",
+    "gh api -X GET repos/o/r/issues --jq '.[].title'",
+    "gh api --method=GET repos/o/r",
+    "gh api --paginate repos/o/r/pulls",
+    "find . -name '*.java' | xargs grep -l Foo",
+    "xargs cat",
+    "find . -print0 | xargs -0 -n 20 wc -l",
+    "git ls-files | xargs -I{} grep -l x {}",
+    "ls | xargs -I {} cat {}",
+    "xargs",
   ];
   const notReadOnly = [
     "",
@@ -110,8 +174,6 @@ describe("isReadOnlyCommand", () => {
     "{ ls; }",
     "ls &",
     "ls |& cat",
-    "ls 2>&1",
-    "ls 2>/dev/null",
     "sed -i 's/a/b/' file",
     "sed -i.bak 's/a/b/' file",
     "sed -ni 's/a/b/p' file",
@@ -232,17 +294,100 @@ describe("isReadOnlyCommand", () => {
     "/tmp/bin/ls",
     "/Users/me/repo/node_modules/.bin/ls",
     "tee out",
-    "xargs cat",
     "less file",
     "more file",
     "man ls",
     "git st",
+    // §19.3: redirections that write a file, commands that are not read-only behind a harmless redirection
+    "ls > out.txt",
+    "./x 2>&1 | tail",
+    "ls 2>/dev/nullx",
+    "ls 2>/dev/null/x",
+    "ls >&out.txt",
+    "ls 2>&1x",
+    "ls 2>'/dev/null'",
+    "ls >| /dev/null",
+    "cat <<EOF",
+    // §19.3: git that writes, opens an editor or a pager, or prints through configured programs
+    "git config user.email a@b",
+    "git config --add x.y z",
+    "git config --unset user.email",
+    "git config --unset-a x.y",
+    "git config --replace-all x.y z",
+    "git config --edit",
+    "git config -e",
+    "git config --ed",
+    "git config --rename-section a b",
+    "git config --remove-section a",
+    "git config set user.email a@b",
+    "git config unset user.email",
+    "git config edit",
+    "git config",
+    "git grep -O x",
+    "git grep --open-files-in-pager=vim x",
+    "git cat-file --batch",
+    "git cat-file --textconv HEAD:x",
+    "git cat-file --filters HEAD:x",
+    "git cat-file blob HEAD:x",
+    "git stash",
+    "git stash pop",
+    "git stash drop",
+    "git worktree add ../x",
+    "git worktree remove ../x",
+    "git worktree prune",
+    // tests that can run code, GitHub writes
+    "test -v 'a[$(rm x)]'",
+    "[ -v x ]",
+    "[ -f x",
+    "[[ -f x ]]",
+    "test -f $F",
+    "gh pr checkout 42",
+    "gh pr merge 42",
+    "gh pr comment 42 -b hi",
+    "gh pr create",
+    "gh issue create",
+    "gh repo clone acme/acme",
+    "gh run rerun 1",
+    "gh api -X POST repos/o/r/issues",
+    "gh api -XDELETE repos/o/r",
+    "gh api --method PATCH repos/o/r",
+    "gh api -f a=b repos/o/r/issues",
+    "gh api -F a=@file repos/o/r/issues",
+    "gh api --field a=b repos/o/r",
+    "gh api --raw-field a=b repos/o/r",
+    "gh api --input body.json repos/o/r",
+    "gh api -if a=b repos/o/r",
+    "gh api",
+    "gh",
+    "gh pr",
+    "gh pr view $N",
+    // xargs into anything but a command whose options are all harmless
+    "xargs rm",
+    "xargs sed -n p",
+    "xargs git log",
+    "xargs xargs cat",
+    "xargs -p cat",
+    "xargs --max-args=1 cat",
+    "xargs -I {} sh -c 'cat {}'",
+    "xargs $CMD",
+    "awk '{print}' f",
+    // cd / pushd / git -C without a context
+    "cd src && git status",
+    "cd src",
+    "pushd src && ls",
+    "git -C src log",
   ];
   it.each(readOnly)("read-only: %s", (cmd) => {
     expect(isReadOnlyCommand(cmd)).toBe(true);
   });
   it.each(notReadOnly)("NOT read-only: %j", (cmd) => {
     expect(isReadOnlyCommand(cmd)).toBe(false);
+  });
+
+  it("scanCommand keeps refusing every redirection and `{}` (allow patterns and remembered keys, §19.3)", () => {
+    expect(scanCommand("ls 2>&1")).toBeNull();
+    expect(scanCommand("ls 2>/dev/null")).toBeNull();
+    expect(scanCommand("find . -exec cat {} +")).toBeNull();
   });
 
   it("scanCommand splits segments with quotes awareness", () => {
@@ -258,6 +403,80 @@ describe("isReadOnlyCommand", () => {
     // Unquoted, the shell drops them: that word names another directory.
     expect(scanCommand("cd C:\\Users\\me")).toEqual({ segments: [["cd", "C:Usersme"]] });
     expect(isReadOnlyCommand('cat "C:\\Users\\me\\a.txt"')).toBe(true);
+  });
+});
+
+/** §19.3: where a command runs — `cd` / `pushd` / `git -C` count as read-only only into the repository. */
+describe("isReadOnlyCommand with a context", () => {
+  // <tmp>/acme (the root: sub/deeper, src, vendor/lib — a nested clone), <tmp>/acme-42 (another worktree: src), <tmp>/other
+  const base = realpathSync(makeTempDir("rg-roctx"));
+  afterAll(() => removeDir(base));
+  const root = join(base, "acme");
+  const sibling = join(base, "acme-42");
+  const vendor = join(root, "vendor", "lib");
+  for (const d of [join(root, "sub", "deeper"), join(root, "src"), vendor, join(sibling, "src"), join(base, "other")]) mkdirSync(d, { recursive: true });
+  const ctx: ReadOnlyContext = { cwd: root, root, sameRepoDirs: [sibling], foreignDir: (d) => d === vendor || d.startsWith(vendor + "/") };
+
+  it("a cd into the root or one of the repository's worktrees is neutral; it moves where later segments run", () => {
+    for (const cmd of [
+      `cd ${root}/sub && git status`,
+      "cd sub && git status",
+      `cd ${sibling} && ls`,
+      "cd ../acme-42 && ls && git log --oneline -1",
+      "cd ../acme-42 && git -C src log --oneline -3",
+      `pushd ${sibling} && git status`,
+      "cd -P ../acme-42 && ls",
+      "cd -- sub && ls",
+      "cd sub",
+      "cd sub/deeper && ls",
+      `git -C ${sibling} log --oneline -3`,
+      "git -C ../acme-42 status",
+      "git -C . -C sub status",
+      "git -C ../acme-42 config --get user.email",
+    ]) {
+      expect(isReadOnlyCommand(cmd, ctx), cmd).toBe(true);
+      if (/\bcd\b|pushd|-C/.test(cmd)) expect(isReadOnlyCommand(cmd), `${cmd} (no context)`).toBe(false);
+    }
+  });
+
+  it("anywhere else a cd / pushd / git -C is not read-only — a foreign repository's config can run programs on git status", () => {
+    for (const cmd of [
+      "cd /elsewhere/repo && git status",
+      "cd missing && git status", // not there: CDPATH decides where the shell goes
+      "cd .. && ls",
+      "cd ../other && git status",
+      "cd && ls",
+      "cd - && ls",
+      "cd $HOME && ls",
+      "cd ~ && ls",
+      "cd ~/acme && ls",
+      "cd ~dev && ls",
+      "cd a b && ls",
+      "pushd +1",
+      "cd vendor/lib && git status",
+      "git -C /elsewhere log",
+      "git -C .. log",
+      "git -C vendor/lib status",
+      "git -C $DIR status",
+      "git -C",
+      "cd sub && git -C .. -C .. log",
+      // a cd that fails, or one in a pipeline, leaves the shell where it was: the next -C must be safe from both
+      "cd sub || git -C .. log",
+      "cd sub; cd ..; ls",
+      "cd ../acme-42 | git -C ../acme-42/.. log",
+      "cd sub && rm x",
+      `"cd" sub && ls`,
+    ]) {
+      expect(isReadOnlyCommand(cmd, ctx), cmd).toBe(false);
+    }
+  });
+
+  it("an unquoted `~` is the home folder; a quoted one is a folder named ~ where the shell is", () => {
+    mkdirSync(join(root, "~"), { recursive: true });
+    const inHome: ReadOnlyContext = { cwd: homedir(), root: homedir(), sameRepoDirs: [] };
+    expect(isReadOnlyCommand("cd ~ && ls", inHome)).toBe(true);
+    expect(isReadOnlyCommand("cd ~ && ls", ctx)).toBe(false);
+    expect(isReadOnlyCommand("cd '~' && ls", ctx)).toBe(true);
   });
 });
 

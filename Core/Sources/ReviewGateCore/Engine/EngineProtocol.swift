@@ -2437,6 +2437,8 @@ public struct EngineErrorDetail: Sendable, Equatable {
     public var toolName: String?
     public var path: String?
     public var branch: String?
+    /// MARK: r1-scope — §33.4: what a command changed in `path` (relative to it; `worktree_outside_review`), nil = not told.
+    public var files: [String]?
     // MARK: wave3 mac-session
     /// §36.8: the versions of a `cli_version_changed` notice.
     public var cli: CliVersionChange?
@@ -2594,6 +2596,7 @@ extension TranscriptItem: Decodable {
             facts.resetAt = (try? c.decodeIfPresent(String.self, forKey: .resetAt)) ?? nil
             facts.status = (try? c.decodeIfPresent(Int.self, forKey: .status)) ?? nil
             LongWorkWire.applyErrorFacts(from: decoder, to: &facts)   // wave4 w4-longwork (§38.2)
+            ScopeWire.applyErrorFacts(from: decoder, to: &facts)   // r1-scope (§33.4)
             kind = .error(message: (try? c.decodeIfPresent(String.self, forKey: .message)) ?? "",
                           fatal: (try? c.decodeIfPresent(Bool.self, forKey: .fatal)) ?? false,
                           scope: (try? c.decodeIfPresent(ErrorScope.self, forKey: .scope)) ?? .session,
@@ -3199,6 +3202,7 @@ extension EngineEvent: Decodable {
             detail.branch = Self.lenient(String.self, c, .branch)
             detail.cli = Self.lenient(CliVersionChange.self, c, .cli)   // wave3 mac-session (§36.8)
             LongWorkWire.applyErrorFacts(from: decoder, to: &detail)   // wave4 w4-longwork (§38.2)
+            ScopeWire.applyErrorFacts(from: decoder, to: &detail)   // r1-scope (§33.4)
             self = .error(
                 message: try c.decode(String.self, forKey: .message),
                 fatal: try c.decodeIfPresent(Bool.self, forKey: .fatal) ?? false,

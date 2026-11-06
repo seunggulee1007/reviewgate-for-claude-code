@@ -303,12 +303,17 @@ import Testing
         app.handle(.state(snapshot(seq: 1, workbenches: ["/wb/feature"])))
         app.handle(.error(message: "Bash worked outside this window's review (/wb/feature): …", fatal: false, scope: .session,
                           detail: EngineErrorDetail(code: "worktree_outside_review", detail: nil, toolName: "Bash", path: "/wb/feature")))
-        // wave4b w4b-follow (§39.4): a worktree of this repository — the chat can follow it there first.
-        #expect(app.errorBanner?.actions == [.moveChat, .openWorkbench])
+        // r1-scope (§33.4): a row, never a banner — the row carries the actions. wave4b w4b-follow (§39.4): a worktree of
+        // this repository — the chat can follow it there first.
+        #expect(app.errorBanner == nil)
+        let first = errorRows(app).last!.info
+        #expect(ScopeText.rowActions(first, isWorkbench: app.isWorkbenchPath) == [.moveChat, .openWorkbench])
         app.handle(.error(message: "m", fatal: false, scope: .session,
                           detail: EngineErrorDetail(code: "worktree_outside_review", detail: nil, toolName: "Bash", path: "/repo/vendor/lib")))
-        #expect(app.errorBanner?.actions == [.openFolder])
-        #expect(app.errorBanner?.message.contains("/repo/vendor/lib") == true)
+        let second = errorRows(app).last!
+        #expect(ScopeText.rowActions(second.info, isWorkbench: app.isWorkbenchPath) == [.openFolder])
+        #expect(second.message.contains("/repo/vendor/lib"))
+        #expect(app.errorBanner == nil)
     }
 
     /// Handoff §6 #17 / #20: notices and errors come back from `transcript_restore` as rows, worded and merged like live ones.

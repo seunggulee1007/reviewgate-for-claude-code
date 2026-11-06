@@ -25,6 +25,8 @@ export type ErrorFacts = {
   toolName?: string;
   path?: string;
   branch?: string;
+  /** MARK: r1-scope — §33.4: what a command changed in `path` (`worktree_outside_review`, relative to it). */
+  files?: string[];
 };
 
 export type ErrorTone = "fatal" | "error" | "warning" | "info";
@@ -67,6 +69,7 @@ export function factsOf(ev: {
   toolName?: string;
   path?: string;
   branch?: string;
+  files?: string[];
 }): ErrorFacts {
   return {
     ...(ev.code ? { code: ev.code } : {}),
@@ -77,6 +80,7 @@ export function factsOf(ev: {
     ...(ev.toolName ? { toolName: ev.toolName } : {}),
     ...(ev.path ? { path: ev.path } : {}),
     ...(ev.branch ? { branch: ev.branch } : {}),
+    ...(Array.isArray(ev.files) && ev.files.length > 0 ? { files: ev.files.filter((f): f is string => typeof f === "string") } : {}), // MARK: r1-scope
   };
 }
 
@@ -97,6 +101,7 @@ export function restoredErrorFacts(item: {
   toolName?: string;
   path?: string;
   branch?: string;
+  files?: string[];
 }): ErrorFacts {
   const facts = factsOf(item);
   if (facts.toolName !== undefined) return facts;
@@ -114,7 +119,8 @@ export function restoredErrorFacts(item: {
 
 /** §2.6: repeats merge on `code` + the CLI's words, else `code` + the text (§30 "clients merge repeats on code + detail"). */
 export function errorKey(message: string, facts: ErrorFacts | undefined): string {
-  return `${facts?.code ?? ""}\u0000${facts?.cliDetail ?? message}`;
+  // r1-scope (§33.4): two rows naming other files never fold into one ×N.
+  return `${facts?.code ?? ""}\u0000${facts?.cliDetail ?? message}${facts?.files ? `\u0000${facts.files.join("\n")}` : ""}`;
 }
 
 export type ErrorRow = Extract<ChatItem, { kind: "error" }>;

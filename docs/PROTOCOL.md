@@ -573,6 +573,12 @@ The review boundary is path-aware and the gate outlives the engine process. Ever
   not in `changedFiles` because the snapshot never sees them). Denied ones are simply not written. Cleared when the next
   turn starts. An approved edit of one of Claude Code's own settings files (card reason `claude_config`, §33.9) is not
   listed: the review shows it (mods group), `.claude/settings.local.json` through `local_settings_changed` (§32).
+  **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) such an edit — and
+  one into Claude's own memory (`~/.claude/projects/<key>/memory/…`, which asked in every mode before) — gets no card: the
+  hook returns no decision and the CLI's own rules decide, as in the terminal. Claude Code's own settings files still ask
+  (`~/.claude/settings.json` included, checked first; §33.9), and git's own state stays denied. Every such edit that ran is
+  listed in `changedOutside` all the same: a PostToolUse hook records it (in default mode the approved card did). Memory
+  files are listed by their path; clients recognise them and label them (`메모리에 기록`).
 - **Ignored writes (`ignoredTouched`, `filteredByPattern`).** After the collection the turn's tool-touched paths under the
   root are run through `git check-ignore --stdin`; the gitignored ones (`.env`, `build/`, `*.log`, …) are listed in
   `state.gate.ignoredTouched` — written on disk, invisible to the review by construction. Paths hidden by
@@ -672,7 +678,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   `LANGUAGE`, `TZ`, `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR`, `COLUMNS`, `LINES`, `TERM`; `NODE_OPTIONS=`, `PAGER=`, `GIT_*=`,
   `LD_*=` … reject); a `/abs/path/git` counts by its basename only from `/bin`, `/usr/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
   `/sbin`, `/usr/sbin`, `./x` never — is in `ls cat head tail wc pwd which type echo printf grep rg find fd stat file env date
-  whoami tree du df ps id uname sort uniq cut sed tr jq node npm python3 git` (`awk` is NOT: its programs can write, pipe, run
+  whoami tree du df ps id uname sort uniq cut sed tr jq node npm python3 git test [ true false gh xargs` (§19.3; `awk` is NOT: its programs can write, pipe, run
   commands and load files) and its arguments pass the per-command check: `sed` needs `-n`/`--quiet`/`--silent`, no
   `-i`/`-I`/`--in-place`/`-f`/`--file`, and every script (`-e`, `--expression`, or the first operand) must parse as addresses +
   simple commands (`p P l q Q = d D n N g G h H x z { }`) and `s`/`y` with only `g p i I m M <n>` flags — `w`/`W`/`r`/`R`/`e`
@@ -686,11 +692,13 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   — any other global option (`-c`, `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--config-env`, …) rejects — without `-o`,
   `--output`, `--ext-diff`, `--textconv` (or their prefixes), where `branch`/`tag` must be listing (no positional unless
   `--list`/`-l`/`--contains`/`--merged`/`--points-at`; no `-d`/`-D`/`-m`/`-c`/`-f`/`-u`/`-a`/`-s`/`--set-upstream-to`/…) and
-  `remote` only bare, `show` or `get-url`. A word with an unquoted glob (`*`, `?`, `[`) or `$` is only allowed as an argument of
+  `remote` only bare, `show` or `get-url` (§19.3 adds more git reads, `config` reads, `gh` reads, `test`, `xargs`, and `cd` /
+  `git -C` into the repository). A word with an unquoted glob (`*`, `?`, `[`) or `$` is only allowed as an argument of
   `ls cat head tail wc pwd which type echo printf grep stat du df ps id uname cut tr jq whoami` (a planted file named `--pre=x`
   matched by `*` must never reach `rg`/`sort`/`git`/…), never as the command name. Any `>`, `<`
-  (so `2>&1`, `<(…)`, heredocs too), `(`, `)`, `{`/`}` at a word start, backtick, `$(`, background `&`, `|&`, an unterminated quote,
-  an empty line, or a segment starting with anything else (`sudo`, `rm`, `mv`, `cp`, `tee`, `xargs`, `eval`, `exec`, `npm test`,
+  (so `<(…)`, heredocs too — but not a redirection into /dev/null or onto another stream such as `2>&1`, §19.3), `(`, `)`,
+  `{`/`}` at a word start, backtick, `$(`, background `&`, `|&`, an unterminated quote,
+  an empty line, or a segment starting with anything else (`sudo`, `rm`, `mv`, `cp`, `tee`, `eval`, `exec`, `npm test`,
   `node script.js`, …) makes the command NOT read-only. The PreToolUse Bash hook then answers `permissionDecision: "allow"`
   (reason `ReviewGate: read-only command`) instead of `ask`, and `canUseTool` applies the same rule should it still be reached;
   the budget deny is checked first, and a git command that changes the repository (`git commit|merge|checkout|…`) always
@@ -1180,6 +1188,43 @@ same scanner as the read-only classifier) and:
 - A quoted command name holding whitespace (`"npm test" x`) never matches. `rememberKey` uses the tokenized first
   segment when the line tokenizes (`echo "a b" c` → `Bash:echo a b`), the raw first two words otherwise (unchanged:
   `echo hi > x.txt` → `Bash:echo hi`, but that redirected line itself is no longer auto-allowed by the key).
+
+**Read-only commands, wider (2026-11; the list of §10).** The terminal ran `grep -rn X src 2>/dev/null | head`,
+`find . | xargs grep -l X`, `git config --get user.email`, `test -f x`, `gh pr view 42` or `cd ../acme-42 && git log` without
+asking; ReviewGate put each of them on a card — and on every guard that lets reads through (the §33.4 scope cards, plan
+mode §19.4, side questions §21, the unprompted-turn guard §18). `isReadOnlyCommand(command, context?)`
+(`engine/src/session/bashClass.ts`) now also accepts:
+
+- A redirection that writes no file: `2>&1`, `1>&2`, `>&2`, `>/dev/null`, `2>/dev/null`, `&>/dev/null` (and the `>>` forms).
+  Any other `>` / `<` still makes the line not read-only. Allow patterns and remembered keys still never cover a redirected
+  line (above): only the classifier drops these.
+- `test` / `[ … ]` — never with `-v` / `-R`, where bash evaluates an array subscript (`a[$(cmd)]`) — `true`, `false`.
+- git reads: `grep` (not `-O` / `--open-files-in-pager`, which runs a program), `ls-tree`, `merge-base`, `rev-list`,
+  `show-ref`, `for-each-ref`, `cat-file -p|-t|-s|-e` (no `--batch*`, `--textconv`, `--filters`), `stash list|show`,
+  `worktree list`, and the `config` read forms: `--get`, `--get-all`, `--get-regexp`, `--list` / `-l`, `get <key>`, `list`,
+  or exactly one positional key — never with `--add`, `--unset*`, `--replace-all`, `--edit` / `-e`, `--rename-section`,
+  `--remove-section` (or a prefix git would take for one), the subcommands `set` / `unset` / `edit` / `rename-section` /
+  `remove-section`, or a short option other than `-l`, `-z`, `-f <file>`, `-t <type>`.
+- `gh pr view|list|diff|checks|status`, `gh issue view|list`, `gh repo view`, `gh run view|list`, and `gh api <path>` as a
+  GET: no `-X` / `--method` other than `GET`, none of `-f` / `-F` / `--field` / `--raw-field` / `--input` (they make it a POST).
+- `xargs [-0] [-r] [-n N] [-I R] [-P N] [-L N] <command> …` when `<command>` is one of the commands whose every option is
+  harmless (the glob-safe list of §10: what `xargs` reads becomes its arguments, so a planted file named `--pre=x` stays a
+  file name) and read-only with its own arguments; no command is `echo`. `xargs rm`, `xargs sed -n p`, `xargs git log` are not.
+  A lone `{}` word (`xargs -I {} cat {}`) is literal to the shell and accepted.
+- **Where it runs (the context).** `{cwd, root, sameRepoDirs}`: the shell's directory, the checkpoint root and the
+  repository's other worktrees (they share its git config). A `cd <dir>` / `cd -P|-L <dir>` / `pushd <dir>` is neutral
+  when `<dir>` (no `$`, glob or backtick; an unquoted `~` / `~/…` is the home folder) is an existing folder inside the root
+  or one of those worktrees and not inside a nested repository of its own (a clone, a submodule): it moves where the
+  following segments may run — a `cd` that fails, or runs in a pipeline's subshell, leaves the shell where it was, so a
+  later relative path must be safe from every place the shell may be. `git -C <dir>` may name such a folder the same way.
+  Any other `cd` — elsewhere, bare `cd`, `cd -`, `cd ~user`, `pushd +N`, a folder that is not there (CDPATH would decide where
+  the shell goes) — makes the line not read-only: a foreign repository's config can run an fsmonitor or a pager on
+  `git status`. Without a context neither `cd` nor `git -C` is read-only, as before.
+- **Who judges with the context.** The Bash hook (the hook input's `cwd`, the checkpoint root, `git worktree list` minus
+  the root, cached per turn), `canUseTool` (the session's folder), the plan-mode and unprompted-turn guards (§19.4, §18), the
+  settings-file check (§33.9) and side questions (§21: the project folder, no other worktrees). So `cd ../acme-42 && git log`
+  or `git -C ../acme-42 status` runs without the §33.4 card (a read-only command never got it), in plan mode and in a side
+  question. The queue the engine answers after a remembered allow (§33.1) still judges without it.
 
 ### 19.4 Plan mode does not edit
 
@@ -1785,7 +1830,11 @@ type StaleReview = {
   diff is the call's only when its **change time** (`ctime`, which `touch -t` / `cp -p` cannot set back; a deleted file: its
   nearest existing parent directory) falls inside the call's **execution window**: from the PreToolUse hook — moved up to
   `PostToolUse − duration_ms` (tool execution only, so a permission card the user thought about is not part of it) — minus
-  1.5 s, to the PostToolUse hook plus 0.1 s. A change made between two calls is nobody's.
+  1.5 s, to the PostToolUse hook plus 0.1 s. A change made between two calls is nobody's. **Not after a read-only command**
+  (§10, §19.3 — judged at its PreToolUse, where it runs; not one run in the background): it changes nothing, so it takes no
+  snapshot and no diff (0.2–0.6 s each on a large repository, before Claude got its result) and leaves the previous
+  snapshot as the base; the turn's first snapshot is taken before its first command that may write. A file such a command
+  wrote all the same still reaches the review at the turn's end (snapshot B, §34.1) as `external` — only its cause is lost.
 - **`external`** — nothing of Claude's explains it: an IDE save, another Claude session, a `git pull` / checkout, a file
   Claude only read, a failed edit, work done while the app was closed (restore), an edit found by `refresh`.
 
@@ -2033,6 +2082,9 @@ not know and treats the card like the others (no "always allow" / "세션 동안
   e.g. a sibling `../acme-4821`, or the main checkout from a workbench), or a Bash command that runs there (§33.4);
   `reason.path` = that worktree.
 - **`worktree_command`** / **`worktree_isolation`** — §33.4.
+- **Auto mode** (2026-11, §39.5): an edit that would get `outside_project`, `nested_repository` or `other_worktree` gets no
+  card — the CLI decides, and the file is listed in `changedOutside` (§8); `claude_config` keeps its card. A Bash command:
+  §33.4.
 - **`claude_config`** — an edit tool, a Bash command or a writing MCP call changes `.claude/settings.json`,
   `.claude/settings.local.json` or `.mcp.json` (§33.9); `reason.path` = that file. The location codes above come first.
 - **`git_command`** — a Bash command that changes the repository (`git commit`, `merge`, `pull`, `checkout`, `reset`, …;
@@ -2047,8 +2099,11 @@ Claude's edits where this window's review never sees them (verified: an edit in 
 `diff-tree A B` empty, the tree only holds the `160000` gitlink). ReviewGate's way to work in parallel is a workbench (§6).
 
 - **`EnterWorktree` is always denied** by the PreToolUse hook (deny wins in every mode; `canUseTool` repeats it), with
-  *"ReviewGate: EnterWorktree is not available here — this window reviews only this folder … tell the user: they open a
-  separate ReviewGate workbench for it."* Allowing it would move the whole session out of the review.
+  *"ReviewGate: EnterWorktree is not available in ReviewGate. To work in a separate worktree run `git worktree add
+  ../<repo>-<name> -b <branch>` (never under /tmp) and continue there; ReviewGate offers to move this chat into it. Do not
+  switch this checkout's branch to start new work unless the user asked."* Allowing it would move the whole session out of
+  the review. (2026-11: it said to keep working in this folder and ask the user for a workbench — a skill that starts its
+  work in a worktree then ran `git checkout -b` in this checkout instead.)
 - **`Workflow` and isolated agents** (`isolation` other than `"none"`, or a `cwd` outside the project / in a nested
   repository) are **denied unless `settings.allowWorktreeIsolation`** (default false), with a reason telling Claude to run
   the agent without `isolation` / `cwd` or to ask the user for a workbench. With the setting on they still never run
@@ -2060,19 +2115,42 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   new worktree>}`; a command that runs in — or `cd` / `pushd` / `git -C` into — a nested repository or another worktree
   gets `nested_repository` / `other_worktree` with that path. "Runs in" uses the CLI's current directory from the hook
   input (the Bash shell's directory after an earlier `cd`). These never ride on `bashAllowPatterns`, a remembered key or
-  the user's rules; a read-only command (§10) still runs without a card. After an approved one ran:
-  `worktree_outside_review`. The worktree list is re-read after any command mentioning `worktree`.
-- **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?}` with an English `message`:
+  the user's rules; a read-only command (§10, §19.3: a `cd` / `git -C` into a worktree of this repository included) still
+  runs without a card. After one ran:
+  `worktree_outside_review` (for a command in another worktree or a nested repository: only when it changed something
+  there, with `files`, below). The worktree list is re-read after any command mentioning `worktree`.
+  **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) a command in another
+  worktree of the repository or in a nested repository gets **no card**: the hook reads those folders' state for the
+  after-notice and goes on to the settings-file (§33.9) and git (§46) checks — a command there that changes Claude Code's
+  settings or the repository keeps that card — and then leaves it to the CLI's own rules and classifier, as in the terminal.
+  Those files were never in this window's review; the row after the call lists what changed, and that worktree's own window
+  reviews it. So does a `git worktree add` of this repository (not of another one: no chat can follow there): no card, and
+  once the worktree is there the engine lists it and says so in a `worktree_outside_review` row whose action moves this chat
+  into it (§39.4).
+- **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?, files?}` with an English `message`:
   `worktree_blocked` (a deny above: `toolName` = `EnterWorktree` / `Workflow` / `Agent` / `Task`, `branch` = EnterWorktree's
-  `name`, `path` = its `path`) and `worktree_outside_review` (an approved worktree command / isolated agent / command in
-  another worktree ran; `path` = where). At most once per turn per tool, path and branch; it sets `state.lastError` like any
-  error. Clients show a banner with **"워크벤치로 열기"**: `workbench_create {branch}` for a blocked EnterWorktree (prefilled
-  with `branch`), or open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
+  `name`, `path` = its `path`; at most once per turn per tool, path and branch; it sets `state.lastError` like any error) and
+  `worktree_outside_review`:
+  - an approved worktree command or isolated agent ran (`path` = the new worktree / the agent's): once per turn per tool,
+    path and branch;
+  - a command ran in another worktree or a nested repository (`path` = that worktree / repository root) **and changed
+    something there** (2026-11). The Bash hook reads that folder's `git status --porcelain` before the call, with each
+    entry's file size and times, and again after it; `files` (new, optional) lists the paths that differ — a new, changed,
+    removed or committed file — relative to `path`, POSIX, sorted, at most 100. A call that changed nothing there raises
+    none (before, every approved one did, a `make` that wrote nothing too). One notice per call; a file a notice of this turn
+    named already is not named again. Without `files` (git could not tell) it only says where.
+
+  `worktree_outside_review` is a row, not a failure: it never sets `state.lastError` (before, it did) and never stops a
+  queue; its transcript row keeps `files` (§35.3). Clients show `worktree_blocked` as a banner with **"워크벤치로 열기"**:
+  `workbench_create {branch}` for a blocked EnterWorktree (prefilled with `branch`). `worktree_outside_review` is a chat
+  row only (2026-11; before, an orange banner), an information row (blue) live and restored alike: *"이 창의 리뷰에 잡히지
+  않는 곳에서 바뀌었어요: <path>"* with the files on its second line (the first 8, then *"외 N개"*) — without `files` the
+  earlier sentence — and the actions the banner had: **[이 채팅을 거기로 옮기기]** and **[워크벤치로 열기]** when `path` is a
+  worktree of this repository (`state.workbenches.list`, §39.4), else **[폴더 열기]**; none on another chat's rows (viewing).
+  Two rows naming other files never fold into one ×N.
 - **System instruction.** The engine appends its own paragraph after `settings.systemPromptAppend` (separated by a blank
-  line): *"ReviewGate reviews every change you make in this folder (<cwd>). Work only inside it: do not create or enter git
-  worktrees (EnterWorktree, `git worktree add`) and do not `cd` into another worktree or a nested repository to change files
-  there. …"* plus whether isolation is blocked or allowed, and *"If parallel work on another branch is needed, say so: the
-  user opens a separate ReviewGate workbench for it."*
+  line): *"ReviewGate reviews every change you make in this folder (<cwd>). …"* — the current wording is in §39.4 — plus
+  whether isolation is blocked or allowed.
 
 ### 33.5 The user's Claude Code allow rules (audit daily-04, SME-04, market-14)
 
@@ -2602,6 +2680,7 @@ do) keeps working. The reply carries `skipped` only when the command had an `id`
 ```ts
 // a kind: "error" transcript row (§30) also keeps, when its event carried them (ErrorRowDetails):
 toolName?: string; path?: string; branch?: string;   // §33.4 worktree_blocked / worktree_outside_review
+files?: string[];                                   // §33.4 worktree_outside_review of a command: what it changed there
 exitCode?: number | null; signal?: string | null;   // §30: how the CLI ended
 sessionId?: string;                                 // §30 resume_not_found / resume_failed: the chat that could not be continued
 resetAt?: string; status?: number | null;           // usage_limit / rate_limited, the HTTP status of an API error
@@ -3970,14 +4049,23 @@ sends none of it and the engine behaves as before.
     A `follow` sent anyway is a plain allow. `chat_move` (and a plan sent to a workbench) to such a folder is refused
     `other_repository` instead of `not_a_worktree`. Seen in a real chat: a window on one repository's worktree, and
     Claude ran `cd <another repository> && git worktree add …`.
-- **System instruction (§33.4, changed).** *"ReviewGate reviews every change you make in this folder (<cwd>). Work inside
-  it; never use EnterWorktree. If the task needs its own git worktree, you may create it with `git worktree add`, but tell
-  the user right away in one line: changes there are not reviewed until they move this chat into that worktree (ReviewGate
-  offers it), so do not change files there before that. Do not `cd` into another worktree or a nested repository to change
-  files there."* `EnterWorktree` stays denied (it moves the whole session out of the review); the `worktree_command` card
-  stays.
-- **Clients** (Mac and Electron the same, same i18n keys). The `worktree_outside_review` banner leads with **[이 채팅을
-  거기로 옮기기]** when `path` is in `state.workbenches.list` ([워크벤치로 열기] stays; off with a one-line reason on a
+- **Made in auto mode** (2026-11). In auto mode a `git worktree add` of this repository runs without a card (§33.4,
+  §39.5). The Bash hook reads the repository's worktrees before the command and passes them with its after-notice, so the
+  engine still knows whether this chat made the worktree (`baseline: "head"` on a move, as after a card). Once the worktree
+  is there it is listed in `state.workbenches`, and then `worktree_outside_review {path: <its root>}` says so — a chat row
+  whose [이 채팅을 거기로 옮기기] sends `chat_move` (asking first while Claude works, below). A command that made no worktree
+  says nothing. In default mode the card and "허용하고 따라가기" are as they were.
+- **System instruction (§33.4, changed 2026-11).** *"ReviewGate reviews every change you make in this folder (<cwd>).
+  EnterWorktree is not available in ReviewGate. To work in a separate worktree run `git worktree add ../<repo>-<name> -b
+  <branch>` (never under /tmp) and continue there; ReviewGate offers to move this chat into it. Do not switch this checkout's
+  branch to start new work unless the user asked. Commands may run in this repository's other worktrees; ReviewGate lists
+  what they changed after the call, and that worktree's own window reviews it."* plus the isolation sentence. Before, it
+  said *"never use EnterWorktree"* with only the user's workbench as the way out, and *"Do not `cd` into another worktree
+  or a nested repository to change files there."*: a skill that starts its work in a worktree skipped that step and ran
+  `git checkout -b` in this checkout (the IDE's checkout followed). `EnterWorktree` stays denied (it moves the whole session
+  out of the review); in default mode the `worktree_command` card stays.
+- **Clients** (Mac and Electron the same, same i18n keys). The `worktree_outside_review` row (2026-11: a banner before,
+  §33.4) leads with **[이 채팅을 거기로 옮기기]** when `path` is in `state.workbenches.list` ([워크벤치로 열기] stays; off with a one-line reason on a
   record). While Claude works (a turn, a card / question / plan, a start) it asks "Claude가 작업 중이에요 — 멈추고 옮길까요?"
   [멈추고 옮기기] [취소] with "거기서 하던 일을 이어서 하라고 보내기" (on): `followUp` = "작업 폴더를 <worktree>로 옮겼어요. 하던
   일을 이어서 해 줘.". A `worktree_command` card shows **[허용하고 따라가기]**. On `chat_moved` the app fronts the window
@@ -4005,7 +4093,10 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   decide. It applies only while the hook input's `permission_mode` is `auto` too (absent — an older CLI — counts as the
   engine's mode); a CLI that runs another mode keeps the cards. Unchanged in every mode, because they are decided first: the
   git guard and budget denies, `EnterWorktree`, the Workflow / isolated-agent rules (§33.4), the reason cards (§33.3:
-  `outside_project`, `nested_repository`, `other_worktree`, `worktree_command`, `worktree_isolation`, `claude_config`),
+  `outside_project`, `nested_repository`, `other_worktree`, `worktree_command`, `worktree_isolation`, `claude_config`)
+  — except, since 2026-11, a Bash command in another worktree of the repository or in a nested repository and a
+  `git worktree add` of this repository (§33.4: the CLI's call, listed after it), and an edit outside the project, in a
+  nested repository or in Claude's memory (§8: the CLI's call, listed in `changedOutside`) —
   the edit budget hook and the review of every file a call changed (a Bash command that writes a project file is caught by
   the post-Bash snapshot and lands in the review, as before). `SendMessage`, `AskUserQuestion`, `EnterPlanMode` and
   `ExitPlanMode` keep their card (§44.1: EnterPlanMode no longer — it only restricts Claude). What the classifier hands to

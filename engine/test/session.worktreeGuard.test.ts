@@ -83,7 +83,9 @@ describe("worktree tools (§33.4, audit market-01)", () => {
       const c = ctx(root, { allowWorktreeIsolation });
       const d = await pre(c, "EnterWorktree", { name: "feature-x" }, root);
       expect(d.decision).toBe("deny");
-      expect(d.reason).toMatch(/workbench/i);
+      // §39.5: the way to a worktree of its own, so a worktree-first skill does not switch this checkout's branch instead.
+      expect(d.reason).toMatch(/git worktree add \.\.\/<repo>-<name> -b <branch>/);
+      expect(d.reason).toMatch(/Do not switch this checkout's branch/);
       expect(c.notices).toEqual([{ code: "worktree_blocked", toolName: "EnterWorktree", toolUseId: "t1", branch: "feature-x" }]);
     }
   });
@@ -231,11 +233,14 @@ describe("ClaudeSession worktree guard (§33.4)", () => {
       const sp = captured.options!.systemPrompt as { type: string; append: string };
       expect(sp.append.startsWith("Budget: 10 files.")).toBe(true);
       expect(sp.append).toContain(root);
-      // §39.4: a worktree may be created, said at once; the review follows only when the user moves the chat there.
-      expect(sp.append).toMatch(/never use EnterWorktree/i);
-      expect(sp.append).toMatch(/you may create it/i);
-      expect(sp.append).toMatch(/move this chat into that worktree/i);
-      expect(sp.append).toMatch(/workbench/i);
+      // §39.4 / §39.5: no EnterWorktree — the alternative is said (a worktree next to this one, the chat can move there),
+      // and a worktree-first skill must not switch this checkout's branch instead.
+      expect(sp.append).toMatch(/EnterWorktree is not available in ReviewGate/);
+      expect(sp.append).not.toMatch(/never use EnterWorktree/i);
+      expect(sp.append).toMatch(/run `git worktree add \.\.\/<repo>-<name> -b <branch>` \(never under \/tmp\) and continue there/);
+      expect(sp.append).toMatch(/offers to move this chat into it/);
+      expect(sp.append).toMatch(/Do not switch this checkout's branch to start new work unless the user asked/);
+      expect(sp.append).toMatch(/lists what they changed after the call/);
       if (allowWorktreeIsolation) expect(sp.append).toMatch(/allowed by the user/i);
       else expect(sp.append).toMatch(/blocks them/i);
       await s.dispose();
