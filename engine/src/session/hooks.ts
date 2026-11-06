@@ -11,7 +11,7 @@ import type { PermissionMode, PermissionReason } from "../protocol.js";
 import { openCheckpoint, type GitCheckpoint } from "../git/checkpoint.js";
 import { matchesIgnore } from "../git/ignore.js";
 import { isModsPath } from "../git/mods.js";
-import { commonDir, gitDir, listWorktrees, sameRepository } from "../git/worktrees.js";
+import { commonDir, gitDir, listWorktrees, sameRepository, type GitWorktree } from "../git/worktrees.js";
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
 import { isReadOnlyCommand, isRemembered, matchesAllowPattern, type ReadOnlyContext } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
@@ -317,8 +317,15 @@ export type HookContext = {
   log: SessionLog;
 };
 
-/** §33.4: a Bash call's folders outside this window's review, with their state before it ran (null: git did not answer). */
-export type ScopeWatch = { targets: { code: PermissionReason["code"]; path: string; before: DirState | null }[] };
+/**
+ * §33.4: a Bash call's folders outside this window's review, with their state before it ran (null: git did not answer);
+ * §39.5 `worktree`: a worktree command left to the CLI in auto mode — the path it names and the repository's worktrees
+ * before it ran (null: git did not answer), for the engine's §39.4 bookkeeping.
+ */
+export type ScopeWatch = {
+  targets: { code: PermissionReason["code"]; path: string; before: DirState | null }[];
+  worktree?: { path?: string; before: GitWorktree[] | null };
+};
 
 function allow(): HookJSONOutput {
   return {};
@@ -538,6 +545,10 @@ async function noticeAfterBash(input: HookInput, ctx: HookContext): Promise<void
   }
   ctx.scopeWatches!.delete(toolUseId);
   ctx.scopeReasons?.delete(toolUseId); // its card (if any) was answered
+  if (watch.worktree) {
+    const w = watch.worktree;
+    ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "Bash", toolUseId, ...(w.path ? { path: w.path } : {}), reasonCode: "worktree_command", ...(w.before ? { worktreesBefore: w.before } : {}) });
+  }
   for (const t of watch.targets) {
     const after = t.before ? await dirState(t.path) : null;
     const files = t.before && after ? changedPaths(t.before, after) : undefined;
@@ -801,7 +812,15 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (scope && !(ctx.autoAllowReadOnlyBash !== false && readOnly)) {
       // §33.4: what it changes in the other worktrees / nested repositories it runs in is listed after the call.
       if (scope.code !== "worktree_command") await watchOutside(ctx, toolUseId, command, cwd, root, ro.sameRepoDirs);
-      const cliDecides = scopeCliDecides(ctx, input) && (scope.code === "other_worktree" || scope.code === "nested_repository");
+      // §39.5: a worktree of this repository may be made without a card too (another repository's keeps it: no chat can
+      // follow there); the engine is told once it ran, with the worktrees there were before, and offers to move the chat.
+      const cliDecides = scopeCliDecides(ctx, input) && !scope.otherRepository;
+      if (cliDecides && scope.code === "worktree_command" && toolUseId) {
+        const before = await listWorktrees(root).catch(() => null);
+        if (!ctx.scopeWatches) ctx.scopeWatches = new Map();
+        const prior = ctx.scopeWatches.get(toolUseId);
+        ctx.scopeWatches.set(toolUseId, { targets: prior?.targets ?? [], worktree: { ...(scope.path ? { path: scope.path } : {}), before } });
+      }
       if (!cliDecides) {
         rememberScope(ctx, toolUseId, scope);
         return askPre(SCOPE_ASK_REASON);

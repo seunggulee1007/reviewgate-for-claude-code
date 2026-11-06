@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { PermissionReason } from "../protocol.js";
+import type { GitWorktree } from "../git/worktrees.js";
 import { HOST_FLAVOR, isInside, parseAbs, realpathLenient, relativeInside, samePath, toRepoRelative } from "../platform/paths.js";
 import { scanCommand, type ReadOnlyContext } from "./bashClass.js";
 
@@ -322,6 +323,11 @@ export type ScopeNotice = {
    * POSIX, sorted, at most 100): what that folder's `git status` shows differently after the call.
    */
   files?: string[];
+  /**
+   * §39.5: a worktree command left to the CLI in auto mode (no card): the repository's worktrees before it ran — what the
+   * engine reads at a card otherwise (§39.4: did this chat make it?); engine-internal.
+   */
+  worktreesBefore?: GitWorktree[];
 };
 
 /** English fallback of a notice's `error.message` (clients localize on `code`). */
@@ -334,9 +340,15 @@ export function scopeNoticeMessage(n: ScopeNotice): string {
   return n.files?.length ? `${text} Changed: ${n.files.join(", ")}` : text;
 }
 
-export const ENTER_WORKTREE_REASON =
-  "ReviewGate: EnterWorktree is not available here — this window reviews only this folder, and a worktree's changes would bypass that review. " +
-  "Keep working in this folder. If the work needs its own branch or worktree, tell the user: they open a separate ReviewGate workbench for it.";
+/**
+ * §33.4 / §39.4: EnterWorktree would move the whole session out of this window's review; the way to a worktree of its own
+ * is `git worktree add` (this chat can follow it there). Worded so that a skill that starts its work in a worktree does not
+ * fall back to switching this checkout's branch.
+ */
+const WORKTREE_WAY =
+  "To work in a separate worktree run `git worktree add ../<repo>-<name> -b <branch>` (never under /tmp) and continue there; " +
+  "ReviewGate offers to move this chat into it. Do not switch this checkout's branch to start new work unless the user asked.";
+export const ENTER_WORKTREE_REASON = `ReviewGate: EnterWorktree is not available in ReviewGate. ${WORKTREE_WAY}`;
 export const ISOLATION_REASON =
   "ReviewGate: agents run in this folder only — `isolation`, an Agent `cwd` outside the project and the Workflow tool put their changes outside " +
   "this window's review, so they are blocked. Run the agent again without `isolation` / `cwd`, or do the work here. If a separate worktree is " +
@@ -368,21 +380,20 @@ export function worktreeToolBlocked(toolName: string, input: Record<string, unkn
 }
 
 /**
- * The engine's own system instruction (appended after the client's): work in this folder. MARK: wave4b w4b-follow — §39.4:
- * a team that makes a worktree per issue may let Claude create one, said at once; the user moves the chat there (the
- * review follows). EnterWorktree stays denied: it would move the whole session out of the review.
+ * The engine's own system instruction (appended after the client's). MARK: wave4b w4b-follow — §39.4: a team that makes a
+ * worktree per issue lets Claude create one with `git worktree add` and work there; the user moves the chat there (the
+ * review follows). EnterWorktree stays denied: it would move the whole session out of the review. §39.5 (2026-11): commands
+ * in the repository's other worktrees are listed after the call; the way to a worktree is said, so a worktree-first skill
+ * does not switch this checkout's branch instead.
  */
 export function scopeInstruction(cwd: string, allowIsolation: boolean): string {
   return (
-    `ReviewGate reviews every change you make in this folder (${cwd}). Work inside it; never use EnterWorktree. ` +
-    "If the task needs its own git worktree, you may create it with `git worktree add`, but tell the user right away in one line: " +
-    "changes there are not reviewed until they move this chat into that worktree (ReviewGate offers it), so do not change files " +
-    "there before that. Commands may run in this repository's other worktrees; ReviewGate lists what they changed after " +
+    `ReviewGate reviews every change you make in this folder (${cwd}). EnterWorktree is not available in ReviewGate. ${WORKTREE_WAY} ` +
+    "Commands may run in this repository's other worktrees; ReviewGate lists what they changed after " +
     "the call, and that worktree's own window reviews it. " +
     (allowIsolation
-      ? "Agents with `isolation: \"worktree\"` and the Workflow tool are allowed by the user, but their changes are outside this window's review — prefer working here. "
-      : "Agents with `isolation` and the Workflow tool are not available: their changes would be outside the review, so ReviewGate blocks them. ") +
-    "If parallel work on another branch is needed, say so: the user opens a separate ReviewGate workbench for it."
+      ? "Agents with `isolation: \"worktree\"` and the Workflow tool are allowed by the user, but their changes are outside this window's review — prefer working here."
+      : "Agents with `isolation` and the Workflow tool are not available: their changes would be outside the review, so ReviewGate blocks them.")
   );
 }
 

@@ -291,3 +291,82 @@ describe("§39.5: in auto mode a command in another worktree or a nested reposit
     expect(c.scopeReasons?.get("c1")?.code).toBe("claude_config");
   });
 });
+
+describe("§39.5: making a worktree in auto mode", () => {
+  const auto = { permission_mode: "auto" };
+
+  it("`git worktree add` of this repository runs without a card in auto mode; the notice after it carries the worktrees before", async () => {
+    const { root } = repoWithSibling();
+    const target = join(dirname(root), `${basename(root)}-43`);
+    dirs.push(target);
+    const add = `git worktree add ../${basename(target)} -b f`;
+    const c = ctx(root, { permissionMode: "auto" });
+    expect(await preBash(c, add, root, "m1", auto)).toEqual({});
+    expect(c.scopeReasons?.has("m1") ?? false).toBe(false);
+    sh(root, "worktree", "add", "-q", "-b", "f", target); // what the command did
+    await postBash(c, add, root, "m1", auto);
+    expect(c.notices).toHaveLength(1);
+    const n = c.notices[0] as { code: string; path: string; reasonCode: string; worktreesBefore: { path: string }[] };
+    expect(n).toMatchObject({ code: "worktree_outside_review", toolName: "Bash", toolUseId: "m1", path: target, reasonCode: "worktree_command" });
+    expect(n.worktreesBefore.map((w) => w.path)).not.toContain(target);
+    expect(n.worktreesBefore.map((w) => w.path)).toContain(root);
+    // Default mode keeps the card (with "허용하고 따라가기").
+    const def = ctx(root);
+    expect(await preBash(def, "git worktree add ../acme-44 -b g", root, "m2")).toMatchObject({ decision: "ask" });
+    expect(def.scopeReasons?.get("m2")).toMatchObject({ code: "worktree_command" });
+  });
+
+  it("another repository's worktree keeps its card in auto mode (no chat of this window can follow it there)", async () => {
+    const { root } = repoWithSibling();
+    const other = realpathSync(makeRepo());
+    dirs.push(other);
+    const c = ctx(root, { permissionMode: "auto" });
+    expect(await preBash(c, `cd ${other} && git worktree add -b x ${other}-x`, root, "o1", auto)).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("o1")).toMatchObject({ code: "worktree_command", otherRepository: true });
+  });
+});
+
+describe("§39.5: the engine — a worktree the CLI made in auto mode", () => {
+  it("is listed, said in a row naming it (its actions can move the chat there), and reviews from HEAD when the chat moves", async () => {
+    const main = realpathSync(makeRepo());
+    const wt = `${main}-43`;
+    dirs.push(main, wt);
+    const h = makeHarness();
+    harnesses.push(h);
+    await h.hello();
+    await h.open(main);
+    await h.engine.handle({ type: "send", text: "make a worktree for task 43" });
+    const s = h.session();
+    const before = (await import("../src/git/worktrees.js")).parseWorktreeList(sh(main, "worktree", "list", "--porcelain"));
+    sh(main, "worktree", "add", "-q", "-b", "task-43", wt);
+    write(wt, "work.txt", "done there before the move\n");
+    s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: wt, reasonCode: "worktree_command", worktreesBefore: before });
+    await h.waitFor(() => h.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row", 10_000);
+    expect(h.engine.state.workbenches.list.some((w) => w.path === wt)).toBe(true);
+    const row = h.ofType("error").find((e) => e.code === "worktree_outside_review")!;
+    expect(row).toMatchObject({ fatal: false, scope: "session", toolName: "Bash", path: wt });
+    expect(row).not.toHaveProperty("worktreesBefore");
+    expect(h.engine.state.lastError).toBeNull();
+    // The chat moves there (the row's action): this chat made it, so its review starts at HEAD and holds what was done there.
+    s.emitTurnEnd({ sessionId: h.engine.state.sessions.currentId! });
+    await h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "turn end");
+    await h.engine.request({ type: "chat_move", path: wt });
+    expect(h.ofType("chat_moved").at(-1)).toMatchObject({ path: wt, baseline: "head" });
+  });
+
+  it("a worktree command that made nothing (git refused it) says nothing", async () => {
+    const main = realpathSync(makeRepo());
+    dirs.push(main);
+    const h = makeHarness();
+    harnesses.push(h);
+    await h.hello();
+    await h.open(main);
+    await h.engine.handle({ type: "send", text: "make a worktree" });
+    const before = (await import("../src/git/worktrees.js")).parseWorktreeList(sh(main, "worktree", "list", "--porcelain"));
+    h.session().emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: `${main}-none`, reasonCode: "worktree_command", worktreesBefore: before });
+    await h.settle();
+    await new Promise((r) => setTimeout(r, 300));
+    await h.settle();
+    expect(h.ofType("error").filter((e) => e.code === "worktree_outside_review")).toEqual([]);
+  });
+});
