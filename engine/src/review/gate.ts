@@ -58,6 +58,39 @@ export const FILE_DIFF_MAX_LINES = 20_000;
 /** MARK: wave4b w4b-bigturn — §39.1: above this many files the reject checks read whole trees once (`worktreeMatchesMany`). */
 const BATCH_CHECK_MIN = 8;
 
+/** §46: the newest commits of a HEAD move looked at for a copy of a commit of Claude's a rebase rewrote. */
+const MAX_COPY_SEARCH = 300;
+
+/** A commit and what a rebase keeps of it: its author's email, and author, author time and subject together (`meta`). */
+type CommitMeta = { sha: string; email: string; meta: string };
+
+/** `git log <args>`: each commit's sha, author email and `meta`, newest first; empty when git failed. */
+async function commitMetas(cp: GitCheckpoint, args: string[]): Promise<CommitMeta[]> {
+  const out = await cp.git(["log", "--format=%H%x00%ae%x00%at%x00%s", ...args], { allowFailure: true }).catch(() => null);
+  if (!out || out.status !== 0) return [];
+  return out.text
+    .split("\n")
+    .map((line) => line.split("\0"))
+    .filter((f) => f.length >= 4)
+    .map(([sha, email, ...rest]) => ({ sha: sha!, email: email!, meta: [email, ...rest].join("\0") }));
+}
+
+/** sha → `git patch-id --stable` of the commits `git log -p <args>` shows (plumbing-safe whatever the user's diff config). */
+async function patchIds(cp: GitCheckpoint, args: string[]): Promise<Map<string, string>> {
+  const ids = new Map<string, string>();
+  const log = await cp
+    .git(["log", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/", "--format=commit %H", ...args], { allowFailure: true })
+    .catch(() => null);
+  if (!log || log.status !== 0 || log.stdout.length === 0) return ids;
+  const out = await cp.git(["patch-id", "--stable"], { stdin: log.stdout, allowFailure: true }).catch(() => null);
+  if (!out || out.status !== 0) return ids;
+  for (const line of out.text.split("\n")) {
+    const [id, sha] = line.trim().split(/\s+/);
+    if (id && sha) ids.set(sha, id);
+  }
+  return ids;
+}
+
 /**
  * The per-turn review gate (port of the review half of Core `Session/SessionStore.swift`):
  * snapshot A before a send, snapshot B + changed-file list after the turn, accept / reject
@@ -123,8 +156,13 @@ export class ReviewGate {
    * A fresh A (nothing left to review) starts without them.
    */
   ownCommits: string[] = [];
-  /** MARK: r1-git — commits Claude's `git commit --amend` replaced: their changes live on in the amend (never taken back out of A). */
+  /**
+   * MARK: r1-git — commits Claude's `git commit --amend` replaced, and Claude's commits a rebase rewrote: their changes live on
+   * in the amend / the copy (never taken back out of A).
+   */
   private replacedCommits: string[] = [];
+  /** §46: Claude's own commits a rebase rewrote, each to its copy (`followRewrittenOwn`) — what a row about them names. */
+  private ownCopies = new Map<string, string>();
   /** `baseHead` of the review a fresh `snapshotStart` replaced (back on `abortTurn`). */
   private freshUndoBaseHead: HeadInfo | null = null;
   /** §31: other Claude processes in this worktree (the engine re-checks on open and on every send). */
@@ -223,6 +261,7 @@ export class ReviewGate {
     this.baseMerge = null;
     this.ownCommits = []; // MARK: r1-git
     this.replacedCommits = [];
+    this.ownCopies = new Map();
     this.changedFiles = [];
     this.reviewNotes = [];
     this.isRequestingChanges = false;
@@ -332,6 +371,7 @@ export class ReviewGate {
     this.baseMerge = null;
     this.ownCommits = []; // MARK: r1-git
     this.replacedCommits = [];
+    this.ownCopies = new Map();
     this.changedFiles = [];
     this.reviewNotes = [];
     this.acceptedPatchHashes = new Map();
@@ -480,6 +520,8 @@ export class ReviewGate {
     const base = this.baseHead;
     const head = await cp.head().catch(() => null);
     if (base?.sha && head?.sha && head.sha !== base.sha) {
+      // §46: a rebase may have rewritten Claude's commits — their copies are Claude's own from now on.
+      if (this.ownCommits.length > 0) await this.followRewrittenOwn(cp, base.sha, head.sha).catch(() => undefined);
       const own = new Set(this.ownCommits); // MARK: r1-git — §46: Claude's own commits are never carried
       const replaced = new Set(this.replacedCommits);
       const carried = await Promise.all(out.map((t) => this.carryHeadMove(cp, t, base.sha!, head.sha!, own, replaced).catch(() => null)));
@@ -566,6 +608,85 @@ export class ReviewGate {
       rangeFrom = c.sha;
     }
     return rangeFrom === to ? t : cp.carryCommits(t, rangeFrom, to);
+  }
+
+  /**
+   * §46: Claude's own commits a rebase rewrote (`git pull --rebase` after a rejected push, `git rebase`, a cherry-pick —
+   * Claude's or the user's). An own commit no longer in `head`'s history whose copy is in `base..head` — the same author,
+   * author time and subject, or the same patch (`git patch-id --stable`: a reworded one) — gives way to the copy, Claude's
+   * own from now on: the carry leaves it out and its files keep `committedIn`. The rewritten one counts as replaced (its
+   * changes live on in the copy). Before, the copy was carried into A like a commit of someone else's.
+   */
+  private async followRewrittenOwn(cp: GitCheckpoint, base: string, head: string): Promise<void> {
+    const gone: string[] = [];
+    for (const sha of this.ownCommits) {
+      if (this.replacedCommits.includes(sha)) continue;
+      const r = await cp.git(["merge-base", "--is-ancestor", sha, head], { allowFailure: true }).catch(() => null);
+      if (r?.status === 1) gone.push(sha);
+    }
+    if (gone.length === 0) return;
+    const own = new Set(this.ownCommits);
+    const range = (await commitMetas(cp, ["--no-merges", `--max-count=${MAX_COPY_SEARCH}`, `${base}..${head}`])).filter((c) => !own.has(c.sha));
+    if (range.length === 0) return;
+    const mine = await commitMetas(cp, ["--no-walk=unsorted", ...gone]);
+    const copies = new Map<string, string>();
+    const taken = new Set<string>();
+    const pair = (key: (c: CommitMeta) => string | undefined) => {
+      for (const g of mine) {
+        const k = key(g);
+        if (copies.has(g.sha) || !k) continue;
+        const copy = range.find((c) => !taken.has(c.sha) && key(c) === k);
+        if (copy) {
+          copies.set(g.sha, copy.sha);
+          taken.add(copy.sha);
+        }
+      }
+    };
+    pair((c) => c.meta);
+    // A reworded copy: the same patch — looked for among the commits of the same author only (a rebase keeps the author).
+    const left = mine.filter((g) => !copies.has(g.sha));
+    const authors = new Set(left.map((g) => g.email));
+    const candidates = range.filter((c) => !taken.has(c.sha) && authors.has(c.email));
+    if (left.length > 0 && candidates.length > 0) {
+      const ids = await patchIds(cp, ["--no-walk=unsorted", ...left.map((g) => g.sha), ...candidates.map((c) => c.sha)]);
+      pair((c) => ids.get(c.sha));
+    }
+    if (copies.size === 0) return;
+    this.ownCommits = [...new Set(this.ownCommits.map((sha) => copies.get(sha) ?? sha))];
+    for (const [from, to] of copies) {
+      if (!this.replacedCommits.includes(from)) this.replacedCommits.push(from);
+      this.ownCopies.set(from, to);
+    }
+    this.onChange();
+  }
+
+  /** §46: what Claude's own commit `sha` is now — its copy after a rebase (`followRewrittenOwn`), else itself. */
+  ownCommitNow(sha: string): string {
+    let at = sha;
+    for (let k = 0; k < 8 && this.ownCopies.has(at); k++) at = this.ownCopies.get(at)!;
+    return at;
+  }
+
+  /**
+   * §46: Claude's own commits — made this turn (`made`) or in HEAD's history when it began (`from`) — that left HEAD's history
+   * with no copy in it (a squash, a checkout elsewhere) while a file they changed is no longer in the review: their files did
+   * not "stay in the review", so the turn's HEAD move is not Claude's to explain. An amended or rebased one does not count.
+   */
+  async ownCommitsLost(from: string | null, made: readonly string[]): Promise<string[]> {
+    const cp = this.checkpoint;
+    if (!cp || this.ownCommits.length === 0) return [];
+    const ancestor = async (a: string, b: string) => (await cp.git(["merge-base", "--is-ancestor", a, b], { allowFailure: true }).catch(() => null))?.status;
+    const madeNow = new Set(made.map((sha) => this.ownCommitNow(sha)));
+    const listed = new Set(this.changedFiles.flatMap((f) => (f.oldPath !== null ? [f.path, f.oldPath] : [f.path])));
+    const lost: string[] = [];
+    for (const sha of this.ownCommits) {
+      if (this.replacedCommits.includes(sha) || (await ancestor(sha, "HEAD")) !== 1) continue;
+      if (!madeNow.has(sha) && (from === null || (await ancestor(sha, from)) !== 0)) continue;
+      const out = await cp.git(["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", "--root", sha], { allowFailure: true }).catch(() => null);
+      const paths = out && out.status === 0 ? out.stdout.toString("utf8").split("\0").filter((p) => p.length > 0) : [];
+      if (paths.some((p) => !listed.has(p))) lost.push(sha);
+    }
+    return lost;
   }
 
   /** MARK: r1-git — §46: commits Claude's `git commit` made (the session's `git_result`): never carried into A. */
@@ -797,6 +918,7 @@ export class ReviewGate {
       this.freshUndo = { start: this.turnStartTree, end: this.turnEndTree, skipped: this.snapshotSkipped, ranges: this.rangeState(), baseMerge: this.baseMerge, ownCommits: this.ownCommits, replacedCommits: this.replacedCommits };
       this.ownCommits = []; // MARK: r1-git — §46: A holds what Claude committed before
       this.replacedCommits = [];
+      this.ownCopies = new Map();
       this.snapshotSkipped = snap.skipped;
       this.resetRanges(); // §34: a fresh A starts a new review — no held B, no ranges of the old one
       this.freshUndoBaseHead = this.baseHead;

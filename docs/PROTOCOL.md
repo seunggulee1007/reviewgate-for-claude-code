@@ -1885,7 +1885,10 @@ starts where the one before ended; none with a move from before its command ran 
 `explainedBy: "claude_git"` (+ `commits`: the short shas of the commits Claude made, oldest first), `state.gate.headMoved`
 stays unset (a carry that failed still sets it, as before) and a gray row follows: `claude_committed` (`detail`: the short
 shas; "Claude가 커밋함 <sha> — 파일은 리뷰에 그대로") or, with no commit (a branch, a pull, a checkout), `claude_moved_head`
-(`detail`: "main@abc1234 → feature/acme-7@abc1234"). Any other move keeps the bar.
+(`detail`: "main@abc1234 → feature/acme-7@abc1234"). Any other move keeps the bar — and so does a chain of Claude's own
+moves in which one of Claude's commits (made in the turn, or in HEAD's history when it began) left HEAD's history with no
+copy there while a file it changed is no longer in the review (a squash, a checkout elsewhere: `ReviewGate.ownCommitsLost`);
+then no `claude_committed` row says its files stayed. A commit a rebase rewrote is named by its copy (§46).
 
 ### 31.4 Other Claude processes in this worktree
 
@@ -6174,7 +6177,15 @@ the terminal's auto mode asked for none).
   `baseHead` along first parents (a checkout elsewhere, an amend in a later turn) and Claude committed, the carry goes
   through their merge base: what only `baseHead` had is taken back out, what HEAD has brought in, Claude's commits neither
   way and a commit Claude's amend replaced (`amended`) not taken out. Any failure keeps today's fallback (the whole move;
-  `headMoved`). A listed file one of Claude's commits changed (the newest still in HEAD's history) carries
+  `headMoved`). A commit of Claude's that a rebase rewrote — `git pull --rebase` after a rejected push, `git rebase
+  origin/main`, a cherry-pick, in the turn that committed or a later one — is found before the carry: an own commit no
+  longer in HEAD's history whose copy is among the newest 300 commits of `baseHead..HEAD` (the same author, author time and
+  subject, or else the same `git patch-id --stable`: a reworded copy) gives way to the copy, which is Claude's own from
+  then on (and the rewritten one replaced). Before, the copy was carried into A like someone else's commit: the file
+  vanished from the review while the row said "its files stay in the review" (same turn), or the carry failed and what the
+  rebase brought in (`Up.java`) showed as Claude's change (a later turn). One that left HEAD's history with no copy (a
+  squash, a checkout elsewhere) makes the move unexplained (§31.3: the bar, no `claude_committed` row) when a file it
+  changed is no longer listed. A listed file one of Claude's commits changed (the newest still in HEAD's history) carries
   `committedIn: "<short sha>"` (`state.changedFiles[]`, set at every collection, refresh and restore). Rejecting it reverts
   the working tree to A as for any file — the commit stays, the file now differs from HEAD — and a gray row says so:
   `reject_committed` (`detail`: "App.java (abc1234)"). The app's `commit` of accepted paths leaves out a path with no change
@@ -6217,7 +6228,8 @@ the terminal's auto mode asked for none).
   find -exec) asking with work and running without, `--abort` / `--skip` over a resolved conflict and after it, the hook
   in auto and default mode, a remembered `Bash:git push` against a force push and `Bash:git merge` against
   `git merge --abort`), `engine/test/gitResult.test.ts` (the stash row,
-  Claude's own commits, amend, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
+  Claude's own commits, amend, a rebase of them in the same and a later turn — reworded too —, one left behind by a
+  checkout, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
   (real CLI 2.1.318 on sonnet in auto mode, a scratch repository with a local bare origin outside /tmp: "branch
   feature/acme-7, fix App.java, commit, push -u" asked nothing, the branch reached origin, App.java stayed pending with
   `committedIn` and origin not `external`, `head_moved.explainedBy: "claude_git"` and a `claude_committed` row, no bar;

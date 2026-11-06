@@ -3559,8 +3559,15 @@ export class ReviewEngine {
       return true;
     }) && sameHead(at, to);
     if (explained) {
-      const commits = [...new Set(moves.flatMap((m) => m.ownCommits))].map((sha) => sha.slice(0, 7));
-      return { from, to, explainedBy: "claude_git", ...(commits.length > 0 ? { commits } : {}) };
+      // A commit of Claude's that left HEAD's history with no copy in it (a squash, a checkout elsewhere) took its files out
+      // of the review: that move is reported, never "its files stay in the review". A rebased one is named by its copy.
+      const made = moves.flatMap((m) => m.ownCommits);
+      const lost = await this.gate.ownCommitsLost(from.sha, made).catch(() => []);
+      if (lost.length === 0) {
+        const commits = [...new Set(made.map((sha) => this.gate.ownCommitNow(sha)))].map((sha) => sha.slice(0, 7));
+        return { from, to, explainedBy: "claude_git", ...(commits.length > 0 ? { commits } : {}) };
+      }
+      this.log("info", `Claude's commits ${lost.map((c) => c.slice(0, 7)).join(", ")} left HEAD's history: the move is reported`);
     }
     this.gate.headMoved = { from, to };
     return { from, to };

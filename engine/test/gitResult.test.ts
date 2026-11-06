@@ -239,6 +239,96 @@ describe("the engine: Claude's own commit keeps its files in the review (§46)",
     expect(h.engine.state.changedFiles).toEqual([]);
   });
 
+  /** A repository whose `upstream` branch has a commit of someone else's (Up.java) on the base, opened in the app. */
+  async function openedWithUpstream(): Promise<{ h: Harness; root: string; main: string }> {
+    const root = repo();
+    const main = branch(root);
+    sh(root, "checkout", "-q", "-b", "upstream");
+    write(root, "Up.java", "class Up {}\n");
+    sh(root, "add", "Up.java");
+    sh(root, "commit", "-qm", "upstream work");
+    sh(root, "checkout", "-q", main);
+    const h = makeHarness();
+    harnesses.push(h);
+    await h.hello();
+    await h.open(root);
+    return { h, root, main };
+  }
+  const collected = async (h: Harness) => {
+    await h.waitFor((s) => s.gate.turnEndTree !== null && s.gate.phase !== "collecting", "turn collection");
+    await h.settle();
+  };
+
+  it("a rebase of Claude's commit in the same turn (git pull --rebase after a rejected push) keeps its files on the rewritten commit; what came in is not Claude's", async () => {
+    const { h, root, main } = await openedWithUpstream();
+    await h.engine.handle({ type: "send", text: "fix App.java, commit and push" });
+    const a = h.engine.state.gate.turnStartTree!;
+    const base = { sha: head(root), branch: main };
+    write(root, "App.java", "class App { /* fixed */ }\n");
+    sh(root, "add", "App.java");
+    sh(root, "commit", "-qm", "fix: App");
+    const c1 = head(root);
+    h.session().emit({ type: "git_result", toolUseId: "c1", from: base, to: { sha: c1, branch: main }, ownCommits: [c1] });
+    sh(root, "rebase", "-q", "upstream"); // the push was rejected: Claude's commit goes on top of what came in
+    const rebased = head(root);
+    expect(rebased).not.toBe(c1);
+    h.session().emit({ type: "git_result", toolUseId: "p1", from: { sha: c1, branch: main }, to: { sha: rebased, branch: main } });
+    h.session().emitTurnEnd({ toolFiles: [{ path: `${root}/App.java`, tools: ["Bash"], count: 1, toolUseIds: ["c1"] }] });
+    await collected(h);
+    const s = h.engine.state;
+    expect(s.changedFiles.map((f) => [f.path, f.state, f.committedIn])).toEqual([["App.java", "pending", rebased.slice(0, 7)]]);
+    expect(s.gate.turnStartTree).not.toBe(a); // Up.java was carried into A
+    expect(s.gate.headMoved ?? null).toBeNull();
+    expect(h.ofType("head_moved")).toEqual([expect.objectContaining({ explainedBy: "claude_git", commits: [rebased.slice(0, 7)] })]);
+    expect(h.ofType("error").filter((e) => e.code === "claude_committed")).toEqual([expect.objectContaining({ detail: rebased.slice(0, 7) })]);
+  });
+
+  it("a rebase in a later turn — reworded, so only its patch tells it is Claude's commit — keeps the files on it", async () => {
+    const { h, root, main } = await openedWithUpstream();
+    await h.engine.handle({ type: "send", text: "fix App.java and commit" });
+    const base = { sha: head(root), branch: main };
+    write(root, "App.java", "class App { /* fixed */ }\n");
+    sh(root, "add", "App.java");
+    sh(root, "commit", "-qm", "fix: App");
+    const c1 = head(root);
+    h.session().emit({ type: "git_result", toolUseId: "c1", from: base, to: { sha: c1, branch: main }, ownCommits: [c1] });
+    h.session().emitTurnEnd({ toolFiles: [{ path: `${root}/App.java`, tools: ["Bash"], count: 1, toolUseIds: ["c1"] }] });
+    await collected(h);
+    expect(h.engine.state.changedFiles.map((f) => [f.path, f.committedIn])).toEqual([["App.java", c1.slice(0, 7)]]);
+    await h.engine.handle({ type: "send", text: "pull --rebase, reword the commit and push" });
+    sh(root, "rebase", "-q", "upstream");
+    execFileSync("git", ["-C", root, "commit", "-q", "--amend", "-m", "fix(app): App, reworded"], { env: { ...process.env, GIT_COMMITTER_DATE: "@2000000000 +0000" } });
+    const copy = head(root);
+    h.session().emit({ type: "git_result", toolUseId: "p1", from: { sha: c1, branch: main }, to: { sha: copy, branch: main } });
+    h.session().emitTurnEnd();
+    await collected(h);
+    const s = h.engine.state;
+    expect(s.changedFiles.map((f) => [f.path, f.state, f.committedIn])).toEqual([["App.java", "pending", copy.slice(0, 7)]]);
+    expect(s.gate.headMoved ?? null).toBeNull();
+    expect(h.ofType("head_moved").at(-1)).toMatchObject({ explainedBy: "claude_git" });
+    expect(h.ofType("error").filter((e) => e.code === "claude_moved_head")).toHaveLength(1);
+  });
+
+  it("a commit of Claude's that left HEAD's history with no copy there (a checkout elsewhere) is no explained move: the bar, no 'files stay' row", async () => {
+    const { h, root, main } = await openedWithUpstream();
+    await h.engine.handle({ type: "send", text: "commit App.java, then start over on a branch" });
+    const base = { sha: head(root), branch: main };
+    write(root, "App.java", "class App { /* fixed */ }\n");
+    sh(root, "add", "App.java");
+    sh(root, "commit", "-qm", "fix: App");
+    const c1 = head(root);
+    h.session().emit({ type: "git_result", toolUseId: "c1", from: base, to: { sha: c1, branch: main }, ownCommits: [c1] });
+    sh(root, "checkout", "-q", "-b", "redo", base.sha);
+    h.session().emit({ type: "git_result", toolUseId: "b1", from: { sha: c1, branch: main }, to: { sha: base.sha, branch: "redo" } });
+    h.session().emitTurnEnd({ toolFiles: [{ path: `${root}/App.java`, tools: ["Bash"], count: 1, toolUseIds: ["c1"] }] });
+    await collected(h);
+    const s = h.engine.state;
+    expect(s.changedFiles.map((f) => f.path)).not.toContain("App.java"); // on main's commit, not on disk
+    expect(s.gate.headMoved).not.toBeNull();
+    expect(h.ofType("head_moved").at(-1)?.explainedBy).toBeUndefined();
+    expect(h.ofType("error").filter((e) => e.code === "claude_committed")).toEqual([]);
+  });
+
   it("an amend in a later turn keeps both changes in the review, on the amended commit", async () => {
     const { h, root, a, commit } = await turnThatCommits();
     await h.engine.handle({ type: "send", text: "also add a field and amend" });
