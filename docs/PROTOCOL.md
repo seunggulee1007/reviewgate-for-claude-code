@@ -6237,10 +6237,21 @@ feature flag of its own, and on this machine both folded alike.
   `steer` (the turn ended meanwhile, the review is being collected) puts the message in the queue instead, so it is never
   lost. A message with images is queued: the CLI takes images only with a message of its own.
 - **Electron.** The same behavior.
+- **An open question (r1-composer M08).** While Claude's `AskUserQuestion` waits, a message steered into the turn only
+  waits behind it: typing "y" and ↩ left the turn stuck until the card was found and clicked. So the message box answers
+  the question instead. The question it answers is the oldest open `AskUserQuestion` while no other card is open (⌘↩ / ⌘⌫
+  answer that one first) and the running chat is shown (Core `AppState.openQuestion`). A typed answer goes to the first
+  question without an answer (`QuestionDraft.fill`): the option whose label it is (letter case aside), else that
+  question's "Other…" text, next to what was picked ("Postgres, 번으로 해줘"). The card goes out (`permission_response
+  {allow: true, updatedInput: {questions, answers}}`, as its own Answer button sends it) once every question has an
+  answer; until then the card shows what was filled. 1…N in an empty box pick option N of that question (several answers:
+  on and off), and ↩ in an empty box sends the card. Nothing changes on the wire.
 - **Verified.** Engine `session.peer.test.ts` (§50 block): folded into the turn (one `turn_end`), run as its own command
   after the result (the turn waits, usage summed, no unprompted turn), refused without a turn. `w50.steer.test.ts`: the
   session gets the text with the mentions, the row `steered` with the turn's number, refusals. Core `RunAsTaskTests`: the
-  command's JSON, a refusal queues. Real CLI: `sidecar/test/driver-steer.mjs` (haiku, CLI 2.1.318). It sends a `sleep 10`
+  command's JSON, a refusal queues. Core `ComposerQuestionTests` (M08): the open question with and without another card, a
+  typed answer sent as the answer (nothing steered or queued), a label that picks its option, several questions answered in
+  turn with the number keys, a note typed after a pick. Real CLI: `sidecar/test/driver-steer.mjs` (haiku, CLI 2.1.318). It sends a `sleep 10`
   request, then steers in a request for `note.txt` and a word in the reply. Observed: one `turn_end`, both rows turn 1
   (the second `steered`), `note.txt` in the review, the word in the reply.
 - Owner: steer (engine `session/claude.ts` `steerUser`, `engine.ts` `steer`, `protocol.ts`; Core
