@@ -2,118 +2,128 @@
  * `AskUserQuestion` permission card: renders the SDK's questions as radios (checkboxes when
  * `multiSelect`) with a bold label + description, an optional `preview` for the focused option, and
  * an "Other…" free-text fallback. "Answer" replies via `answerQuestions` (`updatedInput.answers`
- * keyed by question text — labels joined with ", " for multiSelect, else the free text); "Skip" denies.
+ * keyed by question text — the picked labels, then the free text, joined with ", "); "Skip" denies.
+ * MARK: r1-composer M08 (docs/PROTOCOL.md §50 "An open question") — the question the message box answers (`openQuestionOf`)
+ * sits above the composer (`QuestionSlot`), the question a typed answer or 1…N goes to marked and its options numbered; its
+ * transcript row is one line while it waits there and once it is answered. The card and the composer share one draft
+ * (`useQuestionDrafts`). A question open while another card or an older question comes first stays a card in the transcript.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import type { PermissionRequest } from "@reviewgate/engine";
 import { t } from "../../i18n";
 import { isPermissionPending } from "../../permissionQueue";
 import { useStore, type ChatItem } from "../../store";
 import { AgentTag, DecisionCaption } from "./PermissionBits";
 import { isEnter } from "../../ime";
+import { currentQuestion, draftAnswers, emptyDraft, isComplete, openQuestionOf, parseQuestions, useQuestionDrafts, type Question, type QuestionDraft } from "../../openQuestion";
+import { useViewing } from "../../viewedChat";
+import "./question.css";
 
-type QuestionOption = { label: string; description: string; preview?: string };
-type Question = { question: string; header: string; multiSelect: boolean; options: QuestionOption[] };
-type Answer = { selected: string[]; otherChecked: boolean; otherText: string };
+type PermissionItem = Extract<ChatItem, { kind: "permission" }>;
 
-function asString(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
-
-function parseQuestions(input: Record<string, unknown>): Question[] {
-  const raw = input["questions"];
-  if (!Array.isArray(raw)) return [];
-  return raw.map((q) => {
-    const rec = (q ?? {}) as Record<string, unknown>;
-    const options = Array.isArray(rec["options"])
-      ? (rec["options"] as unknown[]).map((o) => {
-          const opt = (o ?? {}) as Record<string, unknown>;
-          const preview = asString(opt["preview"]);
-          return { label: asString(opt["label"]), description: asString(opt["description"]), ...(preview ? { preview } : {}) };
-        })
-      : [];
-    return { question: asString(rec["question"]), header: asString(rec["header"]), multiSelect: rec["multiSelect"] === true, options };
-  });
-}
-
-function answerText(a: Answer): string {
-  if (a.otherChecked) return a.otherText.trim();
-  return a.selected.join(", ");
-}
-
-export function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "permission" }> }) {
+/** The transcript's row for a question: one line, unless the card has to be answered right there. */
+export function QuestionCard({ item }: { item: PermissionItem }) {
   const { request, allowed } = item;
   const questions = useMemo(() => parseQuestions(request.input), [request.input]);
-  const answerQuestions = useStore((s) => s.answerQuestions);
-  const respondPermission = useStore((s) => s.respondPermission);
   // §33.1: answerable while its own request is open (another card may be older).
   const pending = useStore((s) => isPermissionPending(s.state, request.requestId));
-  const active = allowed === null && pending;
-  const [answers, setAnswers] = useState<Answer[]>(() => questions.map(() => ({ selected: [], otherChecked: false, otherText: "" })));
+  const viewing = useViewing() !== null;
+  const inSlot = useStore((s) => openQuestionOf(s.state, viewing)?.requestId === request.requestId);
+  if (allowed !== null || !pending || inSlot) return <QuestionLine item={item} questions={questions} waiting={allowed === null && pending} />;
+  return <QuestionEditor request={request} questions={questions} slot={false} />;
+}
 
-  if (allowed !== null) {
-    return (
-      <div className="perm decided" data-permission-id={request.requestId} data-testid="Permission decided">
-        <div className="head">
-          <span className="orange">❓</span>
-          <span className="title">{t("Question")}</span>
-          <span className={`caption bold ${allowed ? "green" : "red"}`} data-testid="Permission decision">{allowed ? t("Answered") : t("Skipped")}</span>
-        </div>
-        {questions.map((q, i) => (
-          <div className="qa-row" key={i}>
-            <span className="q">{q.question}</span>
-            <span className="a bold">{item.answers?.[q.question] ?? t("(skipped)")}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
+/** r1-composer M08: the card the message box answers, above the composer (`ChatPane`). */
+export function QuestionSlot() {
+  const viewing = useViewing() !== null;
+  const request = useStore((s) => openQuestionOf(s.state, viewing));
+  const questions = useMemo(() => (request ? parseQuestions(request.input) : []), [request]);
+  if (!request) return null;
+  return (
+    <div className="question-slot" data-testid="Question slot">
+      <QuestionEditor key={request.requestId} request={request} questions={questions} slot />
+    </div>
+  );
+}
 
-  const select = (qi: number, label: string) => {
-    setAnswers((prev) => {
-      const next = [...prev];
+/** One line: "Claude의 질문: … — 아래에서 답해 주세요" while its card waits above the composer, then the answers. */
+function QuestionLine({ item, questions, waiting }: { item: PermissionItem; questions: Question[]; waiting: boolean }) {
+  const asked = questions.map((q) => q.question).join(" · ");
+  const answerOf = (q: Question) => item.answers?.[q.question] ?? "—";
+  const text = waiting
+    ? t("Claude asked: {0} — answer it below", asked)
+    : item.allowed === true
+      ? t("Answered: {0}", questions.map((q) => `${q.question} → ${answerOf(q)}`).join(" · "))
+      : item.allowed === false
+        ? t("Skipped: {0}", asked)
+        : t("Handled: {0}", asked);
+  const full = questions.map((q) => `${q.question}\n→ ${answerOf(q)}`).join("\n\n");
+  return (
+    <div
+      className={`question-line ${waiting ? "waiting" : ""}`}
+      data-permission-id={item.request.requestId}
+      data-testid={waiting ? "Question line waiting" : "Question line"}
+      title={full}
+    >
+      <span className="q-mark" aria-hidden="true">❓</span>
+      <span className="truncate">{text}</span>
+    </div>
+  );
+}
+
+function QuestionEditor({ request, questions, slot }: { request: PermissionRequest; questions: Question[]; slot: boolean }) {
+  const answerQuestions = useStore((s) => s.answerQuestions);
+  const respondPermission = useStore((s) => s.respondPermission);
+  const active = useStore((s) => isPermissionPending(s.state, request.requestId));
+  const stored = useQuestionDrafts((s) => s.drafts[request.requestId]);
+  const setDraft = useQuestionDrafts((s) => s.setDraft);
+  const clearDraft = useQuestionDrafts((s) => s.clearDraft);
+  const answers: QuestionDraft = stored ?? emptyDraft(questions);
+  const current = slot ? currentQuestion(questions, answers) : null;
+  const refs = useRef<(HTMLDivElement | null)[]>([]);
+  // r1-composer M08: with several questions the one the message box answers now scrolls into view.
+  useEffect(() => {
+    if (current !== null && questions.length > 1) refs.current[current]?.scrollIntoView?.({ block: "nearest" });
+  }, [current, questions.length]);
+
+  const update = (qi: number, change: (a: QuestionDraft[number]) => QuestionDraft[number]) => {
+    const next = questions.map((_, i) => answers[i] ?? { selected: [], otherChecked: false, otherText: "" });
+    next[qi] = change(next[qi]!);
+    setDraft(request.requestId, next);
+  };
+
+  const select = (qi: number, label: string) =>
+    update(qi, (cur) => {
       const q = questions[qi]!;
-      const cur = next[qi]!;
       const has = cur.selected.includes(label);
       const selected = q.multiSelect ? (has ? cur.selected.filter((l) => l !== label) : [...cur.selected, label]) : [label];
-      next[qi] = { ...cur, selected, otherChecked: false };
-      return next;
+      return { ...cur, selected, otherChecked: q.multiSelect ? cur.otherChecked : false };
     });
-  };
 
-  const selectOther = (qi: number) => {
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[qi] = { ...next[qi]!, selected: [], otherChecked: true };
-      return next;
-    });
-  };
+  const selectOther = (qi: number) =>
+    update(qi, (cur) => (questions[qi]!.multiSelect ? { ...cur, otherChecked: !cur.otherChecked } : { ...cur, selected: [], otherChecked: true }));
 
-  const setOtherText = (qi: number, text: string) => {
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[qi] = { ...next[qi]!, otherText: text };
-      return next;
-    });
-  };
+  const setOtherText = (qi: number, text: string) => update(qi, (cur) => ({ ...cur, otherText: text }));
 
-  const allAnswered = questions.length > 0 && questions.every((_, i) => answerText(answers[i]!).length > 0);
+  const allAnswered = isComplete(questions, answers);
 
   const submit = () => {
     if (!active || !allAnswered) return;
-    const record: Record<string, string> = {};
-    questions.forEach((q, i) => (record[q.question] = answerText(answers[i]!)));
-    answerQuestions(request.requestId, record);
+    answerQuestions(request.requestId, draftAnswers(questions, answers));
+    clearDraft(request.requestId);
   };
 
   const skip = () => {
     if (!active) return;
     respondPermission(request.requestId, false, t("User skipped the questions"));
+    clearDraft(request.requestId);
   };
 
+  const optionCount = current !== null ? (questions[current]?.options.length ?? 0) : 0;
   return (
     <div
-      className={`perm question-card ${active ? "" : "handled"}`}
-      data-permission-id={request.requestId}
+      className={`perm question-card ${active ? "" : "handled"} ${slot ? "in-slot" : ""}`}
+      data-permission-id={slot ? undefined : request.requestId}
       data-testid={active ? "Question card" : "Permission handled"}
       onKeyDown={(e) => {
         if (isEnter(e) && (e.metaKey || e.ctrlKey)) submit();
@@ -126,23 +136,23 @@ export function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "permis
         {!active && <DecisionCaption status="handled" decision={null} />}
       </div>
       {questions.map((q, i) => {
-        const a = answers[i]!;
+        const a = answers[i] ?? { selected: [], otherChecked: false, otherText: "" };
         const inputType = q.multiSelect ? "checkbox" : "radio";
         const focused = q.options.find((o) => a.selected.includes(o.label) && o.preview);
+        const answersHere = current === i;
         return (
-          <div className="question" key={i}>
+          <div className={`question ${answersHere && questions.length > 1 ? "current" : ""}`} key={i} ref={(el) => void (refs.current[i] = el)}>
             <span className="q-chip">{q.header}</span>
+            {answersHere && questions.length > 1 && (
+              <span className="tiny accent" data-testid={`Question ${i} answered from the message box`}>↓ {t("Answered from the message box")}</span>
+            )}
             <div className="q-text bold">{q.question}</div>
             <div className="q-options">
-              {q.options.map((opt) => (
+              {q.options.map((opt, oi) => (
                 <label className="q-option" key={opt.label}>
-                  <input
-                    type={inputType}
-                    name={`q-${i}`}
-                    checked={a.selected.includes(opt.label)}
-                    onChange={() => select(i, opt.label)}
-                    disabled={!active}
-                  />
+                  {answersHere && <kbd className="q-key">{oi + 1}</kbd>}
+                  {/* no shared `name`: the draft keeps the one-answer rule, and a note typed after a pick shows both */}
+                  <input type={inputType} checked={a.selected.includes(opt.label)} onChange={() => select(i, opt.label)} disabled={!active} />
                   <span className="col" style={{ gap: 1 }}>
                     <span className="bold">{opt.label}</span>
                     <span className="muted caption">{opt.description}</span>
@@ -150,7 +160,7 @@ export function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "permis
                 </label>
               ))}
               <label className="q-option">
-                <input type={inputType} name={`q-${i}`} checked={a.otherChecked} onChange={() => selectOther(i)} disabled={!active} />
+                <input type={inputType} checked={a.otherChecked} onChange={() => selectOther(i)} disabled={!active} />
                 <span className="bold">{t("Other…")}</span>
               </label>
               {a.otherChecked && (
@@ -170,6 +180,11 @@ export function QuestionCard({ item }: { item: Extract<ChatItem, { kind: "permis
         );
       })}
       <div className="actions">
+        {slot && active && (
+          <span className="caption muted grow" data-testid="Question card hint">
+            {optionCount > 0 ? t("Pick 1–{0} or type below · ⌘↩ answers · ⌥↩ sends separately", optionCount) : t("Type below · ⌘↩ answers · ⌥↩ sends separately")}
+          </span>
+        )}
         <button type="button" className="danger" disabled={!active} onClick={skip} data-testid="Skip">
           {t("Skip")}
         </button>

@@ -6297,12 +6297,19 @@ feature flag of its own, and on this machine both folded alike.
   the question ("질문과 별개로 보내기", also ⌥↩: into the turn as above, where it is read once the question is answered),
   queues it or stops the turn first. A question open while another card waits, or behind an older question, stays a card
   in the transcript, as before.
+  **Electron.** The same (`src/renderer/openQuestion.ts`, `QuestionCard.tsx` `QuestionSlot`, `sendNow.ts`): the card above
+  the composer and the transcript's one line, ⌘↩ (Ctrl+Enter) answers — the primary button is "답하기" —, ⌥↩ (Alt+Enter)
+  sends the text apart from the question, 1…N in an empty box pick an option, and the card and the box share one draft
+  (`useQuestionDrafts`). A card's answer is its picked options, then the "Other…" text, as on the Mac (with several answers
+  it was the "Other…" text alone).
 - **Verified.** Engine `session.peer.test.ts` (§50 block): folded into the turn (one `turn_end`), run as its own command
   after the result (the turn waits, usage summed, no unprompted turn), refused without a turn. `w50.steer.test.ts`: the
   session gets the text with the mentions, the row `steered` with the turn's number, refusals. Core `RunAsTaskTests`: the
   command's JSON, a refusal queues. Core `ComposerQuestionTests` (M08): the open question with and without another card, a
   typed answer sent as the answer (nothing steered or queued), a label that picks its option, several questions answered in
-  turn with the number keys, a note typed after a pick. Real CLI: `sidecar/test/driver-steer.mjs` (haiku, CLI 2.1.318). It sends a `sleep 10`
+  turn with the number keys, a note typed after a pick. Electron `openQuestion.test.ts` (the same cases),
+  `sendNow.test.ts` (the M08 block: 답하기, ⌘↩, ⌥↩, the hint in Korean and on Windows), `questionCard.test.ts` (the slot with
+  numbered options, the one-line rows, a question behind another card). Real CLI: `sidecar/test/driver-steer.mjs` (haiku, CLI 2.1.318). It sends a `sleep 10`
   request, then steers in a request for `note.txt` and a word in the reply. Observed: one `turn_end`, both rows turn 1
   (the second `steered`), `note.txt` in the review, the word in the reply.
 - Owner: steer (engine `session/claude.ts` `steerUser`, `engine.ts` `steer`, `protocol.ts`; Core

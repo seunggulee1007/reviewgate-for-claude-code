@@ -8,6 +8,7 @@ import { HUDStrip } from "./HUDStrip";
 import { PeerCard } from "./PeerCard";
 import { PermissionNotices } from "./PermissionBits";
 import { PlanCard } from "./PlanCard";
+import { QuestionSlot } from "./QuestionCard"; // MARK: r1-composer M08
 import { SidecarLog } from "./SidecarLog";
 import { StatusLine } from "./StatusLine"; // MARK: wave6 w6-statusline (§44.2)
 import { Transcript } from "./Transcript";
@@ -30,6 +31,8 @@ export default function ChatPane() {
       <Transcript />
       <HUDStrip />
       <PermissionNotices />
+      {/* r1-composer M08 — Claude's open question, the card the message box answers (none while another chat is shown) */}
+      <QuestionSlot />
       {!viewing && <PlanCard />}
       <ContextWarningBanner />
       <PeerCard />
