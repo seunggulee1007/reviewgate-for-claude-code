@@ -245,13 +245,21 @@ import Testing
 
     // MARK: - Settings
 
+    /// §38.2: no tool-call limit unless the user turns one on (0 goes to the engine: no `maxTurns` for the CLI); the number
+    /// stays stored while it is off.
     @Test func maxTurnsSetting() {
         let d = defaults()
-        #expect(AppSettings.maxTurns(defaults: d) == 200)
-        #expect(AppSettings.engineSettings(defaults: d).maxTurns == 200)
+        #expect(!AppSettings.maxTurnsLimitEnabled(defaults: d))
+        #expect(AppSettings.maxTurns(defaults: d) == 0)
+        #expect(AppSettings.engineSettings(defaults: d).maxTurns == 0)
+        #expect(AppSettings.maxTurnsNumber(defaults: d) == 200)
         AppSettings.setMaxTurns(5000, defaults: d)
-        #expect(AppSettings.maxTurns(defaults: d) == 1000)
+        #expect(AppSettings.maxTurnsNumber(defaults: d) == 1000)
         AppSettings.setMaxTurns(300, defaults: d)
+        #expect(AppSettings.maxTurns(defaults: d) == 0)   // a number alone limits nothing
+        AppSettings.setMaxTurnsLimitEnabled(true, defaults: d)
+        #expect(AppSettings.maxTurns(defaults: d) == 300)
+        #expect(AppSettings.engineSettings(defaults: d).maxTurns == 300)
         let store = makeStore(d)
         var sent: [EngineCommand] = []
         store.commandSink = { sent.append($0) }
@@ -259,5 +267,10 @@ import Testing
         guard case let .setSettings(s)? = sent.last else { Issue.record("no set_settings"); return }
         #expect(s.maxTurns == 300)
         #expect(s.budget == nil)
+        AppSettings.setMaxTurnsLimitEnabled(false, defaults: d)   // turned off again
+        store.pushMaxTurns()
+        guard case let .setSettings(off)? = sent.last else { Issue.record("no set_settings"); return }
+        #expect(off.maxTurns == 0)
+        #expect(AppSettings.maxTurnsNumber(defaults: d) == 300)   // kept for the next time it is on
     }
 }

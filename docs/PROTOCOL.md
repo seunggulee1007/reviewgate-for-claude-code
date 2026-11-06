@@ -3523,7 +3523,11 @@ as before.
   (`result.subtype: "error_max_turns"`) sends the notice `error{fatal: false, scope: "session", code: "max_turns",
   maxTurns: N}` before its `turn_end` (whose `stopReason` stays `error_max_turns`). The clients' row "도구 호출 한도(N회)에
   닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the same chat by the composer's queue rules (the limit counts
-  per message: the CLI starts counting again).
+  per message: the CLI starts counting again). Settings › 제한 has "메시지당 도구 호출 수 제한하기", off by default — the
+  clients send `maxTurns: 0` until it is turned on (Mac `maxTurnsLimit`, Electron `settings.maxTurnsLimit`); the number
+  (10–1000, 200 until changed) stays stored for then, its stepper greyed out while off, the note "끔(기본): 제한 없음 —
+  Claude가 터미널에서처럼 메시지 하나를 끝날 때까지 이어서 하고, 언제든 [중지]로 멈출 수 있어요". A number stored before
+  the switch (Electron's file kept the old default 200) limits nothing until the limit is turned on.
 - **Hooks and CLI words.** The session sets `includeHookEvents: true`. These become notices
   (`error{fatal: false, scope: "session"}`, a transcript row like every notice, §30; never `state.lastError`, never a
   stopped queue; repeats merge on `code` + `detail`, ×N):

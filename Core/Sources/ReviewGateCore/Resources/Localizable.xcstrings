@@ -6039,6 +6039,22 @@
         }
       }
     },
+    "Limit tool calls per message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit tool calls per message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지당 도구 호출 수 제한하기"
+          }
+        }
+      }
+    },
     "Line breaks and control characters are not allowed": {
       "localizations": {
         "en": {
@@ -7603,6 +7619,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "꺼짐"
+          }
+        }
+      }
+    },
+    "Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끔(기본): 제한 없음 — Claude가 터미널에서처럼 메시지 하나를 끝날 때까지 이어서 하고, 언제든 [중지]로 멈출 수 있어요. 새 채팅이나 세션 다시 시작부터 적용돼요."
           }
         }
       }
