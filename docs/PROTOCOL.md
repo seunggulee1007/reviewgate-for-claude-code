@@ -6216,6 +6216,17 @@ scrolled into view. Now a window that small lays out like any other. The layout 
 and shoots it after every change around it: ⇧⇥ through the modes, the diff pane opened and closed (⌘⇧D), turns that end
 into a review and reviews that end (`chat-*.png`; the log says how much of the transcript is drawn, `BLANK` for nothing).
 
+- **Send always in the window (r1-composer M11).** With files pending (almost always in auto mode) the diff pane opens
+  beside the chat, and at 1000 × 637 the chat was ~311 pt wide: the composer's bottom row ([!] · Accept 2 & Send · model ·
+  mode) pushed Send, 바로 보내기 and Stop past the window's edge. Now:
+  - the send button (and Stop) keep their size; the secondary controls — 변경 요청 (N), Accept N & Send, the next
+    message's model, the mode — fold into one "⋯" menu, the mode staying as an icon, when at their own width they would
+    leave the hint less than 60 pt (Core `ComposerBarFit.compact`);
+  - 변경 요청 (N) shows only with notes to send (`AppState.showsRequestChanges`; it can do nothing without);
+  - beside the diff, the chat keeps 380 pt as long as the diff keeps 240 (the split's minimums are 420 / 380; below that
+    they share the room in proportion as before — Core `PaneSplit.leadingWidth`).
+  Verified: Core `ComposerLayoutTests` (the fold at the report's widths, the split at 677 / 557 / 1117 pt, the request
+  button with no, sent and unsent notes).
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the
   first message sent in the task's mode, `task_started` sent: true, the file gone, a second open plain), no mode (the
   default), a session that cannot start (`sent: false`, nothing sent), refusals before anything is created, and
