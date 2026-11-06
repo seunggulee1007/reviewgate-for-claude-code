@@ -3509,13 +3509,20 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   `engine/test/git.timeout.test.ts`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
-- **A draft that lasts (r1-composer M12, Mac).** Each chat's draft — its text and @ mentions; images stay in memory — is
-  also saved on disk as it is typed (UserDefaults `composerDrafts`, under the chat's id, `project:<root>` for an engine
-  without chats; at most 50, the oldest saved go first; an empty box removes it at once, a draft over 200 000 characters
-  is not saved). The first chat an engine reports (a window opened, the app started again, the engine restarted) shows its
-  saved draft when the box is empty; what was typed before stays and belongs to that chat. Core `AppState.moveDraft`,
-  `saveDraft`, `savedDraft` (`Session/ComposerDraftKeep.swift`); verified by Core `ComposerDraftKeepTests` (a draft back
-  after a restart, chat to chat with and without images, an engine without chats, the cap and a huge draft).
+- **A draft that lasts (r1-composer M12, Mac).** The chat column lived only in the Changes / History / Search tabs with
+  a project open: the PRs tab, or an engine that stopped and the project opened again, made a new one, and what was
+  typed (its mentions and images), the question card's picks, a deny instruction, the plan card's notes and the scroll
+  place were gone. The window now keeps the composer and the transcript's own state (`WindowModel.chatComposer` /
+  `chatTranscript`), so the chat made again shows them as they were (it opens at the newest row); "Claude에게 보내기" on PR
+  comments joins the draft kept there. The composer remembers the chat its draft belongs to and follows it when it comes
+  back (another chat meanwhile swaps the drafts as above). Each chat's draft — its text and @ mentions; images stay in
+  memory — is also saved on disk as it is typed (UserDefaults `composerDrafts`, under the chat's id, `project:<root>`
+  for an engine without chats; at most 50, the oldest saved go first; an empty box removes it at once, a draft over 200
+  000 characters is not saved). The first chat an engine reports (a window opened, the app started again, the engine
+  restarted) shows its saved draft when the box is empty; what was typed before stays and belongs to that chat. Core
+  `AppState.moveDraft`, `saveDraft`, `savedDraft` (`Session/ComposerDraftKeep.swift`); verified by Core
+  `ComposerDraftKeepTests` (a draft back after a restart, chat to chat with and without images, an engine without chats,
+  the cap and a huge draft).
 
 ### 38.2 Long work
 

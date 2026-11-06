@@ -32,6 +32,12 @@ final class ComposerModel {
     var dropHover = false
     /// ↑ / ↓ in an empty composer: this project's previous prompts.
     @ObservationIgnored var history = PromptHistoryNavigator(entries: [])
+    // MARK: r1-composer M12 — the window keeps this composer (§38.1)
+    /// The chat the draft belongs to (`AppState.draftChatId` when the composer last followed it): the chat may have changed
+    /// while the chat column was away (the PRs tab, an engine that stopped).
+    @ObservationIgnored var draftChatId: String?
+    /// False until the composer first followed a chat (its window opened): an empty box then gets the chat's saved draft.
+    @ObservationIgnored var draftChatBound = false
 
     // MARK: Mentions (§23)
 
@@ -470,7 +476,13 @@ struct ChatComposer: View {
         }
         // wave3 mac-flow (§36.14): "Send to Claude" from the PR tab — also when the chat was not on screen yet.
         .onChange(of: model.composerDraftTick) { _, _ in composer.takeComposerDraft(model) }
-        .onAppear { composer.takeComposerDraft(model) }
+        .onAppear {
+            followDraftChat(store.draftChatId)   // r1-composer M12: first, so a PR's text joins the draft that comes back
+            composer.takeComposerDraft(model)
+        }
+        // r1-composer M12 (§38.1): saved as it is typed (an emptied box at once), and when the chat column goes away.
+        .task(id: savedDraft) { await saveDraftSoon() }
+        .onDisappear { saveDraftNow() }
         // MARK: §49 Run as Task — the task started in its workbench: its text leaves this composer (unless edited since);
         // a task handed here that the session could not take comes into it.
         .onChange(of: model.startedTaskTick) { _, _ in
@@ -488,17 +500,7 @@ struct ChatComposer: View {
             model.insertIntoComposer(handed.text)
         }
         // MARK: wave4 w4-safety — polish-12: each chat tab keeps its own draft (text, mentions, images).
-        .onChange(of: store.draftChatId) { previous, current in
-            guard let previous, let current, previous != current else { return }
-            // wave6 w6-terminal (§44.1): a recalled prompt on screen is not the draft — the one typed before ↑ is kept.
-            store.stashDraft(ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions, images: composer.images),
-                             for: previous)
-            composer.history.reset(entries: store.promptHistory)
-            let kept = store.takeDraft(for: current)
-            composer.draft = kept.text
-            composer.mentions = kept.mentions
-            composer.images = kept.images
-        }
+        .onChange(of: store.draftChatId) { _, current in followDraftChat(current) }
         .task(id: composer.notice) {
             guard composer.notice != nil else { return }
             try? await Task.sleep(for: .seconds(6))
@@ -712,6 +714,47 @@ struct ChatComposer: View {
             sendWhileWorking()
         }
         return true
+    }
+
+    // MARK: r1-composer M12 — a draft that lasts (§38.1)
+
+    /// What is saved for the chat: the draft typed before ↑ while a recalled prompt is shown, and the mentions.
+    private var savedDraft: ChatDraft {
+        ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions)
+    }
+
+    /// The box follows the chat its draft belongs to (polish-12). Another chat: what is typed is kept for the chat left (in
+    /// memory with its images, and on disk) and the other chat's draft comes in. The first chat a window — or an engine
+    /// after none — reports into an empty box brings back its saved draft; a chat that went away keeps what is typed.
+    private func followDraftChat(_ current: String?) {
+        // wave6 w6-terminal (§44.1): a recalled prompt on screen is not the draft — the one typed before ↑ is kept.
+        let typed = ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions, images: composer.images)
+        let first = !composer.draftChatBound
+        let previous = composer.draftChatId
+        composer.draftChatBound = true
+        if current != nil || first { composer.draftChatId = current }
+        let shown = first ? (typed.isEmpty ? store.savedDraft(for: current) : nil) : store.moveDraft(typed, from: previous, to: current)
+        guard let shown else { return }
+        composer.history.reset(entries: store.promptHistory)
+        composer.draft = shown.text
+        composer.mentions = shown.mentions
+        composer.images = shown.images
+    }
+
+    private func saveDraftNow() {
+        guard composer.draftChatBound else { return }
+        store.saveDraft(savedDraft, for: composer.draftChatId)
+    }
+
+    /// A moment after the last keystroke; an emptied box (sent, cleared) at once, so a quit right after a send never brings
+    /// the message back.
+    private func saveDraftSoon() async {
+        guard composer.draftChatBound else { return }
+        if !savedDraft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !savedDraft.mentions.isEmpty {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+        }
+        saveDraftNow()
     }
 
     /// "Accept N & Send" (⌘⇧↩): confirmed first when it would accept more than three files.

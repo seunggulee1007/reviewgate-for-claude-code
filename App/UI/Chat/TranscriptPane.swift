@@ -153,7 +153,9 @@ struct TranscriptPane: View {
             .defaultScrollAnchor(.bottom, for: .initialOffset)
             .defaultScrollAnchor(.bottom, for: .alignment)
             .onAppear {
-                // A window that opens on an existing transcript starts at its end.
+                // A window that opens on an existing transcript starts at its end — also a chat made again over the state
+                // the window kept (r1-composer M12: back from the PRs tab), whose last scroll may have been cut off.
+                view.userScrolling = false
                 view.seenCount = store.transcript.count
                 DispatchQueue.main.async { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }

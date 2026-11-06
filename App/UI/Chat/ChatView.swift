@@ -9,9 +9,10 @@ struct ChatView: View {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
     @Environment(\.openWindow) private var openWindow
-    @State private var composer = ComposerModel()
-    @State private var transcript = TranscriptViewState()
     @State private var actions = ChatActions()
+    /// r1-composer M12: the window keeps them — the PRs tab and an engine that stopped make this view again (§38.1).
+    private var composer: ComposerModel { model.chatComposer }
+    private var transcript: TranscriptViewState { model.chatTranscript }
 
     var body: some View {
         // §49.2: a short window (a new workbench's, or one with the mode offer up) never pushes the HUD or the composer out
