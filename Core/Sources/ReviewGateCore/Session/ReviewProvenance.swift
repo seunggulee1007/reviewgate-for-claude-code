@@ -322,7 +322,7 @@ public enum ReviewNotices {
                                         details: change.permissions ? [ReviewProvenanceText.localSettingsPermissionsNote] : [], dismissKeys: [key]))
             }
         }
-        if let move = gate.headMoved {
+        if let move = gate.headMoved, !move.isClaudesOwn {   // r1-git (§31.3): Claude's own move is a chat row, never this bar
             let key = "head|\(turn)|\(move.from.sha ?? "")|\(move.from.branch ?? "")|\(move.to.sha ?? "")|\(move.to.branch ?? "")"
             if !dismissed.contains(key) {
                 out.append(ReviewNotice(id: key, kind: .headMoved(move), severity: .warning, message: ReviewProvenanceText.headMoved(move), dismissKeys: [key]))
@@ -484,7 +484,8 @@ public enum ReviewProvenanceText {
     public static func logLine(for event: EngineEvent) -> String? {
         switch event {
         case let .headMoved(e):
-            return "[info] head_moved turn \(e.turn): \(headLabel(e.move.from)) → \(headLabel(e.move.to))"
+            let own = e.move.isClaudesOwn ? " (Claude's git\(e.move.commits.isEmpty ? "" : ": " + e.move.commits.joined(separator: ", ")))" : ""   // r1-git
+            return "[info] head_moved turn \(e.turn): \(headLabel(e.move.from)) → \(headLabel(e.move.to))\(own)"
         case let .concurrentClaude(e):
             let list = e.sessions.map { session in
                 "pid \(session.pid) \(session.name ?? "-") (\(session.entrypoint ?? "?"))"

@@ -54,6 +54,8 @@ public enum SessionNotices {
         "chat_moved_in", "chat_moved_in_disk", "chat_move_failed",
         // MARK: wave4b w4b-auto (§39.5)
         "auto_mode_denied", "auto_mode_unavailable",
+        // MARK: r1-git (§46, §31.3)
+        "git_stashed", "claude_committed", "claude_moved_head", "reject_committed",
     ]
 
     /// Codes whose banner means the Claude session died; `state.session.ready` turning true clears it (§30).
@@ -66,6 +68,7 @@ public enum SessionNotices {
 
     public static func style(code: String?, fatal: Bool) -> NoticeStyle {
         if fatal { return .error }
+        if let git = GitNoticeText.style(code) { return git }   // r1-git (§46): gray rows
         switch code {
         case "resume_not_found", "resume_failed": return .info
         case "cli_version_changed": return .info   // wave3 mac-session (§36.8)
@@ -113,6 +116,7 @@ public enum SessionNotices {
         if let text = LongWorkText.errorText(message: message, detail: detail) { return text }   // wave4 w4-longwork (§38.2)
         if let text = ChatMoveText.noticeText(code: detail.code, path: detail.path, message: message, detail: detail.detail) { return text }   // wave4b w4b-follow
         if let text = AutoModeText.errorText(message: message, detail: detail) { return text }   // wave4b w4b-auto (§39.5)
+        if let text = GitNoticeText.errorText(message: message, detail: detail) { return text }   // r1-git (§46)
         switch detail.code {
         case "session_start_failed": return String(localized: "Claude Code quit right after it started.", bundle: .module)
         case "session_crashed": return String(localized: "The Claude session ended unexpectedly.", bundle: .module)
@@ -161,6 +165,7 @@ public enum SessionNotices {
     public static func secondaryLine(message: String, detail: EngineErrorDetail) -> String? {
         if LongWorkText.hidesSecondary(detail.code) { return nil }   // wave4 w4-longwork (§38.2): the CLI's words are the row
         if AutoModeText.hidesSecondary(detail.code) { return nil }   // wave4b w4b-auto (§39.5): the row names the call and the reason
+        if GitNoticeText.isRowOnly(detail.code) { return nil }   // r1-git (§46): the row names the files / commits
         if detail.code == "hook_blocked", !(detail.hookName ?? "").isEmpty { return nil }   // wave4b w4b-check4 (§40.1): the row names the hook and the reason
         var parts: [String] = []
         if let words = detail.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !words.isEmpty {

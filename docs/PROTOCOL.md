@@ -5948,7 +5948,13 @@ the terminal's auto mode asked for none).
   first two words) never answers `git push --force` (it used to). `canUseTool` finds the reason itself should the hook not
   have seen the call. Plan mode (§19.4) and the unprompted guard (§18) still deny first; an approved command raises no
   `worktree_outside_review`. Clients localize on the code (Mac and Electron: red, "커밋하지 않은 작업을 버리거나 원격 기록을
-  바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"); one that does not know it shows `message`.
+  바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"); one that does not know it shows `message`. A card with a reason has no
+  session allow (⌥⌘↩ does nothing there): its "Allow once" says why in its help — "한 번씩만 허용돼요 — 리뷰로 되돌릴 수 없는
+  작업을 버릴 수 있는 git 명령이라 기억해 두지 않아요 (⌘↩)" (another reason: "… 리뷰가 따라가지 못하는 곳에서 하는 호출이라 …";
+  Core `PermissionCardOptions.onceOnlyHelp`, Electron `gitNotices.onceOnlyHelp`). The clients show `committedIn` as a
+  "커밋됨 <sha>" badge on the changed-file row (and in the diff header on the Mac) and the four §46 notices as gray rows
+  (Core `GitNoticeText`, Electron `gitNotices.ts`; tests `Core/Tests/ReviewGateCoreTests/GitAutoTests.swift`,
+  `clients/desktop/src/renderer/gitNotices.test.ts`).
 - **Not Claude's edits.** The post-Bash snapshot of a git command that changes the working tree (`GIT_MUTATING_RE`, hooks.ts:
   `checkout`, `switch`, `reset`, `restore`, `stash` (not `list` / `show`), `clean`, `rebase`, `merge`, `apply`, `am`, `pull`,
   `cherry-pick`, `revert`, `bisect`, `gh pr checkout|merge`, with any option groups before the verb) (§31) reports no files

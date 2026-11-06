@@ -149,6 +149,7 @@ public extension AppState {
         if LongWorkText.isRowOnly(code) { return }   // wave4 w4-longwork (§38.2): hook / CLI words are chat rows only
         if code == "auto_mode_unavailable" { noteAutoModeUnavailable() }   // wave6 w6-terminal (§44.1): shift+tab skips auto
         if AutoModeText.isRowOnly(code) { return }   // wave4b w4b-auto (§39.5): what auto mode blocked is a gray row
+        if GitNoticeText.isRowOnly(code) { return }   // r1-git (§46): what Claude's git commands did is a row
         var banner = ErrorBanner(message: text, scope: scope, fatal: fatal, code: code,
                                  actions: SessionNotices.bannerActions(code: code, repeats: count, path: detail?.path,
                                                                        pathIsWorkbench: isWorkbenchPath(detail?.path)))

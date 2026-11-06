@@ -51,6 +51,19 @@ public struct PermissionCardOptions: Sendable, Equatable {
     }
 }
 
+// MARK: r1-git — §46
+extension PermissionCardOptions {
+    /// Why a card with a `reason` allows one call at a time (the "Allow once" button's help; ⌥⌘↩ does nothing there): a
+    /// destructive git command, or a call outside what the review sees. Nil for a card that can be remembered.
+    public static func onceOnlyHelp(_ request: PermissionRequest) -> String? {
+        guard let reason = request.reason, request.toolName != "SendMessage" else { return nil }
+        if reason.code == .gitCommand {
+            return String(localized: "Allowed one call at a time — this git command can throw away work the review cannot bring back, so it is never remembered (⌘↩)", bundle: .module)
+        }
+        return String(localized: "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)", bundle: .module)
+    }
+}
+
 // MARK: wave2 check-clients
 extension PermissionCardOptions {
     /// The risk line under the call: never on a SendMessage card, and next to a §33.3 `reason` only with a real risk — an
@@ -178,7 +191,8 @@ public enum PermissionReasonText {
             }
             return String(localized: "Changes a Claude Code settings file — hooks, permissions and MCP settings change; settings.local.json is not kept in the review and cannot be reverted", bundle: .module)
         case .gitCommand:
-            return String(localized: "A git command that changes the repository (commit · merge · checkout · reset …) — what it brings in is not counted as Claude's edits, and a commit cannot be reverted from the review", bundle: .module)
+            // r1-git (§46): only a command that throws away uncommitted work or rewrites the remote has this card.
+            return String(localized: "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back", bundle: .module)
         case .other:
             let message = reason.message.trimmingCharacters(in: .whitespacesAndNewlines)
             return message.isEmpty ? String(localized: "Works somewhere this window's review does not see", bundle: .module) : message

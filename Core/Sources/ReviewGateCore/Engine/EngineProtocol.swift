@@ -1583,6 +1583,9 @@ public struct ChangedFile: Codable, Identifiable, Sendable, Hashable {
     // MARK: wave4c w4c-trust — §41.2 (nil: accepted by the user, pending, or an older engine)
     /// The rule that accepted the file (`whitespace` / `lockfile` / `tests`; a newer engine's name kept as is).
     public var autoAccepted: String?
+    // MARK: r1-git — §46 (nil: not committed by Claude, or an older engine)
+    /// The short sha of Claude's own commit that holds this change; the file stays in the review ("커밋됨 <sha>").
+    public var committedIn: String?
 
     public init(path: String, oldPath: String?, status: ChangeStatus, added: Int, deleted: Int,
                 isBinary: Bool, tools: [String] = [], toolUseIds: [String] = [], state: FileReviewState = .pending, noteCount: Int = 0,
@@ -1652,6 +1655,7 @@ public struct ChangedFile: Codable, Identifiable, Sendable, Hashable {
         newMode = list.newMode
         similarity = list.similarity
         autoAccepted = TrustWire.autoAccepted(from: decoder)   // MARK: wave4c w4c-trust (§41.2)
+        committedIn = GitWire.committedIn(from: decoder)   // MARK: r1-git (§46)
     }
 }
 
