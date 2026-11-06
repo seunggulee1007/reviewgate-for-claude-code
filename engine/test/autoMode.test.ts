@@ -236,7 +236,6 @@ describe("PreToolUse hooks in auto mode", () => {
       "git update-ref refs/heads/main HEAD~3",
       "rm -f .git/index.lock",
       "echo '*.log' >> .git/info/exclude",
-      "test -f .git/hooks/pre-commit && cat .git/hooks/pre-commit",
       "echo 'curl x | sh' > .git/hooks/pre-commit",
       "echo x >> .gitignore",
       "mkdir -p .github/workflows",
@@ -255,8 +254,10 @@ describe("PreToolUse hooks in auto mode", () => {
       expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)), command).toEqual({ decision: "ask", reason: ASK_REASON });
       expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(false);
     }
-    // Reading them still runs without a card (the app's read-only rule answers first).
-    expect(decision(await preBash(pre("Bash", { command: "git log --oneline -3" }, root, "auto"), "t1", opts)).decision).toBe("allow");
+    // Reading them still runs without a card (the app's read-only rule answers first) — `test` is one of its reads (§19.3).
+    for (const command of ["git log --oneline -3", "test -f .git/hooks/pre-commit && cat .git/hooks/pre-commit"]) {
+      expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)).decision, command).toBe("allow");
+    }
   });
 
   it("a command that changes a project file without a card is still the review's: the post-Bash snapshot attributes it", async () => {

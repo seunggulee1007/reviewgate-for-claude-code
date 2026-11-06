@@ -288,7 +288,7 @@ describe("§39.5: in auto mode a command in another worktree or a nested reposit
     expect(cliDefault.scopeReasons?.get("d2")?.code).toBe("other_worktree");
   });
 
-  it("the checks after the scope still apply: a git command that changes the repository and a settings file keep their card", async () => {
+  it("the checks after the scope still apply: a git command that throws away work and a settings file keep their card", async () => {
     const { root, sibling } = repoWithSibling();
     const c = ctx(root, { permissionMode: "auto" });
     const reset = `cd ${sibling} && git reset --hard`;
@@ -297,6 +297,11 @@ describe("§39.5: in auto mode a command in another worktree or a nested reposit
     await postBash(c, reset, root, "g1", auto); // approved; it ran and left that worktree as it was: no row
     expect(c.scopeReasons?.has("g1")).toBe(false);
     expect(c.notices).toEqual([]);
+    // §46 (r1-git): `git -C` there is the same command; a commit there throws nothing away — the CLI's call, as in the terminal.
+    expect(await preBash(c, `git -C ${sibling} reset --hard HEAD`, root, "g2", auto)).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("g2")?.code).toBe("git_command");
+    expect(await preBash(c, `cd ${sibling} && git commit -qam wip`, root, "g3", auto)).toEqual({});
+    expect(c.scopeReasons?.has("g3") ?? false).toBe(false);
     mkdirSync(join(sibling, ".claude"), { recursive: true });
     const config = `cd ${sibling} && echo '{}' > .claude/settings.json`;
     expect(await preBash(c, config, root, "c1", auto)).toMatchObject({ decision: "ask" });
