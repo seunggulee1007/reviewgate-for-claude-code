@@ -4329,14 +4329,21 @@ rules. Every field stays optional; an older engine or client behaves as before.
   every mode (§46). The plain card stays only for a command that names ReviewGate's own state in git:
   `<git dir>/reviewgate/…` (chats, remembered allows, attachments; a linked worktree's `.git/worktrees/<name>/reviewgate/`
   too), `reviewgate-review.json`, `refs/reviewgate/…` (the review's pinned trees) or the `.git` folder itself (`rm -rf
-  .git`) — `REVIEWGATE_STATE_RE`, case-insensitive — and for one that deletes or overwrites what holds the commits inside
-  it (`GIT_STORE_RE`): `refs`, `objects`, `logs` (and what is in them), `packed-refs`, `index`, `HEAD` (a linked worktree's
-  under `worktrees/<name>/` too) or a glob over the folder (`rm -rf .git/*`). Only the words a command writes count: every
-  operand of `rm` / `rmdir` / `unlink` / `shred` / `truncate` / `mv` / `tee`, the target of `cp` / `ln` / `install` /
-  `rsync` / `ditto` (`-t` too), `dd of=`, the start points of `find … -delete` and a redirection's file (`> .git/HEAD`) —
-  also in a script a shell runs (`bash -c 'rm -rf .git/logs'`, the §46 scanner). Before, `rm -rf .git/refs`, `.git/objects`
-  or `.git/*` (the stash, unpushed commits, the review's pinned trees) ran without one; a lock file (`.git/index.lock`,
-  `HEAD.lock`), `info/`, `hooks/` and a copy out of `.git` (`cp -r .git/objects ../backup`) stay the CLI's. An MCP tool
+  .git`) — `REVIEWGATE_STATE_RE` / `GIT_FOLDER_RE`, case-insensitive — and for one that deletes or overwrites what holds
+  the commits inside it (`GIT_STORE_RE`): `refs`, `objects`, `logs` (and what is in them), `packed-refs`, `index`, `HEAD` (a
+  linked worktree's under `worktrees/<name>/` too) or a glob over the folder (`rm -rf .git/*`). Only the words a command
+  writes count: every operand of `rm` / `rmdir` / `unlink` / `shred` / `truncate` / `mv` / `tee`, the target of `cp` / `ln`
+  / `install` / `rsync` / `ditto` (`-t` too), `dd of=`, the start points of `find … -delete` and a redirection's file (`>
+  .git/HEAD`) — also in a script a shell runs (`bash -c 'rm -rf .git/logs'`, the §46 scanner) and after a `cd` into the
+  folder (`cd .git && rm -rf refs`). Before, `rm -rf .git/refs`, `.git/objects` or `.git/*` (the stash, unpushed commits,
+  the review's pinned trees) ran without one; a lock file (`.git/index.lock`, `HEAD.lock`, `cd .git && rm -f index.lock`),
+  `info/`, `hooks/` and a copy out of `.git` (`cp -r .git/objects ../backup`) stay the CLI's. A name that only leaves the
+  folder out is no name of it (`leftOutWords`; before, the bare word kept the card): an exclusion flag's value (`tar
+  --exclude=.git -czf ../src.tgz .`, `rsync -a --exclude .git ./ ../copy/`, `grep --exclude-dir=.git`; any `--…exclude…=` /
+  `--…ignore…=` — not with `--delete-excluded`, which deletes it at the target) and the pattern of a find test whose branch
+  prunes it without `-delete` / `-exec` (`find . -path ./.git -prune -o -name '*.orig' -delete`, `\( -name .git -o -name
+  node_modules \) -prune -o …`). A negated test (`find . ! -name .git -delete`) still names it — it leaves the folder's
+  contents in — and so does a command run inside ReviewGate's state folder (`cd .git/reviewgate && …`). An MCP tool
   writing into `.git/` keeps its card (§41.2, unchanged).
 - **자동 spreads like any other mode** (Mac `AppSettings.permissionMode(root:)`; reversed after 0.5.6). The last mode used
   anywhere (`"*"`, also what `hello` carries) seeds a project opened for the first time, 자동 included — keeping 자동 out

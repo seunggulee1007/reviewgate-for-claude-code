@@ -277,6 +277,49 @@ describe("PreToolUse hooks in auto mode", () => {
     }
   });
 
+  // §40.1: a command that only names `.git` to leave it out writes nothing there — an exclusion flag's value, a find path it
+  // prunes. Naming the folder anywhere else, or writing into it after a `cd`, keeps the card.
+  it("a command that names .git only to leave it out (an exclusion flag, a pruned find path) is the CLI's in auto mode", async () => {
+    const root = repo();
+    const { preBash } = hooksFor(ctx(root, { permissionMode: "auto" }));
+    for (const command of [
+      "tar --exclude=.git -czf ../acme-src.tgz .",
+      "rsync -a --exclude .git ./ ../acme-copy/",
+      "find . -path ./.git -prune -o -name '*.orig' -delete",
+    ]) {
+      expect(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts), command).toEqual({});
+    }
+    for (const command of [
+      "tar --exclude .git --exclude=node_modules -czf ../acme-src.tgz .",
+      "rsync -a --exclude=.git/ --exclude target ./ ../acme-copy/",
+      "grep -rl --exclude-dir=.git TODO . | xargs sed -i '' 's/TODO/DONE/'",
+      "find . -name .git -prune -o -type f -name '*.pyc' -exec rm {} +",
+      "find . \\( -name .git -o -name node_modules \\) -prune -o -type f -name '*.tmp' -delete",
+      "find . -type d -name '.git' -prune -o -name '*.rej' -print0 | xargs -0 rm -f",
+      "bash -c 'tar --exclude=.git -czf ../acme-src.tgz .'",
+      "cd .git && rm -f index.lock", // a lock file, as `rm -f .git/index.lock`
+    ]) {
+      expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(true);
+    }
+    for (const command of [
+      "tar --exclude=.git -czf ../acme-src.tgz . && rm -rf .git",
+      "find . -name .git -type d -exec rm -rf {} +",
+      "find . -name .git -prune -exec rm -rf {} +", // prunes it and deletes it
+      "find . -name .git | xargs rm -rf",
+      "find . ! -name .git -delete", // a negated name leaves the folder's contents in
+      "rsync -a --delete --delete-excluded --exclude .git ../acme-template/ ./",
+      "cd .git && rm -rf refs objects",
+      "cd .git && rm -rf ./*",
+      "cd .git/reviewgate && python3 tidy.py",
+      "mv .git ../acme-git-old",
+      "rm -rf ./.git/",
+      "rm -rf .git/reviewgate",
+    ]) {
+      expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(false);
+    }
+    expect(decision(await preBash(pre("Bash", { command: "find . -name .git -type d -exec rm -rf {} +" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: ASK_REASON });
+  });
+
   it("a command that changes a project file without a card is still the review's: the post-Bash snapshot attributes it", async () => {
     const root = repo();
     const cp = await openCheckpoint(root);

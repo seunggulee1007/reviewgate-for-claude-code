@@ -8,7 +8,7 @@
  * changed (the post-Bash snapshot). What the classifier blocked becomes a gray chat row; a CLI that cannot run auto mode
  * (the model, a policy) is said once.
  */
-import { basename } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import type { PermissionMode } from "../protocol.js";
 import { CommandRefused } from "../errors.js";
 import { redactDetail } from "./cliRecords.js";
@@ -78,12 +78,22 @@ export function autoModeKeepsMcpCard(input: Record<string, unknown> | undefined)
 
 /**
  * ReviewGate's own state inside git: `<git dir>/reviewgate/` (chats, remembered allows, attachments), `<git dir>/reviewgate-
- * review.json` and `refs/reviewgate/` (the review's pinned trees) — also through a linked worktree's `.git/worktrees/<name>/`
- * — and the `.git` folder itself (`rm -rf .git`, `mv .git x`), which holds them. Not `.gitignore` / `.github`; any other path
- * inside `.git` only when a command deletes or overwrites what holds the commits (`GIT_STORE_RE`).
+ * review.json` and `refs/reviewgate/` (the review's pinned trees) — also through a linked worktree's `.git/worktrees/<name>/`.
  */
 const REVIEWGATE_STATE_RE =
-  /(?:^|[\s'"=:/\\(<>|;&])\.git(?:[/\\](?:[^\s'"`;&|<>]*[/\\])?reviewgate|[/\\]?(?=[\s'"`)<>|;&]|$))|(?:^|[\s'"=:/\\(<>|;&^])refs[/\\]reviewgate(?![\w-])/i;
+  /(?:^|[\s'"=:/\\(<>|;&])\.git[/\\](?:[^\s'"`;&|<>]*[/\\])?reviewgate|(?:^|[\s'"=:/\\(<>|;&^])refs[/\\]reviewgate(?![\w-])/i;
+
+/**
+ * The `.git` folder itself (`rm -rf .git`, `mv .git x`, `./.git/`), which holds ReviewGate's state and the commits. Not
+ * `.gitignore` / `.github`; any other path inside `.git` only when a command deletes or overwrites what holds the commits
+ * (`GIT_STORE_RE`).
+ */
+const GIT_FOLDER_RE = /(?:^|[\s'"=:/\\(<>|;&])\.git[/\\]?(?=[\s'"`)<>|;&]|$)/i;
+
+/** ReviewGate's state or the `.git` folder itself, named in a text. */
+function namesGitState(text: string): boolean {
+  return REVIEWGATE_STATE_RE.test(text) || GIT_FOLDER_RE.test(text);
+}
 
 /**
  * Inside `.git`, what holds the commits and branches the review cannot bring back: `refs`, `objects`, `logs` (with what is
@@ -116,21 +126,91 @@ function writtenPaths(w: readonly string[]): string[] {
   return [];
 }
 
+/** Flags whose value is what a command leaves out (`--exclude .git`, `--exclude-dir .git`, `--ignore .git`). */
+const EXCLUDE_FLAG_RE = /^--(?:exclude|ignore)(?:-dir)?$/i;
+/** The same with the value attached: any `--…exclude…=` / `--…ignore…=` (`--exclude=.git`, `--exclude-dir=.git`). */
+const EXCLUDE_ASSIGN_RE = /^--[\w-]*(?:exclude|ignore)[\w-]*=/i;
+/** find's tests that take a name or path pattern. */
+const FIND_PATTERN_TEST_RE = /^-(?:i?name|i?path|i?wholename|i?regex)$/;
+/** find's actions that change what a test matched. */
+const FIND_ACTION_RE = /^-(?:delete|exec|execdir|ok|okdir)$/;
+
 /**
- * True when a Bash command keeps the app's card in auto mode too: it names ReviewGate's own state in git (`REVIEWGATE_STATE_RE`)
- * or deletes / overwrites what holds the commits (`GIT_STORE_RE`: `rm -rf .git/refs`, `rm -rf .git/*`, `> .git/index`; also in
- * a script a shell runs, `walkCommands`). r1-git: a push, `git config`, a ref write and any other path inside `.git/` go to
- * the CLI's rules and classifier (a push that rewrites the remote has the git card in every mode, §46). Read-only commands
- * never get here: the app's read-only rule allowed them first.
+ * The words of a command (indexes into `w`, its program's words) that only name what it leaves out: an exclusion flag's
+ * value (`tar --exclude=.git`, `rsync --exclude .git`, `grep --exclude-dir=.git`) — unless the command deletes what it
+ * excludes (`rsync --delete-excluded`) — and the pattern of a find test it prunes without acting on it (`find . -path ./.git
+ * -prune -o …`, `find . \( -name .git -o -name node_modules \) -prune -o …`). A negated test (`! -name .git`) is not one:
+ * it leaves the folder's contents in.
+ */
+function leftOutWords(w: readonly string[]): Set<number> {
+  const out = new Set<number>();
+  if (w.length > 0 && basename(w[0]!) === "find") {
+    for (let k = 1; k + 1 < w.length; k++) if (FIND_PATTERN_TEST_RE.test(w[k]!) && findPrunesOnly(w, k + 2)) out.add(k + 1);
+  }
+  if (w.includes("--delete-excluded")) return out;
+  for (let k = 1; k < w.length; k++) {
+    if (EXCLUDE_ASSIGN_RE.test(w[k]!)) out.add(k);
+    else if (EXCLUDE_FLAG_RE.test(w[k]!) && k + 1 < w.length) out.add(++k);
+  }
+  return out;
+}
+
+/**
+ * Whether the and-chain of a find test, from `k` on (after its pattern), prunes what the test matched and does nothing else
+ * to it: a `-prune` before the chain's `-o` / `,` / end and no `-delete` / `-exec` / `-ok`. A chain that ends inside a group
+ * (`\( -name .git -o -name node_modules \)`) goes on after the group's `\)`.
+ */
+function findPrunesOnly(w: readonly string[], k: number): boolean {
+  let prune = false;
+  let depth = 0;
+  for (let i = k; i < w.length; i++) {
+    const a = w[i]!;
+    if (FIND_ACTION_RE.test(a)) return false;
+    if (a === "-prune") prune = true;
+    else if (a === "(") depth++;
+    else if (a === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && (a === "-o" || a === "-or" || a === ",")) {
+      let d = 0;
+      let j = i + 1;
+      for (; j < w.length; j++) {
+        if (w[j] === "(") d++;
+        else if (w[j] === ")" && d-- === 0) break;
+      }
+      if (j >= w.length) break;
+      i = j;
+    }
+  }
+  return prune;
+}
+
+/** Where `walkCommands` starts a line: a folder of its own, so a path written after a `cd` is read where it points. */
+const LINE_START = "/";
+
+/**
+ * True when a Bash command keeps the app's card in auto mode too: it names ReviewGate's own state in git or the `.git` folder
+ * itself (`REVIEWGATE_STATE_RE`, `GIT_FOLDER_RE`), or deletes / overwrites what holds the commits (`GIT_STORE_RE`: `rm -rf
+ * .git/refs`, `rm -rf .git/*`, `> .git/index`, `cd .git && rm -rf refs`; also in a script a shell runs, `walkCommands`). A
+ * name that only leaves the folder out does not count: an exclusion flag's value or a find path it prunes (`leftOutWords`:
+ * `tar --exclude=.git`, `find . -path ./.git -prune -o …`). r1-git: a push, `git config`, a ref write and any other path
+ * inside `.git/` go to the CLI's rules and classifier (a push that rewrites the remote has the git card in every mode, §46).
+ * Read-only commands never get here: the app's read-only rule allowed them first.
  */
 export function autoModeKeepsCommandCard(command: string): boolean {
-  if (REVIEWGATE_STATE_RE.test(command)) return true;
-  if (!/\.git[/\\]/i.test(command)) return false;
-  const store = (paths: readonly string[] | undefined) => (paths ?? []).some((p) => GIT_STORE_RE.test(p));
-  if (parseCommands(command).some((c) => store(c.writes))) return true;
+  if (!/git|reviewgate/i.test(command.replace(/['"\\]/g, ""))) return false;
+  const kept = (p: string) => namesGitState(p) || GIT_STORE_RE.test(p);
+  // A redirection's file — a shell's too (walkCommands goes into its script instead of handing the shell on).
+  if (parseCommands(command).some((c) => (c.writes ?? []).some(kept))) return true;
   let hit = false;
-  walkCommands(command, ".", ({ words, cmd }) => {
-    hit ||= store(writtenPaths(words)) || store(cmd.writes);
+  walkCommands(command, LINE_START, ({ words, cmd, dir }) => {
+    if (hit) return;
+    const at = (p: string) => (dir === LINE_START || isAbsolute(p) ? [p] : [p, join(dir, p)]);
+    const skip = leftOutWords(words);
+    const offset = cmd.words.length - words.length; // `words` is `cmd.words` without its wrappers and assignments
+    hit =
+      REVIEWGATE_STATE_RE.test(dir) ||
+      [...writtenPaths(words), ...(cmd.writes ?? [])].flatMap(at).some(kept) ||
+      cmd.words.some((w, k) => !skip.has(k - offset) && namesGitState(w)) ||
+      (cmd.input !== undefined && namesGitState(cmd.input));
   });
   return hit;
 }
