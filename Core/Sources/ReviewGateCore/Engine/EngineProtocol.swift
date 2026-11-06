@@ -344,6 +344,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     public var maxTurns: Int?
     /// §52: background commands, Ctrl+B and turns Claude starts itself as review turns (engine default true; next session start).
     public var backgroundWork: Bool?
+    /// §52.2: subagents finish inside the turn that started them, as before 0.6 (engine default false; next session start).
+    public var subagentsInTurn: Bool?
     // MARK: wave4b w4b-bigturn
     /// §39.1: an untracked file at least this large (MB) is a stub in snapshots (engine default 50; live).
     public var largeFileMB: Int?
@@ -2523,6 +2525,10 @@ public struct ToolResultInfo: Sendable, Equatable {
     public var cliAgentId: String?
     /// §36.2: the agent was stopped with `stop_agent` (the result reads "[Request interrupted by user for tool use]").
     public var stoppedBy: AgentStoppedBy?
+    /// §52.2: the call's agent went to work in the background — this answer is no report (its own result comes later).
+    public var agentLaunched = false
+    /// §52.2: that agent's own result when it ended (`preview` is its report): the call's last result.
+    public var agentEnded = false
 
     public init(parentToolUseId: String? = nil, truncated: Bool = false, testOutcome: TestOutcome? = nil) {
         self.parentToolUseId = parentToolUseId

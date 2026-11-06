@@ -101,6 +101,12 @@ public enum BackgroundText {
     /// The `auto_turn` row.
     public static func autoTurnTitle(_ info: AutoTurnInfo) -> String {
         switch info.trigger {
+        case .background where info.task?.kind == .agent:   // §52.2
+            switch info.task?.status {
+            case "failed": return String(localized: "A background agent failed — Claude went on", bundle: .module)
+            case "stopped": return String(localized: "A background agent was stopped — Claude went on", bundle: .module)
+            default: return String(localized: "A background agent finished — Claude went on", bundle: .module)
+            }
         case .background:
             switch info.task?.status {
             case "failed": return String(localized: "A background task failed — Claude went on", bundle: .module)
@@ -155,14 +161,24 @@ public extension AppSettings {
     static func backgroundWork(defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: backgroundWorkKey) as? Bool ?? true
     }
+
+    /// §52.2: subagents finish inside the turn that started them, as before 0.6 (default off: they work in the background and
+    /// Claude answers meanwhile, as in the terminal; next session start).
+    static let subagentsInTurnKey = "subagentsInTurn"
+
+    static func subagentsInTurn(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: subagentsInTurnKey) as? Bool ?? false
+    }
 }
 
 public extension AppState {
-    /// Settings › background work: `set_settings {backgroundWork}` (the engine uses it at the next session start).
+    /// Settings › background work: `set_settings {backgroundWork, subagentsInTurn}` (the engine uses them at the next
+    /// session start).
     func pushBackgroundWork() {
         guard state.seq > 0 || commandSink != nil else { return }
         var settings = EngineSettings()
         settings.backgroundWork = AppSettings.backgroundWork(defaults: settingsDefaults)
+        settings.subagentsInTurn = AppSettings.subagentsInTurn(defaults: settingsDefaults)   // §52.2
         fire(.setSettings(settings))
     }
 }

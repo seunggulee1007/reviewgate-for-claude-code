@@ -14460,6 +14460,22 @@
         }
       }
     },
+    "Off (the default): as in the terminal, a subagent works in the background and Claude answers your messages meanwhile; what it changes still goes into the next review, and Claude goes on when it is done. On: Claude waits for its subagents before it answers, as before. Takes effect when the session restarts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off (the default): as in the terminal, a subagent works in the background and Claude answers your messages meanwhile; what it changes still goes into the next review, and Claude goes on when it is done. On: Claude waits for its subagents before it answers, as before. Takes effect when the session restarts."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끔(기본): 터미널에서처럼 서브에이전트는 백그라운드에서 일하고, 그동안 Claude가 메시지에 답해요. 서브에이전트가 바꾼 파일은 다음 리뷰에 들어가고, 끝나면 Claude가 이어서 해요. 켬: 예전처럼 Claude가 서브에이전트를 기다린 뒤에 답해요. 세션을 다시 시작하면 적용돼요."
+          }
+        }
+      }
+    },
     "Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.": {
       "localizations": {
         "en": {
@@ -21874,6 +21890,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "서브에이전트"
+          }
+        }
+      }
+    },
+    "Subagents finish inside the turn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subagents finish inside the turn"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "서브에이전트가 턴 안에서 끝나게"
           }
         }
       }
