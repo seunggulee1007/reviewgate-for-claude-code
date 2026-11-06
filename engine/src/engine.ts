@@ -3520,10 +3520,12 @@ export class ReviewEngine {
     // A HEAD move of the running turn: its commits stay in the review; the move explains the turn's `head_moved`.
     if (ev.from && ev.to && this.gate.running) {
       this.turnGitMoves.push({ from: { ...ev.from }, to: { ...ev.to }, foreign: ev.foreign === true, ownCommits: [...(ev.ownCommits ?? [])] });
-      if (ev.ownCommits && ev.ownCommits.length > 0) {
-        this.log("info", `Claude committed ${ev.ownCommits.map((c) => c.slice(0, 7)).join(", ")}: kept in the review`);
-        this.gate.noteOwnCommits(ev.ownCommits, ev.amended ?? []);
-      }
+    }
+    // §52.2: so do the commits of a subagent working in the background between turns (only background work runs git then):
+    // the next turn's review keeps its A, and they are never carried into it as someone else's.
+    if (ev.from && ev.to && ev.ownCommits && ev.ownCommits.length > 0) {
+      this.log("info", `Claude committed ${ev.ownCommits.map((c) => c.slice(0, 7)).join(", ")}${this.gate.running ? "" : " in the background"}: kept in the review`);
+      this.gate.noteOwnCommits(ev.ownCommits, ev.amended ?? []);
     }
     const stashed = ev.stashed ?? [];
     if (stashed.length > 0) {

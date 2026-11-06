@@ -244,6 +244,27 @@ describe("§52.2 a subagent working in the background", () => {
     expect(s.gate.headMoved ?? null).toBeNull();
   });
 
+  it("a commit it makes between turns is Claude's: it stays in the next review (committedIn), with the review standing or finished (§46)", async () => {
+    for (const finish of [false, true]) {
+      const { h, dir, id } = await opened();
+      await turnWithAgent(h, dir, id);
+      if (finish) await h.engine.request({ type: "finish_review" });
+      // While no turn runs the subagent writes sub.txt and commits it; the hooks report its commit (git_result).
+      const from = { sha: sh(dir, "rev-parse", "HEAD").trim(), branch: "main" };
+      write(dir, "sub.txt", "sub\n");
+      sh(dir, "add", "sub.txt");
+      sh(dir, "commit", "-qm", "sub");
+      const commit = sh(dir, "rev-parse", "HEAD").trim();
+      h.session().emit({ type: "git_result", toolUseId: "toolu_c", from, to: { sha: commit, branch: "main" }, ownCommits: [commit] });
+      await h.settle();
+      await h.engine.handle({ type: "send", text: "2+2는?" });
+      h.session().emitTurnEnd({ sessionId: id, toolFiles: [{ path: join(dir, "sub.txt"), tools: ["Write"], count: 1, toolUseIds: ["toolu_sub"] }] });
+      const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "sub.txt"), `turn 2 collected (finish: ${finish})`);
+      expect(s.changedFiles.find((f) => f.path === "sub.txt"), `finish: ${finish}`).toMatchObject({ state: "pending", committedIn: commit.slice(0, 7) });
+      expect(s.changedFiles.map((f) => f.path), `finish: ${finish}`).toEqual(finish ? ["sub.txt"] : ["a.txt", "sub.txt"]);
+    }
+  });
+
   it("without background work a finished review lets the next turn take a fresh A (as before)", async () => {
     const { h, dir, id } = await opened();
     await h.engine.handle({ type: "send", text: "a" });

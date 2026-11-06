@@ -883,9 +883,10 @@ export class ReviewGate {
     if (carry && base !== null && this.turnStartTree === null && this.turnEndTree === null) {
       this.baseHead = base.baseHead;
       this.baseMerge = base.baseMerge;
-      this.ownCommits = base.ownCommits;
-      this.replacedCommits = base.replacedCommits;
-      this.ownCopies = base.ownCopies;
+      // With the commits a subagent in the background made since (`noteOwnCommits` between turns).
+      this.ownCommits = [...new Set([...base.ownCommits, ...this.ownCommits])];
+      this.replacedCommits = [...new Set([...base.replacedCommits, ...this.replacedCommits])];
+      this.ownCopies = new Map([...base.ownCopies, ...this.ownCopies]);
       // §46: what git brought in since that B (a pull, a commit outside the app) goes into it first, as `followHead` does for
       // a standing review — else the turn would list it as Claude's change. Claude's own commits are not carried.
       const [tree] = cp ? await this.carryGitMoves(cp, [base.tree]).catch(() => [base.tree]) : [base.tree];
