@@ -273,4 +273,43 @@ import Testing
         #expect(off.maxTurns == 0)
         #expect(AppSettings.maxTurnsNumber(defaults: d) == 300)   // kept for the next time it is on
     }
+
+    // MARK: r1x — §38.2: a PreToolUse hook's deny is its call's — a quiet row, no alarm
+
+    @Test func aHookDeniedResultIsAQuietRowNamingTheHookAndWhy() throws {
+        let line = #"{"type":"tool_result","toolUseId":"toolu_r","isError":true,"preview":"PreToolUse:Read hook error: [ACME READ BUDGET] Denied: delta.diff is 82394 bytes","parentToolUseId":"toolu_agent","hookDenied":{"hook":"PreToolUse:Read","reason":"[ACME READ BUDGET] Denied: delta.diff is 82394 bytes"}}"#
+        guard case let .toolResult(_, isError, _, info) = try NDJSON.decode(EngineEvent.self, from: line) else { Issue.record("not toolResult"); return }
+        #expect(isError)
+        let denial = try #require(info.hookDenied)
+        #expect(denial == HookDenial(hook: "PreToolUse:Read", reason: "[ACME READ BUDGET] Denied: delta.diff is 82394 bytes"))
+        #expect(LongWorkText.hookDenied(denial) == "Blocked by a hook: PreToolUse:Read — [ACME READ BUDGET] Denied: delta.diff is 82394 bytes")
+        #expect(LongWorkText.hookDenied(HookDenial(hook: "PreToolUse:Bash", reason: "")) == "Blocked by a hook: PreToolUse:Bash")
+        // The row restored from the chat reads the same; a result without it, or without a hook name, has none.
+        let row = try NDJSON.decode(TranscriptItem.self, from: #"{"at":"2026-11-06T02:00:00Z","turn":2,"kind":"tool_result","toolUseId":"toolu_r","isError":true,"preview":"x","hookDenied":{"hook":"PreToolUse:Read","reason":"too big"}}"#)
+        guard case let .toolResult(_, _, _, restored) = row.kind else { Issue.record("not a tool result row"); return }
+        #expect(restored.hookDenied == HookDenial(hook: "PreToolUse:Read", reason: "too big"))
+        guard case let .toolResult(_, _, _, none) = try NDJSON.decode(EngineEvent.self, from: #"{"type":"tool_result","toolUseId":"t","isError":true,"preview":"x","hookDenied":{"reason":"r"}}"#) else { return }
+        #expect(none.hookDenied == nil)
+    }
+
+    @Test func aFailedHookAndAnOldPreToolUseBlockAreGrayRowsAStopHookStaysAWarning() {
+        #expect(LongWorkText.isQuietHookNotice(code: "hook_failed", hookName: "PostToolUse:Edit"))
+        #expect(LongWorkText.isQuietHookNotice(code: "hook_blocked", hookName: "PreToolUse:Read"))
+        #expect(!LongWorkText.isQuietHookNotice(code: "hook_blocked", hookName: "Stop"))
+        #expect(!LongWorkText.isQuietHookNotice(code: "hook_blocked", hookName: nil))
+        #expect(!LongWorkText.isQuietHookNotice(code: "cli_warning", hookName: nil))
+        #expect(SessionNotices.style(code: "hook_failed", fatal: false, quiet: true) == .info)
+        #expect(SessionNotices.style(code: "hook_blocked", fatal: false) == .warning)
+        let store = makeStore()
+        var failed = EngineErrorDetail(code: "hook_failed")
+        failed.hookName = "PostToolUse:Edit"
+        failed.exitCode = 1
+        store.handle(.error(message: "The hook PostToolUse:Edit failed (exit 1)", fatal: false, scope: .session, detail: failed))
+        var stop = EngineErrorDetail(code: "hook_blocked")
+        stop.hookName = "Stop"
+        stop.detail = "tests are red"
+        store.handle(.error(message: "The hook Stop blocked this: tests are red", fatal: false, scope: .session, detail: stop))
+        let quiet = store.transcript.compactMap { if case let .error(_, _, _, info) = $0 { return info.quiet }; return nil }
+        #expect(quiet == [true, false])
+    }
 }

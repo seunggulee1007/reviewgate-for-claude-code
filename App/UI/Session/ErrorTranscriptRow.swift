@@ -16,7 +16,7 @@ struct ErrorTranscriptRow: View {
     /// False for another chat's rows (§38.4 viewing): its actions would act on this window's chat.
     var actionable = true
 
-    private var style: NoticeStyle { SessionNotices.style(code: info.code, fatal: fatal) }
+    private var style: NoticeStyle { SessionNotices.style(code: info.code, fatal: fatal, quiet: info.quiet) }
 
     private var tint: Color {
         switch style {

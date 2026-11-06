@@ -30,6 +30,8 @@ public struct ErrorRowInfo: Sendable, Equatable {
     public var lastAt: Date?
     /// MARK: r1-scope — §33.4 `worktree_outside_review`: the folder the row's actions open or move this chat to.
     public var path: String?
+    /// r1x — §38.2: a hook notice that is no alarm (a failed hook, a PreToolUse block restored from before): a gray row.
+    public var quiet = false
 
     public init(code: String? = nil, detail: String? = nil, secondary: String? = nil, scope: ErrorScope? = nil, count: Int = 1,
                 lastAt: Date? = nil, path: String? = nil) {
@@ -114,8 +116,9 @@ public enum SessionNotices {
         return notices.contains(code)
     }
 
-    public static func style(code: String?, fatal: Bool) -> NoticeStyle {
+    public static func style(code: String?, fatal: Bool, quiet: Bool = false) -> NoticeStyle {
         if fatal { return .error }
+        if quiet { return .info }   // r1x (§38.2): a failed hook, a PreToolUse hook's block — gray, no alarm
         if let git = GitNoticeText.style(code) { return git }   // r1-git (§46): gray rows
         switch code {
         case "resume_not_found", "resume_failed": return .info

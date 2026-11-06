@@ -3665,7 +3665,9 @@ as before.
   quiet gray row under the call — a subagent's inside its agent's group — "훅이 막음 · PreToolUse:Read — <reason>", never
   an error. The app's own denies (no `hook_response`: §18, plan mode, `.git`) and other errors are unchanged; a hook that
   failed (`hook_failed`) stays a row, gray now. A `hook_blocked` restored from before (a PreToolUse `hookName`) reads gray
-  too. `w4c.hookBlockOnce.test.ts` (a subagent's JSON deny, exit 2, an unrelated error, a failed hook).
+  too. `w4c.hookBlockOnce.test.ts` (a subagent's JSON deny, exit 2, an unrelated error, a failed hook). Mac
+  `HookDeniedRow` (ToolRows.swift, `ToolResultInfo.hookDenied`), `ErrorRowInfo.quiet` / `LongWorkText.isQuietHookNotice`;
+  Core `LongWorkTests`.
 - **Usage windows.** Every `rate_limit_event` whose `rate_limit_info` names a `rateLimitType` updates
   `state.hud.rateLimits?: [{kind, status: "allowed" | "allowed_warning" | "rejected", percent?, resetsAt?, at}]`, one entry per
   kind (`five_hour`, `seven_day`, `seven_day_opus`, …, as the CLI names it), windows whose `resetsAt` passed dropped. The

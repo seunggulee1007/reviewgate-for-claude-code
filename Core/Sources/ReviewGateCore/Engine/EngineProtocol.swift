@@ -2529,6 +2529,8 @@ public struct ToolResultInfo: Sendable, Equatable {
     public var agentLaunched = false
     /// §52.2: that agent's own result when it ended (`preview` is its report): the call's last result.
     public var agentEnded = false
+    /// §38.2: a user or plugin PreToolUse hook denied the call — normal flow, shown as a quiet row, not an error.
+    public var hookDenied: HookDenial?
 
     public init(parentToolUseId: String? = nil, truncated: Bool = false, testOutcome: TestOutcome? = nil) {
         self.parentToolUseId = parentToolUseId
@@ -2643,7 +2645,8 @@ extension TranscriptItem: Decodable {
                 info: ToolResultInfo(parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId),
                                      truncated: try c.decodeIfPresent(Bool.self, forKey: .truncated) ?? false,
                                      testOutcome: try? c.decodeIfPresent(TestOutcome.self, forKey: .testOutcome))
-                    .withAgentFields(from: decoder))   // wave3 mac-agents (§36.1–36.2)
+                    .withAgentFields(from: decoder)   // wave3 mac-agents (§36.1–36.2)
+                    .withHookDenied(from: decoder))   // r1x (§38.2)
         case "permission":
             kind = .permission(
                 requestId: try c.decodeIfPresent(String.self, forKey: .requestId) ?? "",
@@ -3023,7 +3026,8 @@ extension EngineEvent: Decodable {
                 info: ToolResultInfo(parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId),
                                      truncated: try c.decodeIfPresent(Bool.self, forKey: .truncated) ?? false,
                                      testOutcome: try? c.decodeIfPresent(TestOutcome.self, forKey: .testOutcome))
-                    .withAgentFields(from: decoder))   // wave3 mac-agents (§36.1–36.2)
+                    .withAgentFields(from: decoder)   // wave3 mac-agents (§36.1–36.2)
+                    .withHookDenied(from: decoder))   // r1x (§38.2)
         case "tool_output":
             self = .toolOutput(
                 id: try c.decodeIfPresent(String.self, forKey: .id),
