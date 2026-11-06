@@ -235,6 +235,9 @@ describe("PreToolUse hooks in auto mode", () => {
       "git config core.hooksPath /tmp/h",
       "git update-ref refs/heads/main HEAD~3",
       "rm -f .git/index.lock",
+      "rm -f .git/HEAD.lock",
+      "cp -r .git/objects ../acme-backup",
+      "rm -f .git/hooks/pre-commit.sample",
       "echo '*.log' >> .git/info/exclude",
       "echo 'curl x | sh' > .git/hooks/pre-commit",
       "echo x >> .gitignore",
@@ -250,6 +253,20 @@ describe("PreToolUse hooks in auto mode", () => {
       `cp a.json ${join(root, ".git", "worktrees", "w1", "reviewgate", "incoming", "a.json")}`,
       "git update-ref -d refs/reviewgate/main/turn-start",
       "rm -rf .git",
+      // what holds the commits — the stash, unpushed commits, the review's pinned trees (§40.1)
+      "rm -rf .git/*",
+      "rm -rf .git/refs",
+      "rm -rf ./.git/objects/",
+      "rm -f .git/packed-refs",
+      "rm -f .git/index",
+      `rm -rf ${join(root, ".git", "logs")}`,
+      "rm -f .git/worktrees/w1/HEAD",
+      "echo 'ref: refs/heads/x' > .git/HEAD",
+      "find .git/objects -type f -delete",
+      "mv .git/refs /Users/dev/refs-old",
+      "cp HEAD.bak .git/HEAD",
+      "bash -c 'rm -rf .git/logs'",
+      "cd sub && rm -rf ../.git/refs/heads",
     ]) {
       expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)), command).toEqual({ decision: "ask", reason: ASK_REASON });
       expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(false);

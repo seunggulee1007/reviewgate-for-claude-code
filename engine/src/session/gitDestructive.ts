@@ -34,6 +34,8 @@ export type ShellCommand = {
   input?: string;
   /** Its stdin comes from what the line does not spell out: a pipe (`… | sh`) or a file (`sh < x`). */
   stdinElsewhere?: boolean;
+  /** The files its redirections write (`> x`, `>> x`, `2> x`, `&> x`), as written. */
+  writes?: string[];
 };
 
 type HereDoc = { delim: string; strip: boolean; cmd: ShellCommand };
@@ -60,8 +62,9 @@ function parseList(s: string, start: number, nested: boolean, out: ShellCommand[
   let cmd: ShellCommand = { words: [] };
   let word = "";
   let inWord = false;
-  /** The next word is a redirection's target, not an argument. */
+  /** The next word is a redirection's target, not an argument (`writeNext`: one it writes). */
   let dropNext = false;
+  let writeNext = false;
   /** The next word is a here-string: the command's input. */
   let inputNext = false;
   /** Subshells `( … )` opened in this list. */
@@ -70,7 +73,10 @@ function parseList(s: string, start: number, nested: boolean, out: ShellCommand[
   const endWord = () => {
     if (inWord) {
       if (dropNext) dropNext = false;
-      else if (inputNext) {
+      else if (writeNext) {
+        writeNext = false;
+        (cmd.writes ??= []).push(word);
+      } else if (inputNext) {
         inputNext = false;
         cmd.input = word;
       } else cmd.words.push(word);
@@ -192,7 +198,8 @@ function parseList(s: string, start: number, nested: boolean, out: ShellCommand[
           continue;
         }
       } else if (s[j] === ">" || s[j] === "|" || (c === "<" && s[j] === ">")) j++;
-      dropNext = true;
+      if (c === ">") writeNext = true;
+      else dropNext = true;
       i = j;
       continue;
     }
@@ -200,7 +207,7 @@ function parseList(s: string, start: number, nested: boolean, out: ShellCommand[
       if (s[i + 1] === ">") {
         endWord(); // `&>` / `&>>`
         i += s[i + 2] === ">" ? 3 : 2;
-        dropNext = true;
+        writeNext = true;
         continue;
       }
       endCommand();

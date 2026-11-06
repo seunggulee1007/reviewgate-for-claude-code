@@ -345,9 +345,11 @@ describe("gitInvocations / shellCommands", () => {
     ]);
     expect(parseCommands("sh <<< 'git status' && sh < run.sh 2> err.txt")).toEqual([
       { words: ["sh"], input: "git status" },
-      { words: ["sh"], stdinElsewhere: true },
+      { words: ["sh"], stdinElsewhere: true, writes: ["err.txt"] },
     ]);
     expect(parseCommands("a || b 2<&1")).toEqual([{ words: ["a"] }, { words: ["b"] }]);
+    // What its redirections write (§40.1): `>`, `>>`, `>|`, `&>`; never a stream (`2>&1`).
+    expect(parseCommands("echo x > .git/HEAD 2>&1 && make &>> build.log >| out.txt").map((c) => c.writes)).toEqual([[".git/HEAD"], ["build.log", "out.txt"]]);
   });
 
   it("knows where each git command runs", () => {

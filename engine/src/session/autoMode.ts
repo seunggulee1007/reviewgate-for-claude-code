@@ -8,9 +8,11 @@
  * changed (the post-Bash snapshot). What the classifier blocked becomes a gray chat row; a CLI that cannot run auto mode
  * (the model, a policy) is said once.
  */
+import { basename } from "node:path";
 import type { PermissionMode } from "../protocol.js";
 import { CommandRefused } from "../errors.js";
 import { redactDetail } from "./cliRecords.js";
+import { parseCommands, walkCommands } from "./gitDestructive.js";
 import { userRuleApplies, type McpToolHints } from "./permissionRules.js";
 
 /**
@@ -77,20 +79,60 @@ export function autoModeKeepsMcpCard(input: Record<string, unknown> | undefined)
 /**
  * ReviewGate's own state inside git: `<git dir>/reviewgate/` (chats, remembered allows, attachments), `<git dir>/reviewgate-
  * review.json` and `refs/reviewgate/` (the review's pinned trees) — also through a linked worktree's `.git/worktrees/<name>/`
- * — and the `.git` folder itself (`rm -rf .git`, `mv .git x`), which holds them. Not `.gitignore` / `.github`, and no
- * other path inside `.git` (`.git/index.lock`, `.git/info/exclude`, `.git/hooks/x`: the CLI's to judge, as in the terminal).
+ * — and the `.git` folder itself (`rm -rf .git`, `mv .git x`), which holds them. Not `.gitignore` / `.github`; any other path
+ * inside `.git` only when a command deletes or overwrites what holds the commits (`GIT_STORE_RE`).
  */
 const REVIEWGATE_STATE_RE =
   /(?:^|[\s'"=:/\\(<>|;&])\.git(?:[/\\](?:[^\s'"`;&|<>]*[/\\])?reviewgate|[/\\]?(?=[\s'"`)<>|;&]|$))|(?:^|[\s'"=:/\\(<>|;&^])refs[/\\]reviewgate(?![\w-])/i;
 
 /**
- * True when a Bash command keeps the app's card in auto mode too: it names ReviewGate's own state in git (`REVIEWGATE_STATE_RE`).
- * r1-git: a push, `git config`, a ref write and any other path inside `.git/` go to the CLI's rules and classifier (a push
- * that rewrites the remote has the git card in every mode, §46). Read-only commands never get here: the app's read-only
- * rule allowed them first.
+ * Inside `.git`, what holds the commits and branches the review cannot bring back: `refs`, `objects`, `logs` (with what is
+ * in them), `packed-refs`, `index`, `HEAD` — a linked worktree's under `worktrees/<name>/` too — or a glob over the folder
+ * (`.git/*`): the stash, unpushed commits and the review's pinned trees. Not a lock file (`index.lock`), `info/`, `hooks/`
+ * or `config`: the CLI's to judge, as in the terminal.
+ */
+const GIT_STORE_RE = /(?:^|[/\\])\.git[/\\](?:worktrees[/\\][^/\\]+[/\\])?(?:[^/\\]*[*?[]|(?:refs|objects|logs)(?:[/\\]|$)|(?:packed-refs|index|HEAD)$)/i;
+
+/** Commands that delete or overwrite every file they are given. */
+const REMOVERS: ReadonlySet<string> = new Set(["rm", "rmdir", "unlink", "shred", "truncate", "mv", "tee"]);
+/** Commands that write their last operand (or the folder of `-t`). */
+const COPIERS: ReadonlySet<string> = new Set(["cp", "ln", "install", "rsync", "ditto"]);
+
+/** The files a command deletes or overwrites, as written: every operand of `rm` / `mv` / …, `cp`'s target, `dd of=`, `find … -delete`'s start points. */
+function writtenPaths(w: readonly string[]): string[] {
+  const name = basename(w[0]!);
+  const ops = w.slice(1).filter((a) => !a.startsWith("-"));
+  if (REMOVERS.has(name)) return ops;
+  if (COPIERS.has(name)) {
+    const t = w.findIndex((a) => a === "-t" || a === "--target-directory");
+    const eq = w.find((a) => a.startsWith("--target-directory="));
+    return [ops[ops.length - 1], t > 0 ? w[t + 1] : undefined, eq?.slice("--target-directory=".length)].filter((x): x is string => !!x);
+  }
+  if (name === "dd") return w.filter((a) => a.startsWith("of=")).map((a) => a.slice(3));
+  if (name === "find" && w.includes("-delete")) {
+    const end = w.findIndex((a, k) => k > 0 && (a.startsWith("-") || a === "(" || a === "!"));
+    return w.slice(1, end === -1 ? w.length : end);
+  }
+  return [];
+}
+
+/**
+ * True when a Bash command keeps the app's card in auto mode too: it names ReviewGate's own state in git (`REVIEWGATE_STATE_RE`)
+ * or deletes / overwrites what holds the commits (`GIT_STORE_RE`: `rm -rf .git/refs`, `rm -rf .git/*`, `> .git/index`; also in
+ * a script a shell runs, `walkCommands`). r1-git: a push, `git config`, a ref write and any other path inside `.git/` go to
+ * the CLI's rules and classifier (a push that rewrites the remote has the git card in every mode, §46). Read-only commands
+ * never get here: the app's read-only rule allowed them first.
  */
 export function autoModeKeepsCommandCard(command: string): boolean {
-  return REVIEWGATE_STATE_RE.test(command);
+  if (REVIEWGATE_STATE_RE.test(command)) return true;
+  if (!/\.git[/\\]/i.test(command)) return false;
+  const store = (paths: readonly string[] | undefined) => (paths ?? []).some((p) => GIT_STORE_RE.test(p));
+  if (parseCommands(command).some((c) => store(c.writes))) return true;
+  let hit = false;
+  walkCommands(command, ".", ({ words, cmd }) => {
+    hit ||= store(writtenPaths(words)) || store(cmd.writes);
+  });
+  return hit;
 }
 
 /** The `permission_mode` of a hook input (CLI 2.1.30x), undefined when it carries none. */

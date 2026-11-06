@@ -4298,7 +4298,15 @@ rules. Every field stays optional; an older engine or client behaves as before.
   every mode (§46). The plain card stays only for a command that names ReviewGate's own state in git:
   `<git dir>/reviewgate/…` (chats, remembered allows, attachments; a linked worktree's `.git/worktrees/<name>/reviewgate/`
   too), `reviewgate-review.json`, `refs/reviewgate/…` (the review's pinned trees) or the `.git` folder itself (`rm -rf
-  .git`) — `REVIEWGATE_STATE_RE`, case-insensitive. An MCP tool writing into `.git/` keeps its card (§41.2, unchanged).
+  .git`) — `REVIEWGATE_STATE_RE`, case-insensitive — and for one that deletes or overwrites what holds the commits inside
+  it (`GIT_STORE_RE`): `refs`, `objects`, `logs` (and what is in them), `packed-refs`, `index`, `HEAD` (a linked worktree's
+  under `worktrees/<name>/` too) or a glob over the folder (`rm -rf .git/*`). Only the words a command writes count: every
+  operand of `rm` / `rmdir` / `unlink` / `shred` / `truncate` / `mv` / `tee`, the target of `cp` / `ln` / `install` /
+  `rsync` / `ditto` (`-t` too), `dd of=`, the start points of `find … -delete` and a redirection's file (`> .git/HEAD`) —
+  also in a script a shell runs (`bash -c 'rm -rf .git/logs'`, the §46 scanner). Before, `rm -rf .git/refs`, `.git/objects`
+  or `.git/*` (the stash, unpushed commits, the review's pinned trees) ran without one; a lock file (`.git/index.lock`,
+  `HEAD.lock`), `info/`, `hooks/` and a copy out of `.git` (`cp -r .git/objects ../backup`) stay the CLI's. An MCP tool
+  writing into `.git/` keeps its card (§41.2, unchanged).
 - **자동 spreads like any other mode** (Mac `AppSettings.permissionMode(root:)`; reversed after 0.5.6). The last mode used
   anywhere (`"*"`, also what `hello` carries) seeds a project opened for the first time, 자동 included — keeping 자동 out
   (→ 기본) started every new worktree of a repository worked in auto mode in 기본, with a card for every command and MCP
