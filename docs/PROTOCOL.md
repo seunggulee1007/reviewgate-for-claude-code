@@ -672,7 +672,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   `LANGUAGE`, `TZ`, `NO_COLOR`, `FORCE_COLOR`, `CLICOLOR`, `COLUMNS`, `LINES`, `TERM`; `NODE_OPTIONS=`, `PAGER=`, `GIT_*=`,
   `LD_*=` … reject); a `/abs/path/git` counts by its basename only from `/bin`, `/usr/bin`, `/usr/local/bin`, `/opt/homebrew/bin`,
   `/sbin`, `/usr/sbin`, `./x` never — is in `ls cat head tail wc pwd which type echo printf grep rg find fd stat file env date
-  whoami tree du df ps id uname sort uniq cut sed tr jq node npm python3 git` (`awk` is NOT: its programs can write, pipe, run
+  whoami tree du df ps id uname sort uniq cut sed tr jq node npm python3 git test [ true false gh xargs` (§19.3; `awk` is NOT: its programs can write, pipe, run
   commands and load files) and its arguments pass the per-command check: `sed` needs `-n`/`--quiet`/`--silent`, no
   `-i`/`-I`/`--in-place`/`-f`/`--file`, and every script (`-e`, `--expression`, or the first operand) must parse as addresses +
   simple commands (`p P l q Q = d D n N g G h H x z { }`) and `s`/`y` with only `g p i I m M <n>` flags — `w`/`W`/`r`/`R`/`e`
@@ -686,11 +686,13 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   — any other global option (`-c`, `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--config-env`, …) rejects — without `-o`,
   `--output`, `--ext-diff`, `--textconv` (or their prefixes), where `branch`/`tag` must be listing (no positional unless
   `--list`/`-l`/`--contains`/`--merged`/`--points-at`; no `-d`/`-D`/`-m`/`-c`/`-f`/`-u`/`-a`/`-s`/`--set-upstream-to`/…) and
-  `remote` only bare, `show` or `get-url`. A word with an unquoted glob (`*`, `?`, `[`) or `$` is only allowed as an argument of
+  `remote` only bare, `show` or `get-url` (§19.3 adds more git reads, `config` reads, `gh` reads, `test`, `xargs`, and `cd` /
+  `git -C` into the repository). A word with an unquoted glob (`*`, `?`, `[`) or `$` is only allowed as an argument of
   `ls cat head tail wc pwd which type echo printf grep stat du df ps id uname cut tr jq whoami` (a planted file named `--pre=x`
   matched by `*` must never reach `rg`/`sort`/`git`/…), never as the command name. Any `>`, `<`
-  (so `2>&1`, `<(…)`, heredocs too), `(`, `)`, `{`/`}` at a word start, backtick, `$(`, background `&`, `|&`, an unterminated quote,
-  an empty line, or a segment starting with anything else (`sudo`, `rm`, `mv`, `cp`, `tee`, `xargs`, `eval`, `exec`, `npm test`,
+  (so `<(…)`, heredocs too — but not a redirection into /dev/null or onto another stream such as `2>&1`, §19.3), `(`, `)`,
+  `{`/`}` at a word start, backtick, `$(`, background `&`, `|&`, an unterminated quote,
+  an empty line, or a segment starting with anything else (`sudo`, `rm`, `mv`, `cp`, `tee`, `eval`, `exec`, `npm test`,
   `node script.js`, …) makes the command NOT read-only. The PreToolUse Bash hook then answers `permissionDecision: "allow"`
   (reason `ReviewGate: read-only command`) instead of `ask`, and `canUseTool` applies the same rule should it still be reached;
   the budget deny is checked first, and a git command that changes the repository (`git commit|merge|checkout|…`) always
@@ -1180,6 +1182,38 @@ same scanner as the read-only classifier) and:
 - A quoted command name holding whitespace (`"npm test" x`) never matches. `rememberKey` uses the tokenized first
   segment when the line tokenizes (`echo "a b" c` → `Bash:echo a b`), the raw first two words otherwise (unchanged:
   `echo hi > x.txt` → `Bash:echo hi`, but that redirected line itself is no longer auto-allowed by the key).
+
+**Read-only commands, wider (2026-11; the list of §10).** The terminal ran `grep -rn X src 2>/dev/null | head`,
+`find . | xargs grep -l X`, `git config --get user.email`, `test -f x`, `gh pr view 42` or `cd ../acme-42 && git log` without
+asking; ReviewGate put each of them on a card — and on every guard that lets reads through (the §33.4 scope cards, plan
+mode §19.4, side questions §21, the unprompted-turn guard §18). `isReadOnlyCommand(command, context?)`
+(`engine/src/session/bashClass.ts`) now also accepts:
+
+- A redirection that writes no file: `2>&1`, `1>&2`, `>&2`, `>/dev/null`, `2>/dev/null`, `&>/dev/null` (and the `>>` forms).
+  Any other `>` / `<` still makes the line not read-only. Allow patterns and remembered keys still never cover a redirected
+  line (above): only the classifier drops these.
+- `test` / `[ … ]` — never with `-v` / `-R`, where bash evaluates an array subscript (`a[$(cmd)]`) — `true`, `false`.
+- git reads: `grep` (not `-O` / `--open-files-in-pager`, which runs a program), `ls-tree`, `merge-base`, `rev-list`,
+  `show-ref`, `for-each-ref`, `cat-file -p|-t|-s|-e` (no `--batch*`, `--textconv`, `--filters`), `stash list|show`,
+  `worktree list`, and the `config` read forms: `--get`, `--get-all`, `--get-regexp`, `--list` / `-l`, `get <key>`, `list`,
+  or exactly one positional key — never with `--add`, `--unset*`, `--replace-all`, `--edit` / `-e`, `--rename-section`,
+  `--remove-section` (or a prefix git would take for one), the subcommands `set` / `unset` / `edit` / `rename-section` /
+  `remove-section`, or a short option other than `-l`, `-z`, `-f <file>`, `-t <type>`.
+- `gh pr view|list|diff|checks|status`, `gh issue view|list`, `gh repo view`, `gh run view|list`, and `gh api <path>` as a
+  GET: no `-X` / `--method` other than `GET`, none of `-f` / `-F` / `--field` / `--raw-field` / `--input` (they make it a POST).
+- `xargs [-0] [-r] [-n N] [-I R] [-P N] [-L N] <command> …` when `<command>` is one of the commands whose every option is
+  harmless (the glob-safe list of §10: what `xargs` reads becomes its arguments, so a planted file named `--pre=x` stays a
+  file name) and read-only with its own arguments; no command is `echo`. `xargs rm`, `xargs sed -n p`, `xargs git log` are not.
+  A lone `{}` word (`xargs -I {} cat {}`) is literal to the shell and accepted.
+- **Where it runs (the context).** `{cwd, root, sameRepoDirs}`: the shell's directory, the checkpoint root and the
+  repository's other worktrees (they share its git config). A `cd <dir>` / `cd -P|-L <dir>` / `pushd <dir>` is neutral
+  when `<dir>` (no `$`, glob or backtick; an unquoted `~` / `~/…` is the home folder) is an existing folder inside the root
+  or one of those worktrees and not inside a nested repository of its own (a clone, a submodule): it moves where the
+  following segments may run — a `cd` that fails, or runs in a pipeline's subshell, leaves the shell where it was, so a
+  later relative path must be safe from every place the shell may be. `git -C <dir>` may name such a folder the same way.
+  Any other `cd` — elsewhere, bare `cd`, `cd -`, `cd ~user`, `pushd +N`, a folder that is not there (CDPATH would decide where
+  the shell goes) — makes the line not read-only: a foreign repository's config can run an fsmonitor or a pager on
+  `git status`. Without a context neither `cd` nor `git -C` is read-only, as before.
 
 ### 19.4 Plan mode does not edit
 
