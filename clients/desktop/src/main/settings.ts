@@ -85,6 +85,7 @@ export const DEFAULTS: AppSettings = {
   showStatusLine: true,
   // MARK: §52
   backgroundWork: true,
+  subagentsInTurn: false, // §52.2
 };
 
 let cache: AppSettings | null = null;
@@ -286,6 +287,8 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     showStatusLine: s.showStatusLine !== false,
     // MARK: §52 background commands and /loop (next session start; older engines ignore it)
     backgroundWork: s.backgroundWork !== false,
+    // §52.2 subagents in the turn as before 0.6 (next session start; off unless turned on; older engines ignore it)
+    subagentsInTurn: s.subagentsInTurn === true,
     allowedProjectStatusLine: allowedProjectStatusLineFor(s.projectStatusLineAllowed, projectRoot),
     // MARK: wave3 desktop-session — §36.6 this project's "Load local settings" (next session start; older engines ignore it)
     loadLocalSettings: loadLocalSettingsFor(s.projectLoadLocalSettings, projectRoot),

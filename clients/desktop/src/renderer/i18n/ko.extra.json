@@ -958,5 +958,8 @@
   "Move {0} to…": "{0} 옮기기…",
   "Move to another commit": "다른 커밋으로 옮기기",
   "Close this sheet — some commits were already made": "이 창을 닫아 주세요 — 일부 커밋은 이미 만들어졌어요",
-  "Stopped — the next message waits": "멈춤 — 다음 메시지 대기 중"
+  "Stopped — the next message waits": "멈춤 — 다음 메시지 대기 중",
+  "A background agent finished, so Claude went on": "백그라운드 에이전트가 끝나 Claude가 이어서 했어요",
+  "A background agent failed, so Claude went on": "백그라운드 에이전트가 실패해 Claude가 이어서 했어요",
+  "A background agent stopped, so Claude went on": "백그라운드 에이전트가 멈춰 Claude가 이어서 했어요"
 }

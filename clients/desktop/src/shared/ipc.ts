@@ -138,6 +138,8 @@ export type AppSettings = {
   // MARK: §52
   /** §52: background commands and /loop as in the terminal (absent = on); the engine uses it at the next session start. */
   backgroundWork?: boolean;
+  /** §52.2: subagents finish inside the turn that started them, as before 0.6 (absent = off); next session start. */
+  subagentsInTurn?: boolean;
   // MARK: wave6 w6-statusline
   /** §44.2: the user's Claude Code status line under the composer (default true; live). */
   showStatusLine?: boolean;

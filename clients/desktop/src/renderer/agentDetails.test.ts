@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AgentNode, ReviewState, SideFork } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { agentResultMetaOf, agentUseMetaOf } from "./agentMeta";
+import { agentResultMetaOf, agentUseMetaOf, shownAgentResult } from "./agentMeta";
 import {
   agentRefusalText,
   agentsDoneNotification,
@@ -60,6 +60,17 @@ describe("§36 row fields are read leniently", () => {
     expect(agentResultMetaOf({})).toEqual({});
     expect(agentResultMetaOf({ agentUsage: { tokens: "many" }, cliAgentId: "", stoppedBy: "engine" })).toEqual({});
     expect(agentResultMetaOf({ agentUsage: { tokens: 10, toolUses: Number.NaN, durationMs: 5 } })).toEqual({});
+  });
+
+  it("§52.2: the launch of a background agent is no result; its end is", () => {
+    const launched = agentResultMetaOf({ agentLaunched: true });
+    const ended = agentResultMetaOf({ agentEnded: true, stoppedBy: "user" });
+    expect(launched).toEqual({ agentLaunched: true });
+    expect(ended).toEqual({ agentEnded: true, stoppedBy: "user" });
+    expect(agentResultMetaOf({ agentLaunched: "yes", agentEnded: 1 })).toEqual({});
+    expect(shownAgentResult({ preview: "Async agent launched", ...launched })).toBeUndefined();
+    expect(shownAgentResult({ preview: "리뷰 3건", ...ended })).toEqual({ preview: "리뷰 3건", agentEnded: true, stoppedBy: "user" });
+    expect(shownAgentResult(undefined)).toBeUndefined();
   });
 });
 

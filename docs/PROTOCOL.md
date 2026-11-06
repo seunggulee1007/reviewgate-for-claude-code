@@ -6838,6 +6838,9 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   last result) — "에이전트 보고" with the report, or "사용자가 중지". The auto-turn row says "백그라운드 에이전트가 끝나
   Claude가 이어서 했어요" (실패해 / 멈춰) with the agent's description and report (`AutoTurnInfo.Task.kind` / `toolUseId`;
   an odd kind reads as `other`).
+- **Electron.** The same: Settings › General "서브에이전트가 턴 안에서 끝나게" (`settings.subagentsInTurn`, off, disabled
+  while background work is off), the group without the launch's report (`agentMeta.shownAgentResult`), the agent's
+  titles on the auto-turn row (`background.autoTurnTitle`).
 - **Verified.** Engine `w52.agents.test.ts` (the session with CLI 2.1.318's frames: inputs kept / kept in the turn with
   the setting; the launch is no report; the subagent's calls pass the guard between turns — hook and `canUseTool` — the
   main thread's do not, nor its own after it ended; an agent it starts; its edits between turns in the next turn's
@@ -6846,7 +6849,8 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   as before without background work; stopped from the list, stopped by the user; its end recorded as the call's result,
   named on the auto turn, kept for `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes
   back after a restart); Core `BackgroundWorkTests` (the setting off by default, with `hello` and the toggle; the agent's
-  auto turn and its titles; the launch is no result, the end is).
+  auto turn and its titles; the launch is no result, the end is); Electron `background.test.ts`, `agentDetails.test.ts`,
+  `backgroundSettings.test.ts` (the same).
 
 ## 53. Commits in meaningful units
 

@@ -17,6 +17,14 @@ describe("background work setting (§52)", () => {
     expect(sanitizeSettingsPatch({ backgroundWork: "no" }).rejected).toEqual(["backgroundWork"]);
   });
 
+  it("§52.2 subagentsInTurn: off by default, a boolean only, sent with hello / set_settings", () => {
+    expect(DEFAULTS.subagentsInTurn).toBe(false);
+    expect(engineSettings({ ...DEFAULTS }, null).subagentsInTurn).toBe(false);
+    expect(engineSettings({ ...DEFAULTS, subagentsInTurn: true }, null).subagentsInTurn).toBe(true);
+    expect(sanitizeSettingsPatch({ subagentsInTurn: true })).toEqual({ patch: { subagentsInTurn: true }, rejected: [] });
+    expect(sanitizeSettingsPatch({ subagentsInTurn: "yes" }).rejected).toEqual(["subagentsInTurn"]);
+  });
+
   it("is sent as backgroundWork with hello / set_settings: on by default, off when turned off", () => {
     expect(DEFAULTS.backgroundWork).toBe(true);
     expect(engineSettings({ ...DEFAULTS }, null).backgroundWork).toBe(true);
