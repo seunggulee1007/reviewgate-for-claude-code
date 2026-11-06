@@ -127,7 +127,7 @@ describe("Shift+Tab in the store (§44.1)", () => {
     useStore.getState().handleEvent({ type: "state", state: { ...s, seq: s.seq + 1, project: { path: "/repo", root: "/repo", name: "repo", branch: "main", remoteURL: null }, session, gate } });
   };
 
-  it("switches to the next mode now; while Claude works it waits for the turn's end and goes on from the waiting one", async () => {
+  it("switches to the next mode now; while a plan-mode turn runs it waits for the turn's end and goes on from the waiting one", async () => {
     const useStore = await loadStore();
     useStore.setState({ scheduledPermissionMode: null, autoModeUnavailable: false });
     snapshot(useStore, "default");
@@ -143,6 +143,48 @@ describe("Shift+Tab in the store (§44.1)", () => {
     useStore.getState().cyclePermissionMode();
     expect(modeCalls()).toEqual([]);
     expect(useStore.getState().scheduledPermissionMode).toBe("default");
+  });
+
+  // §39.5: a pick goes out while Claude works — the CLI applies it from its next tool call; plan mode waits for the turn's end.
+  it("while a turn runs in the default mode: accept edits and auto go out at once, plan waits (and Shift+Tab goes on from it)", async () => {
+    const useStore = await loadStore();
+    useStore.setState({ scheduledPermissionMode: null, autoModeUnavailable: false, requestedPermissionMode: null });
+    snapshot(useStore, "default", { running: true });
+    useStore.getState().cyclePermissionMode();
+    expect(modeCalls()).toEqual(["acceptEdits"]);
+    await flush();
+    snapshot(useStore, "acceptEdits", { running: true });
+    await until(() => useStore.getState().requestedPermissionMode === null);
+    useStore.getState().cyclePermissionMode();
+    expect(modeCalls()).toEqual(["acceptEdits"]);
+    expect(useStore.getState().scheduledPermissionMode).toBe("plan");
+    useStore.getState().cyclePermissionMode();
+    expect(modeCalls()).toEqual(["acceptEdits", "auto"]);
+    expect(useStore.getState().scheduledPermissionMode).toBeNull();
+    await flush();
+    snapshot(useStore, "auto", { running: true });
+    await until(() => useStore.getState().requestedPermissionMode === null);
+  });
+
+  it("a switch the engine refuses session_busy (the turn began to be collected) waits for the turn's end, with no banner", async () => {
+    const useStore = await loadStore();
+    useStore.setState({ scheduledPermissionMode: null, autoModeUnavailable: false, requestedPermissionMode: null, errorBanner: null });
+    respond = (c) =>
+      c.type === "set_permission_mode" ? { ok: false, error: "session_busy", code: "session_busy" } : { ok: true, reply: { type: "result", ok: true } };
+    snapshot(useStore, "default", { running: true });
+    useStore.getState().pickPermissionMode("auto");
+    expect(modeCalls()).toEqual(["auto"]);
+    await flush();
+    snapshot(useStore, "default", { running: true }); // ends the refusal's settle()
+    await until(() => useStore.getState().scheduledPermissionMode === "auto");
+    expect(useStore.getState().errorBanner).toBeNull();
+    respond = () => ({ ok: true, reply: { type: "result", ok: true } });
+    calls.length = 0;
+    snapshot(useStore, "default"); // the turn ended: the waiting pick goes out
+    expect(modeCalls()).toEqual(["auto"]);
+    await flush();
+    snapshot(useStore, "auto");
+    await until(() => useStore.getState().requestedPermissionMode === null);
   });
 
   it("a refused auto (or the engine's notice) makes Shift+Tab skip auto until another model", async () => {

@@ -2,7 +2,8 @@
  * MARK: wave4b w4b-auto
  * docs/PROTOCOL.md §39.5 in Electron (as on the Mac, AutoMode.swift / AppState+AutoMode.swift) — pure, unit-tested: auto
  * mode leaves commands to Claude Code's own judgment (its classifier) while file changes are still reviewed; what it blocked
- * is a gray chat row, an auto mode the CLI cannot run says why, a mode picked while Claude works applies when the turn ends.
+ * is a gray chat row, an auto mode the CLI cannot run says why, a mode picked while Claude works applies from its next step
+ * (plan mode, into or out of it, when the turn ends).
  */
 import type { PermissionMode } from "@reviewgate/engine";
 import { t } from "./i18n";
@@ -47,9 +48,15 @@ export function scheduledModeHelp(): string {
   return t("Claude is working — the mode changes when this turn ends");
 }
 
+/** The menu's last line while Claude works (§39.5): a pick applies from Claude's next step — unless plan mode is involved (`switchesNow` false). */
+export function busyModeHelp(switchesNow: boolean): string {
+  return switchesNow ? t("Claude is working — a new mode applies from its next step (plan mode: when this turn ends)") : scheduledModeHelp();
+}
+
 /**
- * What a pick from the mode menu does: switch now (`send`) when the session is idle, else wait for the turn to end
- * (`scheduled`; picking the mode the session already runs drops the waiting one). Nothing without an open session.
+ * What a pick from the mode menu does: switch now (`send`) when the engine takes it (`busy` false: idle, or §39.5 a switch
+ * among default / acceptEdits / auto during a turn), else wait for the turn to end (`scheduled`; picking the mode the
+ * session already runs drops the waiting one). Nothing without an open session.
  */
 export function pickMode(
   picked: PermissionMode,

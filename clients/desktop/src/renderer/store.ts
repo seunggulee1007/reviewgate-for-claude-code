@@ -507,9 +507,10 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   /**
    * M20 `set_permission_mode`: switches the live session's mode → null, or the refusal code (`session_busy`, `no_session`,
    * `invalid_mode`). `force` (wave6 w6-terminal, §44.1): also when the snapshot already shows `mode` — another switch may
-   * still be on its way (Shift+Tab pressed again before the engine's state came back).
+   * still be on its way (Shift+Tab pressed again before the engine's state came back). `busyWaits` (§39.5): a `session_busy`
+   * refusal shows no banner — the caller makes the pick wait for the turn's end.
    */
-  setPermissionMode(mode: PermissionMode, opts?: { force?: boolean }): Promise<string | null>;
+  setPermissionMode(mode: PermissionMode, opts?: { force?: boolean; busyWaits?: boolean }): Promise<string | null>;
   /** M20 `plan_response{approve:true}`: leaves plan mode in `mode` (default `"default"`) and lets the engine send the follow-up. */
   approvePlan(mode?: PermissionMode): Promise<string | null>;
   /** M20 `plan_response{approve:false}`: stays in plan mode with an optional note for the next planning turn. */
@@ -789,8 +790,8 @@ export const useStore = create<Store>((set, get, api) => {
   const notCapturedNotice = (paths: string[]) =>
     notice(refusalMessage({ code: "not_captured", error: `not_captured:${paths.join(", ")}`, detail: paths.join(", "), paths }), "git", "not_captured");
 
-  /** M20 `set_permission_mode` / `plan_response`: null on success, else the engine's refusal code (also shown in the banner). */
-  const planCommand = async (cmd: EngineCommand): Promise<string | null> => {
+  /** M20 `set_permission_mode` / `plan_response`: null on success, else the engine's refusal code (also shown in the banner — not a `session_busy` the caller waits out, §39.5). */
+  const planCommand = async (cmd: EngineCommand, opts: { busyWaits?: boolean } = {}): Promise<string | null> => {
     const isAnswer = cmd.type === "plan_response";
     if (isAnswer) {
       if (get().planAnswering) return "session_busy";
@@ -814,7 +815,7 @@ export const useStore = create<Store>((set, get, api) => {
         const plan = r.code === "plan_followup_failed" ? planAfterFollowupFailure(current, get().answeredPlan) : current;
         set((s) => ({ planAnswering: false, answeredPlan: null, planNotice: plan ? words : null, state: { ...s.state, session: { ...s.state.session, pendingPlan: plan } } }));
         if (!plan) notice(words, "session", r.code);
-      } else notice(words, "session", r.code);
+      } else if (!(opts.busyWaits === true && r.code === "session_busy")) notice(words, "session", r.code);
       await get().settle();
       return r.error;
     }
@@ -1583,7 +1584,7 @@ export const useStore = create<Store>((set, get, api) => {
     async setPermissionMode(mode, opts) {
       if (!get().state.session.open) return "no_session";
       if (!opts?.force && permissionMode(get().state) === mode) return null;
-      return await planCommand({ type: "set_permission_mode", mode });
+      return await planCommand({ type: "set_permission_mode", mode }, { busyWaits: opts?.busyWaits === true });
     },
 
     async approvePlan(mode) {

@@ -1,15 +1,15 @@
 /**
  * M20 permission-mode dropdown in the composer footer (docs/M20-MODES.md): the four modes the engine
  * exposes, the current one checked, each with its one-line help.
- * MARK: wave4b w4b-auto — §39.5: while a turn is in flight (`set_permission_mode` is refused with `session_busy` then) a
- * pick waits for the turn to end ("기본 → 자동"); the HUD chip is the same menu.
+ * MARK: wave4b w4b-auto — §39.5: while a turn is in flight a pick applies from Claude's next step; one into or out of plan
+ * mode (or while the turn is collected) waits for the turn to end ("기본 → 계획"); the HUD chip is the same menu.
  */
 import { t } from "../../i18n";
 import { permissionMode, useStore } from "../../store";
 import { Menu, type MenuItem } from "../Menu";
 import type { PermissionMode } from "@reviewgate/engine";
-import { autoModeHelp, scheduledModeHelp, scheduledModeText } from "../../autoMode";
-import { modeBusy } from "../../storeAutoMode";
+import { autoModeHelp, busyModeHelp, scheduledModeText } from "../../autoMode";
+import { modeBusy, modeSwitchesNow } from "../../storeAutoMode";
 import { modeLine, planApproveMode } from "../../terminalMode"; // MARK: wave6 w6-terminal (§44.1)
 
 export const MODES: PermissionMode[] = ["default", "acceptEdits", "plan", "auto"];
@@ -64,7 +64,7 @@ function useModeMenu() {
       ),
       onClick: () => pick(m),
     })),
-    ...(busy ? [{ kind: "footer" as const, label: scheduledModeHelp() }] : []),
+    ...(busy ? [{ kind: "footer" as const, label: busyModeHelp(modeSwitchesNow(state, "auto", mode)) }] : []),
   ];
   return { mode, scheduled, label, title, items, open: state.session.open };
 }

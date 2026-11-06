@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { autoModeErrorText, autoModeHelp, dueScheduledMode, isAutoModeRow, pickMode } from "./autoMode";
+import type { ReviewState } from "@reviewgate/engine";
+import { autoModeErrorText, autoModeHelp, busyModeHelp, dueScheduledMode, isAutoModeRow, pickMode, scheduledModeHelp } from "./autoMode";
 import { presentationOf } from "./errorCodes";
+import { modeSwitchesNow } from "./storeAutoMode";
 
 // MARK: wave4b w4b-auto — docs/PROTOCOL.md §39.5 in Electron, as on the Mac (AutoModeTests.swift): what auto mode blocked
-// is a gray row naming the call and the reason; a mode picked while Claude works waits for the turn's end.
+// is a gray row naming the call and the reason; a mode picked while Claude works applies from its next step (plan mode
+// waits for the turn's end).
 
 describe("auto mode words (§39.5)", () => {
   it("a blocked call names the call and the reason; without either the row still says what happened", () => {
@@ -40,6 +43,21 @@ describe("picking a mode (§39.5)", () => {
 
   it("no open session: nothing", () => {
     expect(pickMode("auto", { ...idle, open: false })).toEqual({ send: null, scheduled: null });
+  });
+
+  it("while a turn runs the engine takes default / acceptEdits / auto at once; plan (into or out of it), a start or a collection waits", () => {
+    const state = (phase: string, starting = false) => ({ session: { starting }, gate: { phase } }) as unknown as ReviewState;
+    expect(modeSwitchesNow(state("idle"), "plan", "default")).toBe(true);
+    expect(modeSwitchesNow(state("running"), "auto", "default")).toBe(true);
+    expect(modeSwitchesNow(state("running"), "acceptEdits", "auto")).toBe(true);
+    expect(modeSwitchesNow(state("running"), "plan", "default")).toBe(false);
+    expect(modeSwitchesNow(state("running"), "auto", "plan")).toBe(false);
+    expect(modeSwitchesNow(state("collecting"), "auto", "default")).toBe(false);
+    expect(modeSwitchesNow(state("reverting"), "auto", "default")).toBe(false);
+    expect(modeSwitchesNow(state("starting"), "auto", "default")).toBe(false);
+    expect(modeSwitchesNow(state("idle", true), "auto", "default")).toBe(false);
+    expect(busyModeHelp(true)).toBe("Claude is working — a new mode applies from its next step (plan mode: when this turn ends)");
+    expect(busyModeHelp(false)).toBe(scheduledModeHelp());
   });
 
   it("after a snapshot: the waiting mode goes out once idle, waits while busy, is dropped for a closed session or another project", () => {
