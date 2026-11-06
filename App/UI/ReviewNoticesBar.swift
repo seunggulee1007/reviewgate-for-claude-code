@@ -349,18 +349,34 @@ struct ReviewNoticesBar: View {
 
     private func chipList(_ kind: IntegrityChip) -> some View {
         ForEach(paths(kind), id: \.self) { path in
-            Button {
-                reveal(path, kind: kind)
-            } label: {
-                Label(path, systemImage: kind == .outside ? "arrow.up.forward.app" : "doc")
-                    .font(.callout.monospaced())
-                    .lineLimit(1).truncationMode(.middle)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+            // r1-scope (§8): a note Claude wrote into its own memory says so, with [열기]; other paths reveal in Finder.
+            if kind == .outside, let memory = ScopeText.memoryFile(path) {
+                HStack(spacing: 6) {
+                    Label(ScopeText.memoryLabel(memory), systemImage: "brain")
+                        .font(.callout)
+                        .lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Open") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }
+                        .controlSize(.small)
+                        .help(path)
+                        .accessibilityIdentifier("Open memory note \(memory)")
+                }
+                .help(path)
+                .accessibilityIdentifier("Integrity path \(path)")
+            } else {
+                Button {
+                    reveal(path, kind: kind)
+                } label: {
+                    Label(path, systemImage: kind == .outside ? "arrow.up.forward.app" : "doc")
+                        .font(.callout.monospaced())
+                        .lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(path)
+                .accessibilityIdentifier("Integrity path \(path)")
             }
-            .buttonStyle(.plain)
-            .help(path)
-            .accessibilityIdentifier("Integrity path \(path)")
         }
     }
 
