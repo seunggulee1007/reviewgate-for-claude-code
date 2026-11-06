@@ -3509,6 +3509,13 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   `engine/test/git.timeout.test.ts`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
+- **A draft that lasts (r1-composer M12, Mac).** Each chat's draft — its text and @ mentions; images stay in memory — is
+  also saved on disk as it is typed (UserDefaults `composerDrafts`, under the chat's id, `project:<root>` for an engine
+  without chats; at most 50, the oldest saved go first; an empty box removes it at once, a draft over 200 000 characters
+  is not saved). The first chat an engine reports (a window opened, the app started again, the engine restarted) shows its
+  saved draft when the box is empty; what was typed before stays and belongs to that chat. Core `AppState.moveDraft`,
+  `saveDraft`, `savedDraft` (`Session/ComposerDraftKeep.swift`); verified by Core `ComposerDraftKeepTests` (a draft back
+  after a restart, chat to chat with and without images, an engine without chats, the cap and a huge draft).
 
 ### 38.2 Long work
 
