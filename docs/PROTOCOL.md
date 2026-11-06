@@ -2136,7 +2136,8 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) a command in another
   worktree of the repository or in a nested repository gets **no card**: the hook reads those folders' state for the
   after-notice and goes on to the settings-file (§33.9) and git (§46) checks — a command there that changes Claude Code's
-  settings or the repository keeps that card — and then leaves it to the CLI's own rules and classifier, as in the terminal.
+  settings, or throws away uncommitted work or rewrites the remote (`cd ../<wt> && git reset --hard`, `git -C ../<wt>
+  clean -f`), keeps that card — and then leaves it to the CLI's own rules and classifier, as in the terminal.
   Those files were never in this window's review; the row after the call lists what changed, and that worktree's own window
   reviews it. So does a `git worktree add` of this repository (not of another one: no chat can follow there): no card, and
   once the worktree is there the engine lists it and says so in a `worktree_outside_review` row whose action moves this chat
@@ -6085,7 +6086,8 @@ the terminal's auto mode asked for none).
   every reason card it offers no "always allow" and stores no `remember` — so a remembered `Bash:git push` (the key is the
   first two words) never answers `git push --force` (it used to). `canUseTool` finds the reason itself should the hook not
   have seen the call. Plan mode (§19.4) and the unprompted guard (§18) still deny first; an approved command raises no
-  `worktree_outside_review`. Clients localize on the code (Mac and Electron: red, "커밋하지 않은 작업을 버리거나 원격 기록을
+  `worktree_outside_review` — unless it ran in another worktree or a nested repository and changed something there (§33.4:
+  the row lists those files). Clients localize on the code (Mac and Electron: red, "커밋하지 않은 작업을 버리거나 원격 기록을
   바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"); one that does not know it shows `message`. A card with a reason has no
   session allow (⌥⌘↩ does nothing there): its "Allow once" says why in its help — "한 번씩만 허용돼요 — 리뷰로 되돌릴 수 없는
   작업을 버릴 수 있는 git 명령이라 기억해 두지 않아요 (⌘↩)" (another reason: "… 리뷰가 따라가지 못하는 곳에서 하는 호출이라 …";

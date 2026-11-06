@@ -307,6 +307,18 @@ describe("§39.5: in auto mode a command in another worktree or a nested reposit
     expect(await preBash(c, config, root, "c1", auto)).toMatchObject({ decision: "ask" });
     expect(c.scopeReasons?.get("c1")?.code).toBe("claude_config");
   });
+
+  it("an approved git card next door is followed by the row of what it changed there (§33.4, §46)", async () => {
+    const { root, sibling } = repoWithSibling();
+    const c = ctx(root, { permissionMode: "auto" });
+    write(sibling, "other.txt", "work in progress\n"); // uncommitted work in the other worktree
+    const reset = `cd ${sibling} && git reset --hard`;
+    expect(await preBash(c, reset, root, "g4", auto)).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("g4")?.code).toBe("git_command");
+    sh(sibling, "reset", "-q", "--hard"); // the user allowed it: what the command did
+    await postBash(c, reset, root, "g4", auto);
+    expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "g4", path: sibling, files: ["other.txt"], reasonCode: "other_worktree" }]);
+  });
 });
 
 describe("§39.5: making a worktree in auto mode", () => {
