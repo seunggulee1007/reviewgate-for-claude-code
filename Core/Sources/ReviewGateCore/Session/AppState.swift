@@ -486,8 +486,8 @@ public final class AppState {
     /// The plan card's approve / keep-planning wait while a turn runs, its changes are collected, a revert is in flight
     /// or the previous answer is still on its way (the engine would refuse it with `gate_closed:*`).
     public var isPlanLocked: Bool { isReviewLocked || isAnsweringPlan }
-    /// M20: the mode picker is live only with an open, idle session — the engine refuses `set_permission_mode`
-    /// with `session_busy` while a turn, a start, a collection or a revert is in flight.
+    /// M20: the session is open and idle — any mode can be set now. §39.5: while a turn runs some can too
+    /// (`canSetPermissionMode(to:)`); a start, a collection or a revert takes none (`session_busy`).
     public var canSetPermissionMode: Bool {
         sessionInfo.open && !isRunning && !isStarting && !isSnapshotting && !isReverting
     }
@@ -1061,9 +1061,10 @@ public final class AppState {
     // MARK: - Permission modes (docs/M20-MODES.md)
 
     /// `set_permission_mode{mode}`: switches the live session and remembers the choice for this project.
-    /// No-op when the mode is unchanged or the session is busy (the engine would refuse with `session_busy`).
+    /// No-op when the mode is unchanged or the engine would refuse it now (`session_busy`: plan mode during a turn, a start,
+    /// a collection; §39.5 `canSetPermissionMode(to:)`).
     public func setPermissionMode(_ mode: PermissionMode) {
-        guard mode != permissionMode, canSetPermissionMode else { return }
+        guard mode != permissionMode, canSetPermissionMode(to: mode) else { return }
         state.session.permissionMode = mode
         rememberPermissionMode(mode)
         fire(.setPermissionMode(mode: mode))

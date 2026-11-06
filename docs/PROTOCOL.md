@@ -4036,9 +4036,11 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   depends on it: files are collected at the turn's end in every mode, and the git card (§40.1, §46) is the same in every
   mode.
 - **Clients.** The mode help of 자동: "명령은 Claude Code의 자동 판단으로 실행돼요. 파일 변경은 그대로 리뷰돼요." The HUD's mode
-  chip is the mode menu (one click picks a mode). A pick while a turn runs (`set_permission_mode` is refused `session_busy`
-  then) waits and is sent when the turn ends — the picker shows "기본 → 자동", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면
-  모드가 바뀌어요"; another project or a closed session drops it. Settings › Permissions has "시작 모드" (the mode a project
+  chip is the mode menu (one click picks a mode). While Claude works a pick of 기본 / 편집 바로 허용 / 자동 goes out at once
+  (above) — the menu's last line says "Claude가 작업 중이에요 — 고른 모드는 다음 단계부터 적용돼요 (계획 모드는 이번 턴이
+  끝나면)"; a pick the engine would refuse then (into or out of 계획, a collection) — or did refuse `session_busy` — waits and
+  is sent when the turn ends: the picker shows "기본 → 계획", the menu "Claude가 작업 중이에요 — 이번 턴이 끝나면 모드가
+  바뀌어요"; another project or a closed session drops it. Settings › Permissions has "시작 모드" (the mode a project
   opened for the first time starts in, auto included; a pick in a project stays that project's: Mac
   `AppSettings.startPermissionMode` — unset, the last mode used anywhere as before —, Electron `settings.permissionMode`; a
   worktree of a repository whose other worktrees ran in ReviewGate starts as they ran last, before either, §11). The
@@ -5562,7 +5564,8 @@ changed default.
 - **⇧⇥ / Shift+Tab** in the message box cycles the mode as the terminal does: 기본 → 편집 바로 허용 → 계획 → 자동 → 기본, through
   `set_permission_mode` (plan mode included, as the mode menu). Auto is skipped once the engine said it cannot run here —
   the `auto_mode_unavailable` notice or refusal — until another project, another model (`selectedModel`) or auto taken after
-  all; while Claude works a pick waits for the turn's end (§39.5) and the next ⇧⇥ goes on from it, and a ⇧⇥ pressed again
+  all; while Claude works a pick goes out at once unless plan mode is involved (§39.5) — that one waits for the turn's end
+  and the next ⇧⇥ goes on from it (기본 → 편집 바로 허용 now → 계획 waiting → 자동 now) —, and a ⇧⇥ pressed again
   before the engine's state came back goes on from the mode on its way (Mac: shown at once; Electron
   `requestedPermissionMode`), so the same mode is never sent twice. Only the message box
   takes the key: everywhere else Shift+Tab still moves the focus back (Mac `ComposerKey.backtab` from `insertBacktab:`,

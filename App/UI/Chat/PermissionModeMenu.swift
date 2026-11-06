@@ -2,11 +2,12 @@ import SwiftUI
 import ReviewGateCore
 
 // MARK: wave4b w4b-auto
-// docs/PROTOCOL.md §39.5: one mode menu for the composer picker and the HUD chip. Picking a mode switches now, or — while
-// Claude works (the engine refuses `set_permission_mode` then) — when the turn ends; a refused switch says why.
+// docs/PROTOCOL.md §39.5: one mode menu for the composer picker and the HUD chip. Picking a mode switches now — while
+// Claude works too, from its next step — except plan mode during a turn, which waits for the turn's end; a refused switch
+// says why.
 
 /// The entries: every mode with its one-line help (auto: "명령은 Claude Code의 자동 판단으로 실행돼요. 파일 변경은 그대로
-/// 리뷰돼요."), the current — or waiting — one checked; while Claude works a last line says the pick waits for the turn.
+/// 리뷰돼요."), the current — or waiting — one checked; while Claude works a last line says when a pick applies.
 struct PermissionModeMenuItems: View {
     @Environment(AppState.self) private var store
 
@@ -26,7 +27,7 @@ struct PermissionModeMenuItems: View {
         }
         if !store.canSetPermissionMode {
             Divider()
-            Text(AutoModeText.scheduledHelp)
+            Text(AutoModeText.busyHelp(switchesNow: store.canSetPermissionMode(to: .auto)))
         }
     }
 }

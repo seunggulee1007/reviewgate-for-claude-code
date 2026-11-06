@@ -49,4 +49,11 @@ public enum AutoModeText {
     public static var scheduledHelp: String {
         String(localized: "Claude is working — the mode changes when this turn ends", bundle: .module)
     }
+
+    /// The mode menu's last line while Claude works (§39.5): a pick applies from Claude's next step, unless plan mode is
+    /// involved (`switchesNow` false: the turn is in plan mode, or the engine takes no switch now) — that one waits.
+    public static func busyHelp(switchesNow: Bool) -> String {
+        switchesNow ? String(localized: "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)", bundle: .module)
+            : scheduledHelp
+    }
 }

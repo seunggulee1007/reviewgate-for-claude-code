@@ -2513,6 +2513,22 @@
         }
       }
     },
+    "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 고른 모드는 다음 단계부터 적용돼요 (계획 모드는 이번 턴이 끝나면)"
+          }
+        }
+      }
+    },
     "Claude went on by itself": {
       "localizations": {
         "en": {

@@ -3,7 +3,7 @@ import Testing
 @testable import ReviewGateCore
 
 /// wave4b w4b-auto: auto mode on the Mac (docs/PROTOCOL.md §39.5) — what the classifier blocked is a gray row, an auto mode
-/// the CLI cannot run says why, a mode picked while Claude works waits for the turn's end.
+/// the CLI cannot run says why, a mode picked while Claude works applies from its next step (plan mode: at the turn's end).
 @Suite @MainActor struct AutoModeTests {
     private func defaults() -> UserDefaults { UserDefaults(suiteName: "AutoModeTests.\(UUID().uuidString)")! }
     private func makeStore(_ d: UserDefaults? = nil) -> AppState { AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: d ?? defaults()) }
@@ -74,22 +74,62 @@ import Testing
         #expect(AppSettings.permissionMode(root: "/repo", defaults: d) == .auto)
     }
 
-    @Test func pickWhileRunningWaitsForTheTurnToEnd() {
-        let store = makeStore()
+    /// §39.5: auto picked while Claude works goes out at once — the CLI applies it from its next tool call, as Shift+Tab in
+    /// the terminal; plan mode (into or out of it) waits for the turn's end, and so does anything while it is collected.
+    @Test func pickWhileRunningSwitchesNowButPlanWaits() {
+        let d = defaults()
+        let store = makeStore(d)
         var sent: [EngineCommand] = []
         store.commandSink = { sent.append($0) }
         store.handle(.state(snapshot(seq: 1, phase: .running)))
         #expect(store.canPickPermissionMode && !store.canSetPermissionMode)
+        #expect(store.canSetPermissionMode(to: .auto) && !store.canSetPermissionMode(to: .plan))
         store.pickPermissionMode(.auto)
-        #expect(sent.isEmpty)
-        #expect(store.scheduledPermissionMode == .auto)
-        #expect(store.permissionMode == .default)
-        store.handle(.state(snapshot(seq: 2, phase: .collecting)))
-        #expect(sent.isEmpty)   // still busy
-        store.handle(.state(snapshot(seq: 3)))
         #expect(sent == [.setPermissionMode(mode: .auto)])
         #expect(store.scheduledPermissionMode == nil)
         #expect(store.permissionMode == .auto)
+        #expect(AppSettings.permissionMode(root: "/repo", defaults: d) == .auto)
+        #expect(AutoModeText.busyHelp(switchesNow: store.canSetPermissionMode(to: .auto))
+                == "Claude is working — a new mode applies from its next step (plan mode: when this turn ends)")
+        store.pickPermissionMode(.plan)
+        #expect(sent == [.setPermissionMode(mode: .auto)])
+        #expect(store.scheduledPermissionMode == .plan)
+        store.handle(.state(snapshot(seq: 2, phase: .collecting, mode: .auto)))
+        #expect(!store.canSetPermissionMode(to: .default))   // a collection takes no switch
+        #expect(sent == [.setPermissionMode(mode: .auto)])   // still busy
+        store.handle(.state(snapshot(seq: 3, mode: .auto)))
+        #expect(sent == [.setPermissionMode(mode: .auto), .setPermissionMode(mode: .plan)])
+        #expect(store.scheduledPermissionMode == nil)
+        #expect(store.permissionMode == .plan)
+        // A turn in plan mode: leaving it waits for the turn's end too.
+        store.handle(.state(snapshot(seq: 4, phase: .running, mode: .plan)))
+        #expect(!store.canSetPermissionMode(to: .auto))
+        #expect(AutoModeText.busyHelp(switchesNow: store.canSetPermissionMode(to: .auto)) == AutoModeText.scheduledHelp)
+        store.pickPermissionMode(.auto)
+        #expect(store.scheduledPermissionMode == .auto)
+        #expect(sent.count == 2)
+    }
+
+    /// An engine that cannot take the switch after all (`session_busy`: the turn's changes began to be collected) — the
+    /// mode it runs shows again and the pick waits for the turn's end.
+    @Test func aBusyRefusalSchedulesThePick() async {
+        let d = defaults()
+        let store = makeStore(d)
+        var asked: [EngineCommand] = []
+        store.requestSink = { command in
+            asked.append(command)
+            throw EngineClientError.refused("session_busy", code: "session_busy")
+        }
+        store.handle(.state(snapshot(seq: 1, phase: .running)))
+        store.pickPermissionMode(.auto)
+        #expect(store.permissionMode == .auto)   // shown at once
+        for _ in 0..<50 where store.scheduledPermissionMode == nil { await Task.yield() }
+        #expect(asked == [.setPermissionMode(mode: .auto)])
+        #expect(store.scheduledPermissionMode == .auto)
+        #expect(store.permissionMode == .default)
+        #expect(store.permissionModeRefusal == nil)
+        #expect(AppSettings.permissionMode(root: "/repo", defaults: d) == .default)
+        #expect(store.errorBanner == nil)
     }
 
     @Test func pickingTheCurrentModeOrLeavingTheProjectDropsTheWait() {
@@ -97,10 +137,11 @@ import Testing
         var sent: [EngineCommand] = []
         store.commandSink = { sent.append($0) }
         store.handle(.state(snapshot(seq: 1, phase: .running)))
-        store.pickPermissionMode(.auto)
+        store.pickPermissionMode(.plan)
+        #expect(store.scheduledPermissionMode == .plan)
         store.pickPermissionMode(.default)   // the current mode: nothing waits any more
         #expect(store.scheduledPermissionMode == nil)
-        store.pickPermissionMode(.acceptEdits)
+        store.pickPermissionMode(.plan)
         store.handle(.state(snapshot(seq: 2, path: "/other")))
         #expect(store.scheduledPermissionMode == nil)
         #expect(sent.isEmpty)

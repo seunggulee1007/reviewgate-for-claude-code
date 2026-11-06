@@ -69,8 +69,9 @@ extension AppState {
                               approvesIntoAuto: permissionMode == .plan && planApproveMode == .auto, autoUnavailable: autoModeUnavailable)
     }
 
-    /// shift+tab in the composer: the next mode of the terminal's cycle — now, or when the turn ends while Claude works
-    /// (`pickPermissionMode`). From a waiting pick it goes on from that one; auto is skipped where it cannot run.
+    /// shift+tab in the composer: the next mode of the terminal's cycle — now, while Claude works too (from its next step,
+    /// §39.5), except plan mode during a turn, which waits for the turn's end (`pickPermissionMode`). From a waiting pick it
+    /// goes on from that one; auto is skipped where it cannot run.
     public func cyclePermissionMode() {
         guard canPickPermissionMode else { return }
         let from = scheduledPermissionMode ?? permissionMode
