@@ -93,4 +93,56 @@ import Testing
         defaults.set(false, forKey: AppSettings.backgroundWorkKey)
         #expect(AppSettings.engineSettings(defaults: defaults).backgroundWork == false)
     }
+
+    // MARK: §52.2 subagents in the background
+
+    @Test func subagentsInTurnIsOffByDefaultAndGoesOutWithHelloAndTheToggle() throws {
+        let defaults = UserDefaults(suiteName: "BackgroundWorkTests.\(UUID().uuidString)")!
+        #expect(!AppSettings.subagentsInTurn(defaults: defaults))
+        #expect(AppSettings.engineSettings(defaults: defaults).subagentsInTurn == false)
+        defaults.set(true, forKey: AppSettings.subagentsInTurnKey)
+        #expect(AppSettings.engineSettings(defaults: defaults).subagentsInTurn == true)
+        let store = makeStore(defaults)
+        var sent: [EngineCommand] = []
+        store.commandSink = { sent.append($0) }
+        store.pushBackgroundWork()
+        guard case let .setSettings(settings)? = sent.last else { Issue.record("no set_settings"); return }
+        #expect(settings.backgroundWork == true && settings.subagentsInTurn == true)
+        let wire = try json(.setSettings(settings))
+        #expect((wire["settings"] as? [String: Any])?["subagentsInTurn"] as? Bool == true)
+    }
+
+    @Test func anAgentsAutoTurnNamesTheAgentAndItsReport() throws {
+        guard case let .autoTurn(_, info) = try NDJSON.decode(EngineEvent.self, from: #"{"type":"auto_turn","turn":3,"trigger":"background","task":{"taskId":"a1","description":"PR 다시 검토","status":"completed","summary":"리뷰 3건","kind":"agent","toolUseId":"toolu_a"}}"#) else {
+            Issue.record("not autoTurn"); return
+        }
+        #expect(info.task == .init(taskId: "a1", description: "PR 다시 검토", status: "completed", summary: "리뷰 3건", kind: .agent, toolUseId: "toolu_a"))
+        let bash = AutoTurnInfo(trigger: .background, task: .init(taskId: "b1", description: "npm test", status: "completed", kind: .bash))
+        #expect(BackgroundText.autoTurnTitle(info) != BackgroundText.autoTurnTitle(bash))
+        let failed = AutoTurnInfo(trigger: .background, task: .init(taskId: "a1", description: "x", status: "failed", kind: .agent))
+        let stopped = AutoTurnInfo(trigger: .background, task: .init(taskId: "a1", description: "x", status: "stopped", kind: .agent))
+        #expect(Set([BackgroundText.autoTurnTitle(info), BackgroundText.autoTurnTitle(failed), BackgroundText.autoTurnTitle(stopped)]).count == 3)
+        // An older engine's task (no kind) reads as before; an odd kind as `other`.
+        guard case let .autoTurn(_, old) = try NDJSON.decode(EngineEvent.self, from: #"{"type":"auto_turn","turn":3,"trigger":"background","task":{"taskId":"b1","description":"npm test","status":"completed","kind":"daemon"}}"#) else {
+            Issue.record("not autoTurn"); return
+        }
+        #expect(old.task?.kind == .other)
+        #expect(BackgroundText.autoTurnTitle(old) == BackgroundText.autoTurnTitle(bash))
+    }
+
+    @Test func theLaunchIsNoResultTheAgentsEndIs() throws {
+        guard case let .toolResult(_, _, _, launched) = try NDJSON.decode(EngineEvent.self, from: #"{"type":"tool_result","toolUseId":"toolu_a","isError":false,"preview":"Async agent launched successfully.","agentLaunched":true}"#),
+              case let .toolResult(_, _, _, ended) = try NDJSON.decode(EngineEvent.self, from: #"{"type":"tool_result","toolUseId":"toolu_a","isError":false,"preview":"리뷰 3건","agentEnded":true}"#) else {
+            Issue.record("not toolResult"); return
+        }
+        #expect(launched.agentLaunched && !launched.agentEnded)
+        #expect(ended.agentEnded && !ended.agentLaunched)
+        // Without its node (a restored chat), "launched" says nothing of how it ended; its end does.
+        #expect(AgentRowStatus.resolve(node: nil, result: (false, launched), running: true) == .running)
+        #expect(AgentRowStatus.resolve(node: nil, result: (false, launched), running: false) == .stopped)
+        #expect(AgentRowStatus.resolve(node: nil, result: (false, ended), running: false) == .completed)
+        let row = try NDJSON.decode(TranscriptItem.self, from: #"{"at":"2026-11-06T02:00:00Z","turn":2,"kind":"tool_result","toolUseId":"toolu_a","isError":true,"preview":"Task stopped","agentEnded":true}"#)
+        guard case let .toolResult(_, isError, _, info) = row.kind else { Issue.record("not a tool result row"); return }
+        #expect(isError && info.agentEnded)
+    }
 }

@@ -156,15 +156,18 @@ extension AgentNode {
 }
 
 extension ToolResultInfo {
-    private enum AgentKeys: String, CodingKey { case agentUsage, cliAgentId, stoppedBy }
+    private enum AgentKeys: String, CodingKey { case agentUsage, cliAgentId, stoppedBy, agentLaunched, agentEnded }
 
-    /// §36.1–36.2: the Agent / Task fields of a `tool_result` (event and transcript row) on top of the existing ones.
+    /// §36.1–36.2: the Agent / Task fields of a `tool_result` (event and transcript row) on top of the existing ones;
+    /// §52.2: `agentLaunched` / `agentEnded` of an agent that worked in the background.
     func withAgentFields(from decoder: Decoder) -> ToolResultInfo {
         guard let c = try? decoder.container(keyedBy: AgentKeys.self) else { return self }
         var info = self
         info.agentUsage = lenientValue(AgentUsage.self, c, .agentUsage)
         info.cliAgentId = AgentWire.nonEmpty(lenientValue(String.self, c, .cliAgentId))
         info.stoppedBy = lenientValue(String.self, c, .stoppedBy).flatMap(AgentStoppedBy.init(rawValue:))
+        info.agentLaunched = lenientValue(Bool.self, c, .agentLaunched) ?? false
+        info.agentEnded = lenientValue(Bool.self, c, .agentEnded) ?? false
         return info
     }
 }

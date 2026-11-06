@@ -3,6 +3,11 @@
 // `state.session.backgroundTasks` while it runs; when it ends, the turn Claude starts by itself is a review turn
 // (`auto_turn {trigger: "background"}`, its edits collected) and what the background command wrote after the first turn's
 // B is in that review. With RG_LOOP=1 a `/loop 1m` run is checked as well (`auto_turn {trigger: "schedule"}`, ~70 s more).
+// With RG_AGENT=1 (§52.2, r1x): a subagent in the background — the main agent starts one that reads a big file (a
+// project PreToolUse hook denies the read without offset/limit), sleeps ~20 s and writes agent.txt; a message sent
+// meanwhile is answered before the subagent ends; its calls are never denied as unprompted, the hook's deny is a
+// `hookDenied` result (no notice), its end is the call's own result, the hand-back no peer card, and agent.txt is in the
+// review with the agent's Write as its cause. RG_ONLY=agent skips A. RG_MODE=auto starts the session in auto mode.
 // Through the bundled sidecar on a fresh scratch repository (loadUserSettings off). Model calls on RG_MODEL (default haiku).
 //
 //   node sidecar/test/driver-background.mjs [scratchDir] [sidecar.mjs]   (default $TMPDIR/rg-background, RE-CREATED)
@@ -20,6 +25,9 @@ const SIDECAR = process.argv[3] ?? join(dirname(fileURLToPath(import.meta.url)),
 const CLAUDE = process.env.CLAUDE_PATH ?? `${homedir()}/.local/bin/claude`;
 const MODEL = process.env.RG_MODEL ?? "haiku";
 const LOOP = process.env.RG_LOOP === "1";
+const AGENT = process.env.RG_AGENT === "1";
+const ONLY_AGENT = process.env.RG_ONLY === "agent";
+const MODE = process.env.RG_MODE || "default";
 const STEP_TIMEOUT_MS = 150_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -41,6 +49,13 @@ git(repo, "init", "-q", "-b", "main");
 git(repo, "config", "user.email", "background@example.com");
 git(repo, "config", "user.name", "background");
 writeFileSync(join(repo, "README.md"), "background check\n");
+if (AGENT) {
+  // A project hook like the user's read budget: a Read of big.txt without offset/limit is denied (JSON), others pass.
+  mkdirSync(join(repo, ".claude"), { recursive: true });
+  writeFileSync(join(repo, ".claude", "read-budget.mjs"), `let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const i=JSON.parse(s);const f=String(i.tool_input?.file_path??"");if(i.tool_name==="Read"&&f.endsWith("big.txt")&&i.tool_input.limit===undefined){process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:"[ACME READ BUDGET] Denied: big.txt is 9000 bytes and this call has no offset/limit"}}));}});`);
+  writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Read", hooks: [{ type: "command", command: "node .claude/read-budget.mjs" }] }] } }, null, 2) + "\n");
+  writeFileSync(join(repo, "big.txt"), Array.from({ length: 300 }, (_, i) => `line ${i} of the big file`).join("\n") + "\n");
+}
 git(repo, "add", "-A");
 git(repo, "commit", "-q", "-m", "init");
 
@@ -100,11 +115,13 @@ try {
     ignorePatterns: [], autoAllowTools: [], loadUserSettings: false,
     systemPromptAppend: "You are running inside a ReviewGate test. Do exactly what each message asks, nothing more.",
     claudePath: CLAUDE, model: MODEL, ghHost: "github.com",
+    ...(MODE !== "default" ? { permissionMode: MODE } : {}),
   };
   await request({ type: "hello", protocolVersion: 2, client: "test", env: { PATH: process.env.PATH ?? "" }, settings });
   await request({ type: "open_project", path: repo });
   await waitFor(() => state?.session.open && !state.session.starting, "session open");
 
+  if (!ONLY_AGENT) {
   // A: a background command, then the turn Claude starts when it ends.
   await request({
     type: "send",
@@ -132,6 +149,63 @@ try {
     && observed.tasksAfter === 0 && !observed.unpromptedText;
   observed.checkA = okA;
   if (!okA) failed = true;
+  }
+
+  // C (RG_AGENT=1): a subagent in the background; the main agent answers meanwhile (§52.2).
+  if (AGENT) {
+    const ends = () => events.filter((e) => e.type === "turn_end").length;
+    const startEnds = ends();
+    const startAuto = events.filter((e) => e.type === "auto_turn").length;
+    const firstEvent = events.length;
+    await request({
+      type: "send",
+      text: "Use the Agent tool (subagent_type general-purpose) to start exactly ONE subagent with this task: 'First read the file big.txt with the Read tool without offset or limit; if that is denied, read it with offset 0 and limit 5. Then run the Bash command `sleep 20`. Then use the Write tool to create the file agent.txt containing the single word agent. Then finish with a one-line report.' Do not wait for it and do not check on it. After starting it, reply with exactly one word: STARTED.",
+    });
+    await waitFor(() => ends() > startEnds, "the turn that started the agent");
+    const agentCall = events.slice(firstEvent).find((e) => e.type === "tool_use" && (e.name === "Agent" || e.name === "Task"));
+    observed.agentStarted = { call: agentCall?.id ?? null, input: agentCall ? { run_in_background: agentCall.input.run_in_background ?? null } : null };
+    observed.agentLaunched = events.slice(firstEvent).some((e) => e.type === "tool_result" && e.toolUseId === agentCall?.id && e.agentLaunched === true);
+    await waitFor(settled, "turn 1 collected");
+    const askedAt = Date.now();
+    await request({ type: "send", text: "Quick question while that runs: what is 2+2? Answer with just the number." });
+    await waitFor(() => ends() > startEnds + 1, "the answer to the question");
+    const agentEndedEarly = events.some((e) => e.type === "tool_result" && e.toolUseId === agentCall?.id && e.agentEnded === true);
+    const answer = events.filter((e) => e.type === "turn_end").at(-1);
+    observed.answer = { seconds: Math.round((Date.now() - askedAt) / 100) / 10, beforeTheAgentEnded: !agentEndedEarly, stopReason: answer?.stopReason ?? null };
+    observed.liveWhileAnswered = { tasks: (state?.session.backgroundTasks ?? []).map((t) => t.kind), agents: (state?.hud.agents ?? []).filter((a) => a.isBackground && ["running", "pending"].includes(a.status)).length };
+    await waitFor(settled, "the answer collected");
+    // The agent ends; Claude goes on by itself (the hand-back turn).
+    await waitFor(() => events.some((e) => e.type === "tool_result" && e.toolUseId === agentCall?.id && e.agentEnded === true), "the agent's own result");
+    await waitFor(() => events.filter((e) => e.type === "auto_turn").length > startAuto, "the turn after the agent");
+    observed.autoTurn = events.filter((e) => e.type === "auto_turn").at(-1);
+    await waitFor(() => ends() > startEnds + 2, "the auto turn's end");
+    await waitFor(settled, "the auto turn collected");
+    await sleep(1000);
+    const mine = events.slice(firstEvent);
+    observed.agentEnd = mine.filter((e) => e.type === "tool_result" && e.toolUseId === agentCall?.id).map((e) => ({ launched: e.agentLaunched ?? false, ended: e.agentEnded ?? false, isError: e.isError, preview: String(e.preview).slice(0, 120) }));
+    observed.hookDenied = mine.filter((e) => e.type === "tool_result" && e.hookDenied).map((e) => e.hookDenied);
+    observed.hookNotices = mine.filter((e) => e.type === "error" && (e.code === "hook_blocked" || e.code === "hook_failed")).length;
+    observed.unprompted = { denied: mine.filter((e) => e.type === "error" && e.code === "unprompted_blocked").map((e) => e.message), text: mine.some((e) => e.type === "text_delta" && e.unprompted === true) };
+    observed.peerCards = mine.filter((e) => e.type === "peer_message").length + (state?.session.peerInbox ?? []).length;
+    observed.agentReview = filesOf().filter((f) => f.path === "agent.txt");
+    const fileCause = (state?.changedFiles ?? []).find((f) => f.path === "agent.txt");
+    observed.agentFileCause = fileCause ? { tools: fileCause.tools, toolUseIds: fileCause.toolUseIds } : null;
+    observed.agentFile = (() => {
+      try {
+        return execFileSync("cat", [join(repo, "agent.txt")], { encoding: "utf8" }).trim();
+      } catch {
+        return null;
+      }
+    })();
+    const okC = !!agentCall && observed.agentLaunched && observed.answer.beforeTheAgentEnded
+      && observed.autoTurn?.trigger === "background" && observed.autoTurn?.task?.kind === "agent"
+      && observed.agentEnd.some((r) => r.ended && !r.isError)
+      && observed.hookDenied.some((d) => d.hook === "PreToolUse:Read") && observed.hookNotices === 0
+      && observed.unprompted.denied.length === 0 && !observed.unprompted.text && observed.peerCards === 0
+      && observed.agentFile === "agent" && observed.agentReview.length === 1 && observed.agentReview[0].origin === "tool";
+    observed.checkC = okC;
+    if (!okC) failed = true;
+  }
 
   // B (RG_LOOP=1): a /loop run becomes a review turn too.
   if (LOOP) {

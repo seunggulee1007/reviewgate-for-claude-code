@@ -43,6 +43,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.commitTrailer) private var commitTrailer = ""
     @AppStorage(AppSettings.Key.autoRestartSession) private var autoRestartSession = true
     @AppStorage(AppSettings.backgroundWorkKey) private var backgroundWork = true   // §52
+    @AppStorage(AppSettings.subagentsInTurnKey) private var subagentsInTurn = false   // §52.2
     // M16 permissions
     @AppStorage(AppSettings.Key.autoAllowReadOnlyBash) private var autoAllowReadOnlyBash = true
     @AppStorage(AppSettings.Key.bashAllowPatterns) private var bashAllowPatterns = ""
@@ -163,6 +164,12 @@ private struct GeneralSettingsView: View {
                     .accessibilityIdentifier("Allow background work")
                 Text("As in the terminal: Claude can run a command in the background (a dev server, a long build) and /loop can repeat a prompt. When a background command ends or a scheduled run starts, Claude goes on by itself — that turn is reviewed like any other, and files a background command changed in between go into the next review. Takes effect when the session restarts.")
                     .font(.caption).foregroundStyle(.secondary)
+                // §52.2: subagents work in the background by default, as in the terminal — Claude answers meanwhile.
+                Toggle("Subagents finish inside the turn", isOn: $subagentsInTurn)
+                    .disabled(!backgroundWork)
+                    .accessibilityIdentifier("Subagents finish inside the turn")
+                Text("Off (the default): as in the terminal, a subagent works in the background and Claude answers your messages meanwhile; what it changes still goes into the next review, and Claude goes on when it is done. On: Claude waits for its subagents before it answers, as before. Takes effect when the session restarts.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             StatusLineSettingsSection()   // MARK: wave6 w6-statusline (§44.2)
             Section("Side questions") {
@@ -250,6 +257,7 @@ private struct GeneralSettingsView: View {
         .onChange(of: maxTurns) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // wave4 w4-longwork
         .onChange(of: maxTurnsLimit) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushMaxTurns() } }   // §38.2
         .onChange(of: backgroundWork) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushBackgroundWork() } }   // §52
+        .onChange(of: subagentsInTurn) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushBackgroundWork() } }   // §52.2
         .onChange(of: worktreeRoot) { _, _ in
             let root = AppSettings.worktreeRoot()
             for store in WorkbenchRegistry.shared.allStores { store.updateWorktreeRoot(root) }

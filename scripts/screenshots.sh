@@ -21,7 +21,8 @@
 #   SHOTS_PROMPT   the prompt (default: the tour's own)       SHOTS_MODEL    default haiku
 #   SHOTS_WIDTH    image width in pixels (default 1600)        SHOTS_TIMEOUT  seconds for the tour (default 600)
 #   SHOTS_LAYOUT   1: no turn — the chat column in short windows, the "Run as Task" sheet and the transcript through
-#                  ⇧⇥ and reviews (made-up rows), PNGs left in SHOTS_DIR/raw
+#                  ⇧⇥ and reviews (made-up rows), PNGs left in SHOTS_DIR/raw; scroll: only the transcript's scroll check
+#                  (subagents' rows coming in above the bottom, following and scrolled up; `scroll:` lines in tour.log)
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -322,7 +323,7 @@ OPEN_PID=""
 [ ! -f "$RAW/tour-failed.txt" ] || die "the tour failed: $(cat "$RAW/tour-failed.txt") (log: $RAW/tour.log)"
 ls "$RAW"/*.png >/dev/null 2>&1 || die "the tour wrote no images (log: $RAW/tour.log)"
 
-if [ "${SHOTS_LAYOUT:-}" = 1 ]; then   # the layout check: its PNGs stay in the scratch folder, never in docs/images
+if [ -n "${SHOTS_LAYOUT:-}" ]; then   # the layout / scroll check: its PNGs stay in the scratch folder, never in docs/images
   say "layout shots: $(ls "$RAW"/*.png | tr '\n' ' ')"
   exit 0
 fi

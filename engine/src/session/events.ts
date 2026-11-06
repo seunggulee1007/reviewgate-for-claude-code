@@ -92,6 +92,12 @@ export type SessionEvent =
       stoppedBy?: AgentStoppedBy;
       /** §36.1: the cleaned report (≤ 50 000 chars, `truncated` beyond) for the transcript row and `agent_report`; never sent on the wire. */
       keptReport?: { text: string; truncated: boolean };
+      /** §52.2: the call's subagent went to work in the background (no report yet). */
+      agentLaunched?: true;
+      /** §52.2: the call's subagent worked in the background and ended — this is its result (a second one for the call). */
+      agentEnded?: true;
+      /** §38.2: a user or plugin PreToolUse hook denied the call (its name, what it said). */
+      hookDenied?: { hook: string; reason: string };
     }
   /**
    * §34.6: the tree a post-Bash snapshot took (`root`: the repository it is of) — the engine reuses it as the live tree

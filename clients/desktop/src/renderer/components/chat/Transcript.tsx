@@ -31,6 +31,7 @@ import { PeerMessageRow } from "./PeerMessageRow";
 import { AutoTurnRowView } from "./AutoTurnRow"; // MARK: §52
 // MARK: wave3 desktop-agents
 import { agentViewOf, continuationCounts } from "../../agentDetails";
+import { shownAgentResult } from "../../agentMeta"; // §52.2
 import { useAgentUi } from "../../agentUi";
 import { AgentMenuButton, AgentReportRow, collapsedLine, ContinueRow, ModelChip, ResumedBadge, StopAgentButton, useAgentContextMenu, useAgentMenuItems } from "../agents/AgentBits";
 import { OlderRowsBar } from "./OlderRows"; // MARK: wave4 w4-history (§38.3)
@@ -111,7 +112,7 @@ function AgentGroup({ item, root, nested }: { item: ToolUseItem; root: string | 
   const focus = useStore((s) => s.transcriptFocus);
   const revealed = useContext(FindContext).expand.has(item.toolUseId);
   const agent = agents.find((a) => a.toolUseId === item.toolUseId);
-  const result = index.results.get(item.toolUseId);
+  const result = shownAgentResult(index.results.get(item.toolUseId)); // §52.2: the launch is no result
   // MARK: wave3 desktop-agents — one view of the agent (its node, else its rows): §36.1–36.3
   const continuations = useContext(ContinuationContext).get(item.toolUseId) ?? 0;
   const view = agentViewOf({ node: agent, use: item, result, running, continuations });

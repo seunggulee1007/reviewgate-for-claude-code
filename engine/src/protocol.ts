@@ -351,6 +351,12 @@ export type Settings = {
    * as review turns (default true; next session start). Off: `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` and §18.
    */
   backgroundWork?: boolean;
+  /**
+   * §52.2: subagents finish inside the turn that started them (every Agent / Task call gets `run_in_background: false`), as
+   * before 0.6 — off by default: they run as in the terminal and the main agent answers while they work (next session
+   * start; only with `backgroundWork` on).
+   */
+  subagentsInTurn?: boolean;
   // MARK: wave4b w4b-bigturn
   /** §39.1: an untracked file at least this large (MB) is kept out of snapshots as a stub (1–100000, default 50; live). */
   largeFileMB?: number;
@@ -1508,6 +1514,23 @@ export type ToolResultEvent = {
   cliAgentId?: string;
   /** §36.2: the agent was stopped with `stop_agent`. */
   stoppedBy?: AgentStoppedBy;
+  /**
+   * §52.2: the result of an Agent / Task call whose subagent went to work in the background ("Async agent launched …"):
+   * no report — the agent's own result comes when it ends (`agentEnded`). Clients show the agent as working.
+   */
+  agentLaunched?: true;
+  /**
+   * §52.2: the agent of this Agent / Task call worked in the background and ended (`task_notification`): `preview` is its
+   * report (what it handed back through SubagentHandback, else the CLI's summary); `isError` when it failed or was stopped.
+   * A second `tool_result` for the same call — the last one is the call's result.
+   */
+  agentEnded?: true;
+  /**
+   * §38.2: a user or plugin PreToolUse hook denied this call before it ran (`hook`: the CLI's hook name, `PreToolUse:Read`;
+   * `reason`: what it said — Claude reads it and adapts). Normal flow, not a failure: clients show a quiet row under the
+   * call, and no `hook_blocked` notice is sent for it.
+   */
+  hookDenied?: { hook: string; reason: string };
 };
 /** Reply to `tool_output`: `output` is null when the engine kept nothing for that id (not Bash, older run, evicted). */
 export type ToolOutputEvent = { type: "tool_output"; id?: string; toolUseId: string; output: string | null; truncated: boolean };
@@ -1617,7 +1640,7 @@ export type TranscriptItem = { at: string; turn: number } & (
   | { kind: "assistant_text"; text: string; unprompted?: true }
   | { kind: "tool_use"; id: string; name: string; input: Record<string, unknown>; file?: string; parentToolUseId?: string; rationale?: string; rationaleSource?: RationaleSource; rationaleAge?: number; continues?: AgentContinuation; explore?: true /* MARK: wave4b w4b-tabs (§39.2) */ }
   /** §36.1: an Agent / Task result row also keeps the cleaned `report` (≤ 50 000 chars; never sent in `transcript_restore`, read with `agent_report`). */
-  | { kind: "tool_result"; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome; agentUsage?: AgentUsage; cliAgentId?: string; stoppedBy?: AgentStoppedBy; report?: string; reportTruncated?: true }
+  | { kind: "tool_result"; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome; agentUsage?: AgentUsage; cliAgentId?: string; stoppedBy?: AgentStoppedBy; report?: string; reportTruncated?: true; /** §52.2 */ agentLaunched?: true; agentEnded?: true; /** §38.2 */ hookDenied?: { hook: string; reason: string } }
   | { kind: "permission"; requestId: string; toolName: string; allow: boolean; file?: string }
   | { kind: "budget_event"; event: "warn" | "deny"; toolName: string; file?: string; files: number; lines: number }
   | { kind: "turn_end"; stopReason: string; usage: TurnUsage; files: number; added: number; deleted: number; changedOutside: string[]; external?: number; review?: ChangeTotals; merged?: true; /** MARK: wave5 w5-model (§43.4) */ autoModel?: AutoModelChoice }
@@ -1758,8 +1781,12 @@ export type BackgroundTask = {
 export type AutoTurnTrigger = "background" | "schedule" | "continue";
 export type AutoTurnInfo = {
   trigger: AutoTurnTrigger;
-  /** `background`: the task whose notification came last. */
-  task?: { taskId: string; description: string; status: string; summary?: string };
+  /**
+   * `background`: the task whose notification came last. §52.2: `kind` as in `BackgroundTask` (`agent`: a subagent; absent
+   * from an older engine); `toolUseId`: the call that started it; for a subagent `summary` is its report (the text it handed
+   * back through SubagentHandback, else the CLI's summary).
+   */
+  task?: { taskId: string; description: string; status: string; summary?: string; kind?: BackgroundTask["kind"]; toolUseId?: string };
   /** `schedule`: the lifecycle frame's `wakeup_source` (`schedule_wakeup`, …). */
   wakeupSource?: string;
 };

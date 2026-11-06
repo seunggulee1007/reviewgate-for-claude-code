@@ -132,8 +132,9 @@ public extension AppState {
         var rows = transcript
         let restored = restoredTranscriptIDs
         // r1-scope (§33.4): a command's changes outside the review — the files on the row, its folder for the row's actions.
-        let info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail?.detail, secondary: secondary, scope: scope, lastAt: Date()),
+        var info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail?.detail, secondary: secondary, scope: scope, lastAt: Date()),
                                      detail: detail)
+        info.quiet = LongWorkText.isQuietHookNotice(code: code, hookName: detail?.hookName)   // r1x (§38.2)
         let count = SessionNotices.appendError(
             to: &rows, message: text, fatal: fatal,
             info: info,
@@ -171,8 +172,9 @@ public extension AppState {
                                 facts: EngineErrorDetail = EngineErrorDetail()) -> (text: String, info: ErrorRowInfo) {
         let full = SessionNotices.restoredDetail(code: code, detail: detail, message: message, facts: facts)
         let text = EngineMessages.error(message: message, detail: full)
-        let info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail, secondary: SessionNotices.secondaryLine(message: message, detail: full),
+        var info = ScopeText.rowInfo(ErrorRowInfo(code: code, detail: detail, secondary: SessionNotices.secondaryLine(message: message, detail: full),
                                                   scope: scope, lastAt: Self.isoDate(at)), detail: full)   // r1-scope (§33.4)
+        info.quiet = LongWorkText.isQuietHookNotice(code: code, hookName: facts.hookName)   // r1x (§38.2)
         return (text, info)
     }
 

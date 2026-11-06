@@ -7,7 +7,15 @@
 import type { AgentContinuation, AgentStoppedBy, AgentUsage } from "@reviewgate/engine";
 
 export type AgentUseMeta = { continues?: AgentContinuation };
-export type AgentResultMeta = { agentUsage?: AgentUsage; cliAgentId?: string; stoppedBy?: AgentStoppedBy };
+export type AgentResultMeta = {
+  agentUsage?: AgentUsage;
+  cliAgentId?: string;
+  stoppedBy?: AgentStoppedBy;
+  /** §52.2: the call's agent went to work in the background — no report (its own result comes when it ends). */
+  agentLaunched?: true;
+  /** §52.2: that agent's own result when it ended (the call's last result; `preview` is its report). */
+  agentEnded?: true;
+};
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const count = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
@@ -20,12 +28,19 @@ export function agentUseMetaOf(ev: { continues?: unknown }): AgentUseMeta {
   return { continues: { agentToolUseId: c["agentToolUseId"], agentType: c["agentType"] } };
 }
 
-/** `tool_result` (event or row) → `agentUsage` (all three numbers), `cliAgentId`, `stoppedBy: "user"`. */
-export function agentResultMetaOf(ev: { agentUsage?: unknown; cliAgentId?: unknown; stoppedBy?: unknown }): AgentResultMeta {
+/** `tool_result` (event or row) → `agentUsage` (all three numbers), `cliAgentId`, `stoppedBy: "user"`, §52.2's flags. */
+export function agentResultMetaOf(ev: { agentUsage?: unknown; cliAgentId?: unknown; stoppedBy?: unknown; agentLaunched?: unknown; agentEnded?: unknown }): AgentResultMeta {
   const out: AgentResultMeta = {};
   const u = ev.agentUsage;
   if (isObject(u) && count(u["tokens"]) && count(u["toolUses"]) && count(u["durationMs"])) out.agentUsage = { tokens: u["tokens"], toolUses: u["toolUses"], durationMs: u["durationMs"] };
   if (text(ev.cliAgentId)) out.cliAgentId = ev.cliAgentId;
   if (ev.stoppedBy === "user") out.stoppedBy = "user";
+  if (ev.agentLaunched === true) out.agentLaunched = true;
+  if (ev.agentEnded === true) out.agentEnded = true;
   return out;
+}
+
+/** §52.2: an Agent call's result as shown: "launched in the background" is none (the agent's own comes when it ends). */
+export function shownAgentResult<T extends AgentResultMeta>(result: T | undefined): T | undefined {
+  return result?.agentLaunched ? undefined : result;
 }

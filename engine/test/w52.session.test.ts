@@ -9,7 +9,7 @@ import { outputPathOf, taskKind } from "../src/session/background.js";
  * docs/PROTOCOL.md §52 at the session level, with the frames CLI 2.1.318 sends (verified over stream-json, haiku):
  * a background Bash call (`task_started {is_backgrounded}`, the result naming its output file, `background_tasks_changed`,
  * `task_notification`), the turn the CLI then runs itself (`system/init`, no lifecycle frame, `result.origin`), a `/loop`
- * run (`command_lifecycle started` with `wakeup_source`), and Agent calls kept in the turn by the hook.
+ * run (`command_lifecycle started` with `wakeup_source`); Agent calls keep their input (§52.2, w52.agents.test.ts).
  */
 
 const SID = "s1";
@@ -151,7 +151,7 @@ describe("§52 background Bash and the turn the CLI runs after it", () => {
     await until(() => ofType(events, "auto_turn_start").length === 1, "auto turn");
     expect(ofType(events, "auto_turn_start")[0]).toEqual({
       type: "auto_turn_start", trigger: "background",
-      task: { taskId: "b35tmk0c1", description: "Run sleep then write done", status: "completed", summary: "Background command \"Run sleep then write done\" completed (exit code 0)" },
+      task: { taskId: "b35tmk0c1", description: "Run sleep then write done", status: "completed", summary: "Background command \"Run sleep then write done\" completed (exit code 0)", kind: "bash", toolUseId: "toolu_bg" },
     });
     expect(ofType(events, "background_tasks").at(-1)!.tasks).toEqual([]);
     expect(s.isTurnActive).toBe(true);
@@ -237,13 +237,10 @@ describe("§52 background Bash and the turn the CLI runs after it", () => {
   });
 });
 
-describe("§52 Agent calls stay in the turn", () => {
-  it("with background work on, the hook sets run_in_background: false; off, the input is left alone", async () => {
+describe("§52 Agent calls", () => {
+  it("keep their input by default (§52.2: subagents run as in the terminal; w52.agents.test.ts covers subagentsInTurn)", async () => {
     const on = await afterOneTurn();
-    expect(await pre(on.script, "Agent", { description: "d", prompt: "p", subagent_type: "general-purpose" })).toMatchObject({
-      updatedInput: { description: "d", prompt: "p", subagent_type: "general-purpose", run_in_background: false },
-    });
-    expect(await pre(on.script, "Agent", { description: "d", prompt: "p", run_in_background: false })).toBe("pass");
+    expect(await pre(on.script, "Agent", { description: "d", prompt: "p", subagent_type: "general-purpose" })).toBe("pass");
     await on.s.dispose();
     const off = await afterOneTurn({ backgroundWork: false });
     expect(await pre(off.script, "Agent", { description: "d", prompt: "p", run_in_background: true })).toBe("pass");

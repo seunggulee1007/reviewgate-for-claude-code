@@ -21,6 +21,7 @@ import "./miniDiff.css";
 import { reportFindingsLine } from "../../chatFollowups"; // MARK: wave4 w4-check3
 import { labelDetail, ToolNameLabel } from "../agents/AgentGlanceBits"; // MARK: wave4b w4b-agents
 import { backgroundWorkOn, canMoveToBackground } from "../../background"; // MARK: §52
+import { hookDeniedText } from "../../longWork"; // r1x (§38.2)
 
 /** Calls whose input carries the text they write. */
 const MINI_TOOLS = new Set(["Edit", "MultiEdit", "Write"]);
@@ -225,6 +226,22 @@ export function MiniDiffBlock({ mini }: { mini: MiniDiff }) {
 }
 
 export function ToolResultRow({ item, toolName, label }: { item: ToolResultItem; toolName?: string; label?: string }) {
+  // r1x — §38.2: a user or plugin hook denied the call — normal flow (Claude reads why and adapts), a quiet line, no error.
+  if (item.hookDenied) return <HookDeniedRow denial={item.hookDenied} />;
+  return <ToolResultDetails item={item} toolName={toolName} label={label} />;
+}
+
+/** r1x — §38.2: "훅이 막음: PreToolUse:Read — <reason>" under the call it denied (a subagent's inside its agent's group). */
+function HookDeniedRow({ denial }: { denial: { hook: string; reason: string } }) {
+  return (
+    <div className="tool-result hook-denied faint caption" title={denial.reason} data-testid="Hook denied row">
+      <span aria-hidden="true">✋ </span>
+      {hookDeniedText(denial)}
+    </div>
+  );
+}
+
+function ToolResultDetails({ item, toolName, label }: { item: ToolResultItem; toolName?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(false);
   const { isError, preview } = item;

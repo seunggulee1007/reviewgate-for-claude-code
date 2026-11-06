@@ -801,6 +801,54 @@
         }
       }
     },
+    "A background agent failed — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background agent failed — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 에이전트가 실패해 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
+    "A background agent finished — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background agent finished — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 에이전트가 끝나 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
+    "A background agent was stopped — Claude went on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A background agent was stopped — Claude went on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 에이전트가 멈춰 Claude가 이어서 했어요"
+          }
+        }
+      }
+    },
     "A background task failed — Claude went on": {
       "localizations": {
         "en": {

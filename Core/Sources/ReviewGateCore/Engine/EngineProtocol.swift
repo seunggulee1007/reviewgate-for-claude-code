@@ -344,6 +344,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     public var maxTurns: Int?
     /// §52: background commands, Ctrl+B and turns Claude starts itself as review turns (engine default true; next session start).
     public var backgroundWork: Bool?
+    /// §52.2: subagents finish inside the turn that started them, as before 0.6 (engine default false; next session start).
+    public var subagentsInTurn: Bool?
     // MARK: wave4b w4b-bigturn
     /// §39.1: an untracked file at least this large (MB) is a stub in snapshots (engine default 50; live).
     public var largeFileMB: Int?
@@ -2523,6 +2525,12 @@ public struct ToolResultInfo: Sendable, Equatable {
     public var cliAgentId: String?
     /// §36.2: the agent was stopped with `stop_agent` (the result reads "[Request interrupted by user for tool use]").
     public var stoppedBy: AgentStoppedBy?
+    /// §52.2: the call's agent went to work in the background — this answer is no report (its own result comes later).
+    public var agentLaunched = false
+    /// §52.2: that agent's own result when it ended (`preview` is its report): the call's last result.
+    public var agentEnded = false
+    /// §38.2: a user or plugin PreToolUse hook denied the call — normal flow, shown as a quiet row, not an error.
+    public var hookDenied: HookDenial?
 
     public init(parentToolUseId: String? = nil, truncated: Bool = false, testOutcome: TestOutcome? = nil) {
         self.parentToolUseId = parentToolUseId
@@ -2637,7 +2645,8 @@ extension TranscriptItem: Decodable {
                 info: ToolResultInfo(parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId),
                                      truncated: try c.decodeIfPresent(Bool.self, forKey: .truncated) ?? false,
                                      testOutcome: try? c.decodeIfPresent(TestOutcome.self, forKey: .testOutcome))
-                    .withAgentFields(from: decoder))   // wave3 mac-agents (§36.1–36.2)
+                    .withAgentFields(from: decoder)   // wave3 mac-agents (§36.1–36.2)
+                    .withHookDenied(from: decoder))   // r1x (§38.2)
         case "permission":
             kind = .permission(
                 requestId: try c.decodeIfPresent(String.self, forKey: .requestId) ?? "",
@@ -3017,7 +3026,8 @@ extension EngineEvent: Decodable {
                 info: ToolResultInfo(parentToolUseId: try c.decodeIfPresent(String.self, forKey: .parentToolUseId),
                                      truncated: try c.decodeIfPresent(Bool.self, forKey: .truncated) ?? false,
                                      testOutcome: try? c.decodeIfPresent(TestOutcome.self, forKey: .testOutcome))
-                    .withAgentFields(from: decoder))   // wave3 mac-agents (§36.1–36.2)
+                    .withAgentFields(from: decoder)   // wave3 mac-agents (§36.1–36.2)
+                    .withHookDenied(from: decoder))   // r1x (§38.2)
         case "tool_output":
             self = .toolOutput(
                 id: try c.decodeIfPresent(String.self, forKey: .id),

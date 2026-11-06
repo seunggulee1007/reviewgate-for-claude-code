@@ -195,3 +195,86 @@ describe("§52.1 a turn Claude starts itself", () => {
     expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
   });
 });
+
+describe("§52.2 a subagent working in the background", () => {
+  const agentTask = task({ taskId: "a1", kind: "agent", description: "Make sub.txt", toolUseId: "toolu_agent", hasOutput: false });
+
+  /** Turn 1: Claude starts a subagent in the background (its call answered at once) and edits a.txt; the agent works on. */
+  async function turnWithAgent(h: Harness, dir: string, id: string): Promise<void> {
+    await h.engine.handle({ type: "send", text: "서브에이전트로 sub.txt 만들고 a.txt 고쳐줘" });
+    h.session().emitSessionInfo();
+    h.session().emit({ type: "tool_use", id: "toolu_agent", name: "Agent", input: { description: "Make sub.txt", subagent_type: "general-purpose", prompt: "…", run_in_background: true } });
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_started", taskId: "a1", toolUseId: "toolu_agent", description: "Make sub.txt", subagentType: "general-purpose", taskType: "local_agent", isBackground: true, depth: 1 } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: false, preview: "Async agent launched successfully.", agentLaunched: true });
+    h.session().emit({ type: "background_tasks", tasks: [agentTask] });
+    write(dir, "a.txt", "a\n");
+    h.session().emitTurnEnd({ sessionId: id, toolFiles: [{ path: join(dir, "a.txt"), tools: ["Write"], count: 1, toolUseIds: ["toolu_w"] }] });
+    await h.waitFor((s) => s.gate.phase === "reviewing", "turn 1 collected");
+  }
+
+  it("a review finished while it works: the next turn starts from that B, so what it wrote after B is reviewed (with its call as the cause)", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    // The subagent writes sub.txt after B; the user finishes the review meanwhile.
+    h.session().emit({ type: "tool_use", id: "toolu_sub", name: "Write", input: { file_path: join(dir, "sub.txt"), content: "sub\n" }, file: join(dir, "sub.txt"), parentToolUseId: "toolu_agent" });
+    write(dir, "sub.txt", "sub\n");
+    await h.engine.request({ type: "finish_review" });
+    expect(h.engine.state.changedFiles).toEqual([]);
+    // The user asks something; the session says what the agent changed since (the idle calls are this turn's).
+    await h.engine.handle({ type: "send", text: "2+2는?" });
+    h.session().emitTurnEnd({ sessionId: id, toolFiles: [{ path: join(dir, "sub.txt"), tools: ["Write"], count: 1, toolUseIds: ["toolu_sub"] }] });
+    const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.length > 0, "turn 2 collected");
+    // a.txt stayed as the finished review left it (in A); sub.txt is new since B — the agent's.
+    expect(s.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["sub.txt", "pending", "tool"]]);
+  });
+
+  it("without background work a finished review lets the next turn take a fresh A (as before)", async () => {
+    const { h, dir, id } = await opened();
+    await h.engine.handle({ type: "send", text: "a" });
+    h.session().emitSessionInfo();
+    write(dir, "a.txt", "a\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    await h.waitFor((x) => x.gate.phase === "reviewing", "collected");
+    await h.engine.request({ type: "finish_review" });
+    write(dir, "ide.txt", "saved in the IDE\n");
+    await h.engine.handle({ type: "send", text: "b" });
+    write(dir, "b.txt", "b\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "b.txt"), "collected 2");
+    expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
+  });
+
+  it("stopped from the background list, it is stopped by the user (its result says so, as with its own ■)", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    await h.engine.request({ type: "task_stop", taskId: "a1" });
+    expect(h.session().stopTasks).toEqual(["a1"]);
+    expect(h.engine.state.hud.agents.find((a) => a.toolUseId === "toolu_agent")).toMatchObject({ status: "stopped", stoppedBy: "user" });
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_notification", taskId: "a1", toolUseId: "toolu_agent", status: "stopped", summary: "Task stopped" } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: true, preview: "Task stopped", agentEnded: true });
+    await h.settle();
+    expect(h.ofType("tool_result").at(-1)).toMatchObject({ toolUseId: "toolu_agent", agentEnded: true, stoppedBy: "user" });
+  });
+
+  it("its end is its call's result row (the report); the turn Claude runs after it names the agent; the agent comes back with the chat", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_notification", taskId: "a1", toolUseId: "toolu_agent", status: "completed", summary: "sub.txt를 만들었어요." } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: false, preview: "sub.txt를 만들었어요.", agentEnded: true, agentReport: "sub.txt를 만들었어요.", keptReport: { text: "sub.txt를 만들었어요.", truncated: false } });
+    h.session().emit({ type: "background_tasks", tasks: [] });
+    const t = { taskId: "a1", description: "Make sub.txt", status: "completed", summary: "sub.txt를 만들었어요.", kind: "agent" as const, toolUseId: "toolu_agent" };
+    h.session().emitAutoTurnStart({ trigger: "background", task: t });
+    await h.waitFor(() => h.session().autoTurnAnswers.length === 1, "auto turn taken");
+    expect(h.ofType("auto_turn")).toEqual([{ type: "auto_turn", turn: 2, trigger: "background", task: t }]);
+    expect(h.ofType("tool_result").filter((e) => e.toolUseId === "toolu_agent").map((e) => [e.agentLaunched ?? false, e.agentEnded ?? false, e.preview])).toEqual([
+      [true, false, "Async agent launched successfully."],
+      [false, true, "sub.txt를 만들었어요."],
+    ]);
+    // The auto turn's start moved the finished agent to the history (§39.3).
+    const node = [...h.engine.state.hud.agents, ...(h.engine.state.hud.agentHistory ?? [])].find((a) => a.toolUseId === "toolu_agent");
+    expect(node).toMatchObject({ status: "completed", isBackground: true, reportPreview: "sub.txt를 만들었어요." });
+    expect(await h.engine.request({ type: "agent_report", toolUseId: "toolu_agent" })).toMatchObject({ type: "agent_report", text: "sub.txt를 만들었어요." });
+    const rows = rowsOf(dir, id).filter((r) => r.kind === "tool_result" && r.toolUseId === "toolu_agent");
+    expect(rows.map((r) => [r.agentLaunched ?? false, r.agentEnded ?? false])).toEqual([[true, false], [false, true]]);
+  });
+});

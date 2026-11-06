@@ -158,6 +158,12 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
           {t("Allow background tasks and /loop")}
         </label>
         <div className="note">{t("Like the terminal, Claude can run commands in the background (a dev server, a long build) and repeat the same request with /loop. When a background command ends or a scheduled run starts, Claude goes on, and that turn is reviewed like any other. Files a background command changed in the meantime join the next review. Takes effect when the session restarts.")}</div>
+        {/* §52.2: subagents work in the background by default, as in the terminal — Claude answers meanwhile. */}
+        <label className="check">
+          <input type="checkbox" checked={settings.subagentsInTurn === true} disabled={!backgroundWorkOn(settings)} onChange={(e) => patch({ subagentsInTurn: e.target.checked })} data-testid="Subagents finish inside the turn" />
+          {t("Subagents finish inside the turn")}
+        </label>
+        <div className="note">{t("Off (the default): as in the terminal, a subagent works in the background and Claude answers your messages meanwhile; what it changes still goes into the next review, and Claude goes on when it is done. On: Claude waits for its subagents before it answers, as before. Takes effect when the session restarts.")}</div>
       </section>
       <section>
         <h4>{t("Side questions")}</h4>

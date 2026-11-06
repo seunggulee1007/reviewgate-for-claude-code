@@ -25,8 +25,9 @@ const epoch = (iso: string): number => {
 
 /**
  * The finished subagents in `rows` (a chat's transcript rows, oldest first), newest first, at most 50. A call without a
- * result ended with the engine (`stopped`); a background agent (its result is only the launch) is left out — its end is
- * not in the rows. `displayPath` makes the edited files repo-relative, as the live tracker does.
+ * result ended with the engine (`stopped`); a background agent is in only once its end is in the rows (§52.2 `agentEnded`,
+ * its call's last result) — the launch alone says nothing of how it ended. `displayPath` makes the edited files
+ * repo-relative, as the live tracker does.
  */
 export function agentHistoryFromRows(rows: readonly TranscriptItem[], displayPath: (abs: string) => string): AgentNode[] {
   const calls: ToolUseRow[] = [];
@@ -65,8 +66,9 @@ export function agentHistoryFromRows(rows: readonly TranscriptItem[], displayPat
   const out: AgentNode[] = [];
   for (const c of calls) {
     const input = c.input ?? {};
-    if (input.run_in_background === true) continue;
     const res = results.get(c.id);
+    const background = input.run_in_background === true || res?.agentLaunched === true || res?.agentEnded === true;
+    if (background && res?.agentEnded !== true) continue;
     const status: AgentStatus = !res || res.stoppedBy === "user" ? "stopped" : res.isError ? "failed" : "completed";
     const parent = c.parentToolUseId && agentIds.has(c.parentToolUseId) ? c.parentToolUseId : undefined;
     const isolation = str(input.isolation);
@@ -77,7 +79,7 @@ export function agentHistoryFromRows(rows: readonly TranscriptItem[], displayPat
       type: str(input.subagent_type) ?? "general-purpose",
       description: str(input.description) ?? "",
       status,
-      isBackground: false,
+      isBackground: background,
       depth: depthOf(c.id),
       startedAt: epoch(c.at),
       endedAt: res ? epoch(res.at) : epoch(c.at),

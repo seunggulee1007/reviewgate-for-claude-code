@@ -169,6 +169,14 @@ struct ToolResultRow: View {
     private var canShowFull: Bool { info.truncated && (toolName == nil || toolName == "Bash") }
 
     var body: some View {
+        if let denial = info.hookDenied {
+            HookDeniedRow(denial: denial)   // r1x (§38.2): a hook said no — normal flow, not an error
+        } else {
+            result
+        }
+    }
+
+    private var result: some View {
         DisclosureGroup(isExpanded: expanded) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(preview.isEmpty ? String(localized: "(empty)") : preview)
@@ -209,6 +217,30 @@ struct ToolResultRow: View {
         .sheet(isPresented: $showFull) {
             ToolOutputSheet(toolUseId: toolUseId, preview: preview)
         }
+    }
+}
+
+/// r1x — §38.2: the user's (or a plugin's) PreToolUse hook denied the call before it ran. Normal flow — Claude reads the
+/// reason and adapts — so a quiet gray line under the call (a subagent's inside its agent's group), never an error row.
+struct HookDeniedRow: View {
+    let denial: HookDenial
+
+    var body: some View {
+        Label {
+            Text(verbatim: LongWorkText.hookDenied(denial))
+                .lineLimit(3)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        } icon: {
+            Image(systemName: "hand.raised")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 20)
+        .help(denial.reason)
+        .accessibilityIdentifier("Hook denied row")
     }
 }
 

@@ -65,13 +65,34 @@ public struct AutoTurnInfo: Decodable, Sendable, Equatable {
         public var description: String
         /// `completed` / `failed` / `stopped`.
         public var status: String
+        /// §52.2: for a subagent, its report.
         public var summary: String?
+        /// §52.2: what ended (`agent`: a subagent); nil from an older engine.
+        public var kind: BackgroundTaskInfo.Kind?
+        /// §52.2: the call that started it.
+        public var toolUseId: String?
 
-        public init(taskId: String, description: String, status: String, summary: String? = nil) {
+        public init(taskId: String, description: String, status: String, summary: String? = nil, kind: BackgroundTaskInfo.Kind? = nil,
+                    toolUseId: String? = nil) {
             self.taskId = taskId
             self.description = description
             self.status = status
             self.summary = summary
+            self.kind = kind
+            self.toolUseId = toolUseId
+        }
+
+        private enum CodingKeys: String, CodingKey { case taskId, description, status, summary, kind, toolUseId }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            taskId = try c.decode(String.self, forKey: .taskId)
+            description = (try? c.decodeIfPresent(String.self, forKey: .description)) ?? ""
+            status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "completed"
+            summary = (try? c.decodeIfPresent(String.self, forKey: .summary)) ?? nil
+            // An odd kind reads as `other` (as in the task list); none (an older engine) stays nil.
+            kind = ((try? c.decodeIfPresent(String.self, forKey: .kind)) ?? nil).map { BackgroundTaskInfo.Kind(rawValue: $0) ?? .other }
+            toolUseId = (try? c.decodeIfPresent(String.self, forKey: .toolUseId)) ?? nil
         }
     }
 

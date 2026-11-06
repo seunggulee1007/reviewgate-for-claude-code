@@ -106,6 +106,59 @@ public enum LongWorkText {
     }
 }
 
+// MARK: r1x — §38.2: a PreToolUse hook's deny is its call's
+
+/// `tool_result.hookDenied`: the user's (or a plugin's) PreToolUse hook denied the call before it ran.
+public struct HookDenial: Sendable, Equatable {
+    /// The CLI's hook name (`PreToolUse:Read`).
+    public var hook: String
+    /// What the hook said (Claude reads it and adapts).
+    public var reason: String
+
+    public init(hook: String, reason: String) {
+        self.hook = hook
+        self.reason = reason
+    }
+}
+
+extension ToolResultInfo {
+    private enum HookKeys: String, CodingKey { case hookDenied }
+    private struct Wire: Decodable { var hook: String?; var reason: String? }
+
+    /// §38.2: `hookDenied {hook, reason}` of a `tool_result` (event and transcript row), leniently: no hook name, none.
+    func withHookDenied(from decoder: Decoder) -> ToolResultInfo {
+        guard let c = try? decoder.container(keyedBy: HookKeys.self),
+              let wire = (try? c.decodeIfPresent(Wire.self, forKey: .hookDenied)) ?? nil,
+              let hook = wire.hook?.trimmingCharacters(in: .whitespacesAndNewlines), !hook.isEmpty else { return self }
+        var info = self
+        info.hookDenied = HookDenial(hook: hook, reason: (wire.reason ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+        return info
+    }
+}
+
+public extension LongWorkText {
+    /// The quiet row under a call a hook denied: "훅이 막음: PreToolUse:Read — <reason>".
+    static func hookDenied(_ denial: HookDenial) -> String {
+        errorText(message: "", detail: {
+            var d = EngineErrorDetail()
+            d.code = "hook_blocked"
+            d.hookName = denial.hook
+            d.detail = denial.reason
+            return d
+        }()) ?? denial.hook
+    }
+
+    /// A hook notice that is no alarm: a PreToolUse hook's block restored from before (§38.2 puts new ones on the call) and
+    /// a hook that failed — gray rows. A prompt / stop hook that stopped the turn stays a warning.
+    static func isQuietHookNotice(code: String?, hookName: String?) -> Bool {
+        switch code {
+        case "hook_failed": return true
+        case "hook_blocked": return (hookName ?? "").hasPrefix("PreToolUse")
+        default: return false
+        }
+    }
+}
+
 /// "풀리면 이어서 하기": when to send, wait or give up.
 public enum LimitResume {
     /// The send waits this long after the reset (the window opens a little late at times).

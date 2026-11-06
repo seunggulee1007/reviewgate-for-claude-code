@@ -586,6 +586,8 @@ private struct AgentGroupNodeView: View, Equatable {
     var body: some View {
         if case let .toolUse(_, _, _, _, input, _) = call {
             let agent = store.agents.last { $0.toolUseId == toolUseId }
+            // §52.2: "launched in the background" is no result — the agent's own comes when it ends.
+            let result: ChatItem? = if case let .toolResult(_, _, _, _, info)? = self.result, info.agentLaunched { nil } else { self.result }
             let resultInfo: ToolResultInfo? = if case let .toolResult(_, _, _, _, info)? = result { info } else { nil }
             let status: AgentStatus = if case let .toolResult(_, _, isError, _, info)? = result {
                 AgentRowStatus.resolve(node: agent, result: (isError, info), running: context.running)

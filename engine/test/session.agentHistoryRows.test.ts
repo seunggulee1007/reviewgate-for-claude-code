@@ -92,6 +92,21 @@ describe("agentHistoryFromRows (§42.4)", () => {
     expect(got.some((n) => n.toolUseId === "ag3")).toBe(false);
   });
 
+  it("§52.2: a background agent whose end is in the rows (agentEnded, its call's last result) comes back as one", () => {
+    const withEnd: TranscriptItem[] = [
+      ...rows.slice(0, 9),
+      { at: at(12), turn: 2, kind: "tool_result", toolUseId: "ag3", isError: false, preview: "Async agent launched", agentLaunched: true },
+      { at: at(16), turn: 2, kind: "tool_use", id: "e3", name: "Write", input: { file_path: "/repo/src/C.java" }, file: "/repo/src/C.java", parentToolUseId: "ag3" },
+      { at: at(20), turn: 2, kind: "tool_result", toolUseId: "ag3", isError: false, preview: "C.java를 만들었어요", agentEnded: true, agentUsage: { tokens: 1_200, toolUses: 2, durationMs: 9_000 } },
+    ];
+    const got = agentHistoryFromRows(withEnd, (p) => p.replace("/repo/", ""));
+    expect(got.find((n) => n.toolUseId === "ag3")).toMatchObject({
+      status: "completed", isBackground: true, files: ["src/C.java"], reportPreview: "C.java를 만들었어요", tokens: 1_200, endedAt: Date.parse(at(20)),
+    });
+    // Launched only (no end in the rows): left out, as before.
+    expect(agentHistoryFromRows(withEnd.slice(0, 10), (p) => p).some((n) => n.toolUseId === "ag3")).toBe(false);
+  });
+
   it("the tracker takes them once, only while it knows no history of its own", () => {
     const t = new AgentTracker(() => 1_000);
     const nodes = agentHistoryFromRows(rows, (p) => p);

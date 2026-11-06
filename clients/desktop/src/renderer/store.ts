@@ -90,7 +90,7 @@ import { createSafetySlice, type SafetySlice } from "./storeSafety";
 import { TurnStopTracker } from "./workSafety";
 import { createLongWorkSlice, type LongWorkSlice } from "./storeLongWork"; // MARK: wave4 w4-longwork
 import { createAutoModeSlice, type AutoModeSlice } from "./storeAutoMode"; // MARK: wave4b w4b-auto
-import { longWorkRowFacts, RESUME_DELAY_MS } from "./longWork"; // MARK: wave4 w4-longwork
+import { hookDeniedOf, longWorkRowFacts, RESUME_DELAY_MS } from "./longWork"; // MARK: wave4 w4-longwork
 import { stopReasonWords } from "./stopWords"; // MARK: wave4b w4b-check4 (§40.1)
 import { compactedField, type CompactedRowFacts } from "./commitFormat"; // MARK: wave4c w4c-commit (§41.1)
 import type { PRCreateMeta } from "@reviewgate/engine";
@@ -112,7 +112,7 @@ export type ChatItem =
   /** `unprompted`: written in a turn Claude Code ran on its own, outside any request (docs/PROTOCOL.md §18). */
   | { kind: "assistant"; id: number; text: string; streaming: boolean; unprompted?: true }
   | { kind: "toolUse"; id: number; toolUseId: string; name: string; file?: string; input: Record<string, unknown>; parentToolUseId?: string; rationale?: string } & RationaleMeta & AgentUseMeta & ExploreMeta /* MARK: wave4b w4b-tabs (§39.2) */
-  | { kind: "toolResult"; id: number; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome } & AgentResultMeta
+  | { kind: "toolResult"; id: number; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome; /** r1x §38.2 */ hookDenied?: { hook: string; reason: string } } & AgentResultMeta
   | { kind: "permission"; id: number; request: PermissionRequest; allowed: boolean | null; answers?: Record<string, string> }
   | { kind: "budget"; id: number; event: BudgetEventEvent }
   /**
@@ -133,6 +133,11 @@ export type ChatItem =
 
 let nextId = 1;
 const uid = () => nextId++;
+/** r1x — §38.2: a tool_result's `hookDenied` (event or row) as the item keeps it. */
+const hookDeniedField = (ev: { hookDenied?: unknown }): { hookDenied?: { hook: string; reason: string } } => {
+  const d = hookDeniedOf(ev);
+  return d ? { hookDenied: d } : {};
+};
 
 /** Shared by the live `turn_end` event and restored `TranscriptItem` rows of the same kind. */
 function turnEndSummary(ev: { files: number; added: number; deleted: number; stopReason: string; usage: { costUsd: number; durationMs: number }; external?: number; merged?: true; review?: ChangeTotals }): string {
@@ -162,7 +167,7 @@ function transcriptItemsToChatItems(items: TranscriptItem[], budget: Budget): Ch
         out.push({ kind: "toolUse", id: uid(), toolUseId: item.id, name: item.name, file: item.file, input: item.input, parentToolUseId: item.parentToolUseId, rationale: item.rationale, ...rationaleMetaOf(item), ...agentUseMetaOf(item), ...exploreMetaOf(item) });
         break;
       case "tool_result":
-        out.push({ kind: "toolResult", id: uid(), toolUseId: item.toolUseId, isError: item.isError, preview: item.preview, parentToolUseId: item.parentToolUseId, truncated: item.truncated, testOutcome: item.testOutcome, ...agentResultMetaOf(item) });
+        out.push({ kind: "toolResult", id: uid(), toolUseId: item.toolUseId, isError: item.isError, preview: item.preview, parentToolUseId: item.parentToolUseId, truncated: item.truncated, testOutcome: item.testOutcome, ...agentResultMetaOf(item), ...hookDeniedField(item) });
         break;
       case "permission":
         // The persisted row only keeps the decision, not the original `input`; restored cards show it empty.
@@ -1174,7 +1179,7 @@ export const useStore = create<Store>((set, get, api) => {
           set((s) => ({ transcript: [...finishStreaming(s.transcript), { kind: "toolUse", id: uid(), toolUseId: ev.id, name: ev.name, file: ev.file, input: ev.input, parentToolUseId: ev.parentToolUseId, rationale: ev.rationale, ...rationaleMetaOf(ev), ...agentUseMetaOf(ev), ...exploreMetaOf(ev) }] }));
           break;
         case "tool_result":
-          set((s) => ({ transcript: [...s.transcript, { kind: "toolResult", id: uid(), toolUseId: ev.toolUseId, isError: ev.isError, preview: ev.preview, parentToolUseId: ev.parentToolUseId, truncated: ev.truncated, testOutcome: ev.testOutcome, ...agentResultMetaOf(ev) }] }));
+          set((s) => ({ transcript: [...s.transcript, { kind: "toolResult", id: uid(), toolUseId: ev.toolUseId, isError: ev.isError, preview: ev.preview, parentToolUseId: ev.parentToolUseId, truncated: ev.truncated, testOutcome: ev.testOutcome, ...agentResultMetaOf(ev), ...hookDeniedField(ev) }] }));
           break;
         case "permission_request": {
           const { type: _t, ...request } = ev;

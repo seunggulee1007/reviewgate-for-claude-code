@@ -79,6 +79,18 @@ describe("§52 background work logic", () => {
     expect(hasAutoTurnRow([bg, sched], 7)).toBe(false);
   });
 
+  it("§52.2: a subagent that worked in the background — its own titles, its report as the summary, its call", () => {
+    const agent = autoTurnRowOf({ turn: 3, trigger: "background", task: { taskId: "a1", description: "PR 다시 검토", status: "completed", summary: "리뷰 3건", kind: "agent", toolUseId: "toolu_a" } }, 1)!;
+    expect(agent.task).toEqual({ taskId: "a1", description: "PR 다시 검토", status: "completed", summary: "리뷰 3건", kind: "agent", toolUseId: "toolu_a" });
+    expect(autoTurnTitle(agent)).toBe("백그라운드 에이전트가 끝나 Claude가 이어서 했어요");
+    expect(autoTurnLines(agent)).toEqual({ detail: "PR 다시 검토", summary: "리뷰 3건" });
+    expect(autoTurnTitle({ trigger: "background", task: { taskId: "a", description: "x", status: "failed", kind: "agent" } })).toBe("백그라운드 에이전트가 실패해 Claude가 이어서 했어요");
+    expect(autoTurnTitle({ trigger: "background", task: { taskId: "a", description: "x", status: "stopped", kind: "agent" } })).toBe("백그라운드 에이전트가 멈춰 Claude가 이어서 했어요");
+    // An odd kind reads as `other` (a background task); an older engine's task has none.
+    expect(autoTurnRowOf({ turn: 3, trigger: "background", task: { taskId: "x", description: "d", status: "completed", kind: "daemon" } }, 2)!.task?.kind).toBe("other");
+    expect(autoTurnRowOf({ turn: 3, trigger: "background", task: { taskId: "x", description: "d", status: "completed" } }, 2)!.task).not.toHaveProperty("kind");
+  });
+
   it("[백그라운드로] only on a main-thread Bash call that still runs, with the setting on", () => {
     const ok = { name: "Bash", parentToolUseId: undefined, hasResult: false, turnRunning: true, externalTurn: false, enabled: true };
     expect(canMoveToBackground(ok)).toBe(true);

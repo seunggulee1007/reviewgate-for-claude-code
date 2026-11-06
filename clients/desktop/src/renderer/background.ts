@@ -90,6 +90,9 @@ export function autoTurnRowOf(
           description: typeof rawTask.description === "string" ? rawTask.description : "",
           status: typeof rawTask.status === "string" ? rawTask.status : "completed",
           ...(typeof rawTask.summary === "string" && rawTask.summary !== "" ? { summary: rawTask.summary } : {}),
+          // §52.2: what ended (an older engine: none) and the call that started it.
+          ...(typeof rawTask.kind === "string" ? { kind: KINDS.has(rawTask.kind) ? (rawTask.kind as BackgroundTask["kind"]) : ("other" as const) } : {}),
+          ...(typeof rawTask.toolUseId === "string" && rawTask.toolUseId !== "" ? { toolUseId: rawTask.toolUseId } : {}),
         }
       : undefined;
   return {
@@ -106,6 +109,12 @@ export function autoTurnRowOf(
 export function autoTurnTitle(row: Pick<AutoTurnInfo, "trigger" | "task">): string {
   switch (row.trigger) {
     case "background":
+      // §52.2: a subagent that worked in the background.
+      if (row.task?.kind === "agent") {
+        if (row.task.status === "failed") return t("A background agent failed, so Claude went on");
+        if (row.task.status === "stopped") return t("A background agent stopped, so Claude went on");
+        return t("A background agent finished, so Claude went on");
+      }
       if (row.task?.status === "failed") return t("A background task failed, so Claude went on");
       if (row.task?.status === "stopped") return t("A background task stopped, so Claude went on");
       return t("A background task finished, so Claude went on");

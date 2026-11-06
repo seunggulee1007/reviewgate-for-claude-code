@@ -1409,7 +1409,8 @@ export class ReviewEngine {
         if (this.gate.reverting) throw new CommandRefused("reverting");
         if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
         if (this.gate.changedFiles.length === 0 && this.gate.reviewNotes.length === 0 && this.gate.stale === null) return;
-        this.gate.finishReview();
+        // §52.2: background work since B — the next turn starts from this B, so what it writes is still reviewed.
+        this.gate.finishReview(this.bgCarry || (this.sessionState.backgroundTasks ?? []).length > 0);
         this.touch();
         return;
       case "keep_review":
@@ -2982,6 +2983,7 @@ export class ReviewEngine {
           systemPromptAppend: s.systemPromptAppend,
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
           backgroundWork: s.backgroundWork !== false, // §52
+          subagentsInTurn: s.subagentsInTurn === true, // §52.2
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
           bashAllowPatterns: [...(s.bashAllowPatterns ?? [])],
@@ -7272,11 +7274,16 @@ export class ReviewEngine {
     if (!session) throw new CommandRefused("no_session");
     if (typeof taskId !== "string" || !(this.sessionState.backgroundTasks ?? []).some((t) => t.taskId === taskId)) throw new CommandRefused("task_unknown");
     if (!session.stopTask) throw new CommandRefused("task_stop_failed:this Claude session cannot stop a task", { code: "task_stop_failed" });
+    // §52.2: a subagent stopped from the list is stopped by the user, as with its own ■ (`stop_agent`): its result says so.
+    const agent = this.agents.callOfTask(taskId);
+    if (agent) this.agents.requestStop(agent);
     try {
       await withTimeout(session.stopTask(taskId), STOP_AGENT_TIMEOUT_MS, "stopTask");
     } catch (e) {
+      if (agent && this.agents.node(agent)?.stoppedBy !== "user") this.agents.cancelStop(agent);
       throw new CommandRefused(`task_stop_failed:${firstLineOf(errorMessage(e))}`, { code: "task_stop_failed" });
     }
+    if (agent && this.agents.confirmStop(agent)) this.agentsChanged();
     this.log("info", `task_stop: background task ${taskId} stopped`);
   }
 

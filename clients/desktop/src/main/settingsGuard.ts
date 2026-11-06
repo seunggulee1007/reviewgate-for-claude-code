@@ -121,6 +121,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   showStatusLine: bool,
   // MARK: §52
   backgroundWork: bool,
+  subagentsInTurn: bool, // §52.2
   projectStatusLineAllowed: (v) => projectShas(v),
   // MARK: wave4b w4-notify — §39.6
   notifyWaiting: bool,

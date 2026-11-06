@@ -95,7 +95,8 @@ public enum AgentRowStatus {
     /// `failed`); else running while the turn runs and stopped after it.
     public static func resolve(node: AgentNode?, result: (isError: Bool, info: ToolResultInfo)?, running: Bool) -> AgentStatus {
         if let node { return node.status }
-        if let result {
+        // §52.2: "launched in the background" says nothing of how it ended.
+        if let result, !result.info.agentLaunched {
             if result.info.stoppedBy == .user { return .stopped }
             return result.isError ? .failed : .completed
         }
