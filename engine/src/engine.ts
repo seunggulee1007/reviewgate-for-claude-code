@@ -1409,7 +1409,8 @@ export class ReviewEngine {
         if (this.gate.reverting) throw new CommandRefused("reverting");
         if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
         if (this.gate.changedFiles.length === 0 && this.gate.reviewNotes.length === 0 && this.gate.stale === null) return;
-        this.gate.finishReview();
+        // §52.2: background work since B — the next turn starts from this B, so what it writes is still reviewed.
+        this.gate.finishReview(this.bgCarry || (this.sessionState.backgroundTasks ?? []).length > 0);
         this.touch();
         return;
       case "keep_review":

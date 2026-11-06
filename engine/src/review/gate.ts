@@ -209,10 +209,16 @@ export class ReviewGate {
    * is called off before it ran (a refused `peer_accept`, a session gone right after A); its collection drops it.
    */
   private freshUndo: { start: string | null; end: string | null; skipped: SkippedPath[]; ranges: RangeState; baseMerge: string | null; ownCommits: string[]; replacedCommits: string[] } | null = null;
+  /**
+   * §52.2: the B a `finish_review` left while background work ran (`finishReview(keepBase)`): the next turn that carries
+   * (`prepareAnswer(true)`) starts from it instead of a fresh A. Gone with that turn, a fresh A or a reset.
+   */
+  private carryBaseTree: string | null = null;
 
   reset(): void {
     this.restoredFrom = null; // MARK: wave2 check-engine (§35.9)
     this.freshUndo = null; // MARK: wave3 check-engine (§37.8)
+    this.carryBaseTree = null; // §52.2
     this.running = false;
     this.collecting = false;
     this.reverting = false;
@@ -315,8 +321,10 @@ export class ReviewGate {
    * baseline, no longer a review; the round goes to the history with them `pending` (`finished`). The accept /
    * reject verdicts of a live review still prefix the next message; those of a stale restored one (§31) belong to an
    * old conversation and are dropped.
+   * §52.2 `keepBase`: background work runs (or ran since B) — the reviewed B stays the next turn's A (`prepareAnswer(carry)`),
+   * so what it writes after B is still reviewed instead of becoming part of a fresh A.
    */
-  finishReview(): void {
+  finishReview(keepBase = false): void {
     this.lastReject = null; // MARK: wave4c w4c-trust (§41.2)
     this.restoredFrom = null; // MARK: wave2 check-engine (§35.9)
     if (this.stale !== null) {
@@ -326,6 +334,7 @@ export class ReviewGate {
     }
     if (this.turnStartTree !== null && this.turnEndTree !== null) this.trackRound(null);
     this.completeRound(true);
+    this.carryBaseTree = keepBase && this.stale === null ? this.turnEndTree : null;
     this.turnStartTree = null;
     this.turnEndTree = null;
     this.baseHead = null;
@@ -742,6 +751,13 @@ export class ReviewGate {
    */
   async prepareAnswer(carry = false): Promise<void> {
     const cp = this.checkpoint;
+    // §52.2: a review finished while background work ran — its B is this turn's A (an empty review until the turn ends).
+    const base = this.carryBaseTree;
+    this.carryBaseTree = null;
+    if (carry && base !== null && this.turnStartTree === null && this.turnEndTree === null) {
+      this.turnStartTree = base;
+      this.turnEndTree = base;
+    }
     const start = this.turnStartTree;
     const end = this.turnEndTree;
     // §52 `carry`: a background process may have written since B — the turn keeps A even with nothing pending, so what it

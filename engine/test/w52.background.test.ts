@@ -212,6 +212,38 @@ describe("§52.2 a subagent working in the background", () => {
     await h.waitFor((s) => s.gate.phase === "reviewing", "turn 1 collected");
   }
 
+  it("a review finished while it works: the next turn starts from that B, so what it wrote after B is reviewed (with its call as the cause)", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    // The subagent writes sub.txt after B; the user finishes the review meanwhile.
+    h.session().emit({ type: "tool_use", id: "toolu_sub", name: "Write", input: { file_path: join(dir, "sub.txt"), content: "sub\n" }, file: join(dir, "sub.txt"), parentToolUseId: "toolu_agent" });
+    write(dir, "sub.txt", "sub\n");
+    await h.engine.request({ type: "finish_review" });
+    expect(h.engine.state.changedFiles).toEqual([]);
+    // The user asks something; the session says what the agent changed since (the idle calls are this turn's).
+    await h.engine.handle({ type: "send", text: "2+2는?" });
+    h.session().emitTurnEnd({ sessionId: id, toolFiles: [{ path: join(dir, "sub.txt"), tools: ["Write"], count: 1, toolUseIds: ["toolu_sub"] }] });
+    const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.length > 0, "turn 2 collected");
+    // a.txt stayed as the finished review left it (in A); sub.txt is new since B — the agent's.
+    expect(s.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["sub.txt", "pending", "tool"]]);
+  });
+
+  it("without background work a finished review lets the next turn take a fresh A (as before)", async () => {
+    const { h, dir, id } = await opened();
+    await h.engine.handle({ type: "send", text: "a" });
+    h.session().emitSessionInfo();
+    write(dir, "a.txt", "a\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    await h.waitFor((x) => x.gate.phase === "reviewing", "collected");
+    await h.engine.request({ type: "finish_review" });
+    write(dir, "ide.txt", "saved in the IDE\n");
+    await h.engine.handle({ type: "send", text: "b" });
+    write(dir, "b.txt", "b\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "b.txt"), "collected 2");
+    expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
+  });
+
   it("its end is its call's result row (the report); the turn Claude runs after it names the agent; the agent comes back with the chat", async () => {
     const { h, dir, id } = await opened();
     await turnWithAgent(h, dir, id);

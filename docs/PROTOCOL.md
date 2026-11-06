@@ -6715,7 +6715,8 @@ process:
 - **Changes between turns.** While a background task is live after a turn's collection (or one ran since), the next
   turn of any kind keeps the last review's A (`prepareAnswer` even with nothing pending; accepted files whose patch is
   unchanged stay accepted). So what a background process wrote after B shows in that turn's review as `external`
-  (§31.1), instead of becoming part of a fresh A. `finish_review` drops A, so a turn after it starts fresh.
+  (§31.1), instead of becoming part of a fresh A. `finish_review` drops A, so a turn after it starts fresh — §52.2: unless
+  background work runs (or ran since B): then the finished review's B is the next turn's A.
 - **Labels.** `auto_turn.task` names the background task whose notification came last (description, `completed` /
   `failed` / `stopped`, the CLI's summary). `wakeupSource` is the lifecycle frame's own value.
 - **Claude Code's own files.** `/loop` writes `.claude/scheduled_tasks.lock`. The CLI lists its runtime files in
@@ -6806,7 +6807,9 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   turn of ours runs, the files its calls change (edit tools by their `file_path`, Bash by the post-Bash snapshot) are kept
   (`idleToolFiles`) and become the next turn's — the user's next message or the turn the CLI runs when the agent ends —
   whose review keeps A (§52.1), so they are in it with the agent's call as the cause (`origin: tool` / `bash`). A failed
-  edit is no cause.
+  edit is no cause. `finish_review` while background work runs (or ran since B) keeps that B for the next turn
+  (`ReviewGate.finishReview(keepBase)`, `prepareAnswer(carry)`): what the agent writes after it is reviewed, not taken
+  into a fresh A.
 - **The call's results.** The CLI's immediate answer is no report: the `tool_result` says `agentLaunched: true` (no
   `keptReport`, no `why` report). When the agent ends, the session sends a second `tool_result` for the same call with
   `agentEnded: true`: `preview` is its report (`handback_report.text`, else the notification's `summary`), `isError` when it
@@ -6831,9 +6834,9 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   the setting; the launch is no report; the subagent's calls pass the guard between turns — hook and `canUseTool` — the
   main thread's do not, nor its own after it ended; an agent it starts; its edits between turns in the next turn's
   `toolFiles`; its end as the call's result, once; no peer for the hand-back; the hand-back turn ours; a stopped agent; our
-  queued message's turn not ended by the CLI's), `w52.background.test.ts` (its end recorded as the call's result, named
-  on the auto turn, kept for `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes back
-  after a restart).
+  queued message's turn not ended by the CLI's), `w52.background.test.ts` (a finished review keeps its B while it works;
+  as before without background work; its end recorded as the call's result, named on the auto turn, kept for
+  `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes back after a restart).
 
 ## 53. Commits in meaningful units
 
