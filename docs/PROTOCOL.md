@@ -1250,7 +1250,8 @@ the CLI did not let the held messages through; they are still held), `lfs_missin
 `send_failed` / `collect_failed` when the snapshot failed because the repository's LFS filter cannot run — git-lfs missing),
 `worktree_blocked` / `worktree_outside_review` (+ `toolName`, `path?`, `branch?`; §33.4), `cli_version_changed` (non-fatal
 notice + `cli {from, to, verified}`; §36.8), `git_stashed` (non-fatal notice, a gray row; `detail`: the files a `git stash`
-of Claude's took out of the working tree; §46).
+of Claude's took out of the working tree; §46), `claude_committed` / `claude_moved_head` (non-fatal notices, gray rows;
+`detail`: the short shas / "from → to"; a HEAD move Claude's own git commands made, §31.3).
 
 **Refusal codes** (`result{ok:false, code}`; the leading word of `error`, or the listed explicit code where `error` is
 English): `binary_file`, `branch_in_use`, `cannot_remove_current`, `cannot_remove_main`, `collect_failed`, `commit_failed`,
@@ -1772,7 +1773,9 @@ type StaleReview = {
 // state.gate: externalPendingCount: number; headMoved: { from: HeadInfo; to: HeadInfo } | null;
 //             concurrentClaude: ConcurrentClaude[]; stale: StaleReview | null
 // state.changedFiles[].origin: FileOrigin;  turn_summary.files[].origin: FileOrigin;  turn_end.external: number
-// events: { type: "head_moved"; turn; from; to } | { type: "concurrent_claude"; at: "open" | "send"; sessions }
+// state.changedFiles[].committedIn?: string   // r1-git: the short sha of Claude's own commit holding the change (§46)
+// events: { type: "head_moved"; turn; from; to; explainedBy?: "claude_git"; commits?: string[] }   // explainedBy: r1-git, §31.3
+//       | { type: "concurrent_claude"; at: "open" | "send"; sessions }
 // commands: reject_all { force?, includeExternal? } | finish_review | keep_review
 ```
 
@@ -1824,6 +1827,13 @@ its collection. When it differs — a commit, pull, checkout or rebase outside t
 (§46) — `state.gate.headMoved = {from, to}` until the next turn starts and `head_moved {turn, from, to}` follows the
 turn's `turn_end` (never before it: `interrupt` replies once `turn_end` is out). The collection first carries the commits
 into A (§46), so what moved in with the new HEAD is not in the list; only when they do not apply on A is it there, `external`.
+MARK: r1-git — a move Claude's own git commands made is no warning: the session reports every HEAD move of a git command
+(`git_result {from, to, ownCommits?, foreign?}`, §46), and when those moves chain from the turn's start to its end (each one
+starts where the one before ended; none with a move from before its command ran in it) `head_moved` carries
+`explainedBy: "claude_git"` (+ `commits`: the short shas of the commits Claude made, oldest first), `state.gate.headMoved`
+stays unset (a carry that failed still sets it, as before) and a gray row follows: `claude_committed` (`detail`: the short
+shas; "Claude가 커밋함 <sha> — 파일은 리뷰에 그대로") or, with no commit (a branch, a pull, a checkout), `claude_moved_head`
+(`detail`: "main@abc1234 → feature/acme-7@abc1234"). Any other move keeps the bar.
 
 ### 31.4 Other Claude processes in this worktree
 
@@ -5958,6 +5968,25 @@ the terminal's auto mode asked for none).
   (`git merge --abort`) has its incoming side taken back out of A (the reverse patch, conflicts keeping A), and
   `baseMerge` is cleared. `head_moved` (§31.3) still follows a turn in which HEAD moved. The carry's `git diff` is
   plumbing-safe whatever the user's config (`--no-color`, explicit `a/` `b/` prefixes).
+- **Claude's own commits stay in the review** (r1-git; before, an approved `git add -A && git commit` was carried whole into
+  A and the turn listed nothing — the edited file vanished from the review, and a "branch / commit changed" bar showed for the
+  commit the user had just approved). Before a Bash call whose git command may move HEAD (`commit`, `checkout`, `switch`,
+  `reset`, `pull`, `merge`, `rebase`, `cherry-pick`, `revert`, `am`, `bisect`, `update-ref`, `symbolic-ref`, `branch -m`,
+  `gh pr checkout|merge`) the hook reads HEAD and the newest HEAD reflog entry; after it, HEAD again and the reflog entries
+  written since (`git log -g --date=unix`). The commits its `git commit` made (`commit:`, `commit (amend):`, `commit
+  (initial):` — not `commit (merge):`, not a pull's, merge's, rebase's or cherry-pick's) written while the call ran (from
+  PostToolUse − `duration_ms`, so not the user's own commit while a card waited — that makes the move `foreign`) are
+  Claude's: the session reports `git_result {toolUseId, from, to, ownCommits, amended?, foreign?}` and the engine hands them
+  to the gate (`ReviewGate.noteOwnCommits`, kept with the review as `ownCommits` until a fresh A). The carry walks
+  `baseHead..HEAD` along first parents as before but leaves Claude's own commits out — A keeps the content from before them;
+  every other commit (a pull, someone else's) is carried, merges by their other side. When HEAD does not get back to
+  `baseHead` along first parents (a checkout elsewhere, an amend in a later turn) and Claude committed, the carry goes
+  through their merge base: what only `baseHead` had is taken back out, what HEAD has brought in, Claude's commits neither
+  way and a commit Claude's amend replaced (`amended`) not taken out. Any failure keeps today's fallback (the whole move;
+  `headMoved`). A listed file one of Claude's commits changed (the newest still in HEAD's history) carries
+  `committedIn: "<short sha>"` (`state.changedFiles[]`, set at every collection, refresh and restore). Rejecting it reverts
+  the working tree to A as for any file — the commit stays, the file now differs from HEAD. Tests:
+  `engine/test/gitResult.test.ts`.
 - **A stash** (r1-git). Before a Bash call whose git command puts work away (`git stash`, `stash push` / `save`, `stash -u`, …;
   not `pop` / `apply` / `list`) the hook reads `git status --porcelain` of the checkpoint root; after it (PostToolUse or
   PostToolUseFailure — `postGitCommand`, next to `postBash`) again. The files that were dirty and are no longer are on no
@@ -5984,7 +6013,9 @@ the terminal's auto mode asked for none).
   and a git failure that is `not a git repository` reads as words (`EngineMessages.plainGitFailure`). The clients' default prompt now says
   to run them only when the user asks (Mac `AppSettings.defaultSystemPromptAppend`, Electron `DEFAULT_SYSTEM_PROMPT_APPEND`).
 - **Compatibility.** One new `PermissionReason.code`; a client that does not know it shows `message` on an orange line
-  (Electron, until it localizes it). The persisted review gains an optional `baseMerge`.
+  (Electron, until it localizes it). The persisted review gains an optional `baseMerge`. r1-git: optional
+  `changedFiles[].committedIn`, `head_moved.explainedBy` / `commits`, the persisted `ownCommits`, three notice codes
+  (`git_stashed`, `claude_committed`, `claude_moved_head`) — an older client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
   substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, the hook in auto
   and default mode, a remembered `Bash:git push` against a force push),

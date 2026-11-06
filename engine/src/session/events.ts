@@ -10,6 +10,7 @@ import type { ScopeNotice } from "./reviewScope.js";
 import type { RateLimitWindow } from "../protocol.js"; // MARK: wave4 w4-longwork
 import type { PermissionMode } from "../protocol.js"; // MARK: wave6 w6-terminal
 import type { AutoTurnInfo, BackgroundTask } from "../protocol.js"; // §52
+import type { HeadInfo } from "../protocol.js"; // MARK: r1-git
 
 /**
  * A file the turn's tools touched: tool names plus the tool_use ids that touched it (edit tools by their
@@ -41,9 +42,12 @@ export type StartProgress = { kind: "hook" | "plugin" | "status"; id?: string; n
 
 /**
  * MARK: r1-git — §46: what one of Claude's git commands did (hooks.ts `postGitCommand`): files a `git stash` took out of the
- * working tree (`stashed`, repo-relative).
+ * working tree (`stashed`, repo-relative); HEAD moved `from` → `to` — `ownCommits`: the commits its `git commit` made (full
+ * shas, oldest first; the reflog's `commit:` / `commit (amend):` entries written while it ran); `amended`: the commits its
+ * `git commit --amend` replaced; `foreign`: the reflog also shows a move from before the command ran (someone else's, e.g.
+ * while its card waited).
  */
-export type GitCommandResult = { toolUseId: string; stashed?: string[] };
+export type GitCommandResult = { toolUseId: string; stashed?: string[]; from?: HeadInfo; to?: HeadInfo; ownCommits?: string[]; amended?: string[]; foreign?: true };
 
 export type SessionEvent =
   | SessionInfoEvent

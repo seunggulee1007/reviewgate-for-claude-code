@@ -507,6 +507,8 @@ export class ReviewEngine {
   private readonly turnEditCalls = new Map<string, string>();
   /** §31: HEAD / branch when the running turn started (compared after its collection → `head_moved`). */
   private turnHead: HeadInfo | null = null;
+  /** MARK: r1-git — §46: the HEAD moves Claude's git commands made in the running turn (the session's `git_result`), in order. */
+  private turnGitMoves: { from: HeadInfo; to: HeadInfo; foreign: boolean; ownCommits: string[] }[] = [];
   /** §32: hashes of `.claude/settings.local.json` when the running turn started (→ `local_settings_changed`). */
   private turnLocalSettings: LocalSettingsDigest | null = null;
   /** §32: HEADs of the linked worktrees inside the project when the running turn started (→ `nested_changes`). */
@@ -3426,7 +3428,8 @@ export class ReviewEngine {
         // What the record closes on: this collection's B and list (a send meanwhile clears B for its own turn).
         const closing = { end: this.gate.turnEndTree, listed: this.gate.changedFiles, delta: r.delta };
         const moved = await this.headMove();
-        if (moved) this.emit({ type: "head_moved", turn, from: { ...moved.from }, to: { ...moved.to } });
+        if (moved) this.emit({ type: "head_moved", turn, from: { ...moved.from }, to: { ...moved.to }, ...(moved.explainedBy ? { explainedBy: moved.explainedBy } : {}), ...(moved.commits ? { commits: [...moved.commits] } : {}) });
+        if (moved?.explainedBy) this.noteClaudeHeadMove(moved); // MARK: r1-git (§46)
         const local = await this.localSettingsMove();
         if (local) this.emit({ type: "local_settings_changed", turn, ...local });
         const nested = await this.nestedMove(toolFiles, windows);
@@ -3451,6 +3454,7 @@ export class ReviewEngine {
   private async noteTurnStartState(): Promise<void> {
     const root = this.gate.checkpoint?.root;
     this.turnHead = await this.readHead();
+    this.turnGitMoves = []; // MARK: r1-git (§46)
     this.turnLocalSettings = root ? await localSettingsDigest(root).catch(() => null) : null;
     this.turnNestedHeads = root ? await worktreeHeads(root).catch(() => new Map()) : new Map();
   }
@@ -3502,11 +3506,20 @@ export class ReviewEngine {
   }
 
   /**
-   * MARK: r1-git — §46: what one of Claude's git commands did. A `git stash` that took files out of the working tree is a
-   * gray chat row naming them (`git_stashed`): they are no longer on disk, so the review cannot show them until a
-   * `git stash pop` brings them back.
+   * MARK: r1-git — §46: what one of Claude's git commands did. A HEAD move while a turn runs is noted (`turnGitMoves`, for
+   * `headMove`) and the commits its `git commit` made go to the gate (`noteOwnCommits`: never carried into A). A `git stash`
+   * that took files out of the working tree is a gray chat row naming them (`git_stashed`): they are no longer on disk, so the
+   * review cannot show them until a `git stash pop` brings them back.
    */
   private onGitResult(ev: GitCommandResult): void {
+    // A HEAD move of the running turn: its commits stay in the review; the move explains the turn's `head_moved`.
+    if (ev.from && ev.to && this.gate.running) {
+      this.turnGitMoves.push({ from: { ...ev.from }, to: { ...ev.to }, foreign: ev.foreign === true, ownCommits: [...(ev.ownCommits ?? [])] });
+      if (ev.ownCommits && ev.ownCommits.length > 0) {
+        this.log("info", `Claude committed ${ev.ownCommits.map((c) => c.slice(0, 7)).join(", ")}: kept in the review`);
+        this.gate.noteOwnCommits(ev.ownCommits, ev.amended ?? []);
+      }
+    }
     const stashed = ev.stashed ?? [];
     if (stashed.length > 0) {
       const shown = stashed.slice(0, STASHED_SHOWN).join(", ") + (stashed.length > STASHED_SHOWN ? ` (+${stashed.length - STASHED_SHOWN})` : "");
@@ -3522,17 +3535,45 @@ export class ReviewEngine {
   }
 
   /**
-   * §31: HEAD at the turn's start vs now. A commit, pull or checkout made while the turn ran (Claude's git commands
-   * are denied, so it is someone else's) is reported once: `state.gate.headMoved` until the next turn + `head_moved`.
+   * §31: HEAD at the turn's start vs now. MARK: r1-git — §46: when Claude's own git commands made every step of it (each
+   * reported move starts where the one before ended, from the turn's start to now, none with someone else's move in it) it
+   * is `explainedBy: "claude_git"` (with the commits Claude made): no `state.gate.headMoved` — a chat row says it. Any other
+   * move (a commit, pull or checkout outside the app while the turn ran) is reported once: `state.gate.headMoved` until the
+   * next turn + `head_moved`.
    */
   private async headMove(): Promise<HeadMove | null> {
     const from = this.turnHead;
+    const moves = this.turnGitMoves;
     this.turnHead = null;
+    this.turnGitMoves = [];
     if (!from) return null;
     const to = await this.readHead();
-    if (!to || (to.sha === from.sha && to.branch === from.branch)) return null;
+    if (!to || sameHead(to, from)) return null;
+    let at: HeadInfo = from;
+    const explained = moves.length > 0 && moves.every((m) => {
+      if (m.foreign || !sameHead(m.from, at)) return false;
+      at = m.to;
+      return true;
+    }) && sameHead(at, to);
+    if (explained) {
+      const commits = [...new Set(moves.flatMap((m) => m.ownCommits))].map((sha) => sha.slice(0, 7));
+      return { from, to, explainedBy: "claude_git", ...(commits.length > 0 ? { commits } : {}) };
+    }
     this.gate.headMoved = { from, to };
     return { from, to };
+  }
+
+  /** MARK: r1-git — §46: the chat row of a HEAD move Claude's git commands made (`claude_committed` / `claude_moved_head`). */
+  private noteClaudeHeadMove(moved: HeadMove): void {
+    const label = (h: HeadInfo) => (h.branch && h.sha ? `${h.branch}@${h.sha.slice(0, 7)}` : h.sha ? h.sha.slice(0, 7) : h.branch ?? "?");
+    const commits = moved.commits ?? [];
+    if (commits.length > 0) {
+      const detail = commits.join(", ");
+      this.notice(`Claude committed ${detail} — its files stay in the review.`, "session", { code: "claude_committed", detail });
+    } else {
+      const detail = `${label(moved.from)} → ${label(moved.to)}`;
+      this.notice(`Claude's git command moved HEAD (${detail}); the review shows only Claude's own changes.`, "session", { code: "claude_moved_head", detail });
+    }
   }
 
   private async retryCollect(): Promise<void> {
@@ -7508,6 +7549,8 @@ export class ReviewEngine {
 const MAX_CHECKPOINT_RECORDS_KEPT = 60;
 /** MARK: r1-git — §46: files a `git_stashed` row names (the rest as "(+N)"). */
 const STASHED_SHOWN = 10;
+/** MARK: r1-git — the same commit and branch. */
+const sameHead = (a: HeadInfo, b: HeadInfo): boolean => a.sha === b.sha && a.branch === b.branch;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped CLI's process to be gone before it gives up. */
 const CHAT_MOVE_EXIT_WAIT_MS = 5000;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped turn's collection. */

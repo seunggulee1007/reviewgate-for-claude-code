@@ -19,7 +19,7 @@ import type { GitCommandResult, SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
-import { destructiveGitReason, dirtyPaths, stashesWork, type GitProbe } from "./gitDestructive.js"; // MARK: r1-git (§46)
+import { destructiveGitReason, dirtyPaths, entriesSince, headReflog, isOwnCommitSubject, movesHead, stashesWork, type GitProbe, type ReflogEntry } from "./gitDestructive.js"; // MARK: r1-git (§46)
 import {
   bashClaudeConfigTarget,
   bashScopeReason,
@@ -314,7 +314,7 @@ export type HookContext = {
   reviewPaths?: () => ReadonlySet<string>;
   /** Test seam: what the git card asks the repository (`gitDestructive.gitProbe`). */
   gitProbe?: GitProbe;
-  /** What a git command of Claude's did (`postGitCommand`): files a `git stash` took out of the working tree. */
+  /** What a git command of Claude's did (`postGitCommand`): files a `git stash` took out of the working tree, a HEAD move. */
   onGitCommand?: (result: GitCommandResult) => void;
   /** What the PreToolUse hook read before a git command ran, by tool_use id (`noteGitBefore` → `postGitCommand`). */
   gitBefore?: Map<string, GitBefore>;
@@ -328,20 +328,33 @@ function allow(): HookJSONOutput {
 
 // MARK: r1-git — §46: what Claude's git commands did, read around the call.
 
-/** The state a git command may change, read by the PreToolUse hook: the dirty files before a `git stash`. */
-export type GitBefore = { dirty?: string[] };
+/**
+ * The state a git command may change, read by the PreToolUse hook: the dirty files before a `git stash`; HEAD and the newest
+ * HEAD reflog entry (`marker`, null: no reflog yet) before a command that may move it; `at`: when (epoch ms).
+ */
+export type GitBefore = { dirty?: string[]; head?: { sha: string | null; branch: string | null }; marker?: ReflogEntry | null; at: number };
 
-/** Before a Bash call: what `postGitCommand` compares with — the dirty files when the line stashes work away. */
+/** Before a Bash call: what `postGitCommand` compares with — the dirty files when it stashes work away, HEAD when it may move it. */
 async function noteGitBefore(ctx: HookContext, input: HookInput, command: string): Promise<void> {
   const id = toolUseIdOf(input);
-  if (!id || !ctx.onGitCommand || !/git/.test(command)) return;
+  if (!id || !ctx.onGitCommand || !/git|\bgh\b/.test(command)) return;
   const cwd = hookCwd(input, ctx);
-  if (!stashesWork(command, cwd)) return;
+  const stash = stashesWork(command, cwd);
+  const moves = movesHead(command, cwd);
+  if (!stash && !moves) return;
   try {
     const root = await containmentRoot(ctx);
-    const before: GitBefore = {};
-    const dirty = await dirtyPaths(root);
-    if (dirty) before.dirty = dirty;
+    const before: GitBefore = { at: ctx.now?.() ?? Date.now() };
+    if (stash) {
+      const dirty = await dirtyPaths(root);
+      if (dirty) before.dirty = dirty;
+    }
+    if (moves) {
+      if (!ctx.checkpoint) ctx.checkpoint = await openCheckpoint(ctx.cwd);
+      const [head, log] = await Promise.all([ctx.checkpoint.head(), headReflog(root, 1)]);
+      before.head = head;
+      before.marker = log[0] ?? null;
+    }
     if (!ctx.gitBefore) ctx.gitBefore = new Map();
     ctx.gitBefore.set(id, before);
   } catch (e) {
@@ -349,7 +362,11 @@ async function noteGitBefore(ctx: HookContext, input: HookInput, command: string
   }
 }
 
-/** After that call (it ran, or failed after it ran): what changed — a stash that took files out of the working tree. */
+/**
+ * After that call (it ran, or failed after it ran): what changed — a stash that took files out of the working tree, a HEAD
+ * move with the commits Claude's `git commit` made in it (the reflog's commit entries written while the call ran; a move
+ * from before — the user's, while the card waited — makes it `foreign`).
+ */
 async function noteGitAfter(ctx: HookContext, input: HookInput): Promise<void> {
   const id = toolUseIdOf(input);
   const before = id ? ctx.gitBefore?.get(id) : undefined;
@@ -366,7 +383,27 @@ async function noteGitAfter(ctx: HookContext, input: HookInput): Promise<void> {
         if (stashed.length > 0) result.stashed = stashed;
       }
     }
-    if (result.stashed) ctx.onGitCommand?.(result);
+    if (before.head && ctx.checkpoint) {
+      const to = await ctx.checkpoint.head();
+      if (to.sha !== before.head.sha || to.branch !== before.head.branch) {
+        result.from = before.head;
+        result.to = to;
+        // The call ran from `now - duration_ms` (CLI 2.1.308; else since the PreToolUse hook): reflog times are in seconds.
+        const now = ctx.now?.() ?? Date.now();
+        const duration = (input as { duration_ms?: unknown }).duration_ms;
+        const ranFrom = typeof duration === "number" && duration >= 0 ? Math.max(before.at, now - duration) : before.at;
+        const since = Math.floor(ranFrom / 1000) - 1;
+        const all = await headReflog(root);
+        const entries = entriesSince(all, before.marker ?? null, since);
+        const mine = entries.filter((e) => e.at >= since && isOwnCommitSubject(e.subject));
+        if (mine.length > 0) result.ownCommits = [...new Set(mine.map((e) => e.sha).reverse())];
+        // An amend's entry follows the one of the commit it replaced (that commit's changes are in the amended one).
+        const amended = mine.filter((e) => e.subject.startsWith("commit (amend):")).map((e) => all[all.indexOf(e) + 1]?.sha).filter((x): x is string => !!x);
+        if (amended.length > 0) result.amended = [...new Set(amended)];
+        if (entries.some((e) => e.at < since)) result.foreign = true;
+      }
+    }
+    if (result.stashed || result.from) ctx.onGitCommand?.(result);
   } catch (e) {
     ctx.log("debug", `git state after Bash failed: ${String(e)}`);
   }

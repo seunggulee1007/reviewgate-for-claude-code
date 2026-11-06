@@ -1051,7 +1051,17 @@ export type ConcurrentClaude = {
 
 /** §31: a commit (`sha` null = unborn HEAD) and branch (null = detached). */
 export type HeadInfo = { sha: string | null; branch: string | null };
-export type HeadMove = { from: HeadInfo; to: HeadInfo };
+export type HeadMove = {
+  from: HeadInfo;
+  to: HeadInfo;
+  /**
+   * MARK: r1-git — §31.3 / §46 (`head_moved` only): Claude's own git commands made every step of the move (a commit, a branch,
+   * a pull, …): no `state.gate.headMoved`, a chat row instead. Absent: someone else's move (or an older engine).
+   */
+  explainedBy?: "claude_git";
+  /** With `explainedBy`: the short shas of the commits Claude's `git commit` made in the turn, oldest first (none: no commit). */
+  commits?: string[];
+};
 
 /**
  * `origin` (§31) is always sent by this engine; optional for clients' placeholder states. `group` (§32): set for mods files.
