@@ -300,10 +300,10 @@ describe("the PreToolUse Bash hook (§46)", () => {
     return d;
   }
 
-  it("auto mode: a commit, a branch, a stash and a pull are the CLI's (no decision); reset --hard asks with the reason", async () => {
+  it("auto mode: a commit, a branch, a stash, a pull and a push are the CLI's (no decision); reset --hard asks with the reason", async () => {
     const root = repo();
     const { preBash, ctx } = hook(root, { permissionMode: "auto" });
-    for (const command of ["git add -A && git commit -m x", "git checkout -b feature/acme-7", "git stash", "git pull --rebase"]) {
+    for (const command of ["git add -A && git commit -m x", "git checkout -b feature/acme-7", "git stash", "git pull --rebase", "git push -u origin feature/acme-7"]) {
       expect(await preBash(command, "t1", "auto"), command).toEqual({});
     }
     expect(decision(await preBash("git reset --hard origin/main", "r1", "auto"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });

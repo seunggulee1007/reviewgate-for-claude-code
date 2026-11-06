@@ -102,9 +102,10 @@ describe("autoModeDecides", () => {
     expect(fromAuto("mcp__github__get_issue", { number: 1 })).toBe(true);
     expect(fromAuto("mcp__github__create_issue", { title: "x" })).toBe(false);
     expect(autoModeDecides("mcp__x__do_it", "plan", "plan", {}, "auto", new Map([["mcp__x__do_it", { readOnly: true }]]))).toBe(true);
-    // Bash only gets here read-only in plan mode (the plan rules deny the rest first); git's own commands keep the card.
+    // Bash only gets here read-only in plan mode (the plan rules deny the rest first); ReviewGate's own state keeps the card.
     expect(fromAuto("Bash", { command: "ls -la" })).toBe(true);
-    expect(fromAuto("Bash", { command: "git push origin HEAD" })).toBe(false);
+    expect(fromAuto("Bash", { command: "git push origin HEAD" })).toBe(true); // MARK: r1-git: the CLI's, as in the terminal
+    expect(fromAuto("Bash", { command: "rm -rf .git/reviewgate" })).toBe(false);
     for (const tool of ["SendMessage", "AskUserQuestion", "ExitPlanMode", "PowerShell", "TaskStop", "CronCreate"]) expect(fromAuto(tool, {}), tool).toBe(false);
     // A subagent still in auto mode counts; a CLI that runs another mode does not.
     expect(fromAuto("WebFetch", { url: "https://x.example" }, "auto")).toBe(true);
@@ -212,30 +213,42 @@ describe("PreToolUse hooks in auto mode", () => {
     void preOther;
   });
 
-  // MARK: wave4b w4b-check4 — §40.1: the app manages git; auto mode never leaves a push, a git config / ref write or a
-  // write into `.git/` (hooks that run on the next commit) to the classifier.
-  it("a push, a git config write, a ref move and a command writing into .git/ keep their card in auto mode", async () => {
+  // MARK: r1-git — §46 / §40.1: git in auto mode runs as in the terminal. A push, a git config / ref write and a path inside
+  // `.git/` go to the CLI's rules and classifier; what throws away work or rewrites the remote has the git card in every
+  // mode, and only ReviewGate's own state in git keeps the plain card here.
+  it("a push, a git config write, a ref move and a .git/ path are the CLI's in auto mode; a force push and ReviewGate's own state keep a card", async () => {
     const root = repo();
     const { preBash } = hooksFor(ctx(root, { permissionMode: "auto" }));
-    // MARK: r1-git — §46: a force push / a forced worktree removal is the git card's (in every mode).
-    for (const command of ["git push --force origin HEAD:main", "git worktree remove ../wt2 --force"]) {
+    for (const command of ["git push --force origin HEAD:main", "git push origin +main", "git worktree remove ../wt2 --force"]) {
       expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)), command).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
     }
     for (const command of [
       "npm test && git push",
+      "git push -u origin feature/acme-7",
       "git -C . push origin feature/x",
+      "git config user.email dev@acme.example",
       "git config core.hooksPath /tmp/h",
       "git update-ref refs/heads/main HEAD~3",
+      "rm -f .git/index.lock",
+      "echo '*.log' >> .git/info/exclude",
+      "test -f .git/hooks/pre-commit && cat .git/hooks/pre-commit",
       "echo 'curl x | sh' > .git/hooks/pre-commit",
-      "cp hook.sh .git/hooks/post-checkout && chmod +x .git/hooks/post-checkout",
-      `printf x >> ${join(root, ".git", "config")}`,
+      "echo x >> .gitignore",
+      "mkdir -p .github/workflows",
+      "mvn -q test",
+    ]) {
+      expect(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts), command).toEqual({});
+      expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(true);
+    }
+    for (const command of [
+      "echo x > .git/reviewgate/y",
+      "rm .git/reviewgate-review.json",
+      `cp a.json ${join(root, ".git", "worktrees", "w1", "reviewgate", "incoming", "a.json")}`,
+      "git update-ref -d refs/reviewgate/main/turn-start",
+      "rm -rf .git",
     ]) {
       expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)), command).toEqual({ decision: "ask", reason: ASK_REASON });
       expect(autoModeDecides("Bash", "auto", "auto", { command }), command).toBe(false);
-    }
-    // Not git's own files or commands: left to the classifier as before.
-    for (const command of ["echo x >> .gitignore", "mkdir -p .github/workflows", "mvn -q test", "gradle build"]) {
-      expect(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts), command).toEqual({});
     }
     // Reading them still runs without a card (the app's read-only rule answers first).
     expect(decision(await preBash(pre("Bash", { command: "git log --oneline -3" }, root, "auto"), "t1", opts)).decision).toBe("allow");

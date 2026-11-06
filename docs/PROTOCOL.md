@@ -4032,8 +4032,8 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   `bypassPermissions` / `dontAsk` stay unoffered.
 - Verified with CLI 2.1.309 / SDK 0.3.270 (haiku, `canUseTool` set, hooks returning no decision): in auto mode `mvn -v`,
   `echo > file`, `node -e`, `mkdir && touch` ran without `can_use_tool`; the classifier let what the user's prompt asked for
-  through (`rm -rf <a scratch dir outside cwd>`, `curl … | sh`, `git push --force`): in the app the push keeps its card
-  (§40.1 — the git guard itself never covered a push), a `cd` / `git -C` outside the project still gets its reason card, and judging the rest is the classifier's, as
+  through (`rm -rf <a scratch dir outside cwd>`, `curl … | sh`, `git push --force`): in the app the force push keeps its card
+  (§46, r1-git: the `git_command` card, in every mode; a plain push is the classifier's), a `cd` / `git -C` outside the project still gets its reason card, and judging the rest is the classifier's, as
   in the terminal; an `autoMode.soft_deny` rule against `mvn` gave `permission_denied{decision_reason: "[Security Weaken]"}` and no
   `can_use_tool`; `claude-haiku-4-5` and auto mode turned off by settings started in `default` with a `can_use_tool` per
   command; `setPermissionMode("auto")` between turns took effect on the next turn.
@@ -4089,7 +4089,8 @@ clients (no contract written first); every subsection says how it was built. Add
 notice source, one setting; nothing an existing client relies on changes meaning.
 
 - §40.1 **0.2.4–0.2.6 follow-ups** — auto mode keeps the card for a push, a git config / ref write and a write into
-  `.git/`; 자동 picked in one project does not start a new one; a hook that blocked on purpose is `hook_blocked`, not a
+  `.git/` (r1-git: now only for ReviewGate's own state in git; §46 cards what rewrites the remote); 자동 picked in one
+  project does not start a new one; a hook that blocked on purpose is `hook_blocked`, not a
   failure; the turn-end line says the stop reason in words; "풀리면 이어서 하기" belongs to its chat; wave 4 wire goldens.
 - §40.2 **A review list that reads like the code** — one risk rule in the engine (settings, SQL, schema, CI and
   permission badges; a test below the code it tests), a diff without lines says what changed, the list grouped by folder
@@ -4139,6 +4140,15 @@ rules. Every field stays optional; an older engine or client behaves as before.
   own commit included), gets the card (`ask`, the plain reason) instead of the classifier. The app's own rules answer
   first as before (a `Bash(git push:*)` pattern still allows; `git log`, `cat .git/HEAD` still run without a card); the
   other modes are unchanged (they already asked); `.gitignore` / `.github/` are not `.git`.
+  MARK: r1-git — reversed for git: in auto mode a push, `git config`, `update-ref` / `symbolic-ref` / `commit-tree` /
+  `replace` / `filter-branch` / `filter-repo`, `git worktree remove|move|prune` and any other path inside `.git/`
+  (`rm -f .git/index.lock`, `.git/info/exclude`, `test -f .git/hooks/x`) go to the CLI's rules and classifier, as in the
+  terminal (they cost a card per push and per `git config user.email`). What rewrites the remote or throws work away — a
+  force push, `+refspec`, `--delete`, `--mirror`, `--prune`, `worktree remove --force` — has the `git_command` card in
+  every mode (§46). The plain card stays only for a command that names ReviewGate's own state in git:
+  `<git dir>/reviewgate/…` (chats, remembered allows, attachments; a linked worktree's `.git/worktrees/<name>/reviewgate/`
+  too), `reviewgate-review.json`, `refs/reviewgate/…` (the review's pinned trees) or the `.git` folder itself (`rm -rf
+  .git`) — `REVIEWGATE_STATE_RE`, case-insensitive. An MCP tool writing into `.git/` keeps its card (§41.2, unchanged).
 - **자동 spreads like any other mode** (Mac `AppSettings.permissionMode(root:)`; reversed after 0.5.6). The last mode used
   anywhere (`"*"`, also what `hello` carries) seeds a project opened for the first time, 자동 included — keeping 자동 out
   (→ 기본) started every new worktree of a repository worked in auto mode in 기본, with a card for every command and MCP
