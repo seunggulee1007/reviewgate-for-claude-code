@@ -6898,7 +6898,10 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   whose review keeps A (§52.1), so they are in it with the agent's call as the cause (`origin: tool` / `bash`). A failed
   edit is no cause. `finish_review` while background work runs (or ran since B) keeps that B for the next turn
   (`ReviewGate.finishReview(keepBase)`, `prepareAnswer(carry)`): what the agent writes after it is reviewed, not taken
-  into a fresh A.
+  into a fresh A. That B keeps what the review knew of HEAD (§46: `baseHead`, a merge under way, Claude's own commits):
+  when it becomes the next turn's A, what git brought in since — the user's pull, a commit outside the app — goes into it
+  first, as `followHead` does for a standing review (Claude's own commits are not carried), so the turn does not list
+  upstream's files as Claude's; commits that do not apply on it leave it as it is and `headMoved` says so.
 - **The call's results.** The CLI's immediate answer is no report: the `tool_result` says `agentLaunched: true` (no
   `keptReport`, no `why` report). When the agent ends, the session sends a second `tool_result` for the same call with
   `agentEnded: true`: `preview` is its report (`handback_report.text`, else the notification's `summary`), `isError` when it

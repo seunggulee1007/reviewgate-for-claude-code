@@ -228,6 +228,22 @@ describe("§52.2 a subagent working in the background", () => {
     expect(s.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["sub.txt", "pending", "tool"]]);
   });
 
+  it("a review finished while it works: a commit someone else makes before the next turn (a pull) goes into that B, not into the review (§46)", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    await h.engine.request({ type: "finish_review" });
+    // The user pulls while the subagent still works: up.txt arrives in a commit of someone else's.
+    write(dir, "up.txt", "upstream\n");
+    sh(dir, "add", "up.txt");
+    sh(dir, "-c", "user.email=dev@acme.example", "commit", "-qm", "upstream change");
+    await h.engine.handle({ type: "send", text: "2+2는?" });
+    write(dir, "b.txt", "b\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    const s = await h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "b.txt"), "turn 2 collected");
+    expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
+    expect(s.gate.headMoved ?? null).toBeNull();
+  });
+
   it("without background work a finished review lets the next turn take a fresh A (as before)", async () => {
     const { h, dir, id } = await opened();
     await h.engine.handle({ type: "send", text: "a" });

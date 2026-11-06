@@ -249,14 +249,16 @@ export class ReviewGate {
   private freshUndo: { start: string | null; end: string | null; skipped: SkippedPath[]; ranges: RangeState; baseMerge: string | null; ownCommits: string[]; replacedCommits: string[] } | null = null;
   /**
    * §52.2: the B a `finish_review` left while background work ran (`finishReview(keepBase)`): the next turn that carries
-   * (`prepareAnswer(true)`) starts from it instead of a fresh A. Gone with that turn, a fresh A or a reset.
+   * (`prepareAnswer(true)`) starts from it instead of a fresh A. Gone with that turn, a fresh A or a reset. §46: with what
+   * the review knew of HEAD (`baseHead`, the merge under way, Claude's own commits), so a commit someone else makes before
+   * that turn ends (a pull) is carried into it as into a standing review's A.
    */
-  private carryBaseTree: string | null = null;
+  private carryBase: { tree: string; baseHead: HeadInfo | null; baseMerge: string | null; ownCommits: string[]; replacedCommits: string[]; ownCopies: Map<string, string> } | null = null;
 
   reset(): void {
     this.restoredFrom = null; // MARK: wave2 check-engine (§35.9)
     this.freshUndo = null; // MARK: wave3 check-engine (§37.8)
-    this.carryBaseTree = null; // §52.2
+    this.carryBase = null; // §52.2
     this.running = false;
     this.collecting = false;
     this.reverting = false;
@@ -373,7 +375,10 @@ export class ReviewGate {
     }
     if (this.turnStartTree !== null && this.turnEndTree !== null) this.trackRound(null);
     this.completeRound(true);
-    this.carryBaseTree = keepBase && this.stale === null ? this.turnEndTree : null;
+    this.carryBase =
+      keepBase && this.stale === null && this.turnEndTree !== null
+        ? { tree: this.turnEndTree, baseHead: this.baseHead, baseMerge: this.baseMerge, ownCommits: this.ownCommits, replacedCommits: this.replacedCommits, ownCopies: this.ownCopies }
+        : null;
     this.turnStartTree = null;
     this.turnEndTree = null;
     this.baseHead = null;
@@ -873,11 +878,20 @@ export class ReviewGate {
   async prepareAnswer(carry = false): Promise<void> {
     const cp = this.checkpoint;
     // §52.2: a review finished while background work ran — its B is this turn's A (an empty review until the turn ends).
-    const base = this.carryBaseTree;
-    this.carryBaseTree = null;
+    const base = this.carryBase;
+    this.carryBase = null;
     if (carry && base !== null && this.turnStartTree === null && this.turnEndTree === null) {
-      this.turnStartTree = base;
-      this.turnEndTree = base;
+      this.baseHead = base.baseHead;
+      this.baseMerge = base.baseMerge;
+      this.ownCommits = base.ownCommits;
+      this.replacedCommits = base.replacedCommits;
+      this.ownCopies = base.ownCopies;
+      // §46: what git brought in since that B (a pull, a commit outside the app) goes into it first, as `followHead` does for
+      // a standing review — else the turn would list it as Claude's change. Claude's own commits are not carried.
+      const [tree] = cp ? await this.carryGitMoves(cp, [base.tree]).catch(() => [base.tree]) : [base.tree];
+      this.turnStartTree = tree!;
+      this.turnEndTree = tree!;
+      if (tree !== base.tree) await this.pinRefs().catch(() => undefined);
     }
     const start = this.turnStartTree;
     const end = this.turnEndTree;
