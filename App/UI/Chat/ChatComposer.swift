@@ -84,8 +84,10 @@ final class ComposerModel {
         return String(rest)
     }
 
-    func paletteVisible(canSend: Bool) -> Bool {
-        canSend && !paletteDismissed && (paletteForced || slashToken != nil)
+    /// r1-composer M14: `available` is an open project (`AppState.canUseSlashPalette`) — the palette works while Claude
+    /// works or the session starts too; a pick goes into the draft, ↩ then sends, steers or queues it as any message.
+    func paletteVisible(available: Bool) -> Bool {
+        available && !paletteDismissed && (paletteForced || slashToken != nil)
     }
 
     /// wave3 mac-session (§36.5): the session's commands grouped by source with this project's recently used first; one
@@ -99,8 +101,8 @@ final class ComposerModel {
 
     /// ⌘/: an empty draft becomes "/" — what is typed next filters the commands and deleting the "/" closes the palette;
     /// over a typed draft the palette opens as it is and a pick goes in front of the text.
-    func openPalette(canSend: Bool) {
-        guard canSend else { return }
+    func openPalette(available: Bool) {
+        guard available else { return }
         if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             draft = "/"
             caretRequest = 1
@@ -190,7 +192,7 @@ struct ComposerPalettes: View {
             MentionPalette(query: query.query, entries: composer.mentionEntries(changedFiles: store.changedFiles, projectOpen: projectOpen),
                            selection: composer.mentionIndex, isLoading: composer.mentionLoading,
                            onPick: { composer.pickMention($0, store: store) })
-        } else if composer.paletteVisible(canSend: store.canSend) {
+        } else if composer.paletteVisible(available: store.canUseSlashPalette) {   // r1-composer M14: while Claude works too
             // wave3 mac-session (§36.5): descriptions, hints, groups, recently used first, "Starting session…".
             let sections = composer.paletteSections(store)
             SlashCommandPalette(sections: sections, selection: composer.paletteIndex,
@@ -510,7 +512,7 @@ struct ChatComposer: View {
     private var mentionQuery: (range: NSRange, query: String)? { composer.mentionQuery(projectOpen: projectOpen) }
     private var mentionVisible: Bool { composer.mentionVisible(projectOpen: projectOpen) }
     private var mentionEntries: [MentionEntry] { composer.mentionEntries(changedFiles: store.changedFiles, projectOpen: projectOpen) }
-    private var paletteVisible: Bool { composer.paletteVisible(canSend: store.canSend) }
+    private var paletteVisible: Bool { composer.paletteVisible(available: store.canUseSlashPalette) }
 
     /// "Accept N & Send" is a separate, explicit action next to Send; plain Send never accepts anything.
     private var acceptAndSend: Bool { store.canAcceptAndSend }
@@ -875,7 +877,7 @@ struct ChatComposer: View {
                 if composer.draft == "/" { composer.draft = "" }
                 composer.closePalette()
             } else {
-                composer.openPalette(canSend: store.canSend)
+                composer.openPalette(available: store.canUseSlashPalette)
             }
             return true
         case .enter, .tab:
