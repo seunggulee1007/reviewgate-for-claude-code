@@ -1,12 +1,17 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { HookCallback, HookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { HookCallback, HookInput, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { BudgetState } from "../src/session/budget.js";
+import { ClaudeSession } from "../src/session/claude.js";
+import type { SessionEvent } from "../src/session/events.js";
 import {
   ASK_REASON,
   buildHooks,
+  CLAUDE_CONFIG_ASK_REASON,
   configScopeReason,
+  NESTED_REASON,
+  OUTSIDE_REASON,
   planModeBlocked,
   READ_ONLY_BASH_REASON,
   readOnlyContextOf,
@@ -17,7 +22,7 @@ import { foreignRepoDir } from "../src/session/reviewScope.js";
 import { sideToolDenyReason } from "../src/side/sideQuery.js";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
-import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
+import { makeRepo, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 /**
  * docs/PROTOCOL.md §19.3, §33.4, §39.5 (r1-scope): next door without asking. Reading in the repository's other worktrees
@@ -32,6 +37,13 @@ afterEach(async () => {
 });
 
 const opts = { signal: new AbortController().signal };
+
+/** A temporary folder removed after the test (a home folder for Claude's memory). */
+function makeTempDirLocal(): string {
+  const d = makeTempDir("rg-home");
+  dirs.push(d);
+  return d;
+}
 
 /** A repository (with `sub/`, a nested clone `vendor/lib`) and a sibling worktree `<root>-42` (with `src/`). */
 function repoWithSibling(): { root: string; sibling: string; lib: string } {
@@ -368,5 +380,82 @@ describe("§39.5: the engine — a worktree the CLI made in auto mode", () => {
     await new Promise((r) => setTimeout(r, 300));
     await h.settle();
     expect(h.ofType("error").filter((e) => e.code === "worktree_outside_review")).toEqual([]);
+  });
+});
+
+describe("§39.5: edits the review does not see, in auto mode — no card, listed after the turn", () => {
+  const auto = { permission_mode: "auto" };
+
+  async function edit(c: HookContext, toolName: string, toolInput: Record<string, unknown>, cwd: string, id: string, extra: Record<string, unknown> = {}): Promise<{ decision?: string; reason?: string }> {
+    const hooks = buildHooks(c);
+    const pre = hooks.PreToolUse![0]!.hooks[0] as HookCallback;
+    const d = decision(await pre(hookInput("PreToolUse", toolName, toolInput, cwd, id, extra), id, opts));
+    if (d.decision !== "ask" && d.decision !== "deny") {
+      for (const h of hooks.PostToolUse![0]!.hooks) await (h as HookCallback)(hookInput("PostToolUse", toolName, toolInput, cwd, id, { tool_response: {}, ...extra }), id, opts);
+    }
+    return d;
+  }
+
+  it("Claude's memory, a parent folder, a sibling worktree and a nested repository: no decision, each listed; settings files still ask", async () => {
+    const { root, sibling, lib } = repoWithSibling();
+    const home = realpathSync(makeTempDirLocal());
+    const listed: string[] = [];
+    const c = ctx(root, { permissionMode: "auto", claudeHome: home, onOutsideEdit: (f) => listed.push(f) });
+    const memory = join(home, ".claude", "projects", "-work-acme", "memory", "note.md");
+    const parent = join(dirname(root), "notes.txt");
+    dirs.push(parent);
+    expect(await edit(c, "Write", { file_path: memory, content: "remember\n" }, root, "e1", auto)).toEqual({});
+    expect(await edit(c, "Write", { file_path: parent, content: "x\n" }, root, "e2", auto)).toEqual({});
+    expect(await edit(c, "Write", { file_path: join(sibling, "src", "A.java"), content: "class A {}\n" }, root, "e3", auto)).toEqual({});
+    expect(await edit(c, "Edit", { file_path: join(lib, "lib.txt"), old_string: "lib", new_string: "x" }, root, "e4", auto)).toEqual({});
+    expect(listed).toEqual([memory, parent, join(sibling, "src", "A.java"), join(lib, "lib.txt")]);
+    // Inside the project nothing is listed (the review has it).
+    expect(await edit(c, "Write", { file_path: join(root, "sub", "b.txt"), content: "b\n" }, root, "e5", auto)).toEqual({});
+    expect(listed).toHaveLength(4);
+    // Claude Code's own settings keep their card in auto mode too (§33.9) — under the home folder as in the project.
+    const userSettings = join(home, ".claude", "settings.json");
+    expect(await edit(c, "Edit", { file_path: userSettings, old_string: "{", new_string: "{ " }, root, "e6", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    expect(await edit(c, "Write", { file_path: join(lib, ".claude", "settings.json"), content: "{}" }, root, "e7", auto)).toMatchObject({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
+    // git's own state is still denied.
+    expect(await edit(c, "Write", { file_path: join(sibling, ".git"), content: "x" }, root, "e8", auto)).toMatchObject({ decision: "deny" });
+  });
+
+  it("default mode, and auto mode whose CLI runs another mode, keep the cards", async () => {
+    const { root, lib } = repoWithSibling();
+    const home = realpathSync(makeTempDirLocal());
+    const memory = join(home, ".claude", "projects", "-work-acme", "memory", "note.md");
+    for (const [c, extra] of [[ctx(root, { claudeHome: home }), {}], [ctx(root, { permissionMode: "auto", claudeHome: home }), { permission_mode: "default" }]] as const) {
+      expect(await edit(c, "Write", { file_path: memory, content: "x\n" }, root, "d1", extra)).toEqual({ decision: "ask", reason: OUTSIDE_REASON });
+      expect(await edit(c, "Write", { file_path: join(dirname(root), "n.txt"), content: "x\n" }, root, "d2", extra)).toEqual({ decision: "ask", reason: OUTSIDE_REASON });
+      expect(await edit(c, "Write", { file_path: join(lib, "x.txt"), content: "x\n" }, root, "d3", extra)).toEqual({ decision: "ask", reason: NESTED_REASON });
+    }
+  });
+
+  it("the session lists them in turn_end.changedOutside", async () => {
+    const { root } = repoWithSibling();
+    const home = realpathSync(makeTempDirLocal());
+    const events: SessionEvent[] = [];
+    const s = new ClaudeSession({
+      cwd: root,
+      settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", permissionMode: "auto" },
+      claudePath: "/nonexistent/claude",
+      env: {},
+      platform: { killTree: async () => undefined, isWindows: false },
+      emit: (e) => events.push(e),
+      log: () => {},
+    });
+    (s as unknown as { setTurnActive(a: boolean): void }).setTurnActive(true);
+    const hc = (s as unknown as { hookCtx: HookContext }).hookCtx;
+    hc.claudeHome = home;
+    hc.scratchDirs = []; // these test folders live in the temporary folder, which counts as throwaway space otherwise
+    const memory = join(home, ".claude", "projects", "-work-acme", "memory", "MEMORY.md");
+    const parent = join(dirname(root), `${basename(root)}-notes.txt`);
+    dirs.push(parent);
+    expect(await edit(hc, "Write", { file_path: memory, content: "- a note\n" }, root, "w1", auto)).toEqual({});
+    expect(await edit(hc, "Write", { file_path: parent, content: "x\n" }, root, "w2", auto)).toEqual({});
+    (s as unknown as { handleSdkMessage(m: SDKMessage): void }).handleSdkMessage({ type: "result", subtype: "success", session_id: "s1", usage: { input_tokens: 1, output_tokens: 1 }, duration_ms: 5, total_cost_usd: 0 } as unknown as SDKMessage);
+    const end = events.find((e): e is Extract<SessionEvent, { type: "turn_end" }> => e.type === "turn_end");
+    expect(end!.changedOutside).toEqual([memory, parent].sort());
+    await s.dispose();
   });
 });

@@ -436,6 +436,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       mcpToolHints: this.mcpToolHints,
       scopeReasons: new Map(),
       onScopeNotice: (notice) => this.emit({ type: "scope_notice", ...notice }),
+      onOutsideEdit: (file) => this.turnChangedOutside.add(file), // §8 / §39.5: an edit the review does not see
       onUnprompted: (toolName) => this.onUnprompted(toolName),
       onBashFiles: (toolUseId, files) => this.attributeBashFiles(toolUseId, files),
       onBashSnapshot: (toolUseId, tree, root) => this.emit({ type: "bash_snapshot", toolUseId, tree, root }),

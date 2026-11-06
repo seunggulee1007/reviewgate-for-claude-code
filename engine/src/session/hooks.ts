@@ -27,6 +27,7 @@ import {
   CLAUDE_CONFIG_ASK_REASON,
   claudeConfigFile,
   claudeConfigReason,
+  editScopeReason,
   inputClaudeConfigTarget,
   isolatedCall,
   isolatedResult,
@@ -313,6 +314,12 @@ export type HookContext = {
   worktrees?: string[];
   /** §33.4: work outside this window's review was blocked / happened (EnterWorktree, isolated agents, worktree commands). */
   onScopeNotice?: (notice: ScopeNotice) => void;
+  /**
+   * §8 / §39.5: an edit tool changed a file this window's review does not see (outside the root, in a nested repository,
+   * Claude's memory; not a throwaway file in a temporary folder, a plan file or a settings file the review lists): it
+   * goes to `changedOutside`.
+   */
+  onOutsideEdit?: (file: string) => void;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
@@ -719,9 +726,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // A throwaway file in a temporary folder (Claude Code's scratchpad, /tmp) outside any repository: not the user's code,
     // so neither the budget nor the outside-the-project card.
     if (file && ctx.scratchDirs && isOutsideRoot(file, await containmentRoot(ctx)) && isScratchPath(file, ctx.scratchDirs)) return allow();
+    // §39.5: in auto mode an edit the review does not see (Claude's memory, outside the project, a nested repository) is the
+    // CLI's call, as in the terminal, and listed after the turn (postEditScope) — Claude Code's own settings keep their card.
+    const cliDecides = scopeCliDecides(ctx, input);
     // Claude's own memory (~/.claude/projects/<project>/memory) is not in the review: the budget neither counts nor blocks
-    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card.
-    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return askPre(OUTSIDE_REASON);
+    // it (a turn over budget can still note what it learned); it keeps the outside-the-project card (not in auto mode).
+    if (file && isClaudeMemoryFile(file, ctx.claudeHome)) return cliDecides ? allow() : askPre(OUTSIDE_REASON);
     // §54: the change budget is opt-in — without one (the default) an edit is neither counted nor denied.
     if (b.active) {
       const est = estimateEditLines(input.tool_name, ti, ctx.cwd);
@@ -763,10 +773,17 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       }
     }
     // Path containment: an edit outside the checkpoint root (or through a symlink escaping it) is
-    // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card.
-    if (file && isOutsideRoot(file, await containmentRoot(ctx))) return askPre(OUTSIDE_REASON);
+    // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card. §39.5: in auto mode it is the
+    // CLI's call — unless it is one of Claude Code's own settings files (`~/.claude/settings.json`), checked first.
+    if (file && isOutsideRoot(file, await containmentRoot(ctx))) {
+      if (!cliDecides) return askPre(OUTSIDE_REASON);
+      return claudeConfigFile(file) ? askPre(CLAUDE_CONFIG_ASK_REASON) : allow();
+    }
     // §33.3: inside the root but in a nested repository (submodule, worktree, clone) the snapshot only sees a gitlink.
-    if (file && nestedRepoRoot(file, await containmentRoot(ctx))) return askPre(NESTED_REASON);
+    if (file && nestedRepoRoot(file, await containmentRoot(ctx))) {
+      if (!cliDecides) return askPre(NESTED_REASON);
+      return claudeConfigFile(file) ? askPre(CLAUDE_CONFIG_ASK_REASON) : allow();
+    }
     // §33.9: Claude Code's own settings (hooks, permission rules, MCP servers) never change without the card — in every
     // permission mode: this `ask` reaches canUseTool in acceptEdits / auto too (CLI 2.1.308).
     if (file && claudeConfigFile(file)) return askPre(CLAUDE_CONFIG_ASK_REASON);
@@ -895,6 +912,20 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   };
 
   /**
+   * §8 / §39.5: after an edit the review does not see — outside the root, in a nested repository, in Claude's memory (the
+   * locations `editScopeReason` names; not a settings file of the review's own, a throwaway file or a plan file) — the
+   * file goes to `changedOutside` (in auto mode no card listed it).
+   */
+  const postEditScope: HookCallback = async (input) => {
+    if (input.hook_event_name !== "PostToolUse" || !ctx.onOutsideEdit) return allow();
+    const file = toolFile(toolInput(input), ctx.cwd);
+    if (!file || isPlanFile(file, ctx)) return allow();
+    const reason = editScopeReason(file, await containmentRoot(ctx), isOutsideRoot, [], ctx.scratchDirs);
+    if (reason && reason.code !== "claude_config") ctx.onOutsideEdit(file);
+    return allow();
+  };
+
+  /**
    * After a Bash call — PostToolUse, or PostToolUseFailure for a command that exited non-zero (CLI 2.1.308) — the
    * worktree is snapshotted: the files changed since the previous snapshot that also changed inside this call's
    * execution window are the call's (§31); a change made between calls (the IDE, another session, `git pull`) is
@@ -960,7 +991,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       { hooks: [preOther] },
     ],
     PostToolUse: [
-      { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit] },
+      { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit, postEditScope] },
       { matcher: "Bash", hooks: [postBash] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
       { matcher: "Agent|Task|Workflow", hooks: [postIsolated] },

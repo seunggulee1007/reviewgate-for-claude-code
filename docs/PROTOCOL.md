@@ -573,6 +573,12 @@ The review boundary is path-aware and the gate outlives the engine process. Ever
   not in `changedFiles` because the snapshot never sees them). Denied ones are simply not written. Cleared when the next
   turn starts. An approved edit of one of Claude Code's own settings files (card reason `claude_config`, §33.9) is not
   listed: the review shows it (mods group), `.claude/settings.local.json` through `local_settings_changed` (§32).
+  **In auto mode** (2026-11; §39.5: the engine's mode and the hook input's `permission_mode` are `auto`) such an edit — and
+  one into Claude's own memory (`~/.claude/projects/<key>/memory/…`, which asked in every mode before) — gets no card: the
+  hook returns no decision and the CLI's own rules decide, as in the terminal. Claude Code's own settings files still ask
+  (`~/.claude/settings.json` included, checked first; §33.9), and git's own state stays denied. Every such edit that ran is
+  listed in `changedOutside` all the same: a PostToolUse hook records it (in default mode the approved card did). Memory
+  files are listed by their path; clients recognise them and label them (`메모리에 기록`).
 - **Ignored writes (`ignoredTouched`, `filteredByPattern`).** After the collection the turn's tool-touched paths under the
   root are run through `git check-ignore --stdin`; the gitignored ones (`.env`, `build/`, `*.log`, …) are listed in
   `state.gate.ignoredTouched` — written on disk, invisible to the review by construction. Paths hidden by
@@ -2076,6 +2082,9 @@ not know and treats the card like the others (no "always allow" / "세션 동안
   e.g. a sibling `../acme-4821`, or the main checkout from a workbench), or a Bash command that runs there (§33.4);
   `reason.path` = that worktree.
 - **`worktree_command`** / **`worktree_isolation`** — §33.4.
+- **Auto mode** (2026-11, §39.5): an edit that would get `outside_project`, `nested_repository` or `other_worktree` gets no
+  card — the CLI decides, and the file is listed in `changedOutside` (§8); `claude_config` keeps its card. A Bash command:
+  §33.4.
 - **`claude_config`** — an edit tool, a Bash command or a writing MCP call changes `.claude/settings.json`,
   `.claude/settings.local.json` or `.mcp.json` (§33.9); `reason.path` = that file. The location codes above come first.
 - **`git_command`** — a Bash command that changes the repository (`git commit`, `merge`, `pull`, `checkout`, `reset`, …;
@@ -4083,7 +4092,8 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   git guard and budget denies, `EnterWorktree`, the Workflow / isolated-agent rules (§33.4), the reason cards (§33.3:
   `outside_project`, `nested_repository`, `other_worktree`, `worktree_command`, `worktree_isolation`, `claude_config`)
   — except, since 2026-11, a Bash command in another worktree of the repository or in a nested repository and a
-  `git worktree add` of this repository (§33.4: the CLI's call, listed after it) —
+  `git worktree add` of this repository (§33.4: the CLI's call, listed after it), and an edit outside the project, in a
+  nested repository or in Claude's memory (§8: the CLI's call, listed in `changedOutside`) —
   the edit budget hook and the review of every file a call changed (a Bash command that writes a project file is caught by
   the post-Bash snapshot and lands in the review, as before). `SendMessage`, `AskUserQuestion`, `EnterPlanMode` and
   `ExitPlanMode` keep their card (§44.1: EnterPlanMode no longer — it only restricts Claude). What the classifier hands to
