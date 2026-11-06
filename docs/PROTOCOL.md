@@ -6284,7 +6284,8 @@ feature flag of its own, and on this machine both folded alike.
   on and off), and ↩ in an empty box sends the card. Nothing changes on the wire.
   **Mac.** The card sits above the composer, in the cards' place of §49.2 (first, above a plan), with the question the box
   answers marked ("입력창으로 답하는 질문" when there are several) and its options numbered; with several questions the
-  next one scrolls into view. The transcript keeps one line for it: "Claude의 질문: … — 아래에서 답해 주세요" while it
+  next one scrolls into view. Its foot says what the box does: "1–N로 고르거나 아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로 보내기" —
+  at 1000 × 637 the row under the box has no room left for its own hint. The transcript keeps one line for it: "Claude의 질문: … — 아래에서 답해 주세요" while it
   waits, then "답함: 질문 → 답" (or 건너뜀 / 처리됨; every question and answer in the tooltip). The hint reads "Claude가
   질문했어요 — ↩로 답하기 · ⌥↩ 질문과 별개로 보내기" (⌘↩ when ↩ makes a new line), the placeholder "Claude의 질문에 답을
   쓰세요 — 1–N로 고를 수도 있어요", and the primary button is "답하기" (⌘↩ answers too). Its menu sends the text apart from

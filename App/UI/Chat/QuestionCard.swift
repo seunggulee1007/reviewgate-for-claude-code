@@ -272,13 +272,14 @@ struct QuestionCard: View {
     /// How many options the current question has (the hint's 1–N).
     private var optionCount: Int { currentIndex.map { questions.questions[$0].options.count } ?? 0 }
 
-    /// r1-composer M08: what the message box does for this card, after the send key in use.
+    /// r1-composer M08: what the message box does for this card, after the send key in use — ⌥↩ too: in a narrow chat the
+    /// row under the box has no room left for its hint.
     private var composerHint: String {
         switch (optionCount > 0, returnSends) {
-        case (true, true): String(localized: "Type an answer below, or press 1–\(optionCount) · ↩ sends the card")
-        case (true, false): String(localized: "Type an answer below, or press 1–\(optionCount) · ⌘↩ sends the card")
-        case (false, true): String(localized: "Type an answer below · ↩ sends the card")
-        case (false, false): String(localized: "Type an answer below · ⌘↩ sends the card")
+        case (true, true): String(localized: "Pick 1–\(optionCount) or type below · ↩ answers · ⌥↩ sends separately")
+        case (true, false): String(localized: "Pick 1–\(optionCount) or type below · ⌘↩ answers · ⌥↩ sends separately")
+        case (false, true): String(localized: "Type below · ↩ answers · ⌥↩ sends separately")
+        case (false, false): String(localized: "Type below · ⌘↩ answers · ⌥↩ sends separately")
         }
     }
 

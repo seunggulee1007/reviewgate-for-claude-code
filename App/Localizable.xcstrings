@@ -15871,6 +15871,38 @@
         }
       }
     },
+    "Pick 1–%lld or type below · ↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick 1–%lld or type below · ↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–%lld로 고르거나 아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
+    "Pick 1–%lld or type below · ⌘↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick 1–%lld or type below · ⌘↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–%lld로 고르거나 아래에 쓰기 · ⌘↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
     "PR": {
       "localizations": {
         "en": {
@@ -24566,66 +24598,34 @@
         }
       }
     },
-    "Type an answer below · ↩ sends the card": {
+    "Type below · ↩ answers · ⌥↩ sends separately": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Type an answer below · ↩ sends the card"
+            "value": "Type below · ↩ answers · ⌥↩ sends separately"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아래 입력창에 답을 쓰세요 · ↩로 보내기"
+            "value": "아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로 보내기"
           }
         }
       }
     },
-    "Type an answer below · ⌘↩ sends the card": {
+    "Type below · ⌘↩ answers · ⌥↩ sends separately": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Type an answer below · ⌘↩ sends the card"
+            "value": "Type below · ⌘↩ answers · ⌥↩ sends separately"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아래 입력창에 답을 쓰세요 · ⌘↩로 보내기"
-          }
-        }
-      }
-    },
-    "Type an answer below, or press 1–%lld · ↩ sends the card": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Type an answer below, or press 1–%lld · ↩ sends the card"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "아래 입력창에 답을 쓰거나 1–%lld로 고르세요 · ↩로 보내기"
-          }
-        }
-      }
-    },
-    "Type an answer below, or press 1–%lld · ⌘↩ sends the card": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Type an answer below, or press 1–%lld · ⌘↩ sends the card"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "아래 입력창에 답을 쓰거나 1–%lld로 고르세요 · ⌘↩로 보내기"
+            "value": "아래에 쓰기 · ⌘↩ 답하기 · ⌥↩ 따로 보내기"
           }
         }
       }
