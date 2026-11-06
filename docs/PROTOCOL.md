@@ -1824,7 +1824,11 @@ type StaleReview = {
   diff is the call's only when its **change time** (`ctime`, which `touch -t` / `cp -p` cannot set back; a deleted file: its
   nearest existing parent directory) falls inside the call's **execution window**: from the PreToolUse hook — moved up to
   `PostToolUse − duration_ms` (tool execution only, so a permission card the user thought about is not part of it) — minus
-  1.5 s, to the PostToolUse hook plus 0.1 s. A change made between two calls is nobody's.
+  1.5 s, to the PostToolUse hook plus 0.1 s. A change made between two calls is nobody's. **Not after a read-only command**
+  (§10, §19.3 — judged at its PreToolUse, where it runs; not one run in the background): it changes nothing, so it takes no
+  snapshot and no diff (0.2–0.6 s each on a large repository, before Claude got its result) and leaves the previous
+  snapshot as the base; the turn's first snapshot is taken before its first command that may write. A file such a command
+  wrote all the same still reaches the review at the turn's end (snapshot B, §34.1) as `external` — only its cause is lost.
 - **`external`** — nothing of Claude's explains it: an IDE save, another Claude session, a `git pull` / checkout, a file
   Claude only read, a failed edit, work done while the app was closed (restore), an edit found by `refresh`.
 

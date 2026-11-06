@@ -978,6 +978,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.lastTextByAgent = new Map();
     this.callsSinceText = new Map();
     this.hookCtx.bashBaseTree = undefined;
+    this.hookCtx.readOnlyBash = new Set();
     this.hookCtx.toolWindows = new Map();
     this.hookCtx.scopeReasons = new Map();
     this.hookCtx.worktrees = undefined;

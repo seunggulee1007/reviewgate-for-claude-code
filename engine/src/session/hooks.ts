@@ -264,6 +264,11 @@ export type HookContext = {
   /** Tree of the previous post-Bash snapshot this turn (the next one diffs against it); reset per turn. */
   bashBaseTree?: string;
   /**
+   * §31: tool_use ids of the turn's Bash calls judged read-only at their PreToolUse (not run in the background): their
+   * PostToolUse takes no snapshot and leaves `bashBaseTree` as it is. Reset per turn.
+   */
+  readOnlyBash?: Set<string>;
+  /**
    * Files (absolute) a Bash call changed: the diff between the previous post-Bash snapshot and this one, narrowed
    * to what changed inside the call's execution window (§31) when the window is known.
    */
@@ -618,8 +623,9 @@ async function changedBetween(cp: GitCheckpoint, a: string, b: string, ignorePat
 }
 
 /**
- * Before the turn's first Bash call: the tree its post-Bash snapshot is diffed against, so Bash file
- * attribution never picks up what earlier turns left on disk (a request-changes turn keeps the old A).
+ * Before the turn's first Bash call that may write (§31: a read-only one takes none): the tree its post-Bash snapshot is
+ * diffed against, so Bash file attribution never picks up what earlier turns left on disk (a request-changes turn keeps
+ * the old A).
  */
 async function bashBaseline(ctx: HookContext): Promise<void> {
   if (!ctx.onBashFiles || !ctx.checkpointTree || ctx.bashBaseTree !== undefined) return;
@@ -723,7 +729,11 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (b.active && b.denied && writesFiles(command)) {
       return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
     }
-    await bashBaseline(ctx);
+    const readOnly = isReadOnlyCommand(command, ro);
+    // §31: a read-only command (not one run in the background) changes nothing — no baseline before it, no snapshot after.
+    const toolUseId = toolUseIdOf(input);
+    if (readOnly && ti.run_in_background !== true && toolUseId) (ctx.readOnlyBash ??= new Set()).add(toolUseId);
+    else await bashBaseline(ctx);
     // §31: the window opens before any card — `duration_ms` at its end leaves the wait for the user out.
     openWindow(ctx, input, command);
     // §33.4: a command that creates a worktree, or runs in / `cd`s into another worktree or a nested repository, reaches
@@ -735,7 +745,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       const repoDir = worktreeAddRepoDir(command, cwd);
       if (repoDir && (await sameRepository(repoDir, root)) === false) scope = { ...scope, otherRepository: true, message: OTHER_REPO_WORKTREE_MESSAGE };
     }
-    if (scope && !(ctx.autoAllowReadOnlyBash !== false && isReadOnlyCommand(command, ro))) {
+    if (scope && !(ctx.autoAllowReadOnlyBash !== false && readOnly)) {
       rememberScope(ctx, toolUseIdOf(input), scope);
       return askPre(SCOPE_ASK_REASON);
     }
@@ -811,7 +821,8 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
    * After a Bash call — PostToolUse, or PostToolUseFailure for a command that exited non-zero (CLI 2.1.308) — the
    * worktree is snapshotted: the files changed since the previous snapshot that also changed inside this call's
    * execution window are the call's (§31); a change made between calls (the IDE, another session, `git pull`) is
-   * nobody's and stays out of the budget, which counts the turn's edit-tool and Bash files only.
+   * nobody's and stays out of the budget, which counts the turn's edit-tool and Bash files only. Not after a read-only
+   * command (§31).
    */
   const postBash: HookCallback = async (input) => {
     if (input.hook_event_name !== "PostToolUse" && input.hook_event_name !== "PostToolUseFailure") return allow();
@@ -820,6 +831,10 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noticeAfterTool(input.tool_name, input, ctx);
     // A worktree may have been added / moved / removed: list them again for the next call (§33.4).
     if (/\bworktree\b/.test(String(toolInput(input).command ?? ""))) ctx.worktrees = undefined;
+    // §31: a read-only command (judged at its PreToolUse) wrote nothing — no snapshot, no diff, the base tree stays. A file
+    // one wrote all the same still reaches the review at the turn's end (snapshot B), without this call as its cause.
+    const toolUseId = toolUseIdOf(input);
+    if (toolUseId && ctx.readOnlyBash?.delete(toolUseId)) return allow();
     if (!ctx.checkpointTree) return allow();
     const b = ctx.budget;
     try {

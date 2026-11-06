@@ -15,6 +15,8 @@ import {
 } from "../src/session/hooks.js";
 import { foreignRepoDir } from "../src/session/reviewScope.js";
 import { sideToolDenyReason } from "../src/side/sideQuery.js";
+import { openCheckpoint } from "../src/git/checkpoint.js";
+import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
 
 /**
@@ -23,7 +25,9 @@ import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
  */
 
 const dirs: string[] = [];
-afterEach(() => {
+const harnesses: Harness[] = [];
+afterEach(async () => {
+  for (const h of harnesses.splice(0)) await h.engine.dispose();
   for (const d of dirs.splice(0)) removeDir(d);
 });
 
@@ -38,6 +42,9 @@ function repoWithSibling(): { root: string; sibling: string; lib: string } {
   const lib = join(root, "vendor", "lib");
   mkdirSync(lib, { recursive: true });
   sh(lib, "init", "-q");
+  write(lib, "lib.txt", "lib\n");
+  sh(lib, "add", "-A");
+  sh(lib, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qm", "lib");
   const sibling = join(dirname(root), `${basename(root)}-42`);
   sh(root, "worktree", "add", "-q", "-b", "acme-42", sibling);
   dirs.push(sibling);
@@ -70,9 +77,14 @@ function decision(out: unknown): { decision?: string; reason?: string } {
   return { decision: h?.permissionDecision, reason: h?.permissionDecisionReason };
 }
 
-async function preBash(c: HookContext, command: string, cwd: string, toolUseId: string, extra: Record<string, unknown> = {}): Promise<{ decision?: string; reason?: string }> {
+async function preBash(c: HookContext, command: string, cwd: string, toolUseId: string, extra: Record<string, unknown> = {}, toolExtra: Record<string, unknown> = {}): Promise<{ decision?: string; reason?: string }> {
   const hook = buildHooks(c).PreToolUse![1]!.hooks[0] as HookCallback;
-  return decision(await hook(hookInput("PreToolUse", "Bash", { command }, cwd, toolUseId, extra), toolUseId, opts));
+  return decision(await hook(hookInput("PreToolUse", "Bash", { command, ...toolExtra }, cwd, toolUseId, extra), toolUseId, opts));
+}
+
+async function postBash(c: HookContext, command: string, cwd: string, toolUseId: string, extra: Record<string, unknown> = {}): Promise<void> {
+  const hook = buildHooks(c).PostToolUse![1]!.hooks[0] as HookCallback;
+  await hook(hookInput("PostToolUse", "Bash", { command }, cwd, toolUseId, { tool_response: {}, ...extra }), toolUseId, opts);
 }
 
 describe("§19.3: reading next door needs no card", () => {
@@ -116,5 +128,79 @@ describe("§19.3: reading next door needs no card", () => {
     expect(configScopeReason("Bash", { command: "cd .claude && cat settings.json" }, root, root, {})?.code).toBe("claude_config");
     expect(sideToolDenyReason("Bash", { command: "cd sub && ls" }, { allowWeb: false, readOnly: ro })).toBeUndefined();
     expect(sideToolDenyReason("Bash", { command: "cd sub && ls" }, { allowWeb: false })).toBeDefined();
+  });
+});
+
+describe("§31: no worktree snapshot after a read-only command", () => {
+  it("a read-only call takes no baseline before it and no snapshot after it; the next writing call is attributed as before", async () => {
+    const { root } = repoWithSibling();
+    const cp = await openCheckpoint(root);
+    const c = ctx(root);
+    c.checkpointTree = await cp.snapshot();
+    let snapshots = 0;
+    const real = cp.snapshot.bind(cp);
+    cp.snapshot = async (...args: Parameters<typeof cp.snapshot>) => {
+      snapshots++;
+      return real(...args);
+    };
+    c.checkpoint = cp;
+    const reported: [string, string[]][] = [];
+    c.onBashFiles = (id, files) => reported.push([id, files.map((f) => basename(f))]);
+    for (const [id, command] of [["s1", "git status"], ["s2", "grep -rn a sub 2>/dev/null | head"], ["s3", "cd sub && ls"]] as const) {
+      await preBash(c, command, root, id);
+      await postBash(c, command, root, id);
+    }
+    expect(snapshots).toBe(0);
+    expect(c.bashBaseTree).toBeUndefined();
+    // The first command that may write takes the baseline, then its own snapshot.
+    await preBash(c, "touch x.txt", root, "w1");
+    expect(snapshots).toBe(1);
+    const base = c.bashBaseTree;
+    write(root, "x.txt", "x\n");
+    await postBash(c, "touch x.txt", root, "w1");
+    expect(snapshots).toBe(2);
+    expect(reported).toEqual([["w1", ["x.txt"]]]);
+    expect(c.bashBaseTree).not.toBe(base);
+    // A read-only call after it leaves the base tree where the last snapshot put it.
+    const after = c.bashBaseTree;
+    await preBash(c, "git log --oneline -1", root, "s4");
+    await postBash(c, "git log --oneline -1", root, "s4");
+    expect([snapshots, c.bashBaseTree]).toEqual([2, after]);
+  });
+
+  it("a read-only command run in the background is snapshotted as before", async () => {
+    const { root } = repoWithSibling();
+    const cp = await openCheckpoint(root);
+    const c = ctx(root);
+    c.checkpointTree = await cp.snapshot();
+    let snapshots = 0;
+    const real = cp.snapshot.bind(cp);
+    cp.snapshot = async (...args: Parameters<typeof cp.snapshot>) => {
+      snapshots++;
+      return real(...args);
+    };
+    c.checkpoint = cp;
+    c.onBashFiles = () => {};
+    await preBash(c, "tail -f log.txt", root, "bg1", {}, { run_in_background: true });
+    await postBash(c, "tail -f log.txt", root, "bg1");
+    expect(snapshots).toBe(2);
+  });
+
+  it("a file a 'read-only' command wrote all the same still reaches the review at the turn's end", async () => {
+    const root = realpathSync(makeRepo());
+    dirs.push(root);
+    const h = makeHarness();
+    harnesses.push(h);
+    await h.hello();
+    await h.open(root);
+    await h.engine.handle({ type: "send", text: "look around" });
+    const s = h.session();
+    // The hooks took no snapshot for it (§31): no tool_files, no cause — the collection's snapshot B still sees the file.
+    s.emit({ type: "tool_use", id: "b1", name: "Bash", input: { command: "git status" } });
+    write(root, "sneaky.txt", "written by a command judged read-only\n");
+    s.emit({ type: "tool_result", toolUseId: "b1", isError: false, preview: "" });
+    s.emitTurnEnd();
+    await h.waitFor((x) => x.gate.phase === "reviewing", "review");
+    expect(h.engine.state.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["sneaky.txt", "pending", "external"]]);
   });
 });
