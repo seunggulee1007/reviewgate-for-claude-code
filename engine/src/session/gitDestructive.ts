@@ -15,7 +15,7 @@ import { homedir } from "node:os";
 import { existsSync } from "node:fs";
 import { basename, join, posix, resolve } from "node:path";
 import type { PermissionReason } from "../protocol.js";
-import { runGit } from "../git/exec.js";
+import { nulSplit, runGit } from "../git/exec.js";
 import { toRepoRelative } from "../platform/paths.js";
 import { SCOPE_MESSAGES } from "./reviewScope.js";
 
@@ -732,6 +732,16 @@ export function stashesWork(command: string, cwd: string): boolean {
     const sub = g.args.find((a) => !a.startsWith("-"));
     return sub === undefined || sub === "push" || sub === "save" || g.args[0]?.startsWith("-") === true;
   });
+}
+
+/**
+ * Repo-relative paths of `root`'s repository with an uncommitted change — staged or not — and its untracked files
+ * (`git status --porcelain -z`, no renames); null when git could not tell.
+ */
+export async function dirtyPaths(root: string): Promise<string[] | null> {
+  const out = await runGit(root, ["--no-optional-locks", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"], { allowFailure: true, timeoutMs: PROBE_TIMEOUT_MS }).catch(() => null);
+  if (!out || out.status !== 0) return null;
+  return nulSplit(out.stdout).map((e) => e.slice(3)).filter((p) => p.length > 0);
 }
 
 /** One HEAD move a reflog entry records: the commit HEAD went to and what moved it (`commit: …`, `checkout: …`). */

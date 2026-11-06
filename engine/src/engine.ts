@@ -138,6 +138,7 @@ import { scopeNoticeMessage } from "./session/reviewScope.js";
 import { classifyRules, loadPermissionRules, rememberable, sessionUserRules, type LoadedRules, type UserRules } from "./session/permissionRules.js";
 import { clearRememberedAllows, loadRememberedAllows, saveRememberedAllows } from "./session/allowsStore.js";
 import type { SessionEvent, ToolFileEntry } from "./session/events.js";
+import type { GitCommandResult } from "./session/events.js"; // MARK: r1-git (§46)
 import { originOf, type ToolWindow } from "./session/provenance.js";
 import { ToolOutputStore } from "./session/toolOutput.js";
 import { AgentTracker, STOP_AGENT_TIMEOUT_MS } from "./session/agents.js";
@@ -3500,6 +3501,21 @@ export class ReviewEngine {
     return { ...this.gate.localSettingsChanged };
   }
 
+  /**
+   * MARK: r1-git — §46: what one of Claude's git commands did. A `git stash` that took files out of the working tree is a
+   * gray chat row naming them (`git_stashed`): they are no longer on disk, so the review cannot show them until a
+   * `git stash pop` brings them back.
+   */
+  private onGitResult(ev: GitCommandResult): void {
+    const stashed = ev.stashed ?? [];
+    if (stashed.length > 0) {
+      const shown = stashed.slice(0, STASHED_SHOWN).join(", ") + (stashed.length > STASHED_SHOWN ? ` (+${stashed.length - STASHED_SHOWN})` : "");
+      this.log("info", `git stash took ${stashed.length} file(s) out of the working tree: ${shown}`);
+      this.notice(`Stashed and out of the review: ${shown} — git stash pop brings them back.`, "session", { code: "git_stashed", detail: shown });
+      this.touch();
+    }
+  }
+
   /** MARK: r1-git — §46: repo-relative paths still under review (pending, changes requested) — the hooks' git card. */
   private pathsUnderReview(): ReadonlySet<string> {
     return new Set(this.gate.changedFiles.filter((f) => f.state === "pending" || f.state === "changesRequested").map((f) => f.path));
@@ -6125,6 +6141,9 @@ export class ReviewEngine {
       case "auto_turn_start": // §52.1
         this.onAutoTurnStart(source, ev);
         return;
+      case "git_result": // MARK: r1-git (§46)
+        this.onGitResult(ev);
+        return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
         // §29 (audit peer-04): a peer message the CLI delivered by itself has its card — no banner, no paused queue.
@@ -7487,6 +7506,8 @@ export class ReviewEngine {
 
 /** Records kept in memory per chat (the file keeps the same number). */
 const MAX_CHECKPOINT_RECORDS_KEPT = 60;
+/** MARK: r1-git — §46: files a `git_stashed` row names (the rest as "(+N)"). */
+const STASHED_SHOWN = 10;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped CLI's process to be gone before it gives up. */
 const CHAT_MOVE_EXIT_WAIT_MS = 5000;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped turn's collection. */

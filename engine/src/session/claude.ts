@@ -441,6 +441,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       onBashFiles: (toolUseId, files) => this.attributeBashFiles(toolUseId, files),
       onBashSnapshot: (toolUseId, tree, root) => this.emit({ type: "bash_snapshot", toolUseId, tree, root }),
       ...(opts.reviewPaths ? { reviewPaths: opts.reviewPaths } : {}), // MARK: r1-git (§46)
+      onGitCommand: (result) => this.emit({ type: "git_result", ...result }), // MARK: r1-git (§46)
       toolWindows: new Map(),
       emit: (m) => this.emit(m),
       log: opts.log,

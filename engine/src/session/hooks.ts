@@ -15,11 +15,11 @@ import { commonDir, gitDir, listWorktrees, sameRepository } from "../git/worktre
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
 import { isReadOnlyCommand, isRemembered, matchesAllowPattern } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
-import type { SessionEvent, SessionLog } from "./events.js";
+import type { GitCommandResult, SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
-import { destructiveGitReason, type GitProbe } from "./gitDestructive.js"; // MARK: r1-git (§46)
+import { destructiveGitReason, dirtyPaths, stashesWork, type GitProbe } from "./gitDestructive.js"; // MARK: r1-git (§46)
 import {
   bashClaudeConfigTarget,
   bashScopeReason,
@@ -314,12 +314,62 @@ export type HookContext = {
   reviewPaths?: () => ReadonlySet<string>;
   /** Test seam: what the git card asks the repository (`gitDestructive.gitProbe`). */
   gitProbe?: GitProbe;
+  /** What a git command of Claude's did (`postGitCommand`): files a `git stash` took out of the working tree. */
+  onGitCommand?: (result: GitCommandResult) => void;
+  /** What the PreToolUse hook read before a git command ran, by tool_use id (`noteGitBefore` → `postGitCommand`). */
+  gitBefore?: Map<string, GitBefore>;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
 
 function allow(): HookJSONOutput {
   return {};
+}
+
+// MARK: r1-git — §46: what Claude's git commands did, read around the call.
+
+/** The state a git command may change, read by the PreToolUse hook: the dirty files before a `git stash`. */
+export type GitBefore = { dirty?: string[] };
+
+/** Before a Bash call: what `postGitCommand` compares with — the dirty files when the line stashes work away. */
+async function noteGitBefore(ctx: HookContext, input: HookInput, command: string): Promise<void> {
+  const id = toolUseIdOf(input);
+  if (!id || !ctx.onGitCommand || !/git/.test(command)) return;
+  const cwd = hookCwd(input, ctx);
+  if (!stashesWork(command, cwd)) return;
+  try {
+    const root = await containmentRoot(ctx);
+    const before: GitBefore = {};
+    const dirty = await dirtyPaths(root);
+    if (dirty) before.dirty = dirty;
+    if (!ctx.gitBefore) ctx.gitBefore = new Map();
+    ctx.gitBefore.set(id, before);
+  } catch (e) {
+    ctx.log("debug", `git state before Bash failed: ${String(e)}`);
+  }
+}
+
+/** After that call (it ran, or failed after it ran): what changed — a stash that took files out of the working tree. */
+async function noteGitAfter(ctx: HookContext, input: HookInput): Promise<void> {
+  const id = toolUseIdOf(input);
+  const before = id ? ctx.gitBefore?.get(id) : undefined;
+  if (!id || !before) return;
+  ctx.gitBefore!.delete(id);
+  try {
+    const root = await containmentRoot(ctx);
+    const result: GitCommandResult = { toolUseId: id };
+    if (before.dirty) {
+      const after = await dirtyPaths(root);
+      if (after) {
+        const left = new Set(after);
+        const stashed = before.dirty.filter((p) => !left.has(p));
+        if (stashed.length > 0) result.stashed = stashed;
+      }
+    }
+    if (result.stashed) ctx.onGitCommand?.(result);
+  } catch (e) {
+    ctx.log("debug", `git state after Bash failed: ${String(e)}`);
+  }
 }
 
 const SUBAGENT_TOOLS_RE = /^(Agent|Task)$/;
@@ -717,6 +767,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
+    await noteGitBefore(ctx, input, command); // MARK: r1-git (§46): what a git command may change, read before it runs
     const planDeny = planModeBlocked(input.tool_name, ti, ctx);
     if (planDeny) return denyPre(planDeny);
     // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
@@ -864,6 +915,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     return allow();
   };
 
+  /** MARK: r1-git — §46: after a Bash call (it ran, or exited non-zero after running): what its git commands did. */
+  const postGitCommand: HookCallback = async (input) => {
+    if (input.hook_event_name === "PostToolUse" || input.hook_event_name === "PostToolUseFailure") await noteGitAfter(ctx, input);
+    return allow();
+  };
+
   return {
     PreToolUse: [
       { matcher: EDIT_TOOLS_MATCHER, hooks: [preEdit] },
@@ -872,12 +929,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     ],
     PostToolUse: [
       { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit] },
-      { matcher: "Bash", hooks: [postBash] },
+      { matcher: "Bash", hooks: [postBash, postGitCommand] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
       { matcher: "Agent|Task|Workflow", hooks: [postIsolated] },
     ],
     PostToolUseFailure: [
-      { matcher: "Bash", hooks: [postBash] },
+      { matcher: "Bash", hooks: [postBash, postGitCommand] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
     ],
   };

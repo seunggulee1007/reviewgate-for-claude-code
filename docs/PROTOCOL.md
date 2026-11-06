@@ -1249,7 +1249,8 @@ failure), `branch_failed`, `workbench_failed`, `commit_failed`, `command_failed`
 the CLI did not let the held messages through; they are still held), `lfs_missing` (§32: instead of
 `send_failed` / `collect_failed` when the snapshot failed because the repository's LFS filter cannot run — git-lfs missing),
 `worktree_blocked` / `worktree_outside_review` (+ `toolName`, `path?`, `branch?`; §33.4), `cli_version_changed` (non-fatal
-notice + `cli {from, to, verified}`; §36.8).
+notice + `cli {from, to, verified}`; §36.8), `git_stashed` (non-fatal notice, a gray row; `detail`: the files a `git stash`
+of Claude's took out of the working tree; §46).
 
 **Refusal codes** (`result{ok:false, code}`; the leading word of `error`, or the listed explicit code where `error` is
 English): `binary_file`, `branch_in_use`, `cannot_remove_current`, `cannot_remove_main`, `collect_failed`, `commit_failed`,
@@ -5957,6 +5958,13 @@ the terminal's auto mode asked for none).
   (`git merge --abort`) has its incoming side taken back out of A (the reverse patch, conflicts keeping A), and
   `baseMerge` is cleared. `head_moved` (§31.3) still follows a turn in which HEAD moved. The carry's `git diff` is
   plumbing-safe whatever the user's config (`--no-color`, explicit `a/` `b/` prefixes).
+- **A stash** (r1-git). Before a Bash call whose git command puts work away (`git stash`, `stash push` / `save`, `stash -u`, …;
+  not `pop` / `apply` / `list`) the hook reads `git status --porcelain` of the checkpoint root; after it (PostToolUse or
+  PostToolUseFailure — `postGitCommand`, next to `postBash`) again. The files that were dirty and are no longer are on no
+  disk the review can see: the session reports them (`git_result {toolUseId, stashed}`) and the engine adds the notice
+  `error{fatal: false, scope: "session", code: "git_stashed", detail: "<up to 10 files>[ (+N)]"}` — a gray row "stash에
+  들어가 리뷰에서 빠진 파일: … (git stash pop으로 되돌림)", never `state.lastError`, never a stopped queue. The stash itself asks
+  nothing (auto mode: the CLI's call); `stash drop` / `clear` have the card. Tests: `engine/test/gitResult.test.ts`.
 - **Committing the merge.** git refuses a partial commit (`--only`) during a merge, so while `MERGE_HEAD` exists `commit`
   stages the accepted paths and commits the whole index — the merge's own staged files plus them — concluding the merge.
   Refused first with `merge_unresolved:<paths>` (`paths` too) when a path is still unmerged and not among the accepted

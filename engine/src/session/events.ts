@@ -39,6 +39,12 @@ export type SessionInfoEvent = {
  */
 export type StartProgress = { kind: "hook" | "plugin" | "status"; id?: string; name: string | null; done?: boolean };
 
+/**
+ * MARK: r1-git — §46: what one of Claude's git commands did (hooks.ts `postGitCommand`): files a `git stash` took out of the
+ * working tree (`stashed`, repo-relative).
+ */
+export type GitCommandResult = { toolUseId: string; stashed?: string[] };
+
 export type SessionEvent =
   | SessionInfoEvent
   | { type: "text_delta"; text: string }
@@ -144,6 +150,8 @@ export type SessionEvent =
   | { type: "external_turn"; running: boolean; commandUuid?: string }
   /** `code` / details: docs/PROTOCOL.md §19.6 (`auth_required`, `usage_limit`, `rate_limited`, `api_retrying`, `api_error`, `cli_start_slow`). */
   | ({ type: "error"; message: string; fatal: boolean } & ErrorDetails)
+  /** MARK: r1-git — §46: what a git command of Claude's did (`GitCommandResult`). */
+  | ({ type: "git_result" } & GitCommandResult)
   // MARK: wave4 w4-longwork — §38.2: a usage window of the subscription changed (`rate_limit_event`).
   | { type: "rate_limit_info"; window: RateLimitWindow }
   | { type: "closed"; code: number };
