@@ -3516,11 +3516,14 @@ robustness-08, SME-10 in part, daily-18). Every field is optional; an older engi
 as before.
 
 - **Tool-call limit.** `settings.maxTurns` (new, optional): the CLI's `maxTurns` — model round trips of one message (≈ tool
-  calls). A whole number in 10–1000, default **200** (was a fixed 60); it applies at the next session start (`--max-turns`
-  is a flag of the CLI process). A turn that stops there (`result.subtype: "error_max_turns"`) sends the notice
-  `error{fatal: false, scope: "session", code: "max_turns", maxTurns: N}` before its `turn_end` (whose `stopReason` stays
-  `error_max_turns`). The clients' row "도구 호출 한도(N회)에 닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the
-  same chat by the composer's queue rules (the limit counts per message: the CLI starts counting again).
+  calls). **No limit by default** (absent or `0`: the session passes no `maxTurns`, so a long skill or migration runs until
+  Claude is done or the user stops it, as in the terminal, whose interactive CLI has no cap — `--max-turns` is a `--print`
+  flag); a limit the user sets is a whole number in 10–1000 (0.5.x defaulted to 200, earlier engines to a fixed 60). It
+  applies at the next session start (`--max-turns` is a flag of the CLI process). A turn that stops at a limit
+  (`result.subtype: "error_max_turns"`) sends the notice `error{fatal: false, scope: "session", code: "max_turns",
+  maxTurns: N}` before its `turn_end` (whose `stopReason` stays `error_max_turns`). The clients' row "도구 호출 한도(N회)에
+  닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the same chat by the composer's queue rules (the limit counts
+  per message: the CLI starts counting again).
 - **Hooks and CLI words.** The session sets `includeHookEvents: true`. These become notices
   (`error{fatal: false, scope: "session"}`, a transcript row like every notice, §30; never `state.lastError`, never a
   stopped queue; repeats merge on `code` + `detail`, ×N):

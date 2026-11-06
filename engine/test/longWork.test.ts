@@ -9,6 +9,8 @@ import {
   DEFAULT_MAX_TURNS,
   hookFailureNotice,
   informationalNotice,
+  maxTurnsNotice,
+  maxTurnsOption,
   rateLimitWindowOf,
   rateLimitWindowsOf,
   upsertRateLimit,
@@ -30,14 +32,22 @@ afterEach(async () => {
 const NOW = Date.parse("2026-10-23T10:00:00Z");
 
 describe("pure rules", () => {
-  it("maxTurns: a whole number in 10–1000, else 200", () => {
-    expect(DEFAULT_MAX_TURNS).toBe(200);
-    expect(clampMaxTurns(undefined)).toBe(200);
-    expect(clampMaxTurns(Number.NaN)).toBe(200);
-    expect(clampMaxTurns("300")).toBe(200);
+  it("maxTurns: no limit (0) unless set — a whole number in 10–1000 when it is", () => {
+    expect(DEFAULT_MAX_TURNS).toBe(0);
+    expect(clampMaxTurns(undefined)).toBe(0);
+    expect(clampMaxTurns(0)).toBe(0);
+    expect(clampMaxTurns(-5)).toBe(0);
+    expect(clampMaxTurns(Number.NaN)).toBe(0);
+    expect(clampMaxTurns("300")).toBe(0);
+    expect(clampMaxTurns(50)).toBe(50);
     expect(clampMaxTurns(3)).toBe(10);
     expect(clampMaxTurns(150.4)).toBe(150);
     expect(clampMaxTurns(5000)).toBe(1000);
+    expect(maxTurnsOption(undefined)).toEqual({});
+    expect(maxTurnsOption(0)).toEqual({});
+    expect(maxTurnsOption(50)).toEqual({ maxTurns: 50 });
+    // A turn can stop at a limit only when one was set; the words never say "0 calls".
+    expect(maxTurnsNotice(0)).toEqual({ code: "max_turns", message: 'Claude stopped at the tool-call limit before it finished; send "continue" to go on.' });
   });
 
   it("informational: a hook's block → hook_blocked, warning / suggestion → cli_warning, notice → cli_notice, info → nothing", () => {
@@ -196,10 +206,14 @@ const result = (extra: Record<string, unknown>) => ({ type: "result", subtype: "
 const sys = (subtype: string, extra: Record<string, unknown>) => ({ type: "system", subtype, uuid: "u", session_id: "s1", ...extra });
 
 describe("ClaudeSession (§38.2)", () => {
-  it("starts the CLI with the setting's maxTurns (default 200) and every hook's events", async () => {
+  it("starts the CLI without a tool-call limit unless the settings set one, and with every hook's events", async () => {
     const a = session();
     await a.s.start();
-    expect(a.options()).toMatchObject({ maxTurns: 200, includeHookEvents: true });
+    expect(a.options()).toMatchObject({ includeHookEvents: true });
+    expect(a.options() && "maxTurns" in a.options()!).toBe(false);
+    const z = session(0);
+    await z.s.start();
+    expect(z.options() && "maxTurns" in z.options()!).toBe(false);
     const b = session(500);
     await b.s.start();
     expect(b.options()?.maxTurns).toBe(500);

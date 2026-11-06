@@ -344,7 +344,7 @@ export type Settings = {
   /** §36.12: how `workbench_create` prepares a new workbench (per project; live). */
   workbenchSetup?: WorkbenchSetup;
   // MARK: wave4 w4-longwork
-  /** §38.2: the tool-call limit of one message (the CLI's `maxTurns`; 10–1000, default 200; next session start). */
+  /** §38.2: the tool-call limit of one message (the CLI's `maxTurns`; 0 or absent = no limit, the default; else 10–1000; next session start). */
   maxTurns?: number;
   /**
    * §52: background Bash / Monitor / Ctrl+B and turns Claude starts itself (a finished background task, `/loop`, cron)
