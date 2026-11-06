@@ -2,12 +2,13 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { EngineCommand, ReviewState, TranscriptItem } from "@reviewgate/engine";
 import { errorEventText, presentationOf } from "./errorCodes";
 import { initI18n } from "./i18n";
-import { scopeFilesLine, scopeRowText } from "./scopeNotices";
+import { memoryFile, memoryLabel, scopeFilesLine, scopeRowText } from "./scopeNotices";
 import { errorKey, factsOf, pausesQueue, sessionActions, type ErrorRow } from "./sessionErrors";
 
 /**
- * r1-scope — docs/PROTOCOL.md §33.4 / §39.5 in the desktop client: what a command changed outside this window's review is a
- * chat row (never a banner, never the last error) naming the files, with the folder's actions.
+ * r1-scope — docs/PROTOCOL.md §33.4 / §39.5 / §8 in the desktop client: what a command changed outside this window's review
+ * is a chat row (never a banner, never the last error) naming the files, with the folder's actions; a note in Claude's
+ * memory reads as such in the list of edits outside the project.
  */
 
 describe("worktree_outside_review is a row with its files", () => {
@@ -40,6 +41,20 @@ describe("worktree_outside_review is a row with its files", () => {
     expect(scopeFilesLine(undefined)).toBe("");
     expect(scopeFilesLine(["a.txt", "b/c.ts"])).toBe("a.txt, b/c.ts");
     expect(scopeFilesLine(Array.from({ length: 10 }, (_, i) => `f${i + 1}.txt`))).toBe("f1.txt, f2.txt, f3.txt, f4.txt, f5.txt, f6.txt, f7.txt, f8.txt and 2 more");
+  });
+});
+
+describe("Claude's memory in the list of edits outside the project", () => {
+  beforeAll(() => initI18n("en", "darwin"));
+
+  it("is recognised by its path and labelled", () => {
+    expect(memoryFile("/Users/dev/.claude/projects/-work-acme/memory/MEMORY.md")).toBe("MEMORY.md");
+    expect(memoryFile("/Users/dev/.claude/projects/-work-acme/memory/notes/acme.md")).toBe("notes/acme.md");
+    expect(memoryFile("C:\\Users\\dev\\.claude\\projects\\C--work-acme\\memory\\MEMORY.md")).toBe("MEMORY.md");
+    expect(memoryFile("/Users/dev/.claude/projects/-work-acme/other.md")).toBeNull();
+    expect(memoryFile("/Users/dev/.claude/projects/-work-acme/memory/")).toBeNull();
+    expect(memoryFile("/work/acme-notes.txt")).toBeNull();
+    expect(memoryLabel("MEMORY.md")).toBe("Saved to memory: MEMORY.md");
   });
 });
 

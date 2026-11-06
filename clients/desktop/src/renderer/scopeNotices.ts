@@ -1,8 +1,8 @@
 /**
- * r1-scope — docs/PROTOCOL.md §33.4 / §39.5 in the desktop client: what already ran outside this window's review is a chat
- * row — never a banner, never `lastError` — naming the files a command changed there, with the folder's actions (move this
- * chat there, open it as a workbench or a folder). The same words as the Mac (Core `ScopeText`; the keys come from its
- * catalog).
+ * r1-scope — docs/PROTOCOL.md §33.4 / §39.5 / §8 in the desktop client: what already ran outside this window's review is a
+ * chat row — never a banner, never `lastError` — naming the files a command changed there, with the folder's actions (move
+ * this chat there, open it as a workbench or a folder); a note Claude wrote into its own memory reads as such in the list
+ * of edits outside the project. The same words as the Mac (Core `ScopeText`; the keys come from its catalog).
  */
 import { t } from "./i18n";
 
@@ -21,4 +21,17 @@ export function scopeFilesLine(files: readonly string[] | undefined): string {
   const head = files.slice(0, SHOWN_FILES).join(", ");
   const more = files.length - Math.min(files.length, SHOWN_FILES);
   return more > 0 ? `${head} ${t("and {0} more", more)}` : head;
+}
+
+/** `…/.claude/projects/<key>/memory/<file>` → `<file>` (its path inside `memory/`, `/`-separated); null for any other path. */
+export function memoryFile(path: string): string | null {
+  const m = /[\\/]\.claude[\\/]projects[\\/][^\\/]+[\\/]memory[\\/](.+)$/.exec(path);
+  if (!m) return null;
+  const file = m[1]!.replace(/\\/g, "/");
+  return file.split("/").some((part) => part === "") ? null : file;
+}
+
+/** "메모리에 기록: <file>". */
+export function memoryLabel(file: string): string {
+  return t("Saved to memory: {0}", file);
 }
