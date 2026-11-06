@@ -170,6 +170,10 @@ export function reasonView(reason: { code: string; message: string; path?: strin
           : t("Changes a Claude Code settings file — hooks, permissions and MCP settings change, and settings.local.json is not kept in the review, so it cannot be undone"),
         "red",
       );
+    // MARK: r1-git — §46: only a git command that throws away uncommitted work or rewrites the remote has this card (red,
+    // as on the Mac); it used to fall through to the engine's English message in orange.
+    case "git_command":
+      return view(t("A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back"), "red");
     default:
       return view(reason.message || code, "orange");
   }

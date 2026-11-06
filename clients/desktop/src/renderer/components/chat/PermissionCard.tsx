@@ -17,6 +17,7 @@ import type { PermissionRequest } from "@reviewgate/engine";
 import { deriveAllowPattern, permissionRisks, type PermissionRisk } from "../../bashPattern";
 import { t } from "../../i18n";
 import { allowPatternLabel, alwaysAllowChoices, canAllowBeyondOnce, reasonView, showsAlwaysAllow } from "../../permissionQueue";
+import { onceOnlyHelp } from "../../gitNotices"; // MARK: r1-git
 import { useStore } from "../../store";
 import { relativeToRoot } from "../../paths";
 import { toolUseIdForPermission } from "../../sideThreads";
@@ -48,6 +49,11 @@ function riskLabel(k: PermissionRisk): string {
     case "history":
       return t("Rewrites git history");
   }
+}
+
+/** MARK: r1-git — §46: "Allow once" — on a card with a reason, why it is one call at a time (the session allow does nothing there). */
+function onceTitle(request: PermissionRequest, isTarget: boolean): string {
+  return onceOnlyHelp(request) ?? (isTarget ? t("Allow once ({0})", `${MOD}↩`) : t("Allow once"));
 }
 
 function riskHelp(k: PermissionRisk): string {
@@ -267,7 +273,8 @@ function ToolPermissionCard({ request, decision }: { request: PermissionRequest;
               {t("Allow and Follow")}
             </button>
           )}
-          <button type="button" className="primary" onClick={once} title={isTarget ? t("Allow once ({0})", `${MOD}↩`) : t("Allow once")} data-testid="Allow">
+          {/* MARK: r1-git — §46: a card with a reason says why it is one call at a time */}
+          <button type="button" className="primary" onClick={once} title={onceTitle(request, isTarget)} data-testid="Allow">
             {t("Allow once")}
             {isTarget && <kbd>{MOD}↩</kbd>}
           </button>
