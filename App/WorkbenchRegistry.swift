@@ -138,6 +138,11 @@ final class WindowModel {
     /// to Claude join the draft kept here.
     let chatComposer = ComposerModel()
     let chatTranscript = TranscriptViewState()
+    #if DEBUG
+    /// r1-composer M11: the composer's send button in the window (SwiftUI's global space) — the layout check
+    /// (App/Debug/ScreenshotTour.swift) says when it is cut off. Not observed.
+    @ObservationIgnored var debugSendFrame: CGRect = .zero
+    #endif
 
     func reveal(toolUseId: String) {
         revealToolUseId = toolUseId

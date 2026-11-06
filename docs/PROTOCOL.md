@@ -6220,11 +6220,16 @@ into a review and reviews that end (`chat-*.png`; the log says how much of the t
   beside the chat, and at 1000 × 637 the chat was ~311 pt wide: the composer's bottom row ([!] · Accept 2 & Send · model ·
   mode) pushed Send, 바로 보내기 and Stop past the window's edge. Now:
   - the send button (and Stop) keep their size; the secondary controls — 변경 요청 (N), Accept N & Send, the next
-    message's model, the mode — fold into one "⋯" menu, the mode staying as an icon, when at their own width they would
-    leave the hint less than 60 pt (Core `ComposerBarFit.compact`);
+    message's model, the mode — fold into one "⋯" menu, the model and the mode staying as icons, when at their own width
+    they would leave the hint less than 60 pt (Core `ComposerBarFit.compact`); the skills / commands / MCP caption is then
+    an icon too (the counts in its tooltip, the warnings kept);
   - 변경 요청 (N) shows only with notes to send (`AppState.showsRequestChanges`; it can do nothing without);
   - beside the diff, the chat keeps 380 pt as long as the diff keeps 240 (the split's minimums are 420 / 380; below that
-    they share the room in proportion as before — Core `PaneSplit.leadingWidth`).
+    they share the room in proportion as before — Core `PaneSplit.leadingWidth`);
+  - the pending-review notice is one line, "검토 대기 N개 · 질문은 수락 없이 가능 ⓘ" (it took five lines of a narrow
+    chat); its ⓘ popover says that sending never accepts or rejects a file and that Claude's new changes join this review.
+  Mac: `ChatComposer` measures the row (its width, the secondary controls at their own width in a hidden copy that takes no
+  key, Stop and the send button) and draws the full or the folded controls; `SplitPane(leadingFloor:)`.
   Verified: Core `ComposerLayoutTests` (the fold at the report's widths, the split at 677 / 557 / 1117 pt, the request
   button with no, sent and unsent notes).
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the

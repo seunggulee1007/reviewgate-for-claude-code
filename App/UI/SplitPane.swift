@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ReviewGateCore
 
 /// A horizontal two-pane split whose divider position is plain state (`fraction` = leading pane width / total), so it
 /// can be persisted per project and restored (M15). `HSplitView` ignores ideal widths, hence this.
@@ -7,6 +8,9 @@ struct SplitPane<Leading: View, Trailing: View>: View {
     @Binding var fraction: Double
     var minLeading: CGFloat = 200
     var minTrailing: CGFloat = 200
+    /// r1-composer M11: when the panes cannot both keep their minimum, the trailing one still keeps its own as long as the
+    /// leading one keeps this much (nil: they share in proportion, as before) — the chat beside the diff in a laptop window.
+    var leadingFloor: CGFloat? = nil
     /// The leading pane is gone and the trailing one takes the width — the trailing view stays the same view (its state,
     /// scroll position and focus survive opening and closing the leading pane).
     var collapsed = false
@@ -68,9 +72,10 @@ struct SplitPane<Leading: View, Trailing: View>: View {
     }
 
     /// Within the minimums; when the pane is narrower than both minimums together (agent panel open in a small
-    /// window) the panes share it in proportion to their minimums instead of the trailing one being pushed out.
+    /// window) the trailing one keeps its minimum while the leading one keeps `leadingFloor`, else the panes share it in
+    /// proportion to their minimums instead of the trailing one being pushed out (Core `PaneSplit`).
     private func clampedWidth(_ width: CGFloat, total: CGFloat) -> CGFloat {
-        guard total >= minLeading + minTrailing else { return (total * minLeading / max(minLeading + minTrailing, 1)).rounded() }
-        return min(max(width, minLeading), total - minTrailing)
+        CGFloat(PaneSplit.leadingWidth(Double(width), total: Double(total), minLeading: Double(minLeading),
+                                       minTrailing: Double(minTrailing), leadingFloor: leadingFloor.map(Double.init)))
     }
 }

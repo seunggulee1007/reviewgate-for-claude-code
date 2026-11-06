@@ -184,7 +184,9 @@ struct MainWindow: View {
                         HStack(spacing: 0) {
                             diffEdgeTab
                             Divider()
-                            SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 360, collapsed: diffCollapsed,
+                            // r1-composer M11: in a laptop window the chat keeps 380 pt beside the diff (the diff the rest, down
+                            // to 240) — squeezed to ~311 pt its composer lost the send button past the window's edge.
+                            SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 380, leadingFloor: 240, collapsed: diffCollapsed,
                                       onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
                                 if store.codeBrowser.isOpen {
                                     // MARK: code-browser (§47): a project file, read-only, until "Back to review".
