@@ -981,6 +981,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.hookCtx.readOnlyBash = new Set();
     this.hookCtx.toolWindows = new Map();
     this.hookCtx.scopeReasons = new Map();
+    this.hookCtx.scopeWatches = new Map();
     this.hookCtx.worktrees = undefined;
     this.turnChangedOutside = new Set();
     this.hookCtx.planFiles = new Set();

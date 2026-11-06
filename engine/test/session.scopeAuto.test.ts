@@ -204,3 +204,44 @@ describe("§31: no worktree snapshot after a read-only command", () => {
     expect(h.engine.state.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["sneaky.txt", "pending", "external"]]);
   });
 });
+
+describe("§33.4: what a command changed in another worktree or a nested repository is listed after it — only when something changed", () => {
+  it("default mode: the card stays; after it ran a notice names the files it changed there; a call that changed nothing raises none", async () => {
+    const { root, sibling } = repoWithSibling();
+    const c = ctx(root);
+    const touch = `cd ${sibling} && touch made.txt`;
+    expect(await preBash(c, touch, root, "w1")).toMatchObject({ decision: "ask" });
+    expect(c.scopeReasons?.get("w1")?.code).toBe("other_worktree");
+    write(sibling, "made.txt", ""); // what the approved command did
+    await postBash(c, touch, root, "w1");
+    expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "w1", path: sibling, files: ["made.txt"], reasonCode: "other_worktree" }]);
+    expect(c.scopeReasons?.has("w1")).toBe(false);
+    // Approved, ran, changed nothing there: no notice.
+    await preBash(c, `cd ${sibling} && ./mvnw -q compile`, root, "w2");
+    await postBash(c, `cd ${sibling} && ./mvnw -q compile`, root, "w2");
+    expect(c.notices).toHaveLength(1);
+    // A file that was changed already and is changed again counts; one the call left alone does not.
+    write(sibling, "dirty.txt", "a\n");
+    await preBash(c, `cd ${sibling} && make`, root, "w3");
+    await new Promise((r) => setTimeout(r, 20));
+    write(sibling, "dirty.txt", "b\n");
+    await postBash(c, `cd ${sibling} && make`, root, "w3");
+    expect(c.notices.at(-1)).toMatchObject({ toolUseId: "w3", path: sibling, files: ["dirty.txt"] });
+    // A commit there: the files it took out of `git status` are what changed.
+    await preBash(c, `cd ${sibling} && make commit`, root, "w4");
+    sh(sibling, "add", "dirty.txt");
+    sh(sibling, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qm", "x");
+    await postBash(c, `cd ${sibling} && make commit`, root, "w4");
+    expect(c.notices.at(-1)).toMatchObject({ toolUseId: "w4", files: ["dirty.txt"] });
+  });
+
+  it("a nested repository the command cds into: the files it changed there", async () => {
+    const { root, lib } = repoWithSibling();
+    const c = ctx(root);
+    const cmd = "cd vendor/lib && echo x >> lib.txt";
+    expect(await preBash(c, cmd, root, "n1")).toMatchObject({ decision: "ask" });
+    write(lib, "lib.txt", "lib\nx\n");
+    await postBash(c, cmd, root, "n1");
+    expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "n1", path: lib, files: ["lib.txt"], reasonCode: "nested_repository" }]);
+  });
+});

@@ -317,6 +317,11 @@ export type ScopeNotice = {
   branch?: string;
   /** MARK: wave4b w4b-follow — §39.4: why the call was on a card (`worktree_command`: it created `path`); engine-internal. */
   reasonCode?: PermissionReason["code"];
+  /**
+   * §33.4: a command run in another worktree or a nested repository — the files it changed there (relative to `path`,
+   * POSIX, sorted, at most 100): what that folder's `git status` shows differently after the call.
+   */
+  files?: string[];
 };
 
 /** English fallback of a notice's `error.message` (clients localize on `code`). */
@@ -325,7 +330,8 @@ export function scopeNoticeMessage(n: ScopeNotice): string {
     const what = n.toolName === "EnterWorktree" ? `a git worktree${n.branch ? ` ("${n.branch}")` : ""}` : `${n.toolName} outside this folder`;
     return `Claude tried to work in ${what}; ReviewGate blocked it because this window's review would not see that work. For parallel work, open a separate workbench.`;
   }
-  return `${n.toolName} worked outside this window's review${n.path ? ` (${n.path})` : ""}: those changes are not reviewed here. Open it as a workbench to review them.`;
+  const text = `${n.toolName} worked outside this window's review${n.path ? ` (${n.path})` : ""}: those changes are not reviewed here. Open it as a workbench to review them.`;
+  return n.files?.length ? `${text} Changed: ${n.files.join(", ")}` : text;
 }
 
 export const ENTER_WORKTREE_REASON =
@@ -535,6 +541,19 @@ export function bashScopeReason(command: string, cwd: string, root: string, work
     if (reason) return reason;
   }
   return null;
+}
+
+/**
+ * §33.4: the other worktrees and nested repositories a Bash command runs in (`bashWorkDirs`: the shell's directory, its
+ * `cd`s and `git -C`s), each once, in order — the folders its after-notice compares.
+ */
+export function bashOutsideDirs(command: string, cwd: string, root: string, worktrees: readonly string[]): PermissionReason[] {
+  const out: PermissionReason[] = [];
+  for (const d of bashWorkDirs(command, cwd)) {
+    const reason = dirScopeReason(d, root, worktrees);
+    if (reason?.path && !out.some((r) => r.path === reason.path)) out.push(reason);
+  }
+  return out;
 }
 
 /** `worktreePath` / `worktreeBranch` of an isolated agent's tool response, when the CLI reports them. */

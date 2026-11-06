@@ -2106,12 +2106,23 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   the user's rules; a read-only command (§10, §19.3: a `cd` / `git -C` into a worktree of this repository included) still
   runs without a card. After an approved one ran:
   `worktree_outside_review`. The worktree list is re-read after any command mentioning `worktree`.
-- **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?}` with an English `message`:
+- **Notices.** `error{fatal: false, scope: "session", code, toolName, path?, branch?, files?}` with an English `message`:
   `worktree_blocked` (a deny above: `toolName` = `EnterWorktree` / `Workflow` / `Agent` / `Task`, `branch` = EnterWorktree's
-  `name`, `path` = its `path`) and `worktree_outside_review` (an approved worktree command / isolated agent / command in
-  another worktree ran; `path` = where). At most once per turn per tool, path and branch; it sets `state.lastError` like any
-  error. Clients show a banner with **"워크벤치로 열기"**: `workbench_create {branch}` for a blocked EnterWorktree (prefilled
-  with `branch`), or open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
+  `name`, `path` = its `path`; at most once per turn per tool, path and branch; it sets `state.lastError` like any error) and
+  `worktree_outside_review`:
+  - an approved worktree command or isolated agent ran (`path` = the new worktree / the agent's): once per turn per tool,
+    path and branch;
+  - a command ran in another worktree or a nested repository (`path` = that worktree / repository root) **and changed
+    something there** (2026-11). The Bash hook reads that folder's `git status --porcelain` before the call, with each
+    entry's file size and times, and again after it; `files` (new, optional) lists the paths that differ — a new, changed,
+    removed or committed file — relative to `path`, POSIX, sorted, at most 100. A call that changed nothing there raises
+    none (before, every approved one did, a `make` that wrote nothing too). One notice per call; a file a notice of this turn
+    named already is not named again. Without `files` (git could not tell) it only says where.
+
+  `worktree_outside_review` is a row, not a failure: it never sets `state.lastError` (before, it did) and never stops a
+  queue; its transcript row keeps `files` (§35.3). Clients show `worktree_blocked` as a banner with **"워크벤치로 열기"**:
+  `workbench_create {branch}` for a blocked EnterWorktree (prefilled with `branch`), and `worktree_outside_review` with
+  the same action — open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
 - **System instruction.** The engine appends its own paragraph after `settings.systemPromptAppend` (separated by a blank
   line): *"ReviewGate reviews every change you make in this folder (<cwd>). Work only inside it: do not create or enter git
   worktrees (EnterWorktree, `git worktree add`) and do not `cd` into another worktree or a nested repository to change files
@@ -2646,6 +2657,7 @@ do) keeps working. The reply carries `skipped` only when the command had an `id`
 ```ts
 // a kind: "error" transcript row (§30) also keeps, when its event carried them (ErrorRowDetails):
 toolName?: string; path?: string; branch?: string;   // §33.4 worktree_blocked / worktree_outside_review
+files?: string[];                                   // §33.4 worktree_outside_review of a command: what it changed there
 exitCode?: number | null; signal?: string | null;   // §30: how the CLI ended
 sessionId?: string;                                 // §30 resume_not_found / resume_failed: the chat that could not be continued
 resetAt?: string; status?: number | null;           // usage_limit / rate_limited, the HTTP status of an API error

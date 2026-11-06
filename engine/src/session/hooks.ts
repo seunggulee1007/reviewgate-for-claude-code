@@ -19,8 +19,10 @@ import type { SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
+import { changedPaths, dirState, type DirState } from "./outsideWatch.js";
 import {
   bashClaudeConfigTarget,
+  bashOutsideDirs,
   bashScopeReason,
   CLAUDE_CONFIG_ASK_REASON,
   claudeConfigFile,
@@ -302,6 +304,11 @@ export type HookContext = {
    * tool_use id — `canUseTool` puts it on the `permission_request`, the post-tool hook raises the notice. Reset per turn.
    */
   scopeReasons?: Map<string, PermissionReason>;
+  /**
+   * §33.4: Bash calls that run in another worktree or a nested repository, by tool_use id — each folder with its `git status`
+   * before the call; after it, a notice lists what changed there (none when nothing did). Reset per turn.
+   */
+  scopeWatches?: Map<string, ScopeWatch>;
   /** The repository's other worktrees (absolute; `git worktree list` minus the root), cached per turn by `otherWorktrees`. */
   worktrees?: string[];
   /** §33.4: work outside this window's review was blocked / happened (EnterWorktree, isolated agents, worktree commands). */
@@ -309,6 +316,9 @@ export type HookContext = {
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
+
+/** §33.4: a Bash call's folders outside this window's review, with their state before it ran (null: git did not answer). */
+export type ScopeWatch = { targets: { code: PermissionReason["code"]; path: string; before: DirState | null }[] };
 
 function allow(): HookJSONOutput {
   return {};
@@ -493,6 +503,36 @@ async function guardWorktreeTools(toolName: string, toolUseId: string | undefine
   if (!isolatedCall(toolName, ti, root)) return undefined;
   rememberScope(ctx, toolUseId, { code: "worktree_isolation", message: SCOPE_MESSAGES.worktree_isolation });
   return askPre(SCOPE_ASK_REASON);
+}
+
+/** §33.4: before a command that runs in another worktree / a nested repository, the state of each of those folders. */
+async function watchOutside(ctx: HookContext, toolUseId: string | undefined, command: string, cwd: string, root: string, worktrees: readonly string[]): Promise<void> {
+  if (!toolUseId) return;
+  const targets = await Promise.all(bashOutsideDirs(command, cwd, root, worktrees).map(async (r) => ({ code: r.code, path: r.path!, before: await dirState(r.path!) })));
+  if (targets.length === 0) return;
+  if (!ctx.scopeWatches) ctx.scopeWatches = new Map();
+  ctx.scopeWatches.set(toolUseId, { targets });
+}
+
+/**
+ * §33.4: after a Bash call that ran in another worktree or a nested repository — one notice per folder it changed, with
+ * the changed files (none when nothing changed there; no list when git could not tell). Any other call: `noticeAfterTool`.
+ */
+async function noticeAfterBash(input: HookInput, ctx: HookContext): Promise<void> {
+  const toolUseId = toolUseIdOf(input);
+  const watch = toolUseId ? ctx.scopeWatches?.get(toolUseId) : undefined;
+  if (!toolUseId || !watch) {
+    noticeAfterTool("Bash", input, ctx);
+    return;
+  }
+  ctx.scopeWatches!.delete(toolUseId);
+  ctx.scopeReasons?.delete(toolUseId); // its card (if any) was answered
+  for (const t of watch.targets) {
+    const after = t.before ? await dirState(t.path) : null;
+    const files = t.before && after ? changedPaths(t.before, after) : undefined;
+    if (files && files.length === 0) continue;
+    ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "Bash", toolUseId, path: t.path, ...(files ? { files } : {}), reasonCode: t.code });
+  }
 }
 
 /**
@@ -746,7 +786,9 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       if (repoDir && (await sameRepository(repoDir, root)) === false) scope = { ...scope, otherRepository: true, message: OTHER_REPO_WORKTREE_MESSAGE };
     }
     if (scope && !(ctx.autoAllowReadOnlyBash !== false && readOnly)) {
-      rememberScope(ctx, toolUseIdOf(input), scope);
+      // §33.4: what it changes in the other worktrees / nested repositories it runs in is listed after the call.
+      if (scope.code !== "worktree_command") await watchOutside(ctx, toolUseId, command, cwd, root, ro.sameRepoDirs);
+      rememberScope(ctx, toolUseId, scope);
       return askPre(SCOPE_ASK_REASON);
     }
     // §33.9: so does a command naming one of Claude Code's own settings files (reading one still runs).
@@ -828,7 +870,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (input.hook_event_name !== "PostToolUse" && input.hook_event_name !== "PostToolUseFailure") return allow();
     const window = finishWindow(ctx, input);
     // §33.4: an approved command outside the review ran (a failing one too: it may have written before it failed).
-    noticeAfterTool(input.tool_name, input, ctx);
+    await noticeAfterBash(input, ctx);
     // A worktree may have been added / moved / removed: list them again for the next call (§33.4).
     if (/\bworktree\b/.test(String(toolInput(input).command ?? ""))) ctx.worktrees = undefined;
     // §31: a read-only command (judged at its PreToolUse) wrote nothing — no snapshot, no diff, the base tree stays. A file

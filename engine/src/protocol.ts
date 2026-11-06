@@ -1645,6 +1645,8 @@ export type ErrorDetails = {
   toolName?: string;
   path?: string;
   branch?: string;
+  /** §33.4 `worktree_outside_review` of a command: the files it changed in `path` (relative to it, POSIX, sorted, ≤ 100). */
+  files?: string[];
   resetAt?: string;
   attempt?: number;
   maxRetries?: number;
@@ -1676,7 +1678,7 @@ export type LogEvent = { type: "log"; level: LogLevel; message: string };
  * §35.3: what a `kind: "error"` transcript row keeps of its event besides `code` / `detail` — only the fields the event
  * carried — so the banner restored after a restart says what the live one said.
  */
-export type ErrorRowDetails = Pick<ErrorDetails, "toolName" | "path" | "branch" | "exitCode" | "signal" | "sessionId" | "resetAt" | "status">;
+export type ErrorRowDetails = Pick<ErrorDetails, "toolName" | "path" | "branch" | "exitCode" | "signal" | "sessionId" | "resetAt" | "status" | "files">;
 /** §35.2: a file `reject_all` left as it was — its content was never captured (§32), so there is nothing to put back. */
 export type RejectSkip = { path: string; code: "not_captured" };
 /** §35.2: the reply of a `reject_all` (with an `id`) that left uncaptured files pending: `skipped` lists them. */

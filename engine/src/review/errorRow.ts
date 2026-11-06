@@ -6,7 +6,7 @@ import type { ErrorDetails, ErrorRowDetails, ErrorScope, TranscriptItem } from "
 export type ErrorRow = Omit<Extract<TranscriptItem, { kind: "error" }>, "at" | "turn">;
 
 /** The details a row keeps besides `code` / `detail`: what the clients' banners read (§33.4, §30, the API errors). */
-const ROW_DETAILS = ["toolName", "path", "branch", "exitCode", "signal", "sessionId", "resetAt", "status"] as const satisfies readonly (keyof ErrorRowDetails)[];
+const ROW_DETAILS = ["toolName", "path", "branch", "exitCode", "signal", "sessionId", "resetAt", "status", "files"] as const satisfies readonly (keyof ErrorRowDetails)[];
 /** MARK: wave4 w4-longwork — §38.2 details a row keeps as well. */
 const LONG_WORK_ROW_DETAILS = ["maxTurns", "hookName"] as const satisfies readonly (keyof ErrorDetails)[];
 

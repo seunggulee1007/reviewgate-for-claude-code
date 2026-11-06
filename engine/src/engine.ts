@@ -6008,13 +6008,26 @@ export class ReviewEngine {
           void this.afterWorktreeCommand(ev.path ?? null, ev.toolUseId ?? null);
           if (followed) return; // the chat follows: no "outside the review" warning for it
         }
-        // §33.4: once per turn and kind; the client's banner offers "open a workbench".
+        // §33.4: once per turn and kind; the client's banner offers "open a workbench". A command's changes in another
+        // worktree / nested repository: a row per call that changed something there, naming only the files no row of this
+        // turn named yet.
         const key = `${ev.code}|${ev.toolName}|${ev.path ?? ""}|${ev.branch ?? ""}`;
-        if (this.scopeNoticed.has(key)) return;
-        this.scopeNoticed.add(key);
-        const { type: _type, toolUseId: _id, reasonCode: _why, ...notice } = ev;
-        this.log("warn", `${ev.code}: ${ev.toolName}${ev.path ? ` ${ev.path}` : ""}`);
-        this.fail(scopeNoticeMessage(notice), false, "session", notice);
+        let files = ev.files;
+        if (files) {
+          files = files.filter((f) => !this.scopeNoticed.has(`${key}|${f}`));
+          if (files.length === 0) return;
+          for (const f of files) this.scopeNoticed.add(`${key}|${f}`);
+        } else {
+          if (this.scopeNoticed.has(key)) return;
+          this.scopeNoticed.add(key);
+        }
+        const { type: _type, toolUseId: _id, reasonCode: _why, files: _files, ...rest } = ev;
+        const notice = { ...rest, ...(files ? { files } : {}) };
+        this.log("warn", `${ev.code}: ${ev.toolName}${ev.path ? ` ${ev.path}` : ""}${files ? ` (${files.length} files)` : ""}`);
+        // What already ran outside the review is a chat row (no state.lastError, never a stopped queue); a blocked call keeps
+        // its banner.
+        if (ev.code === "worktree_outside_review") this.notice(scopeNoticeMessage(notice), "session", notice);
+        else this.fail(scopeNoticeMessage(notice), false, "session", notice);
         return;
       }
       case "budget_event":
