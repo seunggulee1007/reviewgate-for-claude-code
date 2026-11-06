@@ -6680,7 +6680,8 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   (r1-git, §46) no promise of an approval card for each git command any more: only what throws work away or rewrites the
   remote asks, as the engine's own git instruction says; a skill's commits (`allowed-tools: Bash(git commit:*)`) are the
   user's request too. Its first text ("… only when the user asks — the app shows the user an approval card for each.") is
-  an earlier built-in one now (Mac `AppSettings.legacySystemPromptAppends`). With the limit on it goes on "The user set a change limit of {maxFiles} files and about
+  an earlier built-in one now (Mac `AppSettings.legacySystemPromptAppends`, Electron `src/shared/systemPrompt.ts`
+  `LEGACY_SYSTEM_PROMPT_APPENDS`). With the limit on it goes on "The user set a change limit of {maxFiles} files and about
   {maxLines} changed lines per reply: plan each reply to fit it. If an edit is denied with 'REVIEW GATE', report what you
   changed and what remains." A stored append equal to an earlier built-in one (the one before, or the one with "Never run
   git commit/checkout/reset/stash/clean"; surrounding whitespace aside) is the default: Settings' "Reset to default" used to

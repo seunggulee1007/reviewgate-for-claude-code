@@ -26,7 +26,8 @@ describe("change limit (§54)", () => {
     expect(s.budget).toEqual({ maxFiles: 0, maxLines: 0 });
     expect(s.systemPromptAppend).toBe(DEFAULT_SYSTEM_PROMPT_APPEND);
     for (const word of ["small units", "STOP", "wait for the user", "REVIEW GATE"]) expect(s.systemPromptAppend).not.toContain(word);
-    expect(s.systemPromptAppend).toContain("only when the user asks"); // the git sentence stays
+    expect(s.systemPromptAppend).toContain("only when the user or a skill they ran asks"); // the git sentence stays
+    expect(s.systemPromptAppend).not.toContain("approval card"); // r1-git (§46): no card for every git command any more
     // A settings file from before the switch has no `budgetEnabled`: off.
     const old = { ...DEFAULTS } as Record<string, unknown>;
     delete old.budgetEnabled;
@@ -42,6 +43,10 @@ describe("change limit (§54)", () => {
 
   it("a stored earlier built-in append is the built-in one; the user's own stays, its placeholders get the limit's numbers", () => {
     expect(isLegacySystemPromptAppend(LEGACY)).toBe(true);
+    // r1-git: §54's first built-in append (the approval-card promise) is an earlier one now too.
+    const FIRST = "You are working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each.";
+    expect(isLegacySystemPromptAppend(FIRST)).toBe(true);
+    expect(engineSettings({ ...DEFAULTS, systemPromptAppend: FIRST }, null).systemPromptAppend).toBe(DEFAULT_SYSTEM_PROMPT_APPEND);
     expect(isLegacySystemPromptAppend(`  ${LEGACY}\n`)).toBe(true);
     expect(isLegacySystemPromptAppend("my own words")).toBe(false);
     expect(engineSettings({ ...DEFAULTS, systemPromptAppend: LEGACY }, null).systemPromptAppend).toBe(DEFAULT_SYSTEM_PROMPT_APPEND);
