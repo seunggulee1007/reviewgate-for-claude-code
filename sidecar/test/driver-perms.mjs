@@ -7,7 +7,8 @@
 //   CLAUDE_PATH=… (default ~/.local/bin/claude)   RG_STEPS=ABCDK (default; also E, F, W)   RG_GUARD_TEST=1 (C / W prompts say it is a test)
 //
 //   A. two parallel subagents ask at once → pendingPermissions has both (with agents); answering the OLDER one first
-//      runs only that call; the other stays pending until answered (§33.1).
+//      runs only that call; the other stays pending until answered (§33.1) — also once the main agent's turn ended while
+//      they work in the background (§52.2); both files reach a review.
 //   B. an Edit inside a nested repository (vendor/lib) → card with reason nested_repository (denied → file unchanged; §33.3).
 //   C. EnterWorktree → denied with worktree_blocked (§33.4).
 //   W. `git worktree add` in Bash → card with reason worktree_command (denied; §33.4).
@@ -276,10 +277,25 @@ try {
     while (!existsSync(join(REPO, olderFile)) && Date.now() < deadline) await sleep(200);
     check(existsSync(join(REPO, olderFile)), `A: the answered call ran (${olderFile} exists)`);
     check(!existsSync(join(REPO, newerFile)), `A: the unanswered call did not run yet (${newerFile} absent)`);
-    check(state.gate.blockedReason === "awaiting_permission", "A: blockedReason stays awaiting_permission while one is open");
+    // §52.2: subagents work in the background by default — the main agent's turn ends while they wait, and the open card
+    // outlives it. One Claude kept in the foreground (run_in_background: false) keeps the turn running until it is answered.
+    const ended = await waitState(turnDone(before), "the main agent's turn ended", 45_000).then(() => true, () => false);
+    observed.A.turnEndedWhileOpen = ended;
+    if (ended) check((state.session.pendingPermissions ?? []).some((p) => p.requestId === newer.requestId), "A: the open request outlives the main agent's turn (§52.2)");
+    else check(state.gate.blockedReason === "awaiting_permission", "A: blockedReason stays awaiting_permission while one is open");
     await request({ type: "permission_response", requestId: newer.requestId, allow: true });
-    await waitState(turnDone(before), "turn A done");
+    const ranBy = Date.now() + 60_000;
+    while (!existsSync(join(REPO, newerFile)) && Date.now() < ranBy) await sleep(200);
     check(existsSync(join(REPO, newerFile)), `A: the second call ran after its answer (${newerFile} exists)`);
+    // Both files reach a review: the newer one in the turn Claude runs when the agents end (§52.1), or in this turn. That
+    // turn starts a moment after they end — settled is nothing running for 3 s (else the next send is refused external_turn).
+    const settled = (s) =>
+      turnDone(before)(s) && !s.session.externalTurn && (s.session.backgroundTasks ?? []).length === 0 && ["a.txt", "b.txt"].every((f) => s.changedFiles.some((c) => c.path === f));
+    for (let k = 0; k < 10; k++) {
+      await waitState(settled, "both files in the review, the agents done").catch(() => undefined);
+      await sleep(3000);
+      if (settled(state)) break;
+    }
     observed.A.changedFiles = state.changedFiles.map((f) => f.path);
     check(["a.txt", "b.txt"].every((f) => observed.A.changedFiles.includes(f)), "A: both files are in the review");
     await acceptAll();
