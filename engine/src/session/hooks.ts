@@ -661,7 +661,7 @@ async function noticeAfterBash(input: HookInput, ctx: HookContext): Promise<void
   }
   for (const t of watch.targets) {
     const after = t.before ? await dirState(t.path) : null;
-    const files = t.before && after ? changedPaths(t.before, after) : undefined;
+    const files = t.before && after ? await changedPaths(t.path, t.before, after) : undefined;
     if (files && files.length === 0) continue;
     ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "Bash", toolUseId, path: t.path, ...(files ? { files } : {}), reasonCode: t.code });
   }

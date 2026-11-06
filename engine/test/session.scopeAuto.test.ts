@@ -277,6 +277,24 @@ describe("§39.5: in auto mode a command in another worktree or a nested reposit
     expect(lib).toBeTruthy();
   });
 
+  it("an edit and a commit there in one command: its status is as clean after as before — the row names what the commit changed", async () => {
+    const { root, sibling } = repoWithSibling();
+    const c = ctx(root, { permissionMode: "auto" });
+    const fix = `cd ../${basename(sibling)} && sed -i '' 's/line2/fixed/' README.md && git commit -qam fix`;
+    expect(await preBash(c, fix, root, "f1", auto)).toEqual({});
+    write(sibling, "README.md", "line1\nfixed\nline3\n"); // what the command did
+    sh(sibling, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qam", "fix");
+    await postBash(c, fix, root, "f1", auto);
+    expect(c.notices).toEqual([{ code: "worktree_outside_review", toolName: "Bash", toolUseId: "f1", path: sibling, files: ["README.md"], reasonCode: "other_worktree" }]);
+    // A reset there too: the files the commit it went back over changed.
+    const back = `cd ${sibling} && git reset -q --soft HEAD~1 && git stash -q`;
+    expect(await preBash(c, back, root, "f2", auto)).toEqual({});
+    sh(sibling, "reset", "-q", "--soft", "HEAD~1");
+    sh(sibling, "stash", "-q");
+    await postBash(c, back, root, "f2", auto);
+    expect(c.notices.at(-1)).toMatchObject({ toolUseId: "f2", files: ["README.md"] });
+  });
+
   it("the same command keeps its card in default mode, and in auto mode when the CLI runs another mode", async () => {
     const { root, sibling } = repoWithSibling();
     const build = `cd ${sibling} && ./mvnw -q compile`;

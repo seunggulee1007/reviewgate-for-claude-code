@@ -2151,10 +2151,14 @@ Claude's edits where this window's review never sees them (verified: an edit in 
     path and branch;
   - a command ran in another worktree or a nested repository (`path` = that worktree / repository root) **and changed
     something there** (2026-11). The Bash hook reads that folder's `git status --porcelain` before the call, with each
-    entry's file size and times, and again after it; `files` (new, optional) lists the paths that differ — a new, changed,
-    removed or committed file — relative to `path`, POSIX, sorted, at most 100. A call that changed nothing there raises
-    none (before, every approved one did, a `make` that wrote nothing too). One notice per call; a file a notice of this turn
-    named already is not named again. Without `files` (git could not tell) it only says where.
+    entry's file size and times, and its HEAD, and again after it; `files` (new, optional) lists the paths that differ — a
+    new, changed, removed or committed file — and, when HEAD moved there (a commit, a reset, a checkout), the paths the two
+    commits differ in (`git diff --name-only <before> <after>`): an edit committed in the same call (`cd ../acme-42 && sed
+    -i … && git commit -qam fix`) leaves the status as clean as before and raised no row at all — nothing reviewed it, since
+    that worktree's own window takes the move for someone else's commit —, relative to `path`, POSIX, sorted, at most
+    100. A call that changed nothing there raises none (before, every approved one did, a `make` that wrote nothing too).
+    One notice per call; a file a notice of this turn named already is not named again. Without `files` (git could not
+    tell) it only says where.
 
   `worktree_outside_review` is a row, not a failure: it never sets `state.lastError` (before, it did) and never stops a
   queue; its transcript row keeps `files` (§35.3). Clients show `worktree_blocked` as a banner with **"워크벤치로 열기"**:
