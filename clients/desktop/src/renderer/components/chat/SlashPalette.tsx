@@ -21,6 +21,16 @@ export function slashToken(draft: string): string | null {
 }
 
 /**
+ * MARK: r1-composer M14 (docs/PROTOCOL.md §36.5) — when the composer's palette shows: a project is open (also while Claude
+ * works or the session starts — the cached list, or "Starting session…"; it used to wait for a message that could be sent),
+ * Esc has not closed it since the draft last changed, and ⌘/ opened it or a `/token` is typed. A pick goes into the draft;
+ * ⌘↩ then sends it, puts it into the running turn or queues it, like any message.
+ */
+export function slashPaletteShows(o: { projectOpen: boolean; dismissed: boolean; forced: boolean; token: string | null }): boolean {
+  return o.projectOpen && !o.dismissed && (o.forced || o.token !== null);
+}
+
+/**
  * The palette's model for the composer: the sections for the typed `/token`, the flattened entries (what ↑ / ↓ walk), why
  * nothing is listed, whether the CLI is still starting, and the per-project "recently used" memory (a pick, or a sent
  * message that starts with a known command).

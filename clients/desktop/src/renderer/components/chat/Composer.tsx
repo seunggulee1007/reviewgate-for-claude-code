@@ -15,7 +15,7 @@
  * message into that turn (src/renderer/sendNow.ts); its menu queues it for after the turn or stops the turn and sends it.
  * MARK: r1-composer M08 — while Claude's question (AskUserQuestion) is open the box answers it (⌘↩, the primary "답하기";
  * src/renderer/openQuestion.ts): the text goes to the question it answers now, 1…N in an empty box pick an option, ⌥↩ sends
- * the text apart from the question.
+ * the text apart from the question. M14 — the `/` palette and ⌘/ work while Claude works too.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { FileItem } from "@reviewgate/engine";
@@ -42,7 +42,7 @@ import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal 
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
-import { SlashPalette, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
+import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
 import { WaitingLine } from "../agents/AgentBits";
@@ -239,7 +239,8 @@ export function Composer() {
   const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null);
 
   const token = slashToken(draft);
-  const paletteVisible = canSend && !paletteDismissed && (paletteForced || token !== null);
+  // MARK: r1-composer M14 — the palette works while Claude works or the session starts too (a pick goes into the draft).
+  const paletteVisible = slashPaletteShows({ projectOpen: state.project !== null, dismissed: paletteDismissed, forced: paletteForced, token });
 
   // §23: the `@query` at the caret (not while the slash palette is open).
   const mention = paletteVisible || state.project === null ? null : mentionToken(draft, caret);
@@ -370,7 +371,7 @@ export function Composer() {
     setPaletteDismissed(true);
   };
   const openPalette = () => {
-    if (!canSend) return;
+    if (state.project === null) return; // r1-composer M14: not only while a message could be sent
     setPaletteForced(true);
     setPaletteDismissed(false);
     setPaletteIndex(0);

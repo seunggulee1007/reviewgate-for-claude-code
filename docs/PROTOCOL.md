@@ -2963,7 +2963,8 @@ The palette shows what each command does and what it takes, right after the sess
   a project is open (Core `AppState.canUseSlashPalette`): the session's commands, the cache, or "Starting session…" while
   the CLI starts. A pick only goes into the draft; ↩ then sends it, puts it into the running turn (§50 — the CLI expands a
   command sent that way) or queues it, like any message. Mac: `ComposerModel.paletteVisible(available:)` /
-  `openPalette(available:)`. Verified: Core `ComposerPaletteTests` (running, starting, no project).
+  `openPalette(available:)`; Electron: `slashPaletteShows` (`SlashPalette.tsx`). Verified: Core `ComposerPaletteTests`
+  (running, starting, no project), Electron `SlashPalette.test.ts` ("when the palette shows").
 
 ### 36.6 Local settings (SME-01)
 
