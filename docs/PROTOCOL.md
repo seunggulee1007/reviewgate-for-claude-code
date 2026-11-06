@@ -5949,9 +5949,14 @@ the terminal's auto mode asked for none).
   have seen the call. Plan mode (§19.4) and the unprompted guard (§18) still deny first; an approved command raises no
   `worktree_outside_review`. Clients localize on the code (Mac and Electron: red, "커밋하지 않은 작업을 버리거나 원격 기록을
   바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"); one that does not know it shows `message`.
-- **Not Claude's edits.** The post-Bash snapshot of such a command (§31) reports no files (`tool_files`) and adds nothing to
-  the per-turn budget — a merge may bring in seventy files from another branch. The snapshot still moves the next call's
-  base, so Claude's next command is attributed as usual, and conflict resolutions made with `Edit` / `Write` count normally.
+- **Not Claude's edits.** The post-Bash snapshot of a git command that changes the working tree (`GIT_MUTATING_RE`, hooks.ts:
+  `checkout`, `switch`, `reset`, `restore`, `stash` (not `list` / `show`), `clean`, `rebase`, `merge`, `apply`, `am`, `pull`,
+  `cherry-pick`, `revert`, `bisect`, `gh pr checkout|merge`, with any option groups before the verb) (§31) reports no files
+  (`tool_files`) and adds nothing to the per-turn budget — a merge may bring in seventy files from another branch. The
+  snapshot still moves the next call's base, so Claude's next command is attributed as usual, and conflict resolutions made
+  with `Edit` / `Write` count normally. MARK: r1-git — `commit` is not one any more: it changes no file, so what the same line
+  edited (`sed -i … && git add … && git commit …`) is that call's (origin `bash`, not "outside the app"), and stays in the
+  review with `committedIn` (below).
 - **The review.** At a turn's collection, before A → B is diffed, what git brought in while it ran is carried into A and into
   the turn's own start (the "this turn" base, §34.1) — so neither the list nor `turn_end` / `turn_summary` show it as
   Claude's: (1) commits since `baseHead` (`git diff baseHead HEAD`, as §9's `followHead`; all trees or none — when they do not

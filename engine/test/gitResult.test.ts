@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
+import { openCheckpoint } from "../src/git/checkpoint.js";
 import { BudgetState } from "../src/session/budget.js";
 import type { GitCommandResult } from "../src/session/events.js";
 import { buildHooks, type HookContext } from "../src/session/hooks.js";
@@ -253,5 +254,22 @@ describe("the engine: Claude's own commit keeps its files in the review (§46)",
     expect(s.gate.turnStartTree).toBe(a);
     expect(s.changedFiles.map((f) => [f.path, f.committedIn])).toEqual([["App.java", amended.slice(0, 7)]]);
     expect(s.gate.headMoved ?? null).toBeNull();
+  });
+});
+
+describe("postBash: a line that edits and commits keeps its files Claude's (r1-git)", () => {
+  it("sed -i … && git add && git commit: the edited file is the call's, not git's", async () => {
+    const root = repo();
+    const cp = await openCheckpoint(root);
+    const results: GitCommandResult[] = [];
+    const reported: [string, string[]][] = [];
+    const ctx = hookCtx(root, results, { checkpointTree: await cp.snapshot(), onBashFiles: (id, files) => reported.push([id, files.map((f) => f.slice(root.length + 1))]) });
+    await bashCall(ctx, "sed -i '' s/line2/changed/ README.md && git add README.md && git commit -qm fix", "c1", () => {
+      write(root, "README.md", "line1\nchanged\nline3\n");
+      sh(root, "add", "README.md");
+      sh(root, "commit", "-qm", "fix");
+    });
+    expect(reported).toEqual([["c1", ["README.md"]]]);
+    expect(results[0]?.ownCommits).toEqual([sh(root, "rev-parse", "HEAD").trim()]);
   });
 });

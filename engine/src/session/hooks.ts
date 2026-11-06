@@ -167,8 +167,10 @@ export function needsAsk(toolName: string, autoAllowTools: ReadonlySet<string>):
 }
 
 /**
- * §46: a git command whose file changes are git's, not Claude's (postBash attributes none of them). Also matches option
- * groups before the verb: `git -C x commit`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
+ * §46: a git command whose file changes are git's, not Claude's (postBash attributes none of them). MARK: r1-git — not
+ * `commit`: it changes no file, so in `sed -i … && git commit -am x` the files are Claude's (its commit keeps them in the
+ * review, and they would read "outside the app"). Also matches option
+ * groups before the verb: `git -C x reset`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
  * at a non-word, non-dash character, so the read-only `merge-tree` / `merge-base` / `cherry` are not it; nor are
  * `stash list` / `stash show`. `"git"` quoted, option values quoted with spaces (`-C "My Repo"`, `-c user.name="A B"`), `bisect` and
  * `gh pr checkout|merge` count too. An option's separate value never starts with `-`: else `-a -b -c …` splits
@@ -176,7 +178,7 @@ export function needsAsk(toolName: string, autoAllowTools: ReadonlySet<string>):
  * MARK: r1-git — no longer what asks: the card is `gitCommandReason`'s (destructive commands only).
  */
 export const GIT_MUTATING_RE =
-  /\bgit["']?(?:\s+-{1,2}[\w-]+(?:=(?:[^\s"']|"[^"]*"|'[^']*')+|\s+(?:[^\s"'-]|"[^"]*"|'[^']*')(?:[^\s"']|"[^"]*"|'[^']*')*)?)*\s+(commit|checkout|switch|reset|restore|stash(?!\s+(?:list|show)(?![\w-]))|clean|rebase|merge|apply|am|pull|cherry-pick|revert|bisect)(?![\w-])|\bgh\s+pr\s+(?:checkout|merge)(?![\w-])/;
+  /\bgit["']?(?:\s+-{1,2}[\w-]+(?:=(?:[^\s"']|"[^"]*"|'[^']*')+|\s+(?:[^\s"'-]|"[^"]*"|'[^']*')(?:[^\s"']|"[^"]*"|'[^']*')*)?)*\s+(checkout|switch|reset|restore|stash(?!\s+(?:list|show)(?![\w-]))|clean|rebase|merge|apply|am|pull|cherry-pick|revert|bisect)(?![\w-])|\bgh\s+pr\s+(?:checkout|merge)(?![\w-])/;
 export const GIT_ASK_REASON = "ReviewGate: a git command that throws away uncommitted work or rewrites the remote — needs the user's approval";
 
 const NO_PATHS: ReadonlySet<string> = new Set();
