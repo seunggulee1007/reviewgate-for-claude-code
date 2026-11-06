@@ -2146,8 +2146,7 @@ Claude's edits where this window's review never sees them (verified: an edit in 
   the same action — open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
 - **System instruction.** The engine appends its own paragraph after `settings.systemPromptAppend` (separated by a blank
   line): *"ReviewGate reviews every change you make in this folder (<cwd>). …"* — the current wording is in §39.4 — plus
-  whether isolation is blocked or allowed, and *"If parallel work on another branch is needed, say so: the user opens a
-  separate ReviewGate workbench for it."*
+  whether isolation is blocked or allowed.
 
 ### 33.5 The user's Claude Code allow rules (audit daily-04, SME-04, market-14)
 
