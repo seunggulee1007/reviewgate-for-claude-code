@@ -6028,7 +6028,14 @@ the terminal's auto mode asked for none).
   client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
   substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, the hook in auto
-  and default mode, a remembered `Bash:git push` against a force push),
+  and default mode, a remembered `Bash:git push` against a force push), `engine/test/gitResult.test.ts` (the stash row,
+  Claude's own commits, amend, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
+  (real CLI 2.1.318 on sonnet in auto mode, a scratch repository with a local bare origin outside /tmp: "branch
+  feature/acme-7, fix App.java, commit, push -u" asked nothing, the branch reached origin, App.java stayed pending with
+  `committedIn` and origin not `external`, `head_moved.explainedBy: "claude_git"` and a `claude_committed` row, no bar;
+  "git reset --hard origin/main" was exactly one `git_command` card (denied: HEAD stayed); a project skill with
+  `allowed-tools: Bash(git add:*), Bash(git commit:*)` committed without a card and NOTES.md stayed with `committedIn` —
+  three turns, about 35 s; not in `make verify-cli`, which runs haiku without auto mode),
   `engine/test/session.budget.test.ts` (the verb boundary, `pull` / `cherry-pick` / `revert`, `stash list`),
   `session.hooks.test.ts` (the card over an allow pattern; a merge's files neither reported nor counted, the next command
   attributed), `session.claudeConfig.test.ts` (`canUseTool` in auto mode with `autoAllowTools`, a pattern and a remembered
