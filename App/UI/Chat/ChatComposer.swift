@@ -291,6 +291,11 @@ struct ChatComposer: View {
                     Text(store.viewingSendBlocker ?? sendHint)
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .accessibilityIdentifier("Viewing chat hint")
+                } else if question != nil {
+                    // r1-composer M08: ↩ answers Claude's open question (the card above); ⌥↩ sends the text apart from it.
+                    Text(verbatim: questionHint)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .accessibilityIdentifier("Question hint")
                 } else if let reason = store.cannotSendReason {
                     Text(pendingToolPermission != nil && trimmedDraft.isEmpty
                          ? String(localized: "\(reason) — ⌘↩ allow · ⌘⌫ deny")
@@ -345,7 +350,30 @@ struct ChatComposer: View {
                 }
                 NextMessageModelMenu()   // wave5 w5-model (§43.4): "이번엔 opus"
                 PermissionModePicker()
-                if canSteer {
+                if let question {
+                    // r1-composer M08: the message answers Claude's open question (↩); the menu sends it apart from it (⌥↩) —
+                    // into the turn, where it is read once the question is answered — or queues it, or stops the turn first.
+                    Menu {
+                        Button("Send apart from the question", systemImage: "paperplane") { sendWhileWorking() }
+                            .disabled(trimmedDraft.isEmpty || !canQueue)
+                            .accessibilityIdentifier("Send apart from the question")
+                        Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
+                            .disabled(trimmedDraft.isEmpty || !canQueue)
+                        Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
+                            .disabled(!store.isRunning || trimmedDraft.isEmpty)
+                    } label: {
+                        Label("Send answer", systemImage: "arrowshape.turn.up.left.fill")
+                    } primaryAction: {
+                        answerQuestion(question)
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.borderedProminent)
+                    .fixedSize()
+                    .disabled(trimmedDraft.isEmpty && !questionComplete(question))
+                    .help("Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).")
+                    .accessibilityLabel("Send answer")
+                    .accessibilityIdentifier("Send answer")
+                } else if canSteer {
                     // §50: while Claude works the message goes into the turn (primary, ↩ / ⌘↩) — as in the terminal; the menu
                     // queues it for after the turn or stops the turn and sends it right after.
                     Menu {
@@ -506,6 +534,26 @@ struct ChatComposer: View {
     /// The permission the composer's ⌘↩ / ⌥⌘↩ / ⌘⌫ answer: the oldest open request that is not an AskUserQuestion (its
     /// card has its own keys) — §33.1, wave1 mac-perms.
     private var pendingToolPermission: PermissionRequest? { store.shortcutPermission }
+    /// r1-composer M08: Claude's open question — ↩ answers it instead of putting the text into the turn.
+    private var question: OpenQuestion? { store.openQuestion }
+
+    /// r1-composer M08: the hint while Claude's question is open, after the send key in use.
+    private var questionHint: String {
+        returnSends ? String(localized: "Claude asked a question — ↩ to answer · ⌥↩ to send separately")
+            : String(localized: "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately")
+    }
+
+    /// r1-composer M08: the placeholder while Claude's question is open (1…N pick an option of the question it answers).
+    private func questionPlaceholder(_ open: OpenQuestion) -> String {
+        let draft = transcript.questionDrafts[open.requestId] ?? QuestionDraft()
+        let count = draft.current(in: open.questions).map { open.questions.questions[$0].options.count } ?? 0
+        return count > 0 ? String(localized: "Answer Claude's question — or press 1–\(count) to pick an option")
+            : String(localized: "Answer Claude's question")
+    }
+
+    private func questionComplete(_ open: OpenQuestion) -> Bool {
+        (transcript.questionDrafts[open.requestId] ?? QuestionDraft()).isComplete(open.questions)
+    }
     private var pendingReviewCount: Int { store.pendingFiles.count + store.changesRequestedFiles.count }
 
     // MARK: Send
@@ -549,6 +597,33 @@ struct ChatComposer: View {
         transcript.follow = true
         composer.inputFocused = true
         Task { await store.steer(text, mentions: mentions) }
+    }
+
+    /// r1-composer M08: the message box answers Claude's open question — the text answers the question it answers now (the
+    /// card goes out once every question has an answer), or with an empty box the card goes as it is. Never steered: a
+    /// message in the turn would only wait behind the open question. Mentions and images stay for the next message.
+    private func answerQuestion(_ open: OpenQuestion) {
+        let id = open.requestId
+        var draft = transcript.questionDrafts[id] ?? QuestionDraft()
+        guard !trimmedDraft.isEmpty else {
+            if store.submitOpenQuestion(draft) { transcript.questionDrafts[id] = nil }
+            return
+        }
+        let sent = store.answerOpenQuestion(composer.draft, draft: &draft)
+        transcript.questionDrafts[id] = sent ? nil : draft
+        composer.draft = ""
+        composer.history.reset(entries: store.promptHistory)
+        composer.closePalette()
+        composer.inputFocused = true
+    }
+
+    /// r1-composer M08: 1…9 in an empty box — that option of the question the box answers (nothing is sent).
+    private func pickQuestionOption(_ number: Int) -> Bool {
+        guard let open = question, composer.draft.isEmpty else { return false }
+        var draft = transcript.questionDrafts[open.requestId] ?? QuestionDraft()
+        guard store.pickOpenQuestionOption(number, draft: &draft) else { return false }
+        transcript.questionDrafts[open.requestId] = draft
+        return true
     }
 
     /// While Claude works: into the turn when it can take it (§50), else the queue.
@@ -595,6 +670,11 @@ struct ChatComposer: View {
             send()
             return true
         }
+        // r1-composer M08: ⌘↩ answers Claude's open question (with an empty box: sends its card as it is).
+        if shortcut == .commandReturn, let question {
+            answerQuestion(question)
+            return true
+        }
         switch CardShortcuts.action(for: shortcut, focus: .composer(draft: composer.draft), target: pendingToolPermission) {
         case .sendDraft:
             if store.canSend { send() } else if canQueue { sendWhileWorking() } else { return false }
@@ -616,6 +696,11 @@ struct ChatComposer: View {
     /// ↩ with "Return sends" on: the draft goes as ⌘↩ with text does (sent, or queued while Claude works). It never answers a
     /// permission card — a stray Return must not allow a command — and an empty or blocked draft stays as it is.
     private func sendFromReturn() -> Bool {
+        // r1-composer M08: ↩ answers Claude's open question (with an empty box: sends its card as it is).
+        if let question {
+            answerQuestion(question)
+            return true
+        }
         guard !trimmedDraft.isEmpty else { return true }
         if store.viewingChat != nil {
             if store.viewingSendBlocker == nil { send() }
@@ -665,7 +750,7 @@ struct ChatComposer: View {
             HStack(alignment: .bottom, spacing: 4) {
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,
                                  caretRequest: $composer.caretRequest, contentHeight: $composer.height,
-                                 placeholder: String(localized: "Message Claude — @ mentions a file, ⌘V pastes an image"),
+                                 placeholder: question.map(questionPlaceholder) ?? String(localized: "Message Claude — @ mentions a file, ⌘V pastes an image"),
                                  onKey: handleKey, onDrop: { composer.takeDrop($0, root: store.projectURL) },
                                  onDragHover: { composer.dropHover = $0 })
                     .frame(height: min(max(composer.height, 30), 128))
@@ -755,11 +840,20 @@ struct ChatComposer: View {
             case .escape:
                 composer.mentionDismissed = true
                 return true
-            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB:
+            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
+                 .optionEnter, .digit:
                 break
             }
         }
         switch key {
+        case .optionEnter:
+            // r1-composer M08: ⌥↩ while Claude's question is open — the text goes to Claude apart from the question (into
+            // the turn, read once the question is answered; else queued). Otherwise a new line, as before.
+            guard question != nil, !trimmedDraft.isEmpty, canQueue else { return false }
+            sendWhileWorking()
+            return true
+        case let .digit(number):
+            return pickQuestionOption(number)   // r1-composer M08
         case .controlB:
             // §52: as in the terminal — while Claude works, the running command goes on in the background.
             guard store.isRunning, store.backgroundWorkEnabled else { return false }

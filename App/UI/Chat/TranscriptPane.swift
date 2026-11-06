@@ -30,8 +30,8 @@ final class TranscriptViewState {
     // own state) so they are still there on return, as the composer's draft is.
     /// The plan card's step notes and note, for the proposal they were written on.
     var planDraft: PlanCardDraft?
-    /// A question card's choices and "Other…" text, by request id.
-    var questionDrafts: [String: QuestionCardDraft] = [:]
+    /// A question card's choices and "Other…" text, by request id — r1-composer M08: the message box fills it too.
+    var questionDrafts: [String: QuestionDraft] = [:]
     /// A permission card's "Deny with instruction…" text, by request id.
     var denyInstructions: [String: String] = [:]
     // ⌘F
@@ -76,13 +76,6 @@ struct PlanCardDraft: Equatable {
     var plan: String
     var stepNotes: [Int: String] = [:]
     var note = ""
-}
-
-/// What is chosen and typed on a question card (`TranscriptViewState.questionDrafts`), per question (keyed by its text).
-struct QuestionCardDraft: Equatable {
-    var selected: [String: Set<String>] = [:]
-    var otherChosen: Set<String> = []
-    var otherText: [String: String] = [:]
 }
 
 struct TranscriptPane: View {

@@ -2993,6 +2993,38 @@
         }
       }
     },
+    "Answer Claude's question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer Claude's question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문에 답을 쓰세요"
+          }
+        }
+      }
+    },
+    "Answer Claude's question — or press 1–%lld to pick an option": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer Claude's question — or press 1–%lld to pick an option"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문에 답을 쓰세요 — 1–%lld로 고를 수도 있어요"
+          }
+        }
+      }
+    },
     "Answer questions": {
       "localizations": {
         "en": {
@@ -3025,6 +3057,38 @@
         }
       }
     },
+    "Answered from the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered from the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력창으로 답하는 질문"
+          }
+        }
+      }
+    },
+    "Answered: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답함: %@"
+          }
+        }
+      }
+    },
     "Answering": {
       "localizations": {
         "en": {
@@ -3053,6 +3117,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "곁 세션에서 답변 중…"
+          }
+        }
+      }
+    },
+    "Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지로 Claude의 질문에 답해요(↩). 입력창이 비어 있으면 카드에서 고른 그대로 보내요. 메뉴에서 질문과 별개로 보낼 수 있어요(⌥↩)."
           }
         }
       }
@@ -4467,6 +4547,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "CI"
+          }
+        }
+      }
+    },
+    "Claude asked a question — ↩ to answer · ⌥↩ to send separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked a question — ↩ to answer · ⌥↩ to send separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 질문했어요 — ↩로 답하기 · ⌥↩ 질문과 별개로 보내기"
+          }
+        }
+      }
+    },
+    "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 질문했어요 — ⌘↩로 답하기 · ⌥↩ 질문과 별개로 보내기"
+          }
+        }
+      }
+    },
+    "Claude asked: %@ — answer it below": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked: %@ — answer it below"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문: %@ — 아래에서 답해 주세요"
           }
         }
       }
@@ -10070,6 +10198,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "목록 묶기"
+          }
+        }
+      }
+    },
+    "Handled: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handled: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리됨: %@"
           }
         }
       }
@@ -19046,6 +19190,38 @@
         }
       }
     },
+    "Send answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답하기"
+          }
+        }
+      }
+    },
+    "Send apart from the question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send apart from the question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문과 별개로 보내기"
+          }
+        }
+      }
+    },
     "Show the change": {
       "localizations": {
         "en": {
@@ -19074,6 +19250,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "마지막 64KB만 보여요."
+          }
+        }
+      }
+    },
+    "Skipped: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "건너뜀: %@"
           }
         }
       }
@@ -24322,6 +24514,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트의 “로컬 설정 불러오기”를 켭니다. 다음 세션부터 적용됩니다"
+          }
+        }
+      }
+    },
+    "Type an answer below · ↩ sends the card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type an answer below · ↩ sends the card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래 입력창에 답을 쓰세요 · ↩로 보내기"
+          }
+        }
+      }
+    },
+    "Type an answer below · ⌘↩ sends the card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type an answer below · ⌘↩ sends the card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래 입력창에 답을 쓰세요 · ⌘↩로 보내기"
+          }
+        }
+      }
+    },
+    "Type an answer below, or press 1–%lld · ↩ sends the card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type an answer below, or press 1–%lld · ↩ sends the card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래 입력창에 답을 쓰거나 1–%lld로 고르세요 · ↩로 보내기"
+          }
+        }
+      }
+    },
+    "Type an answer below, or press 1–%lld · ⌘↩ sends the card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type an answer below, or press 1–%lld · ⌘↩ sends the card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래 입력창에 답을 쓰거나 1–%lld로 고르세요 · ⌘↩로 보내기"
           }
         }
       }

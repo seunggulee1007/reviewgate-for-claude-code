@@ -30,6 +30,11 @@ enum ComposerKey: Equatable {
     /// §52: ⌃B in an empty message box — the running command goes on in the background (as in the terminal); with text
     /// typed it moves the caret back, as everywhere on the Mac.
     case controlB
+    // MARK: r1-composer M08 — Claude's open question answered from the message box
+    /// ⌥↩ — while Claude's question is open, the text goes to Claude apart from the question (otherwise a new line).
+    case optionEnter
+    /// 1…9 typed into an empty message box — while Claude's question is open, an option of it (otherwise the digit).
+    case digit(Int)
 }
 
 /// What a paste or a drop brought into the composer (§23 mentions / §24 images).
@@ -152,6 +157,11 @@ struct ComposerTextView: NSViewRepresentable {
                 textView.insertNewlineIgnoringFieldEditor(nil)
                 return true
             }
+            // r1-composer M08: ⌥↩ (AppKit's new line that ignores the field editor) is the chat's when it wants it.
+            if selector == #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
+               NSApp.currentEvent?.modifierFlags.contains(.option) == true, parent.onKey(.optionEnter) {
+                return true
+            }
             let key: ComposerKey? = switch selector {
             case #selector(NSResponder.moveUp(_:)): .up(caretOnFirstLine: Self.caretLines(textView).first)
             case #selector(NSResponder.moveDown(_:)): .down(caretOnLastLine: Self.caretLines(textView).last)
@@ -225,6 +235,18 @@ final class ComposerNSTextView: NSTextView {
         let ok = super.resignFirstResponder()
         if ok { coordinator?.focusChanged(false) }
         return ok
+    }
+
+    /// r1-composer M08: 1…9 typed into an empty box go to the chat first (an option of Claude's open question); a digit it
+    /// does not take is typed as usual.
+    override func keyDown(with event: NSEvent) {
+        if string.isEmpty, !hasMarkedText(), let coordinator,
+           event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+           let typed = event.charactersIgnoringModifiers, typed.count == 1, let digit = Int(typed), (1...9).contains(digit),
+           coordinator.parent.onKey(.digit(digit)) {
+            return
+        }
+        super.keyDown(with: event)
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {

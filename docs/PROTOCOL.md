@@ -6246,6 +6246,15 @@ feature flag of its own, and on this machine both folded alike.
   {allow: true, updatedInput: {questions, answers}}`, as its own Answer button sends it) once every question has an
   answer; until then the card shows what was filled. 1…N in an empty box pick option N of that question (several answers:
   on and off), and ↩ in an empty box sends the card. Nothing changes on the wire.
+  **Mac.** The card sits above the composer, in the cards' place of §49.2 (first, above a plan), with the question the box
+  answers marked ("입력창으로 답하는 질문" when there are several) and its options numbered; with several questions the
+  next one scrolls into view. The transcript keeps one line for it: "Claude의 질문: … — 아래에서 답해 주세요" while it
+  waits, then "답함: 질문 → 답" (or 건너뜀 / 처리됨; every question and answer in the tooltip). The hint reads "Claude가
+  질문했어요 — ↩로 답하기 · ⌥↩ 질문과 별개로 보내기" (⌘↩ when ↩ makes a new line), the placeholder "Claude의 질문에 답을
+  쓰세요 — 1–N로 고를 수도 있어요", and the primary button is "답하기" (⌘↩ answers too). Its menu sends the text apart from
+  the question ("질문과 별개로 보내기", also ⌥↩: into the turn as above, where it is read once the question is answered),
+  queues it or stops the turn first. A question open while another card waits, or behind an older question, stays a card
+  in the transcript, as before.
 - **Verified.** Engine `session.peer.test.ts` (§50 block): folded into the turn (one `turn_end`), run as its own command
   after the result (the turn waits, usage summed, no unprompted turn), refused without a turn. `w50.steer.test.ts`: the
   session gets the text with the mentions, the row `steered` with the turn's number, refusals. Core `RunAsTaskTests`: the

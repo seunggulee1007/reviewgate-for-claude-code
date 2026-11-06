@@ -462,6 +462,49 @@ private struct StreamingAnswerText: View {
     }
 }
 
+/// r1-composer M08: Claude's question in the transcript, one line — while its card waits above the composer ("answer it
+/// below"), and once answered, skipped or handled (the questions and their answers; all of them in the tooltip).
+private struct QuestionLineRow: View {
+    let questions: AskUserQuestions
+    let decision: Bool?
+    let isOpen: Bool
+
+    var body: some View {
+        let waiting = decision == nil && isOpen
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: waiting ? "questionmark.bubble.fill" : "questionmark.bubble")
+                .foregroundStyle(waiting ? Color.accentColor : Color.secondary)
+            Text(verbatim: line(waiting: waiting))
+                .foregroundStyle(waiting ? Color.primary : Color.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .font(.callout)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(Text(verbatim: full))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(waiting ? "Question line waiting" : "Question line")
+    }
+
+    private var asked: String { questions.questions.map(\.question).joined(separator: " · ") }
+
+    private func line(waiting: Bool) -> String {
+        if waiting { return String(localized: "Claude asked: \(asked) — answer it below") }
+        switch decision {
+        case true?: return String(localized: "Answered: \(pairs)")
+        case false?: return String(localized: "Skipped: \(asked)")
+        case nil: return String(localized: "Handled: \(asked)")
+        }
+    }
+
+    /// "question → answer" per question.
+    private var pairs: String {
+        questions.questions.map { "\($0.question) → \(questions.answers[$0.question] ?? "—")" }.joined(separator: " · ")
+    }
+
+    private var full: String { questions.questions.map { "\($0.question)\n→ \(questions.answers[$0.question] ?? "—")" }.joined(separator: "\n\n") }
+}
+
 /// §33.1 (wave1 mac-perms): every card answers its own request; buttons only while it is still queued.
 private struct PermissionTranscriptRow: View {
     @Environment(AppState.self) private var store
@@ -476,15 +519,22 @@ private struct PermissionTranscriptRow: View {
     var body: some View {
         let id = request.requestId
         if let questions = AskUserQuestions(request: request) {
-            QuestionCard(
-                questions: questions,
-                decision: allowed,
-                requestId: id,
-                isOpen: store.isPermissionOpen(id),
-                onAnswer: { store.answerQuestions(requestId: id, answers: $0); view.questionDrafts[id] = nil },
-                onSkip: { store.skipQuestions(requestId: id); view.questionDrafts[id] = nil },
-                onFocusComposer: { actions?.focusComposer() },
-                draft: Binding(get: { view.questionDrafts[id] ?? QuestionCardDraft() }, set: { view.questionDrafts[id] = $0 }))
+            let isOpen = store.isPermissionOpen(id)
+            if allowed != nil || !isOpen || store.openQuestion?.requestId == id {
+                // r1-composer M08: the card the message box answers sits above the composer, and an answered one is a line.
+                QuestionLineRow(questions: questions, decision: allowed, isOpen: isOpen)
+            } else {
+                // Open while another card or an older question comes first: the card itself, as before.
+                QuestionCard(
+                    questions: questions,
+                    decision: allowed,
+                    requestId: id,
+                    isOpen: isOpen,
+                    onAnswer: { store.answerQuestions(requestId: id, answers: $0); view.questionDrafts[id] = nil },
+                    onSkip: { store.skipQuestions(requestId: id); view.questionDrafts[id] = nil },
+                    onFocusComposer: { actions?.focusComposer() },
+                    draft: Binding(get: { view.questionDrafts[id] ?? QuestionDraft() }, set: { view.questionDrafts[id] = $0 }))
+            }
         } else {
             PermissionCard(
                 request: request,
