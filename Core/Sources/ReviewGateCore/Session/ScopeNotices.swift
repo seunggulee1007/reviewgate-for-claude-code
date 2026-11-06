@@ -1,9 +1,10 @@
 import Foundation
 
 // MARK: r1-scope
-// docs/PROTOCOL.md §33.4 / §39.5 on the client: what already ran outside this window's review is a chat row — never a
+// docs/PROTOCOL.md §33.4 / §39.5 / §8 on the client: what already ran outside this window's review is a chat row — never a
 // banner, never `lastError` — naming the files a command changed there, with the folder's actions (move this chat there,
-// open it as a workbench or a folder).
+// open it as a workbench or a folder); a file Claude wrote into its own memory reads as such in the "edits outside the
+// project" list.
 
 public enum ScopeText {
     /// At most this many file names on a row; the rest are counted.
@@ -49,6 +50,22 @@ public enum ScopeText {
     public static func rowActions(_ info: ErrorRowInfo, isWorkbench: (String) -> Bool) -> [EngineMessageAction] {
         guard info.code == "worktree_outside_review", let path = info.path, !path.isEmpty else { return [] }
         return SessionNotices.bannerActions(code: info.code, repeats: info.count, path: path, pathIsWorkbench: isWorkbench(path))
+    }
+
+    // MARK: Claude's memory (§8)
+
+    /// `<home>/.claude/projects/<key>/memory/<file>` → `<file>` (its path inside `memory/`); nil for any other path.
+    public static func memoryFile(_ path: String, home: String = NSHomeDirectory()) -> String? {
+        let projects = (home as NSString).appendingPathComponent(".claude/projects") + "/"
+        guard path.hasPrefix(projects) else { return nil }
+        let parts = path.dropFirst(projects.count).split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count >= 3, !parts[0].isEmpty, parts[1] == "memory", !parts[2...].contains(where: \.isEmpty) else { return nil }
+        return parts[2...].joined(separator: "/")
+    }
+
+    /// "메모리에 기록: <file>".
+    public static func memoryLabel(_ file: String) -> String {
+        String(localized: "Saved to memory: \(file)", bundle: .module)
     }
 }
 

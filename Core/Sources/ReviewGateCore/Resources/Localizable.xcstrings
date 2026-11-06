@@ -9555,6 +9555,22 @@
         }
       }
     },
+    "Saved to memory: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to memory: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메모리에 기록: %@"
+          }
+        }
+      }
+    },
     "Select accepted files first — only accepted files can be committed": {
       "localizations": {
         "en": {

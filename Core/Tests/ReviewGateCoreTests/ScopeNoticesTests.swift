@@ -2,8 +2,9 @@ import Foundation
 import Testing
 @testable import ReviewGateCore
 
-/// r1-scope: docs/PROTOCOL.md §33.4 / §39.5 on the Mac — what a command changed outside this window's review is a chat row
-/// (never a banner, never the last error) naming the files, with the folder's actions.
+/// r1-scope: docs/PROTOCOL.md §33.4 / §39.5 / §8 on the Mac — what a command changed outside this window's review is a chat
+/// row (never a banner, never the last error) naming the files, with the folder's actions; a note in Claude's memory reads as
+/// such in the list of edits outside the project.
 @Suite @MainActor struct ScopeNoticesTests {
     private func makeStore() -> AppState {
         AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: UserDefaults(suiteName: "ScopeNoticesTests.\(UUID().uuidString)")!)
@@ -89,5 +90,16 @@ import Testing
         #expect(r.count == 1)
         #expect(r[0].message == "Changed where this window's review does not see it: /work/acme-42")
         #expect(r[0].info.secondary == "made.txt" && r[0].info.path == "/work/acme-42")
+    }
+
+    @Test func aNoteInClaudesMemoryIsRecognisedByItsPath() {
+        let home = "/Users/dev"
+        #expect(ScopeText.memoryFile("/Users/dev/.claude/projects/-work-acme/memory/MEMORY.md", home: home) == "MEMORY.md")
+        #expect(ScopeText.memoryFile("/Users/dev/.claude/projects/-work-acme/memory/notes/acme.md", home: home) == "notes/acme.md")
+        #expect(ScopeText.memoryFile("/Users/dev/.claude/projects/-work-acme/other.md", home: home) == nil)
+        #expect(ScopeText.memoryFile("/Users/dev/.claude/projects/-work-acme/memory", home: home) == nil)
+        #expect(ScopeText.memoryFile("/Users/dev/.claude/settings.json", home: home) == nil)
+        #expect(ScopeText.memoryFile("/work/acme-notes.txt", home: home) == nil)
+        #expect(ScopeText.memoryLabel("MEMORY.md") == "Saved to memory: MEMORY.md")
     }
 }
