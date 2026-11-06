@@ -139,6 +139,8 @@ export type ClaudeSessionOptions = {
   // MARK: wave4d w4d-peers
   /** §42.2: the live session a SendMessage `to` address reaches (the user's session registry); owned by the engine. */
   resolvePeer?: (address: string) => Promise<PeerSessionInfo | null>;
+  /** MARK: r1-git — §46: repo-relative paths still under review (the hooks' git card); owned by the engine. */
+  reviewPaths?: () => ReadonlySet<string>;
 };
 
 // MARK: wave4d w4d-peers
@@ -438,6 +440,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       onUnprompted: (toolName) => this.onUnprompted(toolName),
       onBashFiles: (toolUseId, files) => this.attributeBashFiles(toolUseId, files),
       onBashSnapshot: (toolUseId, tree, root) => this.emit({ type: "bash_snapshot", toolUseId, tree, root }),
+      ...(opts.reviewPaths ? { reviewPaths: opts.reviewPaths } : {}), // MARK: r1-git (§46)
       toolWindows: new Map(),
       emit: (m) => this.emit(m),
       log: opts.log,
@@ -2101,7 +2104,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       (AUTO_ALLOW_RE.test(toolName) && file !== undefined ? editScopeReason(file, root, isOutsideRoot, outsideRoot ? await otherWorktrees(this.hookCtx) : [], this.hookCtx.scratchDirs) : null) ??
       (isolatedCall(toolName, input, root) ? { code: "worktree_isolation", message: SCOPE_MESSAGES.worktree_isolation } : null) ??
       configScopeReason(toolName, input, this.hookCtx.cwd, root, this.hookCtx) ??
-      gitCommandReason(toolName, input);
+      (await gitCommandReason(toolName, input, this.hookCtx)); // MARK: r1-git (§46): destructive git only
     const outside = scope !== null;
     // An approved edit the snapshot never sees goes to changedOutside (§8); a settings file is the review's own business
     // (mods group, or `local_settings_changed` for .claude/settings.local.json — §32).

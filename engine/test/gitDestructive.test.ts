@@ -1,0 +1,343 @@
+import { mkdirSync, realpathSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  destructiveGitReason,
+  entriesSince,
+  gitInvocations,
+  isOwnCommitSubject,
+  movesHead,
+  shellCommands,
+  stashesWork,
+  type GitProbe,
+} from "../src/session/gitDestructive.js";
+import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
+import { BudgetState } from "../src/session/budget.js";
+import { rememberKey } from "../src/session/bashClass.js";
+import { ASK_REASON, buildHooks, GIT_ASK_REASON, REMEMBERED_REASON, type HookContext } from "../src/session/hooks.js";
+import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
+
+/**
+ * MARK: r1-git — docs/PROTOCOL.md §46: only a git command that throws away uncommitted work or rewrites the remote keeps the
+ * card; everything else runs as in the terminal.
+ */
+
+const dirs: string[] = [];
+afterEach(() => {
+  for (const d of dirs.splice(0)) removeDir(d);
+});
+
+/** A probe that must not be asked: the decision of these commands never depends on the repository. */
+const noProbe: GitProbe = {
+  isRef: async () => {
+    throw new Error("isRef asked");
+  },
+  isDirty: async () => {
+    throw new Error("isDirty asked");
+  },
+};
+
+const ROOT = "/work/acme";
+const at = (command: string, reviewPaths: string[] = [], probe: GitProbe = noProbe, cwd = ROOT) =>
+  destructiveGitReason(command, { cwd, root: ROOT, reviewPaths: new Set(reviewPaths), probe });
+
+describe("destructiveGitReason: what never asks", () => {
+  it.each([
+    "git commit -am x",
+    "git add -A && git commit -m 'feat: acme'",
+    "git checkout -b feature/acme-7",
+    "git checkout -b feature/acme-7 origin/main",
+    "git switch -c feature/acme-7",
+    "git checkout main",
+    "git checkout -",
+    "git pull",
+    "git pull --rebase origin main",
+    "git stash",
+    "git stash push -m wip",
+    "git stash pop",
+    "git push",
+    "git push -u origin feature/acme-7",
+    "git push origin HEAD:refs/heads/acme",
+    "git config user.email dev@acme.example",
+    "git rebase main",
+    "git merge --no-edit develop",
+    "git reset HEAD~1",
+    "git reset --soft HEAD~1",
+    "git branch -d done",
+    "git branch feature/x",
+    "git clean -n",
+    "git clean -nd",
+    "git clean --dry-run -d",
+    "git worktree remove ../wt2",
+    "git restore --staged a.txt",
+    "git restore -S a.txt",
+    "grep -rn \"git checkout\" docs/",
+    "echo \"git reset --hard\" >> NOTES",
+    "echo 'git push --force' | tee -a NOTES.md",
+    "rg 'git clean -fd' src",
+    "npm test && mvn -q verify",
+  ])("%s → null", async (command) => {
+    expect(await at(command)).toBeNull();
+  });
+
+  it("a commit message in a here-document is text, whatever it says", async () => {
+    const command = [
+      "git add -A && git commit -m \"$(cat <<'EOF'",
+      "Fix the parser (\"quoted\")",
+      "",
+      "Do not run git push --force or git reset --hard here.",
+      "EOF",
+      ")\"",
+    ].join("\n");
+    expect(await at(command)).toBeNull();
+    expect(await at("cat > deploy.sh <<'EOF'\ngit reset --hard origin/main\ngit clean -fdx\nEOF\nchmod +x deploy.sh")).toBeNull();
+    expect(await at("cat <<-EOF > notes.txt\n\tgit stash drop\n\tEOF\n")).toBeNull();
+  });
+});
+
+describe("destructiveGitReason: what always asks", () => {
+  it.each([
+    "git reset --hard",
+    "git reset --hard origin/main",
+    "git reset --merge",
+    "git reset --har HEAD",
+    "git clean -fd",
+    "git clean -fdx",
+    "git clean -d",
+    "git clean --force",
+    "git branch -D x",
+    "git branch -df x",
+    "git branch --delete --force x",
+    "git branch -M old new",
+    "git branch -C old new",
+    "git branch -f main origin/main",
+    "git stash drop",
+    "git stash drop stash@{1}",
+    "git stash clear",
+    "git push --force",
+    "git push -f",
+    "git push -uf origin f",
+    "git push --force-with-lease",
+    "git push --force-with-lease=main:abc123 origin main",
+    "git push --force-if-includes",
+    "git push --mirror",
+    "git push --delete origin x",
+    "git push origin --delete x",
+    "git push -d origin x",
+    "git push --prune origin",
+    "git push origin :x",
+    "git push origin +main",
+    "git push origin +HEAD:main",
+    "git worktree remove --force w",
+    "git worktree remove -f w",
+    "git checkout -f main",
+    "git checkout --force main",
+    "git switch --discard-changes main",
+    "git switch -f main",
+    "git -C ../wt reset --hard",
+    "git -c core.pager=cat --no-pager reset --hard",
+    "/usr/bin/git reset --hard",
+    "\"git\" reset --hard",
+  ])("%s → git_command", async (command) => {
+    expect(await at(command)).toMatchObject({ code: "git_command" });
+  });
+
+  it("wherever the command hides: chains, pipes, redirections, subshells, wrappers, scripts and substitutions", async () => {
+    for (const command of [
+      "npm test && git reset --hard",
+      "git status; git stash clear",
+      "git reset --hard 2>&1 | tail -5",
+      "git reset --hard > /dev/null 2>&1",
+      "(cd ../wt && git stash drop)",
+      "{ git clean -fd; }",
+      "if git diff --quiet; then git reset --hard; fi",
+      "for b in a b; do git branch -D $b; done",
+      "git branch --merged | grep -v main | xargs -n1 git branch -D",
+      "time -p git clean -fd",
+      "sudo -u dev git push -f",
+      "env GIT_TRACE=1 git push --force",
+      "nohup git push --force &",
+      "bash -c 'git reset --hard'",
+      "sh -ec \"git push origin +main\"",
+      "eval git stash clear",
+      "echo $(git stash drop)",
+      "echo \"$(git stash drop)\"",
+      "echo `git reset --hard`",
+    ]) {
+      expect(await at(command), command).toMatchObject({ code: "git_command" });
+    }
+  });
+});
+
+describe("destructiveGitReason: checkout / restore over files", () => {
+  function repo(): string {
+    const d = realpathSync(makeRepo());
+    dirs.push(d);
+    // a.txt: under review; b.txt: clean; c.txt: changed, not reviewed; src/A.java: under review
+    write(d, "a.txt", "a\n");
+    write(d, "b.txt", "b\n");
+    write(d, "c.txt", "c\n");
+    write(d, "src/A.java", "class A {}\n");
+    sh(d, "add", "-A");
+    sh(d, "commit", "-qm", "files");
+    write(d, "a.txt", "a changed by claude\n");
+    write(d, "c.txt", "c changed by the user\n");
+    write(d, "src/A.java", "class A { int x; }\n");
+    return d;
+  }
+  const review = ["a.txt", "src/A.java"];
+  const run = (root: string, command: string, cwd = root, reviewPaths = review) =>
+    destructiveGitReason(command, { cwd, root, reviewPaths: new Set(reviewPaths) });
+
+  it("a target that holds a file under review or uncommitted work asks; a clean one does not", async () => {
+    const root = repo();
+    expect(await run(root, "git checkout -- a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout -- b.txt")).toBeNull();
+    expect(await run(root, "git checkout -- c.txt")).toMatchObject({ code: "git_command" }); // dirty, not reviewed
+    expect(await run(root, "git checkout HEAD -- b.txt")).toBeNull();
+    expect(await run(root, "git checkout HEAD~0 a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout b.txt")).toBeNull();
+    expect(await run(root, "git checkout a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout .")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout -- src")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout -- '*.java'")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout --ours a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git checkout --theirs -- b.txt")).toBeNull();
+  });
+
+  it("restore: the working tree is what counts — --staged alone never touches it", async () => {
+    const root = repo();
+    expect(await run(root, "git restore --staged a.txt")).toBeNull();
+    expect(await run(root, "git restore a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git restore c.txt", root, [])).toMatchObject({ code: "git_command" }); // dirty
+    expect(await run(root, "git restore b.txt")).toBeNull();
+    expect(await run(root, "git restore -SW b.txt")).toBeNull();
+    expect(await run(root, "git restore --staged --worktree a.txt")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git restore --source=HEAD~0 -- .")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git restore")).toBeNull(); // git refuses: no paths
+  });
+
+  it("paths are where the command runs: a cd / git -C moves them", async () => {
+    const root = repo();
+    mkdirSync(join(root, "docs"), { recursive: true });
+    expect(await run(root, "git checkout -- A.java", join(root, "src"))).toMatchObject({ code: "git_command" });
+    expect(await run(root, "cd src && git checkout -- A.java")).toMatchObject({ code: "git_command" });
+    expect(await run(root, "git -C src checkout -- ../b.txt")).toBeNull();
+    expect(await run(root, "cd docs && git checkout -- ../a.txt")).toMatchObject({ code: "git_command" });
+  });
+
+  it("a branch that is also a folder name is a branch", async () => {
+    const root = repo();
+    sh(root, "branch", "src");
+    expect(await run(root, "git checkout src")).toBeNull();
+  });
+});
+
+describe("gitInvocations / shellCommands", () => {
+  it("reads only commands — never the words of echo, grep or a here-document", () => {
+    expect(shellCommands("echo \"git reset --hard\" >> NOTES && git status")).toEqual([["echo", "git reset --hard"], ["git", "status"]]);
+    expect(shellCommands("git log --oneline 2>&1 | head -3")).toEqual([["git", "log", "--oneline"], ["head", "-3"]]);
+    expect(shellCommands("cat <<EOF\ngit push -f\nEOF\ngit status")).toEqual([["cat"], ["git", "status"]]);
+    expect(shellCommands("git status # git reset --hard")).toEqual([["git", "status"]]);
+    expect(shellCommands("x=$(git rev-parse HEAD); echo $x")[0]).toEqual(["git", "rev-parse", "HEAD"]);
+  });
+
+  it("knows where each git command runs", () => {
+    const inv = gitInvocations("cd ../wt && git -C sub status && git -c a=b --no-pager log", "/work/acme");
+    expect(inv.map((g) => [g.dir, g.verb])).toEqual([
+      ["/work/wt/sub", "status"],
+      ["/work/wt", "log"],
+    ]);
+  });
+
+  it("movesHead / stashesWork: what the hooks watch around a command", () => {
+    for (const c of ["git commit -m x", "git add -A && git commit --amend --no-edit", "git checkout -b f", "git pull", "git merge develop", "git reset --hard", "gh pr checkout 42", "git branch -m new"]) {
+      expect(movesHead(c, ROOT), c).toBe(true);
+    }
+    for (const c of ["git status", "git push", "git stash", "git branch -d x", "echo git commit"]) expect(movesHead(c, ROOT), c).toBe(false);
+    for (const c of ["git stash", "git stash push -m wip", "git stash -u", "git stash save wip"]) expect(stashesWork(c, ROOT), c).toBe(true);
+    for (const c of ["git stash pop", "git stash list", "git stash drop", "git status"]) expect(stashesWork(c, ROOT), c).toBe(false);
+  });
+
+  it("own commits are the reflog's commit entries after the command's marker", () => {
+    expect(isOwnCommitSubject("commit: feat: acme")).toBe(true);
+    expect(isOwnCommitSubject("commit (amend): feat: acme")).toBe(true);
+    expect(isOwnCommitSubject("commit (initial): init")).toBe(true);
+    expect(isOwnCommitSubject("commit (merge): Merge branch 'develop'")).toBe(false);
+    expect(isOwnCommitSubject("pull: Fast-forward")).toBe(false);
+    expect(isOwnCommitSubject("checkout: moving from main to f")).toBe(false);
+    const marker = { sha: "a".repeat(40), at: 100, subject: "commit: before" };
+    const entries = [
+      { sha: "c".repeat(40), at: 200, subject: "commit: mine" },
+      { sha: "b".repeat(40), at: 199, subject: "checkout: moving from main to f" },
+      marker,
+      { sha: "9".repeat(40), at: 50, subject: "commit: older" },
+    ];
+    expect(entriesSince(entries, marker, 0).map((e) => e.subject)).toEqual(["commit: mine", "checkout: moving from main to f"]);
+    expect(entriesSince(entries, null, 0)).toHaveLength(4);
+    expect(entriesSince(entries.slice(0, 2), marker, 199).map((e) => e.at)).toEqual([200, 199]); // marker gone: by time
+  });
+});
+
+describe("the PreToolUse Bash hook (§46)", () => {
+  const opts = { signal: new AbortController().signal };
+  function hook(root: string, over: Partial<HookContext> = {}): { preBash: (command: string, id?: string, mode?: string) => Promise<unknown>; ctx: HookContext } {
+    const ctx: HookContext = { budget: new BudgetState({ maxFiles: 0, maxLines: 0 }), cwd: root, root, ignorePatterns: [], autoAllowTools: new Set(), emit: () => {}, log: () => {}, ...over };
+    const h = buildHooks(ctx).PreToolUse![1]!.hooks[0]!;
+    return {
+      ctx,
+      preBash: (command, id = "t1", mode) =>
+        h({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, session_id: "s", transcript_path: "", cwd: root, tool_use_id: id, ...(mode ? { permission_mode: mode } : {}) } as unknown as HookInput, id, opts),
+    };
+  }
+  const decision = (out: unknown) => {
+    const h = (out as { hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string } }).hookSpecificOutput;
+    return { decision: h?.permissionDecision, reason: h?.permissionDecisionReason };
+  };
+  function repo(): string {
+    const d = realpathSync(makeRepo());
+    dirs.push(d);
+    return d;
+  }
+
+  it("auto mode: a commit, a branch, a stash and a pull are the CLI's (no decision); reset --hard asks with the reason", async () => {
+    const root = repo();
+    const { preBash, ctx } = hook(root, { permissionMode: "auto" });
+    for (const command of ["git add -A && git commit -m x", "git checkout -b feature/acme-7", "git stash", "git pull --rebase"]) {
+      expect(await preBash(command, "t1", "auto"), command).toEqual({});
+    }
+    expect(decision(await preBash("git reset --hard origin/main", "r1", "auto"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    expect(ctx.scopeReasons?.get("r1")).toMatchObject({ code: "git_command" });
+  });
+
+  it("default mode: a commit is the ordinary card (no reason: it can be remembered as `Bash:git commit`)", async () => {
+    const root = repo();
+    const remembered = new Set<string>();
+    const { preBash, ctx } = hook(root, { permissionMode: "default", rememberedAllows: remembered });
+    expect(decision(await preBash("git commit -m x", "c1"))).toEqual({ decision: "ask", reason: ASK_REASON });
+    expect(ctx.scopeReasons?.get("c1")).toBeUndefined();
+    expect(rememberKey("Bash", { command: "git commit -m x" })).toBe("Bash:git commit");
+    remembered.add("Bash:git commit");
+    expect(decision(await preBash("git commit -m y", "c2"))).toEqual({ decision: "allow", reason: REMEMBERED_REASON });
+    expect(decision(await preBash("git clean -fd", "c3"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+  });
+
+  it("a remembered `Bash:git push` never answers a force push: the reason comes first", async () => {
+    const root = repo();
+    const { preBash, ctx } = hook(root, { rememberedAllows: new Set(["Bash:git push"]) });
+    expect(decision(await preBash("git push origin main", "p1"))).toEqual({ decision: "allow", reason: REMEMBERED_REASON });
+    for (const [id, command] of [["p2", "git push --force origin main"], ["p3", "git push origin +main"], ["p4", "git push --delete origin old"]] as const) {
+      expect(decision(await preBash(command, id)), command).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+      expect(ctx.scopeReasons?.get(id)?.code).toBe("git_command");
+    }
+  });
+
+  it("checkout over a file under review asks; the review's paths come from the engine", async () => {
+    const root = repo();
+    const review = new Set<string>();
+    const { preBash } = hook(root, { permissionMode: "auto", reviewPaths: () => review });
+    expect(await preBash("git checkout -- README.md", "k1", "auto")).toEqual({});
+    review.add("README.md");
+    expect(decision(await preBash("git checkout -- README.md", "k2", "auto"))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+  });
+});

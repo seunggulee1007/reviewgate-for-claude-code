@@ -2997,6 +2997,7 @@ export class ReviewEngine {
         log: (level, msg) => this.log(level, msg),
         // MARK: wave4d w4d-peers — §42.2: whom a SendMessage address reaches (the registry, only read).
         resolvePeer: (address) => peerAtAddress({ configDir: claudeConfigDir(this.childEnv()), address }),
+        reviewPaths: () => this.pathsUnderReview(), // MARK: r1-git (§46)
       });
       this.session = session;
       this.liveModels.set(session, this.startModel().model ?? null); // MARK: wave5 w5-model (§43.4)
@@ -3497,6 +3498,11 @@ export class ReviewEngine {
     if (!change) return null;
     this.gate.localSettingsChanged = { path: LOCAL_SETTINGS, ...change };
     return { ...this.gate.localSettingsChanged };
+  }
+
+  /** MARK: r1-git — §46: repo-relative paths still under review (pending, changes requested) — the hooks' git card. */
+  private pathsUnderReview(): ReadonlySet<string> {
+    return new Set(this.gate.changedFiles.filter((f) => f.state === "pending" || f.state === "changesRequested").map((f) => f.path));
   }
 
   /**

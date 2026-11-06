@@ -415,7 +415,7 @@ Golden samples of `state`, `file_diff` and `full_file_content` live in `engine/t
 ## 4. Settings and permissions (carried over from v1)
 
 - `loadUserSettings` (default true) starts the CLI with `settingSources: ["user","project"]` and `skills: "all"`, so the user's `~/.claude` skills, plugins, slash commands and MCP servers are available in app sessions (`state.session.capabilities` lists them). `false` → `settingSources: ["project"]`: only the project's own `.claude/settings.json`, built-in skills only. `.claude/settings.local.json` is never loaded by the CLI; the engine only reads its `permissions` (§33.5) and compares hashes of its parts across a turn (§32, never its content).
-- The CLI runs in `permissionMode: "default"`. `Edit|Write|MultiEdit|NotebookEdit` are auto-allowed **inside the checkpoint root** (the PreToolUse budget hook still gates them) — except inside a nested repository (§33.3) and on Claude Code's own settings files `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json` (§33.9), which always get the card; an edit whose `file_path`/`notebook_path` resolves — through symlinks, for files that do not exist yet via their nearest existing ancestor — outside the root gets `permissionDecision: "ask"` with the reason `ReviewGate: edit outside the project — needs approval` and reaches the permission card like any other tool (§8 `changedOutside`); an edit into git's own state — any path component `.git` (case-insensitive, also through symlinks; covers a linked worktree's `.git` file; on Windows also `.git.`, `.git ` , `.git::$INDEX_ALLOCATION` and the 8.3 name `GIT~1`, §20) or a path under `git rev-parse --git-dir` / `--git-common-dir` — is always denied (`ReviewGate: edits inside the git directory (.git/) are not allowed …`) by the hook and by `canUseTool`, never offered on the card. Every git call the engine makes runs with `-c core.fsmonitor=` (no fsmonitor command) and, except the user-initiated `commit` / `push` (and `pr_create`'s `push -u`), `-c core.hooksPath=<null device>`, so hooks or fsmonitor planted in the repository config never run during snapshots, revert or worktree management; read-only tools (Read, Glob, Grep, LS, TodoWrite, TodoRead, NotebookRead, BashOutput, KillShell, ToolSearch, ListAgents — §33.2) and `Skill` never prompt. Every other tool (Bash, WebFetch, WebSearch, Agent/Task, MCP tools, …) produces a `permission_request` unless listed in `settings.autoAllowTools` — or, for Bash, unless the command is read-only / matches `bashAllowPatterns` / was remembered for the session (§10): the PreToolUse hooks return `permissionDecision: "ask"` (or `"allow"` with a `ReviewGate: …` reason for those three cases), which the CLI evaluates *before* its `permissions.allow` rules, so no settings file can bypass the app's permission card. The one exception is decided by the engine itself (§33.5): the user's `permissions.allow` rules (user / project / local settings files) allow tools that **cannot change files** — WebSearch, WebFetch, Agent/Task, read-only MCP tools, … — never edit tools, Bash or SendMessage; app allow patterns may also name MCP / WebFetch / WebSearch / Agent calls (§33.6). Deny decisions (budget, plan mode) are returned by the same hook before `ask`/`allow`, so deny always wins; a git command that changes the repository is no longer denied but always gets the card with the reason `git_command` (§46).
+- The CLI runs in `permissionMode: "default"`. `Edit|Write|MultiEdit|NotebookEdit` are auto-allowed **inside the checkpoint root** (the PreToolUse budget hook still gates them) — except inside a nested repository (§33.3) and on Claude Code's own settings files `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json` (§33.9), which always get the card; an edit whose `file_path`/`notebook_path` resolves — through symlinks, for files that do not exist yet via their nearest existing ancestor — outside the root gets `permissionDecision: "ask"` with the reason `ReviewGate: edit outside the project — needs approval` and reaches the permission card like any other tool (§8 `changedOutside`); an edit into git's own state — any path component `.git` (case-insensitive, also through symlinks; covers a linked worktree's `.git` file; on Windows also `.git.`, `.git ` , `.git::$INDEX_ALLOCATION` and the 8.3 name `GIT~1`, §20) or a path under `git rev-parse --git-dir` / `--git-common-dir` — is always denied (`ReviewGate: edits inside the git directory (.git/) are not allowed …`) by the hook and by `canUseTool`, never offered on the card. Every git call the engine makes runs with `-c core.fsmonitor=` (no fsmonitor command) and, except the user-initiated `commit` / `push` (and `pr_create`'s `push -u`), `-c core.hooksPath=<null device>`, so hooks or fsmonitor planted in the repository config never run during snapshots, revert or worktree management; read-only tools (Read, Glob, Grep, LS, TodoWrite, TodoRead, NotebookRead, BashOutput, KillShell, ToolSearch, ListAgents — §33.2) and `Skill` never prompt. Every other tool (Bash, WebFetch, WebSearch, Agent/Task, MCP tools, …) produces a `permission_request` unless listed in `settings.autoAllowTools` — or, for Bash, unless the command is read-only / matches `bashAllowPatterns` / was remembered for the session (§10): the PreToolUse hooks return `permissionDecision: "ask"` (or `"allow"` with a `ReviewGate: …` reason for those three cases), which the CLI evaluates *before* its `permissions.allow` rules, so no settings file can bypass the app's permission card. The one exception is decided by the engine itself (§33.5): the user's `permissions.allow` rules (user / project / local settings files) allow tools that **cannot change files** — WebSearch, WebFetch, Agent/Task, read-only MCP tools, … — never edit tools, Bash or SendMessage; app allow patterns may also name MCP / WebFetch / WebSearch / Agent calls (§33.6). Deny decisions (budget, plan mode) are returned by the same hook before `ask`/`allow`, so deny always wins; a git command that throws away uncommitted work or rewrites the remote always gets the card with the reason `git_command` (§46; any other git command is an ordinary one).
 - Budget (opt-in, §54: only while the client set a limit — 0 is none, and none is the default): per-turn `files`/`lines` from the pre-edit estimate and the post-Bash worktree numstat against the turn's own start tree (§34.1 — not A, which a request-changes turn or a question keeps for the review; paths matching `ignorePatterns` excluded) — counting only the files the turn's edit tools and Bash calls changed (§31: a change nothing of Claude's explains is not charged); `warn` at 100 %, `deny` above `hardMultiplier × budget`; after a deny the rest of the turn's edits and the Bash commands that write files are refused with the same reason, nothing else is, and the turn is never interrupted (§54).
 - Ignore patterns: a repo-relative path is ignored when it has the pattern as a prefix, or — when the pattern contains `*` — when the glob matches the full path or (patterns without `/`) the last component; `*` matches any run of characters including `/`. Applied to the review list (the hidden paths are listed in `gate.filteredByPattern`) and to the budget numstat; not to `isWorktreeDirty`, and never to the mods paths (`.claude/**`, `.mcp.json`, `CLAUDE*.md`, §32).
 - With user settings loaded the user's own hooks/plugins run inside app sessions too (e.g. oh-my-claudecode writes `.omc/` into the project) — the app's default ignore list hides `.omc/` from review.
@@ -693,8 +693,9 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   an empty line, or a segment starting with anything else (`sudo`, `rm`, `mv`, `cp`, `tee`, `xargs`, `eval`, `exec`, `npm test`,
   `node script.js`, …) makes the command NOT read-only. The PreToolUse Bash hook then answers `permissionDecision: "allow"`
   (reason `ReviewGate: read-only command`) instead of `ask`, and `canUseTool` applies the same rule should it still be reached;
-  the budget deny is checked first, and a git command that changes the repository (`git commit|merge|checkout|…`) always
-  gets the card with the reason `git_command` (§46). `false` turns the rule off.
+  the budget deny is checked first, and a git command that throws away uncommitted work or rewrites the remote
+  (`git reset --hard`, `clean -f`, a force push, …) always gets the card with the reason `git_command` (§46). `false` turns
+  the rule off.
 - **Allow patterns** (`settings.bashAllowPatterns`, default `[]`; live via `set_settings`). Claude-style entries: `Bash(npm test:*)`
   (prefix `npm test` at a word boundary: `npm test`, `npm test -- --watch`, not `npm testing`), `Bash(git *)` (glob over the whole
   command; `*` any run, `?` one char), `Bash(make)` (exact). Whitespace runs are collapsed on both sides; a bare pattern without
@@ -754,8 +755,8 @@ docs/M20-MODES.md, engine part. Additive: one optional setting, one command, one
   command; then to `settings.permissionMode`, then `"default"`. `session_new` / `session_open` keep the project's mode.
   (A task's or an approved plan's mode, §49 / §42.1, still wins: it is applied after the restore.)
 - **Deny still wins.** The mode never reaches the PreToolUse hooks: the budget returns `deny` before the CLI evaluates any
-  mode, so `auto` and `acceptEdits` cannot bypass the review gate, and a git command that changes the repository gets the
-  card (`git_command`, §46) in those modes too (§10, engine/test/engine.modes.test.ts).
+  mode, so `auto` and `acceptEdits` cannot bypass the review gate, and a git command that throws away uncommitted work or
+  rewrites the remote gets the card (`git_command`, §46) in those modes too (§10, engine/test/engine.modes.test.ts).
 
 ### The plan proposal flow
 
@@ -5888,24 +5889,44 @@ again; and the menus, rebuilt for AppKit on each.
 
 Until now the PreToolUse Bash hook denied every git command that changes the repository ("The app manages git; do not
 commit or move the working tree"), so a user who asked Claude to merge `develop` and resolve the conflicts got a refusal.
-Claude may now run them when asked; each one waits for the user's click, and the review keeps showing only Claude's work.
+Claude may now run them when asked, and the review keeps showing only Claude's work. MARK: r1-git — git runs as it does
+in a terminal: only a command that throws away uncommitted work or rewrites the remote waits for the user's click (before,
+every commit, checkout, pull, merge, stash or restore did — 3 to 8 cards per task, N + 2 for a commit-splitting skill, while
+the terminal's auto mode asked for none).
 
-- **Which commands.** `GIT_MUTATING_RE` (hooks.ts): `git` with any option groups before the verb (`git -C x`, `-c k=v`,
-  `--no-pager`) and the verb `commit`, `checkout`, `switch`, `reset`, `restore`, `stash` (not `stash list` / `stash show`),
-  `clean`, `rebase`, `merge`, `apply`, `am`, `pull`, `cherry-pick` or `revert`. The verb ends at a character that is neither
-  a word character nor `-`: the read-only `merge-tree` / `merge-base` / `cherry` are not it (before, `\b` matched `merge-…`).
-  Also `bisect`, `gh pr checkout|merge`, a quoted `"git"`, and option values quoted with spaces (`-C "My Repo"`,
-  `-c user.name="A B"`); an option's separate value never starts with `-` (no exponential backtracking on long option runs).
-  `push`, `config`, ref writes and worktree removal keep their own rules (§33.4, §40.1).
-- **The card.** Such a command reaches `canUseTool` with `permission_request.reason = {code: "git_command", message}` (§33.3;
-  the hook answers `ask`, reason `ReviewGate: a git command that changes the repository — needs the user's approval`, after
-  the location and settings reasons) — in every permission mode, `acceptEdits` and `auto` included, and whatever
-  `autoAllowTools`, an allow pattern (`Bash(git *)`), a remembered key or the user's rules say; like every reason card it
-  offers no "always allow" and stores no `remember`. `canUseTool` finds the reason itself should the hook not have seen the
-  call. Plan mode (§19.4) and the unprompted guard (§18) still deny first; an approved command raises no
-  `worktree_outside_review`. Clients localize on the code (Mac: red, "저장소를 바꾸는 git 명령입니다(commit · merge ·
-  checkout · reset 등) — 이 명령이 가져오는 변경은 Claude 의 수정으로 세지 않으며, 커밋은 리뷰에서 되돌릴 수 없습니다"); one
-  that does not know it shows `message`.
+- **Which commands ask** (engine `session/gitDestructive.ts` `destructiveGitReason`, called by hooks.ts `gitCommandReason`).
+  The command line is read by a tolerant shell scanner: only the words of commands count — a git command inside `echo`,
+  `grep`, quotes or a here-document (a commit message saying `git push --force`) never does; chains, pipes, redirections
+  (`2>&1`, `> /dev/null`), subshells, `$( … )` / backticks, `bash -c` / `sh -c` / `eval` scripts, `if` / `for` bodies and
+  wrappers (`sudo`, `env`, `time`, `nohup`, `timeout`, `xargs`, …) are looked into; global options before the verb are
+  skipped (`-C <dir>` moves where paths point, as does the line's own `cd`). Always: `reset --hard|--merge`; `checkout` /
+  `switch` with `-f` / `--force` / `--discard-changes`; `clean` unless `-n` / `--dry-run` (a `clean.requireForce = false`
+  config deletes without `-f`); `branch -D` / `-M` / `-C` or any forced branch change (`-df`, `--delete --force`,
+  `branch -f x y`); `stash drop|clear`; `push` with `--force`, `-f` (also inside a cluster: `-uf`), `--force-with-lease`,
+  `--force-if-includes`, `--mirror`, `--delete`, `-d`, `--prune` or a refspec starting with `+` or `:`; `worktree remove`
+  with `--force` / `-f`. Long options count by any prefix git accepts (`--har`); `--no-…` forms never. Only when the targets
+  hold work: `checkout [<tree-ish>] -- <paths>`, `checkout .`, `checkout <x>` when `<x>` is an existing path (or a glob) and
+  not a commit (`git rev-parse --verify --quiet <x>^{commit}`), `checkout --ours|--theirs|-p <paths>`, `checkout <commit>
+  <paths>`, and `restore` of the working tree (no `--staged` / `-S`, or with `--worktree` / `-W`) — when a pathspec (`.`,
+  a folder, a glob, `:(magic)` — everything) covers a file still under review (`pending` / `changesRequested`; the engine
+  hands the hooks its list, `HookContext.reviewPaths`) or a file with an uncommitted change (`git status --porcelain -z
+  --untracked-files=no -- <paths>` where the command runs; from a tree-ish untracked files count too). A
+  `--pathspec-from-file`, a `--git-dir` / `--work-tree` elsewhere or a status git could not give counts as holding work.
+  Everything else — `commit`, `checkout -b` / `switch -c`, `checkout <branch>`, `pull`, `merge`, `rebase`, `stash` (push),
+  `stash pop`, a plain `push` / `push -u`, `config`, `restore --staged` — is an ordinary command: in auto mode the CLI's own
+  rules (the user's `Bash(git checkout:*)`, a skill's `allowed-tools: Bash(git commit:*)`) and its classifier decide (§39.5),
+  in the default mode the ordinary card asks — one that "allow for session" remembers (`Bash:git commit`).
+  `GIT_MUTATING_RE` (hooks.ts) no longer decides any card: it only says which commands' file changes are git's (below).
+- **The card.** A command that asks reaches `canUseTool` with `permission_request.reason = {code: "git_command", message:
+  "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back."}` (§33.3; the
+  hook answers `ask`, reason `ReviewGate: a git command that throws away uncommitted work or rewrites the remote — needs
+  the user's approval`, after the location and settings reasons) — in every permission mode, `acceptEdits` and `auto`
+  included, and whatever `autoAllowTools`, an allow pattern (`Bash(git *)`), a remembered key or the user's rules say; like
+  every reason card it offers no "always allow" and stores no `remember` — so a remembered `Bash:git push` (the key is the
+  first two words) never answers `git push --force` (it used to). `canUseTool` finds the reason itself should the hook not
+  have seen the call. Plan mode (§19.4) and the unprompted guard (§18) still deny first; an approved command raises no
+  `worktree_outside_review`. Clients localize on the code (Mac and Electron: red, "커밋하지 않은 작업을 버리거나 원격 기록을
+  바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"); one that does not know it shows `message`.
 - **Not Claude's edits.** The post-Bash snapshot of such a command (§31) reports no files (`tool_files`) and adds nothing to
   the per-turn budget — a merge may bring in seventy files from another branch. The snapshot still moves the next call's
   base, so Claude's next command is attributed as usual, and conflict resolutions made with `Edit` / `Write` count normally.
@@ -5932,8 +5953,11 @@ Claude may now run them when asked; each one waits for the user's click, and the
   ones, or a review file that is not accepted has its change staged (Claude's `git add`): it would go in unresolved or
   unreviewed. After a commit that alone moved HEAD (its first parent is `baseHead`), `baseHead` follows it and a concluded
   merge clears `baseMerge` — A already holds what the commit holds.
-- **Claude's instruction.** The engine appends after the client's text: when the user asks to merge, pull, rebase,
-  cherry-pick, commit, stash or resolve conflicts, do it with git; every such command gets the approval card; "never run git
+- **Claude's instruction.** The engine appends after the client's text (`GIT_INSTRUCTION`): when the user (or a skill they
+  ran) asks to commit, branch, merge, pull, rebase, cherry-pick, stash, push or resolve conflicts, run git as in a terminal;
+  ReviewGate asks only before reset --hard, clean -f, checkout / restore over files under review or uncommitted, branch -D,
+  stash drop / clear and force pushes (r1-git; it said every such command got the approval card); files Claude commits stay
+  in the review; "never run git
   commit / … " means not on Claude's own initiative; after resolving merge conflicts, leave the merge uncommitted and the
   resolutions unstaged unless the user asked to commit (the user reviews them and commits the merge from the app); a denied
   card means stop and ask; never a worktree, clone or copy of the project under /tmp, /private/tmp or /var/folders (macOS
@@ -5943,7 +5967,10 @@ Claude may now run them when asked; each one waits for the user's click, and the
   to run them only when the user asks (Mac `AppSettings.defaultSystemPromptAppend`, Electron `DEFAULT_SYSTEM_PROMPT_APPEND`).
 - **Compatibility.** One new `PermissionReason.code`; a client that does not know it shows `message` on an orange line
   (Electron, until it localizes it). The persisted review gains an optional `baseMerge`.
-- **Verified.** `engine/test/session.budget.test.ts` (the verb boundary, `pull` / `cherry-pick` / `revert`, `stash list`),
+- **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
+  substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, the hook in auto
+  and default mode, a remembered `Bash:git push` against a force push),
+  `engine/test/session.budget.test.ts` (the verb boundary, `pull` / `cherry-pick` / `revert`, `stash list`),
   `session.hooks.test.ts` (the card over an allow pattern; a merge's files neither reported nor counted, the next command
   attributed), `session.claudeConfig.test.ts` (`canUseTool` in auto mode with `autoAllowTools`, a pattern and a remembered
   key), `autoMode.test.ts` / `engine.modes.test.ts` (the card in auto mode, plan mode still denies), `review.gate.test.ts`

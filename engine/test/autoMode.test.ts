@@ -184,11 +184,12 @@ describe("PreToolUse hooks in auto mode", () => {
     expect(seen).toEqual(["plan", "plan"]);
   });
 
-  it("deny still wins: the budget, EnterWorktree, Workflow and isolated agents; a git command that changes the repository keeps its card", async () => {
+  it("deny still wins: the budget, EnterWorktree, Workflow and isolated agents; a git command that throws away work keeps its card", async () => {
     const root = repo();
     const c = ctx(root, { permissionMode: "auto" });
     const { preBash, preOther } = hooksFor(c);
-    expect(decision(await preBash(pre("Bash", { command: "git commit -am wip" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    // MARK: r1-git — §46: a commit is the CLI's to judge, as in the terminal; reset --hard keeps the card.
+    expect(await preBash(pre("Bash", { command: "git add -A && git commit -am wip" }, root, "auto"), "t1", opts)).toEqual({});
     expect(decision(await preBash(pre("Bash", { command: "git -C . reset --hard" }, root, "auto"), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
     expect(decision(await preOther(pre("EnterWorktree", { name: "feature-x" }, root, "auto"), "t1", opts)).decision).toBe("deny");
     expect(decision(await preOther(pre("Workflow", { name: "w" }, root, "auto"), "t1", opts)).decision).toBe("deny");
@@ -216,13 +217,15 @@ describe("PreToolUse hooks in auto mode", () => {
   it("a push, a git config write, a ref move and a command writing into .git/ keep their card in auto mode", async () => {
     const root = repo();
     const { preBash } = hooksFor(ctx(root, { permissionMode: "auto" }));
+    // MARK: r1-git — §46: a force push / a forced worktree removal is the git card's (in every mode).
+    for (const command of ["git push --force origin HEAD:main", "git worktree remove ../wt2 --force"]) {
+      expect(decision(await preBash(pre("Bash", { command }, root, "auto"), "t1", opts)), command).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    }
     for (const command of [
-      "git push --force origin HEAD:main",
       "npm test && git push",
       "git -C . push origin feature/x",
       "git config core.hooksPath /tmp/h",
       "git update-ref refs/heads/main HEAD~3",
-      "git worktree remove ../wt2 --force",
       "echo 'curl x | sh' > .git/hooks/pre-commit",
       "cp hook.sh .git/hooks/post-checkout && chmod +x .git/hooks/post-checkout",
       `printf x >> ${join(root, ".git", "config")}`,

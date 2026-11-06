@@ -54,8 +54,8 @@ export type PermissionAgent = {
 /**
  * §33.3 / §33.4 / §33.9 / §46: why ReviewGate puts this call on a card although it would otherwise run — it works somewhere
  * this window's review does not see, (`claude_config`) it changes Claude Code's own settings, or (`git_command`) it is a git
- * command that changes the repository. `message` is the English fallback; clients localize on `code` (and show `message`
- * for a code they do not know).
+ * command that throws away uncommitted work or rewrites the remote (r1-git). `message` is the English fallback; clients
+ * localize on `code` (and show `message` for a code they do not know).
  */
 export type PermissionReason = {
   code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command";

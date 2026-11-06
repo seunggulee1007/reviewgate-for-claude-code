@@ -19,6 +19,7 @@ import type { SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
+import { destructiveGitReason, type GitProbe } from "./gitDestructive.js"; // MARK: r1-git (§46)
 import {
   bashClaudeConfigTarget,
   bashScopeReason,
@@ -166,25 +167,33 @@ export function needsAsk(toolName: string, autoAllowTools: ReadonlySet<string>):
 }
 
 /**
- * Also matches option groups before the verb: `git -C x commit`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
+ * §46: a git command whose file changes are git's, not Claude's (postBash attributes none of them). Also matches option
+ * groups before the verb: `git -C x commit`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
  * at a non-word, non-dash character, so the read-only `merge-tree` / `merge-base` / `cherry` are not it; nor are
  * `stash list` / `stash show`. `"git"` quoted, option values quoted with spaces (`-C "My Repo"`, `-c user.name="A B"`), `bisect` and
- * `gh pr checkout|merge` count too (ref writes keep their own card, §40.1). An option's separate value never starts with `-`: else `-a -b -c …` splits
+ * `gh pr checkout|merge` count too. An option's separate value never starts with `-`: else `-a -b -c …` splits
  * into options and values in 2^n ways when no verb follows (30 options took 60 ms, each one more doubled it).
+ * MARK: r1-git — no longer what asks: the card is `gitCommandReason`'s (destructive commands only).
  */
 export const GIT_MUTATING_RE =
   /\bgit["']?(?:\s+-{1,2}[\w-]+(?:=(?:[^\s"']|"[^"]*"|'[^']*')+|\s+(?:[^\s"'-]|"[^"]*"|'[^']*')(?:[^\s"']|"[^"]*"|'[^']*')*)?)*\s+(commit|checkout|switch|reset|restore|stash(?!\s+(?:list|show)(?![\w-]))|clean|rebase|merge|apply|am|pull|cherry-pick|revert|bisect)(?![\w-])|\bgh\s+pr\s+(?:checkout|merge)(?![\w-])/;
-export const GIT_ASK_REASON = "ReviewGate: a git command that changes the repository — needs the user's approval";
+export const GIT_ASK_REASON = "ReviewGate: a git command that throws away uncommitted work or rewrites the remote — needs the user's approval";
+
+const NO_PATHS: ReadonlySet<string> = new Set();
 
 /**
- * §46: the card reason of a Bash command that changes the repository (`GIT_MUTATING_RE`: a commit, merge, pull, checkout, …),
- * null for anything else. Such a command always gets the card — in every permission mode, whatever a pattern, a remembered
- * key or the user's rules say — and the files it changes are not Claude's edits (postBash).
+ * MARK: r1-git — §46: the card reason of a Bash command one of whose git commands throws away uncommitted work or rewrites
+ * the remote (`destructiveGitReason`: reset --hard, clean -f, checkout / restore over files under review or with
+ * uncommitted changes, branch -D, stash drop / clear, a force push, …), null for anything else — a commit, a branch, a
+ * pull, a plain push run as in the terminal. Such a command always gets the card, in every permission mode, whatever a
+ * pattern, a remembered key or the user's rules say. `cwd`: where the command runs (the shell's directory).
  */
-export function gitCommandReason(toolName: string, input: Record<string, unknown>): PermissionReason | null {
+export async function gitCommandReason(toolName: string, input: Record<string, unknown>, ctx: HookContext, cwd: string = ctx.cwd): Promise<PermissionReason | null> {
   if (toolName !== "Bash") return null;
   const command = typeof input.command === "string" ? input.command : "";
-  return GIT_MUTATING_RE.test(command) ? { code: "git_command", message: SCOPE_MESSAGES.git_command } : null;
+  if (!/git/.test(command)) return null;
+  const root = await containmentRoot(ctx);
+  return destructiveGitReason(command, { cwd, root, reviewPaths: ctx.reviewPaths?.() ?? NO_PATHS, ...(ctx.gitProbe ? { probe: ctx.gitProbe } : {}) });
 }
 
 const SHELL_MUTATING_RE =
@@ -300,6 +309,11 @@ export type HookContext = {
   worktrees?: string[];
   /** §33.4: work outside this window's review was blocked / happened (EnterWorktree, isolated agents, worktree commands). */
   onScopeNotice?: (notice: ScopeNotice) => void;
+  // MARK: r1-git — §46
+  /** Repo-relative paths still under review (pending, changes requested): a git command overwriting one asks first. */
+  reviewPaths?: () => ReadonlySet<string>;
+  /** Test seam: what the git card asks the repository (`gitDestructive.gitProbe`). */
+  gitProbe?: GitProbe;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
@@ -733,9 +747,10 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       rememberScope(ctx, toolUseIdOf(input), config);
       return askPre(CLAUDE_CONFIG_ASK_REASON);
     }
-    // §46: and so does a git command that changes the repository (a merge, a commit, …) — Claude runs it when asked, the
-    // user approves each one; this `ask` reaches canUseTool in acceptEdits / auto too.
-    const git = gitCommandReason(input.tool_name, ti);
+    // MARK: r1-git — §46: git runs as in the terminal (auto mode: the CLI's rules and classifier; default: the ordinary card,
+    // which can be remembered). Only a command that throws away uncommitted work or rewrites the remote reaches the card
+    // with the reason — in every mode, never remembered; this `ask` reaches canUseTool in acceptEdits / auto too.
+    const git = await gitCommandReason(input.tool_name, ti, ctx, hookCwd(input, ctx));
     if (git) {
       rememberScope(ctx, toolUseIdOf(input), git);
       return askPre(GIT_ASK_REASON);

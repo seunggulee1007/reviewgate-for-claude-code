@@ -274,18 +274,21 @@ describe("canUseTool: the claude_config card (§33.9)", () => {
 });
 
 describe("canUseTool: the git_command card (§46)", () => {
-  it("a git command that changes the repository is a card with the reason — never auto-allowed by autoAllowTools, a pattern or a remembered key", async () => {
+  it("a git command that throws away work or rewrites the remote is a card with the reason — never auto-allowed by autoAllowTools, a pattern or a remembered key", async () => {
     const root = repo();
-    const { s, events } = session(root, { permissionMode: "auto", autoAllowTools: ["Bash"], bashAllowPatterns: ["Bash(git *)"] }, new Set(["Bash:git merge"]));
+    const { s, events } = session(root, { permissionMode: "auto", autoAllowTools: ["Bash"], bashAllowPatterns: ["Bash(git *)"] }, new Set(["Bash:git push"]));
     const canUseTool = (s as unknown as { canUseTool: CanUseTool }).canUseTool;
-    // The CLI asked without our hook having seen the call: canUseTool finds the reason itself.
-    const pending = canUseTool("Bash", { command: "git merge develop" }, { ...opts } as never);
+    // The CLI asked without our hook having seen the call: canUseTool finds the reason itself — a remembered `Bash:git push`
+    // never answers a force push (MARK: r1-git).
+    const pending = canUseTool("Bash", { command: "git push --force origin main" }, { ...opts } as never);
     const req = await nextRequest(events, 1);
     expect(req).toMatchObject({ toolName: "Bash", reason: { code: "git_command" } });
     expect(req.allowPatterns).toBeUndefined();
     s.respondPermission(req.requestId, true);
     expect(await pending).toMatchObject({ behavior: "allow" });
-    // A read-only git command still rides on the rules.
+    // A merge or a plain push throws nothing away: it rides on the rules (r1-git), as does a read-only git command.
+    expect(await canUseTool("Bash", { command: "git merge develop" }, { ...opts } as never)).toMatchObject({ behavior: "allow" });
+    expect(await canUseTool("Bash", { command: "git push origin main" }, { ...opts } as never)).toMatchObject({ behavior: "allow" });
     expect(await canUseTool("Bash", { command: "git merge-base HEAD develop" }, { ...opts } as never)).toMatchObject({ behavior: "allow" });
   });
 });
