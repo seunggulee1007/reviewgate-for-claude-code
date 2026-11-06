@@ -52,6 +52,8 @@ final class TranscriptViewState {
     @ObservationIgnored var seenCount = 0
     /// While an answer streams the view follows at most every `TranscriptFollower.streamGap`.
     @ObservationIgnored var lastStreamFollow: ContinuousClock.Instant?
+    /// r1x — §45.1: when the view last followed a new row (rows in quick succession are not animated one by one).
+    @ObservationIgnored var lastRowFollow: ContinuousClock.Instant?
     @ObservationIgnored var pendingStreamFollow: Task<Void, Never>?
 
     func isMatch(_ id: UUID) -> Bool { findVisible && matchSet.contains(id) }
@@ -121,6 +123,13 @@ struct TranscriptPane: View {
                     Color.clear.frame(height: 1).id(Self.bottomID)
                 }
                 .padding(12)
+            }
+            // r1x — §45.1: while following, the newest row stays in view whenever the content's height changes — rows coming
+            // into a group above the bottom (a subagent's calls), a row finishing in place, a group folding — at once, not
+            // only when a row is appended (its height can still change after that scroll).
+            .onScrollGeometryChange(for: CGFloat.self) { $0.contentSize.height } action: { old, new in
+                guard abs(new - old) > 0.5, view.follow, !view.userScrolling, view.flashToolUseId == nil, store.viewingChat == nil else { return }
+                proxy.scrollTo(Self.bottomID, anchor: .bottom)
             }
             .onScrollGeometryChange(for: Bool.self) { geo in
                 geo.contentOffset.y + geo.containerSize.height >= geo.contentSize.height - 32
@@ -393,6 +402,7 @@ private struct TranscriptFollower: View {
     private func keepBottom() {
         guard view.follow, !view.userScrolling, view.flashToolUseId == nil else { return }
         proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom)
+        settleAtBottom()   // r1x: once more after the rows are laid out at the new width (the kept row is re-placed meanwhile)
     }
 
     private func follow() {
@@ -407,12 +417,36 @@ private struct TranscriptFollower: View {
         guard view.flashToolUseId == nil else { return }   // don't yank the view away from a revealed row
         if view.follow, !view.userScrolling {
             if count > view.seenCount {
-                withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+                // r1x — §45.1: a row that comes alone glides in; rows that keep coming (subagents at work) do not restart an
+                // animation each — that bounced the view — and one more pin after their layout keeps the newest in view.
+                let now = ContinuousClock.now
+                var alone = true
+                if let last = view.lastRowFollow, now - last < Self.rowGap { alone = false }
+                view.lastRowFollow = now
+                if alone {
+                    withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+                } else {
+                    proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom)
+                }
+                settleAtBottom()
             } else {
                 followStream()   // a streaming delta: no animation per token
             }
         } else if count > view.seenCount {
             view.unseen += count - view.seenCount
+        }
+    }
+
+    /// r1x — §45.1: rows that keep coming less than this apart are followed without an animation each.
+    static let rowGap: Duration = .milliseconds(400)
+
+    /// One more pin to the bottom once the rows just followed are laid out (the lazy stack sizes them after the scroll).
+    private func settleAtBottom() {
+        let state = view, scroller = proxy, app = store
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard state.follow, !state.userScrolling, state.flashToolUseId == nil, app.viewingChat == nil else { return }
+            scroller.scrollTo(TranscriptPane.bottomID, anchor: .bottom)
         }
     }
 

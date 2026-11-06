@@ -62,6 +62,11 @@ private final class Tour {
             do { try await layoutShots(); finish(nil) } catch { finish(error) }
             return
         }
+        // r1x (`SHOTS_LAYOUT=scroll`): only the transcript's scroll check, over a long made-up chat.
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "scroll" {
+            do { try await scrollOnly(); finish(nil) } catch { finish(error) }
+            return
+        }
         do {
             try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
             try place()
@@ -214,6 +219,7 @@ private final class Tour {
         try await prSheetShot()
         try await commitSplitShots(window)
         try await transcriptShots(window)
+        try await scrollChecks(window)
         try await composerShots(window)
     }
 
@@ -367,6 +373,141 @@ private final class Tour {
             store.debugShowGate(.idle)
             try await capture("reviewed-\(turn)")
             checkDraft("reviewed-\(turn)")
+        }
+    }
+
+    /// `SHOTS_LAYOUT=scroll`: a long made-up chat, then `scrollChecks` — dark, at the laptop size.
+    private func scrollOnly() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        store.debugHandle((1...20).flatMap { Self.turnEvents($0, root: root) })
+        try await Task.sleep(for: .milliseconds(1500))
+        try await scrollChecks(window)
+    }
+
+    /// r1x — §45.1: does the transcript hold still while rows change? Three subagents work (their groups open, above the
+    /// bottom); their calls come in and finish, a notice repeats in place (×N), one agent ends (its group folds). Following,
+    /// the view must stay at the bottom and never move up ("JUMP" in the log); scrolled up, the rows shown must stay where
+    /// they are when the rows above them change ("SHIFT"). `scroll: …` lines in tour.log, `chat-scroll-*.png`.
+    private func scrollChecks(_ window: NSWindow) async throws {
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1200))
+        guard let chat = (try? scrollViews(window))?.max(by: { $0.convert($0.bounds, to: nil).maxX < $1.convert($1.bounds, to: nil).maxX }) else {
+            return log("scroll: no chat scroll view")
+        }
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        let state = entry.model.chatTranscript
+        func geometry() -> (y: CGFloat, height: CGFloat, visible: CGFloat) {
+            (chat.contentView.bounds.origin.y, chat.documentView?.frame.height ?? 0, chat.contentView.bounds.height)
+        }
+        /// Samples the clip view every few ms while `body` runs: how often it moved up, and how far it was from the bottom.
+        func sampled(_ what: String, _ body: () async throws -> Void) async rethrows -> [(y: CGFloat, height: CGFloat, visible: CGFloat)] {
+            var samples: [(y: CGFloat, height: CGFloat, visible: CGFloat)] = []
+            let sampler = Task { @MainActor in
+                while !Task.isCancelled {
+                    samples.append(geometry())
+                    try? await Task.sleep(for: .milliseconds(4))
+                }
+            }
+            try await body()
+            try? await Task.sleep(for: .milliseconds(600))
+            sampler.cancel()
+            samples.append(geometry())
+            return samples
+        }
+        let agents = ["toolu_agent_1", "toolu_agent_2", "toolu_agent_3"]
+        func agentCall(_ id: String, _ n: Int) -> EngineEvent {
+            .toolUse(id: id, name: "Agent", input: .object(["subagent_type": .string(n == 1 ? "code-reviewer" : n == 2 ? "security-reviewer" : "test-engineer"),
+                                                            "description": .string("PR #\(40 + n) 다시 검토"), "run_in_background": .bool(true)]), file: nil)
+        }
+        func child(_ agent: String, _ i: Int) -> [EngineEvent] {
+            let id = "\(agent)_call_\(i)"
+            let file = "\(root)/src/\(i % 2 == 0 ? "cart" : "pricing").ts"
+            return [.toolUse(id: id, name: i % 3 == 2 ? "Bash" : "Read",
+                             input: i % 3 == 2 ? .object(["command": .string("git diff --stat origin/main")]) : .object(["file_path": .string(file)]),
+                             file: i % 3 == 2 ? nil : file, info: ToolUseInfo(parentToolUseId: agent)),
+                    .toolResult(toolUseId: id, isError: false, preview: "\(i) lines", info: ToolResultInfo(parentToolUseId: agent))]
+        }
+        let repeated: EngineEvent = .error(message: "Context left until auto-compact: 9%", fatal: false, scope: .session,
+                                           detail: EngineErrorDetail(code: "cli_warning"))
+        // Three subagents start; the turn runs (their groups are open while they work).
+        store.debugShowGate(.running)
+        store.debugHandle([.userMessage(text: "PR 다시 검토해줘 — 리뷰어 셋으로", turn: 30)] + agents.enumerated().map { agentCall($1, $0 + 1) })
+        state.follow = true
+        try await Task.sleep(for: .milliseconds(1500))
+        // 1) Following: calls come in and finish inside the groups (above the bottom); the notice repeats in place.
+        let following = try await sampled("following") {
+            for i in 0..<10 {
+                for agent in agents.prefix(2) {
+                    for event in child(agent, i) {
+                        store.debugHandle([event])
+                        try await Task.sleep(for: .milliseconds(60))
+                    }
+                }
+                if i % 3 == 0 { store.debugHandle([repeated]) }
+            }
+        }
+        report("following", following, following: true)
+        try write(try render(window), "chat-scroll-following")
+        // 2) Scrolled up a little (a user reading the third agent's group): the first two groups, above, keep growing. The
+        // wheel as a user turns it (SwiftUI sees a scroll of the user's, not a jump of the clip view).
+        state.follow = false
+        if let wheel = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 260, wheel2: 0, wheel3: 0),
+           let event = NSEvent(cgEvent: wheel) {
+            chat.scrollWheel(with: event)
+        }
+        try await Task.sleep(for: .milliseconds(900))
+        state.follow = false
+        let scrolledUp = try await sampled("scrolled up") {
+            for i in 10..<16 {
+                for event in child(agents[0], i) {
+                    store.debugHandle([event])
+                    try await Task.sleep(for: .milliseconds(60))
+                }
+            }
+            store.debugHandle([repeated])
+        }
+        report("scrolled up, rows above grow", scrolledUp, following: false)
+        // 3) Still scrolled up: the first agent ends — its report comes and its group folds.
+        let ended = try await sampled("agent ends") {
+            store.debugHandle([.toolResult(toolUseId: agents[0], isError: false, preview: "리뷰 3건: 할인 코드 순서, 세금 반올림, 테스트 누락",
+                                           info: { var i = ToolResultInfo(); i.agentEnded = true; return i }())])
+        }
+        report("scrolled up, a group above folds", ended, following: false)
+        try write(try render(window), "chat-scroll-scrolled-up")
+        state.follow = true
+        store.debugShowGate(.idle)
+        try await Task.sleep(for: .milliseconds(800))
+    }
+
+    /// One `scroll:` line: following, how often the view moved up and how far it was from the bottom at the end; scrolled up,
+    /// how far the rows shown moved (the content's growth the offset did not follow).
+    private func report(_ what: String, _ samples: [(y: CGFloat, height: CGFloat, visible: CGFloat)], following: Bool) {
+        guard let first = samples.first, let last = samples.last else { return log("scroll \(what): no samples") }
+        var ups = 0
+        var worstUp: CGFloat = 0
+        var farthest: CGFloat = 0
+        for (a, b) in zip(samples, samples.dropFirst()) {
+            if b.y < a.y - 4 { ups += 1; worstUp = max(worstUp, a.y - b.y) }
+            farthest = max(farthest, b.height - (b.y + b.visible))
+        }
+        if following {
+            // At the bottom: the stack's bottom padding (12 pt) under the bottom marker.
+            let gap = last.height - (last.y + last.visible)
+            log("scroll \(what): \(samples.count) samples, moved up \(ups)× (worst \(Int(worstUp)) pt), farthest from the bottom \(Int(farthest)) pt, "
+                + "at the end \(Int(gap)) pt" + (ups > 0 || gap > 16 ? " — JUMP" : " — steady"))
+        } else {
+            let grew = last.height - first.height
+            let moved = last.y - first.y
+            let shift = grew - moved
+            log("scroll \(what): content \(grew >= 0 ? "+" : "")\(Int(grew)) pt, offset \(moved >= 0 ? "+" : "")\(Int(moved)) pt, moved up \(ups)× — "
+                + (abs(shift) > 4 ? "SHIFT \(Int(shift)) pt" : "the rows shown stayed"))
         }
     }
 

@@ -5936,6 +5936,19 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   plan mode beside the diff pane and every review that began). It is anchored to the bottom only when it opens and while its
   rows are shorter than the view; a change of size keeps the offset, and while following, `TranscriptFollower` scrolls to the
   newest row (the bottom marker, which the stack makes) instead of an estimated end. The layout check (§49.2) shoots it.
+- **The transcript holds still while rows change above the bottom** (r1x). Subagents at work (§52.2) add their calls to their
+  groups — above the bottom when several run — rows finish in place, a notice counts ×N, a group folds when its agent ends.
+  Following, the view was left wherever that put it: 608 pt above the newest row after three agents' calls, because the
+  follow scroll ran per appended row, before the rows above were laid out, and nothing followed a change of height in
+  place; every row also restarted its own animated scroll. Now, while following, every change of the content's height pins
+  the bottom marker at once (`onScrollGeometryChange` of the content size), a row that comes alone still glides in while
+  rows that keep coming (< 400 ms apart) are followed without an animation each, and one more pin follows 200 ms later
+  (after their layout; also after a change of the room). Scrolled up, the view keeps its offset as before: rows growing in a
+  group above it still move what it shows (25 pt in the check; keeping the shown row with `scrollPosition` blanked the
+  transcript in the layout check, as §45.1's room changes did). `SHOTS_LAYOUT=scroll` (scripts/screenshots.sh,
+  `ScreenshotTour.scrollChecks`; also part of `SHOTS_LAYOUT=1`) feeds three agents' calls into their groups, a repeating
+  notice and an agent's end, and logs the scroll offset every 4 ms: following, it never moved up and ended at the bottom
+  (13 pt: the stack's padding); the 50 transcript shots of the layout check stay without a blank one.
 - **The chat is one view, the diff pane open or closed.** It was the split's trailing pane while the diff pane was open and
   the window's own child while it was closed: two places, so SwiftUI made a new chat whenever a review began (the pane
   opens) or the pane opened or closed (⌘⇧D), and the message being typed, its mentions and images, the composer's focus and
