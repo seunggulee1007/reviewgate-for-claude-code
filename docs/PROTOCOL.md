@@ -6059,8 +6059,14 @@ the terminal's auto mode asked for none).
   The command line is read by a tolerant shell scanner: only the words of commands count — a git command inside `echo`,
   `grep`, quotes or a here-document (a commit message saying `git push --force`) never does; chains, pipes, redirections
   (`2>&1`, `> /dev/null`), subshells, `$( … )` / backticks, `bash -c` / `sh -c` / `eval` scripts, `if` / `for` bodies and
-  wrappers (`sudo`, `env`, `time`, `nohup`, `timeout`, `xargs`, `parallel`, …) and the commands of `find -exec` /
-  `-execdir` / `-ok` are looked into; global options before the verb are
+  wrappers (`sudo`, `env`, `time`, `nohup`, `timeout`, `xargs`, `parallel`, …), the commands of `find -exec` /
+  `-execdir` / `-ok`, a script a shell reads on stdin — a here-document or here-string given to `bash` / `sh` / … with no
+  `-c` and no script file (`bash <<'EOF'`, `sh -s <<< '…'`); when the line pipes or redirects into a shell a script it
+  does not spell out (`echo '…' | sh`, `cat <<'EOF' | bash`, `sh < x`, `bash -c "$(cat <<'EOF' …)"`), every text of the
+  line that could be one (a quoted string with a space, a here-document's body; `\n` read as a line break) — and what git
+  runs itself (`submodule foreach <cmd>` in every submodule, `rebase -x|--exec <cmd>`, `bisect run <cmd>`: one word is a
+  script, several are the command's own words; a checkout, restore or `--abort` there has no folder to look at, so it
+  counts as holding work) are looked into; before, they slipped through. Global options before the verb are
   skipped (`-C <dir>` moves where paths point, as does the line's own `cd`). Always: `reset --hard|--merge`; `checkout` /
   `switch` with `-f` / `--force` / `--discard-changes`; `clean` unless `-n` / `--dry-run` (a `clean.requireForce = false`
   config deletes without `-f`); `branch -D` / `-M` / `-C` or any forced branch change (`-df`, `--delete --force`,
@@ -6185,10 +6191,11 @@ the terminal's auto mode asked for none).
   `ownCommits`, four notice codes (`git_stashed`, `claude_committed`, `claude_moved_head`, `reject_committed`) — an older
   client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
-  substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, paths only the
-  run knows (`$(…)`, `"$f"`, `{a,b}`, xargs, find -exec) asking with work and running without, `--abort` / `--skip` over a
-  resolved conflict and after it, the hook in auto and default mode, a remembered `Bash:git push` against a force push and
-  `Bash:git merge` against `git merge --abort`), `engine/test/gitResult.test.ts` (the stash row,
+  substitutions, wrappers, scripts, a shell's stdin, `submodule foreach` / `rebase --exec` / `bisect run` —, checkout /
+  restore over review and dirty files in a real repository, paths only the run knows (`$(…)`, `"$f"`, `{a,b}`, xargs,
+  find -exec) asking with work and running without, `--abort` / `--skip` over a resolved conflict and after it, the hook
+  in auto and default mode, a remembered `Bash:git push` against a force push and `Bash:git merge` against
+  `git merge --abort`), `engine/test/gitResult.test.ts` (the stash row,
   Claude's own commits, amend, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
   (real CLI 2.1.318 on sonnet in auto mode, a scratch repository with a local bare origin outside /tmp: "branch
   feature/acme-7, fix App.java, commit, push -u" asked nothing, the branch reached origin, App.java stayed pending with

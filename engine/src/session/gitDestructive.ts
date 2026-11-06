@@ -8,8 +8,10 @@
  *
  * The command line is read with a tolerant shell scanner of its own: `bashClass.scanCommand` refuses any redirection,
  * subshell or substitution (`git reset --hard 2>&1`, `(cd x && git stash drop)`, `"$(cat <<'EOF' …)"`), and a refused line
- * must not slip through here. Only the words of commands count — text inside `echo`, `grep` or a here-document never does;
- * `bash -c` / `sh -c` / `eval` scripts and `$( … )` / backticks are read as the commands they are.
+ * must not slip through here. Only the words of commands count — text inside `echo`, `grep` or a here-document given to
+ * `cat` never does; `bash -c` / `sh -c` / `eval` scripts, a script a shell reads on stdin (`bash <<'EOF'`, `echo '…' | sh`),
+ * `$( … )` / backticks, `find -exec` and what git runs itself (`submodule foreach`, `rebase --exec`, `bisect run`) are read
+ * as the commands they are.
  */
 import { homedir } from "node:os";
 import { existsSync } from "node:fs";
@@ -24,7 +26,17 @@ import { SCOPE_MESSAGES } from "./reviewScope.js";
 /** Nested scripts (`bash -c`, `eval`, backticks) are read this deep; deeper ones are not looked into. */
 const MAX_DEPTH = 4;
 
-type HereDoc = { delim: string; strip: boolean };
+/** One simple command of a shell line. */
+export type ShellCommand = {
+  /** Its words, quotes removed (a `$( … )` / backticks as `$(…)` / `` `…` ``: their commands are the line's too). */
+  words: string[];
+  /** What it reads on stdin from the line itself: a here-document's body or a here-string (the last one given). */
+  input?: string;
+  /** Its stdin comes from what the line does not spell out: a pipe (`… | sh`) or a file (`sh < x`). */
+  stdinElsewhere?: boolean;
+};
+
+type HereDoc = { delim: string; strip: boolean; cmd: ShellCommand };
 
 /**
  * The simple commands of a shell line as word lists (quotes removed), in order, those of `$( … )`, `` ` … ` `` and
@@ -33,33 +45,44 @@ type HereDoc = { delim: string; strip: boolean };
  * fails: an unterminated quote runs to the end of the line.
  */
 export function shellCommands(line: string): string[][] {
-  const out: string[][] = [];
+  return parseCommands(line).map((c) => c.words);
+}
+
+/** `shellCommands` with each command's stdin: a here-document's body or a here-string, or a pipe / file it reads. */
+export function parseCommands(line: string): ShellCommand[] {
+  const out: ShellCommand[] = [];
   parseList(line, 0, false, out);
   return out;
 }
 
-function parseList(s: string, start: number, nested: boolean, out: string[][]): number {
+function parseList(s: string, start: number, nested: boolean, out: ShellCommand[]): number {
   const n = s.length;
-  let words: string[] = [];
+  let cmd: ShellCommand = { words: [] };
   let word = "";
   let inWord = false;
-  /** The next word is a redirection's target or a here-string, not an argument. */
+  /** The next word is a redirection's target, not an argument. */
   let dropNext = false;
+  /** The next word is a here-string: the command's input. */
+  let inputNext = false;
   /** Subshells `( … )` opened in this list. */
   let parens = 0;
   const heredocs: HereDoc[] = [];
   const endWord = () => {
     if (inWord) {
       if (dropNext) dropNext = false;
-      else words.push(word);
+      else if (inputNext) {
+        inputNext = false;
+        cmd.input = word;
+      } else cmd.words.push(word);
     }
     word = "";
     inWord = false;
   };
-  const endCommand = () => {
+  /** Ends the command; `piped`: the next one reads what this one writes. */
+  const endCommand = (piped = false) => {
     endWord();
-    if (words.length > 0) out.push(words);
-    words = [];
+    if (cmd.words.length > 0) out.push(cmd);
+    cmd = piped ? { words: [], stdinElsewhere: true } : { words: [] };
   };
   let i = start;
   while (i < n) {
@@ -67,8 +90,12 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
     if (c === "\n") {
       endCommand();
       i++;
-      // A here-document's body starts on the line after its operator.
-      for (const h of heredocs.splice(0)) i = skipHereDoc(s, i, h);
+      // A here-document's body starts on the line after its operator: the input of the command it was given to.
+      for (const h of heredocs.splice(0)) {
+        const r = readHereDoc(s, i, h);
+        h.cmd.input = r.body;
+        i = r.end;
+      }
       continue;
     }
     if (c === "'") {
@@ -114,7 +141,7 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
     }
     if (c === "`") {
       const r = readBackticks(s, i + 1);
-      out.push(...shellCommands(r.body));
+      out.push(...parseCommands(r.body));
       word += "`…`";
       inWord = true;
       i = r.end;
@@ -127,14 +154,19 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
     }
     if (c === "<" || c === ">") {
       // `2>` / `10<`: the digits are the stream, not a word.
+      let fd: string | null = null;
       if (inWord && /^\d+$/.test(word)) {
+        fd = word;
         word = "";
         inWord = false;
       } else endWord();
+      /** This redirection feeds the command's stdin. */
+      const stdin = c === "<" && (fd === null || fd === "0");
       let j = i + 1;
       if (c === "<" && s[j] === "<") {
         if (s[j + 1] === "<") {
-          dropNext = true; // `<<< text`: a here-string
+          if (stdin) inputNext = true; // `<<< text`: a here-string
+          else dropNext = true;
           i = j + 2;
           continue;
         }
@@ -146,10 +178,11 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
         }
         while (s[j] === " " || s[j] === "\t") j++;
         const d = readWord(s, j);
-        if (d.text) heredocs.push({ delim: d.text, strip });
+        if (d.text) heredocs.push({ delim: d.text, strip, cmd });
         i = d.end;
         continue;
       }
+      if (stdin) cmd.stdinElsewhere = true; // `< file`, `<&3`
       if (s[j] === "&") {
         j++;
         const from = j;
@@ -175,8 +208,9 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
       continue;
     }
     if (c === "|") {
-      endCommand();
-      i += s[i + 1] === "|" || s[i + 1] === "&" ? 2 : 1;
+      const or = s[i + 1] === "|";
+      endCommand(!or);
+      i += or || s[i + 1] === "&" ? 2 : 1;
       continue;
     }
     if (c === ";") {
@@ -216,7 +250,7 @@ function parseList(s: string, start: number, nested: boolean, out: string[][]): 
 }
 
 /** A `"…"` string from `i` (after the quote): its text and where it ends; `$( … )` / backticks in it are commands too. */
-function readDoubleQuoted(s: string, i: number, out: string[][]): { text: string; end: number } {
+function readDoubleQuoted(s: string, i: number, out: ShellCommand[]): { text: string; end: number } {
   const n = s.length;
   let text = "";
   let j = i;
@@ -242,7 +276,7 @@ function readDoubleQuoted(s: string, i: number, out: string[][]): { text: string
     }
     if (d === "`") {
       const r = readBackticks(s, j + 1);
-      out.push(...shellCommands(r.body));
+      out.push(...parseCommands(r.body));
       text += "`…`";
       j = r.end;
       continue;
@@ -296,8 +330,12 @@ function readWord(s: string, i: number): { text: string; end: number } {
   return { text, end: j };
 }
 
-/** Index after the here-document's closing line (its body is text, never commands); the end of `s` when it never closes. */
-function skipHereDoc(s: string, i: number, h: HereDoc): number {
+/**
+ * A here-document from `i`: its body (text, never commands of this line — a shell it is given to reads it as its script)
+ * and the index after its closing line; the end of `s` when it never closes.
+ */
+function readHereDoc(s: string, i: number, h: HereDoc): { body: string; end: number } {
+  const lines: string[] = [];
   let j = i;
   while (j < s.length) {
     const nl = s.indexOf("\n", j);
@@ -305,9 +343,10 @@ function skipHereDoc(s: string, i: number, h: HereDoc): number {
     let line = s.slice(j, end).replace(/\r$/, "");
     if (h.strip) line = line.replace(/^\t+/, "");
     j = nl === -1 ? s.length : nl + 1;
-    if (line === h.delim) return j;
+    if (line === h.delim) return { body: lines.join("\n"), end: j };
+    lines.push(line);
   }
-  return s.length;
+  return { body: lines.join("\n"), end: s.length };
 }
 
 // ------------------------------------------------------------------ what runs: wrappers, `cd`, git
@@ -376,84 +415,178 @@ const WRAPPERS: Record<string, (args: readonly string[]) => number> = {
   parallel: (a) => optionsBefore(a, new Set(["-j", "-P", "-n", "-N", "-L", "-I", "-a", "-S", "--jobs", "--arg-file", "--sshlogin"])),
 };
 
-/** The script a `bash -c '…'` / `sh -c` / `eval …` runs; null for any other command. */
-function scriptOf(words: readonly string[]): string | null {
-  const w = programWords(words);
+/** A shell that reads its script from stdin: `bash`, `sh -s`, `bash <<'EOF'`, `… | sh`. */
+const FROM_STDIN = Symbol("stdin");
+
+/**
+ * What a shell runs: the script of `bash -c '…'` / `sh -c` / `eval …`, `FROM_STDIN` for a shell that reads it from stdin (no
+ * `-c` and no script file, or `-s`); null for any other command (`bash script.sh`: a file we do not read).
+ */
+function shellScript(w: readonly string[]): string | typeof FROM_STDIN | null {
   const name = w.length > 0 ? basename(w[0]!) : "";
   if (name === "eval") return w.slice(1).join(" ");
   if (!SHELLS.has(name)) return null;
   let c = false;
+  let s = false;
   for (let k = 1; k < w.length; k++) {
     const a = w[k]!;
-    if (a === "--") break;
-    if (/^-[A-Za-z]+$/.test(a)) {
-      if (a.includes("c")) c = true;
-      if (a === "-o" || a === "+o") k++;
+    if (a === "--") return c ? (w[k + 1] ?? null) : s || k + 1 >= w.length ? FROM_STDIN : null;
+    if (/^[-+][A-Za-z]+$/.test(a)) {
+      if (a.startsWith("-") && a.includes("c")) c = true;
+      if (a.startsWith("-") && a.includes("s")) s = true;
+      if (/[oO]$/.test(a)) k++; // `-o pipefail`, `-euo pipefail`
       continue;
     }
+    if (a.startsWith("--")) continue; // `--login`, `--norc`
     if (c) return a;
-    return null; // `bash script.sh`: a file we do not read
+    return s ? FROM_STDIN : null; // `bash -s arg`: still stdin; `bash script.sh`: a file
   }
-  return null;
+  return c ? null : FROM_STDIN;
+}
+
+/**
+ * The scripts a shell command runs: its `-c` / `eval` script; or what it reads on stdin — the line's here-document or
+ * here-string for it. A script the line does not spell out (`… | sh`, `sh < file`, `bash -c "$(cat <<'EOF' …)"`) is looked
+ * for in every text of the line that could be one (`lineTexts`).
+ */
+function scriptsOf(script: string | typeof FROM_STDIN, cmd: ShellCommand, line: readonly ShellCommand[]): string[] {
+  if (script === FROM_STDIN) {
+    if (cmd.input !== undefined) return [cmd.input];
+    return cmd.stdinElsewhere ? lineTexts(line) : [];
+  }
+  return /^(?:\$\(…\)|`…`)$/.test(script.trim()) ? lineTexts(line) : [script];
+}
+
+/**
+ * Every text of a line that could be a script handed to a shell: a word with a space or a line break in it (`echo 'git
+ * reset --hard' | sh`), a here-document's body, a here-string — `\n` read as a line break (`printf 'git … \n' | sh`).
+ */
+function lineTexts(line: readonly ShellCommand[]): string[] {
+  const out: string[] = [];
+  for (const c of line) {
+    for (const w of c.words) if (/\s/.test(w)) out.push(w);
+    if (c.input !== undefined) out.push(c.input);
+  }
+  return out.map((t) => t.replace(/\\n/g, "\n"));
 }
 
 /**
  * One git command line: the folder it runs in (`cd` and `-C` applied), its global options, its verb and what follows.
  * `moreArgs`: it gets more arguments than written when it runs — from `xargs`, `parallel` or `find -exec … {}`.
+ * `dirUnknown`: it runs in folders the line does not name (`git submodule foreach`, `git rebase --exec`, `find -execdir`).
  */
-export type GitInvocation = { dir: string; globals: string[]; verb: string | null; args: string[]; moreArgs?: boolean };
+export type GitInvocation = { dir: string; globals: string[]; verb: string | null; args: string[]; moreArgs?: boolean; dirUnknown?: boolean };
 
 /** A simple command a line runs, as `walkCommands` hands it on. */
 export type RunCommand = {
   /** The words of the program that runs (assignments, keywords and wrappers dropped). */
   words: string[];
+  /** The command as the line has it (its here-document or here-string, a pipe into it). */
+  cmd: ShellCommand;
   /** The folder it runs in: `cwd`, moved by the line's own `cd` / `pushd`. */
   dir: string;
   /** More arguments come at run time: `xargs`, `parallel`, `find -exec … {}`. */
   moreArgs: boolean;
+  /** It runs in folders the line does not name: in each submodule (`git submodule foreach`), at each rebase step, … */
+  dirUnknown: boolean;
 };
 
 /**
- * Every simple command of a shell line, in order — those of `bash -c` / `sh -c` / `eval` scripts, `$( … )` / backticks and
- * `find -exec` / `-execdir` / `-ok` included — with the folder each runs in. `cd` / `pushd` are not handed on, they move it.
+ * Every simple command of a shell line, in order, with the folder each runs in — also those of `bash -c` / `sh -c` / `eval`
+ * scripts, of a script a shell reads from the line (`bash <<'EOF'`, `<<< '…'`, `echo '…' | sh`), of `$( … )` / backticks,
+ * of `find -exec` / `-execdir` / `-ok`, and those git runs itself (`git submodule foreach <cmd>`, `git rebase -x <cmd>`,
+ * `git bisect run <cmd>`). `cd` / `pushd` are not handed on: they move the folder.
  */
 export function walkCommands(command: string, cwd: string, visit: (c: RunCommand) => void): void {
   let dir = cwd;
-  const walk = (all: readonly (readonly string[])[], depth: number, moreArgs: boolean) => {
-    for (const words of all) {
-      const inner = scriptOf(words);
-      if (inner !== null) {
-        if (depth < MAX_DEPTH) walk(shellCommands(inner), depth + 1, moreArgs || program(words).moreArgs);
-        continue;
-      }
-      const p = program(words);
+  const walk = (cmds: readonly ShellCommand[], depth: number, moreArgs: boolean, dirUnknown: boolean) => {
+    for (const cmd of cmds) {
+      const p = program(cmd.words);
       const w = p.words;
       if (w.length === 0) continue;
+      const more = moreArgs || p.moreArgs;
+      const script = shellScript(w);
+      if (script !== null) {
+        if (depth < MAX_DEPTH) for (const text of scriptsOf(script, cmd, cmds)) walk(parseCommands(text), depth + 1, more, dirUnknown);
+        continue;
+      }
       const name = basename(w[0]!);
       if (name === "cd" || name === "pushd") {
         const arg = w.slice(1).find((a) => !a.startsWith("-"));
         if (arg !== undefined) dir = resolveDir(dir, arg);
         continue;
       }
-      visit({ words: w, dir, moreArgs: moreArgs || p.moreArgs });
-      // `find … -exec <command> {} +|;`: the command runs with the files find found (MARK: §46 — `{}` is filled in).
-      if (name === "find" && depth < MAX_DEPTH) for (const exec of findExecs(w)) walk([exec], depth + 1, true);
+      visit({ words: w, cmd, dir, moreArgs: more, dirUnknown });
+      if (depth >= MAX_DEPTH) continue;
+      // `find … -exec <command> {} +|;`: the command runs with the files find found (`-execdir`: in each one's folder).
+      if (name === "find") for (const e of findExecs(w)) walk([{ words: e.words }], depth + 1, true, dirUnknown || e.inItsFolder);
+      if (name === "git") {
+        const runs = gitRuns(parseGit(w, dir));
+        const at = dir;
+        if (runs.length > 0) walk(runs, depth + 1, false, true);
+        dir = at;
+      }
     }
   };
-  walk(shellCommands(command), 0, false);
+  walk(parseCommands(command), 0, false, false);
 }
 
 /** The commands `find` runs: the words after each `-exec` / `-execdir` / `-ok` / `-okdir`, up to its `;` or `+`. */
-function findExecs(w: readonly string[]): string[][] {
-  const out: string[][] = [];
+function findExecs(w: readonly string[]): { words: string[]; inItsFolder: boolean }[] {
+  const out: { words: string[]; inItsFolder: boolean }[] = [];
   for (let k = 1; k < w.length; k++) {
     if (!/^-(?:exec|execdir|ok|okdir)$/.test(w[k]!)) continue;
     let end = k + 1;
     while (end < w.length && w[end] !== ";" && w[end] !== "+") end++;
-    if (end > k + 1) out.push(w.slice(k + 1, end));
+    if (end > k + 1) out.push({ words: w.slice(k + 1, end), inItsFolder: w[k]!.endsWith("dir") });
     k = end;
   }
   return out;
+}
+
+/**
+ * The commands git runs itself (§46): `submodule foreach <command>` in every submodule — nested repositories the review
+ * does not see —, `rebase -x|--exec <command>` after each step, `bisect run <command>` at each step. One word is a shell
+ * script (`foreach 'git reset --hard'`); several are the command's own words (`bisect run sh -c '…'`), as git runs them.
+ */
+function gitRuns(g: { verb: string | null; args: string[] }): ShellCommand[] {
+  const a = g.args;
+  const runs = (words: string[]): ShellCommand[] => (words.length === 1 ? parseCommands(words[0]!) : [{ words }]);
+  if (g.verb === "submodule") {
+    let k = 0;
+    while (a[k]?.startsWith("-")) k++; // `git submodule --quiet foreach`
+    if (a[k] !== "foreach") return [];
+    k++;
+    while (a[k]?.startsWith("-")) k++; // `--recursive`, `--`
+    return k < a.length ? runs(a.slice(k)) : [];
+  }
+  if (g.verb === "rebase") {
+    const out: ShellCommand[] = [];
+    for (let k = 0; k < a.length; k++) {
+      if ((a[k] === "-x" || a[k] === "--exec") && a[k + 1] !== undefined) out.push(...parseCommands(a[++k]!));
+      else if (a[k]!.startsWith("--exec=")) out.push(...parseCommands(a[k]!.slice("--exec=".length)));
+    }
+    return out;
+  }
+  if (g.verb === "bisect" && a[0] === "run" && a.length > 1) return runs(a.slice(1));
+  return [];
+}
+
+/** A git command's words: the folder it runs in (`-C` applied to `dir`), its global options, its verb and what follows. */
+function parseGit(w: readonly string[], dir: string): { dir: string; globals: string[]; verb: string | null; args: string[] } {
+  let gdir = dir;
+  const globals: string[] = [];
+  let k = 1;
+  while (k < w.length && w[k]!.startsWith("-")) {
+    const opt = w[k]!;
+    globals.push(opt);
+    if (GIT_GLOBAL_WITH_VALUE.has(opt)) {
+      if (opt === "-C" && w[k + 1] !== undefined) gdir = resolveDir(gdir, w[k + 1]!);
+      if (w[k + 1] !== undefined) globals.push(w[k + 1]!);
+      k += 2;
+    } else k++;
+  }
+  return { dir: gdir, globals, verb: w[k] ?? null, args: w.slice(k + 1) };
 }
 
 /** git global options that take a separate value. */
@@ -472,25 +605,13 @@ function resolveDir(base: string, raw: string): string {
 /**
  * The git commands of a shell line, in order, with the folder each runs in: `cwd` moved by the line's own `cd` / `pushd`
  * (a subshell's too — this only decides where paths point) and by `git -C`. Commands that only mention git (`echo`, `grep`,
- * a here-document) are not among them; `bash -c` / `eval` scripts and substitutions are.
+ * a here-document given to `cat`) are not among them; scripts a shell runs and substitutions are (`walkCommands`).
  */
 export function gitInvocations(command: string, cwd: string): GitInvocation[] {
   const out: GitInvocation[] = [];
-  walkCommands(command, cwd, ({ words: w, dir, moreArgs }) => {
+  walkCommands(command, cwd, ({ words: w, dir, moreArgs, dirUnknown }) => {
     if (basename(w[0]!) !== "git") return;
-    let gdir = dir;
-    const globals: string[] = [];
-    let k = 1;
-    while (k < w.length && w[k]!.startsWith("-")) {
-      const opt = w[k]!;
-      globals.push(opt);
-      if (GIT_GLOBAL_WITH_VALUE.has(opt)) {
-        if (opt === "-C" && w[k + 1] !== undefined) gdir = resolveDir(gdir, w[k + 1]!);
-        if (w[k + 1] !== undefined) globals.push(w[k + 1]!);
-        k += 2;
-      } else k++;
-    }
-    out.push({ dir: gdir, globals, verb: w[k] ?? null, args: w.slice(k + 1), ...(moreArgs ? { moreArgs: true } : {}) });
+    out.push({ ...parseGit(w, dir), ...(moreArgs ? { moreArgs: true } : {}), ...(dirUnknown ? { dirUnknown: true } : {}) });
   });
   return out;
 }
@@ -726,6 +847,9 @@ async function restoreDestroys(inv: GitInvocation, opts: DestructiveOptions, pro
  */
 async function targetsHoldWork(inv: GitInvocation, pathspecs: readonly string[], fromTree: boolean, opts: DestructiveOptions, probe: GitProbe): Promise<boolean> {
   if (pathspecs.length === 0) return false;
+  // In every submodule (`git submodule foreach`), at each rebase step: no folder to look at — nested repositories the review
+  // does not see, so the card is all there is.
+  if (inv.dirUnknown) return true;
   if (inv.globals.some((g) => /^--(git-dir|work-tree)(=|$)/.test(g))) return true;
   if (coversReviewFile(inv.dir, pathspecs, opts)) return true;
   const dirty = await probe.isDirty(inv.dir, pathspecs, fromTree);

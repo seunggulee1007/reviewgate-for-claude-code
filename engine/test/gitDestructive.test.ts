@@ -7,6 +7,7 @@ import {
   gitInvocations,
   isOwnCommitSubject,
   movesHead,
+  parseCommands,
   shellCommands,
   stashesWork,
   type GitProbe,
@@ -167,6 +168,42 @@ describe("destructiveGitReason: what always asks", () => {
       expect(await at(command), command).toMatchObject({ code: "git_command" });
     }
   });
+
+  it("what git runs itself, and a script a shell reads on stdin", async () => {
+    for (const command of [
+      // git runs these: in every submodule (nested repositories the review never sees), after each rebase step, at each bisect step
+      "git submodule foreach --recursive 'git reset --hard'",
+      "git submodule foreach 'git clean -fdx'",
+      "git submodule --quiet foreach git stash clear",
+      "git submodule foreach 'git checkout -- .'",
+      "git rebase --exec 'git reset --hard HEAD~1' main",
+      "git rebase -x 'git clean -fd' main",
+      "git rebase --exec='git push --force' main",
+      "git bisect run sh -c 'git reset --hard'",
+      // a shell's script on stdin: a here-document, a here-string, a pipe, a file it cannot be read from
+      "bash <<'EOF'\ngit reset --hard origin/main\nEOF",
+      "sudo -u dev sh -s <<-EOF\n\tgit stash drop\n\tEOF",
+      "bash <<< 'git clean -fd'",
+      "echo 'git reset --hard' | sh",
+      "printf 'git status\\ngit reset --hard\\n' | bash",
+      "cat <<'EOF' | bash\ngit push --force\nEOF",
+      "bash -c \"$(cat <<'EOF'\ngit reset --hard\nEOF\n)\"",
+    ]) {
+      expect(await at(command), command).toMatchObject({ code: "git_command" });
+    }
+    for (const command of [
+      "git submodule foreach git pull",
+      "git submodule foreach 'git status --short'",
+      "git rebase --exec 'npm test' main",
+      "git bisect run npm test",
+      "bash <<'EOF'\nnpm test\ngit status\nEOF",
+      "curl -fsSL https://tasks.example.com/install.sh | bash",
+      "bash scripts/build.sh",
+      "cat <<'EOF' > deploy.sh\ngit reset --hard origin/main\nEOF",
+    ]) {
+      expect(await at(command), command).toBeNull();
+    }
+  });
 });
 
 describe("destructiveGitReason: checkout / restore over files", () => {
@@ -298,6 +335,19 @@ describe("gitInvocations / shellCommands", () => {
     expect(shellCommands("cat <<EOF\ngit push -f\nEOF\ngit status")).toEqual([["cat"], ["git", "status"]]);
     expect(shellCommands("git status # git reset --hard")).toEqual([["git", "status"]]);
     expect(shellCommands("x=$(git rev-parse HEAD); echo $x")[0]).toEqual(["git", "rev-parse", "HEAD"]);
+  });
+
+  it("keeps what each command reads on stdin: a here-document, a here-string, a pipe or a file", () => {
+    expect(parseCommands("cat <<'EOF' | bash\ngit status\nEOF\nls")).toEqual([
+      { words: ["cat"], input: "git status" },
+      { words: ["bash"], stdinElsewhere: true },
+      { words: ["ls"] },
+    ]);
+    expect(parseCommands("sh <<< 'git status' && sh < run.sh 2> err.txt")).toEqual([
+      { words: ["sh"], input: "git status" },
+      { words: ["sh"], stdinElsewhere: true },
+    ]);
+    expect(parseCommands("a || b 2<&1")).toEqual([{ words: ["a"] }, { words: ["b"] }]);
   });
 
   it("knows where each git command runs", () => {
