@@ -2142,8 +2142,12 @@ Claude's edits where this window's review never sees them (verified: an edit in 
 
   `worktree_outside_review` is a row, not a failure: it never sets `state.lastError` (before, it did) and never stops a
   queue; its transcript row keeps `files` (§35.3). Clients show `worktree_blocked` as a banner with **"워크벤치로 열기"**:
-  `workbench_create {branch}` for a blocked EnterWorktree (prefilled with `branch`), and `worktree_outside_review` with
-  the same action — open `path` as a project / workbench when it is a worktree (`state.workbenches.list`).
+  `workbench_create {branch}` for a blocked EnterWorktree (prefilled with `branch`). `worktree_outside_review` is a chat
+  row only (2026-11; before, an orange banner), an information row (blue) live and restored alike: *"이 창의 리뷰에 잡히지
+  않는 곳에서 바뀌었어요: <path>"* with the files on its second line (the first 8, then *"외 N개"*) — without `files` the
+  earlier sentence — and the actions the banner had: **[이 채팅을 거기로 옮기기]** and **[워크벤치로 열기]** when `path` is a
+  worktree of this repository (`state.workbenches.list`, §39.4), else **[폴더 열기]**; none on another chat's rows (viewing).
+  Two rows naming other files never fold into one ×N.
 - **System instruction.** The engine appends its own paragraph after `settings.systemPromptAppend` (separated by a blank
   line): *"ReviewGate reviews every change you make in this folder (<cwd>). …"* — the current wording is in §39.4 — plus
   whether isolation is blocked or allowed.
@@ -4060,8 +4064,8 @@ sends none of it and the engine behaves as before.
   or a nested repository to change files there."*: a skill that starts its work in a worktree skipped that step and ran
   `git checkout -b` in this checkout (the IDE's checkout followed). `EnterWorktree` stays denied (it moves the whole session
   out of the review); in default mode the `worktree_command` card stays.
-- **Clients** (Mac and Electron the same, same i18n keys). The `worktree_outside_review` banner leads with **[이 채팅을
-  거기로 옮기기]** when `path` is in `state.workbenches.list` ([워크벤치로 열기] stays; off with a one-line reason on a
+- **Clients** (Mac and Electron the same, same i18n keys). The `worktree_outside_review` row (2026-11: a banner before,
+  §33.4) leads with **[이 채팅을 거기로 옮기기]** when `path` is in `state.workbenches.list` ([워크벤치로 열기] stays; off with a one-line reason on a
   record). While Claude works (a turn, a card / question / plan, a start) it asks "Claude가 작업 중이에요 — 멈추고 옮길까요?"
   [멈추고 옮기기] [취소] with "거기서 하던 일을 이어서 하라고 보내기" (on): `followUp` = "작업 폴더를 <worktree>로 옮겼어요. 하던
   일을 이어서 해 줘.". A `worktree_command` card shows **[허용하고 따라가기]**. On `chat_moved` the app fronts the window

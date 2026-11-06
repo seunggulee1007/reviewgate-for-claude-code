@@ -2433,6 +2433,38 @@
         }
       }
     },
+    "Changed where this window's review does not see it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed where this window's review does not see it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창의 리뷰에 잡히지 않는 곳에서 바뀌었어요"
+          }
+        }
+      }
+    },
+    "Changed where this window's review does not see it: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed where this window's review does not see it: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창의 리뷰에 잡히지 않는 곳에서 바뀌었어요: %@"
+          }
+        }
+      }
+    },
     "Choose a base branch first": {
       "localizations": {
         "en": {
