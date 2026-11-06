@@ -4877,13 +4877,20 @@ export class ReviewEngine {
 
   /**
    * The text starts with one of the session's slash commands or skills (`/code-review low`, the client's
-   * `prRespondCommand`): `send` then keeps the review-summary prefix for the next real message — a prefixed text no longer
-   * starts with "/" and the CLI would never run the command. A path like `/Users/x` is no command.
+   * `prRespondCommand`) — by its full name or by an alias the CLI lists for it (`capabilities.commands[].aliases`: a plugin
+   * skill typed by its short name, `/review-respond 12` for `acme-plugin:review-respond`): `send` then keeps the
+   * review-summary prefix for the next real message — a prefixed text no longer starts with "/" and the CLI would never
+   * run the command. While no list is known yet (a fresh worktree before the CLI answered, no cache) any `/word` counts:
+   * the summary waits a message rather than break a command. A path like `/Users/x` is no command.
    */
   private isSessionSlashCommand(text: unknown): boolean {
     const m = typeof text === "string" ? /^\/([^\s/]+)(?:\s|$)/.exec(text.trim()) : null;
+    if (!m) return false;
+    const word = m[1]!;
     const caps = this.sessionState.capabilities ?? this.cachedCapabilities;
-    return !!m && !!caps && (caps.slashCommands.includes(m[1]!) || caps.skills.includes(m[1]!));
+    const commands = caps?.commands ?? [];
+    if (!caps || (caps.slashCommands.length === 0 && caps.skills.length === 0 && commands.length === 0)) return true;
+    return caps.slashCommands.includes(word) || caps.skills.includes(word) || commands.some((c) => c.name === word || (c.aliases ?? []).includes(word));
   }
 
   /** A ReportFindings `file` as the review names it: repo-relative (`./x`, `x\\y` normalized), an outside path as given. */

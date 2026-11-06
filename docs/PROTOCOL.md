@@ -3335,10 +3335,14 @@ Hand PR comments to Claude, ask about a PR hunk, open a PR as a workbench.
   `refs/reviewgate/pr-fetch/<n>` (deleted once the worktree exists), so a concurrent fetch in the user's terminal cannot
   swap `FETCH_HEAD` under it. A `fromPr.number` that is not a positive integer is refused `invalid_pr_number`.
 - *Engine notes (`send`):* a message whose first word is one of the session's slash commands or skills
-  (`capabilities.slashCommands` / `skills`, e.g. the `prRespondCommand` draft or `/code-review low` for §36.13) goes out
-  as that command, like `/compact` (§27): the "[Review gate] …" summary prefix waits for the next real message (a
-  prefixed text no longer starts with `/`, so the CLI never ran the command) and the text is not the commit sheet's
-  suggestion source. Text that only starts with `/` (a path) is sent as before.
+  (`capabilities.slashCommands` / `skills`, e.g. the `prRespondCommand` draft or `/code-review low` for §36.13) — or a
+  name or alias of `capabilities.commands` (a plugin skill typed by its short name: `/review-respond 12` for
+  `acme-plugin:review-respond`, whose `aliases` hold `review-respond`) — goes out as that command, like `/compact` (§27):
+  the "[Review gate] …" summary prefix waits for the next real message (a prefixed text no longer starts with `/`, so the
+  CLI never ran the command: a `disable-model-invocation` skill failed outright, the others ran sideways through the Skill
+  tool) and the text is not the commit sheet's suggestion source. While no list is known yet — a fresh worktree whose CLI
+  has not answered initialize, no cache — any `/word` counts as a command (the summary waits a message rather than break
+  one). Text that only starts with `/` (a path: a second `/` in its first word) is sent as before.
 
 ## 37. 0.2.3 engine follow-ups
 
