@@ -127,19 +127,31 @@ public struct HeadInfo: Codable, Sendable, Hashable {
 public struct HeadMove: Codable, Sendable, Hashable {
     public var from: HeadInfo
     public var to: HeadInfo
+    // MARK: r1-git — §31.3 / §46 (`head_moved` only; nil / empty from an older engine)
+    /// `claude_git`: Claude's own git commands made the move — no bar (the engine sets no `gate.headMoved`), a chat row.
+    public var explainedBy: String?
+    /// With `explainedBy`: the short shas of the commits Claude made in the turn, oldest first.
+    public var commits: [String] = []
 
-    public init(from: HeadInfo, to: HeadInfo) {
+    public init(from: HeadInfo, to: HeadInfo, explainedBy: String? = nil, commits: [String] = []) {
         self.from = from
         self.to = to
+        self.explainedBy = explainedBy
+        self.commits = commits
     }
 
-    private enum CodingKeys: String, CodingKey { case from, to }
+    private enum CodingKeys: String, CodingKey { case from, to, explainedBy, commits }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(from: (try? c.decodeIfPresent(HeadInfo.self, forKey: .from)) ?? HeadInfo(sha: nil, branch: nil),
-                  to: (try? c.decodeIfPresent(HeadInfo.self, forKey: .to)) ?? HeadInfo(sha: nil, branch: nil))
+                  to: (try? c.decodeIfPresent(HeadInfo.self, forKey: .to)) ?? HeadInfo(sha: nil, branch: nil),
+                  explainedBy: (try? c.decodeIfPresent(String.self, forKey: .explainedBy)) ?? nil,
+                  commits: ((try? c.decodeIfPresent([String].self, forKey: .commits)) ?? nil) ?? [])
     }
+
+    /// Claude's own git commands made it (§31.3): a chat row, never the head-moved bar.
+    public var isClaudesOwn: Bool { explainedBy == "claude_git" }
 }
 
 // MARK: - §31 Other Claude processes

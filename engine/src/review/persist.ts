@@ -105,6 +105,8 @@ export type PersistedReview = {
   // MARK: wave3 engine-flow
   /** §36.13: the review's AI pre-reviews (`gate.prereviews`; read back leniently by `restoreRuns`); absent in older files. */
   prereviews?: PreReviewRun[];
+  /** MARK: r1-git — §46: commits Claude's `git commit` made while the review stands (`gate.ownCommits`); absent in older files. */
+  ownCommits?: string[];
 };
 
 export type PersistedSession = { version: 1; sessionId: string; openTabIds?: string[]; permissionMode?: PermissionMode; model?: string | null; effort?: EffortLevel | null; peerInbound?: PeerInboundMode; savedAt: string };
@@ -180,6 +182,7 @@ export async function loadReview(gitDir: string): Promise<PersistedReview | null
     modsCaptured: o.modsCaptured === true,
     ranges: parsePersistedRanges(o.ranges),
     ...(Array.isArray(o.prereviews) ? { prereviews: o.prereviews } : {}), // MARK: wave3 engine-flow (validated by the gate's restore)
+    ...(Array.isArray(o.ownCommits) ? { ownCommits: o.ownCommits.filter((x): x is string => typeof x === "string" && /^[0-9a-f]{40,64}$/.test(x)) } : {}), // MARK: r1-git
   };
 }
 

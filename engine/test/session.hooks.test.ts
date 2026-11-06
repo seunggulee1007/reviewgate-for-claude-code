@@ -262,8 +262,10 @@ describe("Bash auto-allow: read-only commands, allow patterns, remembered allows
     for (const cmd of ["echo hi > x.txt", "npm test", "git status && rm x", "ls $(rm x)"]) {
       expect(decision(await preBash(ctx)(preToolUse("Bash", { command: cmd }, root), "t1", opts)), cmd).toEqual({ decision: "ask", reason: ASK_REASON });
     }
-    // A git command that changes the repository keeps its card (§46) over the auto-allow.
-    expect(decision(await preBash(ctx)(preToolUse("Bash", { command: "git status && git commit -m x" }, root), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    // MARK: r1-git — §46: a commit is an ordinary command (the plain card, which can be remembered); a git command that
+    // throws away uncommitted work keeps its card with the reason over the auto-allow.
+    expect(decision(await preBash(ctx)(preToolUse("Bash", { command: "git status && git commit -m x" }, root), "t1", opts))).toEqual({ decision: "ask", reason: ASK_REASON });
+    expect(decision(await preBash(ctx)(preToolUse("Bash", { command: "git status && git reset --hard" }, root), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
   });
 
   it("autoAllowReadOnlyBash: false turns the read-only rule off (patterns and remembered allows still apply)", async () => {
@@ -285,8 +287,9 @@ describe("Bash auto-allow: read-only commands, allow patterns, remembered allows
     expect(decision(await hook(preToolUse("Bash", { command: "npm run build" }, root), "t1", opts))).toEqual({ decision: "ask", reason: ASK_REASON });
     // A read-only command reports the read-only reason even when a pattern would match too.
     expect(decision(await hook(preToolUse("Bash", { command: "git status" }, root), "t1", opts))).toEqual({ decision: "allow", reason: READ_ONLY_BASH_REASON });
-    // Patterns never override the git card (§46).
-    expect(decision(await hook(preToolUse("Bash", { command: "git commit -m x" }, root), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
+    // Patterns never override the git card (§46) — which only a command that throws away work or rewrites the remote gets.
+    expect(decision(await hook(preToolUse("Bash", { command: "git commit -m x" }, root), "t1", opts))).toEqual({ decision: "allow", reason: ALLOW_PATTERN_REASON });
+    expect(decision(await hook(preToolUse("Bash", { command: "git push --force origin main" }, root), "t1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
     // Patterns are about Bash only.
     expect(decision(await preOther(ctx)(preToolUse("WebFetch", { url: "https://x" }, root), "t2", opts))).toEqual({ decision: "ask", reason: ASK_REASON });
   });
@@ -382,7 +385,7 @@ describe("post-Bash file attribution (change → cause linkage)", () => {
     expect(reported).toEqual([["b1", ["other.txt"]], ["b3", ["new.txt"]]]);
   });
 
-  it("§46: a git command that changes the repository gets the card; what it brings in is neither attributed nor counted", async () => {
+  it("§46: a git command that changes the repository runs as the rules say; what it brings in is neither attributed nor counted", async () => {
     const root = track(makeRepo());
     sh(root, "checkout", "-q", "-b", "develop");
     write(root, "dev1.txt", "from develop\n");
@@ -405,10 +408,10 @@ describe("post-Bash file attribution (change → cause linkage)", () => {
     const pre = (command: string, id: string): HookInput => ({ ...(preToolUse("Bash", { command }, root) as object), tool_use_id: id }) as unknown as HookInput;
     const post = (command: string, id: string): HookInput => ({ ...(postToolUse(root, id) as object), tool_input: { command } }) as unknown as HookInput;
 
-    // Not even an allow pattern skips the card; it carries the reason to canUseTool.
+    // MARK: r1-git — a merge throws nothing away: the allow pattern answers (no card, no reason).
     const merge = "git merge -q --no-edit develop";
-    expect(decision(await preBash(pre(merge, "g1"), "g1", opts))).toEqual({ decision: "ask", reason: GIT_ASK_REASON });
-    expect(ctx.scopeReasons?.get("g1")?.code).toBe("git_command");
+    expect(decision(await preBash(pre(merge, "g1"), "g1", opts))).toEqual({ decision: "allow", reason: ALLOW_PATTERN_REASON });
+    expect(ctx.scopeReasons?.get("g1")).toBeUndefined();
     sh(root, "merge", "-q", "--no-edit", "develop"); // approved: it runs
     await postBash(post(merge, "g1"), "g1", opts);
     expect(reported).toEqual([]);

@@ -3,9 +3,10 @@
  *
  * In `permissionMode: "auto"` the PreToolUse hooks no longer force `ask` on the tools that are not edits and not
  * read-only (Bash, WebFetch, MCP tools, …): the CLI's own rules and its auto-mode classifier decide, as in the terminal.
- * Everything the review gate owns stays as it was — the git card (§46), the budget, the worktree / isolation rules (§33.4), the
- * reason cards (§33.3, §33.9) and the review of every file a call changed (the post-Bash snapshot). What the classifier
- * blocked becomes a gray chat row; a CLI that cannot run auto mode (the model, a policy) is said once.
+ * Everything the review gate owns stays as it was — the git card for what throws away work or rewrites the remote (§46),
+ * the budget, the worktree / isolation rules (§33.4), the reason cards (§33.3, §33.9) and the review of every file a call
+ * changed (the post-Bash snapshot). What the classifier blocked becomes a gray chat row; a CLI that cannot run auto mode
+ * (the model, a policy) is said once.
  */
 import type { PermissionMode } from "../protocol.js";
 import { CommandRefused } from "../errors.js";
@@ -49,7 +50,8 @@ export function autoModeDecides(
   return true;
 }
 
-// MARK: wave4c w4c-trust — §41.2: an MCP tool (a filesystem server) writing into `.git/` asks, as Bash does (§40.1).
+// MARK: wave4c w4c-trust — §41.2: an MCP tool (a filesystem server) writing into `.git/` asks (r1-git: a Bash command only
+// for ReviewGate's own state there, below).
 
 /** Input keys that name a path (not the written content): `path`, `file_path`, `source`, `destination`, `paths`, a `uri` … */
 const MCP_PATH_KEY_RE = /path|source|destination|target|dir|file|uri|location/i;
@@ -70,25 +72,25 @@ export function autoModeKeepsMcpCard(input: Record<string, unknown> | undefined)
   return false;
 }
 
-// MARK: wave4b w4b-check4 — §40.1: the app manages git, also in auto mode.
+// MARK: wave4b w4b-check4 — §40.1; r1-git — git in auto mode runs as in the terminal.
 
 /**
- * Git commands that change what lies outside the review — the remote (a push), git's own settings (`core.hooksPath`, an
- * alias that runs later), a branch moved without `reset`, a worktree removed — keep their card in auto mode (commits, merges and
- * working-tree moves get the git card in every mode, §46). Options before the verb count (`git -C x push`).
+ * ReviewGate's own state inside git: `<git dir>/reviewgate/` (chats, remembered allows, attachments), `<git dir>/reviewgate-
+ * review.json` and `refs/reviewgate/` (the review's pinned trees) — also through a linked worktree's `.git/worktrees/<name>/`
+ * — and the `.git` folder itself (`rm -rf .git`, `mv .git x`), which holds them. Not `.gitignore` / `.github`, and no
+ * other path inside `.git` (`.git/index.lock`, `.git/info/exclude`, `.git/hooks/x`: the CLI's to judge, as in the terminal).
  */
-const AUTO_KEEPS_GIT_RE =
-  /\bgit(?:\s+-{1,2}[\w-]+(?:=\S+|\s+\S+)?)*\s+(?:push|config|update-ref|symbolic-ref|commit-tree|replace|filter-branch|filter-repo|worktree\s+(?:remove|move|prune))\b/;
-/** A path into a `.git` folder (`.git/hooks/pre-commit`, `<main>/.git/config`, a bare `.git` argument); not `.gitignore` / `.github`. */
-const DOT_GIT_PATH_RE = /(?:^|[\s'"=:/\\(<>|;&])\.git(?:[/\\]|(?=[\s'"`)<>|;&]|$))/;
+const REVIEWGATE_STATE_RE =
+  /(?:^|[\s'"=:/\\(<>|;&])\.git(?:[/\\](?:[^\s'"`;&|<>]*[/\\])?reviewgate|[/\\]?(?=[\s'"`)<>|;&]|$))|(?:^|[\s'"=:/\\(<>|;&^])refs[/\\]reviewgate(?![\w-])/i;
 
 /**
- * True when a Bash command keeps the app's card in auto mode too: a git command of `AUTO_KEEPS_GIT_RE` or any command that
- * names a path inside `.git/` (a hook written there runs on the next commit — the app's own commit included). Read-only
- * commands never get here: the app's read-only rule allowed them first.
+ * True when a Bash command keeps the app's card in auto mode too: it names ReviewGate's own state in git (`REVIEWGATE_STATE_RE`).
+ * r1-git: a push, `git config`, a ref write and any other path inside `.git/` go to the CLI's rules and classifier (a push
+ * that rewrites the remote has the git card in every mode, §46). Read-only commands never get here: the app's read-only
+ * rule allowed them first.
  */
 export function autoModeKeepsCommandCard(command: string): boolean {
-  return AUTO_KEEPS_GIT_RE.test(command) || DOT_GIT_PATH_RE.test(command);
+  return REVIEWGATE_STATE_RE.test(command);
 }
 
 /** The `permission_mode` of a hook input (CLI 2.1.30x), undefined when it carries none. */

@@ -52,7 +52,7 @@ public struct PermissionReason: Sendable, Equatable, Hashable {
         case worktreeIsolation
         /// Claude Code's own settings (`.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`).
         case claudeConfig
-        /// §46: a git command that changes the repository (commit, merge, pull, checkout, reset, stash …).
+        /// §46: a git command that throws away uncommitted work or rewrites the remote (reset --hard, clean -f, a force push …).
         case gitCommand
         /// A code this client does not know (a newer engine): the card shows the engine's `message`.
         case other(String)

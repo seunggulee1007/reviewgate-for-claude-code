@@ -453,10 +453,10 @@ import Testing
         #expect(PermissionReasonText.line(config).contains("(.claude/settings.local.json)") && PermissionReasonText.level(config) == .danger)
         #expect(!PermissionReasonText.line(PermissionReason(code: .otherWorktree)).contains("()"))
         #expect(PermissionReasonText.level(PermissionReason(code: .worktreeCommand, path: "/w")) == .danger)
-        // §46: a git command that changes the repository — known on the wire, red, its own line.
+        // §46: a git command that throws away uncommitted work or rewrites the remote — known on the wire, red, its own line.
         let git = PermissionReason(code: .init(rawValue: "git_command"), message: "x")
         #expect(git.code == .gitCommand && git.code.rawValue == "git_command")
-        #expect(PermissionReasonText.line(git).hasPrefix("A git command that changes the repository") && PermissionReasonText.level(git) == .danger)
+        #expect(PermissionReasonText.line(git).hasPrefix("A git command that throws away uncommitted work or rewrites the remote") && PermissionReasonText.level(git) == .danger)
         #expect(PermissionReasonText.line(PermissionReason(code: .other("new"), message: " ")) == "Works somewhere this window's review does not see")
         // An unknown code (a newer engine) shows the engine's own words.
         #expect(PermissionReasonText.line(PermissionReason(code: .other("brand_new_place"), message: "Somewhere new")) == "Somewhere new")

@@ -79,8 +79,8 @@ export const SCOPE_MESSAGES: Record<Exclude<PermissionReason["code"], "claude_co
   other_worktree: "This location is in another worktree of the repository: this window's review does not show changes there — open it as a workbench.",
   worktree_command: "This command creates a git worktree: work inside it is outside this window's review.",
   worktree_isolation: "This runs outside this folder (an isolated worktree, another folder or the Workflow tool): its changes are not in this window's review.",
-  git_command:
-    "This git command changes the repository (a commit, merge, pull, checkout, reset, stash, …): what it brings in is not counted as Claude's edits, and a commit cannot be reverted from the review.",
+  // MARK: r1-git — §46: only what the review cannot bring back asks.
+  git_command: "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back.",
 };
 
 /** Why a directory is outside what the review sees: a nested repository under `root`, or another worktree of the repository. */
@@ -399,16 +399,19 @@ export function scopeInstruction(cwd: string, allowIsolation: boolean): string {
 
 /**
  * §46: the engine's word on git, after the client's text — which may still be an older default that says never to commit.
- * Each command that changes the repository reaches the user's approval card (hooks.ts `gitCommandReason`).
+ * MARK: r1-git — git runs as in the terminal; only a command that throws away uncommitted work or rewrites the remote reaches
+ * the user's card (hooks.ts `gitCommandReason`), and Claude's own commits keep their files in the review.
  */
 export const GIT_INSTRUCTION =
-  "Git: when the user asks you to merge, pull, rebase, cherry-pick, commit, stash or resolve merge conflicts, do it with git as usual — " +
-  "ReviewGate shows the user an approval card for every git command that changes the repository. An instruction never to run " +
-  "git commit / checkout / reset / stash means: not on your own initiative. What a merge or pull brings in is not counted as your " +
-  "change; your conflict resolutions and edits are reviewed as usual. After resolving merge conflicts, leave the merge uncommitted " +
-  "and do not git add the resolved files unless the user asked you to commit — the user reviews the resolutions and commits the " +
-  "merge from ReviewGate. If the user denies the card, stop and ask. Never put a git worktree, clone or copy of the project " +
-  "under /tmp, /private/tmp or /var/folders: macOS deletes files there that were not opened for a few days, .git included.";
+  "Git: when the user (or a skill they ran) asks you to commit, branch, merge, pull, rebase, cherry-pick, stash, push or resolve " +
+  "merge conflicts, run git as you would in a terminal. ReviewGate asks the user only before a git command that throws away " +
+  "uncommitted work or rewrites the remote: reset --hard, clean -f, checkout / restore over files that are under review or " +
+  "uncommitted, branch -D, stash drop / clear and force pushes. Files you commit stay in the user's review. An instruction never " +
+  "to run git commit / checkout / reset / stash means: not on your own initiative. What a merge or pull brings in is not counted " +
+  "as your change; your conflict resolutions and edits are reviewed as usual. After resolving merge conflicts, leave the merge " +
+  "uncommitted and do not git add the resolved files unless the user asked you to commit — the user reviews the resolutions and " +
+  "commits the merge from ReviewGate. If the user denies the card, stop and ask. Never put a git worktree, clone or copy of the " +
+  "project under /tmp, /private/tmp or /var/folders: macOS deletes files there that were not opened for a few days, .git included.";
 
 // ------------------------------------------------------------------ Bash
 

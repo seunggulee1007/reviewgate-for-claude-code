@@ -46,6 +46,11 @@ export type ChangedFile = {
   oldMode?: string;
   newMode?: string;
   similarity?: number;
+  /**
+   * MARK: r1-git — §46: Claude's own `git commit` holds this change: the short sha of the newest such commit still in HEAD's
+   * history. The file stays in the review (A keeps the content from before the commit); rejecting it reverts the working tree.
+   */
+  committedIn?: string;
 } & ChangedFileReview;
 
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";

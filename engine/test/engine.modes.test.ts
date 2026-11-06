@@ -160,8 +160,10 @@ describe("permission modes (docs/M20-MODES.md)", () => {
 
     const preEdit = buildHooks(ctx).PreToolUse![0]!.hooks[0]!;
     const preBash = buildHooks(ctx).PreToolUse![1]!.hooks[0]!;
-    // git card (§46): asks although `autoAllowTools` has Bash
-    expect(decision(await preBash(pre("Bash", { command: "git commit -m x" }), "t1", opts))).toBe("ask");
+    // git card (§46): a command that throws away uncommitted work asks although `autoAllowTools` has Bash (r1-git: a commit
+    // no longer does — it runs as in the terminal)
+    expect(decision(await preBash(pre("Bash", { command: "git reset --hard" }), "t1", opts))).toBe("ask");
+    expect(decision(await preBash(pre("Bash", { command: "git commit -m x" }), "t1", opts))).toBeUndefined();
     // budget
     expect(decision(await preEdit(pre("Write", { file_path: join(dir, "big.txt"), content: "1\n2\n3\n4\n5\n" }), "t2", opts))).toBe("deny");
     expect(ctx.budget.denied).toBe(true);

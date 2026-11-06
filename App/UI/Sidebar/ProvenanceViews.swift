@@ -36,11 +36,24 @@ struct ModsRiskChip: View {
     }
 }
 
-/// The §31–32 badges of a changed file: outside the app, the mods risks, not captured, gitignored.
+/// r1-git (§46): "커밋됨 abc1234" — Claude's own commit holds the change; the file stays in the review.
+struct CommittedChip: View {
+    let sha: String
+
+    var body: some View {
+        TagChip(Text(verbatim: GitNoticeText.committedBadge(sha)), systemImage: "checkmark.seal", tint: .secondary)
+            .help(GitNoticeText.committedHelp(sha))
+            .accessibilityLabel(Text(verbatim: GitNoticeText.committedBadge(sha)))
+            .accessibilityIdentifier("Committed badge")
+    }
+}
+
+/// The §31–32 badges of a changed file: outside the app, the mods risks, not captured, gitignored (and §46: committed).
 struct ProvenanceChips: View {
     let file: ChangedFile
 
     var body: some View {
+        if let sha = file.committedIn { CommittedChip(sha: sha) }   // r1-git (§46)
         if file.isExternal { ExternalChip() }
         ForEach(file.risk, id: \.self) { ModsRiskChip(risk: $0) }
         if file.uncaptured {
@@ -61,10 +74,11 @@ struct DiffProvenanceHeader: View {
     let file: ChangedFile
 
     var body: some View {
-        if file.isExternal || !file.risk.isEmpty || file.uncaptured || file.ignored {
+        if file.isExternal || !file.risk.isEmpty || file.uncaptured || file.ignored || file.committedIn != nil {
             VStack(alignment: .leading, spacing: 3) {
-                if file.isExternal || !file.risk.isEmpty {
+                if file.isExternal || !file.risk.isEmpty || file.committedIn != nil {
                     FlowLayout(spacing: 4) {
+                        if let sha = file.committedIn { CommittedChip(sha: sha) }   // r1-git (§46)
                         if file.isExternal { ExternalChip() }
                         ForEach(file.risk, id: \.self) { ModsRiskChip(risk: $0) }
                     }

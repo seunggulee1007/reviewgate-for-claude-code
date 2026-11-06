@@ -320,7 +320,8 @@ type NoticeGate = Partial<Pick<GateState, "headMoved" | "localSettingsChanged" |
 export function gateNoticeKey(kind: GateNoticeKind, gate: NoticeGate): string | null {
   switch (kind) {
     case "headMoved":
-      return gate.headMoved ? JSON.stringify(gate.headMoved) : null;
+      // MARK: r1-git — §31.3: a move Claude's own git commands made is a chat row, never this banner.
+      return gate.headMoved && gate.headMoved.explainedBy !== "claude_git" ? JSON.stringify(gate.headMoved) : null;
     case "localSettings":
       return gate.localSettingsChanged ? JSON.stringify(gate.localSettingsChanged) : null;
     case "nested":

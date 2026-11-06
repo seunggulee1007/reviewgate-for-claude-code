@@ -18,7 +18,8 @@ import Testing
         for word in ["small units", "STOP", "wait for the user", "REVIEW GATE", "{maxFiles}"] {
             #expect(!prompt.contains(word), "\(word)")
         }
-        #expect(prompt.contains("only when the user asks"))   // the git sentence stays
+        #expect(prompt.contains("only when the user or a skill they ran asks"))   // the git sentence stays
+        #expect(!prompt.contains("approval card"))   // r1-git (§46): no card for every git command any more
     }
 
     @Test func turnedOnTheNumbersGoOutAndTheDefaultAppendNamesThemWithoutStopping() {

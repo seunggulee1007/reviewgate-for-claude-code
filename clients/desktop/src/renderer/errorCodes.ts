@@ -10,6 +10,7 @@ import { longWorkErrorText } from "./longWork"; // MARK: wave4 w4-longwork
 import { chatMoveNoticeText } from "./chatMove"; // MARK: wave4b w4b-follow
 import { autoModeErrorText, autoModeRefusalText } from "./autoMode"; // MARK: wave4b w4b-auto
 import { scopeRowText } from "./scopeNotices"; // MARK: r1-scope
+import { gitNoticeText } from "./gitNotices"; // MARK: r1-git
 
 /** `error` event codes (§19.6 "Claude CLI / API failures" + "Other engine error codes"). */
 export const ERROR_EVENT_CODES = [
@@ -60,6 +61,11 @@ export const ERROR_EVENT_CODES = [
   // MARK: wave4b w4b-auto — §39.5 what auto mode blocked, an auto mode the CLI cannot run
   "auto_mode_denied",
   "auto_mode_unavailable",
+  // MARK: r1-git — §46 / §31.3 what Claude's git commands did
+  "git_stashed",
+  "claude_committed",
+  "claude_moved_head",
+  "reject_committed",
 ] as const;
 
 /** `result{ok:false}` refusal codes (§19.6 "Refusal codes"). */
@@ -297,6 +303,12 @@ export function presentationOf(code: string | undefined): ErrorPresentation {
     case "auto_mode_denied":
     case "auto_mode_unavailable":
       return "row";
+    // MARK: r1-git — §46: gray rows only
+    case "git_stashed":
+    case "claude_committed":
+    case "claude_moved_head":
+    case "reject_committed":
+      return "row";
     default:
       return "banner";
   }
@@ -351,6 +363,8 @@ export function errorEventText(ev: ErrorInfo, opts: { now?: Date; timeZone?: str
   if (longWork !== null) return longWork;
   const auto = autoModeErrorText(ev); // MARK: wave4b w4b-auto (§39.5)
   if (auto !== null) return auto;
+  const git = gitNoticeText(ev); // MARK: r1-git (§46)
+  if (git !== null) return git;
   const withDetail = (summary: string) => (ev.message ? `${summary}: ${ev.message}` : summary);
   switch (ev.code) {
     case "auth_required":

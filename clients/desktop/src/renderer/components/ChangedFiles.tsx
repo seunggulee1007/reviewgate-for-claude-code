@@ -11,6 +11,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ChangedFileState, ChangeStatus, GateState, SideThread } from "@reviewgate/engine";
 import { t } from "../i18n";
+import { committedBadge, committedHelp } from "../gitNotices"; // MARK: r1-git
 import { MENTION_DRAG_TYPE } from "../mentions";
 import { finishReviewBlocked, groupChanges, groupHelp, groupLabel, modsRiskHelp, modsRiskLabel, modsRisksOf, showsGroupHeaders, uncapturedText, type ChangeGroup, type ChangeGroupKind } from "../reviewGate";
 import { ALL_RISKS, riskHelp, riskKinds, riskLabel, riskTone, sortByRisk } from "../risk";
@@ -295,6 +296,10 @@ function FileRow(props: {
             <StateIndicator state={f.state} />
           </div>
           <div className="tools">
+            {/* MARK: r1-git — §46: Claude's own commit holds the change; the file stays in the review */}
+            {f.committedIn && (
+              <span className="pill gray risk" title={committedHelp(f.committedIn)} aria-label={committedBadge(f.committedIn)} data-testid={`Committed ${f.path}`}>{committedBadge(f.committedIn)}</span>
+            )}
             {f.state === "accepted" && <AutoAcceptedBadge rule={f.autoAccepted} path={f.path} />}{/* MARK: wave4c w4c-trust (§41.2) */}
             {/* MARK: wave2 desktop-flow — §34.2 / §34.4 / §34.5 */}
             {pending && f.changedSinceAccepted && (

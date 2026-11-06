@@ -138,6 +138,7 @@ import { scopeNoticeMessage } from "./session/reviewScope.js";
 import { classifyRules, loadPermissionRules, rememberable, sessionUserRules, type LoadedRules, type UserRules } from "./session/permissionRules.js";
 import { clearRememberedAllows, loadRememberedAllows, saveRememberedAllows } from "./session/allowsStore.js";
 import type { SessionEvent, ToolFileEntry } from "./session/events.js";
+import type { GitCommandResult } from "./session/events.js"; // MARK: r1-git (§46)
 import { originOf, type ToolWindow } from "./session/provenance.js";
 import { ToolOutputStore } from "./session/toolOutput.js";
 import { AgentTracker, STOP_AGENT_TIMEOUT_MS } from "./session/agents.js";
@@ -506,6 +507,8 @@ export class ReviewEngine {
   private readonly turnEditCalls = new Map<string, string>();
   /** §31: HEAD / branch when the running turn started (compared after its collection → `head_moved`). */
   private turnHead: HeadInfo | null = null;
+  /** MARK: r1-git — §46: the HEAD moves Claude's git commands made in the running turn (the session's `git_result`), in order. */
+  private turnGitMoves: { from: HeadInfo; to: HeadInfo; foreign: boolean; ownCommits: string[] }[] = [];
   /** §32: hashes of `.claude/settings.local.json` when the running turn started (→ `local_settings_changed`). */
   private turnLocalSettings: LocalSettingsDigest | null = null;
   /** §32: HEADs of the linked worktrees inside the project when the running turn started (→ `nested_changes`). */
@@ -2997,6 +3000,7 @@ export class ReviewEngine {
         log: (level, msg) => this.log(level, msg),
         // MARK: wave4d w4d-peers — §42.2: whom a SendMessage address reaches (the registry, only read).
         resolvePeer: (address) => peerAtAddress({ configDir: claudeConfigDir(this.childEnv()), address }),
+        reviewPaths: () => this.pathsUnderReview(), // MARK: r1-git (§46)
       });
       this.session = session;
       this.liveModels.set(session, this.startModel().model ?? null); // MARK: wave5 w5-model (§43.4)
@@ -3424,7 +3428,8 @@ export class ReviewEngine {
         // What the record closes on: this collection's B and list (a send meanwhile clears B for its own turn).
         const closing = { end: this.gate.turnEndTree, listed: this.gate.changedFiles, delta: r.delta };
         const moved = await this.headMove();
-        if (moved) this.emit({ type: "head_moved", turn, from: { ...moved.from }, to: { ...moved.to } });
+        if (moved) this.emit({ type: "head_moved", turn, from: { ...moved.from }, to: { ...moved.to }, ...(moved.explainedBy ? { explainedBy: moved.explainedBy } : {}), ...(moved.commits ? { commits: [...moved.commits] } : {}) });
+        if (moved?.explainedBy) this.noteClaudeHeadMove(moved); // MARK: r1-git (§46)
         const local = await this.localSettingsMove();
         if (local) this.emit({ type: "local_settings_changed", turn, ...local });
         const nested = await this.nestedMove(toolFiles, windows);
@@ -3449,6 +3454,7 @@ export class ReviewEngine {
   private async noteTurnStartState(): Promise<void> {
     const root = this.gate.checkpoint?.root;
     this.turnHead = await this.readHead();
+    this.turnGitMoves = []; // MARK: r1-git (§46)
     this.turnLocalSettings = root ? await localSettingsDigest(root).catch(() => null) : null;
     this.turnNestedHeads = root ? await worktreeHeads(root).catch(() => new Map()) : new Map();
   }
@@ -3500,17 +3506,74 @@ export class ReviewEngine {
   }
 
   /**
-   * §31: HEAD at the turn's start vs now. A commit, pull or checkout made while the turn ran (Claude's git commands
-   * are denied, so it is someone else's) is reported once: `state.gate.headMoved` until the next turn + `head_moved`.
+   * MARK: r1-git — §46: what one of Claude's git commands did. A HEAD move while a turn runs is noted (`turnGitMoves`, for
+   * `headMove`) and the commits its `git commit` made go to the gate (`noteOwnCommits`: never carried into A). A `git stash`
+   * that took files out of the working tree is a gray chat row naming them (`git_stashed`): they are no longer on disk, so the
+   * review cannot show them until a `git stash pop` brings them back.
+   */
+  private onGitResult(ev: GitCommandResult): void {
+    // A HEAD move of the running turn: its commits stay in the review; the move explains the turn's `head_moved`.
+    if (ev.from && ev.to && this.gate.running) {
+      this.turnGitMoves.push({ from: { ...ev.from }, to: { ...ev.to }, foreign: ev.foreign === true, ownCommits: [...(ev.ownCommits ?? [])] });
+      if (ev.ownCommits && ev.ownCommits.length > 0) {
+        this.log("info", `Claude committed ${ev.ownCommits.map((c) => c.slice(0, 7)).join(", ")}: kept in the review`);
+        this.gate.noteOwnCommits(ev.ownCommits, ev.amended ?? []);
+      }
+    }
+    const stashed = ev.stashed ?? [];
+    if (stashed.length > 0) {
+      const shown = stashed.slice(0, STASHED_SHOWN).join(", ") + (stashed.length > STASHED_SHOWN ? ` (+${stashed.length - STASHED_SHOWN})` : "");
+      this.log("info", `git stash took ${stashed.length} file(s) out of the working tree: ${shown}`);
+      this.notice(`Stashed and out of the review: ${shown} — git stash pop brings them back.`, "session", { code: "git_stashed", detail: shown });
+      this.touch();
+    }
+  }
+
+  /** MARK: r1-git — §46: repo-relative paths still under review (pending, changes requested) — the hooks' git card. */
+  private pathsUnderReview(): ReadonlySet<string> {
+    return new Set(this.gate.changedFiles.filter((f) => f.state === "pending" || f.state === "changesRequested").map((f) => f.path));
+  }
+
+  /**
+   * §31: HEAD at the turn's start vs now. MARK: r1-git — §46: when Claude's own git commands made every step of it (each
+   * reported move starts where the one before ended, from the turn's start to now, none with someone else's move in it) it
+   * is `explainedBy: "claude_git"` (with the commits Claude made): no `state.gate.headMoved` — a chat row says it. Any other
+   * move (a commit, pull or checkout outside the app while the turn ran) is reported once: `state.gate.headMoved` until the
+   * next turn + `head_moved`.
    */
   private async headMove(): Promise<HeadMove | null> {
     const from = this.turnHead;
+    const moves = this.turnGitMoves;
     this.turnHead = null;
+    this.turnGitMoves = [];
     if (!from) return null;
     const to = await this.readHead();
-    if (!to || (to.sha === from.sha && to.branch === from.branch)) return null;
+    if (!to || sameHead(to, from)) return null;
+    let at: HeadInfo = from;
+    const explained = moves.length > 0 && moves.every((m) => {
+      if (m.foreign || !sameHead(m.from, at)) return false;
+      at = m.to;
+      return true;
+    }) && sameHead(at, to);
+    if (explained) {
+      const commits = [...new Set(moves.flatMap((m) => m.ownCommits))].map((sha) => sha.slice(0, 7));
+      return { from, to, explainedBy: "claude_git", ...(commits.length > 0 ? { commits } : {}) };
+    }
     this.gate.headMoved = { from, to };
     return { from, to };
+  }
+
+  /** MARK: r1-git — §46: the chat row of a HEAD move Claude's git commands made (`claude_committed` / `claude_moved_head`). */
+  private noteClaudeHeadMove(moved: HeadMove): void {
+    const label = (h: HeadInfo) => (h.branch && h.sha ? `${h.branch}@${h.sha.slice(0, 7)}` : h.sha ? h.sha.slice(0, 7) : h.branch ?? "?");
+    const commits = moved.commits ?? [];
+    if (commits.length > 0) {
+      const detail = commits.join(", ");
+      this.notice(`Claude committed ${detail} — its files stay in the review.`, "session", { code: "claude_committed", detail });
+    } else {
+      const detail = `${label(moved.from)} → ${label(moved.to)}`;
+      this.notice(`Claude's git command moved HEAD (${detail}); the review shows only Claude's own changes.`, "session", { code: "claude_moved_head", detail });
+    }
   }
 
   private async retryCollect(): Promise<void> {
@@ -3621,6 +3684,8 @@ export class ReviewEngine {
    */
   private async reject(paths: string[], force = false): Promise<void> {
     if (this.gate.reverting) throw new CommandRefused("reverting");
+    // MARK: r1-git — §46: a file Claude committed is reverted on disk like any other; its commit stays — a row says so.
+    const committed = this.gate.changedFiles.filter((f) => f.committedIn && paths.includes(f.path)).map((f) => `${f.path} (${f.committedIn})`);
     const run = this.gate.reject(paths, force);
     this.touch();
     try {
@@ -3631,6 +3696,11 @@ export class ReviewEngine {
         throw e;
       }
       this.fail(errorMessage(e), false, "git", { code: "revert_failed" });
+      return;
+    }
+    if (committed.length > 0) {
+      const detail = committed.join(", ");
+      this.notice(`Reverted on disk; Claude's commit still holds the change (git reset --soft or git revert undoes it): ${detail}`, "session", { code: "reject_committed", detail });
     }
     this.touch();
   }
@@ -3995,20 +4065,30 @@ export class ReviewEngine {
       const open = [...new Set([...(await cp.indexPaths("unmerged")).filter((p) => !chosen.has(p)), ...unreviewed])];
       if (open.length > 0) throw new CommandRefused(`merge_unresolved:${open.slice(0, 5).join(", ")}${open.length > 5 ? ", …" : ""}`, { code: "merge_unresolved", paths: open });
     }
+    // MARK: r1-git — §46: a path with no change against HEAD (Claude's own commit holds it) is not staged again — `git commit
+    // --only` of nothing fails; it leaves the review as committed in that commit. Nothing else left: no commit at all.
+    const already = merging ? [] : await this.unchangedSinceHead(cp, paths);
+    const rest = paths.filter((p) => !already.includes(p));
     let sha: string;
     try {
-      // `--only`: entries the user staged for other paths stay staged and out of this commit.
-      const specs = await stagePaths(cp.root, paths, this.gate.changedFiles);
-      sha = await gitCommit(cp.root, message, merging ? null : specs);
+      if (rest.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
+      else {
+        // `--only`: entries the user staged for other paths stay staged and out of this commit.
+        const specs = await stagePaths(cp.root, rest, this.gate.changedFiles);
+        sha = await gitCommit(cp.root, message, merging ? null : specs);
+      }
     } catch (e) {
       this.fail(`Failed to commit: ${errorMessage(e)}`, false, "git", { code: "commit_failed" });
       throw new CommandRefused(errorMessage(e), { code: "commit_failed" });
     }
     const branch = await cp.branchName();
+    const made: HistoryCommit = { sha, subject: firstLineOf(message).slice(0, 200) };
+    if (rest.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
     this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files: paths, at: new Date().toISOString() };
     this.touch();
     try {
-      await this.gate.dropCommitted(paths, { sha, subject: firstLineOf(message).slice(0, 200) }); // MARK: wave4 w4-history (§38.3)
+      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 ? made : null) : null;
+      await this.gate.dropCommitted(paths, by ?? made); // MARK: wave4 w4-history (§38.3)
     } catch (e) {
       this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
     }
@@ -4016,7 +4096,33 @@ export class ReviewEngine {
     await this.refreshBranches();
     await this.refreshWorkbenches(false);
     if (push) await this.pushLastCommit();
-    return this.committedEvent();
+    return { ...this.committedEvent(), ...(already.length > 0 ? { alreadyCommitted: already } : {}) };
+  }
+
+  /** MARK: r1-git — §46: the review `paths` whose file (both names of a rename) has no change against HEAD — committed already. */
+  private async unchangedSinceHead(cp: GitCheckpoint, paths: readonly string[]): Promise<string[]> {
+    const files = paths.map((p) => this.gate.changedFiles.find((f) => f.path === p)).filter((f): f is ChangedFile => f !== undefined && f.ignored !== true);
+    if (files.length === 0) return [];
+    const specs = [...new Set(files.flatMap((f) => (f.oldPath !== null && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path])))];
+    const out = await cp.git(["--no-optional-locks", "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--", ...specs], { allowFailure: true }).catch(() => null);
+    if (!out || out.status !== 0) return [];
+    const dirty = new Set(out.stdout.toString("utf8").split("\0").filter((e) => e.length > 3).map((e) => e.slice(3)));
+    return files.filter((f) => !dirty.has(f.path) && (f.oldPath === null || !dirty.has(f.oldPath))).map((f) => f.path);
+  }
+
+  /** The commit each already-committed path is in (its `committedIn`, else HEAD's), `made` for the others; per path. */
+  private async commitsHolding(cp: GitCheckpoint, already: readonly string[], made: HistoryCommit | null): Promise<Map<string, HistoryCommit>> {
+    const by = new Map<string, HistoryCommit>();
+    for (const f of this.gate.changedFiles) {
+      if (!already.includes(f.path)) {
+        if (made) by.set(f.path, made);
+        continue;
+      }
+      const out = await cp.git(["log", "-1", "--format=%H%x00%s", f.committedIn ?? "HEAD"], { allowFailure: true }).catch(() => null);
+      const [full, subject] = out && out.status === 0 ? out.text.trim().split("\0") : [];
+      if (full) by.set(f.path, { sha: full, subject: (subject ?? "").slice(0, 200) });
+    }
+    return by;
   }
 
   // §53 commits in meaningful units
@@ -6122,6 +6228,9 @@ export class ReviewEngine {
       case "auto_turn_start": // §52.1
         this.onAutoTurnStart(source, ev);
         return;
+      case "git_result": // MARK: r1-git (§46)
+        this.onGitResult(ev);
+        return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
         // §29 (audit peer-04): a peer message the CLI delivered by itself has its card — no banner, no paused queue.
@@ -7523,6 +7632,10 @@ export class ReviewEngine {
 
 /** Records kept in memory per chat (the file keeps the same number). */
 const MAX_CHECKPOINT_RECORDS_KEPT = 60;
+/** MARK: r1-git — §46: files a `git_stashed` row names (the rest as "(+N)"). */
+const STASHED_SHOWN = 10;
+/** MARK: r1-git — the same commit and branch. */
+const sameHead = (a: HeadInfo, b: HeadInfo): boolean => a.sha === b.sha && a.branch === b.branch;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped CLI's process to be gone before it gives up. */
 const CHAT_MOVE_EXIT_WAIT_MS = 5000;
 /** MARK: wave4b w4b-follow — §39.4: how long `chat_move` waits for the stopped turn's collection. */

@@ -54,8 +54,8 @@ export type PermissionAgent = {
 /**
  * §33.3 / §33.4 / §33.9 / §46: why ReviewGate puts this call on a card although it would otherwise run — it works somewhere
  * this window's review does not see, (`claude_config`) it changes Claude Code's own settings, or (`git_command`) it is a git
- * command that changes the repository. `message` is the English fallback; clients localize on `code` (and show `message`
- * for a code they do not know).
+ * command that throws away uncommitted work or rewrites the remote (r1-git). `message` is the English fallback; clients
+ * localize on `code` (and show `message` for a code they do not know).
  */
 export type PermissionReason = {
   code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command";
@@ -1051,7 +1051,17 @@ export type ConcurrentClaude = {
 
 /** §31: a commit (`sha` null = unborn HEAD) and branch (null = detached). */
 export type HeadInfo = { sha: string | null; branch: string | null };
-export type HeadMove = { from: HeadInfo; to: HeadInfo };
+export type HeadMove = {
+  from: HeadInfo;
+  to: HeadInfo;
+  /**
+   * MARK: r1-git — §31.3 / §46 (`head_moved` only): Claude's own git commands made every step of the move (a commit, a branch,
+   * a pull, …): no `state.gate.headMoved`, a chat row instead. Absent: someone else's move (or an older engine).
+   */
+  explainedBy?: "claude_git";
+  /** With `explainedBy`: the short shas of the commits Claude's `git commit` made in the turn, oldest first (none: no commit). */
+  commits?: string[];
+};
 
 /**
  * `origin` (§31) is always sent by this engine; optional for clients' placeholder states. `group` (§32): set for mods files.
@@ -1445,7 +1455,19 @@ export type FullFileContentEvent = {
   endTree?: string;
 };
 export type PRCreatedEvent = { type: "pr_created"; id?: string; url: string; branch: string };
-export type CommittedEvent = { type: "committed"; id?: string; sha: string; shortSha: string; pushed: boolean; branch: string | null };
+export type CommittedEvent = {
+  type: "committed";
+  id?: string;
+  sha: string;
+  shortSha: string;
+  pushed: boolean;
+  branch: string | null;
+  /**
+   * MARK: r1-git — §46: paths that had no change against HEAD any more (Claude's own commit holds them): not staged again,
+   * they left the review as committed. When every path was one, no commit was made and `sha` is HEAD's.
+   */
+  alreadyCommitted?: string[];
+};
 export type UserMessageEvent = { type: "user_message"; text: string; turn: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice; /** §50: put into the running turn (`steer`) */ steered?: true };
 /** `unprompted`: Claude Code wrote it in a turn it ran on its own, outside any request (§18). */
 export type TextDeltaEvent = { type: "text_delta"; text: string; unprompted?: true };

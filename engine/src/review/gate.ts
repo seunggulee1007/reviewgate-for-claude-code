@@ -117,6 +117,14 @@ export class ReviewGate {
    * when A was snapshotted — so it is never carried twice.
    */
   baseMerge: string | null = null;
+  /**
+   * MARK: r1-git — §46: commits Claude's `git commit` made while this review stands (full shas, oldest first; the session's
+   * `git_result`). `carryGitMoves` never carries them into A — what Claude committed stays in the review, with `committedIn`.
+   * A fresh A (nothing left to review) starts without them.
+   */
+  ownCommits: string[] = [];
+  /** MARK: r1-git — commits Claude's `git commit --amend` replaced: their changes live on in the amend (never taken back out of A). */
+  private replacedCommits: string[] = [];
   /** `baseHead` of the review a fresh `snapshotStart` replaced (back on `abortTurn`). */
   private freshUndoBaseHead: HeadInfo | null = null;
   /** §31: other Claude processes in this worktree (the engine re-checks on open and on every send). */
@@ -200,7 +208,7 @@ export class ReviewGate {
    * §37.8: what a fresh `snapshotStart` replaced (A, B, the ranges, what A left out) — `abortTurn` puts it back when the turn
    * is called off before it ran (a refused `peer_accept`, a session gone right after A); its collection drops it.
    */
-  private freshUndo: { start: string | null; end: string | null; skipped: SkippedPath[]; ranges: RangeState; baseMerge: string | null } | null = null;
+  private freshUndo: { start: string | null; end: string | null; skipped: SkippedPath[]; ranges: RangeState; baseMerge: string | null; ownCommits: string[]; replacedCommits: string[] } | null = null;
 
   reset(): void {
     this.restoredFrom = null; // MARK: wave2 check-engine (§35.9)
@@ -213,6 +221,8 @@ export class ReviewGate {
     this.turnEndTree = null;
     this.baseHead = null;
     this.baseMerge = null;
+    this.ownCommits = []; // MARK: r1-git
+    this.replacedCommits = [];
     this.changedFiles = [];
     this.reviewNotes = [];
     this.isRequestingChanges = false;
@@ -281,6 +291,7 @@ export class ReviewGate {
       baseMerge: this.baseMerge,
       ranges: this.persistedRanges(),
       prereviews: structuredClone(this.prereviews), // MARK: wave3 engine-flow (§36.13)
+      ...(this.ownCommits.length > 0 ? { ownCommits: [...this.ownCommits] } : {}), // MARK: r1-git (§46)
     };
   }
 
@@ -319,6 +330,8 @@ export class ReviewGate {
     this.turnEndTree = null;
     this.baseHead = null;
     this.baseMerge = null;
+    this.ownCommits = []; // MARK: r1-git
+    this.replacedCommits = [];
     this.changedFiles = [];
     this.reviewNotes = [];
     this.acceptedPatchHashes = new Map();
@@ -399,6 +412,8 @@ export class ReviewGate {
     if (files.length === 0) return false;
     carryAutoAccepted(files, saved.changedFiles); // MARK: wave4c w4c-trust (§41.2)
     this.lastReject = null;
+    this.ownCommits = [...(saved.ownCommits ?? [])]; // MARK: r1-git (§46)
+    await this.markCommitted(cp, files);
     await annotateMods(cp, files, start, end);
     await annotateLarge(cp, files, start, end); // MARK: wave4b w4b-bigturn (§39.1)
     await this.annotateFiles({ cp, files, start, end, previous: saved.changedFiles, reason: "restore" });
@@ -465,7 +480,9 @@ export class ReviewGate {
     const base = this.baseHead;
     const head = await cp.head().catch(() => null);
     if (base?.sha && head?.sha && head.sha !== base.sha) {
-      const carried = await Promise.all(out.map((t) => this.carryHeadMove(cp, t, base.sha!, head.sha!).catch(() => null)));
+      const own = new Set(this.ownCommits); // MARK: r1-git — §46: Claude's own commits are never carried
+      const replaced = new Set(this.replacedCommits);
+      const carried = await Promise.all(out.map((t) => this.carryHeadMove(cp, t, base.sha!, head.sha!, own, replaced).catch(() => null)));
       this.baseHead = head;
       if (carried.every((t) => t !== null)) out = carried as string[];
       else {
@@ -495,25 +512,90 @@ export class ReviewGate {
   /**
    * §46: `tree` with HEAD's move `from` → `to` carried in. Along first parents a merge commit brings in only its other side
    * (`merge-base..other parent`, a conflicting file keeping `tree`'s content) — the resolutions committed with it, and
-   * whatever else was staged, stay in the review; any other commit is carried whole. When `to` does not get back to
-   * `from` along first parents (a checkout elsewhere, a rebase), the whole `from..to`.
+   * whatever else was staged, stay in the review; any other commit is carried whole — except Claude's own (`own`, MARK:
+   * r1-git), whose changes stay in the review. When `to` does not get back to `from` along first parents (a checkout
+   * elsewhere, an amend, a rebase) and Claude committed: from their merge base, what `from` had is taken back out and what
+   * `to` has brought in, Claude's own commits neither way and a commit Claude's amend replaced not taken out (its changes are
+   * in the amend); no merge on the way back; else the whole `from..to`.
    */
-  private async carryHeadMove(cp: GitCheckpoint, tree: string, from: string, to: string): Promise<string | null> {
+  private async carryHeadMove(cp: GitCheckpoint, tree: string, from: string, to: string, own: ReadonlySet<string> = new Set(), replaced: ReadonlySet<string> = new Set()): Promise<string | null> {
     const chain = await cp.firstParentChain(from, to);
-    if (!chain || !chain.some((c) => c.parents.length === 2)) return cp.carryCommits(tree, from, to);
+    if (chain) return this.carryChain(cp, tree, from, to, chain, own);
+    if (own.size > 0) {
+      const mb = await cp.mergeBase(from, to);
+      const back = mb === null ? null : mb === from ? [] : await cp.firstParentChain(mb, from);
+      const fwd = mb === null ? null : mb === to ? [] : await cp.firstParentChain(mb, to);
+      if (mb !== null && back !== null && fwd !== null && !back.some((c) => c.parents.length > 1)) {
+        let t: string | null = tree;
+        // Newest first: each run of commits that are not Claude's is reverse-applied as one range.
+        let runTop: string | null = null;
+        let runBottom: string | null = null;
+        for (const c of [...back].reverse()) {
+          if (own.has(c.sha) || replaced.has(c.sha)) {
+            if (runTop !== null && runBottom !== null) t = await cp.carryCommits(t, runTop, runBottom);
+            if (t === null) return null;
+            runTop = runBottom = null;
+            continue;
+          }
+          if (runTop === null) runTop = c.sha;
+          runBottom = c.parents[0] ?? null;
+        }
+        if (runTop !== null && runBottom !== null) t = await cp.carryCommits(t, runTop, runBottom);
+        if (t === null) return null;
+        return fwd.length === 0 ? t : this.carryChain(cp, t, mb, to, fwd, own);
+      }
+    }
+    return cp.carryCommits(tree, from, to);
+  }
+
+  /** `carryHeadMove` along a first-parent `chain` from `from` to `to`: runs of plain commits whole, merges' other side, `own` skipped. */
+  private async carryChain(cp: GitCheckpoint, tree: string, from: string, to: string, chain: { sha: string; parents: string[] }[], own: ReadonlySet<string>): Promise<string | null> {
     let t: string | null = tree;
     let rangeFrom = from;
     for (const c of chain) {
-      if (c.parents.length !== 2) continue;
-      const [p1, p2] = c.parents as [string, string];
-      const mb = await cp.mergeBase(p1, p2);
-      if (!mb) return cp.carryCommits(tree, from, to);
-      if (rangeFrom !== p1) t = await cp.carryCommits(t, rangeFrom, p1);
-      if (t !== null) t = await cp.carryCommits(t, mb, p2, { keepConflicts: true });
+      const merge = c.parents.length === 2;
+      if (!merge && !own.has(c.sha)) continue;
+      const p1 = c.parents[0]!;
+      if (merge) {
+        const mb = await cp.mergeBase(p1, c.parents[1]!);
+        if (!mb) return cp.carryCommits(tree, from, to);
+        if (rangeFrom !== p1) t = await cp.carryCommits(t, rangeFrom, p1);
+        if (t !== null) t = await cp.carryCommits(t, mb, c.parents[1]!, { keepConflicts: true });
+      } else if (rangeFrom !== p1) t = await cp.carryCommits(t, rangeFrom, p1);
       if (t === null) return null;
       rangeFrom = c.sha;
     }
     return rangeFrom === to ? t : cp.carryCommits(t, rangeFrom, to);
+  }
+
+  /** MARK: r1-git — §46: commits Claude's `git commit` made (the session's `git_result`): never carried into A. */
+  noteOwnCommits(shas: readonly string[], replaced: readonly string[] = []): void {
+    for (const sha of replaced) if (!this.replacedCommits.includes(sha)) this.replacedCommits.push(sha);
+    const added = shas.filter((sha) => !this.ownCommits.includes(sha));
+    if (added.length === 0) return;
+    this.ownCommits = [...this.ownCommits, ...added];
+    this.onChange();
+  }
+
+  /**
+   * MARK: r1-git — §46: `committedIn` (short sha) on the listed files one of Claude's own commits changed — the newest of them
+   * still in HEAD's history (one the user reset away does not count). Every other file loses it.
+   */
+  private async markCommitted(cp: GitCheckpoint, files: ChangedFile[]): Promise<void> {
+    for (const f of files) delete f.committedIn;
+    if (this.ownCommits.length === 0 || files.length === 0) return;
+    const byPath = new Map<string, string>();
+    for (const sha of this.ownCommits) {
+      const inHistory = await cp.git(["merge-base", "--is-ancestor", sha, "HEAD"], { allowFailure: true }).catch(() => null);
+      if (!inHistory || inHistory.status !== 0) continue;
+      const out = await cp.git(["diff-tree", "--no-commit-id", "--name-only", "--no-renames", "-r", "-z", "--root", sha], { allowFailure: true }).catch(() => null);
+      if (!out || out.status !== 0) continue;
+      for (const p of out.stdout.toString("utf8").split("\0")) if (p) byPath.set(p, sha.slice(0, 7));
+    }
+    for (const f of files) {
+      const sha = byPath.get(f.path) ?? (f.oldPath !== null ? byPath.get(f.oldPath) : undefined);
+      if (sha) f.committedIn = sha;
+    }
   }
 
   /**
@@ -542,6 +624,7 @@ export class ReviewGate {
     for (const f of byPath.values()) files.push(f);
     files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     carryAutoAccepted(files, this.changedFiles); // MARK: wave4c w4c-trust (§41.2)
+    await this.markCommitted(cp, files); // MARK: r1-git (§46)
     await annotateMods(cp, files, start, end);
     await annotateLarge(cp, files, start, end); // MARK: wave4b w4b-bigturn (§39.1)
     await this.annotateFiles({ cp, files, start, end, previous: this.changedFiles, reason: "refresh" });
@@ -711,7 +794,9 @@ export class ReviewGate {
       const snap = await cp.snapshotDetailed(this.ignorePatterns());
       tree = snap.tree;
       // MARK: wave3 check-engine — §37.8: kept until the turn is collected, for an `abortTurn` before it ran.
-      this.freshUndo = { start: this.turnStartTree, end: this.turnEndTree, skipped: this.snapshotSkipped, ranges: this.rangeState(), baseMerge: this.baseMerge };
+      this.freshUndo = { start: this.turnStartTree, end: this.turnEndTree, skipped: this.snapshotSkipped, ranges: this.rangeState(), baseMerge: this.baseMerge, ownCommits: this.ownCommits, replacedCommits: this.replacedCommits };
+      this.ownCommits = []; // MARK: r1-git — §46: A holds what Claude committed before
+      this.replacedCommits = [];
       this.snapshotSkipped = snap.skipped;
       this.resetRanges(); // §34: a fresh A starts a new review — no held B, no ranges of the old one
       this.freshUndoBaseHead = this.baseHead;
@@ -741,6 +826,8 @@ export class ReviewGate {
     if (undo && this.turnEndTree === null) {
       this.baseHead = this.freshUndoBaseHead;
       this.baseMerge = undo.baseMerge;
+      this.ownCommits = undo.ownCommits; // MARK: r1-git
+      this.replacedCommits = undo.replacedCommits;
       this.turnStartTree = undo.start;
       this.turnEndTree = undo.end;
       this.snapshotSkipped = undo.skipped;
@@ -826,6 +913,7 @@ export class ReviewGate {
       // MARK: wave3 check-engine — §37.3: the same delta says which files get a fresh `why` (no second diff of these trees).
       await this.annotateFiles({ cp, files, start, end, previous: this.changedFiles, reason: "collect", turnPaths: turnPaths(own) });
       markSkipped(files, skipped);
+      await this.markCommitted(cp, files); // MARK: r1-git (§46)
       const ownOrigins = new Map(files.map((f) => [f.path, originOf(f)]));
       if (this.isAnsweringReview) {
         // A question turn merges into the SAME review: every file keeps the state and the tools it

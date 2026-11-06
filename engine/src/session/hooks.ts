@@ -15,11 +15,12 @@ import { commonDir, gitDir, listWorktrees, sameRepository, type GitWorktree } fr
 import { HOST_FLAVOR, hasGitComponent, isInside, isInsidePath, normalizeForCompare, realpathLenient, samePath, toRepoRelative } from "../platform/paths.js";
 import { isReadOnlyCommand, isRemembered, matchesAllowPattern, type ReadOnlyContext } from "./bashClass.js";
 import { BudgetState, estimateEditLines, resolveToolPath } from "./budget.js";
-import type { SessionEvent, SessionLog } from "./events.js";
+import type { GitCommandResult, SessionEvent, SessionLog } from "./events.js";
 import { isReadMcpTool, matchesToolPattern, rememberable, userRuleAllows, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { changedWithin, isMcpTool, WINDOW_MARGIN_MS, type ToolWindow } from "./provenance.js";
 import { autoModeDecides, hookPermissionMode } from "./autoMode.js"; // MARK: wave4b w4b-auto (§39.5)
 import { changedPaths, dirState, type DirState } from "./outsideWatch.js";
+import { destructiveGitReason, dirtyPaths, entriesSince, headReflog, isOwnCommitSubject, movesHead, stashesWork, type GitProbe, type ReflogEntry } from "./gitDestructive.js"; // MARK: r1-git (§46)
 import {
   bashClaudeConfigTarget,
   bashOutsideDirs,
@@ -170,25 +171,35 @@ export function needsAsk(toolName: string, autoAllowTools: ReadonlySet<string>):
 }
 
 /**
- * Also matches option groups before the verb: `git -C x commit`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
+ * §46: a git command whose file changes are git's, not Claude's (postBash attributes none of them). MARK: r1-git — not
+ * `commit`: it changes no file, so in `sed -i … && git commit -am x` the files are Claude's (its commit keeps them in the
+ * review, and they would read "outside the app"). Also matches option
+ * groups before the verb: `git -C x reset`, `git -c k=v reset`, `git --no-pager merge`. The verb ends
  * at a non-word, non-dash character, so the read-only `merge-tree` / `merge-base` / `cherry` are not it; nor are
  * `stash list` / `stash show`. `"git"` quoted, option values quoted with spaces (`-C "My Repo"`, `-c user.name="A B"`), `bisect` and
- * `gh pr checkout|merge` count too (ref writes keep their own card, §40.1). An option's separate value never starts with `-`: else `-a -b -c …` splits
+ * `gh pr checkout|merge` count too. An option's separate value never starts with `-`: else `-a -b -c …` splits
  * into options and values in 2^n ways when no verb follows (30 options took 60 ms, each one more doubled it).
+ * MARK: r1-git — no longer what asks: the card is `gitCommandReason`'s (destructive commands only).
  */
 export const GIT_MUTATING_RE =
-  /\bgit["']?(?:\s+-{1,2}[\w-]+(?:=(?:[^\s"']|"[^"]*"|'[^']*')+|\s+(?:[^\s"'-]|"[^"]*"|'[^']*')(?:[^\s"']|"[^"]*"|'[^']*')*)?)*\s+(commit|checkout|switch|reset|restore|stash(?!\s+(?:list|show)(?![\w-]))|clean|rebase|merge|apply|am|pull|cherry-pick|revert|bisect)(?![\w-])|\bgh\s+pr\s+(?:checkout|merge)(?![\w-])/;
-export const GIT_ASK_REASON = "ReviewGate: a git command that changes the repository — needs the user's approval";
+  /\bgit["']?(?:\s+-{1,2}[\w-]+(?:=(?:[^\s"']|"[^"]*"|'[^']*')+|\s+(?:[^\s"'-]|"[^"]*"|'[^']*')(?:[^\s"']|"[^"]*"|'[^']*')*)?)*\s+(checkout|switch|reset|restore|stash(?!\s+(?:list|show)(?![\w-]))|clean|rebase|merge|apply|am|pull|cherry-pick|revert|bisect)(?![\w-])|\bgh\s+pr\s+(?:checkout|merge)(?![\w-])/;
+export const GIT_ASK_REASON = "ReviewGate: a git command that throws away uncommitted work or rewrites the remote — needs the user's approval";
+
+const NO_PATHS: ReadonlySet<string> = new Set();
 
 /**
- * §46: the card reason of a Bash command that changes the repository (`GIT_MUTATING_RE`: a commit, merge, pull, checkout, …),
- * null for anything else. Such a command always gets the card — in every permission mode, whatever a pattern, a remembered
- * key or the user's rules say — and the files it changes are not Claude's edits (postBash).
+ * MARK: r1-git — §46: the card reason of a Bash command one of whose git commands throws away uncommitted work or rewrites
+ * the remote (`destructiveGitReason`: reset --hard, clean -f, checkout / restore over files under review or with
+ * uncommitted changes, branch -D, stash drop / clear, a force push, …), null for anything else — a commit, a branch, a
+ * pull, a plain push run as in the terminal. Such a command always gets the card, in every permission mode, whatever a
+ * pattern, a remembered key or the user's rules say. `cwd`: where the command runs (the shell's directory).
  */
-export function gitCommandReason(toolName: string, input: Record<string, unknown>): PermissionReason | null {
+export async function gitCommandReason(toolName: string, input: Record<string, unknown>, ctx: HookContext, cwd: string = ctx.cwd): Promise<PermissionReason | null> {
   if (toolName !== "Bash") return null;
   const command = typeof input.command === "string" ? input.command : "";
-  return GIT_MUTATING_RE.test(command) ? { code: "git_command", message: SCOPE_MESSAGES.git_command } : null;
+  if (!/git/.test(command)) return null;
+  const root = await containmentRoot(ctx);
+  return destructiveGitReason(command, { cwd, root, reviewPaths: ctx.reviewPaths?.() ?? NO_PATHS, ...(ctx.gitProbe ? { probe: ctx.gitProbe } : {}) });
 }
 
 const SHELL_MUTATING_RE =
@@ -320,6 +331,15 @@ export type HookContext = {
    * goes to `changedOutside`.
    */
   onOutsideEdit?: (file: string) => void;
+  // MARK: r1-git — §46
+  /** Repo-relative paths still under review (pending, changes requested): a git command overwriting one asks first. */
+  reviewPaths?: () => ReadonlySet<string>;
+  /** Test seam: what the git card asks the repository (`gitDestructive.gitProbe`). */
+  gitProbe?: GitProbe;
+  /** What a git command of Claude's did (`postGitCommand`): files a `git stash` took out of the working tree, a HEAD move. */
+  onGitCommand?: (result: GitCommandResult) => void;
+  /** What the PreToolUse hook read before a git command ran, by tool_use id (`noteGitBefore` → `postGitCommand`). */
+  gitBefore?: Map<string, GitBefore>;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
@@ -336,6 +356,89 @@ export type ScopeWatch = {
 
 function allow(): HookJSONOutput {
   return {};
+}
+
+// MARK: r1-git — §46: what Claude's git commands did, read around the call.
+
+/**
+ * The state a git command may change, read by the PreToolUse hook: the dirty files before a `git stash`; HEAD and the newest
+ * HEAD reflog entry (`marker`, null: no reflog yet) before a command that may move it; `at`: when (epoch ms).
+ */
+export type GitBefore = { dirty?: string[]; head?: { sha: string | null; branch: string | null }; marker?: ReflogEntry | null; at: number };
+
+/** Before a Bash call: what `postGitCommand` compares with — the dirty files when it stashes work away, HEAD when it may move it. */
+async function noteGitBefore(ctx: HookContext, input: HookInput, command: string): Promise<void> {
+  const id = toolUseIdOf(input);
+  if (!id || !ctx.onGitCommand || !/git|\bgh\b/.test(command)) return;
+  const cwd = hookCwd(input, ctx);
+  const stash = stashesWork(command, cwd);
+  const moves = movesHead(command, cwd);
+  if (!stash && !moves) return;
+  try {
+    const root = await containmentRoot(ctx);
+    const before: GitBefore = { at: ctx.now?.() ?? Date.now() };
+    if (stash) {
+      const dirty = await dirtyPaths(root);
+      if (dirty) before.dirty = dirty;
+    }
+    if (moves) {
+      if (!ctx.checkpoint) ctx.checkpoint = await openCheckpoint(ctx.cwd);
+      const [head, log] = await Promise.all([ctx.checkpoint.head(), headReflog(root, 1)]);
+      before.head = head;
+      before.marker = log[0] ?? null;
+    }
+    if (!ctx.gitBefore) ctx.gitBefore = new Map();
+    ctx.gitBefore.set(id, before);
+  } catch (e) {
+    ctx.log("debug", `git state before Bash failed: ${String(e)}`);
+  }
+}
+
+/**
+ * After that call (it ran, or failed after it ran): what changed — a stash that took files out of the working tree, a HEAD
+ * move with the commits Claude's `git commit` made in it (the reflog's commit entries written while the call ran; a move
+ * from before — the user's, while the card waited — makes it `foreign`).
+ */
+async function noteGitAfter(ctx: HookContext, input: HookInput): Promise<void> {
+  const id = toolUseIdOf(input);
+  const before = id ? ctx.gitBefore?.get(id) : undefined;
+  if (!id || !before) return;
+  ctx.gitBefore!.delete(id);
+  try {
+    const root = await containmentRoot(ctx);
+    const result: GitCommandResult = { toolUseId: id };
+    if (before.dirty) {
+      const after = await dirtyPaths(root);
+      if (after) {
+        const left = new Set(after);
+        const stashed = before.dirty.filter((p) => !left.has(p));
+        if (stashed.length > 0) result.stashed = stashed;
+      }
+    }
+    if (before.head && ctx.checkpoint) {
+      const to = await ctx.checkpoint.head();
+      if (to.sha !== before.head.sha || to.branch !== before.head.branch) {
+        result.from = before.head;
+        result.to = to;
+        // The call ran from `now - duration_ms` (CLI 2.1.308; else since the PreToolUse hook): reflog times are in seconds.
+        const now = ctx.now?.() ?? Date.now();
+        const duration = (input as { duration_ms?: unknown }).duration_ms;
+        const ranFrom = typeof duration === "number" && duration >= 0 ? Math.max(before.at, now - duration) : before.at;
+        const since = Math.floor(ranFrom / 1000) - 1;
+        const all = await headReflog(root);
+        const entries = entriesSince(all, before.marker ?? null, since);
+        const mine = entries.filter((e) => e.at >= since && isOwnCommitSubject(e.subject));
+        if (mine.length > 0) result.ownCommits = [...new Set(mine.map((e) => e.sha).reverse())];
+        // An amend's entry follows the one of the commit it replaced (that commit's changes are in the amended one).
+        const amended = mine.filter((e) => e.subject.startsWith("commit (amend):")).map((e) => all[all.indexOf(e) + 1]?.sha).filter((x): x is string => !!x);
+        if (amended.length > 0) result.amended = [...new Set(amended)];
+        if (entries.some((e) => e.at < since)) result.foreign = true;
+      }
+    }
+    if (result.stashed || result.from) ctx.onGitCommand?.(result);
+  } catch (e) {
+    ctx.log("debug", `git state after Bash failed: ${String(e)}`);
+  }
 }
 
 const SUBAGENT_TOOLS_RE = /^(Agent|Task)$/;
@@ -801,6 +904,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
+    await noteGitBefore(ctx, input, command); // MARK: r1-git (§46): what a git command may change, read before it runs
     const planDeny = planModeBlocked(input.tool_name, ti, ctx, ro);
     if (planDeny) return denyPre(planDeny);
     // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
@@ -849,9 +953,10 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       rememberScope(ctx, toolUseIdOf(input), config);
       return askPre(CLAUDE_CONFIG_ASK_REASON);
     }
-    // §46: and so does a git command that changes the repository (a merge, a commit, …) — Claude runs it when asked, the
-    // user approves each one; this `ask` reaches canUseTool in acceptEdits / auto too.
-    const git = gitCommandReason(input.tool_name, ti);
+    // MARK: r1-git — §46: git runs as in the terminal (auto mode: the CLI's rules and classifier; default: the ordinary card,
+    // which can be remembered). Only a command that throws away uncommitted work or rewrites the remote reaches the card
+    // with the reason — in every mode, never remembered; this `ask` reaches canUseTool in acceptEdits / auto too.
+    const git = await gitCommandReason(input.tool_name, ti, ctx, hookCwd(input, ctx));
     if (git) {
       rememberScope(ctx, toolUseIdOf(input), git);
       return askPre(GIT_ASK_REASON);
@@ -984,6 +1089,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     return allow();
   };
 
+  /** MARK: r1-git — §46: after a Bash call (it ran, or exited non-zero after running): what its git commands did. */
+  const postGitCommand: HookCallback = async (input) => {
+    if (input.hook_event_name === "PostToolUse" || input.hook_event_name === "PostToolUseFailure") await noteGitAfter(ctx, input);
+    return allow();
+  };
+
   return {
     PreToolUse: [
       { matcher: EDIT_TOOLS_MATCHER, hooks: [preEdit] },
@@ -992,12 +1103,12 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     ],
     PostToolUse: [
       { matcher: EDIT_TOOLS_MATCHER, hooks: [postEdit, postEditScope] },
-      { matcher: "Bash", hooks: [postBash] },
+      { matcher: "Bash", hooks: [postBash, postGitCommand] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
       { matcher: "Agent|Task|Workflow", hooks: [postIsolated] },
     ],
     PostToolUseFailure: [
-      { matcher: "Bash", hooks: [postBash] },
+      { matcher: "Bash", hooks: [postBash, postGitCommand] },
       { matcher: MCP_TOOLS_MATCHER, hooks: [postWriter] },
     ],
   };

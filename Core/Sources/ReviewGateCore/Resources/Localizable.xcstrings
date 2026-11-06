@@ -897,6 +897,22 @@
         }
       }
     },
+    "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋하지 않은 작업을 버리거나 원격 기록을 바꾸는 git 명령이에요 — 리뷰로 되돌릴 수 없어요"
+          }
+        }
+      }
+    },
     "A hook failed": {
       "localizations": {
         "en": {
@@ -1149,6 +1165,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "에이전트"
+          }
+        }
+      }
+    },
+    "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번씩만 허용돼요 — 리뷰가 따라가지 못하는 곳에서 하는 호출이라 기억해 두지 않아요 (⌘↩)"
+          }
+        }
+      }
+    },
+    "Allowed one call at a time — this git command can throw away work the review cannot bring back, so it is never remembered (⌘↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowed one call at a time — this git command can throw away work the review cannot bring back, so it is never remembered (⌘↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번씩만 허용돼요 — 리뷰로 되돌릴 수 없는 작업을 버릴 수 있는 git 명령이라 기억해 두지 않아요 (⌘↩)"
           }
         }
       }
@@ -2481,6 +2529,38 @@
         }
       }
     },
+    "Claude committed %@ — its files stay in the review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude committed %@ — its files stay in the review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 커밋함 %@ — 파일은 리뷰에 그대로"
+          }
+        }
+      }
+    },
+    "Claude committed this change in %@; the file stays in the review. Rejecting it reverts the working tree — the commit stays (git reset --soft undoes it).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude committed this change in %@; the file stays in the review. Rejecting it reverts the working tree — the commit stays (git reset --soft undoes it)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 이 변경을 %@에 커밋했어요. 파일은 리뷰에 그대로 있어요. 거절하면 작업 트리만 되돌리고 커밋은 남아요(git reset --soft로 되돌릴 수 있어요)."
+          }
+        }
+      }
+    },
     "Claude could not fill in the PR": {
       "localizations": {
         "en": {
@@ -2557,6 +2637,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 이어서 작업했어요"
+          }
+        }
+      }
+    },
+    "Claude's git command moved HEAD (%@) — the review shows only Claude's changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude's git command moved HEAD (%@) — the review shows only Claude's changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 git 명령으로 HEAD가 바뀜 (%@) — 리뷰에는 Claude의 변경만 보여요"
           }
         }
       }
@@ -4019,6 +4115,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld번째 커밋에 메시지가 없어요"
+          }
+        }
+      }
+    },
+    "Committed %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Committed %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋됨 %@"
           }
         }
       }
@@ -9191,6 +9303,22 @@
         }
       }
     },
+    "Reverted on disk — Claude's commit still holds the change: %@ (git reset --soft or git revert undoes it)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reverted on disk — Claude's commit still holds the change: %@ (git reset --soft or git revert undoes it)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디스크에서는 되돌렸지만 Claude의 커밋에 변경이 남아 있어요: %@ (git reset --soft나 git revert로 되돌릴 수 있어요)"
+          }
+        }
+      }
+    },
     "Reverting…": {
       "localizations": {
         "en": {
@@ -10063,6 +10191,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "ReviewGate의 이 프로젝트 세션에서 바로 시작합니다. 디스크에는 아무것도 쓰지 않습니다."
+          }
+        }
+      }
+    },
+    "Stashed and out of the review: %@ (git stash pop brings them back)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stashed and out of the review: %@ (git stash pop brings them back)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stash에 들어가 리뷰에서 빠진 파일: %@ (git stash pop으로 되돌림)"
           }
         }
       }

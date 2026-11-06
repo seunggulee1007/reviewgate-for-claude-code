@@ -195,8 +195,7 @@ test("matchesIgnore: prefix, leading slash, globs (same cases as CheckpointIgnor
 
 test("GIT_MUTATING_RE catches option groups between git and the verb", () => {
   for (const cmd of [
-    "git commit -m x",
-    "git -C /tmp/repo commit -m x",
+    "git -C /tmp/repo checkout -- a.txt",
     "git -c user.name=me reset --hard",
     "git --no-pager -C sub checkout main",
     "cd x && git -C . --git-dir=.git stash",
@@ -223,6 +222,9 @@ test("GIT_MUTATING_RE catches option groups between git and the verb", () => {
     "git cherry -v develop",
     "git stash list",
     "git stash show -p stash@{0}",
+    // MARK: r1-git — a commit changes no file: what the same line edited is Claude's
+    "git commit -m x",
+    "sed -i '' s/a/b/ App.java && git add App.java && git commit -m fix",
   ]) {
     assert.equal(GIT_MUTATING_RE.test(cmd), false, cmd);
   }

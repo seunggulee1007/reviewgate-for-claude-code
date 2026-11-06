@@ -354,7 +354,8 @@ struct PermissionCard: View {
                 ShortcutLabel(title: "Allow once", shortcut: showsShortcuts ? "⌘↩" : nil)
             }
             .buttonStyle(.borderedProminent)
-            .help("Allow this call only (⌘↩ with an empty message box)")
+            // r1-git (§46): a card with a reason says why it is one call at a time (⌥⌘↩ allows nothing more there).
+            .help(PermissionCardOptions.onceOnlyHelp(request).map { Text(verbatim: $0) } ?? Text("Allow this call only (⌘↩ with an empty message box)"))
             .accessibilityLabel("Allow")
             .accessibilityIdentifier("Allow")
         }

@@ -11,6 +11,7 @@ import { currentLanguage, t } from "./i18n";
 import type { ChatItem } from "./store";
 import { hidesSubline, isWarningRow } from "./longWork"; // MARK: wave4 w4-longwork
 import { isAutoModeRow } from "./autoMode"; // MARK: wave4b w4b-auto
+import { isGitRow } from "./gitNotices"; // MARK: r1-git
 
 /** What an `error` event says besides its text (engine `ErrorDetails`, §30 / §33.4) — kept on the banner and the row. */
 export type ErrorFacts = {
@@ -153,6 +154,7 @@ export function errorSubline(facts: ErrorFacts | undefined): string {
   if (!facts) return "";
   if (hidesSubline(facts.code)) return ""; // MARK: wave4 w4-longwork — §38.2 the CLI's words are the row itself
   if (isAutoModeRow(facts.code)) return ""; // MARK: wave4b w4b-auto — §39.5 the row names the call and the reason
+  if (isGitRow(facts.code)) return ""; // MARK: r1-git — §46 the row names the files / commits
   if (facts.code === "hook_blocked" && typeof facts.exitCode === "number") return ""; // MARK: wave4b w4b-check4 — §40.1 the row names the hook and the reason
   const how = typeof facts.exitCode === "number" ? t("exit code {0}", facts.exitCode) : facts.signal ? t("signal {0}", facts.signal) : "";
   return [facts.cliDetail ?? "", how].filter((s) => s.length > 0).join(" · ");
