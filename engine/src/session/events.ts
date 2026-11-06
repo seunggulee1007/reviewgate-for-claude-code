@@ -96,6 +96,8 @@ export type SessionEvent =
       agentLaunched?: true;
       /** §52.2: the call's subagent worked in the background and ended — this is its result (a second one for the call). */
       agentEnded?: true;
+      /** §38.2: a user or plugin PreToolUse hook denied the call (its name, what it said). */
+      hookDenied?: { hook: string; reason: string };
     }
   /**
    * §34.6: the tree a post-Bash snapshot took (`root`: the repository it is of) — the engine reuses it as the live tree

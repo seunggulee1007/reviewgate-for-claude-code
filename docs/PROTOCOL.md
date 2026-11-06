@@ -3656,6 +3656,16 @@ as before.
   - `cli_warning` (`informational` level `warning` / `suggestion`, orange) and `cli_notice` (level `notice`, gray) with the
     CLI's text as `message` and `detail`; level `info` (terminal transcript mode only) goes to the log.
   A `kind: "error"` transcript row also keeps `maxTurns` and `hookName`.
+- **A PreToolUse hook's deny is the call's, not a notice** (r1x). A user or plugin command hook that denies a call (a JSON
+  `permissionDecision: "deny"`, exit 2) is normal flow: Claude reads the reason and adapts (reads the big file in parts).
+  It was a `hook_blocked` notice — an orange row at the chat's end, ×N, far from the call (a subagent's under nothing).
+  Now the session holds the block (`pendingHookDenies`, 30 s) until the denied call's result, which CLI 2.1.318 words
+  `PreToolUse:Read hook error: <reason>` (exit 2: `PreToolUse:Bash hook error: [<command>]: <stderr>`), and puts it on that
+  result: `tool_result.hookDenied {hook, reason}` (event and row). No notice is sent for it. Clients show the result as a
+  quiet gray row under the call — a subagent's inside its agent's group — "훅이 막음 · PreToolUse:Read — <reason>", never
+  an error. The app's own denies (no `hook_response`: §18, plan mode, `.git`) and other errors are unchanged; a hook that
+  failed (`hook_failed`) stays a row, gray now. A `hook_blocked` restored from before (a PreToolUse `hookName`) reads gray
+  too. `w4c.hookBlockOnce.test.ts` (a subagent's JSON deny, exit 2, an unrelated error, a failed hook).
 - **Usage windows.** Every `rate_limit_event` whose `rate_limit_info` names a `rateLimitType` updates
   `state.hud.rateLimits?: [{kind, status: "allowed" | "allowed_warning" | "rejected", percent?, resetsAt?, at}]`, one entry per
   kind (`five_hour`, `seven_day`, `seven_day_opus`, …, as the CLI names it), windows whose `resetsAt` passed dropped. The
@@ -4693,8 +4703,8 @@ ReviewHistoryFile.autoAccepted?: AutoAcceptRule
 - **One row for a blocking prompt / stop hook** (0.2.7). A UserPromptSubmit / Stop / SubagentStop command hook that blocks
   (JSON `decision: "block"` or exit 2) is reported twice by the CLI — its `hook_response` (`hook_blocked` with `hookName`,
   §40.1) and `informational{prevent_continuation}` — and became two rows ("훅이 막음: UserPromptSubmit — …" + "훅이 이 턴을
-  멈췄어요"). The session keeps the first of the two per turn (`continuationBlock`), either order; a PreToolUse deny stays
-  its own row; the result's terminal reason adds none (as before). Verified with CLI 2.1.309 (`sidecar/test/
+  멈췄어요"). The session keeps the first of the two per turn (`continuationBlock`), either order; a PreToolUse deny is its
+  call's (`tool_result.hookDenied`, §38.2); the result's terminal reason adds none (as before). Verified with CLI 2.1.309 (`sidecar/test/
   driver-hookblock.mjs`, the project's own `.claude/settings.json`, no model call): a JSON block and an exit 2 each end
   the turn with one row, `hookName: "UserPromptSubmit"`, `exitCode` 0 / 2, `detail: "commit first"`.
 - **Auto mode asks for an MCP write into `.git/`** (§40.1 for MCP tools, `autoModeKeepsMcpCard`). An `mcp__…` call whose

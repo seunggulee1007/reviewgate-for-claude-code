@@ -1525,6 +1525,12 @@ export type ToolResultEvent = {
    * A second `tool_result` for the same call — the last one is the call's result.
    */
   agentEnded?: true;
+  /**
+   * §38.2: a user or plugin PreToolUse hook denied this call before it ran (`hook`: the CLI's hook name, `PreToolUse:Read`;
+   * `reason`: what it said — Claude reads it and adapts). Normal flow, not a failure: clients show a quiet row under the
+   * call, and no `hook_blocked` notice is sent for it.
+   */
+  hookDenied?: { hook: string; reason: string };
 };
 /** Reply to `tool_output`: `output` is null when the engine kept nothing for that id (not Bash, older run, evicted). */
 export type ToolOutputEvent = { type: "tool_output"; id?: string; toolUseId: string; output: string | null; truncated: boolean };
@@ -1634,7 +1640,7 @@ export type TranscriptItem = { at: string; turn: number } & (
   | { kind: "assistant_text"; text: string; unprompted?: true }
   | { kind: "tool_use"; id: string; name: string; input: Record<string, unknown>; file?: string; parentToolUseId?: string; rationale?: string; rationaleSource?: RationaleSource; rationaleAge?: number; continues?: AgentContinuation; explore?: true /* MARK: wave4b w4b-tabs (§39.2) */ }
   /** §36.1: an Agent / Task result row also keeps the cleaned `report` (≤ 50 000 chars; never sent in `transcript_restore`, read with `agent_report`). */
-  | { kind: "tool_result"; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome; agentUsage?: AgentUsage; cliAgentId?: string; stoppedBy?: AgentStoppedBy; report?: string; reportTruncated?: true; /** §52.2 */ agentLaunched?: true; agentEnded?: true }
+  | { kind: "tool_result"; toolUseId: string; isError: boolean; preview: string; parentToolUseId?: string; truncated?: boolean; testOutcome?: TestOutcome; agentUsage?: AgentUsage; cliAgentId?: string; stoppedBy?: AgentStoppedBy; report?: string; reportTruncated?: true; /** §52.2 */ agentLaunched?: true; agentEnded?: true; /** §38.2 */ hookDenied?: { hook: string; reason: string } }
   | { kind: "permission"; requestId: string; toolName: string; allow: boolean; file?: string }
   | { kind: "budget_event"; event: "warn" | "deny"; toolName: string; file?: string; files: number; lines: number }
   | { kind: "turn_end"; stopReason: string; usage: TurnUsage; files: number; added: number; deleted: number; changedOutside: string[]; external?: number; review?: ChangeTotals; merged?: true; /** MARK: wave5 w5-model (§43.4) */ autoModel?: AutoModelChoice }

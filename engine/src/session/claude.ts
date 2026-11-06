@@ -256,6 +256,9 @@ export const START_SLOW_HINT_MS = 8000;
 export const PEER_RELEASE_TIMEOUT_MS = 3000;
 /** §29: own message uuids remembered for routing (the CLI echoes them in `command_lifecycle` / `result`). */
 const MAX_OWN_COMMANDS = 200;
+/** §38.2: how long a PreToolUse hook's deny waits for its call's result (it comes right after), and how many wait at most. */
+const HOOK_DENY_WAIT_MS = 30_000;
+const MAX_PENDING_HOOK_DENIES = 20;
 /** §52.2: calls remembered until their result (`openCalls`) — a call that never got one is forgotten oldest first. */
 const MAX_OPEN_CALLS = 2000;
 /** §29: a review turn over several released peer messages ends when the next one has not started this long after a result. */
@@ -325,6 +328,11 @@ export class ClaudeSession implements ClaudeSessionLike {
    * (`named`) or the CLI's `informational{prevent_continuation}` (`cli`); the other report of the same block adds none.
    */
   private continuationBlock: "named" | "cli" | null = null;
+  /**
+   * §38.2: PreToolUse blocks of the user's (or a plugin's) command hooks whose denied call has no result yet — its
+   * `tool_result` says it (`hookDenied`) instead of a notice. Oldest first, bounded; one that never meets its call goes.
+   */
+  private pendingHookDenies: { hook: string; reason: string; at: number }[] = [];
   /** The CLI's last stderr bytes (≤ 2 KB), consulted when the query loop dies. */
   private stderrTail = "";
   /** §30: the CLI answered initialize (`session_ready` went out): a death from here on is a crash, not a start failure. */
@@ -1254,6 +1262,12 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (msg.subtype !== "hook_started" && msg.subtype !== "hook_progress" && msg.subtype !== "hook_response") return false;
     if (msg.subtype === "hook_response") {
       const notice = hookFailureNotice(msg as Parameters<typeof hookFailureNotice>[0]);
+      // A PreToolUse hook's deny is normal flow (Claude reads the reason and adapts): the denied call's result says so — a
+      // quiet row under that call, a subagent's under its agent — not a notice of the chat.
+      if (notice?.code === "hook_blocked" && isPreToolUseHook(msg as { hook_event?: unknown; hook_name?: unknown })) {
+        this.notePreToolDeny(notice.hookName ?? "PreToolUse", notice.detail ?? "");
+        return this.initialized;
+      }
       // MARK: wave4c w4c-trust — §41.2: a prompt / stop hook's block is one row with the CLI's `informational` line.
       if (notice?.code === "hook_blocked" && isContinuationHook(msg as { hook_event?: unknown; hook_name?: unknown })) {
         this.hookBlockedThisTurn = true;
@@ -1298,6 +1312,21 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (this.disposing) return;
     const { code, message, ...rest } = n;
     this.emit({ type: "error", message, fatal: false, code, ...rest });
+  }
+
+  /** A command hook denied a call before it ran: its result (next) is told (`takeHookDeny`). */
+  private notePreToolDeny(hook: string, reason: string): void {
+    const now = Date.now();
+    this.pendingHookDenies = [...this.pendingHookDenies.filter((d) => now - d.at < HOOK_DENY_WAIT_MS), { hook, reason, at: now }].slice(-MAX_PENDING_HOOK_DENIES);
+  }
+
+  /** The hook deny an error result reports (`<hook> hook error: …`), taken from the pending ones; undefined for any other. */
+  private takeHookDeny(raw: string): { hook: string; reason: string } | undefined {
+    if (this.pendingHookDenies.length === 0) return undefined;
+    const i = this.pendingHookDenies.findIndex((d) => raw.trimStart().startsWith(`${d.hook} hook error:`));
+    if (i < 0) return undefined;
+    const [d] = this.pendingHookDenies.splice(i, 1);
+    return { hook: d!.hook, reason: hookDenyReasonOf(raw, d!.hook) || d!.reason };
   }
 
   private activity(a: { kind: ActivityKind; toolName?: string; detail?: string }): void {
@@ -2221,6 +2250,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     const testOutcome = bash ? detectTestOutcome(bash.command, isError, text, bash.background, this.opts.testCommandPatterns?.() ?? []) : undefined;
     // §34.8: what an Agent / Task call returns is its subagent's report — kept for the turn's `why` (never on the wire).
     const agentReport = agentCall && !launched && text.trim() ? text.slice(0, AGENT_REPORT_CHARS) : undefined;
+    // §38.2: a user or plugin hook denied the call before it ran (its hook_response came first).
+    const hookDenied = isError ? this.takeHookDeny(raw) : undefined;
     this.emit({
       type: "tool_result",
       toolUseId,
@@ -2228,6 +2259,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       preview: truncated ? text.slice(0, PREVIEW_CHARS) : text,
       ...(parent !== null ? { parentToolUseId: parent } : {}),
       ...(launched ? { agentLaunched: true as const } : {}),
+      ...(hookDenied ? { hookDenied } : {}),
       ...(truncated ? { truncated } : {}),
       ...(kept !== undefined ? { output: { text: kept.output, truncated: kept.truncated } } : {}),
       ...(testOutcome !== undefined ? { testOutcome } : {}),
@@ -2517,6 +2549,23 @@ function imagePlaceholder(b: unknown): string | undefined {
  * MARK: wave4c w4c-trust — §41.2: a `hook_response` of a hook whose block the CLI also reports as
  * `informational{prevent_continuation}` (a UserPromptSubmit / Stop / SubagentStop hook — not a PreToolUse deny).
  */
+/** A PreToolUse hook (`hook_event`, else the `PreToolUse:<tool>` name). */
+function isPreToolUseHook(msg: { hook_event?: unknown; hook_name?: unknown }): boolean {
+  const event = typeof msg.hook_event === "string" && msg.hook_event ? msg.hook_event : typeof msg.hook_name === "string" ? msg.hook_name.split(":")[0]! : "";
+  return event === "PreToolUse";
+}
+
+/**
+ * §38.2: what the denied call's result says after the CLI's frame — `PreToolUse:Read hook error: <reason>` for a JSON deny,
+ * `PreToolUse:Bash hook error: [<command>]: <stderr>` for exit 2 (CLI 2.1.318); "" when the text is not that call's.
+ */
+export function hookDenyReasonOf(text: string, hook: string): string {
+  const t = text.trimStart();
+  const prefix = `${hook} hook error:`;
+  if (!t.startsWith(prefix)) return "";
+  return t.slice(prefix.length).trim().replace(/^\[[^\]\n]*\]:\s*/, "").trim();
+}
+
 function isContinuationHook(msg: { hook_event?: unknown; hook_name?: unknown }): boolean {
   const event = typeof msg.hook_event === "string" && msg.hook_event ? msg.hook_event : typeof msg.hook_name === "string" ? msg.hook_name.split(":")[0]! : "";
   return event === "UserPromptSubmit" || event === "Stop" || event === "SubagentStop";
