@@ -39,8 +39,8 @@ why, you accept or revert each file, and only then does your next instruction go
 hunk. Accepting never touches your files. Reverting restores the file from a snapshot taken when the turn started, and
 leaves your index and commits alone.
 
-**Turn budgets that hold.** Cap how many files and changed lines one turn may touch. The cap is enforced through Claude
-Code's hooks: an edit over budget is denied, not merely discouraged.
+**Turn budgets that hold, when you want one.** Turn on a cap on how many files and changed lines one turn may touch
+(off by default). The cap is enforced through Claude Code's hooks: an edit over budget is denied, not merely discouraged.
 
 **Know why it changed.** Every file links back to the tool calls and the reasoning that produced it. A turn summary
 compares the plan with what was actually done, marks risky changes and shows the test results.
@@ -129,7 +129,8 @@ update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
 2. **Tell Claude what to do** in the chat at the bottom. Return sends; Shift-Return starts a new line.
 3. **Review the turn.** Go through the changed files and accept or revert each one. Your next instruction goes out once
    the turn is reviewed.
-4. **Set a budget** in Settings › Per-turn budget (max files, max changed lines) to keep turns small enough to review.
+4. **Optionally, limit each turn** in Settings › General › Limits › Limit changes per reply (max files, max changed
+   lines; off by default) to keep turns small enough to review.
 
 ## Build from source
 
