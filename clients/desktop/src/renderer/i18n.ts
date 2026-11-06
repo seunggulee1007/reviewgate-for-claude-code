@@ -20,6 +20,7 @@ export function currentLanguage(): string {
 
 const KEY_MAP: [RegExp, string][] = [
   [/⌥⌘↩/g, "Ctrl+Alt+Enter"],
+  [/⌥↩/g, "Alt+Enter"], // MARK: r1-composer M08: sends the text apart from Claude's open question
   [/⌘⇧↩/g, "Ctrl+Shift+Enter"],
   [/⌥⌘\//g, "Ctrl+Alt+/"], // wave4 w4-input (polish-05): the side question
   [/⌥⌘([A-Z])/g, "Ctrl+Alt+$1"], // wave4 w4-input (polish-06): ⌥⌘N, a note on the selected line

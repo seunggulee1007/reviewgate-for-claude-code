@@ -375,6 +375,8 @@
   "{0} — you can type now; the message is queued.": "{0} — 지금 입력해 두면 대기열에 들어갑니다.",
   "Queues the message; it is sent when Claude is done and a plain Send is allowed (⌘↩)": "메시지를 대기열에 넣습니다. Claude가 끝나고 보내기가 가능해지면 전송됩니다 (⌘↩)",
   "More send options": "다른 보내기 옵션",
+  "Claude reads it once the question is answered (⌥↩)": "질문에 답한 뒤 Claude가 읽어요 (⌥↩)",
+  "Answers Claude's question with your message (⌘↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).": "메시지로 Claude의 질문에 답해요(⌘↩). 입력창이 비어 있으면 카드에서 고른 그대로 보내요. 메뉴에서 질문과 별개로 보낼 수 있어요(⌥↩).",
   "Stops Claude's current turn, waits for it to end, then sends this message first (⌥⌘↩)": "Claude의 현재 턴을 중단하고, 끝나기를 기다린 뒤 이 메시지를 먼저 보냅니다 (⌥⌘↩)",
   "Stop & send": "중단하고 보내기",
   "Interrupts the turn, then sends this first": "턴을 중단한 뒤 이 메시지를 먼저 보냅니다",

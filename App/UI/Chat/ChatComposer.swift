@@ -32,6 +32,12 @@ final class ComposerModel {
     var dropHover = false
     /// ↑ / ↓ in an empty composer: this project's previous prompts.
     @ObservationIgnored var history = PromptHistoryNavigator(entries: [])
+    // MARK: r1-composer M12 — the window keeps this composer (§38.1)
+    /// The chat the draft belongs to (`AppState.draftChatId` when the composer last followed it): the chat may have changed
+    /// while the chat column was away (the PRs tab, an engine that stopped).
+    @ObservationIgnored var draftChatId: String?
+    /// False until the composer first followed a chat (its window opened): an empty box then gets the chat's saved draft.
+    @ObservationIgnored var draftChatBound = false
 
     // MARK: Mentions (§23)
 
@@ -84,8 +90,10 @@ final class ComposerModel {
         return String(rest)
     }
 
-    func paletteVisible(canSend: Bool) -> Bool {
-        canSend && !paletteDismissed && (paletteForced || slashToken != nil)
+    /// r1-composer M14: `available` is an open project (`AppState.canUseSlashPalette`) — the palette works while Claude
+    /// works or the session starts too; a pick goes into the draft, ↩ then sends, steers or queues it as any message.
+    func paletteVisible(available: Bool) -> Bool {
+        available && !paletteDismissed && (paletteForced || slashToken != nil)
     }
 
     /// wave3 mac-session (§36.5): the session's commands grouped by source with this project's recently used first; one
@@ -99,8 +107,8 @@ final class ComposerModel {
 
     /// ⌘/: an empty draft becomes "/" — what is typed next filters the commands and deleting the "/" closes the palette;
     /// over a typed draft the palette opens as it is and a pick goes in front of the text.
-    func openPalette(canSend: Bool) {
-        guard canSend else { return }
+    func openPalette(available: Bool) {
+        guard available else { return }
         if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             draft = "/"
             caretRequest = 1
@@ -190,7 +198,7 @@ struct ComposerPalettes: View {
             MentionPalette(query: query.query, entries: composer.mentionEntries(changedFiles: store.changedFiles, projectOpen: projectOpen),
                            selection: composer.mentionIndex, isLoading: composer.mentionLoading,
                            onPick: { composer.pickMention($0, store: store) })
-        } else if composer.paletteVisible(canSend: store.canSend) {
+        } else if composer.paletteVisible(available: store.canUseSlashPalette) {   // r1-composer M14: while Claude works too
             // wave3 mac-session (§36.5): descriptions, hints, groups, recently used first, "Starting session…".
             let sections = composer.paletteSections(store)
             SlashCommandPalette(sections: sections, selection: composer.paletteIndex,
@@ -210,6 +218,12 @@ struct ChatComposer: View {
     let transcript: TranscriptViewState
     /// "Accept N & Send" asks first when it would accept more than three files.
     @State private var confirmAcceptAndSend = false
+    // r1-composer M11: the row under the box, measured — its width, the secondary controls at their own width, Stop and the
+    // send button (`barCompact`).
+    @State private var barWidth: CGFloat = 0
+    @State private var barSecondaryWidth: CGFloat = 0
+    @State private var barStopWidth: CGFloat = 0
+    @State private var barPrimaryWidth: CGFloat = 0
     /// ↩ sends, ⇧↩ is a new line (Settings › General); off: ↩ is a new line and ⌘↩ sends.
     @AppStorage(AppSettings.Key.returnSends) private var returnSends = true
     @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
@@ -218,25 +232,7 @@ struct ChatComposer: View {
         VStack(alignment: .leading, spacing: 6) {
             ViewingChatBar()   // MARK: wave4b w4b-tabs — §39.2 "이 채팅을 보는 중이에요 — 보내면 이 채팅으로 이어가요"
             if pendingReviewCount > 0 {
-                // Sending answers a question; it never accepts. Say so, so nobody sends to "get past" the review — and
-                // (wave2 mac-flow, comp-04) that Claude's next changes join this review rather than a review of their own.
-                VStack(alignment: .leading, spacing: 3) {
-                    Label("\(pendingReviewCount) files pending review — you can ask questions without accepting",
-                          systemImage: "checklist")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                    Text("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, 22)
-                        .accessibilityIdentifier("Pending banner merge note")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(Color.orange.wash(colorScheme, light: 0.12, dark: 0.20), in: RoundedRectangle(cornerRadius: 8))
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("Pending banner")
+                PendingReviewNotice(count: pendingReviewCount)   // r1-composer M11: one line, the why in its ⓘ
             }
             if !store.queuedMessages.isEmpty || store.sendAfterInterrupt != nil {
                 ComposerQueueBar(messages: store.queuedMessages,
@@ -291,6 +287,11 @@ struct ChatComposer: View {
                     Text(store.viewingSendBlocker ?? sendHint)
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .accessibilityIdentifier("Viewing chat hint")
+                } else if question != nil {
+                    // r1-composer M08: ↩ answers Claude's open question (the card above); ⌥↩ sends the text apart from it.
+                    Text(verbatim: questionHint)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .accessibilityIdentifier("Question hint")
                 } else if let reason = store.cannotSendReason {
                     Text(pendingToolPermission != nil && trimmedDraft.isEmpty
                          ? String(localized: "\(reason) — ⌘↩ allow · ⌘⌫ deny")
@@ -304,97 +305,32 @@ struct ChatComposer: View {
                         Color.clear.frame(width: 0, height: 0)
                     }
                 }
-                CapabilitiesCaption()
-                Spacer()
-                if store.isRunning {
-                    // MARK: wave4 w4-safety — robustness-07: the stop did not stop within 10 s.
-                    if store.showsForceRestart {
-                        Button("Force restart", systemImage: "arrow.clockwise.circle") { store.forceRestartStuckTurn() }
-                            .help("The turn did not stop. Ends the Claude process and continues the same conversation — the queue and the review stay.")
-                            .accessibilityLabel("Force restart")
-                            .accessibilityIdentifier("Force restart")
-                    }
-                    Button("Stop", systemImage: "stop.fill") { store.interrupt() }
-                        .keyboardShortcut(".", modifiers: .command)
-                        .accessibilityLabel("Stop")
-                        .accessibilityIdentifier("Stop")
-                }
-                // wave4b w4b-tabs (§39.2): the review is the running chat's — its buttons wait for it to be shown.
-                if store.viewingChat == nil, store.hasPendingReview || !store.reviewNotes.isEmpty {
-                    // wave2 mac-flow (§34.4): the count is what goes out — sent notes are never sent again.
-                    Button("Request changes (\(store.unsentNotes.count))", systemImage: "exclamationmark.bubble") { requestChanges() }
-                        .disabled(!store.canRequestChanges)
-                        .help("Send your notes to Claude as requested changes on this turn's diff (⌘⇧C)")
-                        .accessibilityLabel("Request changes")
-                        .accessibilityIdentifier("Request changes")
-                }
-                if acceptAndSend, store.viewingChat == nil {   // wave4b w4b-tabs
-                    // A separate, explicitly labelled action: accepting is never a side effect of Send.
-                    Menu {
-                        Button("Accept \(store.pendingFiles.count) & Send") { acceptAndSendTapped() }
-                            .keyboardShortcut(.return, modifiers: [.command, .shift])
-                            .disabled(composer.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .accessibilityIdentifier("Accept and send")
-                    } label: {
-                        Text("Accept \(store.pendingFiles.count) & Send")
-                    }
-                    .menuStyle(.borderlessButton)
+                CapabilitiesCaption(compact: barCompact)   // r1-composer M11: an icon when the row folds
+                Spacer(minLength: 0)
+                stopButtons
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barStopWidth = $0 }
+                // r1-composer M11: at a narrow width these fold into "⋯" (the model and the mode as icons) — the send button
+                // never leaves the window.
+                secondaryControls(compact: barCompact, measuring: false)
+                primaryButton
                     .fixedSize()
-                    .help("Accepts the \(store.pendingFiles.count) pending file(s), then sends this message (⌘⇧↩)")
-                    .accessibilityLabel("Accept and send")
-                }
-                NextMessageModelMenu()   // wave5 w5-model (§43.4): "이번엔 opus"
-                PermissionModePicker()
-                if canSteer {
-                    // §50: while Claude works the message goes into the turn (primary, ↩ / ⌘↩) — as in the terminal; the menu
-                    // queues it for after the turn or stops the turn and sends it right after.
-                    Menu {
-                        Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
-                            .disabled(trimmedDraft.isEmpty)
-                            .accessibilityIdentifier("Add to queue")
-                        Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
-                            .disabled(trimmedDraft.isEmpty)
-                            .accessibilityIdentifier("Stop and send")
-                    } label: {
-                        Label("Send now", systemImage: "paperplane.fill")
-                    } primaryAction: {
-                        steerDraft()
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(.borderedProminent)
+                    .layoutPriority(1)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barPrimaryWidth = $0 }
+                    #if DEBUG
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugSendFrame = $0 }   // the layout check
+                    #endif
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barWidth = $0 }
+            .background(alignment: .topLeading) {
+                // r1-composer M11: the secondary controls at their own width — hidden, never answering a key or a click. One
+                // stack: a modifier on the bare views would measure each of them apart.
+                HStack(spacing: ComposerBarFit.spacing) { secondaryControls(compact: false, measuring: true) }
                     .fixedSize()
-                    .disabled(trimmedDraft.isEmpty)
-                    .help("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (↩). The menu queues it for after the turn or stops the turn first.")
-                    .accessibilityLabel("Send now")
-                    .accessibilityIdentifier("Send now")
-                } else if canQueue {
-                    // While Claude works: queue (primary, ⌘↩) or stop the turn and send this right after it.
-                    Menu {
-                        Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
-                            .disabled(!store.isRunning || trimmedDraft.isEmpty)
-                            .accessibilityIdentifier("Stop and send")
-                        Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
-                            .disabled(trimmedDraft.isEmpty)
-                    } label: {
-                        Label("Add to queue", systemImage: "text.badge.plus")
-                    } primaryAction: {
-                        queueDraft()
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(.borderedProminent)
-                    .fixedSize()
-                    .disabled(trimmedDraft.isEmpty)
-                    .help("Queues your message; it is sent when Claude is free. The menu has “Stop and send”. (⌘↩)")
-                    .accessibilityLabel("Add to queue")
-                    .accessibilityIdentifier("Add to queue")
-                } else {
-                    Button("Send", systemImage: "paperplane.fill") { send() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!sendEnabled || trimmedDraft.isEmpty)   // wave4b w4b-tabs
-                        .help(store.viewingSendBlocker ?? String(localized: "Sends your message. The review list is left exactly as it is (⌘↩)"))
-                        .accessibilityLabel("Send")
-                        .accessibilityIdentifier("Send")
-                }
+                    .hidden()
+                    .disabled(true)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barSecondaryWidth = $0 }
             }
             .background { StatusLineMeter() }   // MARK: wave6 w6-statusline — §44.2: the width the status line has
             StatusLineSlot()   // MARK: wave6 w6-statusline — §44.2: under the input, as in the terminal (only when it has lines)
@@ -440,7 +376,13 @@ struct ChatComposer: View {
         }
         // wave3 mac-flow (§36.14): "Send to Claude" from the PR tab — also when the chat was not on screen yet.
         .onChange(of: model.composerDraftTick) { _, _ in composer.takeComposerDraft(model) }
-        .onAppear { composer.takeComposerDraft(model) }
+        .onAppear {
+            followDraftChat(store.draftChatId)   // r1-composer M12: first, so a PR's text joins the draft that comes back
+            composer.takeComposerDraft(model)
+        }
+        // r1-composer M12 (§38.1): saved as it is typed (an emptied box at once), and when the chat column goes away.
+        .task(id: savedDraft) { await saveDraftSoon() }
+        .onDisappear { saveDraftNow() }
         // MARK: §49 Run as Task — the task started in its workbench: its text leaves this composer (unless edited since);
         // a task handed here that the session could not take comes into it.
         .onChange(of: model.startedTaskTick) { _, _ in
@@ -458,21 +400,184 @@ struct ChatComposer: View {
             model.insertIntoComposer(handed.text)
         }
         // MARK: wave4 w4-safety — polish-12: each chat tab keeps its own draft (text, mentions, images).
-        .onChange(of: store.draftChatId) { previous, current in
-            guard let previous, let current, previous != current else { return }
-            // wave6 w6-terminal (§44.1): a recalled prompt on screen is not the draft — the one typed before ↑ is kept.
-            store.stashDraft(ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions, images: composer.images),
-                             for: previous)
-            composer.history.reset(entries: store.promptHistory)
-            let kept = store.takeDraft(for: current)
-            composer.draft = kept.text
-            composer.mentions = kept.mentions
-            composer.images = kept.images
-        }
+        .onChange(of: store.draftChatId) { _, current in followDraftChat(current) }
         .task(id: composer.notice) {
             guard composer.notice != nil else { return }
             try? await Task.sleep(for: .seconds(6))
             if !Task.isCancelled { composer.notice = nil }
+        }
+    }
+
+    // MARK: The row under the box (r1-composer M11)
+
+    /// Stop — and "Force restart" after a stop that did not stop — while Claude works.
+    @ViewBuilder
+    private var stopButtons: some View {
+        if store.isRunning {
+            HStack(spacing: 8) {
+                // MARK: wave4 w4-safety — robustness-07: the stop did not stop within 10 s.
+                if store.showsForceRestart {
+                    Button("Force restart", systemImage: "arrow.clockwise.circle") { store.forceRestartStuckTurn() }
+                        .help("The turn did not stop. Ends the Claude process and continues the same conversation — the queue and the review stay.")
+                        .accessibilityLabel("Force restart")
+                        .accessibilityIdentifier("Force restart")
+                }
+                Button("Stop", systemImage: "stop.fill") { store.interrupt() }
+                    .keyboardShortcut(".", modifiers: .command)
+                    .accessibilityLabel("Stop")
+                    .accessibilityIdentifier("Stop")
+            }
+            .fixedSize()
+        }
+    }
+
+    /// The row folds its secondary controls before the send button would be pushed out of the window (Core `ComposerBarFit`).
+    private var barCompact: Bool {
+        ComposerBarFit.compact(rowWidth: barWidth, secondary: barSecondaryWidth,
+                               trailing: barPrimaryWidth + (store.isRunning ? barStopWidth + ComposerBarFit.spacing : 0))
+    }
+
+    /// 변경 요청 (N), Accept N & Send, the next message's model and the mode: at their own width, or (`compact`) the first two
+    /// in one "⋯" menu and the model and the mode as icons. `measuring`: the hidden copy the row is sized by — it registers
+    /// no shortcut (SwiftUI would take the first one it finds).
+    @ViewBuilder
+    private func secondaryControls(compact: Bool, measuring: Bool) -> some View {
+        // wave4b w4b-tabs (§39.2): the review is the running chat's — its buttons wait for it to be shown.
+        let request = store.showsRequestChanges
+        let accept = acceptAndSend && store.viewingChat == nil
+        if compact {
+            if request || accept {
+                Menu {
+                    if request {
+                        Button("Request changes (\(store.unsentNotes.count))", systemImage: "exclamationmark.bubble") { requestChanges() }
+                            .disabled(!store.canRequestChanges)
+                            .accessibilityIdentifier("Request changes")
+                    }
+                    if accept {
+                        Button("Accept \(store.pendingFiles.count) & Send") { acceptAndSendTapped() }
+                            .keyboardShortcut(.return, modifiers: [.command, .shift])
+                            .disabled(trimmedDraft.isEmpty)
+                            .accessibilityIdentifier("Accept and send")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(request && accept ? String(localized: "Request changes (\(store.unsentNotes.count)) · Accept \(store.pendingFiles.count) & Send")
+                      : request ? String(localized: "Request changes (\(store.unsentNotes.count))") : String(localized: "Accept \(store.pendingFiles.count) & Send"))
+                .accessibilityLabel("More send options")
+                .accessibilityIdentifier("Composer more")
+            }
+            NextMessageModelMenu().labelStyle(.iconOnly)   // wave5 w5-model (§43.4)
+            PermissionModePicker().labelStyle(.iconOnly)
+        } else {
+            if request {
+                // wave2 mac-flow (§34.4): the count is what goes out — sent notes are never sent again.
+                Button("Request changes (\(store.unsentNotes.count))", systemImage: "exclamationmark.bubble") { requestChanges() }
+                    .disabled(!store.canRequestChanges)
+                    .fixedSize()
+                    .help("Send your notes to Claude as requested changes on this turn's diff (⌘⇧C)")
+                    .accessibilityLabel("Request changes")
+                    .accessibilityIdentifier("Request changes")
+            }
+            if accept {
+                // A separate, explicitly labelled action: accepting is never a side effect of Send.
+                Menu {
+                    Button("Accept \(store.pendingFiles.count) & Send") { acceptAndSendTapped() }
+                        .keyboardShortcut(measuring ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
+                        .disabled(trimmedDraft.isEmpty)
+                        .accessibilityIdentifier("Accept and send")
+                } label: {
+                    Text("Accept \(store.pendingFiles.count) & Send")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Accepts the \(store.pendingFiles.count) pending file(s), then sends this message (⌘⇧↩)")
+                .accessibilityLabel("Accept and send")
+            }
+            NextMessageModelMenu()   // wave5 w5-model (§43.4): "이번엔 opus"
+            PermissionModePicker()
+        }
+    }
+
+    /// The send button: 답하기 while Claude's question is open (M08), 바로 보내기 while the turn can take the message (§50),
+    /// 대기열에 추가 while it cannot, else Send.
+    @ViewBuilder
+    private var primaryButton: some View {
+        if let question {
+            // r1-composer M08: the message answers Claude's open question (↩); the menu sends it apart from it (⌥↩) —
+            // into the turn, where it is read once the question is answered — or queues it, or stops the turn first.
+            Menu {
+                Button("Send apart from the question", systemImage: "paperplane") { sendWhileWorking() }
+                    .disabled(trimmedDraft.isEmpty || !canQueue)
+                    .accessibilityIdentifier("Send apart from the question")
+                Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
+                    .disabled(trimmedDraft.isEmpty || !canQueue)
+                Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
+                    .disabled(!store.isRunning || trimmedDraft.isEmpty)
+            } label: {
+                Label("Send answer", systemImage: "arrowshape.turn.up.left.fill")
+            } primaryAction: {
+                answerQuestion(question)
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+            .disabled(trimmedDraft.isEmpty && !questionComplete(question))
+            .help("Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).")
+            .accessibilityLabel("Send answer")
+            .accessibilityIdentifier("Send answer")
+        } else if canSteer {
+            // §50: while Claude works the message goes into the turn (primary, ↩ / ⌘↩) — as in the terminal; the menu
+            // queues it for after the turn or stops the turn and sends it right after.
+            Menu {
+                Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
+                    .disabled(trimmedDraft.isEmpty)
+                    .accessibilityIdentifier("Add to queue")
+                Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
+                    .disabled(trimmedDraft.isEmpty)
+                    .accessibilityIdentifier("Stop and send")
+            } label: {
+                Label("Send now", systemImage: "paperplane.fill")
+            } primaryAction: {
+                steerDraft()
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+            .disabled(trimmedDraft.isEmpty)
+            .help("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review (↩). The menu queues it for after the turn or stops the turn first.")
+            .accessibilityLabel("Send now")
+            .accessibilityIdentifier("Send now")
+        } else if canQueue {
+            // While Claude works: queue (primary, ⌘↩) or stop the turn and send this right after it.
+            Menu {
+                Button("Stop and send", systemImage: "stop.circle") { stopAndSend() }
+                    .disabled(!store.isRunning || trimmedDraft.isEmpty)
+                    .accessibilityIdentifier("Stop and send")
+                Button("Add to queue", systemImage: "text.badge.plus") { queueDraft() }
+                    .disabled(trimmedDraft.isEmpty)
+            } label: {
+                Label("Add to queue", systemImage: "text.badge.plus")
+            } primaryAction: {
+                queueDraft()
+            }
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+            .disabled(trimmedDraft.isEmpty)
+            .help("Queues your message; it is sent when Claude is free. The menu has “Stop and send”. (⌘↩)")
+            .accessibilityLabel("Add to queue")
+            .accessibilityIdentifier("Add to queue")
+        } else {
+            Button("Send", systemImage: "paperplane.fill") { send() }
+                .buttonStyle(.borderedProminent)
+                .disabled(!sendEnabled || trimmedDraft.isEmpty)   // wave4b w4b-tabs
+                .help(store.viewingSendBlocker ?? String(localized: "Sends your message. The review list is left exactly as it is (⌘↩)"))
+                .accessibilityLabel("Send")
+                .accessibilityIdentifier("Send")
         }
     }
 
@@ -482,7 +587,7 @@ struct ChatComposer: View {
     private var mentionQuery: (range: NSRange, query: String)? { composer.mentionQuery(projectOpen: projectOpen) }
     private var mentionVisible: Bool { composer.mentionVisible(projectOpen: projectOpen) }
     private var mentionEntries: [MentionEntry] { composer.mentionEntries(changedFiles: store.changedFiles, projectOpen: projectOpen) }
-    private var paletteVisible: Bool { composer.paletteVisible(canSend: store.canSend) }
+    private var paletteVisible: Bool { composer.paletteVisible(available: store.canUseSlashPalette) }
 
     /// "Accept N & Send" is a separate, explicit action next to Send; plain Send never accepts anything.
     private var acceptAndSend: Bool { store.canAcceptAndSend }
@@ -506,6 +611,26 @@ struct ChatComposer: View {
     /// The permission the composer's ⌘↩ / ⌥⌘↩ / ⌘⌫ answer: the oldest open request that is not an AskUserQuestion (its
     /// card has its own keys) — §33.1, wave1 mac-perms.
     private var pendingToolPermission: PermissionRequest? { store.shortcutPermission }
+    /// r1-composer M08: Claude's open question — ↩ answers it instead of putting the text into the turn.
+    private var question: OpenQuestion? { store.openQuestion }
+
+    /// r1-composer M08: the hint while Claude's question is open, after the send key in use.
+    private var questionHint: String {
+        returnSends ? String(localized: "Claude asked a question — ↩ to answer · ⌥↩ to send separately")
+            : String(localized: "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately")
+    }
+
+    /// r1-composer M08: the placeholder while Claude's question is open (1…N pick an option of the question it answers).
+    private func questionPlaceholder(_ open: OpenQuestion) -> String {
+        let draft = transcript.questionDrafts[open.requestId] ?? QuestionDraft()
+        let count = draft.current(in: open.questions).map { open.questions.questions[$0].options.count } ?? 0
+        return count > 0 ? String(localized: "Answer Claude's question — or press 1–\(count) to pick an option")
+            : String(localized: "Answer Claude's question")
+    }
+
+    private func questionComplete(_ open: OpenQuestion) -> Bool {
+        (transcript.questionDrafts[open.requestId] ?? QuestionDraft()).isComplete(open.questions)
+    }
     private var pendingReviewCount: Int { store.pendingFiles.count + store.changesRequestedFiles.count }
 
     // MARK: Send
@@ -549,6 +674,33 @@ struct ChatComposer: View {
         transcript.follow = true
         composer.inputFocused = true
         Task { await store.steer(text, mentions: mentions) }
+    }
+
+    /// r1-composer M08: the message box answers Claude's open question — the text answers the question it answers now (the
+    /// card goes out once every question has an answer), or with an empty box the card goes as it is. Never steered: a
+    /// message in the turn would only wait behind the open question. Mentions and images stay for the next message.
+    private func answerQuestion(_ open: OpenQuestion) {
+        let id = open.requestId
+        var draft = transcript.questionDrafts[id] ?? QuestionDraft()
+        guard !trimmedDraft.isEmpty else {
+            if store.submitOpenQuestion(draft) { transcript.questionDrafts[id] = nil }
+            return
+        }
+        let sent = store.answerOpenQuestion(composer.draft, draft: &draft)
+        transcript.questionDrafts[id] = sent ? nil : draft
+        composer.draft = ""
+        composer.history.reset(entries: store.promptHistory)
+        composer.closePalette()
+        composer.inputFocused = true
+    }
+
+    /// r1-composer M08: 1…9 in an empty box — that option of the question the box answers (nothing is sent).
+    private func pickQuestionOption(_ number: Int) -> Bool {
+        guard let open = question, composer.draft.isEmpty else { return false }
+        var draft = transcript.questionDrafts[open.requestId] ?? QuestionDraft()
+        guard store.pickOpenQuestionOption(number, draft: &draft) else { return false }
+        transcript.questionDrafts[open.requestId] = draft
+        return true
     }
 
     /// While Claude works: into the turn when it can take it (§50), else the queue.
@@ -595,6 +747,11 @@ struct ChatComposer: View {
             send()
             return true
         }
+        // r1-composer M08: ⌘↩ answers Claude's open question (with an empty box: sends its card as it is).
+        if shortcut == .commandReturn, let question {
+            answerQuestion(question)
+            return true
+        }
         switch CardShortcuts.action(for: shortcut, focus: .composer(draft: composer.draft), target: pendingToolPermission) {
         case .sendDraft:
             if store.canSend { send() } else if canQueue { sendWhileWorking() } else { return false }
@@ -616,6 +773,11 @@ struct ChatComposer: View {
     /// ↩ with "Return sends" on: the draft goes as ⌘↩ with text does (sent, or queued while Claude works). It never answers a
     /// permission card — a stray Return must not allow a command — and an empty or blocked draft stays as it is.
     private func sendFromReturn() -> Bool {
+        // r1-composer M08: ↩ answers Claude's open question (with an empty box: sends its card as it is).
+        if let question {
+            answerQuestion(question)
+            return true
+        }
         guard !trimmedDraft.isEmpty else { return true }
         if store.viewingChat != nil {
             if store.viewingSendBlocker == nil { send() }
@@ -625,6 +787,47 @@ struct ChatComposer: View {
             sendWhileWorking()
         }
         return true
+    }
+
+    // MARK: r1-composer M12 — a draft that lasts (§38.1)
+
+    /// What is saved for the chat: the draft typed before ↑ while a recalled prompt is shown, and the mentions.
+    private var savedDraft: ChatDraft {
+        ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions)
+    }
+
+    /// The box follows the chat its draft belongs to (polish-12). Another chat: what is typed is kept for the chat left (in
+    /// memory with its images, and on disk) and the other chat's draft comes in. The first chat a window — or an engine
+    /// after none — reports into an empty box brings back its saved draft; a chat that went away keeps what is typed.
+    private func followDraftChat(_ current: String?) {
+        // wave6 w6-terminal (§44.1): a recalled prompt on screen is not the draft — the one typed before ↑ is kept.
+        let typed = ChatDraft(text: composer.history.parkedDraft ?? composer.draft, mentions: composer.mentions, images: composer.images)
+        let first = !composer.draftChatBound
+        let previous = composer.draftChatId
+        composer.draftChatBound = true
+        if current != nil || first { composer.draftChatId = current }
+        let shown = first ? (typed.isEmpty ? store.savedDraft(for: current) : nil) : store.moveDraft(typed, from: previous, to: current)
+        guard let shown else { return }
+        composer.history.reset(entries: store.promptHistory)
+        composer.draft = shown.text
+        composer.mentions = shown.mentions
+        composer.images = shown.images
+    }
+
+    private func saveDraftNow() {
+        guard composer.draftChatBound else { return }
+        store.saveDraft(savedDraft, for: composer.draftChatId)
+    }
+
+    /// A moment after the last keystroke; an emptied box (sent, cleared) at once, so a quit right after a send never brings
+    /// the message back.
+    private func saveDraftSoon() async {
+        guard composer.draftChatBound else { return }
+        if !savedDraft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !savedDraft.mentions.isEmpty {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+        }
+        saveDraftNow()
     }
 
     /// "Accept N & Send" (⌘⇧↩): confirmed first when it would accept more than three files.
@@ -665,7 +868,7 @@ struct ChatComposer: View {
             HStack(alignment: .bottom, spacing: 4) {
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,
                                  caretRequest: $composer.caretRequest, contentHeight: $composer.height,
-                                 placeholder: String(localized: "Message Claude — @ mentions a file, ⌘V pastes an image"),
+                                 placeholder: question.map(questionPlaceholder) ?? String(localized: "Message Claude — @ mentions a file, ⌘V pastes an image"),
                                  onKey: handleKey, onDrop: { composer.takeDrop($0, root: store.projectURL) },
                                  onDragHover: { composer.dropHover = $0 })
                     .frame(height: min(max(composer.height, 30), 128))
@@ -755,11 +958,20 @@ struct ChatComposer: View {
             case .escape:
                 composer.mentionDismissed = true
                 return true
-            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB:
+            case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
+                 .optionEnter, .digit:
                 break
             }
         }
         switch key {
+        case .optionEnter:
+            // r1-composer M08: ⌥↩ while Claude's question is open — the text goes to Claude apart from the question (into
+            // the turn, read once the question is answered; else queued). Otherwise a new line, as before.
+            guard question != nil, !trimmedDraft.isEmpty, canQueue else { return false }
+            sendWhileWorking()
+            return true
+        case let .digit(number):
+            return pickQuestionOption(number)   // r1-composer M08
         case .controlB:
             // §52: as in the terminal — while Claude works, the running command goes on in the background.
             guard store.isRunning, store.backgroundWorkEnabled else { return false }
@@ -781,7 +993,7 @@ struct ChatComposer: View {
                 if composer.draft == "/" { composer.draft = "" }
                 composer.closePalette()
             } else {
-                composer.openPalette(canSend: store.canSend)
+                composer.openPalette(available: store.canUseSlashPalette)
             }
             return true
         case .enter, .tab:
@@ -827,6 +1039,52 @@ struct ChatComposer: View {
     }
 }
 
+/// Sending answers a question; it never accepts. Say so, so nobody sends to "get past" the review — and (wave2 mac-flow,
+/// comp-04) that Claude's next changes join this review rather than a review of their own. r1-composer M11: one line
+/// ("검토 대기 N개 · 질문은 수락 없이 가능") with the explanation in its ⓘ popover — it took five lines of a narrow chat.
+private struct PendingReviewNotice: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let count: Int
+    @State private var showsWhy = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label("\(count) pending review · you can ask without accepting", systemImage: "checklist")
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 0)
+            Button {
+                showsWhy.toggle()
+            } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("What sending does to this review")
+            .accessibilityLabel("What sending does to this review")
+            .accessibilityIdentifier("Pending banner why")
+            .popover(isPresented: $showsWhy, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("You can ask questions without accepting: sending never accepts or rejects a file.")
+                    Text("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.")
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("Pending banner merge note")
+                }
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: 300, alignment: .leading)
+                .padding(12)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(Color.orange.wash(colorScheme, light: 0.12, dark: 0.20), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Pending banner")
+    }
+}
+
 /// Last 500 sidecar `log` events, so IPC problems are diagnosable without a terminal.
 /// MARK: wave7 w7-chat — §45.1: its own view — a log line redraws this line, not the chat.
 private struct SidecarLogDisclosure: View {
@@ -857,12 +1115,37 @@ private struct SidecarLogDisclosure: View {
 private struct CapabilitiesCaption: View {
     @Environment(AppState.self) private var store
     @State private var showCapabilities = false
+    /// r1-composer M11: the row under the box folded — the counts go into the icon's tooltip (a narrow row cut them to "0 s…"
+    /// next to a hint cut the same way); the warnings stay.
+    var compact = false
+
+    private var compactHelp: String {
+        guard let caps = store.capabilities else {
+            return store.slashPaletteEmptyState(shown: [])?.text ?? SlashPaletteEmptyState.userSettingsOff.text
+        }
+        let servers = store.mcp.loaded ? store.mcp.servers.count : caps.mcpServers.count
+        return String(localized: "\(caps.skills.count) skills · \(caps.slashCommands.count) commands · \(servers) MCP servers")
+    }
 
     var body: some View {
         Button {
             showCapabilities.toggle()
         } label: {
-            if let caps = store.capabilities {
+            if compact {
+                HStack(spacing: 3) {
+                    if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
+                        Image(systemName: "puzzlepiece.extension.fill").foregroundStyle(.orange)
+                    }
+                    let failing = store.mcp.attentionServers
+                    if !failing.isEmpty {
+                        Circle().fill(failing.contains { $0.status == .failed } ? Color.red : Color.yellow)
+                            .frame(width: 6, height: 6)
+                            .accessibilityLabel("MCP servers need attention")
+                            .accessibilityIdentifier("MCP warning dot")
+                    }
+                    Image(systemName: "puzzlepiece.extension")
+                }
+            } else if let caps = store.capabilities {
                 HStack(spacing: 4) {
                     if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
                         Image(systemName: "puzzlepiece.extension.fill").foregroundStyle(.orange)
@@ -889,7 +1172,8 @@ private struct CapabilitiesCaption: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(1)
-        .help("Skills, slash commands, plugins and MCP servers available in this session")
+        .fixedSize(horizontal: compact, vertical: false)
+        .help(compact ? Text(verbatim: compactHelp) : Text("Skills, slash commands, plugins and MCP servers available in this session"))
         .accessibilityIdentifier("Capabilities")
         .popover(isPresented: $showCapabilities, arrowEdge: .top) {
             if store.extensions != nil {

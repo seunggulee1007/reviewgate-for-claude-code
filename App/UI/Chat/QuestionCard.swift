@@ -7,6 +7,8 @@ import ReviewGateCore
 /// lists the chosen answers. §33.1: the card answers its own request; once that request left the queue without an
 /// answer from here it reads "처리됨". polish-01: ⌘↩ (answer) and Esc (skip) act only while the card itself holds the
 /// keyboard focus — never from the composer, the side-question field or the find bar.
+/// MARK: r1-composer M08 — the card the message box answers (`AppState.openQuestion`) sits above the composer
+/// (`answeredFromComposer`): the question a typed answer or 1…N goes to is marked and its options numbered.
 struct QuestionCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let questions: AskUserQuestions
@@ -20,15 +22,19 @@ struct QuestionCard: View {
     var onSkip: () -> Void = {}
     /// Hands the keyboard back to the composer after an answer given while the card held it.
     var onFocusComposer: () -> Void = {}
+    /// r1-composer M08: the message box answers this card (it sits above the composer).
+    var answeredFromComposer = false
 
     private var isPending: Bool { decision == nil && isOpen }
+    /// ↩ sends the message (Settings › General); off: ⌘↩ does.
+    @AppStorage(AppSettings.Key.returnSends) private var returnSends = true
     @FocusState private var cardFocused: Bool
     /// The "Other…" field being typed in (its key = the question); the card's keys stay out of it.
     @FocusState private var otherFocused: String?
 
     /// Per question (keyed by text): selected option labels, whether "Other…" is chosen and its text — kept in the chat
     /// column (`TranscriptViewState.questionDrafts`), so a look at another chat tab does not lose them.
-    @Binding var draft: QuestionCardDraft
+    @Binding var draft: QuestionDraft
     /// The option whose `preview` is shown (last hovered/selected), per question.
     @State private var previewed: [String: String] = [:]
 
@@ -46,7 +52,8 @@ struct QuestionCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // r1-composer M08: above the composer the card is a little tighter (the transcript keeps more of the column).
+        VStack(alignment: .leading, spacing: answeredFromComposer ? 8 : 12) {
             HStack {
                 Image(systemName: "questionmark.bubble.fill").foregroundStyle(isPending ? Color.accentColor : Color.secondary)
                 Text("Claude has a question").font(.headline)
@@ -72,6 +79,7 @@ struct QuestionCard: View {
             ForEach(Array(questions.questions.enumerated()), id: \.element.id) { index, question in
                 if isPending {
                     questionEditor(index + 1, question)
+                        .id(Self.questionAnchor(index))
                 } else {
                     questionSummary(question)
                 }
@@ -80,6 +88,11 @@ struct QuestionCard: View {
                 HStack {
                     if cardFocused {
                         Text("⌘↩ answers · esc skips").font(.caption).foregroundStyle(.secondary)
+                    } else if answeredFromComposer {
+                        // r1-composer M08: what the message box does for this card.
+                        Text(verbatim: composerHint)
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                            .accessibilityIdentifier("Question card hint")
                     }
                     Spacer()
                     Button("Skip") { answer(onSkip) }
@@ -95,7 +108,7 @@ struct QuestionCard: View {
                 }
             }
         }
-        .padding(12)
+        .padding(answeredFromComposer ? 10 : 12)
         .background(Color.accentColor.wash(colorScheme, light: isPending ? 0.10 : 0.04, dark: isPending ? 0.20 : 0.10), in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor.wash(colorScheme, light: isPending ? (cardFocused ? 0.95 : 0.50) : 0.15,
                                                                                          dark: isPending ? (cardFocused ? 0.95 : 0.60) : 0.25),
@@ -131,16 +144,23 @@ struct QuestionCard: View {
 
     private func questionEditor(_ number: Int, _ question: AskUserQuestions.Question) -> some View {
         let key = question.question
+        let answersHere = answeredFromComposer && currentIndex == number - 1
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 chip(question.header)
                 if question.multiSelect {
                     Text("Select all that apply").font(.caption).foregroundStyle(.secondary)
                 }
+                if answersHere, questions.questions.count > 1 {
+                    // r1-composer M08: the question a typed answer or 1…N goes to.
+                    Label("Answered from the message box", systemImage: "arrow.down")
+                        .font(.caption).foregroundStyle(Color.accentColor)
+                        .accessibilityIdentifier("Question \(number) answered from the message box")
+                }
             }
             Text(question.question).font(.body.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-            ForEach(question.options) { option in
-                optionRow(number: number, question: question, option: option)
+            ForEach(Array(question.options.enumerated()), id: \.element.id) { index, option in
+                optionRow(number: number, question: question, option: option, key: answersHere ? index + 1 : nil)
             }
             otherRow(number: number, question: question)
             if let label = previewed[key], let preview = question.options.first(where: { $0.label == label })?.preview {
@@ -157,7 +177,8 @@ struct QuestionCard: View {
         }
     }
 
-    private func optionRow(number: Int, question: AskUserQuestions.Question, option: AskUserQuestions.Option) -> some View {
+    /// `key`: the number that picks this option from the message box (r1-composer M08), shown in front of it.
+    private func optionRow(number: Int, question: AskUserQuestions.Question, option: AskUserQuestions.Option, key digit: Int? = nil) -> some View {
         let key = question.question
         let isOn = selected[key, default: []].contains(option.label)
         return Button {
@@ -170,6 +191,15 @@ struct QuestionCard: View {
             previewed[key] = option.label
         } label: {
             HStack(alignment: .top, spacing: 8) {
+                if let digit {
+                    Text(verbatim: String(digit))
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16, height: 16)
+                        .background(RoundedRectangle(cornerRadius: 4).strokeBorder(.quaternary))
+                        .padding(.top, 1)
+                        .accessibilityHidden(true)
+                }
                 Image(systemName: glyph(multi: question.multiSelect, on: isOn))
                     .foregroundStyle(isOn ? Color.accentColor : Color.secondary)
                     .padding(.top, 2)
@@ -231,23 +261,30 @@ struct QuestionCard: View {
         multi ? (on ? "checkmark.square.fill" : "square") : (on ? "largecircle.fill.circle" : "circle")
     }
 
-    /// One answer per question, in option order then the free text; nil while any question is unanswered.
-    private func answer(for question: AskUserQuestions.Question) -> String? {
-        let key = question.question
-        let labels = question.options.map(\.label).filter { selected[key, default: []].contains($0) }
-        let other = otherChosen.contains(key) ? otherText[key]?.trimmingCharacters(in: .whitespacesAndNewlines) : nil
-        if otherChosen.contains(key), (other ?? "").isEmpty { return nil }
-        guard !labels.isEmpty || other != nil else { return nil }
-        return AskUserQuestions.answerText(selectedLabels: labels, other: other)
+    /// One answer per question, in option order then the free text (`QuestionDraft`, the rules the message box fills by).
+    private var answers: [String: String] { draft.answers(questions) }
+
+    private var isComplete: Bool { draft.isComplete(questions) }
+
+    /// r1-composer M08: the question a typed answer or 1…N goes to.
+    private var currentIndex: Int? { draft.current(in: questions) }
+
+    /// How many options the current question has (the hint's 1–N).
+    private var optionCount: Int { currentIndex.map { questions.questions[$0].options.count } ?? 0 }
+
+    /// r1-composer M08: what the message box does for this card, after the send key in use — ⌥↩ too: in a narrow chat the
+    /// row under the box has no room left for its hint.
+    private var composerHint: String {
+        switch (optionCount > 0, returnSends) {
+        case (true, true): String(localized: "Pick 1–\(optionCount) or type below · ↩ answers · ⌥↩ sends separately")
+        case (true, false): String(localized: "Pick 1–\(optionCount) or type below · ⌘↩ answers · ⌥↩ sends separately")
+        case (false, true): String(localized: "Type below · ↩ answers · ⌥↩ sends separately")
+        case (false, false): String(localized: "Type below · ⌘↩ answers · ⌥↩ sends separately")
+        }
     }
 
-    private var answers: [String: String] {
-        var out: [String: String] = [:]
-        for q in questions.questions { if let a = answer(for: q) { out[q.question] = a } }
-        return out
-    }
-
-    private var isComplete: Bool { answers.count == questions.questions.count }
+    /// The scroll id of question `index` (the slot above the composer scrolls to the one the message box answers).
+    static func questionAnchor(_ index: Int) -> String { "question-\(index)" }
 
     // MARK: Read-only
 

@@ -9,9 +9,10 @@ struct ChatView: View {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
     @Environment(\.openWindow) private var openWindow
-    @State private var composer = ComposerModel()
-    @State private var transcript = TranscriptViewState()
     @State private var actions = ChatActions()
+    /// r1-composer M12: the window keeps them — the PRs tab and an engine that stopped make this view again (§38.1).
+    private var composer: ComposerModel { model.chatComposer }
+    private var transcript: TranscriptViewState { model.chatTranscript }
 
     var body: some View {
         // §49.2: a short window (a new workbench's, or one with the mode offer up) never pushes the HUD or the composer out
@@ -31,6 +32,7 @@ struct ChatView: View {
             }
             ScrollView {
                 VStack(spacing: 0) {
+                    ChatQuestionSlot(composer: composer)   // r1-composer M08: the question the message box answers
                     ChatPlanSlot(composer: composer)
                     DefaultModeOfferBanner()   // wave1 mac-perms: "터미널처럼 auto 모드로 시작할까요?" (§2.8)
                     ChatPeerInboxSlot()   // §2.7: the inbox card sits right above the composer
@@ -38,6 +40,12 @@ struct ChatView: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
+            #if DEBUG
+            // r1-composer: the layout check says when a card above the composer (Claude's question) is cut.
+            .onScrollGeometryChange(for: CGSize.self) { CGSize(width: $0.containerSize.height, height: $0.contentSize.height) } action: { _, size in
+                model.debugCardsHeights = size
+            }
+            #endif
             ChatComposer(composer: composer, transcript: transcript)
         }
         .clipped()
@@ -104,6 +112,38 @@ private struct ChatPlanSlot: View {
                      stepNotes: transcript.planDraftBinding(key, \.stepNotes),
                      note: transcript.planDraftBinding(key, \.note))
                 .padding(.horizontal, 12).padding(.top, 10)
+        }
+    }
+}
+
+/// r1-composer M08: Claude's open question above the composer — the card the message box answers (a typed answer, 1…N,
+/// ↩). The question a typed answer goes to scrolls into view when it changes (several questions, a small window).
+private struct ChatQuestionSlot: View {
+    @Environment(AppState.self) private var store
+    @Environment(TranscriptViewState.self) private var transcript
+    let composer: ComposerModel
+
+    var body: some View {
+        if let open = store.openQuestion {
+            let id = open.requestId
+            let current = (transcript.questionDrafts[id] ?? QuestionDraft()).current(in: open.questions)
+            ScrollViewReader { proxy in
+                QuestionCard(
+                    questions: open.questions,
+                    decision: nil,
+                    requestId: id,
+                    isOpen: true,
+                    onAnswer: { store.answerQuestions(requestId: id, answers: $0); transcript.questionDrafts[id] = nil },
+                    onSkip: { store.skipQuestions(requestId: id); transcript.questionDrafts[id] = nil },
+                    onFocusComposer: { composer.inputFocused = true },
+                    answeredFromComposer: true,
+                    draft: Binding(get: { transcript.questionDrafts[id] ?? QuestionDraft() }, set: { transcript.questionDrafts[id] = $0 }))
+                .onChange(of: current) { _, index in
+                    guard let index, open.questions.questions.count > 1 else { return }
+                    withAnimation(.easeInOut(duration: 0.15)) { proxy.scrollTo(QuestionCard.questionAnchor(index), anchor: .top) }
+                }
+            }
+            .padding(.horizontal, 12).padding(.top, 10)
         }
     }
 }

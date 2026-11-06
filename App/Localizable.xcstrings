@@ -959,6 +959,22 @@
         }
       }
     },
+    "%lld pending review · you can ask without accepting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld pending review · you can ask without accepting"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검토 대기 %lld개 · 질문은 수락 없이 가능"
+          }
+        }
+      }
+    },
     "%lld permission requests waiting": {
       "localizations": {
         "en": {
@@ -2993,6 +3009,38 @@
         }
       }
     },
+    "Answer Claude's question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer Claude's question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문에 답을 쓰세요"
+          }
+        }
+      }
+    },
+    "Answer Claude's question — or press 1–%lld to pick an option": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer Claude's question — or press 1–%lld to pick an option"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문에 답을 쓰세요 — 1–%lld로 고를 수도 있어요"
+          }
+        }
+      }
+    },
     "Answer questions": {
       "localizations": {
         "en": {
@@ -3025,6 +3073,38 @@
         }
       }
     },
+    "Answered from the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered from the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력창으로 답하는 질문"
+          }
+        }
+      }
+    },
+    "Answered: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답함: %@"
+          }
+        }
+      }
+    },
     "Answering": {
       "localizations": {
         "en": {
@@ -3053,6 +3133,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "곁 세션에서 답변 중…"
+          }
+        }
+      }
+    },
+    "Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answers Claude's question with your message (↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지로 Claude의 질문에 답해요(↩). 입력창이 비어 있으면 카드에서 고른 그대로 보내요. 메뉴에서 질문과 별개로 보낼 수 있어요(⌥↩)."
           }
         }
       }
@@ -4467,6 +4563,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "CI"
+          }
+        }
+      }
+    },
+    "Claude asked a question — ↩ to answer · ⌥↩ to send separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked a question — ↩ to answer · ⌥↩ to send separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 질문했어요 — ↩로 답하기 · ⌥↩ 질문과 별개로 보내기"
+          }
+        }
+      }
+    },
+    "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 질문했어요 — ⌘↩로 답하기 · ⌥↩ 질문과 별개로 보내기"
+          }
+        }
+      }
+    },
+    "Claude asked: %@ — answer it below": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked: %@ — answer it below"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 질문: %@ — 아래에서 답해 주세요"
           }
         }
       }
@@ -10074,6 +10218,22 @@
         }
       }
     },
+    "Handled: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handled: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리됨: %@"
+          }
+        }
+      }
+    },
     "HEAD": {
       "shouldTranslate": false
     },
@@ -12380,6 +12540,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "줄을 더 볼 수 없어요: 파일이 너무 크거나 바이너리예요"
+          }
+        }
+      }
+    },
+    "More send options": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More send options"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 보내기 옵션"
           }
         }
       }
@@ -15695,6 +15871,38 @@
         }
       }
     },
+    "Pick 1–%lld or type below · ↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick 1–%lld or type below · ↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–%lld로 고르거나 아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
+    "Pick 1–%lld or type below · ⌘↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick 1–%lld or type below · ⌘↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1–%lld로 고르거나 아래에 쓰기 · ⌘↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
     "PR": {
       "localizations": {
         "en": {
@@ -17813,6 +18021,22 @@
         }
       }
     },
+    "Request changes (%lld) · Accept %lld & Send": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request changes (%lld) · Accept %lld & Send"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 요청 (%lld) · %lld개 수락 후 보내기"
+          }
+        }
+      }
+    },
     "Requested: %@": {
       "localizations": {
         "en": {
@@ -19046,6 +19270,38 @@
         }
       }
     },
+    "Send answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답하기"
+          }
+        }
+      }
+    },
+    "Send apart from the question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send apart from the question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문과 별개로 보내기"
+          }
+        }
+      }
+    },
     "Show the change": {
       "localizations": {
         "en": {
@@ -19074,6 +19330,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "마지막 64KB만 보여요."
+          }
+        }
+      }
+    },
+    "Skipped: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "건너뜀: %@"
           }
         }
       }
@@ -24326,6 +24598,38 @@
         }
       }
     },
+    "Type below · ↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type below · ↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
+    "Type below · ⌘↩ answers · ⌥↩ sends separately": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type below · ⌘↩ answers · ⌥↩ sends separately"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아래에 쓰기 · ⌘↩ 답하기 · ⌥↩ 따로 보내기"
+          }
+        }
+      }
+    },
     "Type part of a file name": {
       "localizations": {
         "en": {
@@ -24870,6 +25174,22 @@
         }
       }
     },
+    "What sending does to this review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What sending does to this review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보내면 이 리뷰가 어떻게 되는지"
+          }
+        }
+      }
+    },
     "What should Claude do instead?": {
       "localizations": {
         "en": {
@@ -25346,6 +25666,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 채팅을 보는 중이에요. 곁질문은 실행 중인 채팅으로 가요."
+          }
+        }
+      }
+    },
+    "You can ask questions without accepting: sending never accepts or rejects a file.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can ask questions without accepting: sending never accepts or rejects a file."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락하지 않고도 질문할 수 있어요. 보내기는 파일을 수락하거나 거절하지 않아요."
           }
         }
       }

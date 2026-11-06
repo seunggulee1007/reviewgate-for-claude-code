@@ -13,6 +13,9 @@
  * the task started there, the draft empties if it still holds that text (images stay here).
  * MARK: §50 "바로 보내기": while a turn of ours runs and the draft has no images, the primary button (and ⌘↩) puts the
  * message into that turn (src/renderer/sendNow.ts); its menu queues it for after the turn or stops the turn and sends it.
+ * MARK: r1-composer M08 — while Claude's question (AskUserQuestion) is open the box answers it (⌘↩, the primary "답하기";
+ * src/renderer/openQuestion.ts): the text goes to the question it answers now, 1…N in an empty box pick an option, ⌥↩ sends
+ * the text apart from the question. M14 — the `/` palette and ⌘/ work while Claude works too.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { FileItem } from "@reviewgate/engine";
@@ -39,7 +42,7 @@ import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal 
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
-import { SlashPalette, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
+import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
 import { WaitingLine } from "../agents/AgentBits";
@@ -52,7 +55,9 @@ import { isComposing, isEnter } from "../../ime";
 // MARK: wave4b w4b-tabs — §39.2 a send from another chat shown read-only switches there first
 import { sendInViewedChat, useViewing, viewingSendBlocker } from "../../viewedChat";
 import { ViewingChatBar } from "./ViewingChat";
-import { canSteerDraft, composerEnter, primarySend, workingHint } from "../../sendNow"; // MARK: §50
+import { canSteerDraft, composerEnter, primarySend, separateEnter, workingHint } from "../../sendNow"; // MARK: §50
+// MARK: r1-composer M08 — Claude's open question answered from the box
+import { currentQuestion, draftAnswers, emptyDraft, fillAnswer, isComplete, openQuestionOf, parseQuestions, pickOption, useQuestionDrafts } from "../../openQuestion";
 
 export function Composer() {
   const state = useStore((s) => s.state);
@@ -218,11 +223,24 @@ export function Composer() {
   const hasText = draft.trim().length > 0;
   /** §50: the draft can go into the running turn (a draft with images waits in the queue). */
   const canSteer = canSteerDraft(state, { queueMode, viewing: viewing !== null, images: images.length });
-  const primary = primarySend({ canSend, queueMode, canSteer });
-  const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText);
+  // MARK: r1-composer M08 — Claude's open question: ⌘↩ answers it instead of putting the text into the turn (where it would
+  // wait behind the question), ⌥↩ sends the text apart from it, 1…N in an empty box pick an option.
+  const question = useStore((s) => openQuestionOf(s.state, viewing !== null));
+  const questions = useMemo(() => (question ? parseQuestions(question.input) : []), [question]);
+  const questionDraft = useQuestionDrafts((s) => (question ? s.drafts[question.requestId] : undefined));
+  const setQuestionDraft = useQuestionDrafts((s) => s.setDraft);
+  const clearQuestionDraft = useQuestionDrafts((s) => s.clearDraft);
+  const answerQuestions = useStore((s) => s.answerQuestions);
+  const shownQuestionDraft = questionDraft ?? emptyDraft(questions);
+  const questionReady = question !== null && isComplete(questions, shownQuestionDraft);
+  const questionCurrent = question ? currentQuestion(questions, shownQuestionDraft) : null;
+  const questionOptions = questionCurrent !== null ? (questions[questionCurrent]?.options.length ?? 0) : 0;
+  const primary = primarySend({ canSend, queueMode, canSteer, question: question !== null });
+  const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null);
 
   const token = slashToken(draft);
-  const paletteVisible = canSend && !paletteDismissed && (paletteForced || token !== null);
+  // MARK: r1-composer M14 — the palette works while Claude works or the session starts too (a pick goes into the draft).
+  const paletteVisible = slashPaletteShows({ projectOpen: state.project !== null, dismissed: paletteDismissed, forced: paletteForced, token });
 
   // §23: the `@query` at the caret (not while the slash palette is open).
   const mention = paletteVisible || state.project === null ? null : mentionToken(draft, caret);
@@ -353,7 +371,7 @@ export function Composer() {
     setPaletteDismissed(true);
   };
   const openPalette = () => {
-    if (!canSend) return;
+    if (state.project === null) return; // r1-composer M14: not only while a message could be sent
     setPaletteForced(true);
     setPaletteDismissed(false);
     setPaletteIndex(0);
@@ -435,6 +453,41 @@ export function Composer() {
     setMentionDirs({});
     setAttachErrors([]);
     inputRef.current?.focus();
+  };
+
+  /**
+   * r1-composer M08: the box answers Claude's open question — the text answers the question it answers now (the card goes
+   * out once every question has an answer), or with an empty box the card goes as it is. Never steered: it would only wait
+   * behind the question. Chips stay for the next message.
+   */
+  const doAnswer = () => {
+    setSplitOpen(false);
+    if (!question) return;
+    if (!hasText) {
+      if (!questionReady) return;
+      answerQuestions(question.requestId, draftAnswers(questions, shownQuestionDraft));
+      clearQuestionDraft(question.requestId);
+      return;
+    }
+    const filled = fillAnswer(questions, shownQuestionDraft, draft);
+    if (!filled) return;
+    setDraft("");
+    closePalette();
+    setNav(IDLE_NAV);
+    if (isComplete(questions, filled.draft)) {
+      answerQuestions(question.requestId, draftAnswers(questions, filled.draft));
+      clearQuestionDraft(question.requestId);
+    } else {
+      setQuestionDraft(question.requestId, filled.draft);
+    }
+    inputRef.current?.focus();
+  };
+
+  /** r1-composer M08: "질문과 별개로 보내기" (⌥↩) — into the turn, read once the question is answered; else the queue. */
+  const doSeparately = () => {
+    setSplitOpen(false);
+    if (separateEnter({ question: question !== null, hasText, queueMode, canSteer }) === "steer") doSteer();
+    else doQueue();
   };
 
   /** "Stop & send": interrupt the turn, then send this message first. */
@@ -535,12 +588,30 @@ export function Composer() {
           return;
       }
     }
+    // MARK: r1-composer M08 — ⌥↩ while Claude's question is open: the text goes to Claude apart from it (else a new line).
+    if (isEnter(e) && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && separateEnter({ question: question !== null, hasText, queueMode, canSteer })) {
+      e.preventDefault();
+      doSeparately();
+      return;
+    }
+    // 1…9 in an empty box: that option of the question the box answers (nothing is sent; ⌘↩ sends the card).
+    if (question && draft.length === 0 && !e.metaKey && !e.ctrlKey && !e.altKey && /^[1-9]$/.test(e.key)) {
+      const next = pickOption(questions, shownQuestionDraft, Number(e.key));
+      if (next) {
+        e.preventDefault();
+        setQuestionDraft(question.requestId, next);
+        return;
+      }
+    }
     if (isEnter(e) && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       // wave4b w4b-tabs (§39.2): from another chat shown read-only only a plain ⌘↩ sends (there); nothing stops or queues
       // in the running chat from here.
       // §50: while Claude works ⌘↩ puts the draft into the turn when it can take it, else into the queue.
-      switch (composerEnter(e, { viewing: viewing !== null, canSend, canSteer })) {
+      switch (composerEnter(e, { viewing: viewing !== null, canSend, canSteer, question: question !== null })) {
+        case "answer":
+          doAnswer();
+          break;
         case "acceptAndSend":
           doAcceptAndSend();
           break;
@@ -614,6 +685,15 @@ export function Composer() {
     }
   };
 
+  const separateItem = (
+    <div role="menuitem" className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? doSeparately() : undefined)} data-testid="Send apart from the question">
+      <span className="col" style={{ gap: 1 }}>
+        <span>{t("Send apart from the question")}</span>
+        <span className="tiny faint">{t("Claude reads it once the question is answered (⌥↩)")}</span>
+      </span>
+    </div>
+  );
+
   const queueItem = (
     <div role="menuitem" className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? (setSplitOpen(false), doQueue()) : undefined)} data-testid="Queue item">
       <span className="col" style={{ gap: 1 }}>
@@ -661,7 +741,11 @@ export function Composer() {
         ref={inputRef}
         value={draft}
         placeholder={
-          running
+          question
+            ? questionOptions > 0
+              ? t("Answer Claude's question — or press 1–{0} to pick an option", questionOptions)
+              : t("Answer Claude's question")
+            : running
             ? canSteer
               ? t("Claude is working — type a message; ⌘↩ sends it to Claude now, into this turn.")
               : t("Claude is working — type the next message; it is queued and sent when the turn ends.")
@@ -786,7 +870,19 @@ export function Composer() {
         )}
         {primary !== "send" ? (
           <div className="split-send" ref={splitRef} data-testid="Queue split">
-            {primary === "steer" ? (
+            {primary === "answer" ? (
+              // r1-composer M08: the message answers Claude's open question (⌘↩); an empty box sends the card as it is.
+              <button
+                type="button"
+                className="primary split-main"
+                disabled={!hasText && !questionReady}
+                onClick={doAnswer}
+                title={t("Answers Claude's question with your message (⌘↩) — with an empty box, sends the card as it is. The menu sends the message apart from the question (⌥↩).")}
+                data-testid="Send answer"
+              >
+                {t("Send answer")}
+              </button>
+            ) : primary === "steer" ? (
               // §50: as typing while Claude works in the terminal — the message goes into this turn (⌘↩).
               <button
                 type="button"
@@ -823,7 +919,8 @@ export function Composer() {
             {splitOpen && (
               // §50: with "Send now" first the menu offers the queue (after the turn) before stopping the turn, as on the Mac.
               <div className="menu right split-menu" role="menu">
-                {primary === "steer" && queueItem}
+                {primary === "answer" && separateItem}
+                {(primary === "steer" || primary === "answer") && queueItem}
                 <div
                   role="menuitem"
                   className={`item ${!running || !hasText ? "disabled" : ""}`}
@@ -836,7 +933,7 @@ export function Composer() {
                     <span className="tiny faint">{running ? t("Interrupts the turn, then sends this first") : t("Only while Claude is working")}</span>
                   </span>
                 </div>
-                {primary !== "steer" && queueItem}
+                {primary === "queue" && queueItem}
               </div>
             )}
           </div>

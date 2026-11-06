@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { EngineCommand, ReviewState } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { canSteerDraft, composerEnter, primarySend, steerPossible, workingHint } from "./sendNow";
+import { canSteerDraft, composerEnter, primarySend, separateEnter, steerPossible, workingHint } from "./sendNow";
 
 // §50 "Send now" (바로 보내기) in Electron, as on the Mac (RunAsTaskTests.swift §50, ChatComposer.swift): while a turn of ours
 // runs, a typed message goes into it (`steer`); a refusal, or a draft with images, waits in the queue — never lost.
@@ -58,6 +58,41 @@ describe("when a message can go into the turn (§50)", () => {
       initI18n("en", "darwin");
     }
     expect(workingHint("Claude is working…", true)).toBe("Claude is working… — ⌘↩ sends it to Claude now");
+  });
+});
+
+// r1-composer M08 (§50 "An open question"): while Claude's question is open the box answers it — the text would only wait
+// behind the question in the turn. ⌥↩ sends the text apart from it; ⌥⌘↩ still stops the turn and sends.
+describe("an open question (M08)", () => {
+  it("the primary button and ⌘↩ answer it instead of steering", () => {
+    const o = { viewing: false, canSend: false, canSteer: true, question: true };
+    expect(primarySend({ canSend: false, queueMode: true, canSteer: true, question: true })).toBe("answer");
+    expect(composerEnter({ shiftKey: false, altKey: false }, o)).toBe("answer");
+    expect(composerEnter({ shiftKey: false, altKey: true }, o)).toBe("stopAndSend");
+    // Without a question nothing changes.
+    expect(primarySend({ canSend: false, queueMode: true, canSteer: true, question: false })).toBe("steer");
+    expect(composerEnter({ shiftKey: false, altKey: false }, { ...o, question: false })).toBe("steer");
+    // Another chat shown read-only: its own send, never the running chat's question.
+    expect(composerEnter({ shiftKey: false, altKey: false }, { ...o, viewing: true })).toBe("send");
+  });
+
+  it("⌥↩ sends the text apart from the question — into the turn, else the queue; otherwise it stays a new line", () => {
+    expect(separateEnter({ question: true, hasText: true, queueMode: true, canSteer: true })).toBe("steer");
+    expect(separateEnter({ question: true, hasText: true, queueMode: true, canSteer: false })).toBe("queue");
+    expect(separateEnter({ question: true, hasText: false, queueMode: true, canSteer: true })).toBeNull();
+    expect(separateEnter({ question: false, hasText: true, queueMode: true, canSteer: true })).toBeNull();
+  });
+
+  it("the hint says how the box answers it, in Korean too", () => {
+    expect(workingHint("Waiting for permission decision", true, true, true)).toBe("Claude asked a question — ⌘↩ to answer · ⌥↩ to send separately");
+    initI18n("ko", "darwin");
+    try {
+      expect(workingHint("권한 결정 대기 중", true, true, true)).toBe("Claude가 질문했어요 — ⌘↩로 답하기 · ⌥↩ 질문과 별개로 보내기");
+      initI18n("ko", "win32");
+      expect(workingHint("x", true, true, true)).toBe("Claude가 질문했어요 — Ctrl+Enter로 답하기 · Alt+Enter 질문과 별개로 보내기");
+    } finally {
+      initI18n("en", "darwin");
+    }
   });
 });
 

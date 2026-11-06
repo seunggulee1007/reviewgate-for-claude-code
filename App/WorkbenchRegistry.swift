@@ -131,6 +131,20 @@ final class WindowModel {
     /// `composerDraftTick`, or when it appears (the PR tab has no chat).
     var composerDraft: String?
     var composerDraftTick = 0
+    // MARK: r1-composer M12
+    /// The chat column's composer and transcript state, kept by the window (§38.1): the chat is made again when it comes
+    /// back from the PRs tab or after an engine that stopped, and what is typed (with its mentions and images), the
+    /// question card's picks, a deny instruction, the plan card's notes and the folds are still there. PR comments sent
+    /// to Claude join the draft kept here.
+    let chatComposer = ComposerModel()
+    let chatTranscript = TranscriptViewState()
+    #if DEBUG
+    /// r1-composer M11: the composer's send button in the window (SwiftUI's global space) — the layout check
+    /// (App/Debug/ScreenshotTour.swift) says when it is cut off. Not observed.
+    @ObservationIgnored var debugSendFrame: CGRect = .zero
+    /// r1-composer: the cards above the composer — `width` the height they are shown at, `height` the height they need.
+    @ObservationIgnored var debugCardsHeights: CGSize = .zero
+    #endif
 
     func reveal(toolUseId: String) {
         revealToolUseId = toolUseId

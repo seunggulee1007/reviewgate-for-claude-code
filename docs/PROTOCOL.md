@@ -3051,6 +3051,14 @@ The palette shows what each command does and what it takes, right after the sess
   `session.starting` also read "Starting session…" (never "enable user settings").
 - Owners: engine-session (`session/claude.ts`, the capability cache in `engine.ts`); screens mac-/desktop-session (name,
   one-line description, dimmed argument hint; groups built-in / mine / project / each plugin / MCP; recently used first).
+- **While Claude works (r1-composer M14).** The palette (`/` at the start of the box, ⌘/) opened only while a message
+  could be sent, so the next skill had to be typed from memory while Claude worked or the session started. It now works
+  whenever a project is open (Core `AppState.canUseSlashPalette`): the session's commands, the cache, or "Starting
+  session…" while the CLI starts. A pick only goes into the draft; ↩ then sends it, puts it into the running turn (§50 —
+  the CLI expands a command sent that way) or queues it, like any message. Mac:
+  `ComposerModel.paletteVisible(available:)` / `openPalette(available:)`; Electron: `slashPaletteShows`
+  (`SlashPalette.tsx`). Verified: Core `ComposerPaletteTests` (running, starting, no project), Electron
+  `SlashPalette.test.ts` ("when the palette shows").
 
 ### 36.6 Local settings (SME-01)
 
@@ -3600,6 +3608,20 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   `engine/test/git.timeout.test.ts`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
+- **A draft that lasts (r1-composer M12, Mac).** The chat column lived only in the Changes / History / Search tabs with
+  a project open: the PRs tab, or an engine that stopped and the project opened again, made a new one, and what was
+  typed (its mentions and images), the question card's picks, a deny instruction, the plan card's notes and the scroll
+  place were gone. The window now keeps the composer and the transcript's own state (`WindowModel.chatComposer` /
+  `chatTranscript`), so the chat made again shows them as they were (it opens at the newest row); "Claude에게 보내기" on
+  PR comments joins the draft kept there. The composer remembers the chat its draft belongs to and follows it when it
+  comes back (another chat meanwhile swaps the drafts as above). Each chat's draft — its text and @ mentions; images
+  stay in memory — is also saved on disk as it is typed (UserDefaults `composerDrafts`, under the chat's id,
+  `project:<root>` for an engine without chats; at most 50, the oldest saved go first; an empty box removes it at once,
+  a draft over 200 000 characters is not saved). The first chat an engine reports (a window opened, the app started
+  again, the engine restarted) shows its saved draft when the box is empty; what was typed before stays and belongs to
+  that chat. Core `AppState.moveDraft`, `saveDraft`, `savedDraft` (`Session/ComposerDraftKeep.swift`); verified by Core
+  `ComposerDraftKeepTests` (a draft back after a restart, chat to chat with and without images, an engine without chats,
+  the cap and a huge draft).
 
 ### 38.2 Long work
 
@@ -6411,6 +6433,27 @@ scrolled into view. Now a window that small lays out like any other. The layout 
 and shoots it after every change around it: ⇧⇥ through the modes, the diff pane opened and closed (⌘⇧D), turns that end
 into a review and reviews that end (`chat-*.png`; the log says how much of the transcript is drawn, `BLANK` for nothing).
 
+- **Send always in the window (r1-composer M11).** With files pending (almost always in auto mode) the diff pane opens
+  beside the chat, and at 1000 × 637 the chat was ~311 pt wide: the composer's bottom row ([!] · Accept 2 & Send · model ·
+  mode) pushed Send, 바로 보내기 and Stop past the window's edge. Now:
+  - the send button (and Stop) keep their size; the secondary controls — 변경 요청 (N), Accept N & Send, the next
+    message's model, the mode — fold into one "⋯" menu, the model and the mode staying as icons, when at their own width
+    they would leave the hint less than 60 pt (Core `ComposerBarFit.compact`); the skills / commands / MCP caption is then
+    an icon too (the counts in its tooltip, the warnings kept);
+  - 변경 요청 (N) shows only with notes to send (`AppState.showsRequestChanges`; it can do nothing without);
+  - beside the diff, the chat keeps 380 pt as long as the diff keeps 240 (the split's minimums are 420 / 380; below that
+    they share the room in proportion as before — Core `PaneSplit.leadingWidth`);
+  - the pending-review notice is one line, "검토 대기 N개 · 질문은 수락 없이 가능 ⓘ" (it took five lines of a narrow
+    chat); its ⓘ popover says that sending never accepts or rejects a file and that Claude's new changes join this review.
+  Mac: `ChatComposer` measures the row (its width, the secondary controls at their own width in a hidden copy that takes no
+  key, Stop and the send button) and draws the full or the folded controls; `SplitPane(leadingFloor:)`. The layout check
+  (`SHOTS_LAYOUT=1`) ends at 1000 × 637, dark then light: a review with two files pending beside the diff, a turn that runs
+  on beside them (Stop and 바로 보내기) and Claude's question above the composer, with the send button's frame logged ("OUT
+  OF THE WINDOW" when it is not inside) and the cards above the composer's shown and needed heights ("CUT" when it scrolls);
+  then a message typed, the PRs tab and back ("LOST" when the draft is gone) — `composer-*.png`. Seen: the send button in
+  the window in all six, the question card whole (266 of 266 pt), the draft kept both times.
+  Verified: Core `ComposerLayoutTests` (the fold at the report's widths, the split at 677 / 557 / 1117 pt, the request
+  button with no, sent and unsent notes).
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the
   first message sent in the task's mode, `task_started` sent: true, the file gone, a second open plain), no mode (the
   default), a session that cannot start (`sent: false`, nothing sent), refusals before anything is created, and
@@ -6452,6 +6495,36 @@ feature flag of its own, and on this machine both folded alike.
   `steer` (the turn ended meanwhile, the review is being collected) puts the message in the queue instead, so it is never
   lost. A message with images is queued: the CLI takes images only with a message of its own.
 - **Electron.** The same behavior.
+- **An open question (r1-composer M08).** While Claude's `AskUserQuestion` waits, a message steered into the turn only
+  waits behind it: typing "y" and ↩ left the turn stuck until the card was found and clicked. So the message box answers
+  the question instead. The question it answers is the oldest open `AskUserQuestion` while no other card is open (⌘↩ /
+  ⌘⌫ answer that one first) and the running chat is shown (Core `AppState.openQuestion`). A typed answer goes to the
+  first question without an answer (`QuestionDraft.fill`): the option whose label it is (letter case aside), else that
+  question's "Other…" text, next to what was picked ("Postgres, 번으로 해줘"). The card goes out (`permission_response
+  {allow: true, updatedInput: {questions, answers}}`, as its own Answer button sends it) once every question has an
+  answer; until then the card shows what was filled. 1…N in an empty box pick option N of that question (several
+  answers: on and off), and ↩ in an empty box sends the card. Nothing changes on the wire.
+  **Mac.** The card sits above the composer, in the cards' place of §49.2 (first, above a plan), with the question the
+  box answers marked ("입력창으로 답하는 질문" when there are several) and its options numbered; with several questions
+  the next one scrolls into view. Its foot says what the box does: "1–N로 고르거나 아래에 쓰기 · ↩ 답하기 · ⌥↩ 따로
+  보내기" — at 1000 × 637 the row under the box has no room left for its own hint. The transcript keeps one line for it:
+  "Claude의 질문: … — 아래에서 답해 주세요" while it waits, then "답함: 질문 → 답" (or 건너뜀 / 처리됨; every question
+  and answer in the tooltip). The hint reads "Claude가 질문했어요 — ↩로 답하기 · ⌥↩ 질문과 별개로 보내기" (⌘↩ when ↩
+  makes a new line), the placeholder "Claude의 질문에 답을 쓰세요 — 1–N로 고를 수도 있어요", and the primary button is
+  "답하기" (⌘↩ answers too). Its menu sends the text apart from the question ("질문과 별개로 보내기", also ⌥↩: into the
+  turn as above, where it is read once the question is answered), queues it or stops the turn first. A question open
+  while another card waits, or behind an older question, stays a card in the transcript, as before.
+  **Electron.** The same (`src/renderer/openQuestion.ts`, `QuestionCard.tsx` `QuestionSlot`, `sendNow.ts`): the card
+  above the composer and the transcript's one line, ⌘↩ (Ctrl+Enter) answers — the primary button is "답하기" —, ⌥↩
+  (Alt+Enter) sends the text apart from the question, 1…N in an empty box pick an option, and the card and the box share
+  one draft (`useQuestionDrafts`). A card's answer is its picked options, then the "Other…" text, as on the Mac (with
+  several answers it was the "Other…" text alone).
+  **Verified.** Core `ComposerQuestionTests`: the open question with and without another card, a typed answer sent as
+  the answer (nothing steered or queued), a label that picks its option, several questions answered in turn with the
+  number keys, a note typed after a pick. Electron `openQuestion.test.ts` (the same cases), `sendNow.test.ts` (the M08
+  block: 답하기, ⌘↩, ⌥↩, the hint in Korean and on Windows), `questionCard.test.ts` (the slot with numbered options, the
+  one-line rows, a question behind another card). The layout check of §49.2 shows the card whole above the composer at
+  1000 × 637.
 - **Verified.** Engine `session.peer.test.ts` (§50 block): folded into the turn (one `turn_end`), run as its own command
   after the result (the turn waits, usage summed, no unprompted turn), refused without a turn. `w50.steer.test.ts`: the
   session gets the text with the mentions, the row `steered` with the turn's number, refusals. Core `RunAsTaskTests`: the
