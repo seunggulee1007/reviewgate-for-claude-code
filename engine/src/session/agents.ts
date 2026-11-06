@@ -510,6 +510,12 @@ export class AgentTracker {
     return this.byToolUseId(toolUseId);
   }
 
+  /** §52.2: the Agent / Task call of a live subagent's task (`task_stop` from the background list stops an agent too). */
+  callOfTask(taskId: string): string | undefined {
+    const n = this.byTaskId(taskId);
+    return n && LIVE.has(n.status) ? n.toolUseId : undefined;
+  }
+
   /**
    * §36.2 `stop_agent`: the task id `query.stopTask` takes, or why that agent cannot be stopped — no node
    * (`unknown_agent`), not pending / running / paused (`not_running`), no task id (`not_supported`: a CLI without task

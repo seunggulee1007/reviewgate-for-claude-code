@@ -6829,14 +6829,16 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   Before, the first `result` closed the user's turn and the rest of it was guarded as unprompted (§18, "Limits").
 - **The HUD and the agent panel.** A background subagent is in `hud.agents` (`isBackground: true`) while it works, across
   turns, and in "백그라운드 N" (§52, `kind: agent`) with [중지] (`task_stop`); the agent's own ■ (`stop_agent`, §36.2)
-  stops it too.
+  stops it too. Either way it is stopped by the user: `task_stop` of an agent's task marks its node (`stoppedBy: "user"`,
+  `AgentTracker.callOfTask`), and its result reads "사용자가 중지" instead of "에이전트 실패".
 - **Verified.** Engine `w52.agents.test.ts` (the session with CLI 2.1.318's frames: inputs kept / kept in the turn with
   the setting; the launch is no report; the subagent's calls pass the guard between turns — hook and `canUseTool` — the
   main thread's do not, nor its own after it ended; an agent it starts; its edits between turns in the next turn's
   `toolFiles`; its end as the call's result, once; no peer for the hand-back; the hand-back turn ours; a stopped agent; our
   queued message's turn not ended by the CLI's), `w52.background.test.ts` (a finished review keeps its B while it works;
-  as before without background work; its end recorded as the call's result, named on the auto turn, kept for
-  `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes back after a restart).
+  as before without background work; stopped from the list, stopped by the user; its end recorded as the call's result,
+  named on the auto turn, kept for `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes
+  back after a restart).
 
 ## 53. Commits in meaningful units
 

@@ -244,6 +244,18 @@ describe("§52.2 a subagent working in the background", () => {
     expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
   });
 
+  it("stopped from the background list, it is stopped by the user (its result says so, as with its own ■)", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    await h.engine.request({ type: "task_stop", taskId: "a1" });
+    expect(h.session().stopTasks).toEqual(["a1"]);
+    expect(h.engine.state.hud.agents.find((a) => a.toolUseId === "toolu_agent")).toMatchObject({ status: "stopped", stoppedBy: "user" });
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_notification", taskId: "a1", toolUseId: "toolu_agent", status: "stopped", summary: "Task stopped" } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: true, preview: "Task stopped", agentEnded: true });
+    await h.settle();
+    expect(h.ofType("tool_result").at(-1)).toMatchObject({ toolUseId: "toolu_agent", agentEnded: true, stoppedBy: "user" });
+  });
+
   it("its end is its call's result row (the report); the turn Claude runs after it names the agent; the agent comes back with the chat", async () => {
     const { h, dir, id } = await opened();
     await turnWithAgent(h, dir, id);
