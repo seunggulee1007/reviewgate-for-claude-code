@@ -7,6 +7,9 @@ import { notificationFor } from "./attention";
 import { TurnStopTracker } from "./workSafety";
 import {
   activeLimitReset,
+  hookDeniedOf,
+  hookDeniedText,
+  isQuietHookNotice,
   isUsageLimited,
   limitChipText,
   limitResumeStep,
@@ -29,7 +32,7 @@ describe("words and presentation", () => {
     expect(errorEventText({ code: "cli_warning", message: "Context is low", detail: "Context is low" })).toBe("Context is low");
     expect(presentationOf("max_turns")).toBe("warning");
     for (const code of ["hook_failed", "hook_blocked", "cli_warning", "cli_notice"]) expect(presentationOf(code)).toBe("row");
-    expect(errorTone("hook_failed", false)).toBe("warning");
+    expect(errorTone("hook_failed", false)).toBe("info"); // r1x (§38.2): a failed hook is a gray row now
     expect(errorTone("cli_warning", false)).toBe("warning");
     expect(errorTone("cli_notice", false)).toBe("info");
     expect(errorTone("max_turns", false)).toBe("warning");
@@ -37,6 +40,21 @@ describe("words and presentation", () => {
     expect(errorSubline({ code: "cli_warning", cliDetail: "Context is low" })).toBe("");
     expect(errorSubline({ code: "hook_blocked", cliDetail: "blocked: commit first" })).toBe("blocked: commit first");
     expect(longWorkRowFacts({ maxTurns: 150, hookName: "" })).toEqual({ maxTurns: 150 });
+  });
+
+  // r1x — §38.2: a PreToolUse hook's deny is its call's — a quiet row; old PreToolUse blocks and failed hooks are gray
+  it("a hook-denied call reads as a quiet row naming the hook and why; quiet notices", () => {
+    expect(hookDeniedOf({ hookDenied: { hook: "PreToolUse:Read", reason: " [ACME READ BUDGET] too big " } })).toEqual({ hook: "PreToolUse:Read", reason: "[ACME READ BUDGET] too big" });
+    expect(hookDeniedOf({ hookDenied: { reason: "x" } })).toBeUndefined();
+    expect(hookDeniedOf({})).toBeUndefined();
+    expect(hookDeniedText({ hook: "PreToolUse:Read", reason: "[ACME READ BUDGET] too big" })).toBe("Blocked by a hook: PreToolUse:Read — [ACME READ BUDGET] too big");
+    expect(hookDeniedText({ hook: "PreToolUse:Bash", reason: "" })).toBe("Blocked by a hook: PreToolUse:Bash");
+    expect(isQuietHookNotice("hook_failed", "PostToolUse:Edit")).toBe(true);
+    expect(isQuietHookNotice("hook_blocked", "PreToolUse:Read")).toBe(true);
+    expect(isQuietHookNotice("hook_blocked", "Stop")).toBe(false);
+    expect(isQuietHookNotice("hook_blocked", undefined)).toBe(false);
+    expect(errorTone("hook_blocked", false, "PreToolUse:Read")).toBe("info");
+    expect(errorTone("hook_blocked", false, "Stop")).toBe("warning");
   });
 
   // MARK: wave4b w4b-check4 — §40.1

@@ -13,7 +13,7 @@ const ICON = { fatal: "⊗", error: "ⓘ", warning: "⚠", info: "ⓘ" } as cons
 
 export function ErrorNoticeRow({ item }: { item: ErrorRow }) {
   const code = item.facts?.code;
-  const tone = errorTone(code, item.fatal);
+  const tone = errorTone(code, item.fatal, item.facts?.hookName); // r1x (§38.2): a failed hook, an old PreToolUse block — gray
   const repeat = repeatLabel(item.count, item.lastAt);
   const words = errorSubline(item.facts);
   // A blocked worktree names its folder below; information keeps the CLI's words folded.

@@ -18,6 +18,29 @@ export function isWarningRow(code: string | undefined): boolean {
   return code === "hook_failed" || code === "hook_blocked" || code === "cli_warning";
 }
 
+/**
+ * r1x — §38.2: a hook notice that is no alarm — a hook that failed, and a PreToolUse hook's block restored from before (the
+ * engine now puts a new one on the call it denied, `tool_result.hookDenied`): gray rows. A prompt / stop hook that stopped
+ * the turn stays orange.
+ */
+export function isQuietHookNotice(code: string | undefined, hookName: string | undefined): boolean {
+  if (code === "hook_failed") return true;
+  return code === "hook_blocked" && (hookName ?? "").startsWith("PreToolUse");
+}
+
+/** The quiet row under a call a hook denied: "훅이 막음: PreToolUse:Read — <reason>". */
+export function hookDeniedText(d: { hook: string; reason: string }): string {
+  const why = d.reason.trim();
+  return why ? t("Blocked by a hook: {0} — {1}", d.hook, why) : t("Blocked by a hook: {0}", d.hook);
+}
+
+/** `tool_result.hookDenied` (event or row), leniently: no hook name, none. */
+export function hookDeniedOf(ev: { hookDenied?: unknown }): { hook: string; reason: string } | undefined {
+  const h = ev.hookDenied as { hook?: unknown; reason?: unknown } | null | undefined;
+  if (!h || typeof h !== "object" || typeof h.hook !== "string" || h.hook.trim() === "") return undefined;
+  return { hook: h.hook.trim(), reason: typeof h.reason === "string" ? h.reason.trim() : "" };
+}
+
 /** Rows whose second line would repeat the row: the CLI's own words are the row. */
 export function hidesSubline(code: string | undefined): boolean {
   return code === "cli_warning" || code === "cli_notice";

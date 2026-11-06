@@ -8,7 +8,7 @@ import type { ErrorScope } from "@reviewgate/engine";
 import { presentationOf } from "./errorCodes";
 import { currentLanguage, t } from "./i18n";
 import type { ChatItem } from "./store";
-import { hidesSubline, isWarningRow } from "./longWork"; // MARK: wave4 w4-longwork
+import { hidesSubline, isQuietHookNotice, isWarningRow } from "./longWork"; // MARK: wave4 w4-longwork
 import { isAutoModeRow } from "./autoMode"; // MARK: wave4b w4b-auto
 import { isGitRow } from "./gitNotices"; // MARK: r1-git
 
@@ -27,12 +27,15 @@ export type ErrorFacts = {
   branch?: string;
   /** MARK: r1-scope — §33.4: what a command changed in `path` (`worktree_outside_review`, relative to it). */
   files?: string[];
+  /** r1x — §38.2: the hook a `hook_failed` / `hook_blocked` notice names (a PreToolUse one restored from before is quiet). */
+  hookName?: string;
 };
 
 export type ErrorTone = "fatal" | "error" | "warning" | "info";
 
 /** fatal → red; a notice → blue (information) or orange (warning); any other failure → the usual orange banner / red row. */
-export function errorTone(code: string | undefined, fatal: boolean): ErrorTone {
+export function errorTone(code: string | undefined, fatal: boolean, hookName?: string): ErrorTone {
+  if (!fatal && isQuietHookNotice(code, hookName)) return "info"; // r1x — §38.2: a failed hook, an old PreToolUse block: gray
   if (!fatal && isWarningRow(code)) return "warning"; // MARK: wave4 w4-longwork — §38.2 an orange row without a banner
   const p = presentationOf(code);
   if (p === "info" || p === "row") return "info"; // wave3 desktop-session — §36.8 the CLI version notice
@@ -91,6 +94,7 @@ export function factsOf(ev: {
   path?: string;
   branch?: string;
   files?: string[];
+  hookName?: string;
 }): ErrorFacts {
   return {
     ...(ev.code ? { code: ev.code } : {}),
@@ -102,6 +106,7 @@ export function factsOf(ev: {
     ...(ev.path ? { path: ev.path } : {}),
     ...(ev.branch ? { branch: ev.branch } : {}),
     ...(Array.isArray(ev.files) && ev.files.length > 0 ? { files: ev.files.filter((f): f is string => typeof f === "string") } : {}), // MARK: r1-scope
+    ...(typeof ev.hookName === "string" && ev.hookName ? { hookName: ev.hookName } : {}), // r1x (§38.2)
   };
 }
 
@@ -123,6 +128,7 @@ export function restoredErrorFacts(item: {
   path?: string;
   branch?: string;
   files?: string[];
+  hookName?: string;
 }): ErrorFacts {
   const facts = factsOf(item);
   if (facts.toolName !== undefined) return facts;

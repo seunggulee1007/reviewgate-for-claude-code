@@ -40,6 +40,8 @@
 .tool-row .detail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-result summary::-webkit-details-marker { color: var(--fg-3); }
 .tool-result summary.error { color: var(--red); }
+/* r1x — §38.2: a hook said no (normal flow): a quiet gray line under the call, never the error red */
+.tool-result.hook-denied { color: var(--fg-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 .budget-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px; border-radius: 8px; font-size: 12.5px; }
 .budget-row.warn { background: var(--orange-bg); color: var(--orange); }
 .budget-row.deny { background: var(--red-bg); color: var(--red); }
