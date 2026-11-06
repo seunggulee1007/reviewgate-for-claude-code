@@ -6670,8 +6670,11 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
 - **Clients.** The change limit is a switch, off by default; its numbers (files and lines, 10 / 400 until changed) reach
   the engine only while it is on — off, the clients send `{maxFiles: 0, maxLines: 0}`. The default append is now "You are
   working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash,
-  …) only when the user asks — the app shows the user an approval card for each." — nothing about small units, stopping,
-  waiting or 'REVIEW GATE'. With the limit on it goes on "The user set a change limit of {maxFiles} files and about
+  …) only when the user or a skill they ran asks." — nothing about small units, stopping, waiting or 'REVIEW GATE', and
+  (r1-git, §46) no promise of an approval card for each git command any more: only what throws work away or rewrites the
+  remote asks, as the engine's own git instruction says; a skill's commits (`allowed-tools: Bash(git commit:*)`) are the
+  user's request too. Its first text ("… only when the user asks — the app shows the user an approval card for each.") is
+  an earlier built-in one now (Mac `AppSettings.legacySystemPromptAppends`). With the limit on it goes on "The user set a change limit of {maxFiles} files and about
   {maxLines} changed lines per reply: plan each reply to fit it. If an edit is denied with 'REVIEW GATE', report what you
   changed and what remains." A stored append equal to an earlier built-in one (the one before, or the one with "Never run
   git commit/checkout/reset/stash/clean"; surrounding whitespace aside) is the default: Settings' "Reset to default" used to

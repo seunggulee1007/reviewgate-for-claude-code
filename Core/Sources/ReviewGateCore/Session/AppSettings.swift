@@ -91,8 +91,9 @@ public enum AppSettings {
     public static var defaultIgnorePatternsText: String { defaultIgnorePatterns.joined(separator: "\n") }
 
     /// The append Claude gets unless the user wrote their own. §54: nothing about small units, stopping or waiting.
+    /// r1-git (§46): no card promise for git — only what throws work away or rewrites the remote asks (the engine says so).
     public static let defaultSystemPromptAppend = """
-    You are working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each.
+    You are working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user or a skill they ran asks.
     """
 
     /// §54: what the default append adds while the change limit is on; `{maxFiles}` / `{maxLines}` are substituted.
@@ -100,6 +101,7 @@ public enum AppSettings {
 
     /// §54: the built-in appends of earlier versions (Settings' "Reset to default" stored one). A stored copy is the default now.
     static let legacySystemPromptAppends: Set<String> = [
+        "You are working inside a review gate. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each.",   // r1-git: §54's first default
         "You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. Run git commands that change the repository (commit, merge, pull, checkout, reset, stash, …) only when the user asks — the app shows the user an approval card for each. If an edit is denied with 'REVIEW GATE', stop immediately and report.",
         "You are working inside a review gate. Work in small units: at most {maxFiles} files and about {maxLines} changed lines per reply. After finishing one unit, STOP and report what you changed and what the next unit would be; wait for the user. Never run git commit/checkout/reset/stash/clean — the app manages git. If an edit is denied with 'REVIEW GATE', stop immediately and report.",
     ]
