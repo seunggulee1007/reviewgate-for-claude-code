@@ -510,6 +510,12 @@ export class AgentTracker {
     return this.byToolUseId(toolUseId);
   }
 
+  /** §52.2: that Agent / Task call's subagent still works (pending, running or paused). */
+  isLive(toolUseId: string): boolean {
+    const n = this.byToolUseId(toolUseId);
+    return n !== undefined && LIVE.has(n.status);
+  }
+
   /** §52.2: the Agent / Task call of a live subagent's task (`task_stop` from the background list stops an agent too). */
   callOfTask(taskId: string): string | undefined {
     const n = this.byTaskId(taskId);

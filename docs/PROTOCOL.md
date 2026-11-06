@@ -6891,7 +6891,11 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   (`task_updated {is_backgrounded: true}`) — the background, and every agent started under one of them (`parent_task_id`,
   else the subagent whose call started it), until its `task_notification` / a final `task_updated` status. A call whose
   hook input names one of them (or names an agent no task frame named while one of them works) is not denied while no turn
-  of ours runs; `canUseTool` repeats the check with `agentID`. The main thread is guarded as before.
+  of ours runs; `canUseTool` repeats the check with `agentID`. The main thread is guarded as before. Its card outlives
+  the turn that started it: at `turn_end` the engine keeps a pending request whose subagent (`agent.agentToolUseId`)
+  still works — pending, running or paused (`AgentTracker.isLive`) — so it can be answered between turns (the session
+  holds it until then, or until `permission_cancelled`); every other request still ends with the turn. Before, the list
+  was emptied there and the answer was refused `unknown_permission_request` while the subagent kept waiting.
 - **What it changes reaches a review.** In a turn of ours its edits and commands are that turn's, like any call. While no
   turn of ours runs, the files its calls change (edit tools by their `file_path`, Bash by the post-Bash snapshot) are kept
   (`idleToolFiles`) and become the next turn's — the user's next message or the turn the CLI runs when the agent ends —

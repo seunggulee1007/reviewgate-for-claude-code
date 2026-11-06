@@ -265,6 +265,28 @@ describe("§52.2 a subagent working in the background", () => {
     }
   });
 
+  it("its card outlives the turn that started it: the request stays pending and the answer reaches the session; the main thread's goes with the turn", async () => {
+    const { h, dir, id } = await opened();
+    await h.engine.handle({ type: "send", text: "서브에이전트로 sub.txt 만들어줘" });
+    h.session().emitSessionInfo();
+    h.session().emit({ type: "tool_use", id: "toolu_agent", name: "Agent", input: { description: "Make sub.txt", subagent_type: "general-purpose", prompt: "…", run_in_background: true } });
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_started", taskId: "a1", toolUseId: "toolu_agent", description: "Make sub.txt", subagentType: "general-purpose", taskType: "local_agent", isBackground: true, depth: 1 } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: false, preview: "Async agent launched successfully.", agentLaunched: true });
+    h.session().emit({ type: "background_tasks", tasks: [agentTask] });
+    // The subagent asks for a command while the main agent is still answering; a main-thread request is open too.
+    h.session().emit({ type: "permission_request", requestId: "r-agent", toolName: "Bash", input: { command: "touch sub.txt" }, toolUseId: "toolu_sub", agent: { agentId: "a1" } });
+    h.session().emit({ type: "permission_request", requestId: "r-main", toolName: "Bash", input: { command: "npm test" }, toolUseId: "toolu_main" });
+    await h.settle();
+    expect(h.engine.state.session.pendingPermissions.map((p) => p.requestId)).toEqual(["r-agent", "r-main"]);
+    write(dir, "a.txt", "a\n");
+    h.session().emitTurnEnd({ sessionId: id });
+    await h.waitFor((s) => s.gate.phase === "reviewing", "turn 1 collected");
+    expect(h.engine.state.session.pendingPermissions.map((p) => [p.requestId, p.agent?.agentToolUseId])).toEqual([["r-agent", "toolu_agent"]]);
+    await h.engine.request({ type: "permission_response", requestId: "r-agent", allow: true });
+    expect(h.session().permissionResponses).toEqual([{ requestId: "r-agent", allow: true, message: undefined }]);
+    expect(h.engine.state.session.pendingPermissions).toEqual([]);
+  });
+
   it("without background work a finished review lets the next turn take a fresh A (as before)", async () => {
     const { h, dir, id } = await opened();
     await h.engine.handle({ type: "send", text: "a" });

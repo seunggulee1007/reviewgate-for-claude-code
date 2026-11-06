@@ -6179,7 +6179,9 @@ export class ReviewEngine {
         }
         this.gate.running = false;
         this.endTurnWhy();
-        this.setPendingPermissions([]);
+        // §52.2: a subagent working in the background can still wait on its card — the session holds that request until it
+        // is answered or withdrawn (permission_cancelled); every other request ended with the turn.
+        this.setPendingPermissions(this.sessionState.pendingPermissions.filter((p) => p.agent?.agentToolUseId !== undefined && this.agents.isLive(p.agent.agentToolUseId)));
         this.settlePeerTurn();
         if (ev.sessionId) {
           this.sessionState.sessionId = ev.sessionId;
