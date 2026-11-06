@@ -319,15 +319,25 @@ const SHELLS: ReadonlySet<string> = new Set(["bash", "sh", "zsh", "dash", "ksh"]
 
 /** The words of the program that really runs: leading assignments, keywords and wrappers (`sudo`, `env`, `xargs`, …) dropped. */
 function programWords(words: readonly string[]): string[] {
+  return program(words).words;
+}
+
+/** Wrappers that hand the program more arguments than the line spells out: what they read (`xargs`, `parallel`). */
+const FEEDERS: ReadonlySet<string> = new Set(["xargs", "parallel"]);
+
+/** `programWords`, and whether a wrapper adds arguments at run time (`git diff --name-only | xargs git checkout --`). */
+function program(words: readonly string[]): { words: string[]; moreArgs: boolean } {
   let w = [...words];
+  let moreArgs = false;
   for (let guard = 0; guard < 8 && w.length > 0; guard++) {
     while (w.length > 0 && (ASSIGN_RE.test(w[0]!) || KEYWORDS.has(w[0]!))) w = w.slice(1);
     const name = w.length > 0 ? basename(w[0]!) : "";
     const skip = WRAPPERS[name];
-    if (!skip) return w;
+    if (!skip) return { words: w, moreArgs };
+    if (FEEDERS.has(name)) moreArgs = true;
     w = w.slice(1 + skip(w.slice(1)));
   }
-  return w;
+  return { words: w, moreArgs };
 }
 
 /** Options (and option values) a wrapper takes before the command it runs. */
@@ -363,6 +373,7 @@ const WRAPPERS: Record<string, (args: readonly string[]) => number> = {
   },
   stdbuf: (a) => optionsBefore(a, new Set(["-i", "-o", "-e"])),
   xargs: (a) => optionsBefore(a, new Set(["-n", "-L", "-P", "-I", "-d", "-E", "-s", "-a"])),
+  parallel: (a) => optionsBefore(a, new Set(["-j", "-P", "-n", "-N", "-L", "-I", "-a", "-S", "--jobs", "--arg-file", "--sshlogin"])),
 };
 
 /** The script a `bash -c '…'` / `sh -c` / `eval …` runs; null for any other command. */
@@ -386,8 +397,64 @@ function scriptOf(words: readonly string[]): string | null {
   return null;
 }
 
-/** One git command line: the folder it runs in (`cd` and `-C` applied), its global options, its verb and what follows. */
-export type GitInvocation = { dir: string; globals: string[]; verb: string | null; args: string[] };
+/**
+ * One git command line: the folder it runs in (`cd` and `-C` applied), its global options, its verb and what follows.
+ * `moreArgs`: it gets more arguments than written when it runs — from `xargs`, `parallel` or `find -exec … {}`.
+ */
+export type GitInvocation = { dir: string; globals: string[]; verb: string | null; args: string[]; moreArgs?: boolean };
+
+/** A simple command a line runs, as `walkCommands` hands it on. */
+export type RunCommand = {
+  /** The words of the program that runs (assignments, keywords and wrappers dropped). */
+  words: string[];
+  /** The folder it runs in: `cwd`, moved by the line's own `cd` / `pushd`. */
+  dir: string;
+  /** More arguments come at run time: `xargs`, `parallel`, `find -exec … {}`. */
+  moreArgs: boolean;
+};
+
+/**
+ * Every simple command of a shell line, in order — those of `bash -c` / `sh -c` / `eval` scripts, `$( … )` / backticks and
+ * `find -exec` / `-execdir` / `-ok` included — with the folder each runs in. `cd` / `pushd` are not handed on, they move it.
+ */
+export function walkCommands(command: string, cwd: string, visit: (c: RunCommand) => void): void {
+  let dir = cwd;
+  const walk = (all: readonly (readonly string[])[], depth: number, moreArgs: boolean) => {
+    for (const words of all) {
+      const inner = scriptOf(words);
+      if (inner !== null) {
+        if (depth < MAX_DEPTH) walk(shellCommands(inner), depth + 1, moreArgs || program(words).moreArgs);
+        continue;
+      }
+      const p = program(words);
+      const w = p.words;
+      if (w.length === 0) continue;
+      const name = basename(w[0]!);
+      if (name === "cd" || name === "pushd") {
+        const arg = w.slice(1).find((a) => !a.startsWith("-"));
+        if (arg !== undefined) dir = resolveDir(dir, arg);
+        continue;
+      }
+      visit({ words: w, dir, moreArgs: moreArgs || p.moreArgs });
+      // `find … -exec <command> {} +|;`: the command runs with the files find found (MARK: §46 — `{}` is filled in).
+      if (name === "find" && depth < MAX_DEPTH) for (const exec of findExecs(w)) walk([exec], depth + 1, true);
+    }
+  };
+  walk(shellCommands(command), 0, false);
+}
+
+/** The commands `find` runs: the words after each `-exec` / `-execdir` / `-ok` / `-okdir`, up to its `;` or `+`. */
+function findExecs(w: readonly string[]): string[][] {
+  const out: string[][] = [];
+  for (let k = 1; k < w.length; k++) {
+    if (!/^-(?:exec|execdir|ok|okdir)$/.test(w[k]!)) continue;
+    let end = k + 1;
+    while (end < w.length && w[end] !== ";" && w[end] !== "+") end++;
+    if (end > k + 1) out.push(w.slice(k + 1, end));
+    k = end;
+  }
+  return out;
+}
 
 /** git global options that take a separate value. */
 const GIT_GLOBAL_WITH_VALUE: ReadonlySet<string> = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env", "--exec-path", "--list-cmds"]);
@@ -409,39 +476,22 @@ function resolveDir(base: string, raw: string): string {
  */
 export function gitInvocations(command: string, cwd: string): GitInvocation[] {
   const out: GitInvocation[] = [];
-  let dir = cwd;
-  const visit = (all: string[][], depth: number) => {
-    for (const words of all) {
-      const inner = scriptOf(words);
-      if (inner !== null) {
-        if (depth < MAX_DEPTH) visit(shellCommands(inner), depth + 1);
-        continue;
-      }
-      const w = programWords(words);
-      if (w.length === 0) continue;
-      const name = basename(w[0]!);
-      if (name === "cd" || name === "pushd") {
-        const arg = w.slice(1).find((a) => !a.startsWith("-"));
-        if (arg !== undefined) dir = resolveDir(dir, arg);
-        continue;
-      }
-      if (name !== "git") continue;
-      let gdir = dir;
-      const globals: string[] = [];
-      let k = 1;
-      while (k < w.length && w[k]!.startsWith("-")) {
-        const opt = w[k]!;
-        globals.push(opt);
-        if (GIT_GLOBAL_WITH_VALUE.has(opt)) {
-          if (opt === "-C" && w[k + 1] !== undefined) gdir = resolveDir(gdir, w[k + 1]!);
-          if (w[k + 1] !== undefined) globals.push(w[k + 1]!);
-          k += 2;
-        } else k++;
-      }
-      out.push({ dir: gdir, globals, verb: w[k] ?? null, args: w.slice(k + 1) });
+  walkCommands(command, cwd, ({ words: w, dir, moreArgs }) => {
+    if (basename(w[0]!) !== "git") return;
+    let gdir = dir;
+    const globals: string[] = [];
+    let k = 1;
+    while (k < w.length && w[k]!.startsWith("-")) {
+      const opt = w[k]!;
+      globals.push(opt);
+      if (GIT_GLOBAL_WITH_VALUE.has(opt)) {
+        if (opt === "-C" && w[k + 1] !== undefined) gdir = resolveDir(gdir, w[k + 1]!);
+        if (w[k + 1] !== undefined) globals.push(w[k + 1]!);
+        k += 2;
+      } else k++;
     }
-  };
-  visit(shellCommands(command), 0);
+    out.push({ dir: gdir, globals, verb: w[k] ?? null, args: w.slice(k + 1), ...(moreArgs ? { moreArgs: true } : {}) });
+  });
   return out;
 }
 
@@ -548,7 +598,8 @@ export function gitCommandCardReason(): PermissionReason {
  * `--force` / `-f` / `--force-with-lease` / `--force-if-includes` / `--mirror` / `--delete` / `-d` / `--prune` or a refspec
  * starting with `+` or `:`; `worktree remove --force`. Only when its files hold work: `checkout [<tree-ish>] -- <paths>`,
  * `checkout .`, `checkout <path>` (an existing path that is no commit), `checkout --ours|--theirs <paths>` and `restore`
- * of the working tree — when a target covers a file still under review or a file with an uncommitted change.
+ * of the working tree — when a target covers a file still under review or a file with an uncommitted change. A target only
+ * the run knows (`$(git diff --name-only)`, `"$f"`, `{a,b}.txt`, what `xargs` / `find -exec` hand on) is the whole tree.
  */
 export async function destructiveGitReason(command: string, opts: DestructiveOptions): Promise<PermissionReason | null> {
   if (!/git/.test(command)) return null;
@@ -603,6 +654,18 @@ async function destroys(inv: GitInvocation, opts: DestructiveOptions, probe: Git
 /** True when `x` is a pathspec pattern git would expand (`*.java`, `src/?`, `[ab].txt`). */
 const isGlob = (x: string): boolean => /[*?[]/.test(x);
 
+/**
+ * True when the shell or a runner decides `x` only when the line runs: a substitution or a variable (`$(…)`, `` `…` ``,
+ * `$f`, `${f}`), a brace expansion (`{a,b}`, `{1..3}`) or the `{}` that `xargs -I` / `find -exec` fill in.
+ */
+const atRunTime = (x: string): boolean => /[$`]/.test(x) || x.includes("{}") || /\{[^{}]*(?:,|\.\.)[^{}]*\}/.test(x);
+
+/** git's pathspec for the whole working tree, whatever folder the command runs in. */
+const WHOLE_TREE = ":/";
+
+/** The pathspecs of a command as far as the line tells: one known only at run time may name any file. */
+const pathsOf = (inv: GitInvocation, specs: readonly string[]): string[] => (inv.moreArgs || specs.some(atRunTime) ? [WHOLE_TREE] : [...specs]);
+
 async function checkoutDestroys(inv: GitInvocation, opts: DestructiveOptions, probe: GitProbe): Promise<boolean> {
   const o = readOptions(inv.args, "bB", ["orphan", "conflict", "pathspec-from-file"]);
   if (o.short.has("f") || hasLong(o, "force")) return true;
@@ -611,23 +674,29 @@ async function checkoutDestroys(inv: GitInvocation, opts: DestructiveOptions, pr
   if (o.short.has("b") || o.short.has("B") || hasLong(o, "orphan")) return false;
   const pos = o.positionals;
   if (o.afterDashDash !== null) {
-    if (o.afterDashDash.length === 0) return false; // `git checkout main --`: a branch
-    return targetsHoldWork(inv, o.afterDashDash, pos.length > 0, opts, probe);
+    // `git checkout main --`: a branch — unless `xargs` / `find -exec` put the paths after the `--`.
+    if (o.afterDashDash.length === 0 && !inv.moreArgs) return false;
+    return targetsHoldWork(inv, pathsOf(inv, o.afterDashDash), pos.length > 0, opts, probe);
   }
+  // `… | xargs git checkout`: the words it is handed may be paths as well as a branch.
+  if (inv.moreArgs) return targetsHoldWork(inv, [WHOLE_TREE], false, opts, probe);
   if (pos.length === 0) return false;
   // `--ours` / `--theirs` / `-p` only take paths.
-  if (hasLong(o, "ours", "theirs", "patch") || o.short.has("p")) return targetsHoldWork(inv, pos, false, opts, probe);
+  if (hasLong(o, "ours", "theirs", "patch") || o.short.has("p")) return targetsHoldWork(inv, pathsOf(inv, pos), false, opts, probe);
   if (pos.length === 1) {
     const x = pos[0]!;
     if (x === "-" || x.startsWith("@{")) return false;
+    // `git checkout $(git diff --name-only)`, `git checkout "$f"`: a branch or paths — only the run tells, so it asks when
+    // anything could be lost.
+    if (atRunTime(x)) return targetsHoldWork(inv, [WHOLE_TREE], false, opts, probe);
     // `git checkout <x>`: a branch / commit when it is one; else a path — what git does with it.
     const pathLike = x === "." || isGlob(x) || existsSync(resolve(inv.dir, expandHome(x)));
     if (!pathLike || (await probe.isRef(inv.dir, x))) return false;
     return targetsHoldWork(inv, [x], false, opts, probe);
   }
   // `git checkout <tree-ish> <paths…>` when the first word is a commit, else every word is a path.
-  const fromTree = await probe.isRef(inv.dir, pos[0]!);
-  return targetsHoldWork(inv, fromTree ? pos.slice(1) : pos, fromTree, opts, probe);
+  const fromTree = atRunTime(pos[0]!) || (await probe.isRef(inv.dir, pos[0]!));
+  return targetsHoldWork(inv, pathsOf(inv, fromTree ? pos.slice(1) : pos), fromTree, opts, probe);
 }
 
 async function restoreDestroys(inv: GitInvocation, opts: DestructiveOptions, probe: GitProbe): Promise<boolean> {
@@ -638,7 +707,7 @@ async function restoreDestroys(inv: GitInvocation, opts: DestructiveOptions, pro
   const fromTree = o.short.has("s") || hasLong(o, "source");
   if (hasLong(o, "pathspec-from-file")) return targetsHoldWork(inv, ["."], fromTree, opts, probe);
   const paths = [...o.positionals, ...(o.afterDashDash ?? [])];
-  return paths.length > 0 && targetsHoldWork(inv, paths, fromTree, opts, probe);
+  return (paths.length > 0 || inv.moreArgs === true) && targetsHoldWork(inv, pathsOf(inv, paths), fromTree, opts, probe);
 }
 
 /**

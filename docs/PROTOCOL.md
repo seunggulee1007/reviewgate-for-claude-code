@@ -6059,7 +6059,8 @@ the terminal's auto mode asked for none).
   The command line is read by a tolerant shell scanner: only the words of commands count — a git command inside `echo`,
   `grep`, quotes or a here-document (a commit message saying `git push --force`) never does; chains, pipes, redirections
   (`2>&1`, `> /dev/null`), subshells, `$( … )` / backticks, `bash -c` / `sh -c` / `eval` scripts, `if` / `for` bodies and
-  wrappers (`sudo`, `env`, `time`, `nohup`, `timeout`, `xargs`, …) are looked into; global options before the verb are
+  wrappers (`sudo`, `env`, `time`, `nohup`, `timeout`, `xargs`, `parallel`, …) and the commands of `find -exec` /
+  `-execdir` / `-ok` are looked into; global options before the verb are
   skipped (`-C <dir>` moves where paths point, as does the line's own `cd`). Always: `reset --hard|--merge`; `checkout` /
   `switch` with `-f` / `--force` / `--discard-changes`; `clean` unless `-n` / `--dry-run` (a `clean.requireForce = false`
   config deletes without `-f`); `branch -D` / `-M` / `-C` or any forced branch change (`-df`, `--delete --force`,
@@ -6073,6 +6074,12 @@ the terminal's auto mode asked for none).
   hands the hooks its list, `HookContext.reviewPaths`) or a file with an uncommitted change (`git status --porcelain -z
   --untracked-files=no -- <paths>` where the command runs; from a tree-ish untracked files count too). A
   `--pathspec-from-file`, a `--git-dir` / `--work-tree` elsewhere or a status git could not give counts as holding work.
+  A target only the run knows is the whole working tree (`:/`): a substitution or a variable (`git checkout --
+  $(git diff --name-only)`, `git restore $(git ls-files -m)`, `for f in …; do git checkout -- "$f"; done`), a brace
+  expansion (`{a,b}.txt`), and the arguments `xargs`, `parallel` or `find -exec … {}` hand on (`git diff --name-only |
+  xargs git checkout --` — an empty `--` there is no branch); `checkout <x>` with such an `<x>` (`$(…)`, `"$f"`) is checked
+  the same way — paths or a branch, only the run tells. So with a file under review or uncommitted these ask; with nothing
+  to lose they run.
   Everything else — `commit`, `checkout -b` / `switch -c`, `checkout <branch>`, `pull`, `merge`, `rebase`, `stash` (push),
   `stash pop`, a plain `push` / `push -u`, `config`, `restore --staged` — is an ordinary command: in auto mode the CLI's own
   rules (the user's `Bash(git checkout:*)`, a skill's `allowed-tools: Bash(git commit:*)`) and its classifier decide (§39.5),
@@ -6173,7 +6180,8 @@ the terminal's auto mode asked for none).
   `ownCommits`, four notice codes (`git_stashed`, `claude_committed`, `claude_moved_head`, `reject_committed`) — an older
   client shows their English `message`.
 - **Verified.** `engine/test/gitDestructive.test.ts` (r1-git: what asks and what does not, the scanner — here-documents,
-  substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, the hook in auto
+  substitutions, wrappers, scripts —, checkout / restore over review and dirty files in a real repository, paths only the
+  run knows (`$(…)`, `"$f"`, `{a,b}`, xargs, find -exec) asking with work and running without, the hook in auto
   and default mode, a remembered `Bash:git push` against a force push), `engine/test/gitResult.test.ts` (the stash row,
   Claude's own commits, amend, a foreign move, reject, the app's commit after Claude's), `sidecar/test/driver-gitauto.mjs`
   (real CLI 2.1.318 on sonnet in auto mode, a scratch repository with a local bare origin outside /tmp: "branch

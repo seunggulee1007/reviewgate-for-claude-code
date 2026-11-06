@@ -231,6 +231,33 @@ describe("destructiveGitReason: checkout / restore over files", () => {
     sh(root, "branch", "src");
     expect(await run(root, "git checkout src")).toBeNull();
   });
+
+  it("paths only the run knows — a substitution, a variable, a brace expansion, xargs, find -exec — stand for the whole tree", async () => {
+    const root = repo();
+    const fromRun = [
+      "git checkout -- $(git diff --name-only)",
+      "git diff --name-only | xargs git checkout --",
+      "git restore $(git ls-files -m)",
+      'for f in $(git diff --name-only); do git checkout -- "$f"; done',
+      "git ls-files -m | xargs -I{} git checkout -- {}",
+      "git diff --name-only | xargs git restore",
+      "git diff --name-only | parallel git checkout --",
+      "git checkout $(git diff --name-only)",
+      "git checkout `git diff --name-only`",
+      'git checkout "$f"',
+      "git restore ${FILES}",
+      "git checkout -- {a,c}.txt",
+      "find . -name '*.java' -exec git checkout -- {} +",
+      "find src -name '*.java' -exec git restore {} \\;",
+      "git diff --name-only | xargs sh -c 'git checkout -- \"$@\"' _",
+    ];
+    for (const command of [...fromRun, "git checkout HEAD -- $(git diff --name-only)"]) {
+      expect(await run(root, command), command).toMatchObject({ code: "git_command" });
+    }
+    // Nothing to lose — no uncommitted change, nothing under review — nothing asks (a branch in a variable included).
+    sh(root, "checkout", "-q", "--", ".");
+    for (const command of [...fromRun, 'git checkout "$BRANCH"']) expect(await run(root, command, root, []), command).toBeNull();
+  });
 });
 
 describe("gitInvocations / shellCommands", () => {
