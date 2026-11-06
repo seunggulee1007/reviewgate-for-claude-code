@@ -6290,7 +6290,8 @@ Electron the same); nothing changes on the wire, and a queued message passes the
   says "대기열 중지됨: <이유> · 14:03에 다시 보내요" with [지금 보내기] (sends now).
 - **The usage limit.** `usage_limit` stops it until a minute after its `resetAt` (§38.2's "풀리면 이어서 하기" delay); without
   `resetAt` it waits for [재개].
-- **The tool-call limit.** A turn that stopped at the limit (§38.2) does not stop the queue.
+- **The tool-call limit.** A turn that stopped at the limit (§38.2) does not stop the queue (Electron stopped it at
+  `stopReason: "error_max_turns"`).
 - Code: Core `QueueStop` (`Session/SessionNotices.swift`), `AppState+QueueStop.swift`, `AppState.swift` `handleError` /
   `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`. Tests: Core `QueueStopTests`.
 

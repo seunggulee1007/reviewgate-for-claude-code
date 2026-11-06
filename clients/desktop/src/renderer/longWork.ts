@@ -150,7 +150,7 @@ export const DEFAULT_MAX_TURNS = 200;
 export const MIN_MAX_TURNS = 10;
 export const MAX_MAX_TURNS = 1000;
 
-/** A stored value → the limit sent to the engine: a whole number in 10–1000, else 200. */
+/** A stored value → the number of the tool-call limit Settings shows: a whole number in 10–1000, else 200 (main sends it only while the limit is on, §38.2). */
 export function maxTurnsOf(v: unknown): number {
   if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return DEFAULT_MAX_TURNS;
   return Math.min(MAX_MAX_TURNS, Math.max(MIN_MAX_TURNS, Math.round(v)));

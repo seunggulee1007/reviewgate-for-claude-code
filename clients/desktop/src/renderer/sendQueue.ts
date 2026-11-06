@@ -58,9 +58,13 @@ export function moveQueued(items: QueuedMessage[], id: number, dir: -1 | 1): Que
   return next;
 }
 
-/** A turn that ended this way pauses the queue (null = keep going). `interrupted` is skipped once after "Stop & send". */
+/**
+ * A turn that ended this way pauses the queue (null = keep going). `interrupted` is skipped once after "Stop & send". §38.2:
+ * the tool-call limit (`error_max_turns`) does not stop it — the limit counts per message, and the row offers [이어서 계속].
+ */
 export function pauseReasonForTurnEnd(stopReason: string, skipInterruptPause: boolean): "interrupted" | "error" | null {
   if (stopReason === "interrupted") return skipInterruptPause ? null : "interrupted";
+  if (stopReason === "error_max_turns") return null;
   if (stopReason.startsWith("error") || stopReason === "session closed") return "error";
   return null;
 }

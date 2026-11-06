@@ -110,9 +110,17 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
             ? t("Hard stop at ×{0} — edits beyond it are denied by the sidecar. Applies live to the open session.", HARD_MULTIPLIER.toFixed(1))
             : t("Off (the default): no limit on the files or lines one reply changes — Claude finishes the task as in the terminal, and you review the changes afterwards.")}
         </div>
-        {/* MARK: wave4 w4-longwork — §38.2 */}
-        <Stepper label={t("Tool calls per message")} value={maxTurnsOf(settings.maxTurns)} min={MIN_MAX_TURNS} max={MAX_MAX_TURNS} step={10} onChange={(v) => patch({ maxTurns: v })} testId="Max tool calls per message" />
-        <div className="note">{t("Claude stops after this many tool calls for one message; Continue goes on from there. Takes effect in a new chat or after restarting the session.")}</div>
+        {/* MARK: wave4 w4-longwork — §38.2: no limit by default (as in the terminal); the number applies only while it is on */}
+        <label className="check">
+          <input type="checkbox" checked={settings.maxTurnsLimit === true} onChange={(e) => patch({ maxTurnsLimit: e.target.checked })} data-testid="Limit tool calls per message" />
+          {t("Limit tool calls per message")}
+        </label>
+        <Stepper label={t("Tool calls per message")} value={maxTurnsOf(settings.maxTurns)} min={MIN_MAX_TURNS} max={MAX_MAX_TURNS} step={10} disabled={settings.maxTurnsLimit !== true} onChange={(v) => patch({ maxTurns: v })} testId="Max tool calls per message" />
+        <div className="note">
+          {settings.maxTurnsLimit === true
+            ? t("Claude stops after this many tool calls for one message; Continue goes on from there. Takes effect in a new chat or after restarting the session.")
+            : t("Off (the default): no limit — Claude works through a message until it is done, as in the terminal, and Stop ends a turn at any time. Takes effect in a new chat or after restarting the session.")}
+        </div>
       </section>
       <section>
         <h4>{t("Permissions")}</h4>

@@ -102,6 +102,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   // MARK: wave3 check-clients — §34.9 one glob per line
   testCommandPatterns: text(MAX_TEXT),
   // MARK: wave4 w4-longwork — §38.2
+  maxTurnsLimit: bool,
   maxTurns: int(10, 1000),
   // MARK: wave4b w4b-bigturn — §39.1
   largeFileMB: int(1, 100_000),
