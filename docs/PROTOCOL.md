@@ -6272,6 +6272,28 @@ feature flag of its own, and on this machine both folded alike.
   `Session/AppState+Task.swift`, `Engine/EngineProtocol.swift`; App `UI/Chat/ChatComposer.swift`;
   `sidecar/test/driver-steer.mjs`).
 
+### 50.1 The queue keeps going
+
+Messages queued while Claude works used to stop at almost any error — a failing PR list, a refresh, a commit, a file list:
+"대기열 중지됨" and nothing ran until [재개], so coming back after a break nothing had happened. Client rules (Mac and
+Electron the same); nothing changes on the wire, and a queued message passes the same gate as ever when it goes out.
+
+- **What stops it.** Only an `error` about the queued message's own send or its session: `send_failed` / `lfs_missing`
+  (the message goes back to the front, §35.1), `session_crashed`, `session_start_failed`, `session_id_in_use`,
+  `cli_not_found` / `cli_not_executable`, `extensions_init_timeout`, `auth_required`, and any fatal error. It waits for
+  [재개] as before. Everything else — `command_failed` (a PR list, a commit draft, a side question …), `refresh_failed`,
+  `commit_failed`, `branch_failed`, `workbench_failed`, `revert_failed`, `mcp_failed`, `plan_followup_failed`, an error
+  without a code — shows its banner and the queue goes on (a failed collection closes the gate by itself; a plan or a
+  card waiting holds the queue as before). Notices never stopped it (§2.9, §30, §38.2, §39.5).
+- **The API.** `api_error` / `rate_limited` (after the CLI's own retries) stop it for a while: it goes on by itself after
+  30 s, then after 2 min while the API keeps failing; a turn the queue went on after starts over at 30 s. The queue bar
+  says "대기열 중지됨: <이유> · 14:03에 다시 보내요" with [지금 보내기] (sends now).
+- **The usage limit.** `usage_limit` stops it until a minute after its `resetAt` (§38.2's "풀리면 이어서 하기" delay); without
+  `resetAt` it waits for [재개].
+- **The tool-call limit.** A turn that stopped at the limit (§38.2) does not stop the queue.
+- Code: Core `QueueStop` (`Session/SessionNotices.swift`), `AppState+QueueStop.swift`, `AppState.swift` `handleError` /
+  `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`. Tests: Core `QueueStopTests`.
+
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
 Three faults in the PR sheet came in one report:

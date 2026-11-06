@@ -149,6 +149,11 @@ public final class AppState {
     public internal(set) var queuedMessages: [QueuedMessage] = []
     /// Auto-sending stopped on an error (the reason); `resumeQueue()` clears it.
     public private(set) var queuePausedReason: String?
+    /// §50.1: when a queue the API or the usage limit stopped goes on by itself (nil: it waits for Resume).
+    public internal(set) var queueResumesAt: Date?
+    /// §50.1: API failures in a row that stopped the queue (the second waits longer); a turn the queue went on after resets it.
+    var queueRetries = 0
+    @ObservationIgnored var queueResumeTask: Task<Void, Never>?
     /// "Stop and send": sent first once the interrupted turn has ended.
     public internal(set) var sendAfterInterrupt: String?
     /// §27: the last `context_warning`, until dismissed, compacted, or the context dropped below 80 % / the chat changed.
@@ -880,7 +885,10 @@ public final class AppState {
 
     public func removeQueued(id: UUID) {
         queuedMessages.removeAll { $0.id == id }
-        if queuedMessages.isEmpty { queuePausedReason = nil }
+        if queuedMessages.isEmpty {
+            queuePausedReason = nil
+            scheduleQueueResume(at: nil)
+        }
     }
 
     /// Moves a queued message `offset` places (negative = earlier), clamped.
@@ -895,11 +903,13 @@ public final class AppState {
     public func clearQueue() {
         queuedMessages = []
         queuePausedReason = nil
+        scheduleQueueResume(at: nil)
     }
 
-    /// Restarts auto-sending after an error stopped it.
+    /// Restarts auto-sending after an error stopped it (Resume, "지금 보내기", or the time a §50.1 stop goes on by itself).
     public func resumeQueue() {
         queuePausedReason = nil
+        scheduleQueueResume(at: nil)
         drainQueue()
     }
 
@@ -974,8 +984,9 @@ public final class AppState {
         deliver(next, acceptPending: false)   // wave1 mac-session (M7): the same message (id) goes back to the queue if refused
     }
 
-    /// Auto-sending stops on an error (the user sees why and resumes).
-    func pauseQueue(_ reason: String) {
+    /// Auto-sending stops on an error (the user sees why and resumes) — §50.1: `resumesAt`, when it goes on by itself (the
+    /// API after a pause, the usage limit after its reset); a stop without one waits for the user.
+    func pauseQueue(_ reason: String, resumesAt: Date? = nil) {
         queuedSendInFlight = false
         guard !queuedMessages.isEmpty || sendAfterInterrupt != nil else { return }
         if let pending = sendAfterInterrupt {
@@ -987,6 +998,7 @@ public final class AppState {
             interruptFallback = false
         }
         queuePausedReason = reason
+        scheduleQueueResume(at: resumesAt)
     }
 
     /// Attention bookkeeping + the queue after each snapshot.
@@ -1000,6 +1012,8 @@ public final class AppState {
             pendingInterruptSend = nil
             interruptFallback = false
             queuePausedReason = nil
+            scheduleQueueResume(at: nil)
+            queueRetries = 0
             queuedSendInFlight = false
         }
         let phase = state.gate.phase
@@ -1007,6 +1021,7 @@ public final class AppState {
         if phase == .running { turnInFlight = true }
         if turnInFlight, phase == .reviewing || phase == .idle || phase == .collectFailed {
             turnInFlight = false
+            if queuePausedReason == nil { queueRetries = 0 }   // §50.1: the API went through again
             let pending = state.gate.pendingCount + state.gate.changesRequestedCount
             // wave4 w4-safety (daily-14): says why the turn stopped (usage limit, login, error) when it did.
             if let event = turnFinishedAttention(pending: pending, key: "turn:\(state.seq)") { onAttention?(event) }
@@ -2171,7 +2186,8 @@ public final class AppState {
         let notice = SessionNotices.isNotice(code: detail.code, fatal: fatal)
         if !notice {
             requeueFailedSend(code: detail.code)
-            pauseQueue(text)
+            // §50.1: only the message's own failure, its session or the API stop the queue — never a PR list, a refresh, …
+            stopQueue(QueueStop.of(code: detail.code, fatal: fatal), reason: text, detail: detail)
         }
         recordFailure(text, fatal: fatal, scope: scope, detail: detail, engineMessage: message)
         if !fatal, message == fallbackMessage || detail.code == "extensions_init_timeout" && fallbackMessage != nil {

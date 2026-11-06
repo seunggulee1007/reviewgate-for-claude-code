@@ -40,6 +40,51 @@ public struct ErrorRowInfo: Sendable, Equatable {
     }
 }
 
+/// §50.1: what an `error` does to the composer's queue. Most errors leave it going — their banner says what failed (a PR
+/// list, a refresh, a commit, an MCP server …) and a queued message passes the same gate when it goes out. Only the
+/// message's own failure, its session, a login and the API stop it.
+public enum QueueStop: Sendable, Equatable {
+    /// The queue goes on.
+    case none
+    /// Stopped until the user resumes it: the message could not go out (`send_failed`, `lfs_missing`), the session is gone
+    /// or cannot start (`session_crashed`, `session_start_failed`, `session_id_in_use`, no CLI, its extensions timed out),
+    /// a login is needed (`auth_required`), or any fatal error.
+    case pause
+    /// The API failed after the CLI's own retries (`api_error`, `rate_limited`): stopped, and it goes on by itself after
+    /// `retryDelay` (30 s, then 2 min while it keeps failing).
+    case retry
+    /// The usage limit (`usage_limit`): stopped, and it goes on by itself a minute after the limit resets (when the reset
+    /// is known; else it waits for the user).
+    case untilLimitResets
+
+    /// The codes about the message's own session or turn that stop the queue until Resume.
+    public static let pausingCodes: Set<String> = [
+        "send_failed", "lfs_missing", "session_crashed", "session_start_failed", "session_id_in_use", "auth_required",
+        "cli_not_found", "cli_not_executable", "extensions_init_timeout",
+    ]
+
+    public static func of(code: String?, fatal: Bool) -> QueueStop {
+        if fatal { return .pause }
+        switch code {
+        case "api_error", "rate_limited": return .retry
+        case "usage_limit": return .untilLimitResets
+        case let code? where pausingCodes.contains(code): return .pause
+        default: return .none
+        }
+    }
+
+    /// How long the queue waits after its `retries`-th API failure in a row.
+    public static func retryDelay(after retries: Int) -> TimeInterval { retries <= 1 ? 30 : 120 }
+
+    /// The queue bar's second line while a stop goes on by itself: "14:03에 다시 보내요".
+    public static func resumesText(_ date: Date) -> String {
+        String(localized: "Sends again at \(LongWorkText.resetTime(date))", bundle: .module)
+    }
+
+    /// The queue bar's button while a stop goes on by itself.
+    public static var sendNowTitle: String { String(localized: "Send it now", bundle: .module) }
+}
+
 public enum SessionNotices {
     // MARK: Classification (M4, §2.9)
 
