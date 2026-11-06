@@ -53,6 +53,19 @@ extension AppState {
     #if DEBUG
     /// The screenshot tour's layout check (App/Debug/ScreenshotTour.swift): the mode offer card as a first open shows it.
     public func debugShowDefaultModeOffer(_ mode: PermissionMode?) { defaultModeOffer = mode }
+
+    /// The layout check (r1-composer): a review with `files` pending, or (`working`) a turn that runs beside it — the gate
+    /// closed as the engine closes it then, so the composer shows Stop and 바로 보내기. The engine's next snapshot puts its
+    /// own back.
+    public func debugShowComposerState(working: Bool, files: [ChangedFile]) {
+        var snapshot = state
+        snapshot.gate.phase = working ? .running : .reviewing
+        snapshot.gate.canSend = !working
+        snapshot.gate.blockedReason = working ? .running : nil
+        snapshot.gate.pendingCount = files.count
+        snapshot.changedFiles = files
+        state = snapshot
+    }
     #endif
 
     /// The chat took `taskForComposer` (it is never put there twice).

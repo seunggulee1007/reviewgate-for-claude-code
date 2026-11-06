@@ -142,6 +142,8 @@ final class WindowModel {
     /// r1-composer M11: the composer's send button in the window (SwiftUI's global space) — the layout check
     /// (App/Debug/ScreenshotTour.swift) says when it is cut off. Not observed.
     @ObservationIgnored var debugSendFrame: CGRect = .zero
+    /// r1-composer: the cards above the composer — `width` the height they are shown at, `height` the height they need.
+    @ObservationIgnored var debugCardsHeights: CGSize = .zero
     #endif
 
     func reveal(toolUseId: String) {

@@ -40,6 +40,12 @@ struct ChatView: View {
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
+            #if DEBUG
+            // r1-composer: the layout check says when a card above the composer (Claude's question) is cut.
+            .onScrollGeometryChange(for: CGSize.self) { CGSize(width: $0.containerSize.height, height: $0.contentSize.height) } action: { _, size in
+                model.debugCardsHeights = size
+            }
+            #endif
             ChatComposer(composer: composer, transcript: transcript)
         }
         .clipped()

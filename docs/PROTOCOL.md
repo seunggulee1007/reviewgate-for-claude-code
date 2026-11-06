@@ -6229,7 +6229,12 @@ into a review and reviews that end (`chat-*.png`; the log says how much of the t
   - the pending-review notice is one line, "검토 대기 N개 · 질문은 수락 없이 가능 ⓘ" (it took five lines of a narrow
     chat); its ⓘ popover says that sending never accepts or rejects a file and that Claude's new changes join this review.
   Mac: `ChatComposer` measures the row (its width, the secondary controls at their own width in a hidden copy that takes no
-  key, Stop and the send button) and draws the full or the folded controls; `SplitPane(leadingFloor:)`.
+  key, Stop and the send button) and draws the full or the folded controls; `SplitPane(leadingFloor:)`. The layout check
+  (`SHOTS_LAYOUT=1`) ends at 1000 × 637, dark then light: a review with two files pending beside the diff, a turn that runs
+  on beside them (Stop and 바로 보내기) and Claude's question above the composer, with the send button's frame logged ("OUT
+  OF THE WINDOW" when it is not inside) and the cards above the composer's shown and needed heights ("CUT" when it scrolls);
+  then a message typed, the PRs tab and back ("LOST" when the draft is gone) — `composer-*.png`. Seen: the send button in
+  the window in all six, the question card whole (266 of 266 pt), the draft kept both times.
   Verified: Core `ComposerLayoutTests` (the fold at the report's widths, the split at 677 / 557 / 1117 pt, the request
   button with no, sent and unsent notes).
 - **Verified.** Engine `w49.task.test.ts`: the handoff written into the new worktree and taken once by its engine (the

@@ -214,6 +214,88 @@ private final class Tour {
         try await prSheetShot()
         try await commitSplitShots(window)
         try await transcriptShots(window)
+        try await composerShots(window)
+    }
+
+    /// r1-composer — the composer at the laptop size, dark and light (§49.2, §50, §38.1): Send in the window with files
+    /// pending beside the diff (a review, and a turn that runs on beside it: Stop and 바로 보내기), Claude's question whole
+    /// above the composer, and a message typed before a look at the PRs tab still there after it.
+    /// `composer-<step>-<appearance>.png`; the log says "OUT OF THE WINDOW", "CUT" or "LOST" when one is not.
+    private func composerShots(_ window: NSWindow) async throws {
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1200))
+        setComposerText("", in: window)   // what the transcript shots typed
+        let files = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false),
+                     ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        func shoot(_ step: String, _ appearance: Appearance) async throws {
+            try await Task.sleep(for: .milliseconds(1500))
+            let image = try render(window)
+            try write(image, "composer-\(step)-\(appearance.rawValue)")
+            logTranscript(image)
+        }
+        func checkSend(_ step: String) {
+            let send = entry.model.debugSendFrame
+            let room = window.contentView?.bounds.size ?? .zero
+            let inside = send.width > 0 && send.minX >= -0.5 && send.minY >= -0.5 && send.maxX <= room.width + 0.5 && send.maxY <= room.height + 0.5
+            log("composer \(step): send button \(NSStringFromRect(send)) in \(NSStringFromSize(room))" + (inside ? " — in the window" : " — OUT OF THE WINDOW"))
+        }
+        func checkCards(_ step: String) {
+            let cards = entry.model.debugCardsHeights   // width: the height shown, height: the height needed
+            let whole = cards.height > 0 && cards.height <= cards.width + 0.5
+            log("composer \(step): the cards above the composer shown at \(Int(cards.width)) of \(Int(cards.height)) pt" + (whole ? " — whole" : " — CUT"))
+        }
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            // A review began: files pending, the diff pane open beside the chat.
+            store.debugShowComposerState(working: false, files: files)
+            try await shoot("review", appearance)
+            checkSend("review-\(appearance.rawValue)")
+            // Claude works on beside the pending files: Stop and 바로 보내기.
+            store.debugShowComposerState(working: true, files: files)
+            try await shoot("working", appearance)
+            checkSend("working-\(appearance.rawValue)")
+            // Claude asks: the card above the composer, the message box answers it.
+            let question = Self.question(id: "tour-question-\(appearance.rawValue)")
+            store.debugHandle([.permissionRequest(question)])
+            try await shoot("question", appearance)
+            checkSend("question-\(appearance.rawValue)")
+            checkCards("question-\(appearance.rawValue)")
+            store.skipQuestions(requestId: question.requestId)   // the engine says it is not its: the card leaves
+            // A message typed, a look at the PRs tab, back to the chat.
+            let draft = "Rename SAVE10 to WELCOME10 (typed, not sent, \(appearance.rawValue))"
+            setComposerText(draft, in: window)
+            entry.model.tab = .prs
+            try await Task.sleep(for: .milliseconds(1500))
+            entry.model.tab = .changes
+            try await shoot("back-from-prs", appearance)
+            let back = composerView(window)?.string
+            log("composer after the PRs tab (\(appearance.rawValue)): draft " + (back == draft ? "kept" : "LOST (now \"\(back ?? "no composer")\")"))
+            setComposerText("", in: window)
+        }
+        store.debugShowGate(.idle)
+        AppSettings.setAppearance(.dark)
+    }
+
+    /// Types `text` into the composer as a user would (it replaces what is there).
+    private func setComposerText(_ text: String, in window: NSWindow) {
+        guard let box = composerView(window) else { return log("composer: no message box") }
+        window.makeFirstResponder(box)
+        box.insertText(text, replacementRange: NSRange(location: 0, length: (box.string as NSString).length))
+    }
+
+    /// Claude's AskUserQuestion about the demo project: one question, three options.
+    private static func question(id: String) -> PermissionRequest {
+        func option(_ label: String, _ description: String) -> JSONValue { .object(["label": .string(label), "description": .string(description)]) }
+        return PermissionRequest(requestId: id, toolName: AskUserQuestions.toolName, input: .object([
+            "questions": .array([.object([
+                "question": .string("Where should the discount codes live?"),
+                "header": .string("Codes"),
+                "options": .array([option("src/pricing.ts", "Next to the shipping and tax rules"),
+                                   option("A new src/discounts.ts", "Their own module, imported by the cart"),
+                                   option("A JSON file", "Edited without a release; read at start")]),
+                "multiSelect": .bool(false),
+            ])]),
+        ]))
     }
 
     /// The transcript at the laptop size, through what changes the chat column around it: a long chat, a turn streamed in,
