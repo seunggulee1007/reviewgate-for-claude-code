@@ -9,6 +9,7 @@ import { cliChangeText } from "./sessionTools"; // MARK: wave3 desktop-session
 import { longWorkErrorText } from "./longWork"; // MARK: wave4 w4-longwork
 import { chatMoveNoticeText } from "./chatMove"; // MARK: wave4b w4b-follow
 import { autoModeErrorText, autoModeRefusalText } from "./autoMode"; // MARK: wave4b w4b-auto
+import { scopeRowText } from "./scopeNotices"; // MARK: r1-scope
 
 /** `error` event codes (§19.6 "Claude CLI / API failures" + "Other engine error codes"). */
 export const ERROR_EVENT_CODES = [
@@ -211,6 +212,8 @@ export type ErrorInfo = {
   toolName?: string;
   path?: string;
   branch?: string;
+  /** MARK: r1-scope — §33.4 `worktree_outside_review` of a command: what it changed in `path` (relative to it). */
+  files?: string[];
   // MARK: wave3 desktop-session
   /** §36.8: the `cli_version_changed` notice's versions. */
   cli?: { from: string | null; to: string; verified: boolean };
@@ -272,11 +275,13 @@ export function presentationOf(code: string | undefined): ErrorPresentation {
     case "chat_moved_in_disk":
       return "info";
     case "worktree_blocked":
-    case "worktree_outside_review":
     case "peer_release_failed":
     case "unprompted_blocked":
     case "chat_move_failed": // MARK: wave4b w4b-follow (§39.4)
       return "warning";
+    // MARK: r1-scope — §33.4: what already ran outside the review is a chat row (with its folder's actions), never a banner
+    case "worktree_outside_review":
+      return "row";
     // MARK: wave3 desktop-session — §36.8
     case "cli_version_changed":
       return "row";
@@ -419,7 +424,7 @@ export function errorEventText(ev: ErrorInfo, opts: { now?: Date; timeZone?: str
     case "worktree_blocked":
       return worktreeBlockedText(ev.toolName, ev.branch);
     case "worktree_outside_review":
-      return ev.path ? t("Claude worked where this window's review does not see it: {0}", ev.path) : t("Claude worked where this window's review does not see it.");
+      return scopeRowText(ev) ?? (ev.path ? t("Claude worked where this window's review does not see it: {0}", ev.path) : t("Claude worked where this window's review does not see it."));
     // MARK: wave3 desktop-session — §36.8
     case "cli_version_changed":
       return cliChangeText(ev);
