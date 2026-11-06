@@ -1111,7 +1111,8 @@ and leaves the rest under review. Accept semantics are unchanged (`accept` takes
 
 Claude Code can run a turn by itself — e.g. a background subagent finishes after the main turn's `result` and the CLI
 continues without a user message. (§52: with background work on — the default since 0.5.9 — such a turn is taken as a review
-turn; this guard is what applies when it cannot be, and when background work is off.) Nothing collects such a turn: its edits would land outside any A → B window and the
+turn; this guard is what applies when it cannot be, and when background work is off. §52.2: a subagent working in the
+background is not guarded — what it changes reaches the next review.) Nothing collects such a turn: its edits would land outside any A → B window and the
 next `send`'s snapshot A would absorb them unreviewed. `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (§13) avoids the known
 trigger; this guard is the defense in depth, and the only protection when the user's environment explicitly sets the
 variable to a falsy value (`??=` keeps their value).
@@ -1147,7 +1148,8 @@ variable to a falsy value (`??=` keeps their value).
   text / tool rows still show inside the user's turn. A turn the CLI starts without
   a lifecycle frame (a background task's continuation; an older CLI) is only recognized by its `result`, as before: a
   send queued while it runs makes it "active" (its later edits happen after snapshot A, so they are collected), and its
-  `result` closes the user's turn early; the rest of the user's turn is then guarded like an unprompted one. Tool calls
+  `result` closes the user's turn early; the rest of the user's turn is then guarded like an unprompted one (§52.2: not
+  with lifecycle frames — the turn waits for the queued message's own command). Tool calls
   the CLI starts on its own still appear in the transcript (`tool_use` / a denied `tool_result`).
 
 ## 19. Release-review hardening
@@ -6669,10 +6671,10 @@ type AutoTurnTrigger = "background" | "schedule" | "continue";
   - On: the session starts without `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`; an explicit value in the environment still
     wins.
   - Off: as before. The variable is `1`, and a turn the CLI starts is denied (§18).
-- **Agents stay in the turn.** With background work on, the PreToolUse hook gives every `Agent` / `Task` call
-  `updatedInput {…, run_in_background: false}` (main thread and subagents), so a subagent's edits stay in the review of
-  the turn that started it. An agent whose definition always runs in the background is still backgrounded. Its calls
-  after the turn's end are denied (§18).
+- **Agents run as in the terminal** (§52.2). The CLI runs an `Agent` / `Task` call in the background unless its input
+  says `run_in_background: false`; the main agent answers the user while the subagent works, and what the subagent
+  changes still reaches a review. `settings.subagentsInTurn` (opt-in) keeps them in the turn as before: the PreToolUse
+  hook gives every call `updatedInput {…, run_in_background: false}`.
 - **`state.session.backgroundTasks`** follows `background_tasks_changed`.
   - Its `tasks` replace the list. `ambient` tasks are left out.
   - `task_started` adds `toolUseId`, `kind` and `turn`. The output file comes from the Bash call's result ("Output is
@@ -6739,7 +6741,7 @@ process:
     - a short answer that ends before the engine is ready stays ended;
     - nothing taken before a turn of ours or with the setting off;
     - a dispose releases the waiting calls;
-    - Agent calls get `run_in_background: false`.
+    - Agent calls keep their input (§52.2).
   - Engine `w52.background.test.ts`:
     - the list with the turn of its call;
     - `task_stop`, `task_background` and `task_output`, with their refusals;
@@ -6763,6 +6765,75 @@ process:
   (`adoption`, `keepAgentsInTurn`), `engine.ts` (`onAutoTurnStart` / `adoptAutoTurn` / `task*`), `review/gate.ts`
   (`prepareAnswer(carry)`), `git/mods.ts`; Core `Engine/BackgroundProtocol.swift`, `Session/AppState+Background.swift`;
   App `UI/Chat/BackgroundViews.swift`; `sidecar/test/driver-background.mjs`).
+
+### 52.2 Subagents work in the background, the main agent answers
+
+Until 0.5.9 every `Agent` / `Task` call got `run_in_background: false` (§52), so the main turn waited for its subagents:
+a message typed meanwhile sat in the CLI's queue (a skill that starts several reviewers left the user without an answer
+for 25 minutes). In the terminal (CLI 2.1.318) the CLI runs an Agent call in the background and the main agent answers
+while it works. The app does the same now, and the review still sees everything the subagent changes.
+
+Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project PreToolUse hook):
+
+- The call is answered at once ("Async agent launched successfully. … agentId: …"), after `task_started {task_type:
+  "local_agent", is_backgrounded: true, spawn_depth: 1}` and `background_tasks_changed`. The turn ends with its `result`.
+- The subagent's tool calls carry `agent_id` (= its task id) in their hook input and `agentID` in `canUseTool`. A Bash
+  call it makes is a `local_bash` task with `owned_by_subagent`, `parent_task_id`.
+- A message sent meanwhile runs at once: `command_lifecycle started`, its answer, its `result` — the subagent goes on.
+- When it ends: `task_updated {status}`, `task_notification {status, summary, output_file, usage}` — in auto mode the
+  subagent reports through its `SubagentHandback` tool, and the notification says `handback: "send"` with
+  `handback_report {text}` (its `summary` only points at the message). Then `background_tasks_changed`, and the CLI runs a
+  turn itself (`system/init`, no lifecycle frame): the hand-back is replayed as a user message with `origin {kind: "peer",
+  from: <task id>, senderTaskId, name: <agent type>, body, handback: true, handbackReportText}`, and the turn's `result`
+  carries the same origin. Without a hand-back the turn's `result.origin` is `{kind: "task-notification"}`.
+
+```ts
+// settings.subagentsInTurn?: boolean                         // default false; next session start; only with backgroundWork
+// tool_result + agentLaunched?: true                         // the call's answer when its agent went to the background
+// tool_result + agentEnded?: true                            // that agent's own result when it ended (a second tool_result)
+// auto_turn.task + kind?: "bash" | "monitor" | "agent" | "other"; toolUseId?: string   // summary: the agent's report
+```
+
+- **The call keeps its input** (hooks.ts). With `settings.subagentsInTurn` (opt-in, both clients' "서브에이전트가 턴
+  안에서 끝나게") the PreToolUse hook still adds `run_in_background: false`, as before.
+- **Its calls pass the §18 guard** (`hooks.ts unpromptedBlocked(…, agentId)`, `HookContext.backgroundAgent`). The session
+  keeps the live background subagents (`ClaudeSession.bgAgents`): every `local_agent` task started with — or moved to
+  (`task_updated {is_backgrounded: true}`) — the background, and every agent started under one of them (`parent_task_id`,
+  else the subagent whose call started it), until its `task_notification` / a final `task_updated` status. A call whose
+  hook input names one of them (or names an agent no task frame named while one of them works) is not denied while no turn
+  of ours runs; `canUseTool` repeats the check with `agentID`. The main thread is guarded as before.
+- **What it changes reaches a review.** In a turn of ours its edits and commands are that turn's, like any call. While no
+  turn of ours runs, the files its calls change (edit tools by their `file_path`, Bash by the post-Bash snapshot) are kept
+  (`idleToolFiles`) and become the next turn's — the user's next message or the turn the CLI runs when the agent ends —
+  whose review keeps A (§52.1), so they are in it with the agent's call as the cause (`origin: tool` / `bash`). A failed
+  edit is no cause.
+- **The call's results.** The CLI's immediate answer is no report: the `tool_result` says `agentLaunched: true` (no
+  `keptReport`, no `why` report). When the agent ends, the session sends a second `tool_result` for the same call with
+  `agentEnded: true`: `preview` is its report (`handback_report.text`, else the notification's `summary`), `isError` when it
+  failed or was stopped, `agentUsage` from the notification. It is recorded like any result, so the chat shows the agent's
+  report under its group (the last result of a call is its result), `agent_report` answers with it, and §42.4 rebuilds the
+  agent from the rows after a restart (a background agent with only its launch in the rows is still left out). The agent
+  node's `summary` is the report too.
+- **The hand-back is the agent's, not a peer's.** A replayed message whose origin has `handback: true` is never a
+  `peer_delivered` (no "message from another session" card, no §18 episode) — `peerOriginOf` returns null, `handbackOf`
+  reads it; it closes the call with its report when no notification did. A `result` with that origin is the end of the
+  turn the engine took (§52.1), not an unprompted one.
+- **The turn Claude runs after it** is `auto_turn {trigger: "background"}` as for a background command; `task.kind` is
+  `agent`, `task.toolUseId` its call, `task.summary` its report.
+- **A message of ours waiting behind such a turn.** When the user's message is queued in the CLI behind a turn the CLI
+  runs itself (the hand-back came first), that turn's `result` does not end ours: the session waits for our command to
+  start (`queuedOwn`, as for a message put into the turn, §50) and ends the turn with its `result` (both results' usage).
+  Before, the first `result` closed the user's turn and the rest of it was guarded as unprompted (§18, "Limits").
+- **The HUD and the agent panel.** A background subagent is in `hud.agents` (`isBackground: true`) while it works, across
+  turns, and in "백그라운드 N" (§52, `kind: agent`) with [중지] (`task_stop`); the agent's own ■ (`stop_agent`, §36.2)
+  stops it too.
+- **Verified.** Engine `w52.agents.test.ts` (the session with CLI 2.1.318's frames: inputs kept / kept in the turn with
+  the setting; the launch is no report; the subagent's calls pass the guard between turns — hook and `canUseTool` — the
+  main thread's do not, nor its own after it ended; an agent it starts; its edits between turns in the next turn's
+  `toolFiles`; its end as the call's result, once; no peer for the hand-back; the hand-back turn ours; a stopped agent; our
+  queued message's turn not ended by the CLI's), `w52.background.test.ts` (its end recorded as the call's result, named
+  on the auto turn, kept for `agent_report`), `session.agentHistoryRows.test.ts` (an ended background agent comes back
+  after a restart).
 
 ## 53. Commits in meaningful units
 

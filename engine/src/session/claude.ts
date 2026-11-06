@@ -116,6 +116,12 @@ export type SessionSettings = {
   maxTurns?: number;
   /** §52: background tasks on (default) and turns Claude starts itself taken as review turns; false: the §18 behavior. */
   backgroundWork?: boolean;
+  /**
+   * §52.2: subagents finish inside the turn that started them (every Agent / Task call gets `run_in_background: false`), as
+   * before 0.6. Off (the default): they run as in the terminal — in the background unless Claude says not — and the main
+   * agent answers meanwhile. Only with background work on (off, every subagent runs in the turn anyway).
+   */
+  subagentsInTurn?: boolean;
 };
 
 /** An image content block of a user message (§24). */
@@ -220,6 +226,9 @@ export interface ClaudeSessionLike {
  */
 export type SessionStatusUsage = { usage: StatusUsage | null; model: string | null; apiDurationMs: number };
 
+/** A file the turn's calls touched: the tools, how often, and the calls that changed it (§12). */
+type TouchedFile = { path: string; tools: Set<string>; count: number; toolUseIds: string[] };
+
 /** `cancelled`: the session answered it itself (abort, interrupt) — reported as `permission_cancelled` (§33). */
 type PendingPermission = { resolve: (r: PermissionResult, cancelled?: boolean) => void; outsideFile?: string };
 
@@ -247,6 +256,8 @@ export const START_SLOW_HINT_MS = 8000;
 export const PEER_RELEASE_TIMEOUT_MS = 3000;
 /** §29: own message uuids remembered for routing (the CLI echoes them in `command_lifecycle` / `result`). */
 const MAX_OWN_COMMANDS = 200;
+/** §52.2: calls remembered until their result (`openCalls`) — a call that never got one is forgotten oldest first. */
+const MAX_OPEN_CALLS = 2000;
 /** §29: a review turn over several released peer messages ends when the next one has not started this long after a result. */
 const PEER_TURN_GAP_MS = 10_000;
 
@@ -274,7 +285,7 @@ export class ClaudeSession implements ClaudeSessionLike {
   private disposed: Promise<void> | undefined;
   private closedEmitted = false;
   /** Keyed by `normalizeForCompare` (one entry per file however it was spelled); `path` is the first spelling seen. */
-  private turnToolFiles = new Map<string, { path: string; tools: Set<string>; count: number; toolUseIds: string[] }>();
+  private turnToolFiles = new Map<string, TouchedFile>();
   /**
    * Files edit tools touched since the last post-Bash snapshot (`normalizeForCompare` keys): a file the
    * snapshot sees changed is attributed to that Bash call only when no edit tool touched it in between.
@@ -412,6 +423,36 @@ export class ClaudeSession implements ClaudeSessionLike {
   private hadOwnTurn = false;
   /** §52: the engine is taking a turn the CLI started (every call waits for `ready`). */
   private adopting: { resolve: () => void; commandUuid: string | null } | null = null;
+  // ---- §52.2 subagents in the background
+  /**
+   * Live subagents that work in the background (task id → the task they run under, null at the top): every `local_agent`
+   * task started — or moved — to the background, and every agent task started under one of them. Their calls are no
+   * unprompted turn (hooks.ts `backgroundAgent`).
+   */
+  private bgAgents = new Map<string, string | null>();
+  /** Every subagent task id this process started (`task_started` of a `local_agent`). */
+  private agentTaskIds = new Set<string>();
+  /** Agent / Task calls whose background subagent's own result went out (`emitAgentEnd`): once per call. */
+  private agentEndedCalls = new Set<string>();
+  /** Agent / Task tool_use id → the call it ran under (its assistant message's `parent_tool_use_id`; null at the top). */
+  private agentCallParents = new Map<string, string | null>();
+  /** Agent / Task tool_use id → the task id the CLI gave it (`task_started`). */
+  private agentTaskOfCall = new Map<string, string>();
+  /**
+   * What edit tools and Bash calls changed while no turn of ours ran (a background subagent's work): kept for the next
+   * turn, whose review holds them (A is kept, §52.1) — with these calls as their cause.
+   */
+  private idleToolFiles = new Map<string, TouchedFile>();
+  /**
+   * Every call whose result has not come yet: its name and the agent call it runs under (null on the main thread) — a
+   * subagent's call can end after its turn did, and only a subagent works on while no turn of ours runs.
+   */
+  private openCalls = new Map<string, { name: string; parent: string | null }>();
+  /**
+   * Our sent messages (`sendUser`) whose command has not started: a `result` the CLI sends before it (a turn it ran
+   * itself while ours waited in its queue — a background task's notification, a subagent's hand-back) is not our turn's end.
+   */
+  private queuedOwn = new Set<string>();
 
   constructor(opts: ClaudeSessionOptions) {
     this.opts = opts;
@@ -487,11 +528,13 @@ export class ClaudeSession implements ClaudeSessionLike {
     // after our turn_end never reach the review and the next send's snapshot A swallows them. Subagents
     // and Bash must run inside the turn the gate collects, so background tasks are off unless the
     // environment explicitly says otherwise (verified: is_backgrounded false, one result per send).
-    // §52: with background work on (the default) they run as in the terminal — the PreToolUse hook keeps Agent calls in the
-    // turn (`run_in_background: false`), and a turn the CLI starts itself afterwards is taken as a review turn.
+    // §52: with background work on (the default) they run as in the terminal, and a turn the CLI starts itself afterwards is
+    // taken as a review turn. §52.2: so do subagents — the main agent answers while they work, their calls pass the §18
+    // guard, what they change reaches the next review; `subagentsInTurn` (opt-in) keeps them in the turn as before.
     if (s.backgroundWork === false) env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS ??= "1";
     this.bgOn = !envTruthy(env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS);
-    this.hookCtx.keepAgentsInTurn = this.bgOn;
+    this.hookCtx.keepAgentsInTurn = this.bgOn && s.subagentsInTurn === true;
+    this.hookCtx.backgroundAgent = (agentId) => this.isBackgroundAgent(agentId);
     // MARK: wave3 engine-flow — §36.13: `/code-review` in this chat reports its findings through ReportFindings (a
     // read-only tool, hooks.ts) and the engine shows them on the diff lines; an explicit value in the environment wins.
     env.CLAUDE_CODE_REPORT_FINDINGS ??= "1";
@@ -672,12 +715,14 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (!this.q) throw new Error("session not started");
     if (this.disposing) throw new Error("session closed");
     this.resetTurn();
+    this.takeIdleWork(); // §52.2: what a background subagent changed since the last turn is this turn's
     this.reportedApiErrors = new Set();
     this.hookBlockedThisTurn = false; // MARK: wave4 w4-longwork
     this.continuationBlock = null; // MARK: wave4c w4c-trust
     this.hookCtx.checkpointTree = checkpointTree;
     this.hadOwnTurn = true;
     this.bgNotice = null;
+    this.queuedOwn = new Set();
     this.setTurnActive(true);
     // Images first, then the text (the order the Messages API recommends); a text-only message stays a plain string.
     const content: SDKUserMessage["message"]["content"] = images.length === 0
@@ -692,6 +737,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (this.ownCommands.size > MAX_OWN_COMMANDS) this.ownCommands.delete(this.ownCommands.values().next().value!);
     // §52: a send that slipped in while a turn Claude started is being taken joins it — the turn waits for this command.
     if (this.adopting) this.steered.add(uuid);
+    // §52.2: a turn the CLI runs itself before this command starts (a subagent's hand-back) does not end ours.
+    this.queuedOwn.add(uuid);
     this.inbox.push({
       type: "user",
       uuid,
@@ -1016,22 +1063,45 @@ export class ClaudeSession implements ClaudeSessionLike {
       .map(([, v]) => ({ path: v.path, tools: [...v.tools], count: v.count, toolUseIds: [...v.toolUseIds] }));
   }
 
-  /** `toolUseId` only for calls that change the file (edit tools, Bash via the snapshot): a Read is not a cause (§12). */
+  /**
+   * `toolUseId` only for calls that change the file (edit tools, Bash via the snapshot): a Read is not a cause (§12).
+   * §52.2: while no turn of ours runs (a background subagent works on), the next turn takes it (`idleToolFiles`).
+   */
   private touchFile(file: string, toolName: string, toolUseId: string | undefined): void {
     const key = normalizeForCompare(file);
-    const entry = this.turnToolFiles.get(key) ?? { path: file, tools: new Set<string>(), count: 0, toolUseIds: [] };
+    // Between turns only a subagent's call is kept (the main thread's are denied, §18).
+    if (!this.turnActive && (toolUseId === undefined || (this.openCalls.get(toolUseId)?.parent ?? null) === null)) return;
+    const files = this.turnActive ? this.turnToolFiles : this.idleToolFiles;
+    const entry = files.get(key) ?? { path: file, tools: new Set<string>(), count: 0, toolUseIds: [] };
     entry.tools.add(toolName);
     entry.count++;
     if (toolUseId !== undefined && !entry.toolUseIds.includes(toolUseId)) entry.toolUseIds.push(toolUseId);
-    this.turnToolFiles.set(key, entry);
+    files.set(key, entry);
   }
 
   /** Removes `toolUseId` from every file it touched (the tool name stays: it still says what was tried). */
   private dropToolUseId(toolUseId: string): void {
-    for (const entry of this.turnToolFiles.values()) {
+    for (const entry of [...this.turnToolFiles.values(), ...this.idleToolFiles.values()]) {
       const i = entry.toolUseIds.indexOf(toolUseId);
       if (i >= 0) entry.toolUseIds.splice(i, 1);
     }
+  }
+
+  /**
+   * §52.2: at a turn's start, what calls changed while no turn of ours ran (a background subagent's edits and commands)
+   * becomes this turn's — the review keeps A while background work runs (§52.1), so those files are in it, with these
+   * calls as their cause. Files no call changed (a read, a failed edit) are left out.
+   */
+  private takeIdleWork(): void {
+    for (const [key, idle] of this.idleToolFiles) {
+      if (idle.toolUseIds.length === 0) continue;
+      const entry = this.turnToolFiles.get(key) ?? { path: idle.path, tools: new Set<string>(), count: 0, toolUseIds: [] };
+      for (const t of idle.tools) entry.tools.add(t);
+      entry.count += idle.count;
+      for (const id of idle.toolUseIds) if (!entry.toolUseIds.includes(id)) entry.toolUseIds.push(id);
+      this.turnToolFiles.set(key, entry);
+    }
+    this.idleToolFiles = new Map();
   }
 
   /** Post-Bash snapshot (hooks.ts): files changed since the previous one that no edit tool explains. */
@@ -1071,6 +1141,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     // §29: released peer messages belong to the turn that ends here (§50: so do messages put into it).
     this.releasedPeers = new Set();
     this.steered = new Set();
+    this.queuedOwn = new Set();
     this.peerStarted = new Set();
     this.peerDelivered = new Set();
     this.takePeerTurnUsage();
@@ -1357,6 +1428,7 @@ export class ClaudeSession implements ClaudeSessionLike {
         } else if (msg.subtype === "task_started") {
           this.taskCalls.set(msg.task_id, msg.tool_use_id ?? null);
           if (msg.is_backgrounded === true) this.noteBackgroundStart(msg.task_id, msg.tool_use_id ?? null);
+          this.noteAgentTask(msg as unknown as Record<string, unknown>); // §52.2
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1390,6 +1462,9 @@ export class ClaudeSession implements ClaudeSessionLike {
           const p = msg.patch;
           // §52: Ctrl+B (`backgroundTasks`) moved a foreground task to the background.
           if (p.is_backgrounded === true) this.noteBackgroundStart(msg.task_id, this.taskCalls.get(msg.task_id) ?? null);
+          // §52.2: a subagent moved to the background works on after the turn; one that ended does not.
+          if (p.is_backgrounded === true && this.agentTaskIds.has(msg.task_id) && !this.bgAgents.has(msg.task_id)) this.bgAgents.set(msg.task_id, null);
+          if (p.status === "completed" || p.status === "failed" || p.status === "killed") this.bgAgents.delete(msg.task_id);
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1404,6 +1479,9 @@ export class ClaudeSession implements ClaudeSessionLike {
           });
         } else if (msg.subtype === "task_notification") {
           this.noteBackgroundEnd(msg as unknown as Record<string, unknown>);
+          this.bgAgents.delete(msg.task_id); // §52.2
+          // §52.2: a subagent that reported through SubagentHandback: its report, not the CLI's pointer to the message.
+          const summary = handbackReportOf(msg) ?? msg.summary;
           this.emit({
             type: "agent_signal",
             signal: {
@@ -1411,10 +1489,11 @@ export class ClaudeSession implements ClaudeSessionLike {
               taskId: msg.task_id,
               ...(msg.tool_use_id ? { toolUseId: msg.tool_use_id } : {}),
               status: msg.status,
-              ...(msg.summary ? { summary: msg.summary } : {}),
+              ...(summary ? { summary } : {}),
               ...(msg.usage ? { usage: { tokens: msg.usage.total_tokens, toolUses: msg.usage.tool_uses, durationMs: msg.usage.duration_ms } } : {}),
             },
           });
+          this.emitAgentEnd(msg as unknown as Record<string, unknown>); // §52.2
         } else if ((msg as { subtype?: string }).subtype === "background_tasks_changed") {
           this.onBackgroundTasks((msg as { tasks?: unknown }).tasks); // §52
         } else if (msg.subtype === "commands_changed") {
@@ -1534,6 +1613,10 @@ export class ClaudeSession implements ClaudeSessionLike {
             if (this.callsSinceText.has(agentKey)) this.callsSinceText.set(agentKey, this.callsSinceText.get(agentKey)! + 1);
           }
           this.turnToolNames.set(block.id, block.name);
+          this.openCalls.set(block.id, { name: block.name, parent: msg.parent_tool_use_id ?? null });
+          if (this.openCalls.size > MAX_OPEN_CALLS) this.openCalls.delete(this.openCalls.keys().next().value!);
+          // §52.2: an agent started by a subagent working in the background works in the background too.
+          if (SUBAGENT_TOOL_RE.test(block.name)) this.agentCallParents.set(block.id, msg.parent_tool_use_id ?? null);
           // MARK: wave4b w4b-auto (§39.5); wave6 w6-terminal (§44.1): plan mode entered from auto is judged by the classifier too
           if (this.hookCtx.permissionMode === "auto" || (this.hookCtx.permissionMode === "plan" && this.hookCtx.prePlanMode === "auto")) this.autoCallInputs.set(block.id, input);
           if (block.name === "Bash") {
@@ -1566,7 +1649,9 @@ export class ClaudeSession implements ClaudeSessionLike {
         for (const block of content) {
           if (block.type !== "tool_result") continue;
           if (!this.suppressedToolUseIds.delete(block.tool_use_id)) this.emitToolResult(block.tool_use_id, block.is_error === true, block.content, msg.parent_tool_use_id);
-          const name = this.turnToolNames.get(block.tool_use_id);
+          // §52.2: a background subagent's call can end after the turn it started in.
+          const name = this.turnToolNames.get(block.tool_use_id) ?? this.openCalls.get(block.tool_use_id)?.name;
+          this.openCalls.delete(block.tool_use_id);
           // A failed edit (denied, old_string not found) changed nothing: it is no cause of the file (§12, §31).
           if (block.is_error === true && name !== undefined && AUTO_ALLOW_RE.test(name)) this.dropToolUseId(block.tool_use_id);
           if (this.activeSubagents.delete(block.tool_use_id)) {
@@ -1640,6 +1725,8 @@ export class ClaudeSession implements ClaudeSessionLike {
         }
         const running = this.ownRunning;
         this.endOfCliTurn();
+        // §52.2: a message of ours this result echoes is done, whether or not its command was seen starting.
+        for (const u of echoedUuids(msg)) if (this.queuedOwn.has(u)) this.peerStarted.add(u);
         // §29: a released peer message without an echo (no replay): its result says who sent it.
         if (peer && this.releasedPeers.size > 0) {
           const id = running !== null && this.releasedPeers.has(running) ? running : [...this.releasedPeers].find((p) => !this.peerDelivered.has(p));
@@ -1694,6 +1781,8 @@ export class ClaudeSession implements ClaudeSessionLike {
    */
   private beginAutoTurn(trigger: AutoTurnInfo["trigger"], commandUuid: string | null, wakeupSource?: string): void {
     this.resetTurn();
+    this.takeIdleWork(); // §52.2
+    this.queuedOwn = new Set();
     this.reportedApiErrors = new Set();
     this.hookBlockedThisTurn = false;
     this.continuationBlock = null;
@@ -1800,9 +1889,94 @@ export class ClaudeSession implements ClaudeSessionLike {
     const id = typeof m.task_id === "string" ? m.task_id : "";
     if (!id || !this.bgStarted.has(id)) return;
     if (typeof m.output_file === "string" && m.output_file) this.bgOutputFiles.set(id, m.output_file);
-    const description = this.bgTasks.get(id)?.description ?? "";
-    const summary = typeof m.summary === "string" && m.summary ? m.summary : undefined;
-    this.bgNotice = { taskId: id, description, status: typeof m.status === "string" ? m.status : "completed", ...(summary ? { summary } : {}) };
+    const task = this.bgTasks.get(id);
+    const description = task?.description ?? "";
+    // §52.2: a subagent's report — what it handed back, else the CLI's summary (the agent's last words).
+    const summary = handbackReportOf(m) ?? (typeof m.summary === "string" && m.summary ? m.summary : undefined);
+    const kind = task?.kind ?? (this.agentTaskIds.has(id) ? "agent" : undefined);
+    const toolUseId = task?.toolUseId ?? this.bgStarted.get(id)?.toolUseId ?? null;
+    this.bgNotice = {
+      taskId: id,
+      description,
+      status: typeof m.status === "string" ? m.status : "completed",
+      ...(summary ? { summary } : {}),
+      ...(kind ? { kind } : {}),
+      ...(toolUseId ? { toolUseId } : {}),
+    };
+  }
+
+  // ------------------------------------------------------------------ §52.2 subagents in the background
+
+  /**
+   * `task_started` of a subagent (`local_agent`): one that works in the background (`is_backgrounded`), and every agent
+   * started under one of them (`parent_task_id`, else the subagent whose call started it), is a background agent until it
+   * ends — its calls pass the §18 guard (`isBackgroundAgent`).
+   */
+  private noteAgentTask(m: Record<string, unknown>): void {
+    const id = typeof m.task_id === "string" ? m.task_id : "";
+    const isAgent = m.task_type === "local_agent" || (m.task_type === undefined && typeof m.subagent_type === "string");
+    if (!id || !isAgent) return;
+    this.agentTaskIds.add(id);
+    const call = typeof m.tool_use_id === "string" && m.tool_use_id ? m.tool_use_id : null;
+    if (call) this.agentTaskOfCall.set(call, id);
+    const parentTask = typeof m.parent_task_id === "string" && m.parent_task_id ? m.parent_task_id : this.taskOfParentCall(call);
+    if (m.is_backgrounded === true) this.bgAgents.set(id, null);
+    else if (parentTask !== null && this.bgAgents.has(parentTask)) this.bgAgents.set(id, parentTask);
+  }
+
+  /** The task of the subagent whose turn made `call` (the call's assistant message names it); null at the top or unknown. */
+  private taskOfParentCall(call: string | null): string | null {
+    const parent = call === null ? null : this.agentCallParents.get(call) ?? null;
+    return parent === null ? null : this.agentTaskOfCall.get(parent) ?? null;
+  }
+
+  /**
+   * hooks.ts `backgroundAgent`: a live subagent working in the background (or under one). An agent no task frame named,
+   * while one works in the background, is taken to be under it: only background work runs between our turns.
+   */
+  private isBackgroundAgent(agentId: string): boolean {
+    if (this.bgAgents.has(agentId)) return true;
+    return !this.agentTaskIds.has(agentId) && this.bgAgents.size > 0;
+  }
+
+  /** The result of Agent / Task call `toolUseId` is the CLI's "launched in the background" answer, not a report. */
+  private launchedInBackground(toolUseId: string, raw: string): boolean {
+    const task = this.agentTaskOfCall.get(toolUseId);
+    return (task !== undefined && this.bgAgents.has(task)) || /^Async agent launched/.test(raw.trimStart());
+  }
+
+  /**
+   * A subagent that worked in the background ended (`task_notification`, or its hand-back without one): its call gets its
+   * own result — the report, `isError` when it failed or was stopped — once. Its group in the chat closes with it, and the
+   * engine keeps the report (`agent_report`, `why`).
+   */
+  private emitAgentEnd(m: Record<string, unknown>): void {
+    const taskId = typeof m.task_id === "string" ? m.task_id : "";
+    if (!taskId || !this.agentTaskIds.has(taskId) || !this.bgStarted.has(taskId)) return;
+    const call = (typeof m.tool_use_id === "string" && m.tool_use_id ? m.tool_use_id : null) ?? this.taskCalls.get(taskId) ?? null;
+    if (call === null || this.agentEndedCalls.has(call)) return;
+    this.agentEndedCalls.add(call);
+    const status = typeof m.status === "string" ? m.status : "completed";
+    const report = handbackReportOf(m) ?? (typeof m.summary === "string" ? m.summary : "");
+    const usage = m.usage && typeof m.usage === "object" ? (m.usage as { total_tokens?: unknown; tool_uses?: unknown; duration_ms?: unknown }) : undefined;
+    const agentUsage = usage && typeof usage.total_tokens === "number" && typeof usage.tool_uses === "number" && typeof usage.duration_ms === "number"
+      ? { tokens: usage.total_tokens, toolUses: usage.tool_uses, durationMs: usage.duration_ms }
+      : undefined;
+    const parent = this.agentCallParents.get(call) ?? null;
+    const isError = status !== "completed";
+    const truncated = report.length > PREVIEW_CHARS;
+    this.emit({
+      type: "tool_result",
+      toolUseId: call,
+      isError,
+      preview: truncated ? report.slice(0, PREVIEW_CHARS) : report,
+      ...(parent !== null ? { parentToolUseId: parent } : {}),
+      agentEnded: true,
+      ...(truncated ? { truncated } : {}),
+      ...(report.trim() ? { agentReport: report.slice(0, AGENT_REPORT_CHARS) } : {}),
+      ...(agentUsage ? { agentUsage } : {}),
+      ...(!isError && report.trim() ? { keptReport: { text: report.slice(0, AGENT_REPORT_KEPT_CHARS), truncated: report.length > AGENT_REPORT_KEPT_CHARS } } : {}),
+    });
   }
 
   private emitBackgroundTasks(): void {
@@ -1818,9 +1992,7 @@ export class ClaudeSession implements ClaudeSessionLike {
    */
   private ownsResult(msg: Extract<SDKMessage, { type: "result" }>, fromPeer: boolean): boolean {
     if (!this.turnActive) return false;
-    const r = msg as { user_message_uuid?: unknown; user_message_uuids?: unknown };
-    const echoed = [...(Array.isArray(r.user_message_uuids) ? r.user_message_uuids : []), r.user_message_uuid].filter((u): u is string => typeof u === "string");
-    if (echoed.some((u) => this.ownCommands.has(u))) return true;
+    if (echoedUuids(msg).some((u) => this.ownCommands.has(u))) return true;
     if (this.ownRunning !== null) return true;
     if (this.externalCommands.size > 0) return false;
     if (fromPeer && this.releasedPeers.size === 0) return false;
@@ -1843,7 +2015,8 @@ export class ClaudeSession implements ClaudeSessionLike {
 
   /** Released peer messages whose command has not started yet: the review turn goes on through their results. */
   private peerTurnWaits(): boolean {
-    return this.sawLifecycle && [...this.releasedPeers, ...this.steered].some((id) => !this.peerStarted.has(id));
+    // §52.2: so does a message of ours the CLI still holds in its queue behind a turn it ran itself.
+    return this.sawLifecycle && [...this.releasedPeers, ...this.steered, ...this.queuedOwn].some((id) => !this.peerStarted.has(id));
   }
 
   private deferPeerResult(sessionId: string, subtype: string, totalCostUsd: number, inputTokens: number, outputTokens: number, durationMs: number, modelUsage?: Record<string, unknown>): void {
@@ -1895,7 +2068,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       }
       if (this.ownCommands.has(id) || this.releasedPeers.has(id)) {
         this.ownRunning = id;
-        if (this.releasedPeers.has(id) || this.steered.has(id)) this.peerStarted.add(id);
+        if (this.releasedPeers.has(id) || this.steered.has(id) || this.queuedOwn.has(id)) this.peerStarted.add(id);
       } else if (!this.externalCommands.has(id)) {
         this.externalCommands.add(id);
         if (this.externalCommands.size === 1) this.emit({ type: "external_turn", running: true, commandUuid: id });
@@ -1906,7 +2079,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     // completed / cancelled (any terminal state)
     this.ownCommands.delete(id);
     if (this.ownRunning === id) this.ownRunning = null;
-    if (this.releasedPeers.has(id) || this.steered.has(id)) this.peerStarted.add(id); // folded into a running turn without a `started` of its own
+    if (this.releasedPeers.has(id) || this.steered.has(id) || this.queuedOwn.has(id)) this.peerStarted.add(id); // folded into a running turn without a `started` of its own
     if (this.externalCommands.delete(id) && this.externalCommands.size === 0) this.emit({ type: "external_turn", running: false, commandUuid: id });
     this.syncGuard();
     if (this.peerTurnDeferred && !this.peerTurnWaits()) this.finishDeferredPeerTurn();
@@ -1935,6 +2108,13 @@ export class ClaudeSession implements ClaudeSessionLike {
 
   /** A replayed user message: a peer's (`origin.kind: "peer"`) is reported with its body, ours is ignored. */
   private onReplay(m: { uuid?: unknown; origin?: unknown }): void {
+    // §52.2: a subagent's hand-back (SubagentHandback) comes as a message "from another session" — it is the agent's
+    // result, never a peer message: its call's result says it (when the notification did not already).
+    const handback = handbackOf(m.origin);
+    if (handback) {
+      this.emitAgentEnd({ task_id: handback.taskId, status: "completed", handback_report: { text: handback.report } });
+      return;
+    }
     const origin = peerOriginOf(m.origin);
     if (!origin) return;
     const id = typeof m.uuid === "string" ? m.uuid : null;
@@ -1966,6 +2146,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     const q = this.requireQuery();
     if (this.turnActive) throw new Error("a turn is running");
     this.resetTurn();
+    this.takeIdleWork(); // §52.2
+    this.queuedOwn = new Set();
     this.reportedApiErrors = new Set();
     this.hookBlockedThisTurn = false; // MARK: wave4 w4-longwork
     this.continuationBlock = null; // MARK: wave4c w4c-trust
@@ -2019,11 +2201,14 @@ export class ClaudeSession implements ClaudeSessionLike {
     const raw = resultText(content);
     // MARK: wave3 engine-agents — §36.1: an Agent / Task result is its subagent's report, shown and kept without the CLI's
     // hand-back frame; §36.3: so is a SendMessage continuation's (a JSON status line, then the same frame).
-    const toolName = this.turnToolNames.get(toolUseId) ?? "";
+    const toolName = this.turnToolNames.get(toolUseId) ?? this.openCalls.get(toolUseId)?.name ?? "";
     const agentCall = SUBAGENT_TOOL_RE.test(toolName);
-    const report = agentCall || toolName === "SendMessage" ? cleanAgentReport(raw, { jsonLead: !agentCall }) : undefined;
+    // §52.2: a subagent launched in the background answers its call at once ("Async agent launched …"): that is no report —
+    // its own result comes when it ends (`emitAgentEnd`).
+    const launched = agentCall && !isError && this.launchedInBackground(toolUseId, raw);
+    const report = (agentCall && !launched) || toolName === "SendMessage" ? cleanAgentReport(raw, { jsonLead: !agentCall }) : undefined;
     const text = report?.cleaned ? report.text : raw;
-    const keep = !isError && text.trim() !== "" && (agentCall || report?.cleaned === true);
+    const keep = !launched && !isError && text.trim() !== "" && (agentCall || report?.cleaned === true);
     const truncated = text.length > PREVIEW_CHARS;
     const bash = this.bashCalls.get(toolUseId);
     this.bashCalls.delete(toolUseId);
@@ -2035,13 +2220,14 @@ export class ClaudeSession implements ClaudeSessionLike {
     const kept = bash && truncated ? keptOutput(text) : undefined;
     const testOutcome = bash ? detectTestOutcome(bash.command, isError, text, bash.background, this.opts.testCommandPatterns?.() ?? []) : undefined;
     // §34.8: what an Agent / Task call returns is its subagent's report — kept for the turn's `why` (never on the wire).
-    const agentReport = SUBAGENT_TOOL_RE.test(this.turnToolNames.get(toolUseId) ?? "") && text.trim() ? text.slice(0, AGENT_REPORT_CHARS) : undefined;
+    const agentReport = agentCall && !launched && text.trim() ? text.slice(0, AGENT_REPORT_CHARS) : undefined;
     this.emit({
       type: "tool_result",
       toolUseId,
       isError,
       preview: truncated ? text.slice(0, PREVIEW_CHARS) : text,
       ...(parent !== null ? { parentToolUseId: parent } : {}),
+      ...(launched ? { agentLaunched: true as const } : {}),
       ...(truncated ? { truncated } : {}),
       ...(kept !== undefined ? { output: { text: kept.output, truncated: kept.truncated } } : {}),
       ...(testOutcome !== undefined ? { testOutcome } : {}),
@@ -2063,8 +2249,10 @@ export class ClaudeSession implements ClaudeSessionLike {
     // `ExitPlanMode` (CLI 2.1.275+) must never reach a permission card: allowing it lets the very
     // same turn leave plan mode and implement. We take its plan text, hand it to the engine as a
     // proposal and deny the tool, so the turn ends with the plan awaiting `plan_response`.
-    // Outside an engine-started turn nothing may change (the PreToolUse hooks already deny; safety net).
-    if (unpromptedBlocked(toolName, input, this.hookCtx, ro)) {
+    // Outside an engine-started turn nothing may change (the PreToolUse hooks already deny; safety net) — §52.2: but a
+    // subagent working in the background may.
+    const askingAgent = typeof options.agentID === "string" && options.agentID ? options.agentID : undefined;
+    if (unpromptedBlocked(toolName, input, this.hookCtx, ro, askingAgent)) {
       this.onUnprompted(toolName);
       return { behavior: "deny", message: UNPROMPTED_REASON };
     }
@@ -2202,11 +2390,15 @@ function childAlive(c: ChildProcess): boolean {
   return c.exitCode === null && c.signalCode === null;
 }
 
-/** §29: `origin` of a replayed user message / a result when it is a peer's (`kind: "peer"`); null otherwise. */
+/**
+ * §29: `origin` of a replayed user message / a result when it is a peer's (`kind: "peer"`); null otherwise. §52.2: a
+ * subagent's hand-back (`handback: true`, CLI 2.1.318) is no peer message — see `handbackOf`.
+ */
 export function peerOriginOf(o: unknown): PeerOrigin | null {
   if (!o || typeof o !== "object") return null;
   const r = o as Record<string, unknown>;
   if (r.kind !== "peer" || typeof r.from !== "string") return null;
+  if (r.handback === true) return null;
   const str = (k: string) => (typeof r[k] === "string" && r[k] ? (r[k] as string) : undefined);
   const name = str("name");
   const body = typeof r.body === "string" ? r.body : undefined;
@@ -2220,6 +2412,34 @@ export function peerOriginOf(o: unknown): PeerOrigin | null {
     ...(fromMode ? { fromMode } : {}),
     ...(msgId ? { msgId } : {}),
   };
+}
+
+/** The uuids of the messages a `result` says it answered (`user_message_uuid(s)`). */
+function echoedUuids(msg: unknown): string[] {
+  const r = msg as { user_message_uuid?: unknown; user_message_uuids?: unknown };
+  return [...(Array.isArray(r.user_message_uuids) ? r.user_message_uuids : []), r.user_message_uuid].filter((u): u is string => typeof u === "string");
+}
+
+/**
+ * §52.2: a subagent's final report delivered through its SubagentHandback tool, as the CLI stamps the message
+ * (`origin {kind: "peer", from, senderTaskId, name?, body, handback: true, handbackReportText?, handbackNote?, flagged?}`);
+ * null for anything else. `taskId`: the subagent's task; `report`: its words, without the harness's frame.
+ */
+export function handbackOf(o: unknown): { taskId: string; name?: string; report: string } | null {
+  if (!o || typeof o !== "object") return null;
+  const r = o as Record<string, unknown>;
+  if (r.kind !== "peer" || r.handback !== true) return null;
+  const taskId = typeof r.senderTaskId === "string" && r.senderTaskId ? r.senderTaskId : typeof r.from === "string" ? r.from : "";
+  if (!taskId) return null;
+  const report = typeof r.handbackReportText === "string" ? r.handbackReportText : typeof r.body === "string" ? r.body : "";
+  return { taskId, ...(typeof r.name === "string" && r.name ? { name: r.name } : {}), report };
+}
+
+/** §52.2: the report a subagent's SubagentHandback delivered (`task_notification.handback_report.text`); undefined without one. */
+export function handbackReportOf(m: unknown): string | undefined {
+  const report = m && typeof m === "object" ? (m as { handback_report?: unknown }).handback_report : undefined;
+  const text = report && typeof report === "object" ? (report as { text?: unknown }).text : undefined;
+  return typeof text === "string" && text.trim() ? text : undefined;
 }
 
 /**

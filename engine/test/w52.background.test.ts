@@ -195,3 +195,42 @@ describe("§52.1 a turn Claude starts itself", () => {
     expect(s.changedFiles.map((f) => f.path)).toEqual(["b.txt"]);
   });
 });
+
+describe("§52.2 a subagent working in the background", () => {
+  const agentTask = task({ taskId: "a1", kind: "agent", description: "Make sub.txt", toolUseId: "toolu_agent", hasOutput: false });
+
+  /** Turn 1: Claude starts a subagent in the background (its call answered at once) and edits a.txt; the agent works on. */
+  async function turnWithAgent(h: Harness, dir: string, id: string): Promise<void> {
+    await h.engine.handle({ type: "send", text: "서브에이전트로 sub.txt 만들고 a.txt 고쳐줘" });
+    h.session().emitSessionInfo();
+    h.session().emit({ type: "tool_use", id: "toolu_agent", name: "Agent", input: { description: "Make sub.txt", subagent_type: "general-purpose", prompt: "…", run_in_background: true } });
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_started", taskId: "a1", toolUseId: "toolu_agent", description: "Make sub.txt", subagentType: "general-purpose", taskType: "local_agent", isBackground: true, depth: 1 } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: false, preview: "Async agent launched successfully.", agentLaunched: true });
+    h.session().emit({ type: "background_tasks", tasks: [agentTask] });
+    write(dir, "a.txt", "a\n");
+    h.session().emitTurnEnd({ sessionId: id, toolFiles: [{ path: join(dir, "a.txt"), tools: ["Write"], count: 1, toolUseIds: ["toolu_w"] }] });
+    await h.waitFor((s) => s.gate.phase === "reviewing", "turn 1 collected");
+  }
+
+  it("its end is its call's result row (the report); the turn Claude runs after it names the agent; the agent comes back with the chat", async () => {
+    const { h, dir, id } = await opened();
+    await turnWithAgent(h, dir, id);
+    h.session().emit({ type: "agent_signal", signal: { kind: "task_notification", taskId: "a1", toolUseId: "toolu_agent", status: "completed", summary: "sub.txt를 만들었어요." } });
+    h.session().emit({ type: "tool_result", toolUseId: "toolu_agent", isError: false, preview: "sub.txt를 만들었어요.", agentEnded: true, agentReport: "sub.txt를 만들었어요.", keptReport: { text: "sub.txt를 만들었어요.", truncated: false } });
+    h.session().emit({ type: "background_tasks", tasks: [] });
+    const t = { taskId: "a1", description: "Make sub.txt", status: "completed", summary: "sub.txt를 만들었어요.", kind: "agent" as const, toolUseId: "toolu_agent" };
+    h.session().emitAutoTurnStart({ trigger: "background", task: t });
+    await h.waitFor(() => h.session().autoTurnAnswers.length === 1, "auto turn taken");
+    expect(h.ofType("auto_turn")).toEqual([{ type: "auto_turn", turn: 2, trigger: "background", task: t }]);
+    expect(h.ofType("tool_result").filter((e) => e.toolUseId === "toolu_agent").map((e) => [e.agentLaunched ?? false, e.agentEnded ?? false, e.preview])).toEqual([
+      [true, false, "Async agent launched successfully."],
+      [false, true, "sub.txt를 만들었어요."],
+    ]);
+    // The auto turn's start moved the finished agent to the history (§39.3).
+    const node = [...h.engine.state.hud.agents, ...(h.engine.state.hud.agentHistory ?? [])].find((a) => a.toolUseId === "toolu_agent");
+    expect(node).toMatchObject({ status: "completed", isBackground: true, reportPreview: "sub.txt를 만들었어요." });
+    expect(await h.engine.request({ type: "agent_report", toolUseId: "toolu_agent" })).toMatchObject({ type: "agent_report", text: "sub.txt를 만들었어요." });
+    const rows = rowsOf(dir, id).filter((r) => r.kind === "tool_result" && r.toolUseId === "toolu_agent");
+    expect(rows.map((r) => [r.agentLaunched ?? false, r.agentEnded ?? false])).toEqual([[true, false], [false, true]]);
+  });
+});

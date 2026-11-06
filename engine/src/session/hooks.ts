@@ -305,8 +305,17 @@ export type HookContext = {
    * guard decides with `turnActive` as the engine left it.
    */
   adoption?: Promise<void>;
-  /** §52: background work is on — Agent / Task calls get `run_in_background: false` so they finish inside the turn. */
+  /**
+   * §52.2: `settings.subagentsInTurn` (opt-in, with background work on) — Agent / Task calls get `run_in_background: false`
+   * so they finish inside the turn. Off (the default) they run as in the terminal: in the background unless Claude says not.
+   */
   keepAgentsInTurn?: boolean;
+  /**
+   * §52.2: whether a hook's `agent_id` (canUseTool's `agentID`) is a subagent the CLI runs in the background, or one it
+   * started — its calls are no unprompted turn: it may work while no turn of ours runs (what it changes reaches the next
+   * review, A being kept, §52.1).
+   */
+  backgroundAgent?: (agentId: string) => boolean;
   /** A tool call was blocked by the unprompted-turn guard (`unpromptedBlocked`). */
   onUnprompted?: (toolName: string) => void;
   /** Settings.allowWorktreeIsolation (§33.4): Workflow / isolated agents get a card instead of a deny. */
@@ -507,14 +516,17 @@ export function autoAllowReason(
 /**
  * True when `toolName` must be denied because no engine-started turn is running (`ctx.turnActive === false`):
  * everything except the read-only tools and a read-only Bash command that is auto-allowed anyway (`ro`: where it runs).
+ * §52.2: never a call of a subagent working in the background (`agentId`, `ctx.backgroundAgent`).
  */
 export function unpromptedBlocked(
   toolName: string,
   input: Record<string, unknown>,
-  ctx: Pick<HookContext, "turnActive" | "autoAllowReadOnlyBash">,
+  ctx: Pick<HookContext, "turnActive" | "autoAllowReadOnlyBash" | "backgroundAgent">,
   ro?: ReadOnlyContext,
+  agentId?: string,
 ): boolean {
   if (ctx.turnActive !== false) return false;
+  if (agentId && ctx.backgroundAgent?.(agentId)) return false;
   if (READ_ONLY_TOOLS.has(toolName)) return false;
   if (toolName === "Bash") {
     const command = typeof input.command === "string" ? input.command : "";
@@ -547,10 +559,10 @@ export function planModeBlocked(
 }
 
 /** Denies (and reports) a call made outside an engine-started turn; undefined when the guard does not apply. */
-async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro?: ReadOnlyContext): Promise<HookJSONOutput | undefined> {
+async function guardUnprompted(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro: ReadOnlyContext | undefined, hook: HookInput): Promise<HookJSONOutput | undefined> {
   // §52: a turn Claude started itself is being taken as a review turn — nothing runs before its snapshot A.
   if (ctx.adoption) await ctx.adoption;
-  if (!unpromptedBlocked(toolName, input, ctx, ro)) return undefined;
+  if (!unpromptedBlocked(toolName, input, ctx, ro, agentIdOf(hook))) return undefined;
   ctx.onUnprompted?.(toolName);
   return denyPre(UNPROMPTED_REASON);
 }
@@ -600,6 +612,12 @@ function hookCwd(input: HookInput, ctx: HookContext): string {
 
 function toolUseIdOf(input: HookInput): string | undefined {
   const id = (input as { tool_use_id?: unknown }).tool_use_id;
+  return typeof id === "string" && id ? id : undefined;
+}
+
+/** The subagent a hook fired in (`agent_id`, CLI 2.1.x); undefined on the main thread. */
+function agentIdOf(input: HookInput): string | undefined {
+  const id = (input as { agent_id?: unknown }).agent_id;
   return typeof id === "string" && id ? id : undefined;
 }
 
@@ -815,7 +833,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const b = ctx.budget;
     const ti = toolInput(input);
-    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, undefined, input);
     if (unprompted) return unprompted;
     const file = toolFile(ti, ctx.cwd);
     // Never into git's own state (hooks, config, refs): checked before anything can allow it.
@@ -901,7 +919,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     // §19.3: a command is judged where it runs — a `cd` / `git -C` into the repository's own worktrees stays read-only.
     const cwd = hookCwd(input, ctx);
     const ro = await readOnlyContextOf(ctx, cwd);
-    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro, input);
     if (unprompted) return unprompted;
     const command = String(ti.command ?? "");
     await noteGitBefore(ctx, input, command); // MARK: r1-git (§46): what a git command may change, read before it runs
@@ -970,13 +988,14 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (/^(Edit|Write|MultiEdit|NotebookEdit|Bash)$/.test(input.tool_name)) return allow();
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
     const ti = toolInput(input);
-    const unprompted = await guardUnprompted(input.tool_name, ti, ctx);
+    const unprompted = await guardUnprompted(input.tool_name, ti, ctx, undefined, input);
     if (unprompted) return unprompted;
     const worktree = await guardWorktreeTools(input.tool_name, toolUseIdOf(input), ti, ctx);
     if (worktree) return worktree;
     // An MCP tool may write files (an IDE's MCP server, a filesystem server): its window attributes them (§31).
-    // §52: with background work on, a subagent still finishes inside the turn that started it (its edits are that turn's
-    // review): the CLI backgrounds an Agent call unless its input says `run_in_background: false` (2.1.318).
+    // §52.2: only with `subagentsInTurn` (opt-in) does a subagent finish inside the turn that started it: the CLI backgrounds
+    // an Agent call unless its input says `run_in_background: false` (2.1.318). By default it runs as in the terminal and
+    // the main agent stays free to answer; what the subagent changes reaches a review all the same (§52.1, §52.2).
     if (ctx.keepAgentsInTurn && SUBAGENT_TOOLS_RE.test(input.tool_name) && ti.run_in_background !== false) {
       return withUpdatedInput(askOrAllow(input.tool_name, ti, ctx, hookPermissionMode(input)), { ...ti, run_in_background: false });
     }

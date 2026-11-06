@@ -2982,6 +2982,7 @@ export class ReviewEngine {
           systemPromptAppend: s.systemPromptAppend,
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
           backgroundWork: s.backgroundWork !== false, // §52
+          subagentsInTurn: s.subagentsInTurn === true, // §52.2
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
           bashAllowPatterns: [...(s.bashAllowPatterns ?? [])],
