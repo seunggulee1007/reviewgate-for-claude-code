@@ -1,7 +1,8 @@
 /**
  * Client-side message queue (pure, unit-tested). Messages typed while Claude works wait as chips above the
  * composer and go out one at a time, in order, once a plain Send would be allowed (`gate.canSend` — the same
- * gate as a manual send, never `acceptPending`). The queue pauses itself on an error, on a turn the user stopped
+ * gate as a manual send, never `acceptPending`). The queue pauses itself on an error about the message's own send, its
+ * session, a login or the API (§50.1 — the API and the usage limit resume it by themselves), on a turn the user stopped
  * and when the chat changes; the user resumes it. "Stop & send" puts the message first and interrupts the turn.
  */
 import type { SendAttachment } from "@reviewgate/engine";
@@ -20,9 +21,15 @@ export type QueueState = {
   awaitingTurn: boolean;
   /** The next interrupted turn was "Stop & send" — it must not pause the queue. */
   skipInterruptPause: boolean;
+  /** §50.1: when the paused queue goes on by itself (epoch ms; the API after a pause, the usage limit after its reset); absent / null: it waits for the user. */
+  resumeAt?: number | null;
+  /** §50.1: API failures in a row that paused the queue (the second waits longer); a turn the queue went on after resets it. */
+  retries?: number;
+  /** The pause is the user's Stop: the bar says the next message waits and offers [보내기]. */
+  afterStop?: boolean;
 };
 
-export const EMPTY_QUEUE: QueueState = { items: [], paused: null, inflight: false, awaitingTurn: false, skipInterruptPause: false };
+export const EMPTY_QUEUE: QueueState = { items: [], paused: null, inflight: false, awaitingTurn: false, skipInterruptPause: false, resumeAt: null, retries: 0, afterStop: false };
 
 /** The message to send now, or null. */
 export function nextToSend(q: QueueState, gate: { canSend: boolean }): QueuedMessage | null {

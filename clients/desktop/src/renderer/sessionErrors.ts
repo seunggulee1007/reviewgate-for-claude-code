@@ -5,7 +5,6 @@
  * session banner offers, first one first.
  */
 import type { ErrorScope } from "@reviewgate/engine";
-import { needsAction } from "./attention";
 import { presentationOf } from "./errorCodes";
 import { currentLanguage, t } from "./i18n";
 import type { ChatItem } from "./store";
@@ -40,13 +39,34 @@ export function errorTone(code: string | undefined, fatal: boolean): ErrorTone {
 }
 
 /**
- * §2.9: a notice never stops the queue (`resume_*`, `worktree_*`, `peer_release_failed`, the §29 fallback's
- * `unprompted_blocked`, the hints) — a failure does: fatal session errors, `lfs_missing`, `send_failed`, `collect_failed`, ….
+ * §50.1 (the Mac's `QueueStop`): what an `error` does to the queue. Most errors leave it going — their banner says what
+ * failed (a PR list, a refresh, a commit, an MCP server, …) and a queued message passes the same gate when it goes out; a
+ * notice never stops it (§2.9). `pause` until the user resumes: the message's own send (`send_failed`, `lfs_missing`), its
+ * session (crashed, cannot start, no CLI, its extensions timed out), a login, any fatal error. `retry`: the API failed after
+ * the CLI's own retries — it goes on by itself after 30 s, then 2 min. `untilReset`: the usage limit — a minute after the reset.
  */
+export type QueueStop = "none" | "pause" | "retry" | "untilReset";
+
+const QUEUE_PAUSING_CODES: ReadonlySet<string> = new Set([
+  "send_failed", "lfs_missing", "session_crashed", "session_start_failed", "session_id_in_use", "auth_required",
+  "cli_not_found", "cli_not_executable", "extensions_init_timeout",
+]);
+
+export function queueStopOf(ev: { fatal: boolean; code?: string }): QueueStop {
+  if (ev.fatal) return "pause";
+  if (ev.code === "api_error" || ev.code === "rate_limited") return "retry";
+  if (ev.code === "usage_limit") return "untilReset";
+  return ev.code !== undefined && QUEUE_PAUSING_CODES.has(ev.code) ? "pause" : "none";
+}
+
+/** §2.9 / §50.1: the error stops the queue at all. */
 export function pausesQueue(ev: { fatal: boolean; code?: string }): boolean {
-  const p = presentationOf(ev.code);
-  if (p === "info" || p === "warning") return false;
-  return ev.fatal || needsAction(ev) || p === "banner";
+  return queueStopOf(ev) !== "none";
+}
+
+/** §50.1: how long the queue waits after its `retries`-th API failure in a row. */
+export function queueRetryDelayMs(retries: number): number {
+  return retries <= 1 ? 30_000 : 120_000;
 }
 
 /** Reasons a `send` is refused for a moment only — another session's turn (§29), a turn that just started, …. */

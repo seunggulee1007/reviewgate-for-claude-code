@@ -1,9 +1,11 @@
 /**
  * The message queue above the composer (src/renderer/sendQueue.ts): one chip per queued message — click to edit,
  * ‹ › to reorder, × to remove — plus the queue's state (sending next / waiting for the gate / paused with the reason
- * and Resume). Messages go out one at a time with the same gate as a plain Send.
+ * and Resume). Messages go out one at a time with the same gate as a plain Send. §50.1: a pause that ends by itself (the
+ * API, the usage limit) says when, with [지금 보내기]; after the user's Stop the next message waits for [보내기].
  */
 import { useEffect, useRef, useState } from "react";
+import { resetTimeText } from "../../errorCodes";
 import { t } from "../../i18n";
 import { cannotSendReason, useStore } from "../../store";
 import { waitingOf } from "../../agentDetails"; // MARK: wave3 desktop-agents
@@ -28,8 +30,13 @@ export function QueueBar() {
   }, [editing]);
   if (queue.items.length === 0) return null;
 
+  const resumesAt = queue.resumeAt != null ? resetTimeText(new Date(queue.resumeAt).toISOString()) : null;
   const status = queue.paused
-    ? t("Paused: {0}", queue.paused)
+    ? queue.afterStop === true
+      ? queue.paused
+      : resumesAt !== null
+        ? `${t("Paused: {0}", queue.paused)} · ${t("Sends again at {0}", resumesAt)}`
+        : t("Paused: {0}", queue.paused)
     : queue.inflight
       ? t("Sending…")
       : canSend && !queue.awaitingTurn
@@ -49,7 +56,9 @@ export function QueueBar() {
         <span className="queue-title">{t("Queue ({0})", queue.items.length)}</span>
         <span className="queue-status truncate" title={status} data-testid="Queue status">{status}</span>
         {queue.paused && (
-          <button type="button" className="small" onClick={resume} data-testid="Resume queue">{t("Resume")}</button>
+          <button type="button" className="small" onClick={resume} data-testid="Resume queue">
+            {queue.afterStop === true ? t("Send") : queue.resumeAt != null ? t("Send it now") : t("Resume")}
+          </button>
         )}
         <button type="button" className="plain tiny" onClick={clear} title={t("Remove every queued message")} data-testid="Clear queue">{t("Clear")}</button>
       </div>

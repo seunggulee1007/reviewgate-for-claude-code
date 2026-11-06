@@ -3,7 +3,7 @@ import { needsAction } from "./attention";
 import { errorEventText, lfsInstallCommand, presentationOf, refusalMessage } from "./errorCodes";
 import { EngineRefusal, refusalOf } from "./engineRequest";
 import { initI18n } from "./i18n";
-import { appendErrorRow, clearsOnReady, createWorkbenchDialog, errorKey, errorSubline, errorTone, factsOf, pausesQueue, repeatLabel, requeuesSend, sessionActions, type ErrorRow } from "./sessionErrors";
+import { appendErrorRow, clearsOnReady, createWorkbenchDialog, errorKey, errorSubline, errorTone, factsOf, pausesQueue, queueRetryDelayMs, queueStopOf, repeatLabel, requeuesSend, sessionActions, type ErrorRow } from "./sessionErrors";
 import type { ChatItem } from "./store";
 
 const row = (message: string, facts: ErrorRow["facts"], extra: Partial<ErrorRow> = {}): ErrorRow => ({ kind: "error", id: Math.random(), message, fatal: true, ...(facts ? { facts } : {}), ...extra });
@@ -26,15 +26,23 @@ describe("session errors (docs/PROTOCOL.md §29 / §30 / §33.4, M4)", () => {
     expect(presentationOf("session_id_in_use")).toBe("fatalSession");
   });
 
-  it("§2.9: notices keep the queue going; failures stop it", () => {
+  it("§2.9 / §50.1: notices and unrelated failures keep the queue going; the message's own send, its session, a login and the API stop it", () => {
     for (const code of ["resume_not_found", "resume_failed", "worktree_blocked", "worktree_outside_review", "peer_release_failed", "unprompted_blocked", "api_retrying", "cli_start_slow"]) {
       expect(pausesQueue({ fatal: false, code }), code).toBe(false);
     }
-    for (const [code, fatal] of [["session_start_failed", true], ["session_crashed", true], ["session_id_in_use", true], ["lfs_missing", false], ["send_failed", false], ["collect_failed", false]] as const) {
+    // A failing PR list, a refresh, a commit, an MCP server, a collection (the gate holds the queue itself): the banner only.
+    for (const code of ["command_failed", "refresh_failed", "commit_failed", "mcp_failed", "branch_failed", "workbench_failed", "revert_failed", "collect_failed", "plan_followup_failed", "max_turns", "brand_new_failure"]) {
+      expect(queueStopOf({ fatal: false, code }), code).toBe("none");
+    }
+    expect(queueStopOf({ fatal: false })).toBe("none");
+    for (const [code, fatal] of [["session_start_failed", true], ["session_crashed", true], ["session_id_in_use", true], ["lfs_missing", false], ["send_failed", false], ["auth_required", false], ["command_failed", true]] as const) {
+      expect(queueStopOf({ fatal, code }), code).toBe("pause");
       expect(pausesQueue({ fatal, code }), code).toBe(true);
     }
-    // An unknown failure still stops it (the generic banner).
-    expect(pausesQueue({ fatal: false, code: "brand_new_failure" })).toBe(true);
+    expect(queueStopOf({ fatal: false, code: "api_error" })).toBe("retry");
+    expect(queueStopOf({ fatal: false, code: "rate_limited" })).toBe("retry");
+    expect(queueStopOf({ fatal: false, code: "usage_limit" })).toBe("untilReset");
+    expect([queueRetryDelayMs(1), queueRetryDelayMs(2), queueRetryDelayMs(7)]).toEqual([30_000, 120_000, 120_000]);
   });
 
   it("§29: a send the gate refused for a moment waits in the queue; other refusals do not", () => {

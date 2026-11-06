@@ -6292,8 +6292,13 @@ Electron the same); nothing changes on the wire, and a queued message passes the
   `resetAt` it waits for [재개].
 - **The tool-call limit.** A turn that stopped at the limit (§38.2) does not stop the queue (Electron stopped it at
   `stopReason: "error_max_turns"`).
+- **Stop.** After the user's Stop the Mac's queue goes on as before; Electron's keeps its pause, now worded "멈춤 — 다음 메시지
+  대기 중" with [보내기] (sends the next one), and still pauses after a turn that ended with another error (`stopReason`
+  `error_…`, "턴이 오류로 끝났습니다"). A pause already set in the turn (an error above) keeps its reason and time.
 - Code: Core `QueueStop` (`Session/SessionNotices.swift`), `AppState+QueueStop.swift`, `AppState.swift` `handleError` /
-  `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`. Tests: Core `QueueStopTests`.
+  `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`; Electron `sessionErrors.ts` `queueStopOf`, `sendQueue.ts`
+  (`resumeAt`, `retries`, `afterStop`), the queue part of `store.ts`, `components/chat/QueueBar.tsx`. Tests: Core
+  `QueueStopTests`; Electron `queueStopStore.test.ts`, `sessionErrors.test.ts`.
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
