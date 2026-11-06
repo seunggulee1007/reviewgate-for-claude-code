@@ -4047,7 +4047,10 @@ codes, one refusal code, no new command or field. Engine `engine/src/session/aut
   (§40.1 — the git guard itself never covered a push), a `cd` / `git -C` outside the project still gets its reason card, and judging the rest is the classifier's, as
   in the terminal; an `autoMode.soft_deny` rule against `mvn` gave `permission_denied{decision_reason: "[Security Weaken]"}` and no
   `can_use_tool`; `claude-haiku-4-5` and auto mode turned off by settings started in `default` with a `can_use_tool` per
-  command; `setPermissionMode("auto")` between turns took effect on the next turn.
+  command; `setPermissionMode("auto")` between turns took effect on the next turn. During a turn (CLI 2.1.318, sonnet,
+  `sidecar/test/driver-modeswitch.mjs`): a default-mode chat asked for three commands that write files; the first one's card
+  was allowed and `set_permission_mode auto` went out while it ran — the other two ran with no `can_use_tool` and no
+  `auto_mode_denied`, and all three files were in the turn's review.
 - Compatibility: an older engine keeps the cards in auto mode and sends none of the codes; an older client shows the notices
   with their English `message` and the refusal as a generic one.
 - Owner: w4b-auto (engine `session/autoMode.ts`, `session/hooks.ts` `askOrAllow`, `session/claude.ts`; Mac `AutoMode.swift`,
