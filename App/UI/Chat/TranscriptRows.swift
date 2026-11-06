@@ -303,7 +303,8 @@ struct TranscriptRowView: View, Equatable {
             .accessibilityIdentifier(kind == .deny ? "Budget deny" : "Budget warn")
         case let .error(_, message, fatal, info):
             ErrorTranscriptRow(message: message, fatal: fatal, info: info,
-                               highlighted: match.map { highlighted(message, query: $0.query, isCurrent: $0.isCurrent) })
+                               highlighted: match.map { highlighted(message, query: $0.query, isCurrent: $0.isCurrent) },
+                               actionable: !facts.viewing)   // r1-scope (§33.4): another chat's rows act on nothing
         case let .turnEnd(_, summary):
             HStack {
                 Rectangle().fill(.quaternary).frame(height: 1)
