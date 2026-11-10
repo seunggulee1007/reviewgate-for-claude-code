@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 
 const SIDECAR = join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "sidecar.mjs");
 
+// Resolves on "close", not "exit": the last NDJSON line is read only once the stdio pipes are drained.
 function run(lines, { closeStdin = true } = {}) {
   const p = spawn(process.execPath, [SIDECAR], { stdio: ["pipe", "pipe", "pipe"] });
   const out = [];
@@ -17,18 +18,18 @@ function run(lines, { closeStdin = true } = {}) {
   createInterface({ input: p.stderr }).on("line", (l) => err.push(l));
   for (const l of lines) p.stdin.write(JSON.stringify(l) + "\n");
   if (closeStdin) p.stdin.end();
-  const exit = new Promise((resolve) => p.on("exit", (code) => resolve(code)));
+  const exit = new Promise((resolve) => p.on("close", (code) => resolve(code)));
   return { p, out, err, exit };
 }
 
 const settings = { budget: { maxFiles: 5, maxLines: 200 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", ghHost: "github.com" };
 
-test("v2: hello → ready(id) + state seq 1; shutdown → result + exit 0", async () => {
-  const t0 = Date.now();
+test("v2: hello → ready(id) + state seq 1; shutdown → result + exit 0", { timeout: 30_000 }, async () => {
   const { out, err, exit } = run([
     { type: "hello", id: "h", protocolVersion: 2, client: "test", settings },
     { type: "shutdown", id: "bye" },
   ], { closeStdin: false });
+  const tShutdown = Date.now();
   assert.equal(await exit, 0);
   const ready = out.find((m) => m.type === "ready");
   assert.deepEqual({ ...ready, engineVersion: "x" }, { type: "ready", id: "h", engineVersion: "x", platform: process.platform, protocolVersion: 2 });
@@ -38,15 +39,16 @@ test("v2: hello → ready(id) + state seq 1; shutdown → result + exit 0", asyn
   assert.equal(state.state.pr.host, "github.com");
   assert.deepEqual(out.find((m) => m.type === "result" && m.id === "bye"), { type: "result", id: "bye", ok: true });
   assert.ok(err.some((l) => l.includes("protocol v2")), err.join("\n"));
-  assert.ok(Date.now() - t0 < 5000, "shutdown must not hang");
+  // measured from the shutdown write, wide: the sidecar's own fallbacks are 3 s + 1.5 s
+  assert.ok(Date.now() - tShutdown < 15_000, "shutdown must not hang");
 });
 
-test("v2: stdin EOF disposes and exits 0", async () => {
+test("v2: stdin EOF disposes and exits 0", { timeout: 30_000 }, async () => {
   const { exit } = run([{ type: "hello", protocolVersion: 2, client: "test", settings }]);
   assert.equal(await exit, 0);
 });
 
-test("v2: command with id on a closed gate gets result ok:false", async () => {
+test("v2: command with id on a closed gate gets result ok:false", { timeout: 30_000 }, async () => {
   const { out, exit } = run([
     { type: "hello", protocolVersion: 2, client: "test", settings },
     { type: "send", id: "s", text: "hi" },
@@ -56,7 +58,7 @@ test("v2: command with id on a closed gate gets result ok:false", async () => {
   assert.deepEqual(out.find((m) => m.type === "result" && m.id === "s"), { type: "result", id: "s", ok: false, error: "gate_closed:no_session", code: "gate_closed" });
 });
 
-test("first message other than hello → fatal error + exit 2", async () => {
+test("first message other than hello → fatal error + exit 2", { timeout: 30_000 }, async () => {
   const { out, exit } = run([
     { type: "start_session", cwd: process.cwd(), budget: { maxFiles: 1, maxLines: 1 }, systemPromptAppend: "", claudePath: "/nonexistent/claude" },
     { type: "shutdown" },
@@ -69,14 +71,14 @@ test("first message other than hello → fatal error + exit 2", async () => {
   assert.ok(out.every((m) => m.type !== "state" && m.type !== "ready"), "no v2 traffic without hello");
 });
 
-test("non-JSON input is ignored with a stderr warning", async () => {
+test("non-JSON input is ignored with a stderr warning", { timeout: 30_000 }, async () => {
   const p = spawn(process.execPath, [SIDECAR], { stdio: ["pipe", "pipe", "pipe"] });
   const err = [];
   createInterface({ input: p.stderr }).on("line", (l) => err.push(l));
   p.stdin.write("not json\n");
   p.stdin.write(JSON.stringify({ type: "hello", protocolVersion: 2, client: "test", settings }) + "\n");
   p.stdin.end();
-  const code = await new Promise((r) => p.on("exit", r));
+  const code = await new Promise((r) => p.on("close", r));
   assert.equal(code, 0);
   assert.ok(err.some((l) => l.includes("non-JSON")), err.join("\n"));
 });

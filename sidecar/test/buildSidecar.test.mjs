@@ -51,7 +51,7 @@ const makeVersion = (root, version) => {
   execFileSync(process.execPath, [join(root, "scripts", "sync-version.mjs")], { cwd: root, stdio: "pipe" });
 };
 
-test("make version moves only the full hash: a stamp with the dependency hash skips npm ci", { skip }, () => {
+test("make version moves only the full hash: a stamp with the dependency hash skips npm ci", { skip, timeout: 60_000 }, () => {
   const root = makeRoot();
   try {
     const before = hashes(root);
@@ -70,7 +70,7 @@ test("make version moves only the full hash: a stamp with the dependency hash sk
   }
 });
 
-test("a dependency change installs", { skip }, () => {
+test("a dependency change installs", { skip, timeout: 60_000 }, () => {
   const root = makeRoot();
   try {
     const h = hashes(root);
@@ -86,7 +86,7 @@ test("a dependency change installs", { skip }, () => {
   }
 });
 
-test("an older stamp with the whole file's hash: unchanged → recorded without an install, changed → install", { skip }, () => {
+test("an older stamp with the whole file's hash: unchanged → recorded without an install, changed → install", { skip, timeout: 60_000 }, () => {
   const root = makeRoot();
   try {
     stamp(root, [`lock-sha256=${hashes(root).full}`, "node=v24.0.0", "at=then"]);
@@ -99,7 +99,7 @@ test("an older stamp with the whole file's hash: unchanged → recorded without 
   }
 });
 
-test("no node_modules installs; RG_FORCE_INSTALL=1 installs", { skip }, () => {
+test("no node_modules installs; RG_FORCE_INSTALL=1 installs", { skip, timeout: 60_000 }, () => {
   const root = makeRoot();
   try {
     assert.deepEqual(decide(root), { action: "install", reason: "node_modules missing" });
@@ -111,7 +111,7 @@ test("no node_modules installs; RG_FORCE_INSTALL=1 installs", { skip }, () => {
   }
 });
 
-test("node_modules as a symbolic link (a worktree sharing another checkout's tree) is never installed into", { skip }, () => {
+test("node_modules as a symbolic link (a worktree sharing another checkout's tree) is never installed into", { skip, timeout: 60_000 }, () => {
   const root = makeRoot();
   const shared = mkdtempSync(join(tmpdir(), "rg-buildsidecar-shared-"));
   try {
@@ -126,7 +126,7 @@ test("node_modules as a symbolic link (a worktree sharing another checkout's tre
   }
 });
 
-test("npm ci keeps the optional platform packages (esbuild's binary must not depend on its install script)", { skip }, () => {
+test("npm ci keeps the optional platform packages (esbuild's binary must not depend on its install script)", { skip, timeout: 60_000 }, () => {
   const script = readFileSync(join(repo, "scripts", "build-sidecar.sh"), "utf8");
   const installs = script.split("\n").filter((l) => /^\s*npm ci\b/.test(l));
   assert.ok(installs.length > 0);
