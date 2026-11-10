@@ -112,10 +112,13 @@ import Testing
 
     @Test func theErrorEventItselfStopsTheQueueForAWhile() {
         let (app, sent) = queued()
+        // The event takes its own "now": the due time lies 30 s after a moment between these two, however long that took.
+        let before = Date()
         app.handle(.error(message: "The Claude API returned an error.", fatal: false, scope: .session, detail: EngineErrorDetail(code: "api_error")))
+        let after = Date()
         #expect(app.queuePausedReason != nil)
         let due = try? #require(app.queueResumesAt)
-        #expect(due.map { abs($0.timeIntervalSinceNow - 30) < 5 } == true)
+        #expect(due.map { $0 >= before.addingTimeInterval(30) && $0 <= after.addingTimeInterval(30) } == true)
         app.handle(.state(snapshot(seq: 2, phase: .reviewing)))
         #expect(sent().isEmpty)
         app.clearQueue()

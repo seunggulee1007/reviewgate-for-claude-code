@@ -76,19 +76,26 @@ import Testing
         let new = (1...30).map { "new \($0)" }.joined(separator: "\n")
         let p = try #require(ToolEditPreview.make(name: "Edit", input: input(["old_string": .string(old), "new_string": .string(new)])))
         #expect(p.lines.count == ToolEditPreview.maxLines && p.hiddenLines == 20 && p.added == 30 && p.removed == 30)
-        // Thousands of lines: removed then added, no O(n·m) match.
-        let bigOld = (1...3000).map { "o\($0)" }.joined(separator: "\n")
-        let bigNew = (1...3000).map { "n\($0)" }.joined(separator: "\n")
+        // Thousands of lines: removed then added, no O(n·m) match. All but one line are the same, so a line match would
+        // count 1 removed and 1 added with context around them: the counts prove it was skipped, whatever the runner's
+        // speed. The time bounds only catch an explosion (a slow runner is not one).
+        func oneLineChanged(of n: Int) -> (old: String, new: String) {
+            ((1...n).map { "l\($0)" }.joined(separator: "\n"), (1...n).map { $0 == n / 2 ? "changed" : "l\($0)" }.joined(separator: "\n"))
+        }
+        let small = oneLineChanged(of: 100)   // under the limit: matched
+        let matched = try #require(ToolEditPreview.make(name: "Edit", input: input(["old_string": .string(small.old), "new_string": .string(small.new)])))
+        #expect(matched.removed == 1 && matched.added == 1)
+        let (bigOld, bigNew) = oneLineChanged(of: 3000)
         let clock = ContinuousClock()
         let start = clock.now
         let big = try #require(ToolEditPreview.make(name: "Edit", input: input(["old_string": .string(bigOld), "new_string": .string(bigNew)])))
-        #expect(clock.now - start < .seconds(2))
+        #expect(clock.now - start < .seconds(10))
         #expect(big.removed == 3000 && big.added == 3000 && big.lines.count == ToolEditPreview.maxLines)
         #expect(big.lines.allSatisfy { $0.kind == .del } && big.hiddenLines == 6000 - ToolEditPreview.maxLines)
         // A generated Write of 50 000 lines: counted, not split (the row's body runs on every hover).
         let hugeStart = clock.now
         let huge = try #require(ToolEditPreview.make(name: "Write", input: input(["content": .string(String(repeating: "x = 1\n", count: 50_000))])))
-        #expect(clock.now - hugeStart < .seconds(1))
+        #expect(clock.now - hugeStart < .seconds(10))
         #expect(huge.added == 50_000 && huge.lines.count == ToolEditPreview.writeLines && huge.hiddenLines == 50_000 - ToolEditPreview.writeLines)
     }
 
