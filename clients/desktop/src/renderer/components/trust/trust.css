@@ -1,0 +1,19 @@
+/* MARK: wave4c w4c-trust — §41.2: the turn summary's "규칙으로 수락 N개" line and the reject banner (theme tokens only). */
+.trust-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.trust-line button {
+  white-space: nowrap;
+}
+.trust-badge {
+  white-space: nowrap;
+}
+.trust-undo .gate-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

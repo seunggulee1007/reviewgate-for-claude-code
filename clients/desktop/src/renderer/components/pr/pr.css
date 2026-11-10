@@ -1,0 +1,30 @@
+/* PR browser: list (sidebar), detail header, reviews / files list, diff pane. */
+.pr-list-header { display: flex; align-items: center; gap: 6px; padding: 6px 12px; flex-wrap: wrap; }
+.pr-list-header select { max-width: 180px; }
+.pr-list-header input[type="text"] { width: 150px; }
+.pr-login { font-size: 11.5px; color: var(--fg-2); max-width: 140px; }
+.pr-login.warn { color: var(--orange); }
+.pr-error { font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; max-height: 7em; overflow: auto; user-select: text; }
+.pr-row { display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
+.pr-row .top { display: flex; gap: 4px; align-items: center; font-size: 11.5px; color: var(--fg-2); min-width: 0; }
+.pr-row .repo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; min-width: 0; }
+.pr-row .title { font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.list .section-empty { color: var(--fg-2); font-size: 12px; padding: 2px 6px; }
+
+.pr-detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex: 1; }
+.pr-detail-header { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.pr-detail-header h2 { margin: 0; font-size: 14px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pr-refs { font-family: var(--mono); font-size: 11.5px; background: var(--bg-3); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.pr-body { display: flex; flex: 1; min-height: 0; }
+.pr-side { width: 260px; min-width: 200px; max-width: 420px; border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.pr-side .section-toggle { background: transparent; border: 0; padding: 0; color: inherit; font: inherit; display: flex; gap: 4px; align-items: center; cursor: pointer; }
+.pr-review-row { display: flex; flex-direction: column; gap: 3px; padding: 3px 6px; border-left: 2px solid transparent; }
+.pr-review-row.mine { border-left-color: var(--accent); }
+.pr-review-row .body { font-size: 11.5px; color: var(--fg-2); white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; user-select: text; }
+.pr-file-row { display: flex; gap: 6px; align-items: flex-start; }
+.pr-file-row .glyph { width: 14px; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 11px; padding-top: 2px; flex: none; }
+.pr-file-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.pr-file-row .counts { display: flex; gap: 5px; align-items: center; font-size: 10.5px; white-space: nowrap; }
+.pr-diff { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.pr-diff .unified { flex: 1; }
+.bubble-text { white-space: pre-wrap; word-break: break-word; user-select: text; }

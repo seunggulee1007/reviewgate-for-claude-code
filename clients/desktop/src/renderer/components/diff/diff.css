@@ -1,0 +1,58 @@
+/* Diff pane extras (the shared diff rules live in styles.css). */
+
+/* Middle truncation: the directory shrinks with an ellipsis, the file name always stays visible. */
+.diff-header .path-middle { display: flex; min-width: 0; white-space: nowrap; }
+.diff-header .path-middle .head { flex: 0 1 auto; color: var(--fg-2); }
+.diff-header .path-middle .tail { flex: none; }
+
+.diff-header button.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+.split-button { display: inline-flex; align-items: stretch; }
+.split-button > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split-button > .menu-anchor > .menu-button {
+  height: 100%;
+  border: 1px solid var(--border);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-2);
+  padding: 0 5px;
+}
+.split-button > .menu-anchor > .menu-button:hover { background: var(--bg-3); }
+
+/* Bubbles and composers inside Monaco view zones sit flush with the code, not behind the unified gutter. */
+.zone { padding: 4px 8px 0; overflow: hidden; }
+.zone .note-bubble, .zone .note-composer { margin: 0; }
+.zone .note-composer textarea { min-height: 48px; }
+.bubble-text { white-space: pre-wrap; word-break: break-word; user-select: text; }
+
+/* "Why it changed" (ChangeCause): the tool calls behind the selected file, newest last. */
+.change-cause { border-bottom: 1px solid var(--border); background: var(--panel); flex: none; }
+.change-cause .cause-head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 12px; border-radius: 0; font-size: 12px; text-align: left; }
+.change-cause .cause-head .chev { width: 10px; font-size: 10px; color: var(--fg-3); }
+.change-cause .cause-list { list-style: none; margin: 0; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow: auto; }
+.change-cause .cause-item { display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; white-space: normal; background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 5px 8px; }
+.change-cause .cause-item:hover { background: var(--bg-2); border-color: var(--border); }
+.change-cause .cause-item.missing { cursor: default; }
+.change-cause .cause-item > .num { width: 14px; text-align: right; padding-top: 2px; flex: none; }
+.change-cause .cause-icon { width: 14px; text-align: center; color: var(--fg-2); flex: none; }
+.change-cause .cause-rationale { font-size: 12px; line-height: 1.45; color: var(--fg); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; padding-left: 20px; }
+.change-cause .cause-rationale.none { color: var(--fg-3); font-style: italic; }
+.change-cause .cause-item .go { color: var(--fg-3); opacity: 0; flex: none; padding-top: 1px; }
+.change-cause .cause-item:hover .go { opacity: 1; color: var(--accent); }
+.change-cause .agent-badge { flex: none; background: var(--bg-3); color: var(--fg-2); }
+
+/* Hunk-level reject (§17): selection bar above the unified diff, controls on each hunk header. */
+.hunk-bar { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-bottom: 1px solid var(--border); background: var(--panel); flex: none; min-width: 0; }
+.hunk-bar .accent-text { color: var(--accent); font-weight: 600; }
+.unified .line.hunk { align-items: center; }
+.unified .line.hunk .text { overflow: hidden; text-overflow: ellipsis; }
+.unified .hunk-actions { flex: none; position: sticky; right: 0; padding: 1px 8px 1px 6px; background: linear-gradient(to right, transparent, var(--bg) 10px); font-family: var(--font); }
+.unified .hunk-controls { display: inline-flex; align-items: center; gap: 6px; }
+.unified .hunk-check { display: inline-flex; align-items: center; cursor: pointer; }
+.unified .hunk-check input { margin: 0; cursor: pointer; }
+.unified .hunk-revert { font-size: 11px; padding: 0 7px; line-height: 1.55; }
+.unified .line.hunk-sel { box-shadow: inset 3px 0 0 var(--accent); }
+.unified .line.hunk.hunk-sel { background: var(--accent-bg); color: var(--fg); }
+/* MARK: r2-skills-side — §31.1 (M35): a slash command's own work is a row to read, not a call to open */
+.change-cause .cause-item.static { cursor: default; }
+.change-cause .cause-item.static:hover { background: transparent; border-color: transparent; }

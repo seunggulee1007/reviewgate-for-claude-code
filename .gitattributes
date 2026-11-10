@@ -1,0 +1,4 @@
+# Every text file is LF in the working tree on every OS (Windows checkouts included): the engine tests
+# compare file contents, git blobs and wire goldens byte for byte, and scripts/sync-version.mjs --check
+# compares the generated engine/src/version.ts textually. Binary files are detected and left alone.
+* text=auto eol=lf

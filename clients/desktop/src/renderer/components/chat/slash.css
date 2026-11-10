@@ -1,0 +1,14 @@
+/* MARK: wave3 desktop-session — §36.5 the slash palette: two-line rows (name + dimmed argument hint, the description below),
+   sticky group headers. Colors come from the theme tokens, so light and dark both work. */
+.palette.slash-palette { width: 460px; max-width: calc(100% - 24px); }
+.palette.slash-palette .items { max-height: 300px; }
+.palette.slash-palette .note { display: flex; align-items: center; gap: 8px; }
+.palette.slash-palette .note .spinner { width: 10px; height: 10px; flex: none; }
+.slash-head { position: sticky; top: -4px; z-index: 1; padding: 6px 10px 3px; font-size: 11px; font-weight: 600; color: var(--fg-2); background: var(--elevated); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette .item.slash-item { flex-direction: column; align-items: stretch; gap: 1px; padding: 4px 10px; font-family: var(--font); min-width: 0; }
+.slash-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.slash-name { font-family: var(--mono); font-size: 12.5px; color: var(--fg); flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-hint { font-family: var(--mono); font-size: 11px; color: var(--fg-3); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-line .badge { flex: none; margin-left: auto; }
+.slash-desc { font-size: 11.5px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette .item.slash-item.selected .slash-desc { color: var(--fg); }

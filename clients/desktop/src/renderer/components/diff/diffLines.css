@@ -1,0 +1,64 @@
+/*
+ * MARK: wave2 desktop-diff — the unified rows' second-round parts (components/UnifiedDiff.tsx): tools row, wrap / one
+ * horizontal scroll, §34.7 in-line changes, folds, "20줄 더 보기", find hits. The base row rules live in styles.css.
+ * Colours come from the theme tokens (color-mix over --green / --red / --orange), so both themes follow by themselves.
+ */
+.unified-pane { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.unified-pane > .unified { flex: 1; }
+/* The code column is the size container: bubbles / fold rows of the no-wrap layout size themselves with `cqw`. */
+.unified { container-type: inline-size; tab-size: 4; }
+.unified:focus { outline: none; }
+.unified:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.unified-rows { min-width: 100%; }
+
+/* 줄바꿈 (default): a long line wraps inside the code column, its numbers stay at the top. Header rows stay one line. */
+.unified.wrap .line { white-space: pre-wrap; }
+.unified.wrap .line .text { overflow-wrap: anywhere; min-width: 0; }
+.unified.wrap .line.hunk { white-space: pre; }
+/* No wrap: one horizontal scroll for every row — the add / del colours reach the longest line; notes and folds stay in view. */
+.unified.nowrap .unified-rows { width: max-content; }
+.unified.nowrap .note-bubble, .unified.nowrap .note-composer { position: sticky; left: 70px; max-width: calc(100cqw - 78px); }
+.unified.nowrap .diff-fold, .unified.nowrap .diff-expander { position: sticky; left: 0; width: 100cqw; }
+
+/* §34.7: the changed words of a paired add / del line; a pair that differs only in whitespace is dimmed. */
+.unified .line.add .seg { background: color-mix(in srgb, var(--green) 30%, transparent); border-radius: 2px; }
+.unified .line.del .seg { background: color-mix(in srgb, var(--red) 28%, transparent); border-radius: 2px; }
+/* wave3 check-clients: faint as on the Mac (DiffCodeText's 0.55) — its changed parts too, so a whitespace pair recedes. */
+.unified .line.ws-only .text { opacity: 0.55; }
+/* wave3 check-clients: a note, a draft or a composer under a code line reads in the UI font, not the diff's monospace. */
+.unified .note-bubble, .unified .note-composer { font-family: var(--font); }
+
+/* Folds (generated file, large diff) and the context expanders between hunks. */
+.diff-fold, .diff-expander {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 1px 8px 1px 62px; font-family: var(--font); font-size: 11.5px; line-height: 1.6;
+  background: var(--hunk-bg); color: var(--fg-2);
+}
+.diff-fold { border-top: 1px dashed var(--border-strong); border-bottom: 1px dashed var(--border-strong); }
+.diff-fold button, .diff-expander button { color: var(--accent); padding: 0 6px; font-size: 11.5px; }
+.diff-fold button:disabled, .diff-expander button:disabled { color: var(--fg-3); }
+.diff-expander .spinner { width: 10px; height: 10px; flex: none; }
+
+/* The row above the lines: the pane's own bar on the left, find / wrap on the right. */
+.diff-tools { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 28px; padding: 0 8px 0 0; border-bottom: 1px solid var(--border); background: var(--panel); flex: none; }
+.diff-tools-start { flex: 1 1 auto; min-width: 0; display: flex; }
+.diff-tools-start > .hunk-bar { flex: 1 1 auto; border-bottom: 0; background: transparent; }
+.diff-tools-start > .diff-tools-note { flex: none; align-self: center; margin-left: 10px; }
+.diff-tools .diff-tool { flex: none; font-size: 11.5px; padding: 0 7px; line-height: 1.6; background: transparent; border-color: transparent; color: var(--fg-2); }
+.diff-tools .diff-tool:hover:not(:disabled) { background: var(--bg-3); color: var(--fg); }
+.diff-tools .diff-tool.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+/* diff에서 찾기 — the bar floats over the top right of the lines. */
+.diff-find { position: absolute; top: 34px; right: 14px; z-index: 6; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 8px; background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); max-width: calc(100% - 28px); font-family: var(--font); }
+.diff-find input { width: 200px; min-width: 80px; flex: 1 1 auto; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); padding: 2px 6px; font-size: 12.5px; outline: none; }
+.diff-find input:focus { border-color: var(--accent); }
+.diff-find .count { font-size: 11.5px; color: var(--fg-2); min-width: 44px; text-align: center; flex: none; }
+.diff-find .count.none { color: var(--red); }
+.diff-find button { padding: 0 6px; line-height: 1.6; background: transparent; border-color: transparent; flex: none; }
+.diff-find button:hover:not(:disabled) { background: var(--bg-3); }
+::highlight(rg-diff-find) { background-color: color-mix(in srgb, var(--orange) 38%, transparent); color: inherit; }
+::highlight(rg-diff-find-current) { background-color: var(--orange); color: var(--bg); }
+
+/* The line menu (줄 복사 / 경로:줄 복사) opens at the pointer. */
+.line-menu { min-width: 180px; z-index: 60; }
+.line-menu .item .mono { margin-left: auto; padding-left: 12px; }

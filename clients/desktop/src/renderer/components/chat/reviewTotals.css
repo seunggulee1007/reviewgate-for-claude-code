@@ -1,0 +1,6 @@
+/* wave3 check-clients — the turn summary's "이번 턴" label and, on a line of its own, the whole review's totals after a
+   merged turn (§34.3), and the test line's orange "편집 뒤 테스트 없음" when a run came before a later edit (§34.9, as on
+   the Mac). */
+.turn-summary .ts-scope { color: var(--fg-2); font-weight: 600; }
+.turn-summary .ts-review-line { padding: 0 10px 6px 26px; margin-top: -2px; font-size: 11.5px; color: var(--fg-2); }
+.turn-summary .ts-test.orange { color: var(--orange); }

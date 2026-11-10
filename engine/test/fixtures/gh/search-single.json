@@ -1,0 +1,2 @@
+{"total_count": 1, "items": [{"number": 1, "title": "t", "repository_url": "https://api.github.com/repos/a/b",
+  "user": {"login": "u"}, "updated_at": "2026-01-01T00:00:00Z", "html_url": "https://github.com/a/b/pull/1"}]}

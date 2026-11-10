@@ -1,0 +1,101 @@
+# ReviewGate CI. Real-CLI drivers (sidecar/test/driver*.mjs, clients/desktop e2e against a live
+# `claude`) are NOT run here — they need an authenticated Claude Code login; run them locally
+# (see README "Real-CLI drivers").
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: engine / sidecar / desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # sync-version.mjs reads the commit count; engine tests use git history
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      # wave4d w4d-windows: the Windows job spent 972 s of its 19 min in the engine tests (ubuntu: 188 s) — thousands of
+      # short git processes and temp-repo writes, each scanned by Defender; npm ci was 31 s, so a download cache saves
+      # little. The runner is thrown away after the job; a refusal never fails CI.
+      - name: Windows Defender skips the workspace, temp repos, git and node
+        if: runner.os == 'Windows'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "C:\Program Files\Git"
+          Add-MpPreference -ExclusionProcess "git.exe", "node.exe", "bash.exe"
+      - name: git identity (engine tests commit into temp repos)
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
+          git config --global init.defaultBranch main
+          git config --global core.autocrlf false
+      - name: version in sync with VERSION
+        run: node scripts/sync-version.mjs --check
+      - run: npm ci
+      - name: typecheck
+        run: |
+          npm run typecheck -w engine
+          npm run typecheck -w sidecar
+          npm run typecheck -w clients/desktop
+      - name: engine tests
+        run: npm test -w engine
+      - name: sidecar tests
+        run: npm test -w sidecar
+      - name: desktop tests
+        run: npm test -w clients/desktop
+      - name: desktop build
+        run: npm run build -w clients/desktop
+
+  mac:
+    name: Core + Mac app (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: select Xcode 26 (project.yml xcodeVersion 26.0)
+        run: |
+          XC="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$XC" ]; then sudo xcode-select -s "$XC/Contents/Developer"; fi
+          xcodebuild -version
+      - name: install xcodegen
+        run: brew install xcodegen
+      - run: npm ci
+      - name: swift test (Core)
+        run: swift test --package-path Core
+      - name: xcodegen generate
+        run: xcodegen generate
+      - name: xcodebuild Debug (ad-hoc signed, sidecar built by the pre-build phase)
+        run: |
+          set -o pipefail
+          xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Debug \
+            -derivedDataPath build CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM="" build | tail -40
+          test -f build/Build/Products/Debug/ReviewGate.app/Contents/Resources/dist/sidecar.mjs

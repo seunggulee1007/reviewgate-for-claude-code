@@ -1,0 +1,128 @@
+/*
+ * MARK: wave3 desktop-flow — the daily-flow screens (docs/PROTOCOL.md §36.11–36.14): the commit sheet's draft row and
+ * template, the New Workbench sheet's setup / steps / log, the new workbench's setup banner, the AI pre-review (Changes head,
+ * file badges, diff line marks and cards) and the PR tab's Claude buttons. Colours are variables (light / dark /
+ * pre-hydration); the pre-review is purple like the Mac's.
+ */
+:root {
+  --prereview: #6d28d9;
+  --prereview-bg: rgba(124, 58, 237, 0.07);
+  --prereview-chip-bg: rgba(124, 58, 237, 0.13);
+  --prereview-border: rgba(124, 58, 237, 0.32);
+}
+:root[data-theme="dark"] {
+  --prereview: #c4b5fd;
+  --prereview-bg: rgba(167, 139, 250, 0.12);
+  --prereview-chip-bg: rgba(167, 139, 250, 0.2);
+  --prereview-border: rgba(167, 139, 250, 0.45);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --prereview: #c4b5fd;
+    --prereview-bg: rgba(167, 139, 250, 0.12);
+    --prereview-chip-bg: rgba(167, 139, 250, 0.2);
+    --prereview-border: rgba(167, 139, 250, 0.45);
+  }
+}
+
+/* ------------------------------------------------------------ shared bits */
+.flow-row { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.flow-reason { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: var(--orange); min-width: 0; }
+.flow-reason > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.flow-link { border: 0; background: transparent; padding: 0 2px; color: var(--accent); font-size: 11.5px; }
+.flow-link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.flow-box { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.flow-help { font-size: 11px; color: var(--fg-2); line-height: 1.4; }
+.flow-log { font-family: var(--mono); font-size: 11px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-2); border-radius: 6px; padding: 6px 8px; max-height: 150px; overflow: auto; user-select: text; margin: 0; }
+.flow-spark { color: var(--prereview); font-weight: 700; }
+.flow-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 600; padding: 0 6px; border-radius: 999px; line-height: 16px; white-space: nowrap; flex: none; }
+.flow-pill.purple { background: var(--prereview-chip-bg); color: var(--prereview); }
+.flow-pill.gray { background: var(--bg-3); color: var(--fg-2); }
+
+/* ------------------------------------------------------------ §36.11 commit sheet */
+.commit-draft { display: flex; flex-direction: column; gap: 4px; margin-top: -4px; }
+.commit-draft .spinner { width: 10px; height: 10px; }
+.commit-template-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; margin-left: auto; }
+.commit-template-btn .mono { font-size: 11px; max-width: 170px; }
+.commit-template-editor textarea { min-height: 54px; max-height: 120px; font-family: var(--mono); font-size: 12px; }
+.commit-template-preview { display: flex; gap: 8px; align-items: baseline; font-size: 11px; color: var(--fg-2); min-width: 0; }
+.commit-template-preview .mono { color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------ §36.12 New Workbench sheet */
+.wb-location { display: inline-flex; background: var(--bg-3); border-radius: 7px; padding: 2px; gap: 2px; }
+.wb-location button { border: 0; background: transparent; border-radius: 5px; padding: 1px 9px; font-size: 12px; }
+.wb-location button.active { background: var(--segment-active); box-shadow: var(--shadow-sm); }
+.wb-folder { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 0; }
+.wb-folder .path { max-width: 100%; }
+.wb-files-toggle { border: 0; background: transparent; padding: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--fg); }
+.wb-files-toggle:hover:not(:disabled) { background: transparent; color: var(--accent); }
+.wb-files { list-style: none; margin: 0; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; max-height: 140px; overflow: auto; background: var(--bg); }
+.wb-files li { display: flex; gap: 8px; font-size: 11.5px; }
+.wb-files li .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.wb-files li .num { color: var(--fg-2); flex: none; }
+.wb-command { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; user-select: text; }
+.wb-steps { display: flex; flex-direction: column; gap: 4px; }
+.wb-step { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.wb-step .icon { width: 14px; text-align: center; flex: none; font-size: 11px; }
+.wb-step .icon .spinner { width: 9px; height: 9px; }
+.wb-step.done .icon { color: var(--green); }
+.wb-step.warning .icon { color: var(--orange); }
+.wb-step.failed .icon { color: var(--red); }
+.wb-step.pending { color: var(--fg-3); }
+.wb-step .exit { font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--fg-2); }
+.wb-step.failed .exit { color: var(--red); }
+.wb-setup-editor { display: flex; flex-direction: column; gap: 6px; }
+.wb-setup-editor textarea { min-height: 60px; max-height: 120px; font-family: var(--mono); font-size: 12px; }
+.wb-setup-editor h4 { margin: 4px 0 0; font-size: 12px; }
+.wb-setup-banner { flex-direction: column; align-items: stretch; gap: 6px; }
+.wb-setup-banner .head { display: flex; align-items: flex-start; gap: 8px; }
+.wb-setup-banner .head > span.grow { color: var(--fg); }
+
+/* ------------------------------------------------------------ §36.13 AI pre-review */
+.prereview-head { padding: 0 12px 6px; display: flex; flex-direction: column; gap: 3px; }
+.prereview-head .status { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11.5px; }
+.prereview-head .status .spinner { width: 10px; height: 10px; border-top-color: var(--prereview); flex: none; }
+.prereview-head .running { color: var(--prereview); font-weight: 600; }
+.prereview-head .count { border: 0; background: transparent; padding: 0 2px; color: var(--prereview); font-weight: 600; font-size: 11.5px; }
+.prereview-head .count:disabled { color: var(--fg-2); opacity: 1; }
+.prereview-head .count:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.prereview-head .failed { color: var(--orange); }
+.prereview-split { display: inline-flex; align-items: stretch; flex: none; margin-left: auto; }
+.prereview-split > button.start { border-top-right-radius: 0; border-bottom-right-radius: 0; display: inline-flex; gap: 4px; align-items: center; }
+.prereview-split .menu-anchor { display: flex; }
+.prereview-split .menu-anchor .menu-button { background: var(--bg-2); border: 1px solid var(--border); border-left: 0; border-radius: 0 6px 6px 0; padding: 1px 6px; font-size: 11px; }
+.prereview-split .menu-anchor .menu-button:hover:not(:disabled) { background: var(--bg-3); }
+.prereview-split .menu-anchor .menu-button:disabled { opacity: 0.5; cursor: default; }
+.prereview-split .menu-anchor .menu-button .chev { margin-left: 0; }
+.prereview-mark { flex: none; width: 16px; text-align: center; color: var(--prereview); font-family: var(--font); font-size: 10px; font-weight: 700; user-select: none; position: sticky; right: 0; }
+.unified .line.prereview-line { box-shadow: inset -2px 0 0 var(--prereview-border); }
+.prereview-card { margin: 4px 8px 6px 70px; border: 1px solid var(--prereview-border); background: var(--prereview-bg); border-radius: 6px; padding: 7px 10px; font-family: var(--font); font-size: 12.5px; white-space: normal; display: flex; flex-direction: column; gap: 4px; }
+.unified.nowrap .prereview-card { position: sticky; left: 70px; max-width: calc(100cqw - 78px); }
+.prereview-card.stale { opacity: 0.6; }
+.prereview-card .head { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.prereview-card .head .label { color: var(--prereview); font-weight: 650; font-size: 11.5px; }
+.prereview-card .summary { font-weight: 550; user-select: text; overflow-wrap: anywhere; }
+.prereview-card .scenario { font-size: 11.5px; color: var(--fg-2); user-select: text; overflow-wrap: anywhere; }
+.prereview-card .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prereview-card .actions button { font-size: 11.5px; padding: 0 8px; }
+.prereview-card .spinner { width: 9px; height: 9px; }
+.prereview-unplaced { padding: 6px 4px 2px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; flex: none; max-height: 40%; overflow: auto; }
+.prereview-unplaced .prereview-card { margin: 0 8px 6px; }
+
+/* ------------------------------------------------------------ §36.14 PR tab */
+.pr-claude { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.pr-claude .count { font-size: 10px; font-weight: 650; padding: 0 5px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); margin-left: 4px; }
+.note-bubble .send-claude { font-size: 11.5px; }
+
+/* §53 the commit sheet's "나눠서 커밋" mode */
+.commit-split { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.split-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.split-card, .split-none { border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; background: var(--bg); min-width: 0; }
+.split-card textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.split-parts, .split-hunks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.split-hunks { padding-left: 14px; }
+.split-path { flex: 1 1 auto; min-width: 0; }
+.split-chip { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-hunk-text { margin: 4px 0; padding: 6px; max-height: 200px; overflow: auto; font-size: 11px; line-height: 1.4; background: var(--bg-2, var(--bg)); border: 1px solid var(--border); border-radius: 4px; white-space: pre; }
+.split-move { font-size: 11.5px; padding: 1px 4px; }
+.split-blocker { overflow-wrap: anywhere; min-width: 0; }

@@ -1,0 +1,7 @@
+/* MARK: wave5 w5-model — §43.4 auto model (the model picker's 자동, the composer's one-message model, the chat's switch line). */
+.auto-model { display: flex; flex-direction: column; gap: 4px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.25)); }
+.auto-model-policy { display: flex; flex-direction: column; gap: 4px; padding: 0 8px 0 24px; }
+.auto-model-switch { text-align: right; margin-top: 2px; }
+.ts-auto-model { padding: 2px 10px 6px; }
+select.next-model { font-size: 11px; max-width: 150px; padding: 1px 4px; border-radius: 10px; background: transparent; color: var(--fg-2); }
+select.next-model.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }

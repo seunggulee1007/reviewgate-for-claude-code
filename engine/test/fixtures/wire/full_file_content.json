@@ -1,0 +1,25 @@
+{
+  "type": "full_file_content",
+  "path": "README.md",
+  "lines": [
+    "line1",
+    "line2 changed",
+    "line3",
+    "line4"
+  ],
+  "changedNewLines": [
+    2,
+    4
+  ],
+  "deletedAfterNewLine": {
+    "1": [
+      "line2"
+    ]
+  },
+  "isBinary": false,
+  "isTooLarge": false,
+  "oldText": "line1\nline2\nline3\n",
+  "newText": "line1\nline2 changed\nline3\nline4\n",
+  "endTree": "a914defe34f932be66198d956585ee44643d4f89",
+  "id": "req-2"
+}

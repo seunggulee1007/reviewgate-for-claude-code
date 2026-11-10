@@ -1,0 +1,39 @@
+/* Review history (§14): the sidebar list of past rounds and the read-only diff pane. */
+.history-toolbar { padding: 6px 12px; gap: 8px; }
+.history-toolbar label.check { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--fg-2); }
+.rh-list { padding: 4px 6px 10px; }
+.rh-list > li.history-entry { padding: 0; margin-bottom: 4px; border: 1px solid transparent; border-radius: 8px; }
+.rh-list > li.history-entry:hover { background: transparent; }
+.rh-list > li.history-entry.open { border-color: var(--border); background: var(--bg); }
+.rh-list > li.history-entry.viewing { border-color: var(--accent); }
+.history-empty { padding: 12px 8px; line-height: 1.5; white-space: normal; }
+.history-empty:hover { background: transparent !important; }
+.entry-head { display: flex; align-items: flex-start; gap: 6px; width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; white-space: normal; }
+.entry-head .chev { width: 10px; font-size: 10px; color: var(--fg-3); padding-top: 2px; flex: none; }
+.entry-prompt { font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: break-word; }
+.verdict-chip { white-space: nowrap; }
+.entry-files { list-style: none; margin: 0; padding: 0 4px 6px 18px; display: flex; flex-direction: column; gap: 1px; }
+.entry-files > li { border-radius: 6px; padding: 1px 2px; }
+.entry-files > li:hover { background: var(--bg-2); }
+.entry-files > li.selected { background: var(--accent-bg); }
+.entry-file { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; width: 100%; text-align: left; padding: 2px 4px; min-width: 0; }
+.entry-file .glyph { width: 12px; text-align: center; font-size: 11px; flex: none; }
+.entry-file > .truncate { flex: 1 1 130px; min-width: 130px; }
+.entry-file .dir { color: var(--fg-2); }
+.entry-file .name { font-weight: 600; }
+.entry-file > .tiny, .entry-file > .pill { flex: none; }
+.entry-file-meta { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 4px 2px 21px; }
+.entry-notes { list-style: none; margin: 2px 0 4px 21px; padding: 0 0 0 8px; border-left: 2px solid var(--orange-border); display: flex; flex-direction: column; gap: 2px; }
+.entry-notes li { display: flex; gap: 6px; align-items: baseline; font-size: 11.5px; padding: 0; }
+.entry-notes li:hover { background: transparent; }
+.entry-notes .note-body { color: var(--fg); white-space: pre-wrap; word-break: break-word; }
+.history-diff .history-banner { border-bottom: 1px solid var(--border); flex: none; }
+.history-diff .history-file-notes { padding: 4px 0; border-bottom: 1px solid var(--border); }
+.history-diff .history-file-notes .note-bubble { margin-left: 12px; }
+.history-diff .unified .gutter-add { display: none; }
+.history-diff .unified .note-bubble { font-family: var(--font); }
+/* MARK: wave4 w4-history — §38.3: the review history search and a past file's reason. */
+.history-search { padding: 0 12px 6px; }
+.history-search input { min-width: 0; }
+.history-diff .history-why { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-top: 4px; line-height: 1.45; }
+.history-diff .history-why-text { white-space: pre-wrap; word-break: break-word; }

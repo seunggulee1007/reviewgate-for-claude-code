@@ -1,0 +1,458 @@
+/**
+ * M18 theming: EVERY colour in the client comes from one of the variables below. `:root` is the
+ * light palette; `:root[data-theme="dark"]` is the dark one. src/renderer/theme.ts resolves the
+ * `appearance` setting ("system" | "light" | "dark") onto `<html data-theme>`; the
+ * `prefers-color-scheme` block is only the pre-hydration fallback (it is skipped once the renderer
+ * has pinned the theme to light). Text/background pairs are kept at >= 4.5:1 in both themes.
+ */
+:root {
+  color-scheme: light;
+  /* surfaces, from recessed to raised */
+  --bg: #ffffff;
+  --bg-2: #f4f4f5;
+  --bg-3: #e9e9ec;
+  --panel: #fafafa;
+  --elevated: #ffffff;
+  --segment-active: #ffffff;
+  /* text */
+  --fg: #1c1c1e;
+  --fg-2: #5f6368;
+  --fg-3: #6f737b;
+  /* lines */
+  --border: #d9d9de;
+  --border-strong: #c4c4cb;
+  /* accent: --accent is the text/line colour, --accent-solid the filled one */
+  --accent: #1f5fd0;
+  --accent-solid: #2f6fed;
+  --accent-bg: rgba(47, 111, 237, 0.14);
+  --on-accent: #ffffff;
+  /* semantic */
+  --green: #16703f;
+  --green-bg: rgba(31, 143, 78, 0.12);
+  --red: #bf2126;
+  --red-bg: rgba(209, 52, 56, 0.12);
+  --red-solid: #d13438;
+  --orange: #8f5100;
+  --orange-bg: rgba(217, 119, 6, 0.14);
+  --orange-bg-soft: rgba(217, 119, 6, 0.06);
+  --orange-border: rgba(180, 83, 9, 0.45);
+  --orange-border-soft: rgba(180, 83, 9, 0.22);
+  --blue: #1f5fd0;
+  /* diff */
+  --add-bg: rgba(31, 143, 78, 0.13);
+  --del-bg: rgba(209, 52, 56, 0.13);
+  --hunk-bg: rgba(47, 111, 237, 0.08);
+  /* overlays & chrome */
+  --backdrop: rgba(0, 0, 0, 0.35);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --scrollbar: rgba(0, 0, 0, 0.22);
+  --scrollbar-hover: rgba(0, 0, 0, 0.4);
+  --selection: rgba(47, 111, 237, 0.25);
+  /* typography */
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  --font: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --radius: 8px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1a1a1c;
+  --bg-2: #232326;
+  --bg-3: #2e2e33;
+  --panel: #202023;
+  --elevated: #2b2c31;
+  --segment-active: #3a3b42;
+  --fg: #ececee;
+  --fg-2: #a7abb4;
+  --fg-3: #9aa0aa;
+  --border: #3a3b40;
+  --border-strong: #4e4f57;
+  --accent: #7cabff;
+  --accent-solid: #3b6fd4;
+  --accent-bg: rgba(110, 160, 255, 0.18);
+  --on-accent: #ffffff;
+  --green: #55d095;
+  --green-bg: rgba(76, 195, 138, 0.15);
+  --red: #ff7b72;
+  --red-bg: rgba(248, 81, 73, 0.16);
+  --red-solid: #c9372c;
+  --orange: #f5a524;
+  --orange-bg: rgba(245, 165, 36, 0.16);
+  --orange-bg-soft: rgba(245, 165, 36, 0.07);
+  --orange-border: rgba(245, 165, 36, 0.45);
+  --orange-border-soft: rgba(245, 165, 36, 0.22);
+  --blue: #7cabff;
+  --add-bg: rgba(63, 185, 80, 0.22);
+  --del-bg: rgba(248, 81, 73, 0.2);
+  --hunk-bg: rgba(110, 160, 255, 0.12);
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.06);
+  --scrollbar: rgba(255, 255, 255, 0.18);
+  --scrollbar-hover: rgba(255, 255, 255, 0.34);
+  --selection: rgba(110, 160, 255, 0.34);
+}
+
+/* Fallback for the first paint (and for a window whose renderer has not resolved the setting yet). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1a1a1c;
+    --bg-2: #232326;
+    --bg-3: #2e2e33;
+    --panel: #202023;
+    --elevated: #2b2c31;
+    --segment-active: #3a3b42;
+    --fg: #ececee;
+    --fg-2: #a7abb4;
+    --fg-3: #9aa0aa;
+    --border: #3a3b40;
+    --border-strong: #4e4f57;
+    --accent: #7cabff;
+    --accent-solid: #3b6fd4;
+    --accent-bg: rgba(110, 160, 255, 0.18);
+    --on-accent: #ffffff;
+    --green: #55d095;
+    --green-bg: rgba(76, 195, 138, 0.15);
+    --red: #ff7b72;
+    --red-bg: rgba(248, 81, 73, 0.16);
+    --red-solid: #c9372c;
+    --orange: #f5a524;
+    --orange-bg: rgba(245, 165, 36, 0.16);
+    --orange-bg-soft: rgba(245, 165, 36, 0.07);
+    --orange-border: rgba(245, 165, 36, 0.45);
+    --orange-border-soft: rgba(245, 165, 36, 0.22);
+    --blue: #7cabff;
+    --add-bg: rgba(63, 185, 80, 0.22);
+    --del-bg: rgba(248, 81, 73, 0.2);
+    --hunk-bg: rgba(110, 160, 255, 0.12);
+    --backdrop: rgba(0, 0, 0, 0.6);
+    --shadow: 0 10px 34px rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.06);
+    --scrollbar: rgba(255, 255, 255, 0.18);
+    --scrollbar-hover: rgba(255, 255, 255, 0.34);
+    --selection: rgba(110, 160, 255, 0.34);
+  }
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+/* MARK: polish p-ui-kit (PX-06): Korean breaks between words, as on the Mac — not between any two syllables ('리뷰 대기
+   파/일'); a word longer than its line still breaks (`anywhere`), so nothing overflows where it wrapped before. English is
+   as it was. <html lang> is the UI's language (initI18n). Code and paths keep their own rules (break-all, pre). */
+:root:lang(ko) body { word-break: keep-all; overflow-wrap: anywhere; }
+/* …prose whose rule says the legacy `word-break: break-word` (normal + anywhere, which undoes the line above) keeps its
+   Korean words whole too. A new rule for prose writes `overflow-wrap: anywhere` and inherits keep-all instead. */
+:root:lang(ko) :is(.peer-row .peer-body, .auto-turn-row :is(.auto-turn-detail, .auto-turn-summary), .perm .reason-line .grow,
+  .perm.send-message :is(.sm-to, .sm-summary, .sm-body), .rewind-target .prompt, .error-row, .turn-summary .step-text,
+  .clamp2, .clamp3, .bubble-text, .entry-prompt, .entry-notes .note-body, .history-diff .history-why-text, .side-msg) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+::selection { background: var(--selection); }
+/* Themed scrollbars: the default light ones are unreadable on the dark surfaces. */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); background-clip: padding-box; border: 3px solid transparent; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+button:hover:not(:disabled) { background: var(--bg-3); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--accent-solid); border-color: var(--accent-solid); color: var(--on-accent); }
+button.primary:hover:not(:disabled) { filter: brightness(1.12); background: var(--accent-solid); }
+button.danger { color: var(--red); }
+button.plain { background: transparent; border-color: transparent; padding: 2px 6px; }
+button.plain:hover:not(:disabled) { background: var(--bg-3); }
+button.small { font-size: 12px; padding: 1px 8px; }
+button.icon { padding: 2px 6px; }
+/* MARK: polish p-ui-kit (P2-review-39): a button answers the press — a shade darker while it is held (the mouse, or Space
+   on a focused one), the primary one too (its hover brightens it), a plain one filled as on hover; not one that is off
+   (`disabled`, or `aria-disabled` with a reason to show). */
+button:active:not(:disabled):not([aria-disabled="true"]) { filter: brightness(0.92); }
+button.primary:active:not(:disabled):not([aria-disabled="true"]) { filter: brightness(0.92); }
+button.plain:active:not(:disabled):not([aria-disabled="true"]) { background: var(--bg-3); }
+input[type="text"], input[type="number"], textarea, select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+textarea { resize: vertical; font-family: inherit; }
+textarea.mono, input.mono, .mono { font-family: var(--mono); }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-bg); border-color: var(--accent); }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
+.muted { color: var(--fg-2); }
+.faint { color: var(--fg-3); }
+.caption { font-size: 11.5px; }
+.tiny { font-size: 10.5px; }
+.green { color: var(--green); }
+.red { color: var(--red); }
+.orange { color: var(--orange); }
+.blue { color: var(--blue); }
+.bold { font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.col { display: flex; flex-direction: column; min-height: 0; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.spacer { flex: 1 1 auto; }
+.wrap { flex-wrap: wrap; }
+.pill {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  line-height: 16px;
+}
+.pill.orange { background: var(--orange-bg); color: var(--orange); }
+.pill.green { background: var(--green-bg); color: var(--green); }
+.pill.red { background: var(--red-bg); color: var(--red); }
+.pill.gray { background: var(--bg-3); color: var(--fg-2); }
+.banner { padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.banner.orange { background: var(--orange-bg); color: var(--orange); }
+.banner.green { background: var(--green-bg); }
+.banner.red { background: var(--red-bg); color: var(--red); }
+.banner.blue { background: var(--accent-bg); color: var(--accent); }
+.card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); padding: 10px 12px; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+.dot.green { background: var(--green); }
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.progress { height: 4px; width: 44px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
+.progress > div { height: 100%; }
+
+/* ---------------------------------------------------------------- layout */
+.app-shell { display: flex; flex-direction: column; height: 100%; }
+.app { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+/* Narrow windows: the remembered pane widths are preferences, not floors — every pane shrinks toward its own
+   (viewport-proportional) minimum before anything is clipped at the window's right edge. */
+.main > .panes > .pane { flex-shrink: 1; }
+.error-banner { border-bottom: 1px solid var(--border); }
+.error-banner .truncate { user-select: text; }
+.sidebar {
+  width: 300px; min-width: clamp(200px, 18vw, 240px); max-width: 460px;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.main > .panes { flex: 1; display: flex; min-width: 0; min-height: 0; }
+.banner-stack { display: flex; flex-direction: column; flex: none; }
+.banner-stack > .banner { border-bottom: 1px solid var(--border); }
+.diff-edge-tab { flex: none; width: 26px; padding: 10px 0; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--fg-2); font-size: 11.5px; }
+.diff-edge-tab:hover { background: var(--bg-3); color: var(--fg); }
+.diff-edge-tab .label { writing-mode: vertical-rl; }
+.divider { flex: none; width: 5px; margin: 0 -2px; cursor: col-resize; z-index: 5; }
+.divider:hover, .divider.dragging { background: var(--accent-bg); }
+body.resizing { cursor: col-resize; user-select: none; }
+.pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pane.diff { flex: 1.3; min-width: clamp(240px, 30vw, 420px); border-right: 1px solid var(--border); }
+.pane.chat { flex: 1; min-width: clamp(280px, 26vw, 360px); }
+.pane-header { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.scroll { overflow: auto; min-height: 0; flex: 1; }
+.segmented { display: flex; margin: 8px 12px; background: var(--bg-3); border-radius: 7px; padding: 2px; }
+.segmented button { flex: 1; border: 0; background: transparent; border-radius: 5px; padding: 2px 8px; }
+.segmented button.active { background: var(--segment-active); box-shadow: var(--shadow-sm); }
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; height: 100%; padding: 24px; text-align: center; color: var(--fg-2);
+}
+.empty h2 { margin: 0; font-size: 16px; color: var(--fg); }
+.empty .glyph { font-size: 40px; color: var(--fg-3); }
+
+/* ---------------------------------------------------------------- lists */
+.list { list-style: none; margin: 0; padding: 4px 6px; }
+.list li { border-radius: 6px; padding: 4px 6px; cursor: default; }
+.list li:hover { background: var(--bg-3); }
+.list li.selected { background: var(--accent-bg); }
+/* MARK: polish p-ui-kit (P2-review-39 / P2-review-25): a row the keys reach shows the focus (a click does not ring it). */
+.list li:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.list .section { font-size: 11px; font-weight: 600; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 6px 2px; cursor: default; }
+.list .section:hover { background: transparent; }
+.file-row { display: flex; gap: 6px; align-items: flex-start; }
+.file-row .glyph { width: 14px; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 11px; padding-top: 2px; }
+.file-row .path { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.file-row .dir { color: var(--fg-2); }
+.file-row .name { font-weight: 600; }
+.tools { display: flex; gap: 4px; margin-top: 2px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- menus & dialogs */
+.menu-anchor { position: relative; display: inline-block; }
+.menu-button { display: inline-flex; align-items: center; gap: 4px; background: transparent; border: 0; padding: 2px 4px; border-radius: 5px; cursor: pointer; }
+.menu-button:hover { background: var(--bg-3); }
+.menu-button .chev { display: inline-flex; color: var(--fg-2); }
+/* MARK: polish p-ui-kit (P1-chrome-34): the chevron icon at the button's own text size (the HUD's pill, the project name). */
+.menu-button .chev .rg-icon { width: 1em; height: 1em; vertical-align: 0; }
+.menu {
+  position: absolute; z-index: 40; top: 100%; left: 0; min-width: 200px; max-width: 420px; max-height: 60vh; overflow: auto;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); padding: 4px;
+}
+.menu.right { left: auto; right: 0; }
+.menu .item { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 5px; cursor: default; white-space: nowrap; }
+.menu .item:hover:not(.disabled) { background: var(--accent-bg); }
+.menu .item.disabled { color: var(--fg-3); }
+.menu .item.danger { color: var(--red); }
+.menu .item .check { width: 12px; flex: none; display: inline-flex; }
+.menu .sep { border-top: 1px solid var(--border); margin: 4px 6px; }
+.menu .head { font-size: 11px; color: var(--fg-2); padding: 6px 10px 2px; text-transform: uppercase; font-weight: 600; }
+.menu .footer { font-size: 11.5px; color: var(--fg-2); padding: 4px 10px; white-space: normal; }
+/* MARK: polish p-ui-kit (P1-chrome-31): the Menu primitive marks the focused item — the one under the pointer or the one
+   the keys moved to — so the pointer and the keys never mark two; a disabled one is marked too (it can be read, not chosen). */
+.menu.rg-menu:focus, .menu.rg-menu .item:focus { outline: none; }
+.menu.rg-menu .item:hover:not(.disabled) { background: transparent; }
+.menu.rg-menu .item:focus:not(.disabled) { background: var(--accent-bg); }
+.menu.rg-menu .item.disabled:focus { background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.backdrop { position: fixed; inset: 0; background: var(--backdrop); z-index: 50; display: flex; align-items: center; justify-content: center; }
+.dialog { background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow); padding: 18px 20px; width: 460px; max-width: 92vw; max-height: 90vh; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+/* MARK: polish p-ui-kit (P5-sheets-06): the title and the bottom button row stay; the body between them scrolls (its
+   padding keeps the fields' focus rings in view), with a line where content goes under the title or the buttons — drawn
+   by its own scroll position, so none shows while nothing scrolls. Settings' tabs stay with the title. */
+.dialog > h3, .dialog > .actions { flex: none; }
+.dialog > .dialog-body {
+  flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px;
+  margin: -2px -6px; padding: 2px 6px; border-block: 1px solid transparent;
+  animation: rg-dialog-edges linear both; animation-timeline: scroll(self block);
+}
+@keyframes rg-dialog-edges {
+  0% { border-top-color: transparent; border-bottom-color: var(--border); }
+  2% { border-top-color: var(--border); }
+  98% { border-bottom-color: var(--border); }
+  100% { border-top-color: var(--border); border-bottom-color: transparent; }
+}
+.dialog-body .settings > .tabs { position: sticky; top: -2px; margin-top: -2px; z-index: 1; background: var(--elevated); }
+.dialog.wide { width: 620px; }
+.dialog:focus { outline: none; } /* MARK: polish p-ui-kit: it takes the focus itself when no field asks for it */
+/* MARK: polish p-ui-kit (P5-sheets-06): a click past a dialog that keeps its typed text — the dialog pulses. */
+@keyframes rg-dialog-nudge { 0%, 100% { transform: scale(1); } 35% { transform: scale(1.018); } }
+.dialog[data-nudge] { animation: rg-dialog-nudge 0.24s ease-out; }
+@media (prefers-reduced-motion: reduce) { .dialog[data-nudge] { animation: none; outline: 2px solid var(--accent); } }
+.dialog h3 { margin: 0; font-size: 15px; }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; align-items: center; }
+.dialog label.field { display: flex; flex-direction: column; gap: 4px; }
+.dialog label.check { display: flex; gap: 8px; align-items: center; }
+.field-row { display: grid; grid-template-columns: 130px 1fr; gap: 8px; align-items: center; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.tabs button { border: 0; background: transparent; border-radius: 0; border-bottom: 2px solid transparent; padding: 4px 10px; }
+.tabs button.active { border-bottom-color: var(--accent); }
+.settings section { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings section h4 { margin: 0; font-size: 12.5px; }
+.settings table { border-collapse: collapse; width: 100%; }
+.settings td, .settings th { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- chat */
+.transcript { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+/* MARK: polish p-ui-kit (PX-06): `overflow-wrap: anywhere`, not `word-break: break-word` (the same in English), so a Korean
+   message keeps its words whole (the page's keep-all). */
+.msg { padding: 8px 10px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; user-select: text; }
+.msg.user { align-self: flex-end; background: var(--accent-bg); }
+.msg.assistant { align-self: flex-start; background: var(--bg-2); }
+.msg.assistant.unprompted { color: var(--fg-2); background: transparent; border: 1px dashed var(--border); }
+.unprompted-badge { display: block; width: fit-content; margin: 0 0 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; line-height: 18px; white-space: nowrap; color: var(--fg-2); background: var(--bg-2); }
+.tool-row { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.tool-row .name { font-weight: 600; }
+.tool-row .detail { font-family: var(--mono); color: var(--fg-2); }
+.tool-result { margin-left: 20px; font-size: 12px; }
+.tool-result summary { cursor: pointer; color: var(--fg-2); }
+.tool-result pre { margin: 4px 0 0; padding: 6px; background: var(--bg-2); border-radius: 6px; font-size: 11.5px; white-space: pre-wrap; max-height: 240px; overflow: auto; user-select: text; }
+.turn-end { display: flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 11.5px; }
+.turn-end::before, .turn-end::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.perm { border: 1px solid var(--orange-border); background: var(--orange-bg); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.perm.decided { opacity: 0.8; border-color: var(--orange-border-soft); background: var(--orange-bg-soft); }
+.perm pre { margin: 0; background: var(--bg); border-radius: 6px; padding: 8px; font-size: 12px; max-height: 220px; overflow: auto; white-space: pre-wrap; user-select: text; }
+.hud { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--fg-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; background: var(--bg-2); }
+.hud .sep { color: var(--fg-3); }
+.composer { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; position: relative; }
+.composer textarea { min-height: 60px; max-height: 160px; width: 100%; }
+/* MARK: wave6 w6-terminal — §44.1 the terminal's mode line under the message box (tones as the HUD's mode pill) */
+.composer .mode-line { font-size: 11.5px; line-height: 16px; padding-left: 2px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer .mode-line.auto, .composer .mode-line.acceptEdits { color: var(--orange); }
+.composer .mode-line.plan { color: var(--accent); }
+.palette { position: absolute; bottom: 100%; left: 12px; width: 320px; background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow); z-index: 30; }
+.palette .items { max-height: 220px; overflow: auto; padding: 4px; }
+.palette .item { display: flex; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 6px; font-family: var(--mono); cursor: default; }
+.palette .item.selected { background: var(--accent-bg); }
+.palette .foot { border-top: 1px solid var(--border); padding: 4px 10px; font-size: 10.5px; color: var(--fg-3); }
+.logbox { font-family: var(--mono); font-size: 11px; white-space: pre-wrap; background: var(--bg-2); border-radius: 6px; padding: 6px; height: 140px; overflow: auto; user-select: text; }
+.popover { position: absolute; z-index: 40; bottom: 100%; left: 0; width: 320px; max-height: 420px; overflow: auto; background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- diff */
+.monaco-host { flex: 1; min-height: 0; position: relative; }
+.monaco-host > .editor { position: absolute; inset: 0; }
+.unified { font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+.unified .line { display: flex; white-space: pre; }
+.unified .line:hover .gutter-add { visibility: visible; }
+.unified .no { width: 44px; text-align: right; padding-right: 6px; color: var(--fg-3); user-select: none; flex: none; }
+.unified .gutter-add { width: 18px; flex: none; visibility: hidden; text-align: center; color: var(--accent); cursor: pointer; font-weight: 700; user-select: none; }
+.unified .sign { width: 14px; flex: none; text-align: center; user-select: none; }
+.unified .text { flex: 1; padding-right: 8px; user-select: text; }
+.unified .line.add { background: var(--add-bg); }
+.unified .line.del { background: var(--del-bg); }
+.unified .line.hunk { background: var(--hunk-bg); color: var(--fg-2); }
+.note-bubble { margin: 4px 8px 6px 70px; border-left: 3px solid var(--orange); background: var(--orange-bg); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; white-space: pre-wrap; display: flex; gap: 8px; align-items: flex-start; }
+.note-bubble.comment { border-left-color: var(--fg-3); background: var(--bg-2); }
+.note-bubble.draft { border-left-color: var(--accent); background: var(--accent-bg); }
+.note-bubble .body { flex: 1; min-width: 0; }
+.note-composer { margin: 4px 8px 8px 70px; display: flex; flex-direction: column; gap: 6px; }
+.note-composer textarea { min-height: 56px; }
+.notes-list { border-top: 1px solid var(--border); max-height: 40%; overflow: auto; }
+.zone { font-family: var(--font); }
+.monaco-editor .note-glyph { background: transparent; color: var(--accent); }
+.monaco-editor .note-glyph::after { content: "+"; font-weight: 700; display: block; text-align: center; cursor: pointer; }
+.monaco-editor .note-line { background: var(--orange-bg); }
+
+/* ---------------------------------------------------------------- review triage (ChangedFiles) */
+.review-progress { padding: 8px 12px 6px; display: flex; flex-direction: column; gap: 5px; }
+.review-progress .bar { position: relative; height: 5px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
+.review-progress .bar > div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; transition: width 0.25s ease; }
+.review-progress .bar .viewed { background: var(--accent-bg); box-shadow: inset 0 0 0 1px var(--accent); opacity: 0.8; }
+.review-progress .bar .decided { background: var(--green); }
+.viewed-dot { flex: none; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; border: 1.5px solid var(--fg-3); box-sizing: border-box; }
+.viewed-dot.on { background: var(--accent); border-color: var(--accent); }
+.list .section .sort-toggle { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--fg-2); padding: 0 6px; }
+.list .section .sort-toggle.active { color: var(--accent); }
+.list .section .legend-btn { text-transform: none; font-weight: 600; color: var(--fg-3); padding: 0 6px; border-radius: 50%; }
+.risk-legend { width: 264px; white-space: normal; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--fg); padding: 6px; }
+.risk-legend .legend-item { display: flex; align-items: flex-start; gap: 8px; padding: 4px 8px; }
+.risk-legend .legend-item .pill, .risk-legend .legend-item .viewed-dot { flex: none; margin-top: 1px; }
+.tools .pill.risk { font-weight: 600; }
+.tools .pill.tool-pill { font-weight: 500; }
+
+/* A pane whose render threw (components/ErrorBoundary.tsx): the recovery UI fills the pane's slot. */
+.error-boundary { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; }
+.error-boundary .empty { padding: 16px; text-align: center; }
+
+/* MARK: wave4b w4b-auto — §39.5: the HUD's mode pill is the mode menu (the same as the composer's). */
+.hud-mode-chip.pill { padding: 0; }
+.hud-mode-chip .menu-button { color: inherit; font: inherit; line-height: 16px; padding: 0 6px; border-radius: 999px; }
+.hud-mode-chip .menu-button:hover { background: transparent; text-decoration: underline; }
+.hud-mode-chip .menu-button .chev { color: inherit; opacity: 0.7; }

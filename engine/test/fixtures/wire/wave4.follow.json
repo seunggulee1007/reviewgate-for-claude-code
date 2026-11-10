@@ -1,0 +1,141 @@
+{
+  "notices": [
+    {
+      "type": "error",
+      "message": "Auto mode blocked: git push --force — [Security Weaken]",
+      "fatal": false,
+      "scope": "session",
+      "code": "auto_mode_denied",
+      "detail": "git push --force — [Security Weaken]",
+      "toolName": "Bash"
+    },
+    {
+      "type": "error",
+      "message": "Auto mode is not available here (this model or a policy turns it off); Claude Code runs in default mode and asks for commands.",
+      "fatal": false,
+      "scope": "session",
+      "code": "auto_mode_unavailable",
+      "detail": "default"
+    },
+    {
+      "type": "error",
+      "message": "The hook PreToolUse:Bash blocked this: no rm -rf in this repo",
+      "fatal": false,
+      "scope": "session",
+      "code": "hook_blocked",
+      "hookName": "PreToolUse:Bash",
+      "exitCode": 2,
+      "detail": "no rm -rf in this repo"
+    },
+    {
+      "type": "error",
+      "message": "The hook PostToolUse:Bash failed (exit 1): commit-sweep.sh: not found",
+      "fatal": false,
+      "scope": "session",
+      "code": "hook_failed",
+      "hookName": "PostToolUse:Bash",
+      "exitCode": 1,
+      "detail": "commit-sweep.sh: not found"
+    }
+  ],
+  "turnEnd": {
+    "type": "turn_end",
+    "stopReason": "error_max_turns",
+    "usage": {
+      "inputTokens": 10,
+      "outputTokens": 5,
+      "costUsd": 0.01,
+      "durationMs": 1234,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 0,
+      "contextTokens": 100
+    },
+    "files": 0,
+    "added": 0,
+    "deleted": 0,
+    "changedOutside": [],
+    "external": 0,
+    "review": {
+      "files": 0,
+      "added": 0,
+      "deleted": 0
+    }
+  },
+  "results": [
+    {
+      "type": "result",
+      "id": "req-same",
+      "ok": false,
+      "error": "same_worktree",
+      "code": "same_worktree"
+    },
+    {
+      "type": "result",
+      "id": "req-missing",
+      "ok": false,
+      "error": "path_not_found",
+      "code": "path_not_found"
+    },
+    {
+      "type": "result",
+      "id": "req-move",
+      "ok": true
+    },
+    {
+      "type": "result",
+      "id": "req-record",
+      "ok": false,
+      "error": "chat_is_record",
+      "code": "chat_is_record"
+    }
+  ],
+  "chatMoved": {
+    "type": "chat_moved",
+    "sessionId": "chat-1",
+    "path": "/repo-wt",
+    "name": "repo-wt",
+    "baseline": "disk",
+    "interrupted": false
+  },
+  "sourceMeta": {
+    "id": "chat-1",
+    "title": "remember the word cobalt",
+    "createdAt": "2026-01-02T03:04:05.000Z",
+    "updatedAt": "2026-01-02T03:04:05.000Z",
+    "turns": 1,
+    "costUSD": 0.01,
+    "lastUserText": "remember the word cobalt",
+    "cliKnown": true,
+    "movedTo": {
+      "path": "/repo-wt",
+      "name": "repo-wt",
+      "at": "2026-01-02T03:04:05.000Z"
+    }
+  },
+  "movedIn": [
+    {
+      "type": "error",
+      "message": "This chat moved here from /repo. It is reviewed from here on; changes made here before the move are not in the review.",
+      "fatal": false,
+      "scope": "session",
+      "code": "chat_moved_in_disk",
+      "path": "/repo",
+      "sessionId": "chat-1"
+    }
+  ],
+  "targetMeta": {
+    "id": "chat-1",
+    "title": "remember the word cobalt",
+    "createdAt": "2026-01-02T03:04:05.000Z",
+    "updatedAt": "2026-01-02T03:04:05.000Z",
+    "turns": 1,
+    "costUSD": 0.01,
+    "lastUserText": "remember the word cobalt",
+    "cliKnown": true,
+    "movedFrom": {
+      "path": "/repo",
+      "name": "repo",
+      "at": "2026-01-02T03:04:05.000Z"
+    }
+  }
+}

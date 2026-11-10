@@ -1,0 +1,679 @@
+import { existsSync, readFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import type { PermissionReason } from "../protocol.js";
+import type { GitWorktree } from "../git/worktrees.js";
+import { HOST_FLAVOR, hasGitComponent, isInside, parseAbs, programName, realpathLenient, relativeInside, resolveShellPath, samePath, toRepoRelative } from "../platform/paths.js";
+import { scanCommand, type ReadOnlyContext } from "./bashClass.js";
+import { walkCommands } from "./gitDestructive.js";
+import { inlineScripts, opaqueWriters, SCRIPT_WRITE_RE, writtenFiles } from "./shellWrites.js";
+
+/**
+ * What the review of this window can see (docs/PROTOCOL.md §33.3–33.4): the snapshot is `git add -A` of the checkpoint
+ * root into a temporary index, so a submodule, a nested clone or a worktree below the root is recorded as one gitlink
+ * line — edits inside it never reach the review — and a worktree elsewhere is not looked at at all. Pure helpers; the
+ * hooks and `canUseTool` decide with them.
+ */
+
+/** `path = x` entries of `<root>/.gitmodules` (POSIX, repo-relative): submodules, initialized or not. */
+export function submodulePaths(root: string): string[] {
+  let text: string;
+  try {
+    text = readFileSync(join(root, ".gitmodules"), "utf8");
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^\s*path\s*=\s*(.+?)\s*$/.exec(line);
+    if (m) out.push(m[1]!.replace(/^["']|["']$/g, "").replace(/\\/g, "/").replace(/\/+$/, ""));
+  }
+  return out;
+}
+
+/**
+ * The root of the repository `file` lies in when that is a nested one strictly below `root` — a directory between
+ * them holding a `.git` entry (a clone, a submodule, a linked worktree such as `.claude/worktrees/<name>`) or listed
+ * as a submodule path in `.gitmodules` — else null. The outermost one wins; symlinks are resolved first.
+ */
+export function nestedRepoRoot(file: string, root: string): string | null {
+  const realRoot = realpathLenient(root);
+  const rel = relativeInside(realpathLenient(file), realRoot);
+  if (rel === null) return null;
+  const parts = rel.split("/");
+  const submodules = new Set(submodulePaths(realRoot));
+  for (let k = 1; k < parts.length; k++) {
+    const relDir = parts.slice(0, k).join("/");
+    const dir = join(realRoot, ...parts.slice(0, k));
+    if (submodules.has(relDir) || existsSync(join(dir, ".git"))) return dir;
+  }
+  return null;
+}
+
+/**
+ * §19.3: a folder inside the root or one of the repository's other `worktrees` that lies in a nested repository of its own
+ * (a clone, a submodule) — its config is not the repository's. A nested worktree of the repository itself is not foreign.
+ */
+export function foreignRepoDir(dir: string, root: string, worktrees: readonly string[]): boolean {
+  // The deepest of the root and the worktrees holding `dir` is where a nested repository starts.
+  let base: string | null = null;
+  for (const b of [root, ...worktrees]) {
+    if (isInside(dir, b) && (base === null || realpathLenient(b).length > realpathLenient(base).length)) base = b;
+  }
+  if (base === null) return false;
+  const nested = nestedRepoRoot(join(dir, "_"), base);
+  return nested !== null && !worktrees.some((w) => samePath(realpathLenient(w), nested));
+}
+
+/** §19.3: the read-only classifier's context for a command run in `cwd`: the root, the repository's other worktrees. */
+export function readOnlyContext(cwd: string, root: string, worktrees: readonly string[]): ReadOnlyContext {
+  return { cwd, root, sameRepoDirs: worktrees, foreignDir: (dir) => foreignRepoDir(dir, root, worktrees) };
+}
+
+/** English fallbacks of the §33 card reasons (clients localize on `code`); `claude_config` names its file (`claudeConfigMessage`). */
+/** §39.4: the `worktree_command` card of a worktree of another repository. */
+export const OTHER_REPO_WORKTREE_MESSAGE =
+  "This command creates a git worktree of another repository: work there is outside this window's review, and this chat cannot move there.";
+
+export const SCOPE_MESSAGES: Record<Exclude<PermissionReason["code"], "claude_config">, string> = {
+  outside_project: "This edit is outside the project: the review does not show it.",
+  nested_repository: "This location is inside a nested repository (submodule, worktree or clone): the review does not show changes there.",
+  other_worktree: "This location is in another worktree of the repository: this window's review does not show changes there — open it as a workbench.",
+  worktree_command: "This command creates a git worktree: work inside it is outside this window's review.",
+  worktree_isolation: "This runs outside this folder (an isolated worktree, another folder or the Workflow tool): its changes are not in this window's review.",
+  // MARK: r1-git — §46: only what the review cannot bring back asks.
+  git_command: "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back.",
+};
+
+/** Why a directory is outside what the review sees: a nested repository under `root`, or another worktree of the repository. */
+export function dirScopeReason(dir: string, root: string, worktrees: readonly string[]): PermissionReason | null {
+  const nested = nestedRepoRoot(join(dir, "_"), root);
+  if (nested) return { code: "nested_repository", message: SCOPE_MESSAGES.nested_repository, path: nested };
+  if (isInside(dir, root)) return null;
+  const wt = worktrees.find((w) => isInside(dir, w));
+  return wt ? { code: "other_worktree", message: SCOPE_MESSAGES.other_worktree, path: wt } : null;
+}
+
+/**
+ * Why an edit tool's target needs the card (§33.3): in a `.git` folder (M23: a hook, `info/exclude`, the config — git's own
+ * data is denied before; `outside_project`: no snapshot of any worktree sees it), outside the checkpoint root (in another
+ * worktree of the repository: `other_worktree`), or inside a nested repository under it (`path` = that repository's root)
+ * — or, where the review does see it, one of Claude Code's own settings files (`claude_config`, §33.9; `path` = that
+ * file). Null for any other path.
+ */
+export function editScopeReason(file: string, root: string, isOutside: (file: string, root: string) => boolean, worktrees: readonly string[] = [],
+  scratchDirs?: readonly string[]): PermissionReason | null {
+  if (hasGitComponent(resolve(file)) || hasGitComponent(realpathLenient(file))) return { code: "outside_project", message: SCOPE_MESSAGES.outside_project };
+  if (isOutside(file, root)) {
+    if (isScratchPath(file, scratchDirs)) return null;
+    const wt = worktrees.find((w) => isInside(file, w));
+    return wt ? { code: "other_worktree", message: SCOPE_MESSAGES.other_worktree, path: wt } : { code: "outside_project", message: SCOPE_MESSAGES.outside_project };
+  }
+  const nested = nestedRepoRoot(file, root);
+  if (nested) return { code: "nested_repository", message: SCOPE_MESSAGES.nested_repository, path: nested };
+  const config = claudeConfigFile(file);
+  return config ? claudeConfigReason(config, root) : null;
+}
+
+// ------------------------------------------------------------------ scratch folders
+
+/**
+ * The system's temporary folders — `os.tmpdir()` ($TMPDIR; on macOS under /var/folders), /tmp, /private/tmp, /var/tmp —
+ * where Claude Code keeps its scratchpad and Claude writes throwaway files. Real paths of the ones that exist.
+ */
+export function defaultScratchDirs(): string[] {
+  const out: string[] = [];
+  for (const d of [tmpdir(), "/tmp", "/private/tmp", "/var/tmp", "/private/var/folders"]) {
+    if (!existsSync(d)) continue;
+    const real = realpathLenient(d);
+    if (!out.includes(real)) out.push(real);
+  }
+  return out;
+}
+
+/**
+ * True when an edit target outside the project is a throwaway file: inside one of `scratchDirs` and in no git repository
+ * there — a clone or worktree made in /tmp is real work and keeps the outside-the-project card.
+ */
+export function isScratchPath(file: string, scratchDirs: readonly string[] | undefined): boolean {
+  if (!scratchDirs?.length) return false;
+  const real = realpathLenient(file);
+  const scratch = scratchDirs.find((d) => isInside(real, d));
+  if (!scratch) return false;
+  for (let dir = dirname(real); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return false;
+    if (dir === scratch || dirname(dir) === dir || !isInside(dir, scratch)) return true;
+  }
+}
+
+// ------------------------------------------------------------------ Claude Code's own settings (§33.9)
+
+/**
+ * True when `p` names one of Claude Code's own settings files: `settings.json` / `settings.local.json` in a `.claude`
+ * folder, or `.mcp.json` — at the project root or in any folder below it (a module the CLI may be started in) —, the CLI's
+ * own `.claude.json` (`~/.claude.json`, `$CLAUDE_CONFIG_DIR/.claude.json`: user and local MCP servers, a project's enabled
+ * `.mcp.json` servers), and a plugin's `hooks/hooks.json` or `.claude-plugin/plugin.json` (hooks, MCP servers) under
+ * Claude Code's plugins folder (`~/.claude/plugins/…`, `$CLAUDE_CONFIG_DIR/plugins/…`). They decide which hooks run, which
+ * tools are allowed (§33.5 applies the local file's allow rules) and which MCP servers start — from the next tool call or
+ * session on, before the review could undo anything. Lexical and case-insensitive (macOS / Windows file systems are); on
+ * Windows trailing dots / spaces are dropped first.
+ */
+export function isClaudeConfigPath(p: string): boolean {
+  const abs = resolve(p);
+  const parts = parseAbs(abs, HOST_FLAVOR).parts.map((x) => x.toLowerCase());
+  const name = parts[parts.length - 1];
+  const parent = parts[parts.length - 2];
+  if (name === ".mcp.json" || name === ".claude.json") return true;
+  if ((name === "settings.json" || name === "settings.local.json") && parent === ".claude") return true;
+  if ((name === "hooks.json" && parent === "hooks") || (name === "plugin.json" && parent === ".claude-plugin")) return inClaudePlugins(abs, parts);
+  return false;
+}
+
+/** `abs` (its lower-cased `parts`) is under Claude Code's plugins folder: `.claude/plugins/`, or `$CLAUDE_CONFIG_DIR/plugins/`. */
+function inClaudePlugins(abs: string, parts: readonly string[]): boolean {
+  if (parts.some((x, k) => x === "plugins" && parts[k - 1] === ".claude")) return true;
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  return !!configDir && relativeInside(abs, join(resolve(configDir), "plugins")) !== null;
+}
+
+/** The settings file (§33.9) an edit tool's target is — as named, else through symlinks (absolute, native) — or null. */
+export function claudeConfigFile(file: string): string | null {
+  const named = resolve(file);
+  if (isClaudeConfigPath(named)) return named;
+  const real = realpathLenient(file);
+  return isClaudeConfigPath(real) ? real : null;
+}
+
+export const CLAUDE_CONFIG_ASK_REASON = "ReviewGate: changes Claude Code's own settings (hooks, permissions, MCP servers) — needs approval";
+
+/** English fallback of the `claude_config` card reason (clients localize on `code` and show `path` / `keys`). */
+export function claudeConfigMessage(display: string, keys?: readonly string[]): string {
+  return (
+    `Changes Claude Code's own settings (${display}${keys?.length ? `: ${keys.join(", ")}` : ""}) — hooks, permissions and MCP servers there change how Claude runs; ` +
+    ".claude/settings.local.json is not kept in the review and cannot be reverted."
+  );
+}
+
+/** `abs` for the message: project-relative when inside `root`, `~/…` under the home folder, else as is. */
+function displayPath(abs: string, root: string): string {
+  const rel = toRepoRelative(abs, root) ?? relativeInside(resolve(abs), resolve(root));
+  if (rel) return rel;
+  const home = relativeInside(resolve(abs), homedir());
+  return home ? `~/${home}` : abs;
+}
+
+/** The card reason of a change to the settings file `abs` (§33.9); M22: `keys`, the risky settings an edit changes. */
+export function claudeConfigReason(abs: string, root: string, keys?: readonly string[]): PermissionReason {
+  return { code: "claude_config", message: claudeConfigMessage(displayPath(abs, root), keys), path: abs, ...(keys?.length ? { keys: [...keys] } : {}) };
+}
+
+/**
+ * Anything that may be a settings file's name, `--file=` / `>` / quotes / brackets around it left out (`.claude.json`, a
+ * plugin's `hooks.json` / `plugin.json` too: `isClaudeConfigPath` decides once the word is resolved).
+ */
+const CONFIG_WORD_RE = /[^\s"'`<>|&;()=,]*(?:settings(?:\.local)?\.json|\.mcp\.json|\.claude\.json|hooks\.json|plugin\.json)(?![\w.-])/gi;
+/** The names a command mentioning counts as touching the project's own file, however it builds the path (a script, …). */
+const CONFIG_MENTION_RE = /(?<![\w-])(?:settings\.local\.json|\.claude[\\/]+settings\.json|\.mcp\.json)(?![\w-])/i;
+/**
+ * Quotes and backslashes split a name for the shell only (`settings.loc""al.json`, `settings.lo\cal.json`); a Windows path
+ * keeps its backslashes, so both forms are looked at.
+ */
+const unquote = (s: string): string => s.replace(/["'\\]/g, "");
+const spellings = (s: string): string[] => [...new Set([s, unquote(s)])];
+
+function expandHome(p: string): string {
+  if (p === "~" || p === "$HOME" || p === "${HOME}") return homedir();
+  const m = /^(?:~|\$HOME|\$\{HOME\})[\\/](.*)$/s.exec(p);
+  return m ? join(homedir(), m[1]!) : p;
+}
+
+/** The settings file (§33.9) a word names, resolved against `dir`, or null. */
+function configInWord(word: string, dir: string): string | null {
+  for (const text of spellings(word)) {
+    for (const m of text.matchAll(CONFIG_WORD_RE)) {
+      const abs = resolveShellPath(dir, expandHome(m[0].replace(/^file:\/\//i, "")));
+      if (isClaudeConfigPath(abs)) return abs;
+    }
+  }
+  return null;
+}
+
+/**
+ * The project's own settings file a bare mention stands for (`settings.local.json` → `<root>/.claude/settings.local.json`),
+ * absolute and native like the resolved words (`resolve`, not `join`: a drive-less root still gets the host's drive on Windows).
+ */
+function mentionedConfig(text: string, root: string): string | null {
+  const m = spellings(text).map((t) => CONFIG_MENTION_RE.exec(t)).find((x) => x !== null);
+  if (!m) return null;
+  const name = m[0].toLowerCase();
+  if (name === ".mcp.json") return resolve(root, ".mcp.json");
+  return resolve(root, ".claude", name.endsWith("settings.local.json") ? "settings.local.json" : "settings.json");
+}
+
+/**
+ * The Claude Code settings file (§33.9) a Bash command writes (absolute). M22: only as a write target — what the command
+ * writes (`writtenFiles`: a redirection's file, the operands of `rm` / `mv` / `tee` / `truncate`, the target of `cp` / `ln` /
+ * `install`, `dd of=`, the files of `sed -i` / `perl -i`; against the folder each command runs in after the line's own `cd`)
+ * resolving to one (`> .mcp.json`, `cd .claude && sed -i … settings.json`, `mv /tmp/c.json ~/.claude.json`), or one an
+ * interpreter's inline script that writes (`SCRIPT_WRITE_RE`) names in a word of its command, else by a mention of
+ * `settings.local.json`, `.claude/settings.json` or `.mcp.json` there (the project's own file: `node -e "…writeFileSync(
+ * process.argv[1], …)" settings.local.json`). Release-2 review: so does one a command names whose writes its words do not
+ * tell (`opaqueWriters`: `curl -o`, `wget -O`, `git checkout … -- <file>`, `yq -i`, `… | sponge <file>`, `unzip`, a script
+ * file — the rule before M22), and any one the line names when it writes files it does not name (`> "$out"`, `… | xargs
+ * rm`). Null for a command that only reads or names one (`python3 -c "…json.load(open('.claude/settings.json'))…"`,
+ * `cp .mcp.json /tmp/x`, `grep hooks .claude/settings.json`, `git diff`, an `echo`); a plain `settings.json` elsewhere
+ * (`.vscode/`, the project root) is not one.
+ */
+export function bashClaudeConfigTarget(command: string, cwd: string, root: string): string | null {
+  if (!spellings(command).some((t) => /settings(?:\.local)?\.json|\.mcp\.json|\.claude\.json|hooks\.json|plugin\.json/i.test(t))) return null;
+  for (const w of writtenFiles(command, cwd)) {
+    const hit = configInWord(w.path, w.dir);
+    if (hit) return hit;
+  }
+  for (const script of inlineScripts(command, cwd)) {
+    if (!SCRIPT_WRITE_RE.test(script.text)) continue;
+    const hit = namedIn(script.words, script.dir, root);
+    if (hit) return hit;
+  }
+  const opaque = opaqueWriters(command, cwd);
+  for (const c of opaque.commands) {
+    const hit = namedIn(c.words, c.dir, root);
+    if (hit) return hit;
+  }
+  if (!opaque.anyFile) return null;
+  let named: string | null = null;
+  walkCommands(command, cwd, ({ words, cmd, dir }) => {
+    named ??= namedIn([...words, ...(cmd.writes ?? [])], dir, root);
+  });
+  return named;
+}
+
+/** The settings file a command's words name — a word resolving to one against `dir`, else a mention of the project's own — or null. */
+function namedIn(words: readonly string[], dir: string, root: string): string | null {
+  for (const word of words) {
+    const hit = configInWord(word, dir);
+    if (hit) return hit;
+  }
+  return mentionedConfig(words.join(" "), root);
+}
+
+/** Input keys whose value is a command line (an MCP server that runs commands). */
+const COMMAND_KEYS: ReadonlySet<string> = new Set(["command", "commands", "cmd", "script", "shell", "commandline", "command_line"]);
+/**
+ * MARK: wave2 check-engine — §35.6: input keys whose value is one path (`path`, `file_path`, `filePath`, `pathInProject`,
+ * `destination`, `uri`, …), spaces included — a project folder may be called "My Project".
+ */
+const PATH_KEY_RE = /^path|(?:path|file|filename|uri|dir|directory|destination|dest|target)$/i;
+
+/** The settings file (§33.9) a one-path value names, the whole value read as a path (a `file://` URI decoded), or null. */
+function configInPathValue(value: string, root: string): string | null {
+  if (value.length > 4096 || /[\r\n]/.test(value)) return null;
+  let p = value.trim();
+  if (/^file:\/\//i.test(p)) {
+    p = p.replace(/^file:\/\//i, "");
+    try {
+      p = decodeURIComponent(p);
+    } catch {
+      // kept as written
+    }
+  }
+  const abs = resolve(root, expandHome(p));
+  return isClaudeConfigPath(abs) ? abs : null;
+}
+
+/**
+ * The Claude Code settings file (§33.9) a tool call's input names (absolute; relative paths are the project's): a
+ * path-like string value (no whitespace — `pathInProject`, `path`, `file`, nested `edits[].file`, a `file://` URI; under a
+ * one-path key such as `path` / `destination` spaces too, §35.6), or a command-line value (`command`, …) read like a Bash
+ * command. Free text (a file's new content, a message) never counts.
+ */
+export function inputClaudeConfigTarget(input: Record<string, unknown>, root: string): string | null {
+  const walk = (v: unknown, key: string, depth: number): string | null => {
+    if (typeof v === "string") {
+      if (COMMAND_KEYS.has(key.toLowerCase())) return bashClaudeConfigTarget(v, root, root);
+      if (PATH_KEY_RE.test(key)) {
+        const hit = configInPathValue(v, root);
+        if (hit) return hit;
+      }
+      return v.length <= 4096 && !/\s/.test(v) ? configInWord(v, root) : null;
+    }
+    if (depth >= 4 || !v || typeof v !== "object") return null;
+    // An array's items keep the key they are listed under (`commands: [...]`).
+    const entries: [string, unknown][] = Array.isArray(v) ? v.map((x) => [key, x]) : Object.entries(v);
+    for (const [k, x] of entries) {
+      const hit = walk(x, k, depth + 1);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(input, "", 0);
+}
+
+// ------------------------------------------------------------------ worktree tools (§33.4)
+
+/**
+ * Notices the session raises about work outside this window's review (§33.4); the engine turns them into `error` events.
+ * M05b: `worktree_exited` (engine-internal, never sent): ExitWorktree took the CLI back to `path` (its `originalCwd`).
+ */
+export type ScopeNotice = {
+  code: "worktree_blocked" | "worktree_outside_review" | "worktree_exited";
+  toolName: string;
+  toolUseId?: string;
+  /** The worktree / nested repository concerned (absolute). */
+  path?: string;
+  /** The branch Claude wanted (EnterWorktree `name`) or the isolated agent's worktree branch. */
+  branch?: string;
+  /** MARK: wave4b w4b-follow — §39.4: why the call was on a card (`worktree_command`: it created `path`); engine-internal. */
+  reasonCode?: PermissionReason["code"];
+  /**
+   * §33.4: a command run in another worktree or a nested repository — the files it changed there (relative to `path`,
+   * POSIX, sorted, at most 100): what that folder's `git status` shows differently after the call.
+   */
+  files?: string[];
+  /**
+   * §39.5: a worktree command left to the CLI in auto mode (no card): the repository's worktrees before it ran — what the
+   * engine reads at a card otherwise (§39.4: did this chat make it?); engine-internal.
+   */
+  worktreesBefore?: GitWorktree[];
+};
+
+/** English fallback of a notice's `error.message` (clients localize on `code`). */
+export function scopeNoticeMessage(n: ScopeNotice): string {
+  if (n.code === "worktree_blocked") {
+    const what = n.toolName === "EnterWorktree" ? `a git worktree${n.branch ? ` ("${n.branch}")` : ""}` : `${n.toolName} outside this folder`;
+    return `Claude tried to work in ${what}; ReviewGate blocked it because this window's review would not see that work. For parallel work, open a separate workbench.`;
+  }
+  const text = `${n.toolName} worked outside this window's review${n.path ? ` (${n.path})` : ""}: those changes are not reviewed here. Open it as a workbench to review them.`;
+  return n.files?.length ? `${text} Changed: ${n.files.join(", ")}` : text;
+}
+
+/**
+ * §33.4 / §39.4 (M05b): the ways to a worktree of its own — EnterWorktree, or `git worktree add` — after which this chat
+ * follows into that worktree's window and its review goes on there. Worded so that a skill that starts its work in a
+ * worktree does not fall back to switching this checkout's branch.
+ */
+const WORKTREE_WAY =
+  "To work in a separate worktree use EnterWorktree, or run `git worktree add ../<repo>-<name> -b <branch>` (never under /tmp) " +
+  "and continue there: ReviewGate moves this chat into that worktree's window (in auto mode at once, otherwise the user " +
+  "chooses), where its review goes on. Do not switch this checkout's branch to start new work unless the user asked.";
+export const ISOLATION_REASON =
+  "ReviewGate: the user turned off agents that run outside this folder (`isolation`, an Agent `cwd` outside the project, a " +
+  "Workflow whose agents use `isolation`). Run the agent again without `isolation` / `cwd`, or do the work here.";
+export const SCOPE_ASK_REASON = "ReviewGate: works outside this window's review — needs approval";
+/** §39.4 (M05b): the card of EnterWorktree outside auto mode. */
+export const ENTER_WORKTREE_MESSAGE =
+  "Claude moves into a git worktree: its work there is outside this window's review until this chat follows it there.";
+/**
+ * §39.4 (M05b): told to Claude when ExitWorktree `remove` would delete the worktree this window reviews — the chat's rows and
+ * that review live in it, so it is kept (the user removes it in ReviewGate once the review is done).
+ */
+export const EXIT_WORKTREE_KEEP_NOTE =
+  "ReviewGate kept this worktree (action \"keep\"): this window reviews it, and this chat's history lives in it. This chat " +
+  "moves back with you; the user removes the worktree in ReviewGate once its review is done.";
+
+const SUBAGENT_RE = /^(Agent|Task)$/;
+
+/**
+ * Release-2 review: what makes a Workflow's inline script unreadable for `isolation` — an escape that may spell it
+ * (`\u0069solation`, `\x69`), code built or loaded at run time (`eval(`, `Function(`, `import(`, `require(`,
+ * `fromCharCode`), a computed key (`{[k]: "worktree"}`).
+ */
+const WORKFLOW_OPAQUE_RE = /\\u|\\x|fromCharCode|\beval\s*\(|\bFunction\s*\(|\bimport\s*\(|\brequire\s*\(|[{,]\s*\[[^\]\n]*\]\s*:/;
+
+/**
+ * A call that runs work outside this folder: an Agent/Task with `isolation` (`worktree`, `remote`) or with a `cwd` outside
+ * the project or in a nested repository; a Workflow that may give its agents `isolation` (M05b: any other Workflow runs in
+ * this folder like an Agent — what its agents change reaches the review by the turn's snapshot or §52's carry). Release-2
+ * review: unless its inline script provably says nothing of `isolation` — the word anywhere in its input (a quoted key,
+ * `const iso = "worktree"; agent({isolation: iso})`, spread options, its `args`) or a script `WORKFLOW_OPAQUE_RE` cannot
+ * read counts, and so does a named or file workflow (not read). Before, only `isolation: "worktree"` written out did.
+ */
+export function isolatedCall(toolName: string, input: Record<string, unknown>, root: string): boolean {
+  if (toolName === "Workflow") {
+    if (typeof input.script !== "string") return true;
+    let text: string;
+    try {
+      text = JSON.stringify(input);
+    } catch {
+      return true;
+    }
+    return /isolation/i.test(text) || WORKFLOW_OPAQUE_RE.test(input.script);
+  }
+  if (!SUBAGENT_RE.test(toolName)) return false;
+  const iso = input.isolation;
+  if (typeof iso === "string" && iso.trim() !== "" && iso !== "none") return true;
+  const cwd = input.cwd;
+  if (typeof cwd !== "string" || !cwd.trim()) return false;
+  const dir = resolve(root, cwd);
+  return !isInside(dir, root) || nestedRepoRoot(join(dir, "_"), root) !== null;
+}
+
+/**
+ * The deny reason for a worktree tool (§33.4), undefined when it may proceed: an isolated call while the user turned
+ * `allowWorktreeIsolation` off — also a subagent's EnterWorktree (`agentId`, the agent asking), which moves that agent into
+ * another worktree. M05b: the chat's own EnterWorktree is no longer denied — this chat follows it (§39.4).
+ */
+export function worktreeToolBlocked(toolName: string, input: Record<string, unknown>, root: string, allowIsolation: boolean, agentId?: string): string | undefined {
+  if (allowIsolation) return undefined;
+  if (toolName === "EnterWorktree") return agentId !== undefined ? ISOLATION_REASON : undefined;
+  return isolatedCall(toolName, input, root) ? ISOLATION_REASON : undefined;
+}
+
+/**
+ * §39.4 (M05b): where EnterWorktree goes, when its call says — `path` (an existing worktree), or `name` (a new one in
+ * `<root>/.claude/worktrees/<name>`, as the CLI makes it); null for a random name. The tool's result says where it went.
+ */
+export function enterWorktreeTarget(input: Record<string, unknown>, root: string): string | null {
+  if (typeof input.path === "string" && input.path.trim()) return resolve(root, input.path.trim());
+  if (typeof input.name === "string" && input.name.trim()) return join(root, ".claude", "worktrees", ...input.name.trim().split("/"));
+  return null;
+}
+
+/**
+ * The engine's own system instruction (appended after the client's). MARK: wave4b w4b-follow — §39.4: a team that makes a
+ * worktree per issue lets Claude create one and work there; the chat follows (the review follows). §39.5 (2026-11):
+ * commands in the repository's other worktrees are listed after the call; the way to a worktree is said, so a
+ * worktree-first skill does not switch this checkout's branch instead. M05b: EnterWorktree works (the chat follows it), and
+ * so do isolated agents and the Workflow tool unless the user turned them off.
+ */
+export function scopeInstruction(cwd: string, allowIsolation: boolean): string {
+  return (
+    `ReviewGate reviews every change you make in this folder (${cwd}). ${WORKTREE_WAY} ` +
+    "Commands may run in this repository's other worktrees; ReviewGate lists what they changed after " +
+    "the call, and that worktree's own window reviews it. " +
+    (allowIsolation
+      ? "Agents with `isolation` and the Workflow tool may run; what they change in other worktrees is listed after they ran, and that worktree's own window reviews it."
+      : "Agents with `isolation` (and Workflow agents that use it) are turned off by the user: run them without it.")
+  );
+}
+
+/**
+ * §46: the engine's word on git, after the client's text — which may still be an older default that says never to commit.
+ * MARK: r1-git — git runs as in the terminal; only a command that throws away uncommitted work or rewrites the remote reaches
+ * the user's card (hooks.ts `gitCommandReason`), and Claude's own commits keep their files in the review.
+ */
+export const GIT_INSTRUCTION =
+  "Git: when the user (or a skill they ran) asks you to commit, branch, merge, pull, rebase, cherry-pick, stash, push or resolve " +
+  "merge conflicts, run git as you would in a terminal. ReviewGate asks the user only before a git command that throws away " +
+  "uncommitted work or rewrites the remote: reset --hard, clean -f, checkout / restore over files that are under review or " +
+  "uncommitted, branch -D, stash drop / clear and force pushes. Files you commit stay in the user's review. An instruction never " +
+  "to run git commit / checkout / reset / stash means: not on your own initiative. What a merge or pull brings in is not counted " +
+  "as your change; your conflict resolutions and edits are reviewed as usual. After resolving merge conflicts, leave the merge " +
+  "uncommitted and do not git add the resolved files unless the user asked you to commit — the user reviews the resolutions and " +
+  "commits the merge from ReviewGate. If the user denies the card, stop and ask. Never put a git worktree, clone or copy of the " +
+  "project under /tmp, /private/tmp or /var/folders: macOS deletes files there that were not opened for a few days, .git included.";
+
+// ------------------------------------------------------------------ Bash
+
+/**
+ * Simple commands of `command` as word lists: the tokenizer's when the line parses, else a rough split (detection only).
+ * MARK: wave2 check-engine — §35.6: a subshell / brace group / command substitution opener (`(cd x && …)`, `{ cd x; …; }`,
+ * `$(cd x …)`) is not part of the command's first word, so its `cd` still moves the directory for detection.
+ */
+function segments(command: string): string[][] {
+  const scan = scanCommand(command);
+  if (scan) return scan.segments;
+  return command
+    .split(/&&|\|\||;|\||\n/)
+    .map((s) => s.trim().replace(/^(?:\$\(|[({`]|\s)+/, "").split(/\s+/).filter((w) => w.length > 0).map((w) => w.replace(/^["']|["']$/g, "")))
+    .filter((s) => s.length > 0);
+}
+
+/** The words after leading `NAME=value` assignments. */
+function commandWords(words: string[]): string[] {
+  let i = 0;
+  while (i < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]!)) i++;
+  return words.slice(i);
+}
+
+/** `$NAME` / `${NAME}` the environment defines (`$HOME/worktrees/x`); an unknown one stays as written. */
+function expandVars(arg: string): string {
+  return arg.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (m, braced: string | undefined, bare: string | undefined) => {
+    const name = braced ?? bare ?? "";
+    const value = name === "HOME" ? homedir() : process.env[name];
+    return value !== undefined && value !== "" ? value : m;
+  });
+}
+
+/** The folder a `cd` / `pushd` / `git -C` / worktree word names, against `base`, as the shell reads it (§20: MSYS `/c/…` on Windows). */
+function resolveDir(base: string, raw: string): string {
+  const arg = raw.includes("$") ? expandVars(raw) : raw;
+  if (arg === "~") return homedir();
+  if (arg.startsWith("~/")) return join(homedir(), arg.slice(2));
+  return resolveShellPath(base, arg);
+}
+
+/** git global options that take a separate value (`-C <path>`, `-c <k=v>`, …). */
+const GIT_GLOBAL_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env", "--exec-path"]);
+/** `git worktree add` options that take a separate value. */
+const WORKTREE_ADD_WITH_VALUE = new Set(["-b", "-B", "--reason"]);
+
+/**
+ * One simple command's words → the resolved path `git … worktree add … <path>` creates; undefined when the command is
+ * not a `git worktree add`, null when it is but names no path. `cwd` is where it runs (`-C` is applied).
+ */
+export function gitWorktreeAddTarget(words: string[], cwd: string): string | null | undefined {
+  return parseWorktreeAdd(words, cwd)?.target;
+}
+
+/**
+ * `git … worktree add …`: the directory git runs in (`-C` applied) and the new worktree's path (null: none named). git by its
+ * name (§20 `programName`: `git.exe`, `GIT`, `"C:\…\git.exe"`).
+ */
+function parseWorktreeAdd(words: string[], cwd: string): { base: string; target: string | null } | undefined {
+  const w = commandWords(words);
+  if (w.length === 0 || programName(w[0]!) !== "git") return undefined;
+  let base = cwd;
+  let i = 1;
+  while (i < w.length && w[i]!.startsWith("-")) {
+    const opt = w[i]!;
+    if (GIT_GLOBAL_WITH_VALUE.has(opt)) {
+      if (opt === "-C" && w[i + 1] !== undefined) base = resolveDir(base, w[i + 1]!);
+      i += 2;
+    } else i++;
+  }
+  if (w[i] !== "worktree" || w[i + 1] !== "add") return undefined;
+  for (let j = i + 2; j < w.length; j++) {
+    const a = w[j]!;
+    if (a === "--") return { base, target: w[j + 1] !== undefined ? resolveDir(base, w[j + 1]!) : null };
+    if (WORKTREE_ADD_WITH_VALUE.has(a)) {
+      j++;
+      continue;
+    }
+    if (a.startsWith("-")) continue;
+    return { base, target: resolveDir(base, a) };
+  }
+  return { base, target: null };
+}
+
+/**
+ * §39.4: the directory a command's `git worktree add` runs in (after its `cd`s and `-C`) — its repository is the one the
+ * new worktree belongs to. Null when the command adds no worktree.
+ */
+export function worktreeAddRepoDir(command: string, cwd: string): string | null {
+  let dir = cwd;
+  for (const words of segments(command)) {
+    const w = commandWords(words);
+    if (w[0] === "cd" || w[0] === "pushd") {
+      const arg = w.slice(1).find((a) => !a.startsWith("-"));
+      if (arg !== undefined) dir = resolveDir(dir, arg);
+      continue;
+    }
+    const add = parseWorktreeAdd(w, dir);
+    if (add) return add.base;
+  }
+  return null;
+}
+
+/**
+ * Where a Bash command works: the shell's current directory, every `cd` / `pushd` target (in order) and every `git -C` directory
+ * (git by its name, §20 `programName`).
+ */
+export function bashWorkDirs(command: string, cwd: string): string[] {
+  const dirs = [cwd];
+  let cur = cwd;
+  for (const words of segments(command)) {
+    const w = commandWords(words);
+    if (w[0] === "cd" || w[0] === "pushd") {
+      const arg = w.slice(1).find((a) => !a.startsWith("-"));
+      if (arg !== undefined) {
+        cur = resolveDir(cur, arg);
+        dirs.push(cur);
+      }
+      continue;
+    }
+    if (w.length > 0 && programName(w[0]!) === "git") {
+      for (let i = 1; i < w.length - 1 && w[i]!.startsWith("-"); i++) {
+        if (w[i] === "-C") dirs.push(resolveDir(cur, w[i + 1]!));
+        if (GIT_GLOBAL_WITH_VALUE.has(w[i]!)) i++;
+      }
+    }
+  }
+  return dirs;
+}
+
+/**
+ * Why a Bash command works outside what the review sees (§33.4): it creates a worktree (`worktree_command`, `path` =
+ * the new worktree), or it runs in / `cd`s into a nested repository or another worktree. Null otherwise.
+ */
+export function bashScopeReason(command: string, cwd: string, root: string, worktrees: readonly string[]): PermissionReason | null {
+  let dir = cwd;
+  for (const words of segments(command)) {
+    const w = commandWords(words);
+    if (w[0] === "cd" || w[0] === "pushd") {
+      const arg = w.slice(1).find((a) => !a.startsWith("-"));
+      if (arg !== undefined) dir = resolveDir(dir, arg);
+      continue;
+    }
+    const target = gitWorktreeAddTarget(w, dir);
+    if (target !== undefined) return { code: "worktree_command", message: SCOPE_MESSAGES.worktree_command, ...(target ? { path: target } : {}) };
+  }
+  for (const d of bashWorkDirs(command, cwd)) {
+    const reason = dirScopeReason(d, root, worktrees);
+    if (reason) return reason;
+  }
+  return null;
+}
+
+/**
+ * §33.4: the other worktrees and nested repositories a Bash command runs in (`bashWorkDirs`: the shell's directory, its
+ * `cd`s and `git -C`s), each once, in order — the folders its after-notice compares.
+ */
+export function bashOutsideDirs(command: string, cwd: string, root: string, worktrees: readonly string[]): PermissionReason[] {
+  const out: PermissionReason[] = [];
+  for (const d of bashWorkDirs(command, cwd)) {
+    const reason = dirScopeReason(d, root, worktrees);
+    if (reason?.path && !out.some((r) => r.path === reason.path)) out.push(reason);
+  }
+  return out;
+}
+
+/** `worktreePath` / `worktreeBranch` of an isolated agent's tool response, when the CLI reports them. */
+export function isolatedResult(response: unknown): { path?: string; branch?: string } {
+  if (!response || typeof response !== "object") return {};
+  const r = response as { worktreePath?: unknown; worktreeBranch?: unknown };
+  return {
+    ...(typeof r.worktreePath === "string" && r.worktreePath ? { path: r.worktreePath } : {}),
+    ...(typeof r.worktreeBranch === "string" && r.worktreeBranch ? { branch: r.worktreeBranch } : {}),
+  };
+}

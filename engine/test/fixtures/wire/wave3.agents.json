@@ -1,0 +1,202 @@
+{
+  "events": [
+    {
+      "type": "tool_use",
+      "id": "toolu_ag",
+      "name": "Agent",
+      "input": {
+        "description": "coupon codes",
+        "subagent_type": "Explore",
+        "prompt": "find couponCode",
+        "model": "opus"
+      }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_sm",
+      "name": "SendMessage",
+      "input": {
+        "to": "a1b2c3",
+        "message": "gradle 테스트도 돌려줘"
+      },
+      "continues": {
+        "agentToolUseId": "toolu_ag",
+        "agentType": "Explore"
+      }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_rf",
+      "name": "ReportFindings",
+      "input": {
+        "level": "low",
+        "findings": [
+          {
+            "file": "/repo/README.md",
+            "line": 2,
+            "summary": "line2 changed without a test",
+            "short_summary": "no test",
+            "failure_scenario": "a reader of line 2 breaks",
+            "category": "test-coverage"
+          },
+          {
+            "file": "other.txt",
+            "line": null,
+            "summary": "whole file",
+            "short_summary": "file",
+            "failure_scenario": "x"
+          }
+        ]
+      }
+    },
+    {
+      "type": "tool_result",
+      "toolUseId": "toolu_ag",
+      "isError": false,
+      "preview": "## 사용처 14곳",
+      "agentUsage": {
+        "tokens": 14794,
+        "toolUses": 12,
+        "durationMs": 491500
+      },
+      "cliAgentId": "a1b2c3"
+    },
+    {
+      "type": "tool_result",
+      "toolUseId": "toolu_sm",
+      "isError": false,
+      "preview": "42 tests pass"
+    },
+    {
+      "type": "agent_report",
+      "toolUseId": "toolu_ag",
+      "text": "## 사용처 14곳\n- api/a.ts",
+      "truncated": false,
+      "usage": {
+        "tokens": 14794,
+        "toolUses": 12,
+        "durationMs": 491500
+      },
+      "model": "opus",
+      "prompt": "find couponCode",
+      "id": "req-1"
+    },
+    {
+      "type": "prereview",
+      "prereviewId": "toolu_rf",
+      "status": "done",
+      "source": "main",
+      "endTree": "<tree B>",
+      "startedAt": "2026-01-02T03:04:05.000Z",
+      "endedAt": "2026-01-02T03:04:05.000Z",
+      "findings": [
+        {
+          "id": "f1",
+          "file": "README.md",
+          "line": 2,
+          "summary": "line2 changed without a test",
+          "shortSummary": "no test",
+          "failureScenario": "a reader of line 2 breaks",
+          "category": "test-coverage"
+        },
+        {
+          "id": "f2",
+          "file": "other.txt",
+          "line": null,
+          "summary": "whole file",
+          "shortSummary": "file",
+          "failureScenario": "x"
+        }
+      ]
+    }
+  ],
+  "waitingHud": {
+    "agents": [
+      {
+        "id": "a1b2c3",
+        "toolUseId": "toolu_ag",
+        "type": "Explore",
+        "description": "coupon codes",
+        "status": "running",
+        "isBackground": false,
+        "depth": 1,
+        "startedAt": 1700000000000,
+        "files": [],
+        "turn": 1,
+        "prompt": "find couponCode",
+        "model": "opus"
+      }
+    ],
+    "waitingOnAgents": {
+      "count": 1,
+      "longest": {
+        "toolUseId": "toolu_ag",
+        "type": "Explore",
+        "startedAt": 1700000000000
+      }
+    },
+    "subagentDepth": 1
+  },
+  "resumedHud": {
+    "agents": [
+      {
+        "id": "a1b2c3",
+        "toolUseId": "toolu_ag",
+        "type": "Explore",
+        "description": "coupon codes",
+        "status": "running",
+        "isBackground": false,
+        "depth": 1,
+        "startedAt": 1700000000000,
+        "files": [],
+        "turn": 1,
+        "prompt": "find couponCode",
+        "model": "opus",
+        "reportPreview": "## 사용처 14곳\n- api/a.ts",
+        "tokens": 14794,
+        "toolUses": 12,
+        "durationMs": 491500,
+        "cliAgentId": "a1b2c3",
+        "resumeCount": 1,
+        "resumedBy": "toolu_sm"
+      }
+    ],
+    "waitingOnAgents": {
+      "count": 1,
+      "longest": {
+        "toolUseId": "toolu_ag",
+        "type": "Explore",
+        "startedAt": 1700000000000
+      }
+    }
+  },
+  "prereviews": [
+    {
+      "prereviewId": "toolu_rf",
+      "status": "done",
+      "source": "main",
+      "endTree": "<tree B>",
+      "startedAt": "2026-01-02T03:04:05.000Z",
+      "endedAt": "2026-01-02T03:04:05.000Z",
+      "findings": [
+        {
+          "id": "f1",
+          "file": "README.md",
+          "line": 2,
+          "summary": "line2 changed without a test",
+          "shortSummary": "no test",
+          "failureScenario": "a reader of line 2 breaks",
+          "category": "test-coverage"
+        },
+        {
+          "id": "f2",
+          "file": "other.txt",
+          "line": null,
+          "summary": "whole file",
+          "shortSummary": "file",
+          "failureScenario": "x"
+        }
+      ]
+    }
+  ]
+}

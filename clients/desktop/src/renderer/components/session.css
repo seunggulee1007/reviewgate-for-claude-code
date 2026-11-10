@@ -1,0 +1,82 @@
+/*
+ * Session start / recovery, notices and messages from other sessions (docs/PROTOCOL.md §29, §30, §33.4; audit daily-03,
+ * polish-03). Every colour comes from the theme tokens in styles.css, so light and dark both work.
+ */
+
+/* ---------------------------------------------------------------- session banner (SessionErrorBanner) */
+.session-banner { align-items: flex-start; }
+.session-banner .icon { flex: none; width: 16px; text-align: center; line-height: 18px; }
+.session-banner .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.session-banner .main { font-weight: 600; line-height: 18px; user-select: text; overflow-wrap: anywhere; }
+.session-banner .repeat { margin-left: 6px; font-weight: 400; font-size: 11px; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.session-banner .sub { color: var(--fg-2); font-family: var(--mono); font-size: 11.5px; user-select: text; overflow-wrap: anywhere; }
+.session-banner details > summary { cursor: pointer; color: var(--fg-2); font-size: 11.5px; width: fit-content; }
+.session-banner .actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; max-width: 50%; }
+
+/* ---------------------------------------------------------------- transcript error rows (ErrorNoticeRow) */
+.error-row .icon { flex: none; }
+.error-row .err-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.error-row .err-repeat { color: var(--fg-3); font-size: 11px; margin-left: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.error-row .err-sub { color: var(--fg-3); font-family: var(--mono); font-size: 11.5px; }
+.error-row details > summary { cursor: pointer; color: var(--fg-3); font-size: 11.5px; width: fit-content; }
+.error-row.notice-info { color: var(--fg-2); }
+.error-row.notice-info .icon { color: var(--accent); }
+.error-row.notice-warning { color: var(--orange); }
+
+/* ---------------------------------------------------------------- peer messages: the card above the composer */
+.peer-card { margin: 0 12px; border: 1px solid var(--border-strong); border-left: 3px solid var(--accent); background: var(--panel); border-radius: 10px; padding: 9px 12px; display: flex; flex-direction: column; gap: 5px; }
+.peer-card .head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.peer-card .title { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.peer-card .sub { font-size: 11.5px; color: var(--fg-2); }
+.peer-card .senders { font-size: 11.5px; color: var(--fg-2); overflow-wrap: anywhere; }
+.peer-card .notice { font-size: 11.5px; color: var(--orange); }
+.peer-card .hint { font-size: 11.5px; color: var(--accent); }
+.peer-card .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.peer-card .actions .menu-anchor .menu-button { padding: 2px 8px; }
+/* r2-peers: what auto runs by itself is one line, not a card */
+.peer-card.compact { padding: 5px 10px; border-left-width: 2px; }
+.peer-card.compact .head .menu-anchor .menu-button { padding: 1px 6px; }
+
+/* ---------------------------------------------------------------- peer messages: transcript rows */
+.peer-row { align-self: flex-start; max-width: 92%; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); display: flex; flex-direction: column; gap: 4px; user-select: text; }
+.peer-row.unprompted { background: transparent; border-style: dashed; border-left: 3px solid var(--orange); }
+.peer-row .peer-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-2); min-width: 0; }
+.peer-row .peer-body { white-space: normal; word-break: break-word; }
+.peer-row .peer-pid { font-size: 10.5px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.peer-row .actions { display: flex; justify-content: flex-start; gap: 8px; }
+.peer-dropped { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-2); }
+
+/* ---------------------------------------------------------------- §52 background work: the row of a turn Claude started itself */
+.auto-turn-row { align-self: flex-start; max-width: 92%; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); display: flex; flex-direction: column; gap: 3px; user-select: text; }
+.auto-turn-row .auto-turn-head { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-1, var(--fg)); min-width: 0; }
+.auto-turn-row .auto-turn-detail { font-size: 12px; color: var(--fg-2); word-break: break-word; }
+.auto-turn-row .auto-turn-summary { font-size: 11px; color: var(--fg-3); word-break: break-word; }
+.tool-block .bg-note { padding: 2px 10px 4px; color: var(--orange); }
+.tool-row .bg-move { flex: none; }
+
+/* ---------------------------------------------------------------- daily-03: status on the Changes tab, bar on the PRs tab */
+.tab-status { display: inline-flex; align-items: center; justify-content: center; margin-left: 5px; vertical-align: 0; font-size: 10px; font-weight: 700; line-height: 14px; min-width: 14px; height: 14px; padding: 0 4px; border-radius: 999px; }
+.tab-status.running { min-width: 7px; width: 7px; height: 7px; padding: 0; background: var(--accent-solid); animation: rg-tab-pulse 1.4s ease-in-out infinite; }
+.tab-status.waiting { background: var(--orange-bg); color: var(--orange); }
+.tab-status.review { background: var(--accent-bg); color: var(--accent); font-variant-numeric: tabular-nums; }
+@keyframes rg-tab-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .tab-status.running { animation: none; }
+}
+.tab-attention-bar .grow { font-weight: 600; }
+
+/* ---------------------------------------------------------------- HUD: "Claude Code 시작 중…" */
+.hud .starting-chip { display: inline-flex; align-items: center; gap: 5px; flex: none; }
+
+/* ---------------------------------------------------------------- chat list: a chat only its transcript is left of */
+.history-row.highlight { box-shadow: inset 0 0 0 2px var(--accent); }
+.chat-tab .record-only { flex: none; }
+
+/* ---------------------------------------------------------------- toast (polish-03: "지금은 거절할 수 없어요 — …") */
+.rg-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 1000; max-width: min(560px, calc(100vw - 32px)); padding: 8px 14px; border-radius: 8px; background: var(--elevated); color: var(--fg); border: 1px solid var(--border-strong); box-shadow: var(--shadow); font-size: 12.5px; pointer-events: none; animation: rg-toast-in 0.16s ease-out; }
+@keyframes rg-toast-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .rg-toast { animation: none; }
+}
+/* r2-chats-cards — polish P1-chrome-29: a long error reads three lines before it is cut (the whole of it on hover). */
+.clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: normal; }

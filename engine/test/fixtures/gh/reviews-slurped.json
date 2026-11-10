@@ -1,0 +1,6 @@
+[[
+  {"id": 2001, "node_id": "n", "user": {"login": "review-bot[bot]"}, "body": "## Summary",
+   "state": "CHANGES_REQUESTED", "html_url": "h", "pull_request_url": "p", "commit_id": "c",
+   "submitted_at": "2026-01-02T03:04:06Z", "author_association": "NONE"},
+  {"id": 9, "user": {"login": "me"}, "body": "", "state": "PENDING", "commit_id": "c"}
+]]

@@ -1,0 +1,28 @@
+# Xcode / SwiftPM
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+.build/
+build/
+# electron-builder's buildResources (the app icon) — not build output
+!clients/desktop/build/
+.swiftpm/
+xcuserdata/
+
+# Node workspaces (engine + sidecar)
+node_modules/
+sidecar/dist/
+sidecar/dist-test/
+engine/dist/
+
+# misc
+.DS_Store
+.omc/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Electron desktop client (clients/desktop)
+clients/desktop/dist/
+clients/desktop/out/
+clients/desktop/release/
+scratchpad/

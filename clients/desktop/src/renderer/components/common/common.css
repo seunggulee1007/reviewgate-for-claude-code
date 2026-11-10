@@ -1,0 +1,21 @@
+/* MARK: polish p-foundation — the shared pieces' styles (components/common, the toast's action). */
+
+/* Toast with an action: the button is the one part that takes the pointer (`.rg-toast` itself ignores it). */
+.rg-toast .rg-toast-action { pointer-events: auto; margin-left: 10px; padding: 1px 8px; font-size: 12px; background: transparent; border-color: var(--border-strong); color: var(--accent); }
+.rg-toast .rg-toast-action:hover { background: var(--bg-3); }
+
+/* A path cut in the middle: the folders shrink first, the file name stays (MiddlePath). */
+.path-middle { display: flex; min-width: 0; white-space: nowrap; }
+.path-middle .head { flex: 0 1 auto; color: var(--fg-2); }
+.path-middle .tail { flex: none; }
+
+/* A button off for a reason (ReasonButton): dimmed, still focusable and hoverable so its title shows; a click says why. */
+button.rg-reason[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+
+/* The inline SVG icons (icons.tsx) sit on the text's line. */
+.rg-icon { display: inline-block; vertical-align: -3px; flex: none; }
+
+/* "✓ 저장했어요" next to a field that saved (SavedTick). */
+.rg-saved-tick { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--green); opacity: 0; transition: opacity 0.15s; }
+.rg-saved-tick.shown { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .rg-saved-tick { transition: none; } }

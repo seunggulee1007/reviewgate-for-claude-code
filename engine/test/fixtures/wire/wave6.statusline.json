@@ -1,0 +1,59 @@
+{
+  "reply": {
+    "type": "status_line",
+    "lines": [],
+    "updatedAt": null,
+    "enabled": true,
+    "configured": true,
+    "source": "user",
+    "path": "/home/me/.claude/settings.json",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1,
+    "id": "sl-1"
+  },
+  "update": {
+    "type": "status_line",
+    "lines": [
+      "\u001b[1mOpus 5.5\u001b[0m \u001b[38;5;214mv2.1.310\u001b[0m ctx:-%",
+      "\u001b]8;;https://example.com/pr/1\u001b\\PR #1\u001b]8;;\u001b\\ cols=100"
+    ],
+    "updatedAt": "2023-11-14T22:13:20.000Z",
+    "enabled": true,
+    "configured": true,
+    "source": "user",
+    "path": "/home/me/.claude/settings.json",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1
+  },
+  "failed": {
+    "type": "status_line",
+    "lines": [
+      "\u001b[1mOpus 5.5\u001b[0m \u001b[38;5;214mv2.1.310\u001b[0m ctx:-%",
+      "\u001b]8;;https://example.com/pr/1\u001b\\PR #1\u001b]8;;\u001b\\ cols=100"
+    ],
+    "updatedAt": "2023-11-14T22:13:20.000Z",
+    "enabled": true,
+    "configured": true,
+    "source": "user",
+    "path": "/home/me/.claude/settings.json",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1,
+    "error": {
+      "code": "exit",
+      "message": "statusline: jq not found",
+      "at": "2023-11-14T22:13:20.000Z",
+      "exitCode": 127
+    }
+  },
+  "off": {
+    "type": "status_line",
+    "lines": [],
+    "updatedAt": null,
+    "enabled": false,
+    "configured": true,
+    "source": "user",
+    "path": "/home/me/.claude/settings.json",
+    "command": "~/.claude/statusline.sh",
+    "padding": 1
+  }
+}
