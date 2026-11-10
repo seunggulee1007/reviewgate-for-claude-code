@@ -131,23 +131,30 @@ describe("transcript shape (wave4d w4d-speed, polish-09)", () => {
         return renderToStaticMarkup(createElement(Transcript));
       };
       expect(renderAll()).toContain("정리하면");
-      const t0 = performance.now();
-      for (let i = 0; i < 20; i++) {
-        useStore.getState().handleEvent({ type: "text_delta", text: ` b${i}` } as EngineEvent);
-        renderAll();
+      // The fastest of several batches per side: a GC or CPU-steal pause lands in one batch, not in the minimum.
+      let before = Infinity;
+      for (let rep = 0; rep < 3; rep++) {
+        const t0 = performance.now();
+        for (let i = 0; i < 6; i++) {
+          useStore.getState().handleEvent({ type: "text_delta", text: ` b${rep}-${i}` } as EngineEvent);
+          renderAll();
+        }
+        before = Math.min(before, (performance.now() - t0) / 6);
       }
-      const before = (performance.now() - t0) / 20;
-      const t1 = performance.now();
-      for (let i = 0; i < 100; i++) {
-        useStore.getState().handleEvent({ type: "text_delta", text: ` a${i}` } as EngineEvent);
-        const s = useStore.getState();
-        transcriptShape(s.transcript);
-        Object.assign(useStore.getInitialState(), s);
-        renderToStaticMarkup(createElement(AssistantMessage, { item: s.transcript[s.transcript.length - 1] as AssistantItem }));
+      let now = Infinity;
+      for (let rep = 0; rep < 5; rep++) {
+        const t1 = performance.now();
+        for (let i = 0; i < 10; i++) {
+          useStore.getState().handleEvent({ type: "text_delta", text: ` a${rep}-${i}` } as EngineEvent);
+          const s = useStore.getState();
+          transcriptShape(s.transcript);
+          Object.assign(useStore.getInitialState(), s);
+          renderToStaticMarkup(createElement(AssistantMessage, { item: s.transcript[s.transcript.length - 1] as AssistantItem }));
+        }
+        now = Math.min(now, (performance.now() - t1) / 10);
       }
-      const now = (performance.now() - t1) / 100;
       console.log(`wave4d w4d-speed: a delta on a 500-row chat — before ${before.toFixed(2)} ms (every row), now ${now.toFixed(3)} ms (the streaming row)`);
       expect(now).toBeLessThan(before);
-    }, 60_000);
+    }, 120_000);
   });
 });

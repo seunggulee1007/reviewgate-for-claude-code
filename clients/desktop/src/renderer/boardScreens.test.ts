@@ -54,7 +54,8 @@ const gate = (p: Partial<GateState> = {}): GateState =>
     ...p,
   }) as GateState;
 
-const now = Date.now();
+// Assigned under a faked clock: "오늘 N명" counts from the local midnight at render time, which a real clock moves under a run at 00:00-00:15.
+let now = 0;
 const node = (id: string, patch: Partial<AgentNode> = {}): AgentNode => ({
   id: `task-${id}`,
   toolUseId: id,
@@ -71,8 +72,16 @@ const node = (id: string, patch: Partial<AgentNode> = {}): AgentNode => ({
 let seq = 7000;
 
 describe("the agent board (§43.1)", () => {
-  beforeAll(() => initI18n("ko", "win32"));
-  afterAll(() => initI18n("en", "darwin"));
+  beforeAll(() => {
+    initI18n("ko", "win32");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 24, 15, 0));
+    now = Date.now();
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+    initI18n("en", "darwin");
+  });
 
   let useStore: UseStore;
   beforeEach(async () => {

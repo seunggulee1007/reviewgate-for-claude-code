@@ -298,10 +298,10 @@ describe("§36 agents (wave3 desktop-agents)", () => {
   // ------------------------------------------------------------ composer / queue
 
   it("§36.4 the composer line and the queue while the main turn waits on subagents", async () => {
+    const { Composer } = await import("./components/chat/Composer"); // cold import first: it must not eat into the 252 s below
     const startedAt = Date.now() - 252_000;
     setState({ gate: gate(running), hud: { ...useStore.getState().state.hud, agents: [node()], turnStartedAt: Date.now() - 300_000, waitingOnAgents: { count: 2, longest: { toolUseId: "toolu_01Ab", type: "oh-my-claudecode:executor", startedAt } } } });
     useStore.setState({ queue: { ...useStore.getState().queue, items: [{ id: 1, text: "다음 할 일" }] } });
-    const { Composer } = await import("./components/chat/Composer");
     const html = await render(Composer);
     expect(html).toMatch(/data-testid="Composer waiting">.*<span class="truncate">메인은 서브에이전트 2개를 기다리는 중 · executor 4분 1[23]초<\/span>/);
     expect(html).toContain('data-testid="Queue status">에이전트가 끝나면 보냄<');

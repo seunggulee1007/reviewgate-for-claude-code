@@ -48,8 +48,8 @@ describe("relative time", () => {
   });
 
   it("one shared timer per interval wakes its components and stops with the last one", async () => {
+    const { nowTicker } = await import("./components/common/RelTime"); // before the fake clock: a cold import under it can stall
     vi.useFakeTimers();
-    const { nowTicker } = await import("./components/common/RelTime");
     const ticker = nowTicker(1000);
     let a = 0;
     let b = 0;

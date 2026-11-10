@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStore } from "zustand/vanilla";
 import { createSafetySlice, type SafetySlice } from "./storeSafety";
 import type { Store } from "./store";
@@ -15,7 +15,10 @@ function miniStore(restart: () => Promise<void>) {
   }));
 }
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Fake timers (Date too): the slice's setInterval and Date.now() differences run on a clock the test moves, not the runner's.
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+const wait = async (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 describe("force restart (robustness-07)", () => {
   it("is offered when the turn still runs after the delay, and restarts the session", async () => {

@@ -105,7 +105,7 @@ async function loadStore() {
 type UseStore = Awaited<ReturnType<typeof loadStore>>;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 async function until(pred: () => boolean): Promise<void> {
-  const deadline = Date.now() + 2000;
+  const deadline = Date.now() + 20_000; // generous: the awaited state can wait on store.settle()'s real 500 ms
   while (!pred()) {
     if (Date.now() > deadline) throw new Error("timed out");
     await new Promise((r) => setTimeout(r, 10));

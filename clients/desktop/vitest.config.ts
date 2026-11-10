@@ -7,5 +7,11 @@ export default defineConfig({
   resolve: {
     alias: { "@reviewgate/engine": fileURLToPath(new URL("../../engine/src/index.ts", import.meta.url)) },
   },
-  test: { include: ["src/main/**/*.test.ts", "src/renderer/**/*.test.ts"], environment: "node" },
+  test: {
+    include: ["src/main/**/*.test.ts", "src/renderer/**/*.test.ts"],
+    environment: "node",
+    // Cold imports of the store and big component graphs run inside the first test or hook of each (isolated) file; slow CI runners need far more than 5 s / 10 s.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
+  },
 });
