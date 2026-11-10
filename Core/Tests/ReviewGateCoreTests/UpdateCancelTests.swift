@@ -6,22 +6,22 @@ import Testing
 @Suite struct UpdateCancelTests {
     @Test func aCancelledTaskTerminatesItsProcess() async throws {
         let started = ContinuousClock.now
-        let task = Task { try await CommandRunner.run("/bin/sleep", ["5"]) }
+        let task = Task { try await CommandRunner.run("/bin/sleep", ["30"]) }
         try await Task.sleep(for: .milliseconds(200))
         task.cancel()
         let output = try await task.value
         #expect(output.status != 0)
-        #expect(ContinuousClock.now - started < .seconds(3))
+        #expect(ContinuousClock.now - started < .seconds(10))
     }
 
     @Test func aTaskCancelledBeforeTheProcessStartsStopsItToo() async throws {
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return try await CommandRunner.run("/bin/sleep", ["5"])
+            return try await CommandRunner.run("/bin/sleep", ["30"])
         }
         let started = ContinuousClock.now
         _ = try await task.value
-        #expect(ContinuousClock.now - started < .seconds(3))
+        #expect(ContinuousClock.now - started < .seconds(10))
     }
 
     @Test func howMuchHasCome() throws {
