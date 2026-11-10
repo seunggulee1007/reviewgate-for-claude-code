@@ -241,13 +241,13 @@ import Testing
         }
         app.handle(.state(snapshot(seq: 1, phase: .running)))
         app.interruptAndSend("urgent", mentions: ["a"])
-        for _ in 0..<50 where sent.count < 2 { try? await Task.sleep(for: .milliseconds(10)) }
+        await eventually { sent.count >= 2 }
         try? await Task.sleep(for: .milliseconds(20))
         #expect(sent == [.interrupt, .send(text: "urgent", mentions: ["a"])])
         #expect(app.sendAfterInterrupt == "urgent")
         app.handle(.state(snapshot(seq: 2)))
         // M7 (wave1 mac-session): `send` is request/reply, so the resend lands on the request seam a moment later.
-        for _ in 0..<50 where sent.count < 3 { try? await Task.sleep(for: .milliseconds(10)) }
+        await eventually { sent.count >= 3 }
         #expect(sent.last == .send(text: "urgent", mentions: ["a"]) && sent.count == 3)
     }
 
@@ -346,7 +346,7 @@ import Testing
         #expect(await app.rewind(toTurn: 2, mode: .files) == .needsConfirmation)
         #expect(app.forceRejectRequest?.paths == ["a.txt"])
         app.confirmForceReject()
-        for _ in 0..<100 where sent.last != .rewind(toTurn: 2, mode: .files, force: true) { try? await Task.sleep(for: .milliseconds(10)) }
+        await eventually { sent.last == .rewind(toTurn: 2, mode: .files, force: true) }
         #expect(sent.last == .rewind(toTurn: 2, mode: .files, force: true))
 
         // §35.11: a file rewind that left an outside change as it was says so (the toast).

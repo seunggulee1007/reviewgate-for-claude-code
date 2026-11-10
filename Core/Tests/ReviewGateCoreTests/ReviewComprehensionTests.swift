@@ -310,7 +310,7 @@ import Testing
         #expect(app.forceRejectRequest == ForceRejectRequest(command: .reject(paths: ["a.ts"]), paths: ["a.ts"]))
         #expect(app.hunkRefusal == nil)
         app.confirmForceReject()
-        for _ in 0..<100 where sent.last != .reject(paths: ["a.ts"], force: true) { try? await Task.sleep(nanoseconds: 20_000_000) }
+        await eventually { sent.last == .reject(paths: ["a.ts"], force: true) }
         #expect(sent.last == .reject(paths: ["a.ts"], force: true))
     }
 

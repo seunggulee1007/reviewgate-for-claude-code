@@ -43,9 +43,14 @@ import Testing
         return w
     }
 
-    /// Lets the menu slice's main-actor recompute run.
-    private func settle(_ until: () -> Bool) async {
-        for _ in 0..<200 where !until() { await Task.yield() }
+    /// Lets the menu slice's main-actor recompute run, until `until` holds.
+    private func settle(sourceLocation: SourceLocation = #_sourceLocation, _ until: () -> Bool) async {
+        await eventually(sourceLocation: sourceLocation, until)
+    }
+
+    /// For a check that nothing changed: 200 turns of the main actor, for a recompute that would come.
+    private func letRecomputesRun() async {
+        for _ in 0..<200 { await Task.yield() }
     }
 
     // MARK: - Slices
@@ -185,7 +190,7 @@ import Testing
         var hudOnly = snapshot(seq: 2)
         hudOnly.hud.activity = HUDActivity(kind: .thinking, toolName: nil, detail: nil)
         store.handle(.state(hudOnly))
-        await settle { false }
+        await letRecomputesRun()
         #expect(!watcher.fired)
         #expect(store.menuState == menu)
         // A running turn locks reject and the chat switch: the menus say so.

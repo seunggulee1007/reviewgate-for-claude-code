@@ -23,11 +23,6 @@ import Testing
         try JSONSerialization.jsonObject(with: JSONEncoder().encode(command)) as! [String: Any]
     }
 
-    /// Waits (≤ 1 s) for `condition`: `openProjectFile` loads in a task of its own.
-    private func eventually(_ condition: () -> Bool) async {
-        for _ in 0..<100 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
-    }
-
     @Test func wireDecodesLenientlyAndCommandsEncode() throws {
         guard case let .projectFile(file) = try decode(#"{"type":"project_file","id":"r1","path":"src/A.java","lines":["a","b"],"isBinary":false,"truncated":true,"size":12}"#)
         else { Issue.record("not project_file"); return }

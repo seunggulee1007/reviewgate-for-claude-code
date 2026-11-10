@@ -55,10 +55,6 @@ import Testing
         }
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<400 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     // MARK: "요청 후 바뀌지 않음" (Electron's `unchangedSinceRequest`)
 
     @Test func unchangedSinceRequestOnlyOnceTheFollowUpWasCollected() {

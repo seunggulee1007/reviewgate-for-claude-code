@@ -33,10 +33,6 @@ import Testing
         commands.compactMap { if case let .send(text, _, _, _) = $0 { return text }; return nil }
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     private func errorRows(_ app: AppState) -> [(message: String, fatal: Bool, info: ErrorRowInfo)] {
         app.transcript.compactMap { if case let .error(_, m, f, i) = $0 { return (m, f, i) }; return nil }
     }
@@ -65,7 +61,7 @@ import Testing
         #expect(sends(requests).isEmpty)
         // The turn ends; the queue sends "first" — and the engine says an external turn has just started.
         app.handle(.state(snapshot(seq: 2, phase: .reviewing)))
-        await waitUntil { app.queuedMessages.count == 2 }
+        await eventually { app.queuedMessages.count == 2 }
         #expect(sends(requests) == ["first"])
         #expect(app.queuedMessages.map(\.text) == ["first", "second"])
         #expect(app.queuePausedReason == nil)
@@ -77,12 +73,12 @@ import Testing
         #expect(app.cannotSendReason == PeerText.externalTurnComposer(Self.external))
         // It ends: "first" goes out by itself, then "second" after that turn.
         app.handle(.state(snapshot(seq: 4)))
-        await waitUntil { sends(requests).count == 2 }
+        await eventually { sends(requests).count == 2 }
         #expect(sends(requests) == ["first", "first"])
         #expect(app.queuedMessages.map(\.text) == ["second"])
         app.handle(.state(snapshot(seq: 5, phase: .running)))
         app.handle(.state(snapshot(seq: 6)))
-        await waitUntil { sends(requests).count == 3 }
+        await eventually { sends(requests).count == 3 }
         #expect(sends(requests) == ["first", "first", "second"])
         #expect(app.queuedMessages.isEmpty && app.queuePausedReason == nil)
     }
@@ -97,13 +93,13 @@ import Testing
         }
         app.handle(.state(snapshot(seq: 1)))
         app.send("hello")
-        await waitUntil { !app.queuedMessages.isEmpty }
+        await eventually { !app.queuedMessages.isEmpty }
         #expect(app.queuedMessages.map(\.text) == ["hello"])   // a manual send that was refused waits in the queue
         app.drainQueue()
         app.drainQueue()
         #expect(sends(requests) == ["hello"])   // still seq 1: no loop
         app.handle(.state(snapshot(seq: 2)))
-        await waitUntil { sends(requests).count == 2 }
+        await eventually { sends(requests).count == 2 }
         #expect(sends(requests) == ["hello", "hello"])
     }
 
@@ -114,7 +110,7 @@ import Testing
         }
         app.handle(.state(snapshot(seq: 1)))
         app.send("with images")
-        await waitUntil { app.queuePausedReason != nil }
+        await eventually { app.queuePausedReason != nil }
         #expect(app.queuedMessages.map(\.text) == ["with images"])
         #expect(app.queuePausedReason == EngineMessages.refusal(error: "too_many_attachments"))
         #expect(errorRows(app).count == 1)

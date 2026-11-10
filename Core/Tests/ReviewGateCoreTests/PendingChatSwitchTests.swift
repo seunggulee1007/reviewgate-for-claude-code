@@ -62,7 +62,7 @@ import Testing
         await settle()
         #expect(opens(fired) == 0)
         app.handle(.state(snapshot(seq: 3, phase: .idle)))
-        await settle()
+        await eventually { fired.last == .sessionNew && app.pendingChatSwitch == nil }
         #expect(fired.last == .sessionNew)
         #expect(app.pendingChatSwitch == nil)
     }
@@ -75,13 +75,14 @@ import Testing
         app.enqueue("then run the tests")
         #expect(await app.newChat())
         app.handle(.state(snapshot(seq: 2, phase: .idle)))
+        await eventually { sent(fired, "then run the tests") }
         await settle()
         // The queued message went to the chat it was typed in; the new chat waits for that turn.
         #expect(sent(fired, "then run the tests"))
         #expect(opens(fired) == 0 && app.pendingChatSwitch == .newChat)
         app.handle(.state(snapshot(seq: 3, phase: .running)))
         app.handle(.state(snapshot(seq: 4, phase: .idle)))
-        await settle()
+        await eventually { fired.last == .sessionNew }
         #expect(fired.last == .sessionNew)
     }
 
@@ -95,11 +96,11 @@ import Testing
         #expect(await app.sendInViewedChat("go on here"))
         #expect(app.pendingChatSwitchText == String(localized: "Your message goes to '\("Yesterday")' once Claude is done in '\("Mapper fix")'", bundle: .module))
         app.handle(.state(snapshot(seq: 2, phase: .idle)))
-        await settle()
+        await eventually { fired.contains(.sessionOpen(id: "s2")) }
         #expect(fired.contains(.sessionOpen(id: "s2")))
         // The switch landed: the message joins the queue of the chat it was written in and goes out by its rules.
         app.handle(.state(snapshot(seq: 3, phase: .idle, current: "s2")))
-        await settle()
+        await eventually { sent(fired, "go on here") && app.pendingChatSwitch == nil }
         #expect(sent(fired, "go on here"))
         #expect(app.pendingChatSwitch == nil)
     }
@@ -142,9 +143,10 @@ import Testing
             Issue.record("not held")
         }
         app.handle(.state(snapshot(seq: 2, phase: .idle)))
-        await settle()
+        await eventually { fired.contains(.sessionOpen(id: "s2")) }
         #expect(fired.contains(.sessionOpen(id: "s2")))
         app.handle(.state(snapshot(seq: 3, phase: .idle, current: "s2")))
+        await eventually { sent(fired, "first") }
         await settle()
         // Both join the chat's queue in order: the first goes out, the next waits for its turn as a queued message does.
         #expect(sent(fired, "first") && !sent(fired, "then this"))
@@ -172,6 +174,7 @@ import Testing
         app.handle(.state(snapshot(seq: 1, phase: .running)))
         #expect(await app.newChat())
         app.handle(.state(snapshot(seq: 2, phase: .collectFailed, collectError: "git add -A failed")))
+        await eventually { app.pendingChatSwitch == nil }
         await settle()
         #expect(app.pendingChatSwitch == nil && opens(fired) == 0)
         #expect(app.newChatBlocker == AppState.sessionRefusalText("collect_failed"))

@@ -87,7 +87,7 @@ import Testing
         #expect(store.diskCriticalNotice == nil)
         #expect(store.diskChip != nil)   // the chip stays while the disk is low
         store.retrySave()
-        for _ in 0..<50 where sent.isEmpty { try await Task.sleep(nanoseconds: 10_000_000) }
+        await eventually { !sent.isEmpty }
         #expect(sent == [.retrySave])
     }
 

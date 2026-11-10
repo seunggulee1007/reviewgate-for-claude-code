@@ -123,7 +123,7 @@ import Testing
         store.handle(.state(snapshot(seq: 1, phase: .running)))
         store.pickPermissionMode(.auto)
         #expect(store.permissionMode == .auto)   // shown at once
-        for _ in 0..<50 where store.scheduledPermissionMode == nil { await Task.yield() }
+        await eventually { store.scheduledPermissionMode != nil }
         #expect(asked == [.setPermissionMode(mode: .auto)])
         #expect(store.scheduledPermissionMode == .auto)
         #expect(store.permissionMode == .default)
@@ -156,7 +156,7 @@ import Testing
         store.handle(.state(snapshot(seq: 1)))
         store.pickPermissionMode(.auto)
         #expect(store.permissionMode == .auto)   // shown at once
-        for _ in 0..<50 where store.permissionModeRefusal == nil { await Task.yield() }
+        await eventually { store.permissionModeRefusal != nil }
         #expect(store.permissionMode == .default)
         #expect(store.permissionModeRefusal == "Auto mode is not available for this model. Pick another model or mode.")
         #expect(AppSettings.permissionMode(root: "/repo", defaults: d) == .default)

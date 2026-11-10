@@ -55,10 +55,6 @@ import Testing
 
     private func shownLabel(_ app: AppState) -> String? { app.selectedDiff?.allLines.last?.text }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<400 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     /// An engine answering `select_file` / `full_file` with the tree it is told and recording what it was asked.
     @MainActor private final class FakeEngine {
         var tree = "B1"
@@ -276,7 +272,7 @@ import Testing
         let b = file("b.ts") { $0.changedSinceRequest = true; $0.sentNoteCount = 1 }
         app.handle(.state(snapshot(seq: 2, files: [a, b]) { $0.gate.lastRequest = ReviewRequestInfo(turn: 2, at: "t", notes: 1) }))
         app.selectedPath = "b.ts"
-        await waitUntil { app.selectedDiffSince == .review && shownLabel(app) == "review@B1" }
+        await eventually { app.selectedDiffSince == .review && shownLabel(app) == "review@B1" }
         #expect(engine.asked.suffix(2) == [.selectFile(path: "b.ts", since: .request), .selectFile(path: "b.ts", since: nil)])
         #expect(app.selectedDiffSince == .review && app.lastError == nil)
     }
@@ -550,7 +546,7 @@ import Testing
         // The turn touches files: the list is fetched (debounced) and summed up for the HUD.
         app.handle(.state(snapshot(seq: 2, files: [], phase: .running, end: nil, review: nil) { $0.hud.turnFiles = 2 }))
         await app.liveRefreshTask?.value
-        await waitUntil { app.liveChip?.added != nil }
+        await eventually { app.liveChip?.added != nil }
         #expect(asked.first == .liveChanges)
         #expect(app.liveChip == LiveChipSummary(files: 2, added: 312, deleted: 203))
 
@@ -563,7 +559,7 @@ import Testing
         app.handle(.toolUse(id: "e2", name: "Edit", input: .object([:]), file: "a.ts", info: ToolUseInfo()))
         app.handle(.toolResult(toolUseId: "e2", isError: false, preview: "", info: ToolResultInfo()))
         await app.liveRefreshTask?.value
-        await waitUntil { asked.filter { $0 == .liveChanges }.count > before }
+        await eventually { asked.filter { $0 == .liveChanges }.count > before }
         #expect(asked.filter { $0 == .liveChanges }.count == before + 1)
 
         // A live file's diff opens read-only.

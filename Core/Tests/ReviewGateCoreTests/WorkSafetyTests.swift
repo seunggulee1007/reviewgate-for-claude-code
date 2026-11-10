@@ -184,7 +184,7 @@ import Testing
         app.interrupt()
         app.armInterruptWatch(delay: .milliseconds(30))   // the test's short delay instead of 10 s
         #expect(!app.showsForceRestart)
-        try await waitUntil { app.showsForceRestart }
+        await eventually { app.showsForceRestart }
         app.forceRestartStuckTurn()
         #expect(sent.contains(.interrupt))
         #expect(sent.contains(.restartSession))
@@ -197,10 +197,10 @@ import Testing
         app.handle(.state(snapshot(seq: 1, phase: .running)))
         app.interrupt()
         app.armInterruptWatch(delay: .milliseconds(30))
-        try await waitUntil { app.interruptStuck }
+        await eventually { app.interruptStuck }
         app.handle(.state(snapshot(seq: 2, phase: .idle)))
         #expect(!app.showsForceRestart)
-        try await waitUntil { !app.interruptStuck }
+        await eventually { !app.interruptStuck }
         // A stop that works never offers it.
         app.handle(.state(snapshot(seq: 3, phase: .running)))
         app.interrupt()
@@ -208,14 +208,6 @@ import Testing
         app.handle(.state(snapshot(seq: 4, phase: .idle)))
         try await Task.sleep(for: .milliseconds(120))
         #expect(!app.interruptStuck)
-    }
-
-    private func waitUntil(_ condition: @MainActor () -> Bool) async throws {
-        for _ in 0..<200 {
-            if condition() { return }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        Issue.record("condition not met in time")
     }
 
     // MARK: - Draft per chat (polish-12)

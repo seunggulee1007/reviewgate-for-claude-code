@@ -70,10 +70,6 @@ import Testing
 
     // MARK: M7 / §2.9 Stop & send
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     /// "Stop & send": the interrupted turn ends before the send behind it runs; when that send's snapshot A then fails
     /// (`error{send_failed | lfs_missing}`, then `ok`) the message waits first in the stopped queue — it was dropped (the
     /// composer was already cleared). As in Electron.
@@ -91,7 +87,7 @@ import Testing
         app.handle(.state(snapshot(seq: 1)))
         app.handle(.state(snapshot(seq: 2, phase: .running)))
         app.interruptAndSend("이 방향으로 다시 해 줘")
-        await waitUntil { !requests.isEmpty && app.queuePausedReason != nil }
+        await eventually { !requests.isEmpty && app.queuePausedReason != nil }
         #expect(app.queuedMessages.map(\.text) == ["이 방향으로 다시 해 줘"])
         #expect(app.queuePausedReason != nil)
         // Nothing went out twice; Resume sends it again.
@@ -108,7 +104,7 @@ import Testing
         }
         app.handle(.state(snapshot(seq: 1)))
         app.send("LFS 저장소에서 보내기")
-        await waitUntil { app.queuePausedReason != nil }
+        await eventually { app.queuePausedReason != nil }
         #expect(app.queuedMessages.map(\.text) == ["LFS 저장소에서 보내기"])
         #expect(app.queuePausedReason == SessionNotices.lfsMissingText)
         #expect(app.errorBanner?.code == "lfs_missing" && app.errorBanner?.message == SessionNotices.lfsMissingText)

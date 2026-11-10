@@ -149,7 +149,7 @@ import Testing
         var attention: [AttentionEvent] = []
         app.onAttention = { attention.append($0) }
         app.handle(.state(snapshot(seq: 1)))
-        try await Task.sleep(for: .milliseconds(20))
+        await eventually { commands.contains(.sideList) }
         #expect(commands.contains(.sideList))
 
         app.handle(.sideThread(id: nil, thread: running))   // the engine's own snapshot comes first
@@ -378,10 +378,10 @@ import Testing
         }
         app.handle(.state(snapshot(seq: 1, chat: "chat-1")))
         app.handle(.state(snapshot(seq: 2, chat: "chat-1")))
-        try await Task.sleep(for: .milliseconds(20))
+        await eventually { lists >= 1 }
         #expect(lists == 1)
         app.handle(.state(snapshot(seq: 3, chat: "chat-2")))
-        try await Task.sleep(for: .milliseconds(20))
+        await eventually { lists >= 2 && app.side.mainSessionId == "chat-2" }
         #expect(lists == 2)
         #expect(app.side.mainSessionId == "chat-2")
     }

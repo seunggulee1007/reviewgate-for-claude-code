@@ -35,10 +35,6 @@ import Testing
         return s
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     private func peerRows(_ app: AppState) -> [PeerMessage] {
         app.transcript.compactMap { if case let .peerMessage(_, m) = $0 { return m }; return nil }
     }
@@ -98,24 +94,24 @@ import Testing
 
         refusal = .refused("peer_inbox_changed:m1, m2", code: "peer_inbox_changed")
         app.acceptPeerMessages()
-        await waitUntil { app.peerNotice != nil && !app.isPeerBusy }
+        await eventually { app.peerNotice != nil && !app.isPeerBusy }
         #expect(app.peerNotice == PeerText.inboxChanged)
 
         refusal = .refused("gate_closed:external_turn", code: "gate_closed")
         app.acceptPeerMessages()
-        await waitUntil { app.peerNotice == PeerText.waitForOtherWork }
+        await eventually { app.peerNotice == PeerText.waitForOtherWork }
         #expect(app.peerNotice == PeerText.waitForOtherWork)
 
         refusal = .refused("peer_none", code: "peer_none")
         app.dismissPeerMessages()
-        await waitUntil { app.peerInbox.isEmpty }
+        await eventually { app.peerInbox.isEmpty }
         #expect(app.peerInbox.isEmpty && app.peerNotice == nil)
 
         // A success clears the notice; the snapshot without messages clears it too.
         app.handle(.state(snapshot(seq: 2, inbox: [held("m3")])))
         refusal = .refused("peer_release_failed:no released frame", code: "peer_release_failed")
         app.acceptPeerMessages()
-        await waitUntil { app.peerNotice != nil && !app.isPeerBusy }
+        await eventually { app.peerNotice != nil && !app.isPeerBusy }
         #expect(app.peerNotice == SessionNotices.peerReleaseFailedText)
         app.handle(.state(snapshot(seq: 3, inbox: [])))
         #expect(app.peerNotice == nil)

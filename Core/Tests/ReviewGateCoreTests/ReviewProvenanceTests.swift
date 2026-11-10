@@ -59,10 +59,6 @@ import Testing
         return s
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     private func json(_ command: EngineCommand) throws -> [String: Any] {
         try #require(JSONSerialization.jsonObject(with: NDJSON.encodeLine(EngineCommandEnvelope(command: command))) as? [String: Any])
     }
@@ -307,10 +303,10 @@ import Testing
             }
         }
         app.rejectAll(includeExternal: true)
-        await waitUntil { app.forceRejectRequest != nil }
+        await eventually { app.forceRejectRequest != nil }
         #expect(app.forceRejectRequest?.command == .rejectAll(includeExternal: true))
         app.confirmForceReject()
-        await waitUntil { sent.count == 2 }
+        await eventually { sent.count == 2 }
         #expect(sent.last == .rejectAll(force: true, includeExternal: true))
     }
 

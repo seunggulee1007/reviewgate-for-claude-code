@@ -182,10 +182,10 @@ import Testing
             guard case .commitDraft = command else { throw EngineClientError.stopped }   // the project switch asks other things too
             calls += 1
             let call = calls
-            for _ in 0..<1000 where !released.contains(call) { await Task.yield() }
+            await eventually { released.contains(call) }
             return .commitDraft(CommitDraftReply(message: "draft \(call)"))
         }
-        func waitForCalls(_ n: Int) async { for _ in 0..<1000 where calls < n { await Task.yield() } }
+        func waitForCalls(_ n: Int) async { await eventually { calls >= n } }
         let old = Task { await app.flow.draftCommitMessage(paths: nil) }
         await waitForCalls(1)
         #expect(app.flow.isDraftingCommit)

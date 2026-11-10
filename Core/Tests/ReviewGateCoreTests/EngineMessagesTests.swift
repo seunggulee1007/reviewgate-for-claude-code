@@ -29,10 +29,6 @@ import Testing
         ChangedFile(path: path, oldPath: nil, status: .modified, added: 1, deleted: 0, isBinary: false, tools: ["Edit"], state: .pending)
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     // MARK: - Decoding (§19.1, §19.6)
 
     @Test func decodesResultCodeAndPaths() throws {
@@ -254,7 +250,7 @@ import Testing
             }
         }
         app.reject(file("a.txt"))
-        await waitUntil { app.forceRejectRequest != nil }
+        await eventually { app.forceRejectRequest != nil }
         #expect(app.forceRejectRequest == ForceRejectRequest(command: .reject(paths: ["a.txt"]), paths: ["a.txt"]))
         #expect(app.transcript.isEmpty)   // a question, not an error row
 
@@ -263,24 +259,24 @@ import Testing
         #expect(app.forceRejectRequest == nil && sent == [.reject(paths: ["a.txt"])])
 
         app.reject(file("a.txt"))
-        await waitUntil { app.forceRejectRequest != nil }
+        await eventually { app.forceRejectRequest != nil }
         app.confirmForceReject()
-        await waitUntil { sent.count == 3 }
+        await eventually { sent.count == 3 }
         #expect(sent.last == .reject(paths: ["a.txt"], force: true))
         #expect(app.forceRejectRequest == nil)
 
         // reject_all, older engine: the paths come from the text.
         app.rejectAll()
-        await waitUntil { app.forceRejectRequest != nil }
+        await eventually { app.forceRejectRequest != nil }
         #expect(app.forceRejectRequest?.paths == ["a.txt", "b.txt"])
         app.confirmForceReject()
-        await waitUntil { sent.count == 5 }
+        await eventually { sent.count == 5 }
         #expect(sent.last == .rejectAll(force: true))
 
         // Another refusal is an error row in the user's words.
         app.requestSink = { _ in throw EngineClientError.refused("session_running", code: "session_running") }
         app.reject(file("b.txt"))
-        await waitUntil { app.lastError == AppState.sessionRefusalText("session_running") }
+        await eventually { app.lastError == AppState.sessionRefusalText("session_running") }
         #expect(app.lastError == AppState.sessionRefusalText("session_running") && app.forceRejectRequest == nil)
         #expect(app.transcript.count == 1)   // just that row: nothing else failed along the way
     }
@@ -317,7 +313,7 @@ import Testing
         app.handle(.state(snapshot(seq: 2, phase: .reviewing, plan: plan)))
         #expect(!app.isPlanLocked)
         app.approvePlan()
-        await waitUntil { !app.isAnsweringPlan }
+        await eventually { !app.isAnsweringPlan }
         #expect(sent == [.planResponse(approve: true, mode: .default, message: nil)])
         #expect(app.pendingPlan == plan)
         #expect(app.planRefusal == EngineMessages.refusal(error: "gate_closed:collecting"))
@@ -327,7 +323,7 @@ import Testing
         app.keepPlanning(message: "more detail")
         app.handle(.error(message: "The plan answer could not be sent to Claude (x); the plan is still pending.", fatal: false,
                           scope: .session, detail: EngineErrorDetail(code: "plan_followup_failed")))
-        await waitUntil { !app.isAnsweringPlan }
+        await eventually { !app.isAnsweringPlan }
         app.handle(.state(snapshot(seq: 3, plan: plan)))
         #expect(app.pendingPlan == plan && app.planRefusal?.contains("snapshot failed") == true)
 
@@ -335,7 +331,7 @@ import Testing
         refusal = nil
         app.approvePlan(mode: .acceptEdits)
         #expect(app.isAnsweringPlan && app.isPlanLocked)
-        await waitUntil { !app.isAnsweringPlan }
+        await eventually { !app.isAnsweringPlan }
         app.handle(.state(snapshot(seq: 4)))
         #expect(app.pendingPlan == nil && app.planRefusal == nil)
     }
@@ -346,7 +342,7 @@ import Testing
         app.requestSink = { _ in throw EngineClientError.refused("no_plan", code: "no_plan") }
         app.handle(.state(snapshot(seq: 1, plan: plan)))
         app.keepPlanning()
-        await waitUntil { !app.isAnsweringPlan }
+        await eventually { !app.isAnsweringPlan }
         app.handle(.state(snapshot(seq: 2)))
         #expect(app.pendingPlan == plan)   // shown again with the reason
         app.commandSink = { _ in }

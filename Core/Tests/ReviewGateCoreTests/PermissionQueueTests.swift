@@ -56,10 +56,6 @@ import Testing
         return .missing
     }
 
-    private func waitUntil(_ condition: () -> Bool) async {
-        for _ in 0..<400 where !condition() { try? await Task.sleep(for: .milliseconds(5)) }
-    }
-
     private let executor = PermissionAgent(agentId: "taskA", agentToolUseId: "agA", subagentType: "executor", description: "compile")
     private let tester = PermissionAgent(agentId: "taskB", agentToolUseId: "agB", subagentType: "test-engineer", description: "test")
 
@@ -370,7 +366,7 @@ import Testing
         app.handle(.state(running(seq: 1, queue: [r1])))
         app.respondPermission(requestId: "R1", allow: true)
         #expect(card(app, "R1") == .allowed)   // decided at once…
-        await waitUntil { app.permissionNotice != nil }
+        await eventually { app.permissionNotice != nil }
         // …and when the engine says the request was not open, the card reads "처리됨" with a toast.
         #expect(sent == [.permissionResponse(requestId: "R1", allow: true)])
         #expect(app.permissionNotice?.text == PermissionNotice.alreadyHandled.text)
@@ -384,7 +380,7 @@ import Testing
         app.handle(.state(running(seq: 2, queue: [r2])))
         app.requestSink = { _ in throw EngineClientError.refused("gate_closed:reverting", code: "gate_closed") }
         app.respondPermission(requestId: "R2", allow: false)
-        await waitUntil { app.permissionNotice != nil }
+        await eventually { app.permissionNotice != nil }
         #expect(card(app, "R2") == .open && app.shortcutPermission?.requestId == "R2")
 
         // A card whose request is gone sends nothing and says so.
@@ -395,7 +391,7 @@ import Testing
         #expect(sent.count == count && app.permissionNotice?.text == PermissionNotice.alreadyHandled.text)
         count = sent.count
         app.respondPermission(requestId: "R2", allow: true)
-        await waitUntil { sent.count > count }
+        await eventually { sent.count > count }
         #expect(sent.last == .permissionResponse(requestId: "R2", allow: true) && card(app, "R2") == .allowed)
     }
 
