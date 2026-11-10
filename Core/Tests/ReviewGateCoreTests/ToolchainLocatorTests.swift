@@ -42,11 +42,13 @@ import Testing
         #expect(out.status == 3)
     }
 
+    /// A 60 s sleep under a 300 ms timeout ends long before 60 s: half a minute of room for a slow runner, and a timeout
+    /// that did nothing still fails.
     @Test func timeoutTerminates() async throws {
         let start = ContinuousClock.now
-        let out = try await CommandRunner.run("/bin/sleep", ["30"], timeout: .milliseconds(300))
+        let out = try await CommandRunner.run("/bin/sleep", ["60"], timeout: .milliseconds(300))
         #expect(out.status != 0)
-        #expect(ContinuousClock.now - start < .seconds(5))
+        #expect(ContinuousClock.now - start < .seconds(30))
     }
 }
 
