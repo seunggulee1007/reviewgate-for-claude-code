@@ -295,5 +295,5 @@ describe("reject_all of many files reverts them at once (ยง39.1, robustness-10 โ
     await h.engine.request({ type: "reject_all" });
     expect(h.engine.state.changedFiles).toHaveLength(0);
     expect(read(dir, "m-0.txt")).toBe("original 0\n");
-  }, 60_000);
+  });
 });

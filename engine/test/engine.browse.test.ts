@@ -83,7 +83,7 @@ describe("§47 project_file", () => {
     expect(min.lines).toHaveLength(1);
     expect(min.lines[0]!.length).toBe(PROJECT_FILE_MAX_BYTES);
     expect(min.truncated).toBe(true);
-  }, 20_000);
+  });
 });
 
 describe("§47 project_search", () => {

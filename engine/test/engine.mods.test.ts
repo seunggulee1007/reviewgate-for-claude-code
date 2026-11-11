@@ -89,7 +89,7 @@ describe("hooks, skills and settings under a gitignored .claude/ are reviewed (S
       expect(sh(dir, "ls-tree", "-r", "--name-only", tree, "--", ".claude/settings.local.json")).toBe("");
       expect(() => sh(dir, "grep", "-q", "secret", tree, "--", ".claude")).toThrow();
     }
-  }, 30_000);
+  });
 
   it("content too large to capture is listed (uncaptured) and never reverted", async () => {
     const dir = track(makeRepo());
