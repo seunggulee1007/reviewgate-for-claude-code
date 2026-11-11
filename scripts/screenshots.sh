@@ -30,8 +30,9 @@
 #                  the same after 45 more turns in the open chat); cards: the composer's shots (a review,
 #                  Claude's question and a permission card above the composer) six times over the layout check's transcript;
 #                  scrolldown: a long chat scrolled down to its end as a trackpad does, idle and streaming (`scrolldown:` lines,
-#                  a JUMP when the view went further from the newest row than the reader took it).
-#                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST or BLANK in tour.log fails the run (exit 1)
+#                  a JUMP when the view went further from the newest row than the reader took it);
+#                  open: Open Project… / Switch Project… / Open in New Window… in each state a window can be in (`open` lines).
+#                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK or SILENT in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
 #   SHOTS_VISIBLE  1: a SHOTS_LAYOUT run shows its windows and comes to the front as the README run does. By default it is
@@ -354,12 +355,12 @@ if [ -n "${SHOTS_LAYOUT:-}" ]; then   # the layout / scroll check: its PNGs stay
   say "layout shots: $(ls "$RAW"/*.png | tr '\n' ' ')"
   # What the check marks fails the run (§49.2, §45.1): a part taller than the window, a card cut, the send button out of
   # the window, a typed message lost, a transcript that shows none of its rows.
-  marked="$(grep -E 'TALLER|— CUT|OUT OF THE WINDOW|LOST|BLANK' "$RAW/tour.log" || true)"
+  marked="$(grep -E 'TALLER|— CUT|OUT OF THE WINDOW|LOST|BLANK|SILENT' "$RAW/tour.log" || true)"
   if [ -n "$marked" ]; then
     printf '%s\n' "$marked" >&2
-    die "the layout check failed: $(printf '%s\n' "$marked" | wc -l | tr -d ' ') marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK; log: $RAW/tour.log)"
+    die "the layout check failed: $(printf '%s\n' "$marked" | wc -l | tr -d ' ') marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT; log: $RAW/tour.log)"
   fi
-  say "layout check: nothing marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK)"
+  say "layout check: nothing marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT)"
   exit 0
 fi
 

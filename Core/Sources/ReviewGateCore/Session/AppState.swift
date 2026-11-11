@@ -196,6 +196,10 @@ public final class AppState {
     public internal(set) var lastError: String?
     /// M13 (audit 4.2): the last engine `error` event with its scope, until the user dismisses it (`dismissErrorBanner()`).
     public internal(set) var errorBanner: ErrorBanner?
+    /// The folder an open / switch is on its way to, until the engine has answered: the empty window says "Opening <name>…",
+    /// and a `project_open_failed` banner offers to try it again. A newer open replaces it (`beginOpening`).
+    public internal(set) var openingProject: URL?
+    @ObservationIgnored private var openingTick = 0
     /// §19.6: a transient status (`api_retrying` "재시도 중 (2/10)…", `cli_start_slow`) shown in the HUD — not a banner;
     /// it goes away when the turn makes progress, ends or the session has started.
     public private(set) var transientNotice: TransientNotice?
@@ -694,6 +698,8 @@ public final class AppState {
     /// and the window asks whether to take the worktree over (`takeOver()`) or stays empty (`cancelTakeover()`).
     private func open(_ url: URL, command: EngineCommand) async {
         resetProjectView()
+        let opening = beginOpening(url)
+        defer { endOpening(opening) }
         cachedCapabilities = AppSettings.cachedCapabilities(defaults: defaults)
         lockedProjectURL = nil
         refusedLock = nil
@@ -724,8 +730,25 @@ public final class AppState {
         }
     }
 
+    /// `openingProject` is `url` from now on; the returned tick ends it (`endOpening`) unless a newer open began meanwhile.
+    func beginOpening(_ url: URL) -> Int {
+        openingTick &+= 1
+        openingProject = url
+        return openingTick
+    }
+
+    func endOpening(_ tick: Int) {
+        if tick == openingTick { openingProject = nil }
+    }
+    #if DEBUG
+    /// The screenshot tour's "Opening <name>…" shot (App/Debug/ScreenshotTour.swift); nil ends it.
+    public func debugShowOpening(_ url: URL?) {
+        if let url { _ = beginOpening(url) } else { endOpening(openingTick) }
+    }
+    #endif
+
     /// The banner's "Reopen": opens the project again after the engine stopped or failed to start (a new engine is
-    /// spawned lazily by the open).
+    /// spawned lazily by the open), or after an open whose git did not answer (`project_open_failed`).
     public func reopenAfterEngineFailure() async {
         guard let url = errorBanner?.reopenProject else { return }
         errorBanner = nil

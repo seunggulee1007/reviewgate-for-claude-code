@@ -282,6 +282,6 @@ struct WorkbenchCommands: Commands {
     /// Opens `url` in its own window, or focuses the window that already has it open (same as the switcher).
     private func openWorkbench(_ url: URL) {
         if WorkbenchRegistry.shared.focusWindow(for: url) { return }
-        openWindow(id: "workbench", value: url.standardizedFileURL)
+        openWindow(id: "workbench", value: ProjectOpener.newWindowValue(url))
     }
 }

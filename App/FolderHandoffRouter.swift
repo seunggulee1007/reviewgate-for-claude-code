@@ -87,7 +87,7 @@ final class FolderHandoffRouter {
             }
         } else if let openWindow {
             awaitingWindow = true
-            openWindow(id: "workbench", value: request.folder)
+            openWindow(id: "workbench", value: ProjectOpener.newWindowValue(request.folder))
             NSApp.activate(ignoringOtherApps: true)
             Task {
                 try? await Task.sleep(for: .seconds(2))

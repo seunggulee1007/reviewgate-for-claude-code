@@ -135,13 +135,14 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         open(url, store: store)
     }
 
     /// Opens `url` in this window. MARK: polish p-lifecycle (P1-chrome-03): with a project open here it is a switch — ⌘O, the
     /// toolbar's folder, File › Open Recent, the recent list and a git candidate all ask what `requestSwitch` asks.
     static func open(_ url: URL, store: AppState) {
+        if openElsewhereIfWindowGone(url, store: store) { return }
         if store.projectURL != nil, let entry = WorkbenchRegistry.shared.entry(for: store) {
             requestSwitch(to: url, store: store, pending: Bindable(entry.model).pendingSwitch)
             return
@@ -149,16 +150,25 @@ enum ProjectOpener {
         Task { await store.openProject(url) }
     }
 
-    /// Switch flow (header menu, ⌘⇧O, and `open` with a project open). The project already open here does nothing; one open
-    /// in another window comes to the front instead (switching would stop this session for a lock it cannot take). polish
-    /// P1-chrome-03: a switch stops the session, so a turn running, a card waiting or work that would stop or be lost asks
-    /// first (Core `QuitPrompt.projectChange`, "프로젝트를 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are
-    /// asked about by the caller's alert (via `pending`); otherwise the store swaps sessions right away.
+    /// Switch flow (header menu, ⌘⇧O, and `open` with a project open). The project already open here, or in another window,
+    /// brings that window to the front, which says so (`sayAlreadyOpen`) — one in another window is not switched to (that
+    /// would stop this session for a lock it cannot take). polish P1-chrome-03: a switch stops the session, so a turn
+    /// running, a card waiting or work that would stop or be lost asks first (Core `QuitPrompt.projectChange`, "프로젝트를
+    /// 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are asked about by the caller's alert (via `pending`);
+    /// otherwise the store swaps sessions right away.
     static func requestSwitch(to url: URL, store: AppState, pending: Binding<URL?>) {
+        if openElsewhereIfWindowGone(url, store: store) { return }
         let registry = WorkbenchRegistry.shared
         let target = AppSettings.projectKey(url)
-        if store.projectURL.map(AppSettings.projectKey) == target { return }
-        if let other = registry.entry(for: url), other.store !== store, other.focus() { return }
+        if store.projectURL.map(AppSettings.projectKey) == target {
+            registry.entry(for: store)?.focus()
+            sayAlreadyOpen(url)
+            return
+        }
+        if let other = registry.entry(for: url), other.store !== store, other.focus() {
+            sayAlreadyOpen(url)
+            return
+        }
         if let entry = registry.entry(for: store),
            let prompt = QuitPrompt.projectChange(entry.quitState, .switchProject,
                                                  confirmWhileWorking: AppSettings.confirmCloseWhileWorking()) {
@@ -200,7 +210,7 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Switch")
         panel.message = String(localized: "Choose a project folder to switch to")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         requestSwitch(to: url, store: store, pending: pending)
     }
 
@@ -210,8 +220,36 @@ enum ProjectOpener {
     /// brought to the front (never a duplicate, never the takeover alert).
     static func openInNewWindow(_ url: URL, openWindow: OpenWindowAction) {
         let target = url.standardizedFileURL
-        if WorkbenchRegistry.shared.focusWindow(for: target) { return }
-        openWindow(id: "workbench", value: target)
+        if WorkbenchRegistry.shared.focusWindow(for: target) {
+            sayAlreadyOpen(target)
+            return
+        }
+        openWindow(id: "workbench", value: newWindowValue(target))
+    }
+
+    /// The value a new window is opened with: `url` with a fragment of its own. SwiftUI brings forward the window it thinks
+    /// shows a value — a window closed earlier (AppKit keeps it, hidden) still matched the folders it had shown, so no window
+    /// came. The window reads the folder without the fragment (`folderOfWindowValue`); its own folder is kept in sync after.
+    static func newWindowValue(_ url: URL) -> URL {
+        var parts = URLComponents(url: url.standardizedFileURL, resolvingAgainstBaseURL: false)
+        parts?.fragment = UUID().uuidString
+        return parts?.url ?? url
+    }
+
+    static func folderOfWindowValue(_ value: URL) -> URL { URL(fileURLWithPath: value.path).standardizedFileURL }
+
+    /// A store whose window is gone (a menu that still names a closed window) would open the project where no one sees it,
+    /// on an engine already stopped: `url` opens in a window of its own instead. False when the store's window is there.
+    private static func openElsewhereIfWindowGone(_ url: URL, store: AppState) -> Bool {
+        guard WorkbenchRegistry.shared.entry(for: store) == nil, let openWindow = FolderHandoffRouter.shared.openWindow else { return false }
+        openInNewWindow(url, openWindow: openWindow)
+        return true
+    }
+
+    /// An open that finds the project already open ends with its window in front saying so — the window may be the one in
+    /// front already, where coming forward shows nothing (0.5.12 did nothing at all for the project open in this window).
+    private static func sayAlreadyOpen(_ url: URL) {
+        Toast.show(String(localized: "\(url.lastPathComponent) is already open in this window"), systemImage: "info.circle.fill")
     }
 
     /// "Open in New Window…" (⌘⇧N): the folder picker, then `openInNewWindow`.
@@ -222,9 +260,21 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder to open in a new window")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         openInNewWindow(url, openWindow: openWindow)
     }
+
+    /// The folder picked in `panel`; nil on Cancel. DEBUG: `debugPick` (the open check, App/Debug/ScreenshotTour.swift)
+    /// stands in for the user once, and no panel shows.
+    private static func pick(_ panel: NSOpenPanel) -> URL? {
+        #if DEBUG
+        if let url = debugPick { debugPick = nil; return url }
+        #endif
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+    #if DEBUG
+    static var debugPick: URL?
+    #endif
 
     /// ⌥-click on a project row opens it in a new window instead of switching this one.
     static var optionKeyDown: Bool { NSEvent.modifierFlags.contains(.option) }
@@ -411,6 +461,9 @@ private struct WorkbenchWindow: View {
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
             .task {
                 entry.store.fileLog = EngineLogFile.shared   // wave1 mac-session: ~/Library/Logs/ReviewGate (robustness-03)
+                #if DEBUG
+                if let tourLog = ScreenshotTour.logFile { entry.store.fileLog = tourLog }   // a tour's windows: its own folder
+                #endif
                 WorkbenchRegistry.shared.register(entry)
                 AttentionCenter.shared.attach(entry)
                 entry.store.confirmSideSwitch = SideSwitchAlert.confirm   // wave4b w4b-side (§40.3)
@@ -419,7 +472,7 @@ private struct WorkbenchWindow: View {
                 handoff.openWindow = openWindow
                 handoff.beganOpening()
                 defer { handoff.finishedOpening() }
-                if let url {
+                if let url = url.map(ProjectOpener.folderOfWindowValue) {
                     // M19: the window comes back where this project was last seen.
                     entry.applySavedFrame(root: AppSettings.projectKey(url))
                     await entry.store.openProject(url)
@@ -495,7 +548,7 @@ private struct WorkbenchWindow: View {
         for item in restore.dropFirst() {
             let target = URL(fileURLWithPath: item.path).standardizedFileURL
             guard registry.entry(for: target) == nil else { continue }
-            openWindow(id: "workbench", value: target)
+            openWindow(id: "workbench", value: ProjectOpener.newWindowValue(target))
             // Sequentially: two windows must never race for one worktree lock.
             await Self.waitForProject(at: target)
         }

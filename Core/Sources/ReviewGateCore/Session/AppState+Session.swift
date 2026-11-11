@@ -165,6 +165,7 @@ public extension AppState {
         banner.toolName = detail?.toolName
         banner.path = detail?.path
         banner.branch = detail?.branch
+        if code == "project_open_failed" { banner.reopenProject = openingProject }   // "Reopen" tries the open again
         errorBanner = banner
     }
 

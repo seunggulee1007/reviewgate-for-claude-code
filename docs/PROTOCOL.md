@@ -4103,6 +4103,19 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   did not respond within 300 s — …" through the existing error paths (`send_failed`, `collect_failed` with retry,
   `revert_failed`). The user's commit / push (their hooks) and `git switch` are not capped. No wire change. Test:
   `engine/test/git.timeout.test.ts`.
+- **An open whose git does not answer (engine).** `open_project` / `switch_project` start with `git rev-parse
+  --show-toplevel`, which answers at once in any folder. On macOS it once never answered (git started by GUI apps
+  waited on a privacy check until the Mac restarted), and the open waited for ever, with nothing on screen in the window or a
+  new one. It is capped at 20 s: the open ends with `project_open_failed`, "git rev-parse did not respond within 20 s —
+  macOS may be holding ReviewGate's access to this folder: check System Settings › Privacy & Security › Files and
+  Folders, and restart the Mac if it keeps happening", never with the git-init offer. A newer `open_project`,
+  `switch_project` or `close_project` does not wait behind it: the open still in its git call ends quietly (an `info`
+  log line), and the newer command runs at once; the git left behind is killed at its cap. No wire change. Test:
+  `engine/test/git.timeout.test.ts`.
+- **An open on its way says so (Mac).** While `open_project` / `switch_project` is answered, `AppState.openingProject`
+  names the folder and the empty window shows "Opening acme-shop…" ("acme-shop 여는 중…") with a spinner instead of "Open a
+  project to start". A newer open replaces it; an older one ending does not clear it. The `project_open_failed` banner
+  above the empty window has **Reopen**, which opens that folder again. Test: `Core/Tests/…/OpenProjectStallTests.swift`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
 - **A draft that lasts (r1-composer M12, Mac).** The chat column lived only in the Changes / History / Search tabs with
@@ -6536,6 +6549,13 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   (40 pt every 16 ms, the transcript told the user scrolls) to the end, idle and while Claude streams, at 1000 × 637 with
   and without the diff pane and at 1257 × 1104; a jump is the view going further from the newest row than the reader took
   it.
+  `SHOTS_LAYOUT=open` (`ScreenshotTour.openChecks`) runs Open Project… / Switch Project… / Open in New Window… (their menu
+  items, the folder picker answered by `ProjectOpener.debugPick`) and `ProjectOpener.open` in each state a window can be in
+  — idle, the project already open here or in another window, files pending review (also on the PRs tab), a turn running,
+  a message typed, no project, a second window after the first one closed — and logs what each ended in (`open <case>:
+  opened in this window / opened in a new window / asked — "…" / said — "…" / its window came forward / message — …`); SILENT
+  when none of these happened, which fails the run. Every window the tour opens logs under its folder, never to
+  ~/Library/Logs/ReviewGate. `open-opening.png`: the empty window while an open is on its way.
 - **A breathing dot costs the window nothing** (0.5.12). The dot of a live agent — the HUD's "N agents running", an agent
   group's "Running" chip, the Changes tab while Claude works, a side question at work — breathed by a SwiftUI
   `repeatForever` animation, which updates and renders the window's whole view graph every frame (the transcript's scroll
@@ -8034,11 +8054,17 @@ and what stays. The decision and the words are one pure function on each client 
   "리뷰 대기·메모·작성 중인 메시지는 다시 열면 그대로 있어요." [닫기] [취소].
 - **Switching or closing a window's project** (P1-chrome-03) stops its session the same way, so it asks the same way:
   "프로젝트를 바꾸면 이 턴이 멈춰요." / "프로젝트를 닫으면 이 턴이 멈춰요." [전환] / [프로젝트 닫기] [취소]. The pending-review
-  question ("Switch project?") comes only when this one did not ask. The project already open in the window does nothing,
-  and one open in another window comes to the front instead — a switch would stop this session for a lock it cannot take.
+  question ("Switch project?") comes only when this one did not ask. The project already open in the window brings the
+  window forward and says "acme-shop is already open in this window" ("acme-shop 프로젝트는 이미 이 창에 열려 있어요", a toast —
+  0.5.12 did nothing at all, and the folder picker looked broken); one open in another window comes to the front instead,
+  with the same words — a switch would stop this session for a lock it cannot take. Open in New Window… for a folder a
+  window has open does the same.
   Mac: with a project open, ⌘O, the toolbar's folder, File › Open Recent, the recent list and a git candidate go through
   `ProjectOpener.requestSwitch` too (they used to open at once, past even the pending-review question), and Close Project
-  through `requestClose`; the question is a sheet on the window. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and
+  through `requestClose`; the question is a sheet on the window. A new window is opened with the folder plus a fragment of
+  its own (`ProjectOpener.newWindowValue`): SwiftUI brings forward the window it thinks shows a value, and a window closed
+  earlier (AppKit keeps it, hidden) still matched the folders it had shown — Open in New Window… then opened nothing. An
+  open aimed at a window that is gone (a menu that still names a closed window's store) opens in a window of its own. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and
   `closeProject` ask main (`rg:confirmProjectChange`, with the page's facts), which shows the question as a message box on
   that window and answers `{asked, ok}`.
 - **Mac.** The last workbench window's close (⌘W, the close button) asks the quit question as a sheet and then quits —

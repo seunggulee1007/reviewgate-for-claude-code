@@ -91,14 +91,44 @@ export async function initRepository(directory: string): Promise<void> {
   await runGit(directory, ["init", "-q"]);
 }
 
-/** Resolves the toplevel of the repository containing `directory`; throws `NotARepositoryError`. */
-export async function openCheckpoint(directory: string): Promise<GitCheckpoint> {
+/**
+ * The first git call of `open_project` / `switch_project`. It answers at once in any folder; on macOS it once never answered
+ * (git started by GUI apps waited on a privacy check until a restart) and the app's open waited for ever with nothing on
+ * screen. Capped, the open ends with `project_open_failed` and says what to check.
+ */
+export const OPEN_GIT_TIMEOUT_MS = 20_000;
+let openGitTimeoutMs = OPEN_GIT_TIMEOUT_MS;
+/** Test seam. */
+export function setOpenGitTimeout(ms: number): void {
+  openGitTimeoutMs = ms;
+}
+const OPEN_GIT_HINT =
+  "macOS may be holding ReviewGate's access to this folder: check System Settings › Privacy & Security › Files and Folders, and restart the Mac if it keeps happening";
+
+/** A newer open / switch / close took over: the open it superseded ends quietly (its git keeps its own cap). */
+export class OpenSupersededError extends Error {
+  constructor() {
+    super("superseded by a newer open");
+    this.name = "OpenSupersededError";
+  }
+}
+
+/**
+ * Resolves the toplevel of the repository containing `directory`; throws `NotARepositoryError`, `GitTimeoutError` when git
+ * does not answer within `OPEN_GIT_TIMEOUT_MS`, `OpenSupersededError` once `signal` aborts.
+ */
+export async function openCheckpoint(directory: string, signal?: AbortSignal): Promise<GitCheckpoint> {
+  const ms = openGitTimeoutMs;
+  const timeout = () => new GitTimeoutError("git rev-parse", ms, OPEN_GIT_HINT);
   let out: GitResult;
   try {
-    out = await runGit(directory, ["rev-parse", "--show-toplevel"], { allowFailure: true });
-  } catch {
+    const run = runGit(directory, ["rev-parse", "--show-toplevel"], { allowFailure: true, timeoutMs: ms });
+    out = await withDeadline(signal ? supersedable(run, signal) : run, ms + GIT_DEADLINE_GRACE_MS, timeout);
+  } catch (e) {
+    if (e instanceof GitTimeoutError || e instanceof OpenSupersededError) throw e;
     throw new NotARepositoryError(directory);
   }
+  if (out.timedOut) throw timeout();
   const top = out.text.trim();
   if (out.status !== 0 || !top) throw new NotARepositoryError(directory);
   return new GitCheckpoint(toNativeAbs(top));
@@ -163,13 +193,33 @@ function withDeadline<T>(p: Promise<T>, ms: number, error: () => Error): Promise
   });
 }
 
+/** `p`, or `OpenSupersededError` once `signal` aborts (`p` keeps running; its late result is dropped). */
+function supersedable<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new OpenSupersededError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new OpenSupersededError());
+    signal.addEventListener("abort", onAbort, { once: true });
+    p.then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
+
 /** A checkpoint git call that did not answer within its cap (the process was killed). */
 export class GitTimeoutError extends Error {
   constructor(
     public readonly cmd: string,
     public readonly timeoutMs: number,
+    hint = "check the VPN / network (LFS), or a git process holding the repository lock",
   ) {
-    super(`${cmd} did not respond within ${Math.round(timeoutMs / 1000)} s — check the VPN / network (LFS), or a git process holding the repository lock`);
+    super(`${cmd} did not respond within ${Math.round(timeoutMs / 1000)} s — ${hint}`);
     this.name = "GitTimeoutError";
   }
 }

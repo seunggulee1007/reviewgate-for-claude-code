@@ -90,6 +90,22 @@
         }
       }
     },
+    "%@ is already open in this window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is already open in this window"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 프로젝트는 이미 이 창에 열려 있어요"
+          }
+        }
+      }
+    },
     "%@ is not on the remote yet — Create PR pushes it first, then runs `gh pr create` against %@.": {
       "localizations": {
         "en": {
@@ -17640,6 +17656,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트를 열어 시작하세요"
+          }
+        }
+      }
+    },
+    "Opening %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 여는 중…"
           }
         }
       }

@@ -16,6 +16,10 @@ enum Toast {
     static let duration: Duration = .seconds(1.8)
 
     private static var panel: ToastPanel?
+    #if DEBUG
+    /// The last toast's text — the open check (App/Debug/ScreenshotTour.swift) reads and clears it.
+    static var debugShown: String?
+    #endif
     private static var hideTask: Task<Void, Never>?
 
     /// How long a toast with an action stays (time to reach its button; Electron's `showToast` keeps it 6 s too).
@@ -31,6 +35,9 @@ enum Toast {
     /// toast replaces the one shown. With no window it is only announced. `action`: a button in the capsule (the toast
     /// stays `actionDuration`; a click elsewhere on it still closes it).
     static func show(_ text: String, systemImage: String = "checkmark.circle.fill", action: Action? = nil) {
+        #if DEBUG
+        debugShown = text
+        #endif
         AccessibilityNotification.Announcement(action.map { "\(text) — \($0.title)" } ?? text).post()
         guard let parent = NSApp.keyWindow ?? NSApp.mainWindow, parent.isVisible else { return }
         dismiss(animated: false)
