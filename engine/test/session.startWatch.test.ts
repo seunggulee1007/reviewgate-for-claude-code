@@ -1,5 +1,5 @@
 import { realpathSync } from "node:fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Options, Query, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeSession } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
@@ -55,24 +55,29 @@ describe("limits (§36.7)", () => {
 });
 
 describe("StallWatchdog", () => {
-  it("fires only after the limit passed with no signal; restart() pushes it out; stop() ends it", async () => {
-    let fired = 0;
-    const w = new StallWatchdog(60, () => (fired += 1));
-    await sleep(40);
-    w.restart();
-    await sleep(40);
-    w.restart();
-    await sleep(40);
-    expect(fired).toBe(0);
-    await sleep(60);
-    expect(fired).toBe(1);
-    w.restart(); // after it fired: nothing more
-    await sleep(80);
-    expect(fired).toBe(1);
-    const s = new StallWatchdog(30, () => (fired += 1));
-    s.stop();
-    await sleep(50);
-    expect(fired).toBe(1);
+  it("fires only after the limit passed with no signal; restart() pushes it out; stop() ends it", () => {
+    vi.useFakeTimers(); // a pure timer: a virtual clock cannot be stretched by a slow runner
+    try {
+      let fired = 0;
+      const w = new StallWatchdog(60, () => (fired += 1));
+      vi.advanceTimersByTime(40);
+      w.restart();
+      vi.advanceTimersByTime(40);
+      w.restart();
+      vi.advanceTimersByTime(40);
+      expect(fired).toBe(0);
+      vi.advanceTimersByTime(60);
+      expect(fired).toBe(1);
+      w.restart(); // after it fired: nothing more
+      vi.advanceTimersByTime(80);
+      expect(fired).toBe(1);
+      const s = new StallWatchdog(30, () => (fired += 1));
+      s.stop();
+      vi.advanceTimersByTime(50);
+      expect(fired).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -143,16 +148,16 @@ describe("ClaudeSession start progress (§36.7)", () => {
   it("hook / plugin / status signals restart the stall timer and go out as start_progress; a real stall still fires", async () => {
     const events: SessionEvent[] = [];
     const fake = sdk();
-    const s = session(events, fake, 80);
+    const s = session(events, fake, 500);
     await s.start();
-    // Keep it busy for longer than the limit with signals 50 ms apart: no init_timeout.
+    // Keep it busy for longer than the limit with signals 100 ms apart (a fifth of it, room for a stalled runner): no init_timeout.
     for (let i = 0; i < 4; i++) {
-      await sleep(50);
+      await sleep(100);
       feed(s, { type: "system", subtype: i % 2 === 0 ? "hook_started" : "hook_progress", hook_id: "h1", hook_name: "SessionStart:startup", hook_event: "SessionStart" });
     }
-    await sleep(50);
+    await sleep(100);
     feed(s, { type: "system", subtype: "plugin_install", status: "installed", name: "omc" });
-    await sleep(50);
+    await sleep(100);
     feed(s, { type: "system", subtype: "hook_response", hook_id: "h1", hook_name: "SessionStart:startup", hook_event: "SessionStart", outcome: "success" });
     expect(events.filter((e) => e.type === "init_timeout")).toEqual([]);
     expect(events.filter((e) => e.type === "start_progress")).toEqual([
@@ -164,8 +169,8 @@ describe("ClaudeSession start progress (§36.7)", () => {
       { type: "start_progress", kind: "hook", id: "h1", name: "SessionStart:startup", done: true },
     ]);
     // Then silence: the stall fires once.
-    await sleep(140);
-    expect(events.filter((e) => e.type === "init_timeout")).toEqual([{ type: "init_timeout", afterMs: 80 }]);
+    for (const end = Date.now() + 10_000; !events.some((e) => e.type === "init_timeout") && Date.now() < end; ) await sleep(25);
+    expect(events.filter((e) => e.type === "init_timeout")).toEqual([{ type: "init_timeout", afterMs: 500 }]);
     await s.dispose();
   });
 

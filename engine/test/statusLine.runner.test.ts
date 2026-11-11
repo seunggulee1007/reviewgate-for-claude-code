@@ -242,7 +242,7 @@ describe("status line runner (§44.2)", () => {
   });
 
   it("a run that takes too long is stopped with its whole process tree; the lines stay", async () => {
-    const r = rig({ timeoutMs: 1500 });
+    const r = rig({ timeoutMs: 5000 }); // also bounds the first (echo) run: shell + node start take ~1 s on a slow Windows runner; hang lasts 60 s
     r.line.request(100, true);
     await until(() => r.events.find((e) => e.lines.length > 0), "good lines");
     r.env.SL_MODE = "hang";
@@ -250,7 +250,7 @@ describe("status line runner (§44.2)", () => {
     const timedOut = await until(() => r.events.find((e) => e.error?.code === "timeout"), "the timeout");
     expect(timedOut.lines.length).toBe(2);
     const pid = Number(readFileSync(join(r.dir, "pids"), "utf8"));
-    await until(() => !alive(pid), "the grandchild gone", 5000);
+    await until(() => !alive(pid), "the grandchild gone", 15_000);
   });
 
   it("nothing runs while hidden, turned off, without a session or without a command — and the lines go", async () => {
@@ -287,8 +287,12 @@ describe("status line runner (§44.2)", () => {
     r.line.request(100, true);
     await until(() => r.runs().length >= 3, "two refreshes", 10_000);
     r.line.request(100, false);
-    await sleep(1500); // a run already started when it was hidden still finishes (a slow Windows runner takes ~1 s)
-    const n = r.runs().length;
+    // A run already started when it was hidden still finishes (a slow runner takes seconds): count once runs() stood still for 2 s.
+    let n = -1;
+    for (const end = Date.now() + 15_000; n !== r.runs().length && Date.now() < end; ) {
+      n = r.runs().length;
+      await sleep(2000);
+    }
     await sleep(800);
     expect(r.runs().length).toBe(n);
   });
@@ -342,7 +346,7 @@ describe("status line runner (§44.2)", () => {
     r.line.request(100, true);
     const [first] = await until(() => (r.runs().length === 1 ? r.runs() : null), "the first run");
     expect(first!.input.rate_limits).toEqual({ five_hour: { used_percentage: 40, resets_at: Date.parse(resetsAt) / 1000 } });
-    const [, second] = await until(() => (r.runs().length === 2 ? r.runs() : null), "the run after the reset", 5000);
+    const [, second] = await until(() => (r.runs().length === 2 ? r.runs() : null), "the run after the reset", 15_000);
     expect(Date.now()).toBeGreaterThanOrEqual(Date.parse(resetsAt) + 900);
     expect(second!.input).not.toHaveProperty("rate_limits"); // the window reset: no longer in the stdin
     await sleep(1500);
@@ -375,7 +379,7 @@ describe("status line runner (§44.2)", () => {
     const pid = Number(readFileSync(join(r.dir, "pids"), "utf8"));
     strays.push(pid);
     expect(ev.lines[0]).toContain("Opus 5.5");
-    await until(() => !alive(pid), "the straggler gone", 5000);
+    await until(() => !alive(pid), "the straggler gone", 15_000);
   });
 
   it("nothing configured: a statusLine added to the settings later shows within one re-read", async () => {
@@ -416,7 +420,7 @@ describe("status line runner (§44.2)", () => {
 
   // MARK: wave7 w7-state — §45.2: a status line that keeps up without a process per change.
   it("changes run it at most once per interval: none sooner, and the last change still runs once afterwards", async () => {
-    const r = rig({ minIntervalMs: 1500 });
+    const r = rig({ minIntervalMs: 5000 }); // wide: the "not yet" check below must stay inside it on a slow runner
     r.line.request(100, true); // the first show runs after the debounce alone
     await until(() => r.runs().length === 1, "the first run");
     for (let i = 0; i < 5; i++) {
@@ -425,17 +429,17 @@ describe("status line runner (§44.2)", () => {
     }
     await sleep(300);
     expect(r.runs()).toHaveLength(1); // still inside the interval
-    await until(() => r.runs().length === 2, "the trailing run", 6000);
+    await until(() => r.runs().length === 2, "the trailing run", 15_000);
     await sleep(2000);
     expect(r.runs()).toHaveLength(2); // five changes, one run for them
   });
 
   it("a new width runs soon; the window shown again waits for the interval", async () => {
-    const r = rig({ minIntervalMs: 5000 });
+    const r = rig({ minIntervalMs: 60_000 }); // runs at once vs waits for the interval: only the 60 s one is a wait
     r.line.request(100, true);
     await until(() => r.runs().length === 1, "the first run");
     r.line.request(120, true);
-    await until(() => r.runs().length === 2, "the run for the new width", 3000);
+    await until(() => r.runs().length === 2, "the run for the new width", 15_000);
     expect(r.runs()[1]!.columns).toBe("120");
     r.line.request(120, false);
     r.line.request(120, true); // un-occluded: the lines are at most one interval old
@@ -443,11 +447,11 @@ describe("status line runner (§44.2)", () => {
     expect(r.runs()).toHaveLength(2);
     r.set({ variant: "b" });
     r.line.settingsChanged(); // a switch the user changed runs soon
-    await until(() => r.runs().length === 3, "the run after the switch", 3000);
+    await until(() => r.runs().length === 3, "the run after the switch", 15_000);
   });
 
   it("a new width still runs soon when a turn's changes follow it inside the debounce, and they run with it", async () => {
-    const r = rig({ minIntervalMs: 10_000, debounceMs: 150, maxWaitMs: 2000 });
+    const r = rig({ minIntervalMs: 60_000, debounceMs: 150, maxWaitMs: 2000 });
     r.line.request(100, true);
     await until(() => r.runs().length === 1, "the first run");
     r.line.request(140, true);
@@ -455,19 +459,19 @@ describe("status line runner (§44.2)", () => {
       await sleep(30);
       r.line.poke(); // tool calls of the running turn
     }
-    await until(() => r.runs().length === 2, "the run for the new width", 3000);
+    await until(() => r.runs().length === 2, "the run for the new width", 15_000);
     expect(r.runs()[1]!.columns).toBe("140");
     await sleep(500);
     expect(r.runs()).toHaveLength(2);
   });
 
   it("a new width during a run runs right after it, not after the interval", async () => {
-    const r = rig({ minIntervalMs: 10_000 });
+    const r = rig({ minIntervalMs: 60_000 });
     r.env.SL_MODE = "slow";
     r.line.request(100, true);
     await until(() => r.runs().length === 1, "the first run in flight"); // logged before its 400 ms wait
     r.line.request(140, true);
-    await until(() => r.runs().length === 2, "the run for the new width", 3000);
+    await until(() => r.runs().length === 2, "the run for the new width", 15_000);
     expect(r.runs()[1]!.columns).toBe("140");
     await sleep(300);
     expect(r.runs()).toHaveLength(2);

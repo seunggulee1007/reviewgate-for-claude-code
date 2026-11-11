@@ -129,7 +129,10 @@ describe("MCP in the engine (§22)", () => {
     await h.settle();
     expect(h.ofType("mcp_status").length).toBe(n); // no change → no event
     mcp[0]!.statuses[2]!.status = "connected";
-    await h.waitFor(() => h.ofType("mcp_status").length === n + 1, "a change is emitted");
+    // `> n`, not `=== n + 1`: under load a poll tick joins the round still in flight and emits its event too, so the
+    // count can step from n to n + 2 between two looks — every event after n must carry the change.
+    await h.waitFor(() => h.ofType("mcp_status").length > n, "a change is emitted");
+    expect(h.ofType("mcp_status").slice(n).every((e) => e.servers.some((s) => s.name === "plugin:omc:t" && s.status === "connected"))).toBe(true);
     await h.settle();
     expect(h.engine.state.session.extensions?.mcpServers).toContainEqual({ name: "plugin:omc:t", status: "connected" });
   });

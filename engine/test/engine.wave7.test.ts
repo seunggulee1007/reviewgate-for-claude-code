@@ -20,7 +20,10 @@ afterEach(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Longer than the churn window: what waited has gone out, the next churn goes out at once. */
-const quiet = () => sleep(STATE_CHURN_GAP_MS + 40);
+const quiet = async (h: Harness) => {
+  await sleep(STATE_CHURN_GAP_MS + 40);
+  await h.settle(); // a churn timer that expired with this sleep sends its snapshot from a setImmediate
+};
 
 /** A running turn, quiet for longer than the churn window. */
 async function running(): Promise<Harness> {
@@ -32,7 +35,13 @@ async function running(): Promise<Harness> {
   await h.open(dir);
   await h.engine.handle({ type: "send", text: "go" });
   await h.settle();
-  await quiet();
+  // Background snapshots (disk reading, branches) may still land on a slow runner: count from when none has for 300 ms.
+  const deadline = Date.now() + 10_000;
+  for (let n = -1; n !== h.states.length && Date.now() < deadline; ) {
+    n = h.states.length;
+    await sleep(300);
+  }
+  await quiet(h);
   return h;
 }
 
@@ -49,11 +58,11 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     await h.settle();
     expect(h.states.length).toBe(before + 1);
     expect(h.states.at(-1)!.hud.activity).toEqual({ kind: "tool", toolName: "Read", detail: "a.ts" });
-    await quiet();
+    await quiet(h);
     // The assistant message repeats the tool_start the stream already announced.
     s.emit({ type: "activity", kind: "tool_start", toolName: "Read", detail: "a.ts" });
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(before + 1);
     expect(h.ofType("activity").length).toBe(2);
     s.emit({ type: "activity", kind: "tool_end", toolName: "Read" });
@@ -68,11 +77,11 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     const before = h.states.length;
     s.emit({ type: "activity", kind: "idle" });
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(before + 1);
     s.emit({ type: "activity", kind: "idle" });
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(before + 1);
     expect(h.engine.state.hud.activity).toEqual({ kind: "idle" });
   });
@@ -91,7 +100,7 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     const burst = h.states.length - before;
     expect(burst).toBeGreaterThanOrEqual(1);
     expect(burst).toBeLessThanOrEqual(1 + Math.floor(elapsed / STATE_CHURN_GAP_MS));
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBeLessThanOrEqual(before + 2 + Math.floor(elapsed / STATE_CHURN_GAP_MS));
     expect(h.states.at(-1)!.hud.activity).toEqual({ kind: "tool", toolName: "Bash", detail: "d4" });
     const seqs = h.states.map((x) => x.seq);
@@ -104,7 +113,7 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     const s = h.session();
     s.emit({ type: "tool_use", id: "ag1", name: "Agent", input: { description: "look around", prompt: "p" } });
     await h.settle();
-    await quiet();
+    await quiet(h);
     const before = h.states.length;
     const started = Date.now();
     for (let i = 0; i < 8; i++) {
@@ -113,7 +122,7 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     }
     const elapsed = Date.now() - started;
     expect(h.states.length - before).toBeLessThanOrEqual(1 + Math.floor(elapsed / STATE_CHURN_GAP_MS));
-    await quiet();
+    await quiet(h);
     const agent = h.states.at(-1)!.hud.agents.find((a) => a.toolUseId === "ag1");
     expect(agent?.lastTool).toBe("Read");
     expect(h.engine.state.hud.agents.find((a) => a.toolUseId === "ag1")).toEqual(agent);
@@ -134,7 +143,7 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     expect(last.session.pendingPermission?.requestId).toBe("p1");
     expect(last.hud.activity).toEqual({ kind: "tool", toolName: "Bash", detail: "ls" });
     expect(h.events.findIndex((e) => e.type === "permission_request")).toBeLessThan(indexOfState(h.events, last));
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(before + 1); // nothing was left to send
   });
 
@@ -178,7 +187,7 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     s.emit({ type: "text_delta", text: "lo" });
     expect(h.events.at(-1)).toMatchObject({ type: "text_delta", text: "lo" });
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(before);
   });
 
@@ -198,18 +207,18 @@ describe("wave7 §45.2: state snapshots follow what changed", () => {
     const before = h.states.length;
     send(rateLimitWindowsOf(info(0.4), Date.now()));
     await h.settle();
-    await quiet();
+    await quiet(h);
     const after = h.states.length;
     expect(after).toBeGreaterThan(before);
     expect(h.states.at(-1)!.hud.rateLimits!.map((w) => [w.kind, w.percent])).toEqual([["five_hour", 40], ["seven_day", 10]]);
     await sleep(5);
     send(rateLimitWindowsOf(info(0.4), Date.now()).reverse());
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(after);
     send(rateLimitWindowsOf(info(0.45), Date.now()));
     await h.settle();
-    await quiet();
+    await quiet(h);
     expect(h.states.length).toBe(after + 1);
     expect(h.states.at(-1)!.hud.rateLimits!.find((w) => w.kind === "five_hour")?.percent).toBe(45);
   });

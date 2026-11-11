@@ -202,7 +202,7 @@ describe("§52.1 a turn Claude starts itself", () => {
   // MARK: r2-peers — a failed collection holds the turn while its automatic retry (M30) is to run, instead of denying its
   // calls at once; the retry's collection is the failed turn's, and the turn Claude started is reviewed after it.
   it("a failed collection retried while the turn waits: the turn is taken after the retry, its calls never denied", async () => {
-    const { h, dir, id } = await opened({ autoTurnWaitMs: 5_000, collectRetryMs: 400 });
+    const { h, dir, id } = await opened({ autoTurnWaitMs: 30_000, collectRetryMs: 2_000 });
     await h.engine.handle({ type: "send", text: "hi" });
     h.session().emitSessionInfo();
     const gate = (h.engine as unknown as { gate: { runningTurnBase: string | null } }).gate;
@@ -215,7 +215,7 @@ describe("§52.1 a turn Claude starts itself", () => {
     h.session().emitAutoTurnStart({ trigger: "continue" });
     await new Promise((r) => setTimeout(r, 150));
     expect(h.session().autoTurnAnswers).toEqual([]); // still waiting for the retry: its calls wait in the hooks
-    await h.waitFor(() => h.session().autoTurnAnswers.length === 1, "taken");
+    await h.waitFor(() => h.session().autoTurnAnswers.length === 1, "taken", 20_000);
     expect(h.session().autoTurnAnswers[0]!.ok).toBe(true);
     expect(h.ofType("turn_end")).toHaveLength(1); // the retry collected the failed turn by itself
     expect(h.ofType("auto_turn").at(-1)).toMatchObject({ trigger: "continue" });

@@ -61,14 +61,15 @@ describe("state.hud.agents (docs/PROTOCOL.md §13)", () => {
     s.emit({ type: "tool_use", id: "ag1", name: "Agent", input: { description: "d" } });
     await h.settle();
     const before = h.states.length;
+    const t0 = Date.now();
     for (let i = 1; i <= 10; i++) {
       s.emit(progress(i));
       await h.settle();
     }
     const burst = h.states.length - before;
-    expect(burst).toBeLessThanOrEqual(2);
-    await new Promise((r) => setTimeout(r, 300));
-    const last = h.states[h.states.length - 1]!;
+    // One leading snapshot, one more per 250 ms window the burst happened to span (a slow runner may span several).
+    expect(burst).toBeLessThanOrEqual(2 + Math.floor((Date.now() - t0) / 250));
+    const last = await h.waitFor((x) => x.hud.agents[0]?.tokens === 10, "trailing progress");
     expect(last.hud.agents[0]).toMatchObject({ tokens: 10, toolUses: 10 });
   });
 

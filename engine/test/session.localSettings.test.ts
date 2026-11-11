@@ -211,8 +211,9 @@ describe("the gate stays with local settings loaded (§36.6 security)", () => {
       }
       // An ask reaches canUseTool → a permission card, local rules or not.
       const p = on.canUse("Bash", { command: "rm -rf build" }, { signal: new AbortController().signal, toolUseID: "t1" } as never);
-      await new Promise((r) => setTimeout(r, 10));
-      expect(on.events.some((e) => e.type === "permission_request" && e.toolName === "Bash")).toBe(true);
+      const asked = () => on.events.some((e) => e.type === "permission_request" && e.toolName === "Bash");
+      for (const end = Date.now() + 10_000; !asked() && Date.now() < end; ) await new Promise((r) => setTimeout(r, 10));
+      expect(asked()).toBe(true);
       void p;
       // A read-only tool the local rule allows is the only thing it changes (§33.5): WebSearch runs without a card.
       expect(await on.pre("WebSearch", { query: "x" })).toBe("allow");

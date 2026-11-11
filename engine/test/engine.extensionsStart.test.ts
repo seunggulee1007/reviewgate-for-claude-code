@@ -145,15 +145,15 @@ describe("retry_extensions and the automatic retry (§36.7)", () => {
 
   it("the automatic retry waits while a turn runs", async () => {
     const dir = makeRepo();
-    // The idle window must outlast the test seeing the fallback and sending: at 20 ms the retry started first on a slow
-    // CI runner, and the fallback was never seen idle.
-    const h = harness({ extensionsAutoRetryMs: 300 });
+    // The idle window must outlast the test seeing the fallback and sending (a real git snapshot): at 20 ms and at 300 ms
+    // the retry started first on a slow CI runner, and the fallback was never seen idle.
+    const h = harness({ extensionsAutoRetryMs: 3_000 });
     await h.hello({ loadUserSettings: true });
     await h.open(dir);
     h.session().emit({ type: "init_timeout", afterMs: 45_000 });
     await h.waitFor((x) => h.sessions.length === 2 && x.session.open && !x.session.starting, "fallback");
     await h.engine.handle({ type: "send", text: "work" });
-    await new Promise((r) => setTimeout(r, 450)); // past the window: the retry waits for the turn
+    await new Promise((r) => setTimeout(r, 3_400)); // past the window: the retry waits for the turn
     expect(h.sessions).toHaveLength(2);
     h.session().emitTurnEnd();
     await h.waitFor(() => h.sessions.length === 3, "retry after the turn");

@@ -69,7 +69,7 @@ async function failedFreshTurn(h: Harness, dir: string): Promise<void> {
 
 describe("a failed collection retries itself once (M30, §3)", () => {
   it("the automatic retry collects the turn: one turn_end, the review as usual", async () => {
-    const { h, dir } = await opened({ collectRetryMs: 40 });
+    const { h, dir } = await opened({ collectRetryMs: 1000 }); // wide: the test must lift the seam before the retry, however late it notices the failure
     await failedFreshTurn(h, dir);
     expect(h.ofType("turn_end")).toHaveLength(0);
     setTurnBase(h, null); // git can read the trees again
@@ -77,7 +77,7 @@ describe("a failed collection retries itself once (M30, §3)", () => {
     expect(s.gate.collectError).toBeNull();
     expect(s.changedFiles.map((f) => [f.path, f.state, f.origin])).toEqual([["x.txt", "pending", "tool"]]);
     expect(h.ofType("turn_end")).toHaveLength(1);
-    expect(h.ofType("log").some((l) => /one automatic retry in 40 ms/.test(l.message))).toBe(true);
+    expect(h.ofType("log").some((l) => /one automatic retry in 1000 ms/.test(l.message))).toBe(true);
   });
 
   it("is retried only once; then the input is open and the next send keeps A: one review of both turns, the causes kept", async () => {
