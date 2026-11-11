@@ -26,7 +26,8 @@
 #                  blank: the chat column in windows taller than the laptop's (a turn, agents, the diff pane, a review, hidden,
 #                  minimised, another display, a new chat and back; `chat:` / `column:` lines, BLANK / OUT OF THE WINDOW);
 #                  cpu: the main thread's CPU while Claude works with agents, streaming or not, in front and behind
-#                  another app, and a new chat's time to its rows (`cpu:` lines); cards: the composer's shots (a review,
+#                  another app, a new chat's time to its rows and the chat's back from the PRs tab (`cpu:` lines; cpulong:
+#                  the same after 45 more turns in the open chat); cards: the composer's shots (a review,
 #                  Claude's question and a permission card above the composer) six times over the layout check's transcript;
 #                  scrolldown: a long chat scrolled down to its end as a trackpad does, idle and streaming (`scrolldown:` lines,
 #                  a JUMP when the view went further from the newest row than the reader took it).

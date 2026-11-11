@@ -114,6 +114,11 @@ private final class Tour {
             do { try await cpuChecks(); finish(nil) } catch { finish(error) }
             return
         }
+        // `SHOTS_LAYOUT=cpulong`: the same after 45 more turns came while the chat stayed open (a long session's).
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "cpulong" {
+            do { try await cpuChecks(longTurns: 45); finish(nil) } catch { finish(error) }
+            return
+        }
         // `SHOTS_LAYOUT=blank`: only the blank-chat check in tall windows.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "blank" {
             do { try await blankOnly(); finish(nil) } catch { finish(error) }
@@ -1136,7 +1141,7 @@ private final class Tour {
     /// `SHOTS_LAYOUT=cpu`: what the main thread spends while Claude works and nothing changes on screen but the HUD's clock and
     /// the live agents' dots — a long chat (60 turns), the window 1257 × 1104, in front and behind another app — and how late a
     /// job queued on it runs (a tab switch's rows wait for that). `cpu:` lines in tour.log.
-    private func cpuChecks() async throws {
+    private func cpuChecks(longTurns: Int = 0) async throws {
         try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
         guard let window = entry.window else { throw TourError("no window") }
         try place()
@@ -1149,6 +1154,18 @@ private final class Tour {
         window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - 1104), size: NSSize(width: 1257, height: 1104)), display: true)
         store.debugHandle((1...60).flatMap { Self.turnEvents($0, root: root) })
         try await Task.sleep(for: .milliseconds(2500))
+        // A long session: turns that come one after another while the chat stays open (followed), each with an agent's group.
+        for turn in 61..<(61 + longTurns) {
+            let agent = "toolu_long_agent_\(turn)"
+            store.debugHandle(Self.turnEvents(turn, root: root) + [
+                .toolUse(id: agent, name: "Agent", input: .object(["subagent_type": .string("code-reviewer"), "description": .string("Review \(turn)")]), file: nil),
+                .toolResult(toolUseId: agent, isError: false, preview: "done", info: { var i = ToolResultInfo(); i.agentEnded = true; return i }())])
+            try await Task.sleep(for: .milliseconds(60))
+        }
+        if longTurns > 0 {
+            try await Task.sleep(for: .milliseconds(2500))
+            log("cpu long session: \(store.transcript.count) rows after \(longTurns) turns came in")
+        }
         let agentIds = ["toolu_cpu_agent_1", "toolu_cpu_agent_2", "toolu_cpu_agent_3"]
         let started = Date()
         let agents = agentIds.enumerated().map { i, id in
@@ -1212,6 +1229,23 @@ private final class Tour {
         store.debugShowHUD(turnStartedAt: nil, agents: [])
         store.debugShowGate(.idle)
         try await measure("idle, only the agents' rows live, behind another app")
+        // Back to the chat from the PRs tab (the chat view is made again over all its rows): how long until its transcript is laid
+        // out, and what the main thread spent.
+        store.debugShowHUD(turnStartedAt: nil, agents: [])
+        entry.model.tab = .prs
+        try await Task.sleep(for: .milliseconds(1500))
+        let backCPU = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
+        let back0 = ContinuousClock.now
+        entry.model.tab = .changes
+        var backHeight: CGFloat = 0
+        while ContinuousClock.now - back0 < .seconds(10) {
+            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in DispatchQueue.main.async { done.resume() } }
+            if let chat = (try? scrollViews(window)).flatMap(Self.chatScrollView), let h = chat.documentView?.frame.height, h > 2000 { backHeight = h; break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        let backMs = Int(Self.ms(back0.duration(to: .now)))
+        log("cpu back to the chat: laid out after \(backMs) ms (\(Int(backHeight)) pt), main thread \(Int(Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - backCPU) / 1e6)) ms")
+        try await Task.sleep(for: .milliseconds(1500))
         // A new chat beside the agents still at work (the turn has ended, so the switch is not held): how long from the click
         // until the engine switched, and from there until the transcript has laid out the new chat's rows.
         store.debugShowHUD(turnStartedAt: nil, agents: agents)

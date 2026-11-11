@@ -6523,7 +6523,8 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   room above them. `SHOTS_LAYOUT=cpu` (`ScreenshotTour.cpuChecks`) measures the main thread over a 60-turn chat at
   1257 × 1104 while nothing changes on screen but the HUD's clock and the live agents' dots (in front, behind another app,
   with an answer streaming 25 pieces a second), how late a job queued on it every 50 ms runs, and how long a new chat takes
-  from the click to its laid-out rows. `SHOTS_LAYOUT=cards` (`ScreenshotTour.cardsOnly`) runs the composer's shots — a
+  from the click to its laid-out rows, and back from the PRs tab how long until the chat is laid out again; `cpulong` does
+  the same after 45 more turns came while the chat stayed open (a long session). `SHOTS_LAYOUT=cards` (`ScreenshotTour.cardsOnly`) runs the composer's shots — a
   review, Claude at work, Claude's question and a permission card above the composer, dark and light — six times over the
   layout check's transcript (a long chat, the scroll check's agents), each round with request ids of its own: beside the
   diff pane Claude's question leaves the transcript 108 pt, and it showed none of its rows in 6 of 38 question shots (6 of
