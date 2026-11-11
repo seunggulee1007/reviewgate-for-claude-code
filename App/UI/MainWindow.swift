@@ -1107,7 +1107,18 @@ private struct EmptyProjectView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "folder").font(.system(size: 44)).foregroundStyle(.secondary)
-            Text("Open a project to start").font(.title2.weight(.semibold))
+            if let opening = store.openingProject {
+                // An open on its way (it may wait on git — capped by the engine, which then says why): never a silent window.
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Opening \(opening.lastPathComponent)…").font(.title2.weight(.semibold))
+                }
+                .help(opening.path)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("Opening project")
+            } else {
+                Text("Open a project to start").font(.title2.weight(.semibold))
+            }
             Text("ReviewGate runs Claude in a folder and gates every change behind your review.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

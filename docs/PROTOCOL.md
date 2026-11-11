@@ -4112,6 +4112,10 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   `switch_project` or `close_project` does not wait behind it: the open still in its git call ends quietly (an `info`
   log line), and the newer command runs at once; the git left behind is killed at its cap. No wire change. Test:
   `engine/test/git.timeout.test.ts`.
+- **An open on its way says so (Mac).** While `open_project` / `switch_project` is answered, `AppState.openingProject`
+  names the folder and the empty window shows "Opening acme-shop…" ("acme-shop 여는 중…") with a spinner instead of "Open a
+  project to start". A newer open replaces it; an older one ending does not clear it. The `project_open_failed` banner
+  above the empty window has **Reopen**, which opens that folder again. Test: `Core/Tests/…/OpenProjectStallTests.swift`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
 - **A draft that lasts (r1-composer M12, Mac).** The chat column lived only in the Changes / History / Search tabs with

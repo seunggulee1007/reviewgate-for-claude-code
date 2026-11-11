@@ -17644,6 +17644,22 @@
         }
       }
     },
+    "Opening %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 여는 중…"
+          }
+        }
+      }
+    },
     "Open as Workbench": {
       "localizations": {
         "en": {
