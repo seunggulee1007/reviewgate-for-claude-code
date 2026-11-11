@@ -222,8 +222,19 @@ enum ProjectOpener {
             sayAlreadyOpen(target)
             return
         }
-        openWindow(id: "workbench", value: target)
+        openWindow(id: "workbench", value: newWindowValue(target))
     }
+
+    /// The value a new window is opened with: `url` with a fragment of its own. SwiftUI brings forward the window it thinks
+    /// shows a value — a window closed earlier (AppKit keeps it, hidden) still matched the folders it had shown, so no window
+    /// came. The window reads the folder without the fragment (`folderOfWindowValue`); its own folder is kept in sync after.
+    static func newWindowValue(_ url: URL) -> URL {
+        var parts = URLComponents(url: url.standardizedFileURL, resolvingAgainstBaseURL: false)
+        parts?.fragment = UUID().uuidString
+        return parts?.url ?? url
+    }
+
+    static func folderOfWindowValue(_ value: URL) -> URL { URL(fileURLWithPath: value.path).standardizedFileURL }
 
     /// An open that finds the project already open ends with its window in front saying so — the window may be the one in
     /// front already, where coming forward shows nothing (0.5.12 did nothing at all for the project open in this window).
@@ -436,7 +447,7 @@ private struct WorkbenchWindow: View {
                 handoff.openWindow = openWindow
                 handoff.beganOpening()
                 defer { handoff.finishedOpening() }
-                if let url {
+                if let url = url.map(ProjectOpener.folderOfWindowValue) {
                     // M19: the window comes back where this project was last seen.
                     entry.applySavedFrame(root: AppSettings.projectKey(url))
                     await entry.store.openProject(url)
@@ -512,7 +523,7 @@ private struct WorkbenchWindow: View {
         for item in restore.dropFirst() {
             let target = URL(fileURLWithPath: item.path).standardizedFileURL
             guard registry.entry(for: target) == nil else { continue }
-            openWindow(id: "workbench", value: target)
+            openWindow(id: "workbench", value: ProjectOpener.newWindowValue(target))
             // Sequentially: two windows must never race for one worktree lock.
             await Self.waitForProject(at: target)
         }
