@@ -994,7 +994,36 @@ private final class Tour {
         if let id = store.queuedMessages.first?.id {
             log("composer queue: Send now on the queued message would \(String(describing: store.queuedSendNowAction(id: id)))")
         }
+        // §50.3: a waiting message can be edited and taken back — the tools are on screen, inside the window.
+        for (name, what) in [("steer.edit", "Edit on the message in Claude's turn"), ("steer.takeBack", "Take back on it"),
+                             ("queued.edit", "Edit on the queued message"), ("queued.remove", "Remove on it")] {
+            let frame = entry.model.debugQueueTools[name] ?? .zero
+            let inWindow = frame.width > 0 && frame.maxX <= room.width + 0.5 && frame.minX >= -0.5
+            log("composer queue tool \(name) (\(what)): \(NSStringFromRect(frame))" + (frame.width <= 0 ? " — LOST (not shown)" : inWindow ? " — shown" : " — OUT OF THE WINDOW"))
+        }
         try write(try render(window), "composer-queue")
+        // ↑ in an empty box, as in the terminal: the last queued message comes back to edit.
+        setComposerText("", in: window)
+        window.makeFirstResponder(box)
+        box.doCommand(by: #selector(NSResponder.moveUp(_:)))
+        try await Task.sleep(for: .milliseconds(500))
+        let pulled = box.string == "Then run the unit tests and fix what fails" && store.queuedMessages.isEmpty
+        log("composer queue ↑: \(pulled ? "the queued message is back in the box" : "LOST (box \"\(box.string)\", \(store.queuedMessages.count) queued)")")
+        try write(try render(window), "composer-queue-up")
+        // ↑ again on an empty box with only the turn's message waiting: it is taken back — this made-up one is not in the
+        // engine's list, so the engine says Claude read it already, and the box says so (nothing comes back).
+        setComposerText("", in: window)
+        box.doCommand(by: #selector(NSResponder.moveUp(_:)))
+        var notice: String?
+        for _ in 0..<30 {
+            try await Task.sleep(for: .milliseconds(100))
+            notice = composer.notice
+            if notice != nil { break }
+        }
+        let late = notice == SteerTakeBackNotice.alreadyRead && box.string.isEmpty
+        log("composer queue ↑ (in Claude's turn, too late): " + (late ? "the box says \"\(notice ?? "")\"" : "LOST (notice \(notice ?? "none"), box \"\(box.string)\")"))
+        try write(try render(window), "composer-queue-late")
+        composer.notice = nil
         store.clearQueue()
         store.debugShowSteering([])
         store.debugShowGate(.idle)

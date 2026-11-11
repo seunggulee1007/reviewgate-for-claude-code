@@ -30,6 +30,8 @@ struct ComposerQueueBar: View {
     var onMove: (UUID, Int) -> Void = { _, _ in }
     var onResume: () -> Void = {}
     var onClear: () -> Void = {}
+    /// §50.3: the screenshot tour's check that the tools are on screen (DEBUG builds report; release builds ignore it).
+    var debugToolFrame: (String, CGRect) -> Void = { _, _ in }
 
     @State private var editing: UUID?
 
@@ -106,7 +108,9 @@ struct ComposerQueueBar: View {
 
     private var chipRows: some View {
         VStack(alignment: .leading, spacing: Self.rowSpacing) {
-            ForEach(steering) { message in steeringChip(message) }   // MARK: composer (§50.2)
+            ForEach(Array(steering.enumerated()), id: \.element.id) { index, message in   // MARK: composer (§50.2)
+                steeringChip(message, reports: index == 0)
+            }
             if let stopAndSend {
                 chip(index: nil, text: stopAndSend, id: nil)
             }
@@ -142,7 +146,7 @@ struct ComposerQueueBar: View {
 
     /// MARK: composer — §50.2: a message already in Claude's turn, waiting until Claude reads it. §50.3: until then ✎ brings
     /// it back into the message box and × takes it back (the CLI drops it); too late, the box says so and its row stays.
-    private func steeringChip(_ message: SteeringMessage) -> some View {
+    private func steeringChip(_ message: SteeringMessage, reports: Bool) -> some View {
         let busy = takingBack.contains(message.id)
         return HStack(spacing: 5) {
             Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.secondary)
@@ -166,6 +170,7 @@ struct ComposerQueueBar: View {
                 .help(Self.takeBackEditHelp)
                 .accessibilityLabel("Edit the message in Claude's turn")
                 .accessibilityIdentifier("Edit steering message")
+                .queueToolFrame(reports ? "steer.edit" : nil, debugToolFrame)
                 Button { onTakeBack(message.id, false) } label: {
                     Image(systemName: "xmark").font(.caption2.weight(.bold))
                 }
@@ -175,6 +180,7 @@ struct ComposerQueueBar: View {
                 .help(Self.takeBackRemoveHelp)
                 .accessibilityLabel("Take back the message in Claude's turn")
                 .accessibilityIdentifier("Take back steering message")
+                .queueToolFrame(reports ? "steer.takeBack" : nil, debugToolFrame)
             }
         }
         .padding(.leading, 6).padding(.trailing, 8).padding(.vertical, 4)
@@ -225,6 +231,7 @@ struct ComposerQueueBar: View {
                 .help("Edit this queued message")
                 .accessibilityLabel("Edit queued message \(index.map { $0 + 1 } ?? 0)")
                 .accessibilityIdentifier("Edit queued message")
+                .queueToolFrame(index == 0 ? "queued.edit" : nil, debugToolFrame)
                 // MARK: composer — §50.2: as in the terminal, a queued message can go at once.
                 Button { onSendNow(id) } label: {
                     Image(systemName: "paperplane").font(.caption2.weight(.bold))
@@ -244,6 +251,7 @@ struct ComposerQueueBar: View {
                 .help("Remove from the queue")
                 .accessibilityLabel("Remove queued message \(index.map { $0 + 1 } ?? 0)")
                 .accessibilityIdentifier("Remove queued message")
+                .queueToolFrame(index == 0 ? "queued.remove" : nil, debugToolFrame)
             }
         }
         .padding(.leading, 6).padding(.trailing, 8).padding(.vertical, 4)
@@ -276,6 +284,23 @@ struct ComposerQueueBar: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("Queued message")
+    }
+}
+
+private extension View {
+    /// §50.3: reports where a tool is (`name` nil: not this chip) to the screenshot tour; nothing in a release build.
+    @ViewBuilder
+    func queueToolFrame(_ name: String?, _ report: @escaping (String, CGRect) -> Void) -> some View {
+        #if DEBUG
+        if let name {
+            onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { report(name, $0) }
+                .onDisappear { report(name, .zero) }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }
 

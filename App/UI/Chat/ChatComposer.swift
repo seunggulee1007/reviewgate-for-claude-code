@@ -280,7 +280,8 @@ struct ChatComposer: View {
                                  sendNowAction: { store.queuedSendNowAction(id: $0) },
                                  onMove: { store.moveQueued(id: $0, by: $1) },
                                  onResume: { store.resumeQueue() },
-                                 onClear: { store.clearQueue() })
+                                 onClear: { store.clearQueue() },
+                                 debugToolFrame: { model.debugQueueTools[$0] = $1 })   // the composer check (§50.3)
                 #if DEBUG
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugQueueBarFrame = $0 }   // the composer check
                     .onDisappear { model.debugQueueBarFrame = .zero }
