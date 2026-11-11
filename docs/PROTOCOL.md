@@ -7341,6 +7341,10 @@ edit, move and remove, but no way to send one message now: it waited for the tur
   (`Session/QueueSendNow.swift`). A message sent with Stop and send takes the composer's one-message model, not the queued
   message's own. Test `QueueSendNowTests`: the lenient decode, the list shown and cleared, the decision, into the turn with
   its mentions, an image stops and sends, a paused queue sends that message first.
+- **Mac.** The queue bar (`ComposerQueueBar`) shows while anything waits: the messages in Claude's turn first, as dashed
+  chips with ↳ and no tools (the CLI has them: they cannot be edited or taken back), "Claude의 턴에 들어감 — 지금 단계가
+  끝나면 Claude가 읽어요" when nothing else waits. Each queued chip has a paper plane ("바로 보내기"; its tooltip says
+  which of the three it does), the context menu and the editor popover have "바로 보내기" too.
 - **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
   tooltip `sendNowHelp`). Test `queueSendNow.test.ts`: the decision; into the turn with the mentions; with an image, stop
   and send; a paused queue sends that message first.

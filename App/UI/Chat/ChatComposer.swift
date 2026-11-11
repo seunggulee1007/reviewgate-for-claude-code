@@ -255,14 +255,17 @@ struct ChatComposer: View {
             if let failure = store.reviewCollectFailed, store.viewingChat == nil {
                 CollectFailedNotice(detail: failure)   // r2-review-flow M30: the input stays open; Retry right here
             }
-            if !store.queuedMessages.isEmpty || store.sendAfterInterrupt != nil {
+            if !store.queuedMessages.isEmpty || store.sendAfterInterrupt != nil || !store.steeringMessages.isEmpty {
                 ComposerQueueBar(messages: store.queuedMessages,
+                                 steering: store.steeringMessages,   // MARK: composer (§50.2)
                                  stopAndSend: store.sendAfterInterrupt,
                                  pausedReason: store.queuePausedReason,
                                  holdReason: store.queueHoldReason,
                                  waitingOnAgents: store.waitingOnAgents != nil,   // wave3 mac-agents (§36.4)
                                  onUpdate: { store.updateQueued(id: $0, text: $1) },
                                  onRemove: { store.removeQueued(id: $0) },
+                                 onSendNow: { store.sendQueuedNow(id: $0) },   // MARK: composer (§50.2)
+                                 sendNowAction: { store.queuedSendNowAction(id: $0) },
                                  onMove: { store.moveQueued(id: $0, by: $1) },
                                  onResume: { store.resumeQueue() },
                                  onClear: { store.clearQueue() })
