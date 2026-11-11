@@ -109,11 +109,11 @@ describe("Bash attribution is narrowed to the call's execution window (§31)", (
     // The card is open; meanwhile the user edits a file in the IDE.
     await sleep(20);
     write(root, "mine.txt", "mine\n");
-    await sleep(60);
+    await sleep(300); // far beyond the file clock's tick (Windows ~15.6 ms): mine.txt is surely before the window start
     const ran = Date.now();
     write(root, "out.txt", "out\n");
     await sleep(10);
-    await hook(hooks, "PostToolUse", "Bash")(post("Bash", { command: "x" }, root, "b1", { duration_ms: Date.now() - ran + 2 }), "b1", opts);
+    await hook(hooks, "PostToolUse", "Bash")(post("Bash", { command: "x" }, root, "b1", { duration_ms: Date.now() - ran + 50 }), "b1", opts);
     expect(ctx.reported).toEqual([["b1", ["out.txt"]]]);
   });
 
@@ -206,8 +206,8 @@ describe("provenance helpers", () => {
     write(root, "d/x.txt", "x\n");
     const t = await changeTimeOf(join(root, "d/x.txt"), root);
     expect(t).not.toBeNull();
-    expect(t!).toBeGreaterThanOrEqual(before - 5);
-    expect(await changeTimeOf(resolve(root, "d/gone/deeper.txt"), root)).toBeGreaterThanOrEqual(before - 5);
+    expect(t!).toBeGreaterThanOrEqual(before - 50);
+    expect(await changeTimeOf(resolve(root, "d/gone/deeper.txt"), root)).toBeGreaterThanOrEqual(before - 50);
     expect(inWindow(1000, { start: 1200, end: 2000 }, 0)).toBe(false);
     expect(inWindow(1000, { start: 1200, end: 2000 }, 500)).toBe(true);
     expect(inWindow(2050, { start: 1200, end: 2000 }, 0)).toBe(true); // end slack
