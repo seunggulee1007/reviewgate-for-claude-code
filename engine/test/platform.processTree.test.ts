@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { descendantsOf, killProcessTree, parsePsTable } from "../src/platform/processTree.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 const posix = process.platform !== "win32";
 
@@ -16,7 +17,7 @@ function alive(pid: number): boolean {
   }
 }
 
-async function gone(pids: number[], ms = 3000): Promise<boolean> {
+async function gone(pids: number[], ms = WAIT_MS): Promise<boolean> {
   const until = Date.now() + ms;
   while (Date.now() < until) {
     if (pids.every((p) => !alive(p))) return true;

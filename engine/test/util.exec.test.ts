@@ -27,8 +27,9 @@ describe("exec", () => {
 
   it("kills on timeout", async () => {
     const started = Date.now();
-    const out = await exec(node, ["-e", "setTimeout(() => {}, 10000)"], { timeoutMs: 200 });
-    expect(Date.now() - started).toBeLessThan(5000);
+    const out = await exec(node, ["-e", "setTimeout(() => {}, 60000)"], { timeoutMs: 200 });
+    // the child outlives the bound, so only the kill can end it in time; the bound is generous (CI runners stall)
+    expect(Date.now() - started).toBeLessThan(30_000);
     expect(out.timedOut).toBe(true);
     expect(out.status).toBeNull();
     expect(out.signal).toBe("SIGTERM");
@@ -44,7 +45,7 @@ describe("exec", () => {
     });
     expect(out.timedOut).toBe(true);
     expect(out.signal).toBe("SIGKILL");
-  }, 10000);
+  });
 
   it("rejects on spawn failure", async () => {
     await expect(exec("/nonexistent/binary", [])).rejects.toBeInstanceOf(ExecError);

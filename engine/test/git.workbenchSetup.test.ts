@@ -134,9 +134,10 @@ describe("runSetupCommand", () => {
   it("a command past its limit is killed with its children: exitCode null", async () => {
     const dir = tmp("rg-setup");
     const started = Date.now();
-    const r = await runSetupCommand(posix ? "sleep 30" : "ping -n 30 127.0.0.1 > nul", dir, env, { platform, onOutput: () => {}, timeoutMs: 300 });
+    const r = await runSetupCommand(posix ? "sleep 60" : "ping -n 60 127.0.0.1 > nul", dir, env, { platform, onOutput: () => {}, timeoutMs: 300 });
     expect(r.exitCode).toBeNull();
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // the command outlives the bound, so only the kill can end it in time (Windows' taskkill alone may take 10 s)
+    expect(Date.now() - started).toBeLessThan(30_000);
     expect(r.logTail).toMatch(/timed out/);
   });
 

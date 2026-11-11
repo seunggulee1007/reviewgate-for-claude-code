@@ -30,7 +30,7 @@ describe.skipIf(!posix)("checkpoint git timeout", () => {
   it("a git call that does not answer ends with GitTimeoutError", async () => {
     // `sleep` runs as a child of the script (not exec'd): it keeps the output pipes open after the script is killed,
     // like an LFS filter or ssh left behind by a killed git — the call ends anyway.
-    setGitPath(fakeGit("sleep 30; echo never"));
+    setGitPath(fakeGit("sleep 60; echo never"));
     setCheckpointGitTimeout(300);
     const cp = new GitCheckpoint(makeTempDir());
     dirs.push(cp.root);
@@ -39,19 +39,20 @@ describe.skipIf(!posix)("checkpoint git timeout", () => {
     expect(err).toBeInstanceOf(GitTimeoutError);
     expect((err as Error).message).toContain("git add");
     expect((err as Error).message).toContain("did not respond");
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // the fake git outlives the bound (60 s), so only the timeout can end the call in time; wide for a stalled runner
+    expect(Date.now() - started).toBeLessThan(30_000);
   });
 
   it("ends even while a process left behind keeps the output open", async () => {
-    // A background child survives the killed script and holds stdout / stderr: exec alone would wait for it (30 s).
-    setGitPath(fakeGit("sleep 30 &\nwait"));
+    // A background child survives the killed script and holds stdout / stderr: exec alone would wait for it (60 s).
+    setGitPath(fakeGit("sleep 60 &\nwait"));
     setCheckpointGitTimeout(200);
     const cp = new GitCheckpoint(makeTempDir());
     dirs.push(cp.root);
     const started = Date.now();
     const err = await cp.git(["add", "-A"]).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(GitTimeoutError);
-    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(Date.now() - started).toBeLessThan(30_000);
   });
 
   it("a failing git still throws GitCommandError, and allowFailure still resolves", async () => {
@@ -70,7 +71,7 @@ describe.skipIf(!posix)("checkpoint git timeout", () => {
     setCheckpointGitTimeout(100);
     const cp = new GitCheckpoint(makeTempDir());
     dirs.push(cp.root);
-    const out = await cp.git(["rev-parse"], { timeoutMs: 5000 });
+    const out = await cp.git(["rev-parse"], { timeoutMs: 30_000 });
     expect(out.text.trim()).toBe("ok");
   });
 });
