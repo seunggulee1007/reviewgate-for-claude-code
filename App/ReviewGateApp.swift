@@ -142,6 +142,7 @@ enum ProjectOpener {
     /// Opens `url` in this window. MARK: polish p-lifecycle (P1-chrome-03): with a project open here it is a switch — ⌘O, the
     /// toolbar's folder, File › Open Recent, the recent list and a git candidate all ask what `requestSwitch` asks.
     static func open(_ url: URL, store: AppState) {
+        if openElsewhereIfWindowGone(url, store: store) { return }
         if store.projectURL != nil, let entry = WorkbenchRegistry.shared.entry(for: store) {
             requestSwitch(to: url, store: store, pending: Bindable(entry.model).pendingSwitch)
             return
@@ -156,6 +157,7 @@ enum ProjectOpener {
     /// 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are asked about by the caller's alert (via `pending`);
     /// otherwise the store swaps sessions right away.
     static func requestSwitch(to url: URL, store: AppState, pending: Binding<URL?>) {
+        if openElsewhereIfWindowGone(url, store: store) { return }
         let registry = WorkbenchRegistry.shared
         let target = AppSettings.projectKey(url)
         if store.projectURL.map(AppSettings.projectKey) == target {
@@ -235,6 +237,14 @@ enum ProjectOpener {
     }
 
     static func folderOfWindowValue(_ value: URL) -> URL { URL(fileURLWithPath: value.path).standardizedFileURL }
+
+    /// A store whose window is gone (a menu that still names a closed window) would open the project where no one sees it,
+    /// on an engine already stopped: `url` opens in a window of its own instead. False when the store's window is there.
+    private static func openElsewhereIfWindowGone(_ url: URL, store: AppState) -> Bool {
+        guard WorkbenchRegistry.shared.entry(for: store) == nil, let openWindow = FolderHandoffRouter.shared.openWindow else { return false }
+        openInNewWindow(url, openWindow: openWindow)
+        return true
+    }
 
     /// An open that finds the project already open ends with its window in front saying so — the window may be the one in
     /// front already, where coming forward shows nothing (0.5.12 did nothing at all for the project open in this window).

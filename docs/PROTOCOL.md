@@ -8045,7 +8045,8 @@ and what stays. The decision and the words are one pure function on each client 
   `ProjectOpener.requestSwitch` too (they used to open at once, past even the pending-review question), and Close Project
   through `requestClose`; the question is a sheet on the window. A new window is opened with the folder plus a fragment of
   its own (`ProjectOpener.newWindowValue`): SwiftUI brings forward the window it thinks shows a value, and a window closed
-  earlier (AppKit keeps it, hidden) still matched the folders it had shown — Open in New Window… then opened nothing. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and
+  earlier (AppKit keeps it, hidden) still matched the folders it had shown — Open in New Window… then opened nothing. An
+  open aimed at a window that is gone (a menu that still names a closed window's store) opens in a window of its own. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and
   `closeProject` ask main (`rg:confirmProjectChange`, with the page's facts), which shows the question as a message box on
   that window and answers `{asked, ok}`.
 - **Mac.** The last workbench window's close (⌘W, the close button) asks the quit question as a sheet and then quits —
