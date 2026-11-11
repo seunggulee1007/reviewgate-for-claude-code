@@ -1726,6 +1726,16 @@ type AttachmentRef  = { kind: "image"; hash: string /* sha-256 hex of the bytes 
   `CardAnswersTests`. Electron: the same tries (`src/shared/attachments.ts` `fitTries`, `fitSize`, `fitWith`) for a paste or
   a drop (`composerAttach.ts` `fitImage`, drawn on a canvas) and the attach dialog (main `readPickedImage`, Electron's
   `nativeImage`); the chip's tooltip says it was scaled down and a toast says it once; test `composerAttachFit.test.ts`.
+- **⌘V of an image (Mac, composer).** Pasting a screenshot or an image copied in Preview did nothing: ⌘V beeped. The
+  message box is a plain-text `NSTextView`, and AppKit turns Edit › Paste on only for the types such a view reads
+  (`readablePasteboardTypes`: text, RTF, URLs, file names; no PNG or TIFF). The box's own paste, which attaches images,
+  never ran. Paste is now on when the pasteboard holds text or something the box attaches: a file URL, PNG, TIFF, JPEG,
+  GIF or WebP (`ComposerNSTextView.canPaste`, `validateMenuItem` / `validateUserInterfaceItem`). Proof: the quiet
+  check `SHOTS_LAYOUT=composer` pastes through the app's own Edit menu (⌘V as a key equivalent) from a private pasteboard
+  handed to the box, never the user's clipboard. It covers what a screenshot (PNG + TIFF), Preview (TIFF), a browser's
+  Copy Image (TIFF + HTML) and a Finder copy of an image file (file URL + name) put there. Before: "Edit › Paste off —
+  LOST" for a pasteboard of image types only: a screenshot, a copy in Preview. A browser's copy usually carries HTML or a URL
+  and a Finder copy a file name, which the view reads, so those pasted. After: an image is attached for each of the four.
 - Tool results that hold image blocks (a `Read` of a `.png`, an MCP screenshot) are previewed as `[image/png, N bytes]`
   instead of their JSON — no base64 in `tool_result.preview` or the transcript either (the CLI keeps a pasted image on disk
   and Claude may `Read` it back; observed with CLI 2.1.305).
