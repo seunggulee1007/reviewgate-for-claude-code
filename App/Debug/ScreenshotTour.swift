@@ -587,8 +587,13 @@ private final class Tour {
         git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         git.arguments = ["-C", root, "worktree", "add", "-q", "-b", "worktree-acme-42", worktree]
         do { try git.run(); git.waitUntilExit() } catch { log("guards: git worktree add failed: \(error)") }
-        await store.refreshWorkbenches()
-        log("guards: \(worktree) is a workbench: \(store.isWorkbenchPath(worktree) ? "yes" : "NO")")
+        // At most 10 s: an engine whose CLI stopped answering (seen after the Mac slept) never settles, and the rest of
+        // the check need not wait for it.
+        var refreshed = false
+        Task { @MainActor in await store.refreshWorkbenches(); refreshed = true }
+        let refreshDeadline = ContinuousClock.now + .seconds(10)
+        while !refreshed, ContinuousClock.now < refreshDeadline { try await Task.sleep(for: .milliseconds(100)) }
+        log("guards: \(worktree) is a workbench: \(store.isWorkbenchPath(worktree) ? "yes" : "NO")" + (refreshed ? "" : " (the workbench list did not come in 10 s)"))
         var entered = EngineErrorDetail(code: "worktree_outside_review")
         entered.toolName = "EnterWorktree"
         entered.path = worktree
