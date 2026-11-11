@@ -52,6 +52,18 @@ function RestartButton() {
   );
 }
 
+/** `project_open_failed` (its git did not answer, §55.8): the folder opened last, again. */
+function ReopenLastButton() {
+  const path = useStore((s) => s.lastOpenPath);
+  const reopen = useStore((s) => s.reopenLastProject);
+  if (!path) return null;
+  return (
+    <button type="button" className="small" onClick={() => void reopen()} title={path} data-testid="Error reopen last project">
+      {t("Reopen project")}
+    </button>
+  );
+}
+
 /** §22 `mcp_auth_required`: opens the CLI's MCP dialog in a terminal (`mcp_auth`), then the list shows the new status. */
 function McpSignIn({ server }: { server: string }) {
   const auth = useStore((s) => s.mcpAuth);
@@ -121,6 +133,7 @@ export function ErrorBanner() {
       {/* r2-peers (§18): what Claude went on with by itself was denied — [이어서 계속] picks it up as a reviewed turn */}
       {(banner.code === "max_turns" || banner.code === "unprompted_blocked") && <ContinueWorkButton />}
       {banner.code === "usage_limit" && <LimitResumeToggle />}
+      {banner.code === "project_open_failed" && <ReopenLastButton />}
       {kind === "fatalSession" && (
         <button type="button" className="small" onClick={() => openDialog({ kind: "settings", tab: "general" })} data-testid="Error settings">
           {t("Settings")}

@@ -411,6 +411,10 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   dialog: Dialog | null;
   /** The folder whose `open_project` was refused with `locked_by_other_session` (drives the takeover dialog). */
   lockedProjectPath: string | null;
+  /** The folder an open / switch is on its way to, until the engine answers: the empty window says "Opening acme-api…". */
+  openingPath: string | null;
+  /** The folder opened last: `project_open_failed`'s Reopen opens it again. */
+  lastOpenPath: string | null;
   refusedLockPid: number | null;
   // review selection + caches
   selectedPath: string | null;
@@ -475,6 +479,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   switchProject(path: string): Promise<void>;
   requestSwitch(path: string): void;
   chooseAndOpen(mode?: "open" | "switch"): Promise<void>;
+  /** `project_open_failed`'s Reopen: the folder opened last, again. */
+  reopenLastProject(): Promise<void>;
   takeOver(): Promise<void>;
   cancelTakeover(): void;
   closeProject(): Promise<void>;
@@ -908,6 +914,16 @@ export const useStore = create<Store>((set, get, api) => {
     return [...finishStreaming(items), { kind: "assistant", id: uid(), text, streaming: true, ...(unprompted ? { unprompted: true as const } : {}) }];
   };
 
+  // An open / switch on its way (`openingPath`); a newer one replaces it and an older one ending does not clear it.
+  let openingTick = 0;
+  const beginOpening = (path: string): number => {
+    set({ openingPath: path, lastOpenPath: path });
+    return ++openingTick;
+  };
+  const endOpening = (tick: number) => {
+    if (tick === openingTick) set({ openingPath: null });
+  };
+
   const resetProjectView = () => {
     set({ transcript: [], lastError: null, errorBanner: null, selectedPath: null, selectedDiff: null, diffCache: {}, fullFileCache: {}, diffLoading: false, viewedPaths: {}, transcriptRestored: false, transcriptFocus: null, replaceTranscript: false, ui: {}, wantedPath: null, reviewHistory: EMPTY_HISTORY, historyView: null, queue: EMPTY_QUEUE });
     get().resetSide();
@@ -1156,6 +1172,8 @@ export const useStore = create<Store>((set, get, api) => {
     sidebarVisible: true,
     dialog: null,
     lockedProjectPath: null,
+    openingPath: null,
+    lastOpenPath: null,
     refusedLockPid: null,
     selectedPath: null,
     selectedDiff: null,
@@ -1377,6 +1395,7 @@ export const useStore = create<Store>((set, get, api) => {
       keepQueueWhileLeaving(get().state.project?.root ?? null); // MARK: polish p-lifecycle (P4-composer-07): the queue stays kept
       resetProjectView();
       set({ lockedProjectPath: null, refusedLockPid: null, dialog: null, tab: "changes" });
+      const opening = beginOpening(path);
       try {
         await engineRequest({ type: "open_project", path, takeover });
         await get().settle();
@@ -1391,6 +1410,8 @@ export const useStore = create<Store>((set, get, api) => {
         } else {
           fail(message, true);
         }
+      } finally {
+        endOpening(opening);
       }
     },
 
@@ -1398,6 +1419,7 @@ export const useStore = create<Store>((set, get, api) => {
       keepQueueWhileLeaving(get().state.project?.root ?? null); // MARK: polish p-lifecycle (P4-composer-07)
       resetProjectView();
       set({ lockedProjectPath: null, refusedLockPid: null, dialog: null, tab: "changes" });
+      const opening = beginOpening(path);
       try {
         await engineRequest({ type: "switch_project", path });
         await get().settle();
@@ -1408,18 +1430,21 @@ export const useStore = create<Store>((set, get, api) => {
           if (await rg().focusProjectWindow(path)) return;
           set({ lockedProjectPath: path, refusedLockPid: Number(message.split(":")[1] ?? "0") || 0, dialog: { kind: "lockConflict" } });
         } else fail(message, true);
+      } finally {
+        endOpening(opening);
       }
     },
 
     /**
      * Switching (File › Open / Open Recent / Switch Project…, the sidebar's projects). MARK: polish p-lifecycle (P1-chrome-03):
-     * the project already open does nothing and one open in another window comes to the front (a switch would stop this
-     * session for a lock it cannot take); a switch stops the session, so a turn running, a card waiting or work that would
+     * the project already open says so (a toast — it did nothing, as on the Mac in 0.5.12) and one open in another window
+     * comes to the front, which says so too (main's `focusProjectWindow`; a switch would stop this session for a lock it
+     * cannot take); a switch stops the session, so a turn running, a card waiting or work that would
      * stop or be lost asks first (main's question, the Mac's words); otherwise pending files ask (the Mac's "Switch project?").
      */
     requestSwitch(path) {
       void (async () => {
-        if (isOpenProject(get().state.project, path, rg().platform)) return;
+        if (isOpenProject(get().state.project, path, rg().platform)) return showToast(t("{0} is already open in this window", lastComponent(path)));
         if (get().state.project && (await rg().focusProjectWindow(path))) return;
         const answer = await confirmProjectChange(get(), "switch");
         if (!answer.ok) return;
@@ -1435,6 +1460,13 @@ export const useStore = create<Store>((set, get, api) => {
       if (!path) return;
       if (mode === "switch" || get().state.project) get().requestSwitch(path);
       else await get().openProject(path);
+    },
+
+    async reopenLastProject() {
+      const path = get().lastOpenPath;
+      if (!path) return;
+      get().dismissError();
+      await get().openProject(path);
     },
 
     async takeOver() {

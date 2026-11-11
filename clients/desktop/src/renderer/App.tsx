@@ -206,10 +206,19 @@ function NoProject() {
   const [notice, setNotice] = useState<string | null>(null);
   const chooseAndOpen = useStore((s) => s.chooseAndOpen);
   const openProject = useStore((s) => s.openProject);
+  const opening = useStore((s) => s.openingPath);
   return (
     <div className="empty grow" data-testid="No project">
       <div className="glyph">▭</div>
-      <h2>{t("No project open")}</h2>
+      {/* An open on its way (it may wait on git — the engine caps it at 20 s and then says why): never a silent window. */}
+      {opening ? (
+        <h2 className="row" style={{ gap: 8 }} title={displayPath(opening)} data-testid="Opening project">
+          <span className="spinner" aria-hidden="true" />
+          {t("Opening {0}…", lastComponent(opening))}
+        </h2>
+      ) : (
+        <h2>{t("No project open")}</h2>
+      )}
       <div>{t("Open a folder (⌘O) to start a Claude session.")}</div>
       <button type="button" className="primary" onClick={() => void chooseAndOpen("open")} data-testid="Open project">
         {t("Open Project…")}

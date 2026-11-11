@@ -8066,7 +8066,11 @@ and what stays. The decision and the words are one pure function on each client 
   earlier (AppKit keeps it, hidden) still matched the folders it had shown — Open in New Window… then opened nothing. An
   open aimed at a window that is gone (a menu that still names a closed window's store) opens in a window of its own. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and
   `closeProject` ask main (`rg:confirmProjectChange`, with the page's facts), which shows the question as a message box on
-  that window and answers `{asked, ok}`.
+  that window and answers `{asked, ok}`. The folder already open says so there too: a toast "acme-api is already open in
+  this window" in the page, and from main's `focusProjectWindow` (the window holding it — another one, the one Open in New
+  Window… finds, or the lock's owner — comes forward and says it). While `open_project` / `switch_project` is answered, the
+  empty window shows "Opening acme-api…" (`openingPath`); `project_open_failed` has Reopen (`reopenLastProject`, the
+  folder opened last). Test: `clients/desktop/src/renderer/openProject.test.ts`.
 - **Mac.** The last workbench window's close (⌘W, the close button) asks the quit question as a sheet and then quits —
   its engine stops with the window, so nothing is left to keep the app running for
   (`applicationShouldTerminateAfterLastWindowClosed` is true). The window list is written before any engine stops, so the

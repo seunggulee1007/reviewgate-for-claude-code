@@ -5,7 +5,7 @@
  * windows (docs/M19-MULTIPROJECT.md). The engine runs in-process (docs/M9-ENGINE.md §3.2).
  */
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, type WebContents } from "electron";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createPlatform, ReviewEngine, type EngineEvent, type HelloCommand } from "@reviewgate/engine";
 import type { OpenWindow, WindowBounds } from "../shared/ipc.js";
@@ -148,6 +148,8 @@ export function focusProjectWindow(path: string, exceptId?: number): boolean {
   if (!wb || wb.win.isDestroyed() || wb.win.webContents.id === exceptId) return false;
   logLine("main", "main", `w${wb.win.webContents.id} already has ${path} open — focusing it`);
   focusWindow(wb.win);
+  // It may be the window in front already, where coming forward shows nothing: it says so (as the Mac does).
+  wb.win.webContents.send("rg:toast", t("{0} is already open in this window", basename(resolve(path))));
   return true;
 }
 
