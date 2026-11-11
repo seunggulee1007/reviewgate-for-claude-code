@@ -23,6 +23,8 @@ enum ScreenshotTour {
     /// transparent and let clicks through, so the user working beside it sees nothing. The shots render the views
     /// (`cacheDisplay`), not the screen.
     private(set) static var quiet = false
+    /// The tour's engine log (under its folder): every window it opens writes there, never to ~/Library/Logs/ReviewGate.
+    private(set) static var logFile: EngineLogFile?
     private static var quietTimer: Timer?
 
     /// From `applicationWillFinishLaunching`, before any window shows.
@@ -65,7 +67,8 @@ enum ScreenshotTour {
             tour.finish(TourError("bundle id \(Bundle.main.bundleIdentifier ?? "?") does not end in .screenshots"))
             return
         }
-        entry.store.fileLog = EngineLogFile(directory: out.appendingPathComponent("logs"))   // not ~/Library/Logs/ReviewGate
+        logFile = EngineLogFile(directory: out.appendingPathComponent("logs"))
+        entry.store.fileLog = logFile   // not ~/Library/Logs/ReviewGate — nor for the windows the tour opens
         Task { await tour.run() }
     }
 }
@@ -108,6 +111,11 @@ private final class Tour {
         }
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "cpu" {
             do { try await cpuChecks(); finish(nil) } catch { finish(error) }
+            return
+        }
+        // `SHOTS_LAYOUT=open`: what Open Project… / Switch Project… / Open in New Window… end in, state by state.
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "open" {
+            do { try await openChecks(); finish(nil) } catch { finish(error) }
             return
         }
         // `SHOTS_LAYOUT=blank`: only the blank-chat check in tall windows.
@@ -1486,6 +1494,169 @@ private final class Tour {
         }
         try png.write(to: out.appendingPathComponent("\(name).png"))
         log("wrote \(name).png (\(image.width)×\(image.height))")
+    }
+
+    // MARK: Open Project (`SHOTS_LAYOUT=open`)
+
+    /// File › Open Project… (⌘O), Switch Project… (⌘⇧O) and Open in New Window… (⌘⇧N), and `ProjectOpener.open` under
+    /// them, in each state a window can be in: every one must open the project, bring the window that has it forward, ask, or
+    /// say why it did not — `open <case>: <outcome>` lines in tour.log, "SILENT" when none of these happened (fails the run).
+    /// The folder picker is `ProjectOpener.debugPick`; the menus are run by their items (`performActionForItem`).
+    private func openChecks() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let a = store.projectURL else { throw TourError("no project") }
+        let b = try makeProject("acme-b"), c = try makeProject("acme-c")
+        AppSettings.setConfirmCloseWhileWorking(true)
+        defer { AppSettings.setConfirmCloseWhileWorking(false) }
+        let registry = WorkbenchRegistry.shared
+        let main = entry
+        let files = [ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 3, deleted: 1, isBinary: false)]
+        log("open: windows \(registry.entries.count), key \(NSApp.keyWindow === main.window), active \(NSApp.isActive)")
+
+        try await check("idle -> B", b) { ProjectOpener.open(b, store: main.store) }
+        try await check("idle -> A", a) { ProjectOpener.open(a, store: main.store) }
+        try await check("the project open in this window -> A", a) { ProjectOpener.open(a, store: main.store) }
+        main.store.debugShowComposerState(working: false, files: files)
+        try await check("files pending review -> B", b) { ProjectOpener.open(b, store: main.store) }
+        main.model.tab = .prs
+        try await Task.sleep(for: .milliseconds(800))
+        main.store.debugShowComposerState(working: false, files: files)
+        try await check("files pending review, the PRs tab -> B", b) { ProjectOpener.open(b, store: main.store) }
+        main.model.tab = .changes
+        main.store.debugShowComposerState(working: true, files: [])
+        try await check("a turn running -> B", b) { ProjectOpener.open(b, store: main.store) }
+        main.store.debugShowComposerState(working: false, files: [])
+        main.model.chatComposer.draft = "half a message"
+        try await check("a message typed -> B", b) { ProjectOpener.open(b, store: main.store) }
+        main.model.chatComposer.draft = ""
+        await main.store.refresh(scope: nil)
+        try await check("menu Open Project -> B", b) { try self.menu("o", [.command], pick: b) }
+        try await check("menu Switch Project -> A", a) { try self.menu("o", [.command, .shift], pick: a) }
+        let alias = URL(fileURLWithPath: a.path.hasPrefix("/private/") ? String(a.path.dropFirst(8)) : a.path + "/")
+        try await check("the project already open, by another spelling (\(alias.path))", a) { ProjectOpener.open(alias, store: main.store) }
+        await main.store.closeProject()
+        // The empty window while an open is on its way (its git may wait — the engine caps it and then says why).
+        main.store.debugShowOpening(c)
+        try await Task.sleep(for: .milliseconds(1000))
+        if let window = main.window { try write(try render(window), "open-opening") }
+        main.store.debugShowOpening(nil)
+        try await check("project closed -> B", b) { ProjectOpener.open(b, store: main.store) }
+
+        // A second window, then the first one closed: the menus must act on the window left.
+        guard let openWindow = FolderHandoffRouter.shared.openWindow else { throw TourError("no openWindow") }
+        openWindow(id: "workbench")
+        try await until("a second window") { registry.entries.count == 2 && registry.entries.allSatisfy { $0.window != nil } }
+        guard let second = registry.entries.first(where: { $0 !== main }) else { throw TourError("no second window") }
+        second.window?.makeKeyAndOrderFront(nil)
+        main.window?.close()
+        try await until("the first window gone") { registry.entries.count == 1 }
+        try await Task.sleep(for: .milliseconds(800))
+        log("open: windows \(registry.entries.count), key \(NSApp.keyWindow === second.window), focused \(registry.focused === second)")
+        try await check("the closed window's store (a stale menu target) -> C", c) { ProjectOpener.open(c, store: main.store) }
+        try await check("second window: menu Open Project -> A", a) { try self.menu("o", [.command], pick: a) }
+        try await check("second window: menu Open Project -> B", b) { try self.menu("o", [.command], pick: b) }
+        try await check("second window: menu Open in New Window -> C", c) { try self.menu("n", [.command, .shift], pick: c) }
+        guard let third = registry.entries.first(where: { $0 !== second && $0 !== main }) else { throw TourError("no third window") }
+        second.window?.makeKeyAndOrderFront(nil)
+        try await check("second window in front: menu Open in New Window -> C", c) { try self.menu("n", [.command, .shift], pick: c) }
+        try await check("another window: open A", a) { ProjectOpener.open(a, store: third.store) }
+        second.window?.makeKeyAndOrderFront(nil)
+        try await check("second window in front: menu Open in New Window -> C, again", c) { try self.menu("n", [.command, .shift], pick: c) }
+        second.window?.makeKeyAndOrderFront(nil)
+        try await check("second window in front: menu Switch Project -> A", a) { try self.menu("o", [.command, .shift], pick: a) }
+        if let window = registry.entries.first?.window { try write(try render(window), "open-last") }
+    }
+
+    /// Runs `act` and reads off the app, for up to 8 s, what it ended in; a question it raised is cancelled.
+    private func check(_ name: String, _ target: URL, _ act: () throws -> Void) async throws {
+        let registry = WorkbenchRegistry.shared
+        let key = AppSettings.projectKey(target)
+        let before = Dictionary(uniqueKeysWithValues: registry.entries.map { (ObjectIdentifier($0), $0.store.projectURL.map(AppSettings.projectKey)) })
+        let front = NSApp.orderedWindows.first
+        Toast.debugShown = nil
+        try act()
+        var outcome: String?
+        for _ in 0..<80 where outcome == nil {
+            try await Task.sleep(for: .milliseconds(100))
+            for e in registry.entries {
+                if let sheet = e.window?.attachedSheet {
+                    outcome = "asked — \"\(Self.texts(sheet.contentView).joined(separator: " / "))\""
+                    if e.model.pendingSwitch != nil { e.model.pendingSwitch = nil } else { e.window?.endSheet(sheet, returnCode: .alertSecondButtonReturn) }
+                    try await until("the question gone") { e.window?.attachedSheet == nil }
+                    break
+                }
+                let now = e.store.projectURL.map(AppSettings.projectKey)
+                if now == key, e.store.projectInfo != nil, before[ObjectIdentifier(e)] != .some(key) {
+                    outcome = before[ObjectIdentifier(e)] == nil ? "opened in a new window" : "opened in this window"
+                    break
+                }
+                if let banner = e.store.errorBanner { outcome = "message — \(banner.message)"; break }
+                if let toast = Toast.debugShown { outcome = "said — \"\(toast)\""; Toast.debugShown = nil; break }
+            }
+        }
+        if outcome == nil, let window = registry.entry(for: target)?.window, NSApp.orderedWindows.first === window, front !== window {
+            outcome = "its window came forward"
+        }
+        let windows = registry.entries.map { e in
+            (e.store.projectURL?.lastPathComponent ?? "empty") + (e.window.map { NSApp.orderedWindows.first === $0 } == true ? "*" : "")
+        }
+        log("open \(name): \(outcome ?? "SILENT")   [windows: \(windows.joined(separator: ", "))]")
+        if case .some(let line) = outcome, line.hasPrefix("opened") {
+            try await until("\(target.lastPathComponent) ready") { registry.entry(for: target)?.store.isSessionOpen == true }
+        }
+    }
+
+    private func until(_ what: String, timeout seconds: Int = 60, _ done: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(seconds)
+        while !done() {
+            guard ContinuousClock.now < deadline else { throw TourError("timed out waiting for \(what)") }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    /// Runs the main menu's item with this shortcut, the folder picker answering `pick`.
+    private func menu(_ key: String, _ modifiers: NSEvent.ModifierFlags, pick: URL) throws {
+        func find(_ menu: NSMenu) -> (NSMenu, Int)? {
+            for (i, item) in menu.items.enumerated() {
+                if item.keyEquivalent.lowercased() == key,
+                   item.keyEquivalentModifierMask.intersection([.command, .shift, .option, .control]) == modifiers
+                    || (item.keyEquivalent == key.uppercased() && modifiers == [.command, .shift]
+                        && item.keyEquivalentModifierMask.intersection([.command, .shift, .option, .control]) == .command) {
+                    return (menu, i)
+                }
+                if let sub = item.submenu, let hit = find(sub) { return hit }
+            }
+            return nil
+        }
+        guard let bar = NSApp.mainMenu, let (menu, index) = find(bar) else { throw TourError("no menu item for \(key) \(modifiers)") }
+        log("open: menu \"\(menu.items[index].title)\"")
+        ProjectOpener.debugPick = pick
+        menu.performActionForItem(at: index)
+        ProjectOpener.debugPick = nil
+    }
+
+    private static func texts(_ view: NSView?) -> [String] {
+        guard let view else { return [] }
+        let own = (view as? NSTextField).map { [$0.stringValue] } ?? []
+        return own.filter { !$0.isEmpty } + view.subviews.flatMap { texts($0) }
+    }
+
+    /// A git repository of one commit under the tour's folder.
+    private func makeProject(_ name: String) throws -> URL {
+        let dir = out.appendingPathComponent(name, isDirectory: true)
+        try? FileManager.default.removeItem(at: dir)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try "# \(name)\n".write(to: dir.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+        let id = ["-c", "user.name=Acme Dev", "-c", "user.email=dev@acme.example", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"]
+        for args in [["init", "-q", "-b", "main"], ["add", "-A"], id + ["commit", "-q", "-m", "init"]] {
+            let git = Process()
+            git.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            git.arguments = ["-C", dir.path] + args
+            try git.run()
+            git.waitUntilExit()
+            guard git.terminationStatus == 0 else { throw TourError("git \(args) failed in \(dir.path)") }
+        }
+        return dir.standardizedFileURL
     }
 
     // MARK: Ending

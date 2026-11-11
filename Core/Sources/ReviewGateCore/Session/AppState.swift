@@ -740,6 +740,12 @@ public final class AppState {
     func endOpening(_ tick: Int) {
         if tick == openingTick { openingProject = nil }
     }
+    #if DEBUG
+    /// The screenshot tour's "Opening <name>…" shot (App/Debug/ScreenshotTour.swift); nil ends it.
+    public func debugShowOpening(_ url: URL?) {
+        if let url { _ = beginOpening(url) } else { endOpening(openingTick) }
+    }
+    #endif
 
     /// The banner's "Reopen": opens the project again after the engine stopped or failed to start (a new engine is
     /// spawned lazily by the open), or after an open whose git did not answer (`project_open_failed`).

@@ -135,7 +135,7 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         open(url, store: store)
     }
 
@@ -210,7 +210,7 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Switch")
         panel.message = String(localized: "Choose a project folder to switch to")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         requestSwitch(to: url, store: store, pending: pending)
     }
 
@@ -260,9 +260,21 @@ enum ProjectOpener {
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder to open in a new window")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = pick(panel) else { return }
         openInNewWindow(url, openWindow: openWindow)
     }
+
+    /// The folder picked in `panel`; nil on Cancel. DEBUG: `debugPick` (the open check, App/Debug/ScreenshotTour.swift)
+    /// stands in for the user once, and no panel shows.
+    private static func pick(_ panel: NSOpenPanel) -> URL? {
+        #if DEBUG
+        if let url = debugPick { debugPick = nil; return url }
+        #endif
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+    #if DEBUG
+    static var debugPick: URL?
+    #endif
 
     /// ⌥-click on a project row opens it in a new window instead of switching this one.
     static var optionKeyDown: Bool { NSEvent.modifierFlags.contains(.option) }
@@ -449,6 +461,9 @@ private struct WorkbenchWindow: View {
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
             .task {
                 entry.store.fileLog = EngineLogFile.shared   // wave1 mac-session: ~/Library/Logs/ReviewGate (robustness-03)
+                #if DEBUG
+                if let tourLog = ScreenshotTour.logFile { entry.store.fileLog = tourLog }   // a tour's windows: its own folder
+                #endif
                 WorkbenchRegistry.shared.register(entry)
                 AttentionCenter.shared.attach(entry)
                 entry.store.confirmSideSwitch = SideSwitchAlert.confirm   // wave4b w4b-side (§40.3)
