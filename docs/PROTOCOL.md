@@ -3376,7 +3376,9 @@ Rules for every subsection:
   subsection says so). A client before §36 ignores the fields and events. Both clients ship with their engine; the
   compatibility lines matter for mixed builds and for the lanes landing one by one. Until its lane lands, a command stays
   `unknown_command`. Electron's main process forwards only the commands listed in `clients/desktop/src/main/ipcGuard.ts`:
-  each desktop lane adds its own.
+  each desktop lane adds its own. `ipcGuard.test.ts` scans the renderer for every `engineRequest({ type })` and fails
+  on a type the list refuses. `steer` (§50), `unaccept` (Accept all's Undo) and `live_changes` / `live_diff` (§34.6) had
+  been left off, so on Windows they were refused before reaching the engine (fixed in 0.5.14).
 - **Read-only forks** — §36.10 side questions, §36.11 commit drafts, §36.13 pre-reviews — use the §21 machinery and its
   read-only policy (PreToolUse hook + `canUseTool`, deny wins in every mode, never a permission card;
   `disableAllHooks`; no MCP server — side questions have the user's since r2 M18, §21, the one-shot forks still none;

@@ -28,6 +28,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "plan_follow",
   "accept",
   "accept_all",
+  "unaccept", // the Undo of "Accept all"'s toast
+  // §34.6 the running turn's changes so far (reads: the "진행 중 변경" section and its read-only diff)
+  "live_changes",
+  "live_diff",
   "reject",
   "reject_all",
   // §31.5 (wave1 desktop-review): empty the review list without touching files / dismiss the stale flag
