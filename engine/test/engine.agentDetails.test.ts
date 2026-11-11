@@ -127,7 +127,7 @@ describe("stop_agent (docs/PROTOCOL.md §36.2)", () => {
   it("never waits behind the main lane (a running interrupt)", async () => {
     const dir = realpathSync(makeRepo());
     dirs.push(dir);
-    const h = makeHarness({ interruptWaitMs: 5_000 });
+    const h = makeHarness({ interruptWaitMs: 30_000 });
     harnesses.push(h);
     await h.hello();
     await h.open(dir);
@@ -140,7 +140,7 @@ describe("stop_agent (docs/PROTOCOL.md §36.2)", () => {
     void h.engine.handle({ type: "interrupt" }).then(() => (interrupted = true));
     const t = Date.now();
     await h.engine.request({ type: "stop_agent", toolUseId: "slow" });
-    expect(Date.now() - t).toBeLessThan(2_000);
+    expect(Date.now() - t).toBeLessThan(10_000); // far under the 30 s interrupt wait it must not sit behind
     expect(interrupted).toBe(false);
     s.emitTurnEnd();
   });

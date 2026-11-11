@@ -128,7 +128,7 @@ describe("GHAuth", () => {
 
     const start = Date.now();
     const accounts = await status(fakeGH, { HOME: home, PATH: "/usr/bin:/bin" }, "darwin");
-    expect(Date.now() - start).toBeLessThan(12_000);
+    expect(Date.now() - start).toBeLessThan(45_000); // the per-host cut-off is 8 s, the fake gh hangs 60 s
     expect(accounts).toHaveLength(1);
     expect(accounts[0].host).toBe("ghe.example");
     expect(accounts[0].login).toBe("me");

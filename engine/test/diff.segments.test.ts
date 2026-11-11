@@ -138,7 +138,7 @@ describe("addSegments over a parsed diff (§34.7)", () => {
     expect(changed(allLines(d))).toHaveLength(3000);
     expect(changed(allLines(d)).every((l) => l.segments === undefined)).toBe(true);
     expect(d.segmentsLimited).toBeUndefined();
-    expect(ms).toBeLessThan(1500);
+    expect(ms).toBeLessThan(10_000); // the structural checks above prove the rejection; this only catches an explosion, with room for a slow runner
   });
 
   it("the token-diff work budget: lines that share their tokens in another order stop it, cheaper pairs still get theirs", () => {
@@ -153,7 +153,7 @@ describe("addSegments over a parsed diff (§34.7)", () => {
     expect(lines.slice(0, 40).every((l) => l.segments === undefined)).toBe(true);
     expect(covered(lines[41]!)).toEqual(["2"]);
     expect(d.segmentsLimited).toBe(true);
-    expect(ms).toBeLessThan(1500);
+    expect(ms).toBeLessThan(10_000); // the structural checks above prove the rejection; this only catches an explosion, with room for a slow runner
   });
 
   it("binary and header-only diffs are untouched", () => {

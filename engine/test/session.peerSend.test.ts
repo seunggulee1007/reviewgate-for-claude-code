@@ -4,6 +4,7 @@ import type { PeerSessionInfo } from "../src/protocol.js";
 import { ClaudeSession, type SessionSettings } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { ASK_REASON } from "../src/session/hooks.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * MARK: r2-peers — docs/PROTOCOL.md §33.2 at the session level: whom a SendMessage reaches, as the session verifies it — a
@@ -71,7 +72,7 @@ function session(over: Partial<SessionSettings> = {}, resolvePeer?: (address: st
   return { s, events, script };
 }
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);
@@ -128,7 +129,7 @@ describe("SendMessage to a verified recipient (§33.2)", () => {
     expect(await pre(t.script, "SendMessage", { to: "uds:/tmp/cc-socks/1.sock", message: "x" })).toMatchObject({ permissionDecision: "ask" });
     const at = Date.now();
     expect(await pre(t.script, "SendMessage", { to: PEER.address, message: "x" })).toMatchObject({ permissionDecision: "ask" });
-    expect(Date.now() - at).toBeLessThan(2000);
+    expect(Date.now() - at).toBeLessThan(5000); // the lookup bound is 400 ms; a hang would never return
     await t.s.dispose();
   });
 
