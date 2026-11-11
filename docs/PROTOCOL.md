@@ -7392,6 +7392,12 @@ terminal a message typed while Claude works waits in a queue and comes back into
   in (`cancelled: false`, then `started`), folded into the last step before the turn's end, the session closing, the
   CLI failing the request. `w50.steer.test.ts`: taken (no row at the turn's end), too late (its row stays; asked again,
   refused at once), after the turn ended, the CLI could not be asked, a waiting take-back leaves the main lane free.
+  Real CLI: `sidecar/test/driver-steer-takeback.mjs` (haiku, CLI 2.1.322), two turns in one session. In time: during a
+  `sleep 8` a message asking for "BANANA" is steered in, then taken back 1.5 s later. The take-back was `ok`, nothing
+  waited after it, the only row was the first message, there was one `turn_end`, and the reply was "A-DONE" with no
+  BANANA. Too late: during a `sleep 5` a message asking for "CHERRY" is taken back once its steered row came. The refusal
+  was `steer_already_read`, there were two rows (the second `steered`, the same turn) and no third, one `turn_end`, and
+  the reply was "B-DONE CHERRY". `driver-steer.mjs` passes as before.
 - **Mac (Core).** `AppState.takeBackSteering(id:toComposer:)` sends `steer_take_back` and says what became of it
   (`taken`, `alreadyRead`, `failed`). While it waits the id is in `steeringTakingBack`. Taken with `toComposer` (Edit),
   the text and its mentions go into the message box (`taskForComposer`); ↩ sends them again. Too late or failed, nothing
