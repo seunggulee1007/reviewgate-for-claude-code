@@ -4103,6 +4103,15 @@ Client rules (Mac and Electron the same, same i18n keys); the wire does not chan
   did not respond within 300 s — …" through the existing error paths (`send_failed`, `collect_failed` with retry,
   `revert_failed`). The user's commit / push (their hooks) and `git switch` are not capped. No wire change. Test:
   `engine/test/git.timeout.test.ts`.
+- **An open whose git does not answer (engine).** `open_project` / `switch_project` start with `git rev-parse
+  --show-toplevel`, which answers at once in any folder. On macOS it once never answered (git started by GUI apps
+  waited on a privacy check until the Mac restarted), and the open waited for ever, with nothing on screen in the window or a
+  new one. It is capped at 20 s: the open ends with `project_open_failed`, "git rev-parse did not respond within 20 s —
+  macOS may be holding ReviewGate's access to this folder: check System Settings › Privacy & Security › Files and
+  Folders, and restart the Mac if it keeps happening", never with the git-init offer. A newer `open_project`,
+  `switch_project` or `close_project` does not wait behind it: the open still in its git call ends quietly (an `info`
+  log line), and the newer command runs at once; the git left behind is killed at its cap. No wire change. Test:
+  `engine/test/git.timeout.test.ts`.
 - **A draft per chat (polish-12).** The composer's draft, mentions and images are kept per chat (`sessions.currentId`):
   another chat tab shows its own. An engine without `state.sessions` keeps the one window draft as before.
 - **A draft that lasts (r1-composer M12, Mac).** The chat column lived only in the Changes / History / Search tabs with

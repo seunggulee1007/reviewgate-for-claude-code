@@ -3,9 +3,18 @@
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CHECKPOINT_GIT_TIMEOUT_MS, GitCheckpoint, GitTimeoutError, setCheckpointGitTimeout } from "../src/git/checkpoint.js";
-import { GitCommandError, getGitPath, setGitPath } from "../src/git/exec.js";
-import { makeTempDir, removeDir } from "./helpers/repo.js";
+import {
+  CHECKPOINT_GIT_TIMEOUT_MS,
+  GitCheckpoint,
+  GitTimeoutError,
+  OPEN_GIT_TIMEOUT_MS,
+  openCheckpoint,
+  setCheckpointGitTimeout,
+  setOpenGitTimeout,
+} from "../src/git/checkpoint.js";
+import { GitCommandError, NotARepositoryError, getGitPath, setGitPath } from "../src/git/exec.js";
+import { makeHarness } from "./helpers/engine.js";
+import { makeRepo, makeTempDir, removeDir } from "./helpers/repo.js";
 
 const posix = process.platform !== "win32";
 const dirs: string[] = [];
@@ -13,6 +22,7 @@ const realGit = getGitPath();
 afterEach(() => {
   setGitPath(realGit);
   setCheckpointGitTimeout(CHECKPOINT_GIT_TIMEOUT_MS);
+  setOpenGitTimeout(OPEN_GIT_TIMEOUT_MS);
   for (const d of dirs.splice(0)) removeDir(d);
 });
 
@@ -73,4 +83,57 @@ describe.skipIf(!posix)("checkpoint git timeout", () => {
     const out = await cp.git(["rev-parse"], { timeoutMs: 5000 });
     expect(out.text.trim()).toBe("ok");
   });
+
+  // 0.5.12: the Mac app's open waited for ever on a `git rev-parse --show-toplevel` that never answered in the project
+  // folder — no window opened it, nothing said why. Capped, the open ends with `project_open_failed` (the window's banner).
+  it("open_project's first git call is capped: a git that does not answer is a timeout, not \"not a repository\"", async () => {
+    setGitPath(fakeGit("sleep 30; echo never"));
+    setOpenGitTimeout(300);
+    const dir = makeTempDir();
+    dirs.push(dir);
+    const started = Date.now();
+    const err = await openCheckpoint(dir).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(GitTimeoutError);
+    expect(err).not.toBeInstanceOf(NotARepositoryError);
+    expect((err as Error).message).toContain("git rev-parse");
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 30_000);
+
+  it("open_project with a git that does not answer ends with project_open_failed — no git-init offer", async () => {
+    const h = makeHarness();
+    await h.hello();
+    setGitPath(fakeGit("sleep 30; echo never"));
+    setOpenGitTimeout(300);
+    const dir = makeTempDir();
+    dirs.push(dir);
+    await h.engine.handle({ type: "open_project", path: dir });
+    await h.settle();
+    const errors = h.ofType("error");
+    expect(errors.map((e) => e.code)).toContain("project_open_failed");
+    expect(errors.find((e) => e.code === "project_open_failed")?.message).toContain("did not respond");
+    expect(h.engine.state.gitInit).toBeNull();
+    expect(h.engine.state.project).toBeNull();
+    await h.engine.dispose();
+  }, 30_000);
+
+  it("a newer open does not wait behind an open whose git does not answer", async () => {
+    const h = makeHarness();
+    await h.hello();
+    setGitPath(fakeGit("sleep 30; echo never"));
+    setOpenGitTimeout(20_000);
+    const stuck = makeTempDir();
+    dirs.push(stuck);
+    const first = h.engine.handle({ type: "open_project", path: stuck });
+    await new Promise((r) => setTimeout(r, 300));   // the first open is inside its git call
+    setGitPath(realGit);
+    const repo = makeRepo();
+    dirs.push(repo);
+    const started = Date.now();
+    const s = await h.open(repo);
+    await first;
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(s.project?.path).toBe(repo);
+    expect(h.ofType("error").map((e) => e.code)).not.toContain("project_open_failed");
+    await h.engine.dispose();
+  }, 30_000);
 });

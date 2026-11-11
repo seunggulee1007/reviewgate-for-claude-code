@@ -22,7 +22,7 @@ import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { branches as listBranches, createBranch, isWorktreeDirty, switchBranch } from "./git/branches.js";
-import { initRepository, LfsMissingError, openCheckpoint, type GitCheckpoint } from "./git/checkpoint.js";
+import { initRepository, LfsMissingError, openCheckpoint, OpenSupersededError, type GitCheckpoint } from "./git/checkpoint.js";
 import { commit as gitCommit, gitIdentity, push as gitPush, stagePaths } from "./git/commit.js";
 import { CommandRefused, refusalFields } from "./errors.js";
 import { NotARepositoryError, setGitPath } from "./git/exec.js";
@@ -478,6 +478,8 @@ export class ReviewEngine {
   /** The worktree gitdir whose `reviewgate.lock` we hold. */
   private lockedGitDir: string | null = null;
   private readonly lockOwner: LockOwner;
+  /** The open whose first git call is running (`openCheckpoint`): a newer open / switch / close aborts it. */
+  private openAbort: AbortController | null = null;
   /** `git rev-parse --git-dir` of the open worktree: home of the review / session / transcript files. */
   private projectGitDir: string | null = null;
   /** Serializes the review-file writes; each write captures the gate at call time. */
@@ -892,6 +894,8 @@ export class ReviewEngine {
       if (cmd.id) this.reply(cmd.id, { type: "result", id: cmd.id, ok: false, error: "engine disposed", code: "engine_disposed" });
       return Promise.resolve();
     }
+    // A newer open / switch / close never waits behind an open whose git does not answer: that open ends quietly.
+    if (cmd.type === "open_project" || cmd.type === "switch_project" || cmd.type === "close_project") this.openAbort?.abort();
     const lane = laneOf(cmd);
     const run = this.lanes[lane].then(() => this.handleNow(cmd));
     this.lanes[lane] = run.catch(() => undefined);
@@ -2013,9 +2017,15 @@ export class ReviewEngine {
     this.resetProjectState();
     this.touch();
     let cp: GitCheckpoint;
+    const abort = new AbortController();
+    this.openAbort = abort;
     try {
-      cp = await openCheckpoint(path);
+      cp = await openCheckpoint(path, abort.signal);
     } catch (e) {
+      if (e instanceof OpenSupersededError) {
+        this.log("info", "an open superseded by a newer one while its git did not answer");
+        return;
+      }
       if (e instanceof NotARepositoryError) {
         this.gitInit = { path, candidates: findGitCandidates(path), looksUnsafe: looksUnsafeForGitInit(path) };
         this.touch();
@@ -2023,6 +2033,8 @@ export class ReviewEngine {
       }
       this.fail(errorMessage(e), true, "git", { code: "project_open_failed" });
       return;
+    } finally {
+      if (this.openAbort === abort) this.openAbort = null;
     }
     await this.lockProject(cp, takeover);
     await this.adoptCheckpoint(cp, path);
