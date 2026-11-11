@@ -200,6 +200,8 @@
 .queue-chip .queue-num { flex: none; width: 17px; height: 17px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .queue-chip .queue-text { background: transparent; border: 0; padding: 0 4px; max-width: 260px; min-width: 0; text-align: left; cursor: text; }
 .queue-chip .queue-text:hover { background: transparent; color: var(--accent); }
+.queue-chip.steering { border-style: dashed; color: var(--fg-2); } /* composer §50.2: already in Claude's turn */
+.queue-chip.steering .queue-text { cursor: default; }
 .queue-chip .queue-tools { display: inline-flex; flex: none; opacity: 0.55; transition: opacity 0.12s; }
 .queue-chip:hover .queue-tools, .queue-chip:focus-within .queue-tools { opacity: 1; }
 .queue-chip .queue-tools button { background: transparent; border: 0; padding: 0 4px; line-height: 1.3; border-radius: 999px; color: var(--fg-2); }

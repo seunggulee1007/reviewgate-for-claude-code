@@ -28,6 +28,7 @@ import type {
   ExternalTurn,
   PeerInboundMode,
   PeerMessage,
+  SteeringMessage,
   CliInfo,
   ExtensionsWaitingOn,
 } from "./protocol.js";
@@ -76,6 +77,8 @@ export type EngineSlices = {
     peerInbound?: PeerInboundMode;
     peerInbox?: PeerMessage[];
     externalTurn?: ExternalTurn | null;
+    /** MARK: composer — §50.2 (see protocol.ts SessionState). */
+    steering?: SteeringMessage[];
     peerTurn?: { messageIds: string[]; fromNames: string[] } | null;
     /** §52 (see protocol.ts SessionState). */
     backgroundTasks?: BackgroundTask[];

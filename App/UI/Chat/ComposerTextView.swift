@@ -280,8 +280,38 @@ final class ComposerNSTextView: NSTextView {
 
     // MARK: Paste
 
+    /// What ⌘V reads: the clipboard (the DEBUG layout check hands it a private pasteboard — never the user's clipboard).
+    var pasteboard: NSPasteboard = .general
+
+    /// Image bytes and files on a pasteboard the composer attaches (`drop(from:forPaste:)` reads the same types).
+    static let attachableTypes: [NSPasteboard.PasteboardType] = [.fileURL, .png, .tiff, NSPasteboard.PasteboardType(UTType.jpeg.identifier),
+                                                                 NSPasteboard.PasteboardType(UTType.gif.identifier),
+                                                                 NSPasteboard.PasteboardType(UTType.webP.identifier)]
+
+    /// Edit › Paste (⌘V) is on when the pasteboard has text or something to attach. A plain-text view reads only text types
+    /// (its `readablePasteboardTypes` have no PNG or TIFF), so AppKit turned Paste off for a screenshot or an image copied in
+    /// Preview: ⌘V beeped and `paste(_:)` never ran.
+    static func canPaste(from pasteboard: NSPasteboard, readable: [NSPasteboard.PasteboardType]) -> Bool {
+        pasteboard.availableType(from: attachableTypes + readable) != nil
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(paste(_:)) { return isEditable && Self.canPaste(from: pasteboard, readable: readablePasteboardTypes) }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    /// Edit › Paste asks here first (NSTextView answers menu items itself).
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(paste(_:)) { return isEditable && Self.canPaste(from: pasteboard, readable: readablePasteboardTypes) }
+        return super.validateMenuItem(menuItem)
+    }
+
     override func paste(_ sender: Any?) {
-        if let drop = Self.drop(from: .general, forPaste: true), coordinator?.parent.onDrop(drop) == true { return }
+        if let drop = Self.drop(from: pasteboard, forPaste: true), coordinator?.parent.onDrop(drop) == true { return }
+        guard pasteboard === NSPasteboard.general else {
+            if let text = pasteboard.string(forType: .string) { insertText(text, replacementRange: selectedRange()) }
+            return
+        }
         pasteAsPlainText(sender)
     }
 

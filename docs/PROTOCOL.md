@@ -1726,6 +1726,16 @@ type AttachmentRef  = { kind: "image"; hash: string /* sha-256 hex of the bytes 
   `CardAnswersTests`. Electron: the same tries (`src/shared/attachments.ts` `fitTries`, `fitSize`, `fitWith`) for a paste or
   a drop (`composerAttach.ts` `fitImage`, drawn on a canvas) and the attach dialog (main `readPickedImage`, Electron's
   `nativeImage`); the chip's tooltip says it was scaled down and a toast says it once; test `composerAttachFit.test.ts`.
+- **⌘V of an image (Mac, composer).** Pasting a screenshot or an image copied in Preview did nothing: ⌘V beeped. The
+  message box is a plain-text `NSTextView`, and AppKit turns Edit › Paste on only for the types such a view reads
+  (`readablePasteboardTypes`: text, RTF, URLs, file names; no PNG or TIFF). The box's own paste, which attaches images,
+  never ran. Paste is now on when the pasteboard holds text or something the box attaches: a file URL, PNG, TIFF, JPEG,
+  GIF or WebP (`ComposerNSTextView.canPaste`, `validateMenuItem` / `validateUserInterfaceItem`). Proof: the quiet
+  check `SHOTS_LAYOUT=composer` pastes through the app's own Edit menu (⌘V as a key equivalent) from a private pasteboard
+  handed to the box, never the user's clipboard. It covers what a screenshot (PNG + TIFF), Preview (TIFF), a browser's
+  Copy Image (TIFF + HTML) and a Finder copy of an image file (file URL + name) put there. Before: "Edit › Paste off —
+  LOST" for a pasteboard of image types only: a screenshot, a copy in Preview. A browser's copy usually carries HTML or a URL
+  and a Finder copy a file name, which the view reads, so those pasted. After: an image is attached for each of the four.
 - Tool results that hold image blocks (a `Read` of a `.png`, an MCP screenshot) are previewed as `[image/png, N bytes]`
   instead of their JSON — no base64 in `tool_result.preview` or the transcript either (the CLI keeps a pasted image on disk
   and Claude may `Read` it back; observed with CLI 2.1.305).
@@ -3553,6 +3563,20 @@ The palette shows what each command does and what it takes, right after the sess
   `ComposerModel.paletteVisible(available:)` / `openPalette(available:)`; Electron: `slashPaletteShows`
   (`SlashPalette.tsx`). Verified: Core `ComposerPaletteTests` (running, starting, no project), Electron
   `SlashPalette.test.ts` ("when the palette shows").
+- **A plugin installed while the session runs (composer).** The CLI notices a new skill or command under `~/.claude` or
+  `<root>/.claude` by itself (`commands_changed`, probed with CLI 2.1.322). It never notices a plugin installed, removed or
+  switched on or off after it started, for example with `/plugin` in a terminal. The palette went on without it until the
+  next session, while the terminal listed it. While a session of ours is alive and the user's settings are loaded, the
+  engine looks at the files that say which plugins load every 5 s: `<config>/plugins/installed_plugins.json`,
+  `<config>/settings.json`, `<root>/.claude/settings.json` and `settings.local.json`. When one changed and no turn runs
+  or is collected, the CLI reloads its plugins (`Query.reloadPlugins({holdOnCacheImpact: true})`). Its commands replace
+  `capabilities.commands`, and its plugins replace `plugins` / `pluginDetails`. A held reload (it would change the tools
+  the conversation's prompt cache depends on, such as a plugin's MCP server) changes nothing, and the plugin loads with
+  the next session. During a turn the look waits until the turn is over. Nothing changes on the wire. Engine
+  `startPluginSync` / `syncPlugins` (`engine.ts`), `ClaudeSession.reloadPlugins`; test `engine.pluginSync.test.ts` (a
+  reload after the file changed, none during a turn, a held reload, none without user settings). Real CLI: a scratch
+  `CLAUDE_CONFIG_DIR` with a directory marketplace; `claude plugin install demo-two@demo-market` while the session ran
+  put `demo-two:two-skill` into `capabilities.commands` (it was missing before).
 
 ### 36.6 Local settings (SME-01)
 
@@ -7289,6 +7313,44 @@ Electron the same); nothing changes on the wire, and a queued message passes the
   `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`; Electron `sessionErrors.ts` `queueStopOf`, `sendQueue.ts`
   (`resumeAt`, `retries`, `afterStop`), the queue part of `store.ts`, `components/chat/QueueBar.tsx`. Tests: Core
   `QueueStopTests`; Electron `queueStopStore.test.ts`, `sessionErrors.test.ts`.
+
+### 50.2 The queue, as the terminal shows it (composer)
+
+The report: "메시지 바로 보내기, 대기열에 있는 거 보이는 거 — 그런 세세한 기능들이 안 돼". In the terminal a message typed
+while Claude works waits above the input, can be edited or removed there, and can go at once. The app's queue bar had
+edit, move and remove, but no way to send one message now: it waited for the turn and every message before it.
+
+- **What waits in the turn (engine).** A message put into the turn (§50 `steer`) showed as a sent row at once, though
+  Claude reads it only after the current step: nothing said it was still waiting. It now waits in
+  `state.session.steering: [{id, text, mentions?}]` (oldest first) and has no row yet. When the CLI starts it
+  (`command_lifecycle` `started`, or `completed` when it was folded in), the session emits `steer_read {uuid}`. Its
+  `user_message {steered: true}` row is then recorded and emitted, with the number of the turn it went into, where
+  Claude read it. What the CLI never started goes in with the turn's end (or the session's close), in order.
+  `ClaudeSession.steerUser` returns the message's uuid (the `id`). Engine `flushSteering`; tests `w50.steer.test.ts`
+  (it waits, then its row; several in order; the rest at the turn's end) and `session.peer.test.ts` (`steer_read` on
+  `started`, not on `queued`). Real CLI 2.1.322 (`driver-steer.mjs`): right after the steer, `steering` had the message
+  and there was one row. At the end nothing waited and both rows had turn 1.
+- **Send now on each queued message.** Each queued message has "바로 보내기" (⏎). What it does depends on the turn
+  (`queuedSendNow`). While a turn of ours runs and the message has no images, it goes into the turn (§50 `steer`, with
+  its mentions) and leaves the queue. With images, or while the turn cannot take it (another session's turn), the turn
+  stops and the message goes right after it (§28, "중단하고 보내기"). Otherwise (the queue paused or held) it goes first and
+  the queue goes on now. The tooltip says which of the three it does. The other messages keep their order. Nothing
+  changes on the wire.
+- **Mac (Core).** `state.session.steering` decodes element by element (`SessionInfo.steering`,
+  `AppState.steeringMessages`); `QueuedSendNow.action`, `AppState.queuedSendNowAction(id:)` / `sendQueuedNow(id:)`
+  (`Session/QueueSendNow.swift`). A message sent with Stop and send takes the composer's one-message model, not the queued
+  message's own. Test `QueueSendNowTests`: the lenient decode, the list shown and cleared, the decision, into the turn with
+  its mentions, an image stops and sends, a paused queue sends that message first.
+- **Mac.** The queue bar (`ComposerQueueBar`) shows while anything waits: the messages in Claude's turn first, as dashed
+  chips with ↳ and no tools (the CLI has them: they cannot be edited or taken back), "Claude의 턴에 들어감 — 지금 단계가
+  끝나면 Claude가 읽어요" when nothing else waits. Each queued chip has a paper plane ("바로 보내기"; its tooltip says
+  which of the three it does), the context menu and the editor popover have "바로 보내기" too.
+- **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
+  tooltip `sendNowHelp`). Test `queueSendNow.test.ts`: the decision; into the turn with the mentions; with an image, stop
+  and send; a paused queue sends that message first.
+- **Electron, what waits in the turn.** `QueueBar.tsx` shows `state.session.steering` first as dashed chips (↳, no tools)
+  and the bar shows for them alone ("Claude의 턴에 들어감 — …"; Clear only with queued messages). Test
+  `queueSendNow.test.ts` ("the queue bar").
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 

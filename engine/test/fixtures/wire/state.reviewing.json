@@ -171,6 +171,7 @@
     "ready": true,
     "peerInbound": "auto",
     "peerInbox": [],
+    "steering": [],
     "externalTurn": null,
     "backgroundTasks": [],
     "peerTurn": null,

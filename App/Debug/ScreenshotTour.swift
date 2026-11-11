@@ -127,6 +127,11 @@ private final class Tour {
             do { try await openChecks(); finish(nil) } catch { finish(error) }
             return
         }
+        // `SHOTS_LAYOUT=composer`: only the message box's terminal checks (paste, the slash palette, the queue).
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "composer" {
+            do { try await composerOnly(); finish(nil) } catch { finish(error) }
+            return
+        }
         // `SHOTS_LAYOUT=blank`: only the blank-chat check in tall windows.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "blank" {
             do { try await blankOnly(); finish(nil) } catch { finish(error) }
@@ -291,6 +296,7 @@ private final class Tour {
         try await sideShots(window)   // MARK: r2-skills-side (§55.4)
         try await whySkillShots()   // MARK: r2-skills-side (§31.1, M35)
         try await lifecycleShots(window)   // MARK: polish p-lifecycle (§55.8, §55.9)
+        try await composerTerminalChecks(window)   // MARK: composer
     }
 
     /// r2-peers — messages between sessions at the laptop size, dark and light (§29, §33.2, §33.1): a message the default
@@ -877,6 +883,135 @@ private final class Tour {
     }
 
     /// `SHOTS_LAYOUT=blank`: a long made-up chat, then `blankChecks` — dark.
+    // MARK: composer — the message box against the terminal's input
+
+    /// `SHOTS_LAYOUT=composer`: only `composerTerminalChecks`.
+    private func composerOnly() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        try await composerTerminalChecks(window)
+    }
+
+    /// What the terminal's input does, checked in the message box at the laptop size. `composer paste <source>`: ⌘V through
+    /// the app's Edit menu, as the key goes, of what a screenshot, a browser's Copy Image, Preview and a Finder copy of an
+    /// image file put on the pasteboard — a private pasteboard handed to the box, never the user's clipboard; LOST when no
+    /// image was attached. `composer slash`: "/" typed opens the palette with every source a session lists, and the typed
+    /// text filters it; LOST when the palette did not show or a command is missing, CUT when it shows fewer than three rows.
+    private func composerTerminalChecks(_ window: NSWindow) async throws {
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        try await Task.sleep(for: .milliseconds(1200))
+        guard let box = composerView(window) as? ComposerNSTextView else { return log("composer: no message box — LOST") }
+        let composer = entry.model.chatComposer
+        setComposerText("", in: window)
+
+        // ⌘V of an image.
+        let board = NSPasteboard(name: NSPasteboard.Name("rg-tour-paste-\(ProcessInfo.processInfo.processIdentifier)"))
+        box.pasteboard = board
+        defer { box.pasteboard = .general; board.releaseGlobally() }
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                   isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        guard let rep, let png = rep.representation(using: .png, properties: [:]), let tiff = rep.tiffRepresentation else {
+            return log("composer paste: no test image — LOST")
+        }
+        let file = out.appendingPathComponent("paste-source.png")
+        try png.write(to: file)
+        let pasteItem = NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        let sources: [(String, (NSPasteboard) -> Void)] = [
+            ("screenshot", { $0.setData(png, forType: .png); $0.setData(tiff, forType: .tiff) }),
+            ("Preview", { $0.setData(tiff, forType: .tiff) }),
+            ("browser Copy Image", { $0.setData(tiff, forType: .tiff); $0.setString("<img src=\"https://example.com/cat.png\">", forType: .html) }),
+            ("Finder image file", { $0.writeObjects([file as NSURL]); $0.setString(file.lastPathComponent, forType: .string) }),
+        ]
+        for (name, fill) in sources {
+            composer.images = []
+            board.clearContents()
+            fill(board)
+            window.makeFirstResponder(box)
+            let enabled = box.validateMenuItem(pasteItem)
+            let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: window.windowNumber, context: nil, characters: "v", charactersIgnoringModifiers: "v",
+                                       isARepeat: false, keyCode: 9)
+            // The key goes through the menu bar when this window is the key window; a quiet run is never the active app (no
+            // key window), so the menu item's action goes to the box itself — once Edit › Paste is on, as AppKit would.
+            let isKey = NSApp.keyWindow === window
+            let route: String
+            if isKey, let key, NSApp.mainMenu?.performKeyEquivalent(with: key) == true {
+                route = "through the Edit menu"
+            } else if enabled {
+                route = NSApp.sendAction(#selector(NSText.paste(_:)), to: box, from: pasteItem) ? "Edit › Paste's action sent to the box (no key window)" : "action not taken"
+            } else {
+                route = "not sent (Paste off)"
+            }
+            try await Task.sleep(for: .milliseconds(300))
+            let attached = composer.images.count
+            log("composer paste \(name): Edit › Paste \(enabled ? "on" : "off"), ⌘V \(route) — "
+                + (attached == 1 ? "attached an image" : "LOST (\(attached) images\(composer.notice.map { ", notice: \($0)" } ?? ""))"))
+        }
+        composer.images = []
+        composer.notice = nil
+
+        // The slash palette as "/" is typed.
+        store.debugShowCommands(Self.paletteCommands)
+        let files = [ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        for (state, working) in [("idle", false), ("working beside a review", true)] {
+            if working { store.debugShowComposerState(working: true, files: files) }
+            setComposerText("/", in: window)
+            try await Task.sleep(for: .milliseconds(900))
+            let frame = entry.model.debugPaletteFrame, rows = entry.model.debugPaletteRows
+            let missing = Self.paletteCommands.map(\.name).filter { !rows.contains($0) }
+            log("composer slash \"/\" (\(state)): palette \(NSStringFromRect(frame)) with \(rows.count) rows — "
+                + (frame.height <= 0 ? "LOST (no palette)" : !missing.isEmpty ? "LOST (missing \(missing.joined(separator: ", ")))"
+                   : frame.height < 120 ? "CUT (\(Int(frame.height)) pt)" : "every source listed"))
+            try write(try render(window), "composer-slash-\(working ? "working" : "idle")")
+        }
+        for (typed, first) in [("/demo-sk", "demo-plugin:demo-skill"), ("/demo-skill", "demo-plugin:demo-skill"), ("/nested", "tools:nested"),
+                               ("/summ", "mcp__acme-docs__summarize"), ("/PROJ", "proj-cmd"), ("/acme-review:", "acme-review:check")] {
+            setComposerText(typed, in: window)
+            try await Task.sleep(for: .milliseconds(500))
+            let rows = entry.model.debugPaletteRows
+            log("composer slash \"\(typed)\": " + (rows.first == first ? "\(first) first of \(rows.count)" : "LOST (first \(rows.first ?? "none"), want \(first))"))
+        }
+        setComposerText("", in: window)
+
+        // §50.2: the queue above the box — what waits in Claude's turn, a queued message with Send now.
+        store.debugShowComposerState(working: true, files: files)
+        store.debugShowSteering([SteeringMessage(id: "tour-steer-1", text: "Also update the README with the new discount codes")])
+        try await Task.sleep(for: .milliseconds(600))
+        let steeringOnly = entry.model.debugQueueBarFrame
+        log("composer queue (steering only): bar \(NSStringFromRect(steeringOnly))" + (steeringOnly.height > 0 ? " — shown" : " — LOST (no queue bar)"))
+        store.enqueue("Then run the unit tests and fix what fails")
+        try await Task.sleep(for: .milliseconds(900))
+        let bar = entry.model.debugQueueBarFrame, send = entry.model.debugSendFrame
+        let room = window.contentView?.bounds.size ?? .zero
+        let inside = send.width > 0 && send.maxY <= room.height + 0.5 && send.maxX <= room.width + 0.5
+        log("composer queue (steering + 1 queued): bar \(NSStringFromRect(bar)), send button \(NSStringFromRect(send))"
+            + (bar.height <= 0 ? " — LOST (no queue bar)" : inside ? " — in the window" : " — OUT OF THE WINDOW"))
+        if let id = store.queuedMessages.first?.id {
+            log("composer queue: Send now on the queued message would \(String(describing: store.queuedSendNowAction(id: id)))")
+        }
+        try write(try render(window), "composer-queue")
+        store.clearQueue()
+        store.debugShowSteering([])
+        store.debugShowGate(.idle)
+    }
+
+    /// What a session with the user's settings lists (made-up names): built-in, mine, the project's, a plugin's skill with its
+    /// short alias, a plugin command, a command in a subfolder, an MCP prompt.
+    private static let paletteCommands: [SlashCommandInfo] = [
+        SlashCommandInfo(name: "compact", description: "Clear the history but keep a summary", source: .builtin),
+        SlashCommandInfo(name: "my-skill", description: "My own skill", source: .user),
+        SlashCommandInfo(name: "tools:nested", description: "A command in a subfolder", source: .user),
+        SlashCommandInfo(name: "proj-cmd", description: "The project's command", source: .project),
+        SlashCommandInfo(name: "demo-plugin:demo-skill", description: "A plugin's skill", source: .plugin, plugin: "demo-plugin", aliases: ["demo-skill"]),
+        SlashCommandInfo(name: "acme-review:check", description: "A plugin's command", source: .plugin, plugin: "acme-review"),
+        SlashCommandInfo(name: "mcp__acme-docs__summarize", description: "Summarize a page", source: .mcp, server: "acme-docs"),
+    ]
+
     private func blankOnly() async throws {
         try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
         guard let window = entry.window else { throw TourError("no window") }

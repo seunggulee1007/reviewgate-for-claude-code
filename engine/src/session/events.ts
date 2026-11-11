@@ -134,6 +134,8 @@ export type SessionEvent =
   | { type: "models_info"; models: unknown[] }
   /** MARK: wave3 engine-session — §36.5: the CLI's commands (raw `SlashCommand[]`): `initializationResult().commands`, then every `system/commands_changed`. */
   | { type: "commands_info"; commands: unknown[] }
+  /** MARK: composer — §50.2: the CLI started a message `steerUser` put into the turn (its uuid): Claude reads it now. */
+  | { type: "steer_read"; uuid: string }
   /** MARK: wave4d w4d-config — §42.3: the subagents (raw `AgentInfo[]`) of `initializationResult().agents`. */
   | { type: "agents_info"; agents: unknown[] }
   /** MARK: wave3 engine-session — §36.7: the starting CLI made progress (the init watchdog restarted). */

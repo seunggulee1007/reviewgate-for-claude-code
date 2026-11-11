@@ -10,14 +10,24 @@ import { t } from "../../i18n";
 import { cannotSendReason, useStore } from "../../store";
 import { waitingOf } from "../../agentDetails"; // MARK: wave3 desktop-agents
 import { isEnter } from "../../ime";
+import { queuedSendNow } from "../../sendQueue";
+import { steerPossible } from "../../sendNow";
+
+const NO_STEERING: readonly { id: string; text: string }[] = [];
 
 export function QueueBar() {
   const queue = useStore((s) => s.queue);
+  // MARK: composer — §50.2: messages already put into Claude's turn wait here until Claude reads them (as in the terminal).
+  const steering = useStore((s) => s.state.session.steering ?? NO_STEERING);
   const canSend = useStore((s) => s.state.gate.canSend);
   const reason = useStore((s) => cannotSendReason(s.state));
   const edit = useStore((s) => s.editQueuedMessage);
   const remove = useStore((s) => s.removeQueuedMessage);
   const move = useStore((s) => s.moveQueuedMessage);
+  const sendNow = useStore((s) => s.sendQueuedNow); // MARK: composer
+  // MARK: composer — what "Send now" on a chip does (sendQueue.ts `queuedSendNow`), said on its tooltip.
+  const canSteer = useStore((s) => steerPossible(s.state, false));
+  const running = useStore((s) => s.state.gate.phase === "running");
   const resume = useStore((s) => s.resumeQueue);
   const clear = useStore((s) => s.clearQueue);
   // MARK: wave3 desktop-agents — §36.4: the main turn waits on subagents → the queue goes out when they are done.
@@ -28,10 +38,12 @@ export function QueueBar() {
   useEffect(() => {
     if (editing !== null) editRef.current?.focus();
   }, [editing]);
-  if (queue.items.length === 0) return null;
+  if (queue.items.length === 0 && steering.length === 0) return null;
 
   const resumesAt = queue.resumeAt != null ? resetTimeText(new Date(queue.resumeAt).toISOString()) : null;
-  const status = queue.paused
+  const status = queue.items.length === 0
+    ? t("In Claude's turn — Claude reads it after the current step")
+    : queue.paused
     ? queue.afterStop === true
       ? queue.paused
       : resumesAt !== null
@@ -53,16 +65,29 @@ export function QueueBar() {
   return (
     <div className={`queue-bar ${queue.paused ? "paused" : ""}`} data-testid="Queue">
       <div className="queue-head">
-        <span className="queue-title">{t("Queue ({0})", queue.items.length)}</span>
+        <span className="queue-title">{t("Queue ({0})", queue.items.length + steering.length)}</span>
         <span className="queue-status truncate" title={status} data-testid="Queue status">{status}</span>
         {queue.paused && (
           <button type="button" className="small" onClick={resume} data-testid="Resume queue">
             {queue.afterStop === true ? t("Send") : queue.resumeAt != null ? t("Send it now") : t("Resume")}
           </button>
         )}
-        <button type="button" className="plain tiny" onClick={clear} title={t("Remove every queued message")} data-testid="Clear queue">{t("Clear")}</button>
+        {queue.items.length > 0 && (
+          <button type="button" className="plain tiny" onClick={clear} title={t("Remove every queued message")} data-testid="Clear queue">{t("Clear")}</button>
+        )}
       </div>
       <div className="queue-chips">
+        {steering.map((m) => (
+          <span
+            key={m.id}
+            className="queue-chip steering"
+            title={`${m.text}\n\n${t("Already in Claude's turn — Claude reads it after the current step")}`}
+            data-testid="Queue steering chip"
+          >
+            <span className="queue-num" aria-hidden>↳</span>
+            <span className="queue-text truncate">{m.text}</span>
+          </span>
+        ))}
         {queue.items.map((m, i) =>
           editing === m.id ? (
             <span key={m.id} className="queue-chip editing">
@@ -100,6 +125,15 @@ export function QueueBar() {
                 {m.text}
               </button>
               <span className="queue-tools">
+                <button
+                  type="button"
+                  onClick={() => sendNow(m.id)}
+                  aria-label={t("Send now")}
+                  title={sendNowHelp(queuedSendNow(m, { canSteer, running }))}
+                  data-testid="Queue send now"
+                >
+                  ⏎
+                </button>
                 <button type="button" disabled={i === 0} onClick={() => move(m.id, -1)} aria-label={t("Move earlier")} title={t("Move earlier")}>‹</button>
                 <button type="button" disabled={i === queue.items.length - 1} onClick={() => move(m.id, 1)} aria-label={t("Move later")} title={t("Move later")}>›</button>
                 <button type="button" onClick={() => remove(m.id)} aria-label={t("Remove from queue")} title={t("Remove from queue")} data-testid="Queue remove">×</button>
@@ -110,4 +144,13 @@ export function QueueBar() {
       </div>
     </div>
   );
+}
+
+/** MARK: composer — the chip's "Send now" tooltip: what it does now. */
+export function sendNowHelp(how: ReturnType<typeof queuedSendNow>): string {
+  return how === "steer"
+    ? t("Send now — into Claude's turn: Claude reads it after the current step")
+    : how === "stopAndSend"
+      ? t("Send now — stops Claude's turn and sends this message right after")
+      : t("Send now — this message goes first");
 }

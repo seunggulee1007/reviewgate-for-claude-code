@@ -178,6 +178,9 @@ const HUMAN_ORIGIN = { kind: "human" } as const;
 export type PermissionSettings = Pick<SessionSettings, "autoAllowReadOnlyBash" | "bashAllowPatterns" | "userRules">;
 
 /** The surface `ReviewEngine` drives; `FakeClaudeSession` in tests implements it too. */
+/** §36.5: what `reloadPlugins` gives back (the commands raw, as `commands_info` carries them). */
+export type PluginReload = { commands: unknown; plugins: { name: string; path: string; version?: string }[] };
+
 export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text; `opts` (r2-skills-side): a slash command it runs. */
@@ -186,7 +189,7 @@ export interface ClaudeSessionLike {
    * §50: a message into the turn that runs — the CLI hands it to Claude once the current tool call is done, as in the
    * terminal; a turn that ended meanwhile runs it as its own command, still one review turn. Absent on doubles without it.
    */
-  steerUser?(text: string): void;
+  steerUser?(text: string): string;
   interrupt(): Promise<void>;
   /** A deny without `message` is the CLI's own "No" (§33.10); `opts.interrupt` also ends the turn (main agent only). */
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts?: DenyOptions): void;
@@ -205,6 +208,11 @@ export interface ClaudeSessionLike {
   reconnectMcpServer?(name: string): Promise<void>;
   toggleMcpServer?(name: string, enabled: boolean): Promise<void>;
   setMcpServers?(servers: Record<string, McpServerConfig>): Promise<McpSetServersResult>;
+  /**
+   * §36.5: the plugins on disk again (`Query.reloadPlugins`, held when applying would change the tool list the
+   * conversation's prompt cache depends on): the refreshed commands and plugins, or null when the CLI held the reload.
+   */
+  reloadPlugins?(): Promise<PluginReload | null>;
   /** §25: `Query.setModel` (null = the CLI's default model). */
   setModel?(model: string | null): Promise<void>;
   /** §25: the flag-settings `effortLevel` (null = the model's default). */
@@ -384,6 +392,8 @@ export class ClaudeSession implements ClaudeSessionLike {
   private releasedPeers = new Set<string>();
   /** §50: our messages put into the running turn (`steerUser`): like released peers, they belong to it. */
   private steered = new Set<string>();
+  /** MARK: composer — §50.2: steered messages the CLI has not started yet (`steer_read` once it does). */
+  private steerWaiting = new Set<string>();
   /** Released peer messages whose command started / delivered its body this turn. */
   private peerStarted = new Set<string>();
   private peerDelivered = new Set<string>();
@@ -810,7 +820,7 @@ export class ClaudeSession implements ClaudeSessionLike {
   }
 
   /** §50: see `ClaudeSessionLike.steerUser`. Only while our turn runs: the turn's end waits for this command (`peerTurnWaits`). */
-  steerUser(text: string): void {
+  steerUser(text: string): string {
     if (!this.q) throw new Error("session not started");
     if (this.disposing) throw new Error("session closed");
     if (!this.turnActive) throw new Error("no turn is running");
@@ -818,6 +828,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.ownCommands.add(uuid);
     if (this.ownCommands.size > MAX_OWN_COMMANDS) this.ownCommands.delete(this.ownCommands.values().next().value!);
     this.steered.add(uuid);
+    this.steerWaiting.add(uuid); // MARK: composer (§50.2)
     this.inbox.push({
       type: "user",
       uuid,
@@ -828,6 +839,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       // Into the running turn, said explicitly: without a priority the CLI's default (next or later) follows a flag of its own.
       priority: "next",
     });
+    return uuid;
   }
 
   // MARK: wave4d w4d-peers
@@ -910,6 +922,15 @@ export class ClaudeSession implements ClaudeSessionLike {
   private requireQuery(): Query {
     if (!this.q || this.disposing) throw new Error("session not started");
     return this.q;
+  }
+
+  /** §36.5: see `ClaudeSessionLike.reloadPlugins`. */
+  async reloadPlugins(): Promise<PluginReload | null> {
+    const q = this.requireQuery();
+    if (typeof q.reloadPlugins !== "function") return null;
+    const r = await q.reloadPlugins({ holdOnCacheImpact: true });
+    if (r.held === true) return null;
+    return { commands: r.commands, plugins: (r.plugins ?? []).map((p) => ({ name: p.name, path: p.path, ...(p.version ? { version: p.version } : {}) })) };
   }
 
   mcpServerStatus(): Promise<McpServerStatus[]> {
@@ -1236,6 +1257,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     // §29: released peer messages belong to the turn that ends here (§50: so do messages put into it).
     this.releasedPeers = new Set();
     this.steered = new Set();
+    this.steerWaiting = new Set(); // composer (§50.2): the engine shows what is left as read with the turn's end
     this.queuedOwn = new Set();
     this.peerStarted = new Set();
     this.peerDelivered = new Set();
@@ -2175,6 +2197,8 @@ export class ClaudeSession implements ClaudeSessionLike {
     if (!id || !state) return;
     this.sawLifecycle = true;
     if (state === "queued") return;
+    // MARK: composer — §50.2: Claude reads a message put into the turn (started, or folded into it: completed).
+    if (this.steerWaiting.delete(id)) this.emit({ type: "steer_read", uuid: id });
     if (state === "started") {
       const wakeup = typeof f.wakeup_source === "string" && f.wakeup_source ? f.wakeup_source : null;
       if (wakeup !== null && !this.ownCommands.has(id) && !this.releasedPeers.has(id) && this.canAdopt()) {

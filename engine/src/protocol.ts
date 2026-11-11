@@ -984,6 +984,8 @@ export type SessionState = {
   peerInbox?: PeerMessage[];
   /** §29: a turn the CLI runs that is not ours; `canSend` is false meanwhile (`blockedReason: "running"`). */
   externalTurn?: ExternalTurn | null;
+  /** MARK: composer — §50.2: messages put into the running turn (`steer`) that Claude has not read yet, oldest first. */
+  steering?: SteeringMessage[];
   /** §52: the background tasks running now (Bash `run_in_background`, Monitor, …), oldest first. */
   backgroundTasks?: BackgroundTask[];
   /** §29: the running review turn is accepted peer messages (badge the permission card / HUD with the senders). */
@@ -1527,6 +1529,9 @@ export type CommittedEvent = {
    */
   alreadyCommitted?: string[];
 };
+/** MARK: composer — §50.2: a message put into the running turn, waiting for Claude to read it (its row comes then). */
+export type SteeringMessage = { id: string; text: string; mentions?: string[] };
+
 export type UserMessageEvent = { type: "user_message"; text: string; turn: number; mentions?: string[]; attachments?: AttachmentRef[]; /** MARK: wave5 w5-model — §43.4 */ autoModel?: AutoModelChoice; /** §50: put into the running turn (`steer`) */ steered?: true };
 /** `unprompted`: Claude Code wrote it in a turn it ran on its own, outside any request (§18). */
 export type TextDeltaEvent = { type: "text_delta"; text: string; unprompted?: true };

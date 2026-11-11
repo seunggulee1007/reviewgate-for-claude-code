@@ -277,6 +277,8 @@ export type EngineOptions = {
   sideQueryFactory?: (opts: SideQueryOptions) => SideQueryLike;
   /** MCP status poll interval while a session is alive (default 10 000 ms; 0 = off; §22). */
   mcpPollMs?: number;
+  /** §36.5: how often the plugin files are looked at while a session is alive (default 5 000 ms; 0 = off). */
+  pluginSyncMs?: number;
   /** Test seam: runs `claude <args>` (mcp add / remove) instead of the real CLI. */
   runClaude?: (args: string[], cwd: string) => Promise<{ status: number | null; stdout: string; stderr: string }>;
   /** How long `interrupt` waits for the turn to end and its changes to be collected before it replies (default 15 000 ms; §28). */
@@ -334,6 +336,8 @@ type SendOptions = { mentions?: { path: string; kind: "file" | "dir" }[]; images
 type TurnMessage = { text: string; checkpointTree: string | undefined; images?: { mediaType: SendAttachment["mediaType"]; dataBase64: string }[] };
 
 export const MCP_POLL_MS = 10_000;
+/** §36.5: the plugin files (`installed_plugins.json`, the settings with `enabledPlugins`) are looked at this often. */
+export const PLUGIN_SYNC_MS = 5_000;
 const MCP_CALL_TIMEOUT_MS = 8000;
 // MARK: wave4d w4d-config — §42.3: after `mcp_auth` the polls reconnect a server still needing a login, this long, this far apart.
 export const MCP_AUTH_WAIT_MS = 10 * 60_000;
@@ -613,6 +617,12 @@ export class ReviewEngine {
   private readonly mcpPollMs: number;
   private readonly runClaudeFn: EngineOptions["runClaude"];
   private mcpTimer: NodeJS.Timeout | null = null;
+  // MARK: composer — §36.5: a plugin installed or switched since the CLI started (another session's /plugin)
+  private readonly pluginSyncMs: number;
+  private pluginTimer: NodeJS.Timeout | null = null;
+  /** The plugin files as the live session last loaded them (null: not looked at yet). */
+  private pluginStamp: string | null = null;
+  private pluginReloading = false;
   private mcpPolling: Promise<McpStatusEvent | null> | null = null;
   private mcpLast: McpServerInfo[] = [];
   private mcpLastJson = "";
@@ -673,6 +683,8 @@ export class ReviewEngine {
   private peerChoice: PeerInboundMode | undefined;
   /** A turn the CLI runs that is not ours (`state.session.externalTurn`). */
   private externalTurn: ExternalTurn | null = null;
+  /** MARK: composer — §50.2: messages put into the running turn that Claude has not read yet (their rows wait for it). */
+  private steering: { id: string; text: string; mentions?: string[]; turn: number }[] = [];
   /** The running review turn is accepted peer messages. */
   private peerTurn: { messageIds: string[]; fromNames: string[] } | null = null;
   /** The unprompted turn running now delivered a peer message: a card says it, not the §18 banner. */
@@ -812,6 +824,7 @@ export class ReviewEngine {
     this.autoRestartDelayMs = opts.autoRestartDelayMs ?? AUTO_RESTART_DELAY_MS;
     this.collectRetryMs = opts.collectRetryMs ?? COLLECT_RETRY_MS;
     this.mcpPollMs = opts.mcpPollMs ?? MCP_POLL_MS;
+    this.pluginSyncMs = opts.pluginSyncMs ?? PLUGIN_SYNC_MS;
     this.runClaudeFn = opts.runClaude;
     this.interruptWaitMs = opts.interruptWaitMs ?? INTERRUPT_WAIT_MS;
     this.autoTurnWaitMs = opts.autoTurnWaitMs ?? AUTO_TURN_WAIT_MS; // MARK: r2-peers (§52.1)
@@ -2411,6 +2424,7 @@ export class ReviewEngine {
       cli: prev.cli,
     };
     this.startMcpPolling(p.session);
+    this.startPluginSync(p.session); // MARK: composer (§36.5)
     this.log("info", `chat ${p.chatId}: its Claude Code process taken back (no restart)`);
     this.touch();
   }
@@ -3201,6 +3215,7 @@ export class ReviewEngine {
       try {
         await session.start();
         this.startMcpPolling(session);
+        this.startPluginSync(session); // MARK: composer (§36.5)
       } catch (e) {
         if (this.session === session) {
           this.session = null;
@@ -3481,18 +3496,34 @@ export class ReviewEngine {
     const mentions = this.sendOptions(mentionsIn, undefined).mentions ?? [];
     let outgoing = trimmed;
     if (mentions.length > 0) outgoing += `\n\nReferenced files: ${mentions.map((m) => mentionToken(m.path, m.kind)).join(" ")}`;
-    session.steerUser(outgoing);
-    const extras = mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {};
-    this.record({ kind: "user_message", text: trimmed, ...extras, steered: true });
-    this.emit({ type: "user_message", text: trimmed, turn: this.turn, ...extras, steered: true });
-    this.commitSlice.lastUserText = trimmed;
-    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
-    if (meta) {
-      meta.lastUserText = trimmed;
-      meta.updatedAt = new Date().toISOString();
-      this.persistSessions();
-    }
+    const id = session.steerUser(outgoing);
+    // MARK: composer — §50.2: it waits above the input, as in the terminal, until Claude reads it (`steer_read`); its row
+    // comes into the transcript then, where Claude read it.
+    this.steering.push({ id, text: trimmed, ...(mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {}), turn: this.turn });
     this.log("info", `message put into turn ${this.turn}`);
+    this.touch();
+  }
+
+  /**
+   * MARK: composer — §50.2: steered messages Claude read (`id`), or every one left (the turn ended, the session closed):
+   * their user rows, recorded and emitted with the turn they went into, and the chat's last text follows them.
+   */
+  private flushSteering(id?: string): void {
+    const read = id === undefined ? this.steering : this.steering.filter((m) => m.id === id);
+    if (read.length === 0) return;
+    this.steering = id === undefined ? [] : this.steering.filter((m) => m.id !== id);
+    for (const m of read) {
+      const extras = m.mentions ? { mentions: m.mentions } : {};
+      this.record({ kind: "user_message", text: m.text, ...extras, steered: true });
+      this.emit({ type: "user_message", text: m.text, turn: m.turn, ...extras, steered: true });
+      this.commitSlice.lastUserText = m.text;
+      const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+      if (meta) {
+        meta.lastUserText = m.text;
+        meta.updatedAt = new Date().toISOString();
+        this.persistSessions();
+      }
+    }
     this.touch();
   }
 
@@ -5441,6 +5472,82 @@ export class ReviewEngine {
   private stopMcpPolling(): void {
     if (this.mcpTimer) clearInterval(this.mcpTimer);
     this.mcpTimer = null;
+    if (this.pluginTimer) clearInterval(this.pluginTimer);
+    this.pluginTimer = null;
+    this.pluginStamp = null;
+  }
+
+  /**
+   * MARK: composer — §36.5: the CLI picks up a new skill or command by itself (`commands_changed`), never a plugin
+   * installed, removed or switched on or off after it started — `/plugin` in the terminal changed nothing in the palette
+   * until the next session. While a session of ours is alive the plugin files are looked at; when they changed and no turn
+   * runs, the CLI reloads its plugins (`reloadPlugins`, held when it would change the tool list mid-conversation) and the
+   * palette gets the new list. Only with the user's settings loaded: the project's own settings are read at the start.
+   */
+  private startPluginSync(session: ClaudeSessionLike): void {
+    if (this.pluginSyncMs <= 0 || typeof session.reloadPlugins !== "function") return;
+    this.pluginStamp = this.pluginFilesStamp();
+    this.pluginTimer = setInterval(() => void this.syncPlugins(session), this.pluginSyncMs);
+    this.pluginTimer.unref?.();
+  }
+
+  /** Size and time of each file that says which plugins load (absent files count too). */
+  private pluginFilesStamp(): string {
+    const cfg = claudeConfigDir(this.childEnv());
+    const root = this.project?.path ?? this.project?.root;
+    const files = [join(cfg, "plugins", "installed_plugins.json"), join(cfg, "settings.json"),
+      ...(root ? [join(root, ".claude", "settings.json"), join(root, ".claude", "settings.local.json")] : [])];
+    return files.map((f) => {
+      try {
+        const st = statSync(f);
+        return `${st.size}:${st.mtimeMs}`;
+      } catch {
+        return "-";
+      }
+    }).join("|");
+  }
+
+  private async syncPlugins(session: ClaudeSessionLike): Promise<void> {
+    if (this.session !== session || this.closed || this.pluginReloading || !session.reloadPlugins) return;
+    if (!(this.ext?.loadUser ?? false)) return;
+    // A turn runs (or its review is collected): the next look, once it is over.
+    if (this.gate.running || this.gate.collecting || session.isTurnActive) return;
+    const stamp = this.pluginFilesStamp();
+    if (stamp === this.pluginStamp) return;
+    this.pluginStamp = stamp;
+    this.pluginReloading = true;
+    try {
+      const r = await withTimeout(session.reloadPlugins(), MCP_CALL_TIMEOUT_MS, "reloadPlugins");
+      if (this.session !== session) return;
+      if (!r) {
+        this.log("info", "plugins changed on disk; the CLI held the reload (it would change this conversation's tools) — they load with the next session");
+        return;
+      }
+      this.log("info", `plugins reloaded: ${r.plugins.map((p) => p.name).join(", ") || "none"}`);
+      const caps = this.sessionState.capabilities ?? emptyCapabilities();
+      this.sessionState.capabilities = {
+        ...caps,
+        plugins: r.plugins.map((p) => p.name),
+        pluginDetails: r.plugins.map((p) => ({ name: p.name, path: p.path, id: pluginIdFromPath(p.name, p.path), ...(p.version ? { version: p.version } : {}) })),
+      };
+      if (this.ext) this.ext.plugins = r.plugins.map((p) => ({ ...p }));
+      this.refreshExtensions();
+      this.applyCommands(r.commands);
+    } catch (e) {
+      this.log("debug", `reloadPlugins: ${errorMessage(e)}`);
+    } finally {
+      this.pluginReloading = false;
+    }
+  }
+
+  /** §36.5: the CLI's commands (initialize, `commands_changed`, a plugin reload) as the palette's list; cached with the lists. */
+  private applyCommands(raw: unknown): void {
+    const commands = toCommandInfos(raw);
+    if (!commands) return;
+    this.sessionState.capabilities = { ...(this.sessionState.capabilities ?? emptyCapabilities()), commands, state: "ready" };
+    this.cachedCapabilities = this.sessionState.capabilities;
+    this.persistCapabilities(this.sessionState.capabilities);
+    this.touch();
   }
 
   /**
@@ -6439,16 +6546,13 @@ export class ReviewEngine {
         return;
       }
       // MARK: wave3 engine-session
-      case "commands_info": {
-        // §36.5: initialize's commands (no message needed), then each commands_changed; cached with the lists.
-        const commands = toCommandInfos(ev.commands);
-        if (!commands) return;
-        this.sessionState.capabilities = { ...(this.sessionState.capabilities ?? emptyCapabilities()), commands, state: "ready" };
-        this.cachedCapabilities = this.sessionState.capabilities;
-        this.persistCapabilities(this.sessionState.capabilities);
-        this.touch();
+      case "steer_read": // MARK: composer — §50.2
+        this.flushSteering(ev.uuid);
         return;
-      }
+      case "commands_info":
+        // §36.5: initialize's commands (no message needed), then each commands_changed; cached with the lists.
+        this.applyCommands(ev.commands);
+        return;
       case "start_progress": {
         // §36.7: the session restarted its stall watchdog; the client shows what the start waits on.
         const { type: _type, ...progress } = ev;
@@ -6618,6 +6722,7 @@ export class ReviewEngine {
         this.touch();
         return;
       case "turn_end": {
+        this.flushSteering(); // MARK: composer (§50.2): what Claude had not started went in with this turn
         if (!this.gate.running) {
           // No turn of ours is running (closed abnormally already, or the CLI ran one on its own):
           // nothing to collect, and turnCount / cost / the gate stay as they are (§18).
@@ -6736,6 +6841,7 @@ export class ReviewEngine {
         return;
       }
       case "closed":
+        this.flushSteering(); // MARK: composer (§50.2)
         this.stopMcpPolling();
         this.session = null;
         this.sessionState.open = false;
@@ -7984,6 +8090,7 @@ export class ReviewEngine {
         ready: this.sessionState.open && !this.sessionState.starting && (this.sessionStart.ready === true || this.sessionStart.gotInfo),
         peerInbound: this.peerMode(),
         peerInbox: [...this.peerInbox.values()].map((m) => ({ ...m })),
+        steering: this.steering.map(({ id, text, mentions }) => ({ id, text, ...(mentions ? { mentions: [...mentions] } : {}) })), // MARK: composer (§50.2)
         externalTurn: this.externalTurn ? { ...this.externalTurn, peer: this.externalTurn.peer ? { ...this.externalTurn.peer } : null } : null,
         backgroundTasks: (this.sessionState.backgroundTasks ?? []).map((t) => ({ ...t })), // §52
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,

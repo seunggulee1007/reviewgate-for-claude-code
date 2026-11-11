@@ -1,13 +1,16 @@
 import SwiftUI
 import ReviewGateCore
 
-/// Messages queued while Claude is busy, as chips above the composer: click to edit, move earlier / later, remove.
+/// Messages queued while Claude is busy, as chips above the composer: click to edit, move earlier / later, send now, remove.
 /// A status line says when they go out — or why they stopped (an error; "Resume" restarts). §50.1: a stop that goes on by
-/// itself (the API, the usage limit) says when, with "지금 보내기".
+/// itself (the API, the usage limit) says when, with "지금 보내기". MARK: composer — §50.2: the messages already put into
+/// Claude's turn wait here too until Claude reads them, as the terminal shows them above its input.
 struct ComposerQueueBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store
     let messages: [QueuedMessage]
+    /// MARK: composer — §50.2: put into the running turn, not read by Claude yet.
+    var steering: [SteeringMessage] = []
     let stopAndSend: String?
     let pausedReason: String?
     let holdReason: String?
@@ -15,6 +18,9 @@ struct ComposerQueueBar: View {
     var waitingOnAgents = false
     var onUpdate: (UUID, String) -> Void = { _, _ in }
     var onRemove: (UUID) -> Void = { _ in }
+    /// MARK: composer — §50.2: "Send now" on a queued message, and what it would do (its tooltip).
+    var onSendNow: (UUID) -> Void = { _ in }
+    var sendNowAction: (UUID) -> QueuedSendNow? = { _ in nil }
     var onMove: (UUID, Int) -> Void = { _, _ in }
     var onResume: () -> Void = {}
     var onClear: () -> Void = {}
@@ -53,6 +59,13 @@ struct ComposerQueueBar: View {
                         .lineLimit(1)
                         .help(Text(verbatim: statusText))
                         .accessibilityIdentifier("Queue waits for agents")
+                } else if messages.isEmpty, stopAndSend == nil, !steering.isEmpty {
+                    // MARK: composer — §50.2
+                    Label(steeringText, systemImage: "arrow.turn.down.right")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(Text(verbatim: steeringText))
+                        .accessibilityIdentifier("Queue steering status")
                 } else {
                     Label(statusText, systemImage: "tray.full").foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -67,6 +80,7 @@ struct ComposerQueueBar: View {
             .font(.caption)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
+                    ForEach(steering) { message in steeringChip(message) }   // MARK: composer (§50.2)
                     if let stopAndSend {
                         chip(index: nil, text: stopAndSend, id: nil)
                     }
@@ -83,6 +97,39 @@ struct ComposerQueueBar: View {
 
     private var statusText: String {
         String(localized: "\(messages.count) queued — sent in order when Claude is free")
+    }
+
+    /// MARK: composer — §50.2
+    private var steeringText: String {
+        String(localized: "In Claude's turn — Claude reads it after the current step")
+    }
+
+    /// MARK: composer — §50.2: what "Send now" does to this message now.
+    static func sendNowHelp(_ action: QueuedSendNow?) -> String {
+        switch action {
+        case .steer?: String(localized: "Send now — into Claude's turn: Claude reads it after the current step")
+        case .stopAndSend?: String(localized: "Send now — stops Claude's turn and sends this message right after")
+        case .first?, nil: String(localized: "Send now — this message goes first")
+        }
+    }
+
+    /// MARK: composer — §50.2: a message already in Claude's turn — it can no longer be edited or taken back.
+    private func steeringChip(_ message: SteeringMessage) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.secondary)
+            Text(verbatim: message.text.replacingOccurrences(of: "\n", with: " "))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: 150, alignment: .leading)   // narrower than a queued chip: the queued ones keep their tools in sight
+        }
+        .padding(.leading, 6).padding(.trailing, 8).padding(.vertical, 4)
+        .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+        .contentShape(Capsule())
+        .help(Text(verbatim: message.text + "\n\n" + String(localized: "Already in Claude's turn — Claude reads it after the current step")))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("Steering message")
     }
 
     @ViewBuilder
@@ -105,6 +152,16 @@ struct ComposerQueueBar: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: 220, alignment: .leading)
             if let id {
+                // MARK: composer — §50.2: as in the terminal, a queued message can go at once.
+                Button { onSendNow(id) } label: {
+                    Image(systemName: "paperplane").font(.caption2.weight(.bold))
+                }
+                .buttonStyle(IconButtonStyle(padding: 2))
+                .padding(.vertical, -2)
+                .foregroundStyle(.secondary)
+                .help(Self.sendNowHelp(sendNowAction(id)))
+                .accessibilityLabel("Send queued message \(index.map { $0 + 1 } ?? 0) now")
+                .accessibilityIdentifier("Send queued message now")
                 Button { onRemove(id) } label: {
                     Image(systemName: "xmark").font(.caption2.weight(.bold))
                 }
@@ -125,6 +182,8 @@ struct ComposerQueueBar: View {
             if let id, let index {
                 QueuedMessageEditor(text: text, index: index, count: messages.count,
                                     onSave: { onUpdate(id, $0); editing = nil },
+                                    onSendNow: { onUpdate(id, $0); onSendNow(id); editing = nil },   // MARK: composer (§50.2)
+                                    sendNowHelp: Self.sendNowHelp(sendNowAction(id)),
                                     onMove: { onMove(id, $0) },
                                     onRemove: { onRemove(id); editing = nil })
             }
@@ -132,6 +191,7 @@ struct ComposerQueueBar: View {
         .contextMenu {
             if let id, let index {
                 Button("Edit…") { editing = id }
+                Button("Send Now") { onSendNow(id) }   // MARK: composer (§50.2)
                 Button("Move Earlier") { onMove(id, -1) }.disabled(index == 0)
                 Button("Move Later") { onMove(id, 1) }.disabled(index == messages.count - 1)
                 Divider()
@@ -149,6 +209,9 @@ private struct QueuedMessageEditor: View {
     let index: Int
     let count: Int
     var onSave: (String) -> Void
+    /// MARK: composer — §50.2: saves the text, then sends it now.
+    var onSendNow: (String) -> Void
+    var sendNowHelp: String
     var onMove: (Int) -> Void
     var onRemove: () -> Void
 
@@ -172,6 +235,8 @@ private struct QueuedMessageEditor: View {
                     .accessibilityLabel("Move later")   // MARK: wave4d w4d-speed — polish-10
                 Button("Remove", role: .destructive, action: onRemove)
                 Spacer()
+                Button("Send Now") { onSendNow(text) }   // MARK: composer (§50.2)
+                    .help(sendNowHelp)
                 Button("Save") { onSave(text) }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
