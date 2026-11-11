@@ -1293,23 +1293,32 @@ private final class Tour {
                 }
             }
         }
-        /// How far the picture moved up from `a` to `b` (pt), and how well it matched (mean difference; 0 is identical).
+        /// How well `b` is `a` moved up by `s` pt (mean difference over the overlap; 0 is identical), nil without overlap.
+        func mismatch(_ a: [[Double]], _ b: [[Double]], _ s: Int) -> Double? {
+            var diff = 0.0, n = 0
+            for i in stride(from: 0, to: b.count, by: 3) where i + s >= 0 && i + s < a.count {
+                for j in 0..<16 { diff += abs(a[i + s][j] - b[i][j]) }
+                n += 1
+            }
+            return n > b.count / 9 ? diff / Double(n * 16) : nil
+        }
+        /// How far the picture moved up from `a` to `b` (pt), and how well it matched.
         func shift(_ a: [[Double]], _ b: [[Double]]) -> (Int, Double) {
             var best = (0, Double.infinity)
-            for s in -120...240 {
-                var diff = 0.0, n = 0
-                for i in stride(from: 0, to: b.count, by: 3) where i + s >= 0 && i + s < a.count {
-                    for j in 0..<16 { diff += abs(a[i + s][j] - b[i][j]) }
-                    n += 1
-                }
-                guard n > b.count / 9 else { continue }
-                let d = diff / Double(n * 16)
-                if d < best.1 { best = (s, d) }
-            }
+            for s in -120...240 { if let d = mismatch(a, b, s), d < best.1 { best = (s, d) } }
             return best
         }
+        /// A picture with nothing drawn in it (every band within a few percent of one brightness): a blank view, where any
+        /// move matches — not a move of the rows.
+        func blank(_ rows: [[Double]]) -> Bool {
+            let all = rows.flatMap { $0 }
+            guard let lo = all.min(), let hi = all.max() else { return true }
+            return hi - lo < 0.05
+        }
         var before = rows()
-        var steps = 0, off: [String] = []
+        var steps = 0, off: [String] = [], blanks: [String] = [], nudges: [String] = []
+        // How far the rows shown have drifted from where the reader's scroll put them, over steps that did not match.
+        var drift = 0, worstDrift = 0
         while steps < 400 {
             let clip = chat.contentView
             let end = max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height)
@@ -1320,15 +1329,34 @@ private final class Tour {
             chat.reflectScrolledClipView(clip)
             try await Task.sleep(for: .milliseconds(16))
             let after = rows()
-            let (moved, err) = shift(before, after)
-            let expected = Int((to - from).rounded())
-            if abs(moved - expected) > 6 || err > 0.08 {
-                off.append("step \(steps): moved \(moved) pt of \(expected) (match \(String(format: "%.3f", err)), \(Int(end - to)) pt from the end)")
+            // What the clip really moved (at the end it stops short of the 40 pt when the content got shorter meanwhile).
+            let expected = Int((chat.contentView.bounds.minY - from).rounded())
+            if blank(after) {
+                blanks.append("step \(steps) (\(Int(end - to)) pt from the end)")
+            } else if !blank(before) {
+                let (moved, err) = shift(before, after)
+                // Off: the scrolled distance matches clearly worse than another (repeated rows can match several shifts as well).
+                let atExpected = mismatch(before, after, expected) ?? .infinity
+                let line = "step \(steps): moved \(moved) pt of \(expected) (match \(String(format: "%.3f", err)) there, \(String(format: "%.3f", atExpected)) at \(expected), \(Int(end - to)) pt from the end)"
+                if abs(moved - expected) > 6 && atExpected > err + 0.01 {
+                    // The rows shown moved by more or less than the scroll: the lazy stack placing rows above at their real height
+                    // nudges them a few points (and back); the reader is thrown only when that adds up.
+                    drift += moved - expected
+                    worstDrift = max(worstDrift, abs(drift))
+                    if abs(drift) > 80 { off.append(line) } else { nudges.append(line) }
+                } else if err > 0.15 {
+                    off.append(line)   // no shift matches: the picture was replaced
+                } else {
+                    drift = 0
+                }
             }
             before = after
             steps += 1
         }
-        return "\(steps) steps watched, \(off.count) off" + (off.isEmpty ? " — steady" : " — JUMP: " + off.prefix(6).joined(separator: " | "))
+        return "\(steps) steps watched, \(off.count) off, \(nudges.count) nudged (at most \(worstDrift) pt), \(blanks.count) blank"
+            + (nudges.isEmpty ? "" : " [" + nudges.prefix(3).joined(separator: " | ") + "]")
+            + (blanks.isEmpty ? "" : " — BLANK: " + blanks.prefix(6).joined(separator: ", "))
+            + (off.isEmpty ? (blanks.isEmpty ? " — steady" : "") : " — JUMP: " + off.prefix(6).joined(separator: " | "))
     }
 
     /// A trackpad gesture on `chat`: the clip moved `by` pt (positive: up) every 16 ms until `done` and eight steps more.
