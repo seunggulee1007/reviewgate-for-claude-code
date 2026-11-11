@@ -178,6 +178,9 @@ const HUMAN_ORIGIN = { kind: "human" } as const;
 export type PermissionSettings = Pick<SessionSettings, "autoAllowReadOnlyBash" | "bashAllowPatterns" | "userRules">;
 
 /** The surface `ReviewEngine` drives; `FakeClaudeSession` in tests implements it too. */
+/** §36.5: what `reloadPlugins` gives back (the commands raw, as `commands_info` carries them). */
+export type PluginReload = { commands: unknown; plugins: { name: string; path: string; version?: string }[] };
+
 export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text; `opts` (r2-skills-side): a slash command it runs. */
@@ -205,6 +208,11 @@ export interface ClaudeSessionLike {
   reconnectMcpServer?(name: string): Promise<void>;
   toggleMcpServer?(name: string, enabled: boolean): Promise<void>;
   setMcpServers?(servers: Record<string, McpServerConfig>): Promise<McpSetServersResult>;
+  /**
+   * §36.5: the plugins on disk again (`Query.reloadPlugins`, held when applying would change the tool list the
+   * conversation's prompt cache depends on): the refreshed commands and plugins, or null when the CLI held the reload.
+   */
+  reloadPlugins?(): Promise<PluginReload | null>;
   /** §25: `Query.setModel` (null = the CLI's default model). */
   setModel?(model: string | null): Promise<void>;
   /** §25: the flag-settings `effortLevel` (null = the model's default). */
@@ -910,6 +918,15 @@ export class ClaudeSession implements ClaudeSessionLike {
   private requireQuery(): Query {
     if (!this.q || this.disposing) throw new Error("session not started");
     return this.q;
+  }
+
+  /** §36.5: see `ClaudeSessionLike.reloadPlugins`. */
+  async reloadPlugins(): Promise<PluginReload | null> {
+    const q = this.requireQuery();
+    if (typeof q.reloadPlugins !== "function") return null;
+    const r = await q.reloadPlugins({ holdOnCacheImpact: true });
+    if (r.held === true) return null;
+    return { commands: r.commands, plugins: (r.plugins ?? []).map((p) => ({ name: p.name, path: p.path, ...(p.version ? { version: p.version } : {}) })) };
   }
 
   mcpServerStatus(): Promise<McpServerStatus[]> {

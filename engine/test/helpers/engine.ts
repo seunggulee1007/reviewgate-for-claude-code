@@ -1,7 +1,7 @@
 import { ReviewEngine, type EngineOptions } from "../../src/engine.js";
 import type { Platform } from "../../src/platform/index.js";
 import type { Budget, EffortLevel, EngineEvent, HelloCommand, PermissionMode, ReviewState, Settings, TurnUsage } from "../../src/protocol.js";
-import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, SendUserOptions, SessionImage } from "../../src/session/claude.js";
+import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage } from "../../src/session/claude.js";
 import type { SessionEvent, ToolFileEntry } from "../../src/session/events.js";
 import { WAIT_MS } from "./wait.js";
 
@@ -61,6 +61,15 @@ export class FakeClaudeSession implements ClaudeSessionLike {
 
   async interrupt(): Promise<void> {
     this.interrupts += 1;
+  }
+
+  /** §36.5: `reloadPlugins` calls, and what they answer (null: the CLI held the reload). */
+  reloads = 0;
+  reloadResult: PluginReload | null = { commands: [], plugins: [] };
+
+  async reloadPlugins(): Promise<PluginReload | null> {
+    this.reloads += 1;
+    return this.reloadResult;
   }
 
   respondPermission(requestId: string, allow: boolean, message?: string, _updatedInput?: Record<string, unknown>, opts?: DenyOptions): void {

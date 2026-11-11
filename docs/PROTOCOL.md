@@ -3553,6 +3553,20 @@ The palette shows what each command does and what it takes, right after the sess
   `ComposerModel.paletteVisible(available:)` / `openPalette(available:)`; Electron: `slashPaletteShows`
   (`SlashPalette.tsx`). Verified: Core `ComposerPaletteTests` (running, starting, no project), Electron
   `SlashPalette.test.ts` ("when the palette shows").
+- **A plugin installed while the session runs (composer).** The CLI notices a new skill or command under `~/.claude` or
+  `<root>/.claude` by itself (`commands_changed`, probed with CLI 2.1.322). It never notices a plugin installed, removed or
+  switched on or off after it started, for example with `/plugin` in a terminal. The palette went on without it until the
+  next session, while the terminal listed it. While a session of ours is alive and the user's settings are loaded, the
+  engine looks at the files that say which plugins load every 5 s: `<config>/plugins/installed_plugins.json`,
+  `<config>/settings.json`, `<root>/.claude/settings.json` and `settings.local.json`. When one changed and no turn runs
+  or is collected, the CLI reloads its plugins (`Query.reloadPlugins({holdOnCacheImpact: true})`). Its commands replace
+  `capabilities.commands`, and its plugins replace `plugins` / `pluginDetails`. A held reload (it would change the tools
+  the conversation's prompt cache depends on, such as a plugin's MCP server) changes nothing, and the plugin loads with
+  the next session. During a turn the look waits until the turn is over. Nothing changes on the wire. Engine
+  `startPluginSync` / `syncPlugins` (`engine.ts`), `ClaudeSession.reloadPlugins`; test `engine.pluginSync.test.ts` (a
+  reload after the file changed, none during a turn, a held reload, none without user settings). Real CLI: a scratch
+  `CLAUDE_CONFIG_DIR` with a directory marketplace; `claude plugin install demo-two@demo-market` while the session ran
+  put `demo-two:two-skill` into `capabilities.commands` (it was missing before).
 
 ### 36.6 Local settings (SME-01)
 
