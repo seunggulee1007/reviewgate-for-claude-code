@@ -13,8 +13,9 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "cancel_git_init",
   "restart_session",
   "send",
-  // §50: a message into the running turn (↩ while Claude works)
+  // §50: a message into the running turn (↩ while Claude works); §50.3: taking it back before Claude reads it
   "steer",
+  "steer_take_back",
   "request_changes",
   "interrupt",
   "permission_response",

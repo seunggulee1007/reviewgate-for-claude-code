@@ -78,6 +78,7 @@ export function Composer() {
   const requestChanges = useStore((s) => s.requestChanges);
   const restartSession = useStore((s) => s.restartSession);
   const enqueueMessage = useStore((s) => s.enqueueMessage);
+  const pullBackLastWaiting = useStore((s) => s.pullBackLastWaiting); // §50.3
   const interruptAndSend = useStore((s) => s.interruptAndSend);
   const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
@@ -758,6 +759,12 @@ export function Composer() {
     if (!paletteVisible) {
       const el = e.currentTarget;
       const caret = el.selectionStart === el.selectionEnd ? el.selectionStart : null;
+      // §50.3: as in the terminal, ↑ in an empty box first brings back the last message waiting (queued, else in Claude's
+      // turn) to edit; with nothing waiting it walks the prompt history.
+      if (e.key === "ArrowUp" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && draft === "" && nav.index === null && !viewing && pullBackLastWaiting()) {
+        e.preventDefault();
+        return;
+      }
       if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const step = historyStep(history, nav, draft, caret, e.key === "ArrowUp" ? -1 : 1);
         if (!step) return;

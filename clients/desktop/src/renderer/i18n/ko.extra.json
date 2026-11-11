@@ -977,5 +977,7 @@
   "Kept for this repository (all its worktrees). Each command of a chain must match; $(…) and a redirection into a file still ask. Edit or remove it in Settings → Permissions.": "이 저장소(모든 워크트리)에 저장돼요. 이어진 명령은 하나하나 맞아야 하고, $(…)나 파일로 보내는 리다이렉션은 여전히 물어요. 설정 → 권한에서 고치거나 지울 수 있어요.",
   "For this repository and all its worktrees ({0}), added by \"Always allow in this project\" on a permission card. Applies immediately.": "이 저장소와 모든 워크트리에 적용돼요 ({0}). 권한 카드의 ‘이 프로젝트에서 항상 허용’으로 추가돼요. 바로 적용돼요.",
   "Copy Link Address": "링크 주소 복사",
-  "Recent Projects": "최근 프로젝트"
+  "Recent Projects": "최근 프로젝트",
+  "Already first in the queue": "이미 대기열 맨 앞이에요",
+  "Already last in the queue": "이미 대기열 맨 뒤예요"
 }

@@ -66,6 +66,7 @@ describe("isSafeExternalURL / validateCommand", () => {
 
   it("allows steer (§50: ↩ while Claude works puts the message into the turn — refused here, it was only ever queued)", () => {
     expect(validateCommand({ type: "steer", text: "Also check the README" }).ok).toBe(true);
+    expect(validateCommand({ type: "steer_take_back", messageId: "u1" }).ok).toBe(true); // §50.3
   });
 
   it("allows the peer message commands (§29)", () => {

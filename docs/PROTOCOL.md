@@ -7411,8 +7411,21 @@ terminal a message typed while Claude works waits in a queue and comes back into
   (`pullBackLastWaiting`). With nothing waiting, ↑ is the prompt history as before (§44.1). The bar lists one message
   a row, as the terminal does above its input (more than three scroll within it). In the chat column at 1000 × 637
   (356 pt), a row of chips had pushed the second chip's tools out of the window.
+- **Electron.** The same: store `takeBackSteering(id, toComposer)` (the ids waiting in `steerTakingBack`), and
+  `editQueuedInComposer(id)` (with its mentions and images, through `composerBridge`). `pullBackLastWaiting()` is ↑ in an
+  empty composer that is not browsing the history or showing another chat read-only. Too late or failed, a toast says
+  why. `QueueBar.tsx`: a dashed chip has ✎ and × with the Mac's tooltips (a click on its text is ✎); while it is being
+  taken back, "…" with "Claude의 턴에서 되돌리는 중…" stands in for them. Each chip has a context menu: for a dashed
+  one, 입력창에서 편집 / 되돌리기 (off with that reason while it waits); for a queued one, 편집… / 입력창에서 편집 / 바로
+  보내기 / 앞으로 이동 / 뒤로 이동 (off at the ends: "이미 대기열 맨 앞이에요" / "… 맨 뒤예요") / 제거. Queued chips show ✎
+  among their tools. The bar already wraps its chips, so the tools stay in the window. The main process allows
+  `steer_take_back` (`ipcGuard.ts`). Tests: `queueTakeBack.test.ts` covers in time (Edit hands the text and mentions over,
+  × does not), too late (the toast, nothing handed over, a gone id not asked), failed, and ↑ (the last queued message
+  first with its image, then the turn's, nothing waiting). `queueSendNow.test.ts` "the queue bar" checks ✎, × and the
+  waiting mark. `ipcGuard.test.ts`.
 - Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`; Core
-  `Session/QueueSendNow.swift`; App `UI/Chat/ComposerQueueBar.swift`, `UI/Chat/ChatComposer.swift`).
+  `Session/QueueSendNow.swift`; App `UI/Chat/ComposerQueueBar.swift`, `UI/Chat/ChatComposer.swift`; Electron
+  `store.ts`, `components/chat/QueueBar.tsx`, `components/chat/Composer.tsx`, `main/ipcGuard.ts`).
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
