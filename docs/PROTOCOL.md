@@ -7353,6 +7353,43 @@ edit, move and remove, but no way to send one message now: it waited for the tur
   and the bar shows for them alone ("Claude의 턴에 들어감 — …"; Clear only with queued messages). Test
   `queueSendNow.test.ts` ("the queue bar").
 
+### 50.3 Taking a message back from Claude's turn
+
+The report: "대기열에 들어갔으면 삭제하거나 수정할 수 있게 해 줘야 하는 거 아니야? 기존보다 더 편하게 만들어야지". Since 0.5.13 ↩
+while Claude works puts the message into the turn (§50), and its dashed chip could neither be edited nor removed. In the
+terminal a message typed while Claude works waits in a queue and comes back into the input (↑) until Claude takes it.
+
+```ts
+// command: steer_take_back { messageId: string }   // refused steer_already_read | steer_take_back_failed
+```
+
+- **The CLI can take it back.** Its control request `cancel_async_message {message_uuid}` (SDK `Query.cancelAsyncMessage`,
+  0.3.270; not in the typings) drops a queued user message by uuid and answers `{cancelled}`. Read in the bundled CLI:
+  it removes the message from the command queue and writes `command_lifecycle {state: "cancelled"}` for it before the
+  reply. It answers `false` when the message was already dequeued for the turn, or is being folded into it right now
+  (its `isFoldInFlight` guard): that message then goes on to `started` / `completed`. A cancel that reaches the CLI
+  before the message itself is remembered and drops it on arrival (`cancelled`). So the engine does not hold messages
+  back to keep them editable (Claude would get them a step later than in the terminal): it asks the CLI, and the
+  message's own lifecycle frame has the last word. A message is never lost or sent twice: it is either dropped (no row)
+  or read (its row, §50.2).
+- **Session.** `ClaudeSession.takeBackSteer(uuid)` → `"taken" | "read" | "kept"`. Not waiting any more (`steer_read`
+  went out): `read`, the CLI is not asked. `cancelled: true` or the `cancelled` frame: `taken` — the session emits
+  `steer_withdrawn {uuid}`, and the turn's end no longer waits for that command (`peerTurnWaits`). `cancelled: false`:
+  the next frame settles it (`started` / `completed` → `read`, `cancelled` → `taken`); the turn's end or the session's
+  close settle it `read` (the engine shows it as sent then). A CLI without lifecycle frames: `false` is `read`. A CLI
+  that fails the request, or an SDK without the call: `kept` — the message still goes to Claude.
+- **Engine.** `steer_take_back {messageId}` (an `id` of `state.session.steering`) runs on a lane of its own (`steer`),
+  so a take-back waiting for the CLI's frame never holds up the turn's commands. `taken`: the message leaves
+  `state.session.steering` with no row. Refused `steer_already_read` ("Claude already read this message — it stays in
+  the chat") for `read` and for an id no longer waiting (read, or gone in with the turn's end), and
+  `steer_take_back_failed` for `kept` (it still waits). `steer_withdrawn` from the session drops the message too.
+- **Verified.** Engine `session.peer.test.ts` (§50.3 block): in time with the frame before the reply and after it (one
+  `steer_withdrawn`, the turn ends at its result), too late (started before: the CLI not asked), too late while folded
+  in (`cancelled: false`, then `started`), folded into the last step before the turn's end, the session closing, the
+  CLI failing the request. `w50.steer.test.ts`: taken (no row at the turn's end), too late (its row stays; asked again,
+  refused at once), after the turn ended, the CLI could not be asked, a waiting take-back leaves the main lane free.
+- Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`).
+
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
 Three faults in the PR sheet came in one report:

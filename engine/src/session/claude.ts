@@ -181,6 +181,9 @@ export type PermissionSettings = Pick<SessionSettings, "autoAllowReadOnlyBash" |
 /** §36.5: what `reloadPlugins` gives back (the commands raw, as `commands_info` carries them). */
 export type PluginReload = { commands: unknown; plugins: { name: string; path: string; version?: string }[] };
 
+/** §50.3: what became of a take-back (`ClaudeSessionLike.takeBackSteer`). */
+export type SteerTakeBack = "taken" | "read" | "kept";
+
 export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text; `opts` (r2-skills-side): a slash command it runs. */
@@ -190,6 +193,12 @@ export interface ClaudeSessionLike {
    * terminal; a turn that ended meanwhile runs it as its own command, still one review turn. Absent on doubles without it.
    */
   steerUser?(text: string): string;
+  /**
+   * §50.3: takes back a message `steerUser` put into the turn before Claude reads it (the CLI's `cancel_async_message`):
+   * "taken" — the CLI dropped it, Claude never sees it; "read" — Claude has it already (or the turn ended with it);
+   * "kept" — the CLI could not be asked, the message still goes to Claude. Absent on doubles without it.
+   */
+  takeBackSteer?(uuid: string): Promise<SteerTakeBack>;
   interrupt(): Promise<void>;
   /** A deny without `message` is the CLI's own "No" (§33.10); `opts.interrupt` also ends the turn (main agent only). */
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts?: DenyOptions): void;
@@ -394,6 +403,8 @@ export class ClaudeSession implements ClaudeSessionLike {
   private steered = new Set<string>();
   /** MARK: composer — §50.2: steered messages the CLI has not started yet (`steer_read` once it does). */
   private steerWaiting = new Set<string>();
+  /** §50.3: take-backs waiting for the CLI's word on a message (its lifecycle frame, or the turn's end). */
+  private steerTakeBacks = new Map<string, (outcome: SteerTakeBack) => void>();
   /** Released peer messages whose command started / delivered its body this turn. */
   private peerStarted = new Set<string>();
   private peerDelivered = new Set<string>();
@@ -842,6 +853,55 @@ export class ClaudeSession implements ClaudeSessionLike {
     return uuid;
   }
 
+  /**
+   * §50.3: see `ClaudeSessionLike.takeBackSteer`. The CLI drops a queued message by uuid unless it was already dequeued —
+   * or is being folded into the turn right now (its `isFoldInFlight` guard) — and says `cancelled: false` then. Its
+   * `command_lifecycle` frames have the last word: `cancelled` = taken back, `started` / `completed` = Claude read it.
+   * A cancel that reaches the CLI before the message itself is remembered there and drops it on arrival (`cancelled`).
+   */
+  async takeBackSteer(uuid: string): Promise<SteerTakeBack> {
+    if (!this.steerWaiting.has(uuid)) return "read";
+    const q = this.q as unknown as { cancelAsyncMessage?: (id: string) => Promise<boolean> } | null;
+    if (!q || typeof q.cancelAsyncMessage !== "function" || this.disposing) return "kept";
+    const existing = this.steerTakeBacks.get(uuid);
+    const outcome = new Promise<SteerTakeBack>((resolve) => {
+      this.steerTakeBacks.set(uuid, (o) => {
+        existing?.(o);
+        resolve(o);
+      });
+    });
+    let cancelled: boolean;
+    try {
+      cancelled = await q.cancelAsyncMessage(uuid);
+    } catch (e) {
+      this.opts.log("warn", `taking back a message put into the turn: ${String(e)}`);
+      this.settleTakeBack(uuid, "kept");
+      return outcome;
+    }
+    if (cancelled) this.withdrawSteer(uuid); // its `cancelled` frame may have done it already
+    else if (!this.steerWaiting.has(uuid)) this.settleTakeBack(uuid, "read");
+    else if (!this.sawLifecycle) this.settleTakeBack(uuid, "read"); // no frames will tell: it is the CLI's now
+    // else: dequeued for the turn (or not arrived yet) — its next lifecycle frame or the turn's end settles it
+    return outcome;
+  }
+
+  /** §50.3: the CLI dropped a message put into the turn: no row, and the turn's end no longer waits for it. */
+  private withdrawSteer(uuid: string): void {
+    if (!this.steerWaiting.delete(uuid)) return;
+    this.steered.delete(uuid);
+    this.ownCommands.delete(uuid);
+    this.emit({ type: "steer_withdrawn", uuid });
+    this.settleTakeBack(uuid, "taken");
+    if (this.peerTurnDeferred && !this.peerTurnWaits()) this.finishDeferredPeerTurn();
+  }
+
+  private settleTakeBack(uuid: string, outcome: SteerTakeBack): void {
+    const settle = this.steerTakeBacks.get(uuid);
+    if (!settle) return;
+    this.steerTakeBacks.delete(uuid);
+    settle(outcome);
+  }
+
   // MARK: wave4d w4d-peers
   /** §42.2: whom a SendMessage reaches — the engine's registry lookup, bounded; null for a name, an unknown address, a failure. */
   private async peerRecipient(input: Record<string, unknown>): Promise<PeerSessionInfo | null> {
@@ -1044,6 +1104,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     for (const p of this.pendingPermissions.values()) p.resolve({ behavior: "deny", message: "shutting down" });
     this.pendingPermissions.clear();
     for (const w of [...this.peerWaiters]) w.done();
+    for (const id of [...this.steerTakeBacks.keys()]) this.settleTakeBack(id, "read"); // §50.3: the engine shows it as sent
     if (this.peerTurnTimer) clearTimeout(this.peerTurnTimer);
     if (this.adopting) this.autoTurnReady(false); // §52: nothing waits on a session that is going away
     this.abortController.abort();
@@ -1258,6 +1319,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.releasedPeers = new Set();
     this.steered = new Set();
     this.steerWaiting = new Set(); // composer (§50.2): the engine shows what is left as read with the turn's end
+    for (const id of [...this.steerTakeBacks.keys()]) this.settleTakeBack(id, "read"); // §50.3: and so it went in
     this.queuedOwn = new Set();
     this.peerStarted = new Set();
     this.peerDelivered = new Set();
@@ -2198,7 +2260,17 @@ export class ClaudeSession implements ClaudeSessionLike {
     this.sawLifecycle = true;
     if (state === "queued") return;
     // MARK: composer — §50.2: Claude reads a message put into the turn (started, or folded into it: completed).
-    if (this.steerWaiting.delete(id)) this.emit({ type: "steer_read", uuid: id });
+    // §50.3: `cancelled` is a take-back the CLI carried out (`cancel_async_message`, or one remembered for its arrival).
+    if (state === "cancelled" && this.steerWaiting.has(id)) {
+      this.withdrawSteer(id);
+      this.ownRunning = this.ownRunning === id ? null : this.ownRunning;
+      this.syncGuard();
+      return;
+    }
+    if (this.steerWaiting.delete(id)) {
+      this.emit({ type: "steer_read", uuid: id });
+      this.settleTakeBack(id, "read");
+    }
     if (state === "started") {
       const wakeup = typeof f.wakeup_source === "string" && f.wakeup_source ? f.wakeup_source : null;
       if (wakeup !== null && !this.ownCommands.has(id) && !this.releasedPeers.has(id) && this.canAdopt()) {

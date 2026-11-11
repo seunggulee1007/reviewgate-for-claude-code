@@ -1,7 +1,7 @@
 import { ReviewEngine, type EngineOptions } from "../../src/engine.js";
 import type { Platform } from "../../src/platform/index.js";
 import type { Budget, EffortLevel, EngineEvent, HelloCommand, PermissionMode, ReviewState, Settings, TurnUsage } from "../../src/protocol.js";
-import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage } from "../../src/session/claude.js";
+import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage, SteerTakeBack } from "../../src/session/claude.js";
 import type { SessionEvent, ToolFileEntry } from "../../src/session/events.js";
 import { WAIT_MS } from "./wait.js";
 
@@ -58,6 +58,17 @@ export class FakeClaudeSession implements ClaudeSessionLike {
     if (!this.turnActive) throw new Error("no turn is running");
     this.steers.push(text);
     return `steer-${this.steers.length}`;
+  }
+
+  /** §50.3: take-backs asked for, and what the next one answers (a promise to hold it). */
+  readonly takeBacks: string[] = [];
+  takeBackResult: SteerTakeBack | Promise<SteerTakeBack> = "taken";
+
+  async takeBackSteer(uuid: string): Promise<SteerTakeBack> {
+    this.takeBacks.push(uuid);
+    const outcome = await this.takeBackResult;
+    if (outcome === "taken") this.emit({ type: "steer_withdrawn", uuid });
+    return outcome;
   }
 
   async interrupt(): Promise<void> {

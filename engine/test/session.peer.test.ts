@@ -25,11 +25,14 @@ type Script = {
   onFlag: (f: (s: Record<string, unknown>) => void) => void;
   /** What the session wrote to the CLI's stdin. */
   sent: SDKUserMessage[];
+  /** §50.3: `cancel_async_message` — the uuids asked for, and how the CLI answers (the frames it sends first). */
+  cancels: string[];
+  onCancel: (id: string) => Promise<boolean> | boolean;
 };
 
 function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }) => Query; script: Script } {
   let onFlag: (s: Record<string, unknown>) => void = () => {};
-  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [] };
+  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [], cancels: [], onCancel: () => false };
   const queryFn = (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }): Query => {
     script.options = args.options;
     void (async () => {
@@ -61,6 +64,10 @@ function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage
       },
       interrupt: async () => undefined,
       initializationResult: () => Promise.resolve({}),
+      cancelAsyncMessage: async (id: string) => {
+        script.cancels.push(id);
+        return script.onCancel(id);
+      },
       applyFlagSettings: async (s: Record<string, unknown>) => {
         script.flags.push(s);
         onFlag(s); // the CLI's frames for the switch arrive before the call returns (verified: released at +39 ms, reply at +43 ms)
@@ -389,6 +396,115 @@ describe("§50 a message put into the running turn (steerUser)", () => {
     const { s } = session();
     await s.start();
     expect(() => s.steerUser("hello")).toThrow(/no turn/);
+    await s.dispose();
+  });
+});
+
+describe("§50.3 taking back a message put into the turn (takeBackSteer)", () => {
+  /** A turn running with one steered message the CLI has queued. */
+  async function steered(): Promise<{ s: ClaudeSession; events: SessionEvent[]; script: Script; first: string; id: string }> {
+    const { s, events, script } = session();
+    await s.start();
+    s.sendUser("Run the tests", "tree-A");
+    await until(() => script.sent.length === 1, "first message");
+    const first = script.sent[0]!.uuid!;
+    script.push(lifecycle(first, "queued"));
+    script.push(lifecycle(first, "started"));
+    const id = s.steerUser("Also check the README");
+    await until(() => script.sent.length === 2, "the message put in");
+    script.push(lifecycle(id, "queued"));
+    return { s, events, script, first, id };
+  }
+
+  it("in time: the CLI drops it (its cancelled frame before the reply) — taken, no steer_read, the turn ends without it", async () => {
+    const { s, events, script, first, id } = await steered();
+    script.onCancel = async (uuid) => {
+      script.push(lifecycle(uuid, "cancelled")); // the CLI writes the frame, then the control response
+      await new Promise((r) => setTimeout(r, 10));
+      return true;
+    };
+    await expect(s.takeBackSteer(id)).resolves.toBe("taken");
+    expect(script.cancels).toEqual([id]);
+    await until(() => ofType(events, "steer_withdrawn").length === 1, "steer_withdrawn");
+    expect(ofType(events, "steer_withdrawn")[0]).toEqual({ type: "steer_withdrawn", uuid: id });
+    expect(ofType(events, "steer_read")).toEqual([]);
+    // The turn no longer waits for it: its result ends the turn at once.
+    script.push(result(0.02));
+    script.push(lifecycle(first, "completed"));
+    await until(() => ofType(events, "turn_end").length === 1, "turn_end");
+    expect(ofType(events, "unprompted_turn_end")).toEqual([]);
+    // Asking again is too late: it is no longer waiting.
+    await expect(s.takeBackSteer(id)).resolves.toBe("read");
+    expect(script.cancels).toEqual([id]);
+    await s.dispose();
+  });
+
+  it("in time, the reply before the frame: taken once (one steer_withdrawn)", async () => {
+    const { s, events, script, id } = await steered();
+    script.onCancel = (uuid) => {
+      setTimeout(() => script.push(lifecycle(uuid, "cancelled")), 10);
+      return true;
+    };
+    await expect(s.takeBackSteer(id)).resolves.toBe("taken");
+    await new Promise((r) => setTimeout(r, 40));
+    expect(ofType(events, "steer_withdrawn")).toHaveLength(1);
+    expect(ofType(events, "steer_read")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("too late: Claude started it — read, without asking the CLI", async () => {
+    const { s, events, script, id } = await steered();
+    script.push(lifecycle(id, "started"));
+    await until(() => ofType(events, "steer_read").length === 1, "steer_read");
+    await expect(s.takeBackSteer(id)).resolves.toBe("read");
+    expect(script.cancels).toEqual([]);
+    expect(ofType(events, "steer_withdrawn")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("too late while it is being folded in (cancelled: false): its started frame settles it — read, its steer_read once", async () => {
+    const { s, events, script, id } = await steered();
+    script.onCancel = (uuid) => {
+      setTimeout(() => script.push(lifecycle(uuid, "started")), 15);
+      return false;
+    };
+    await expect(s.takeBackSteer(id)).resolves.toBe("read");
+    expect(ofType(events, "steer_read")).toEqual([{ type: "steer_read", uuid: id }]);
+    expect(ofType(events, "steer_withdrawn")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("cancelled: false and no frame before the turn ends: read with the turn's end (the engine shows it as sent)", async () => {
+    const { s, events, script, first, id } = await steered();
+    script.onCancel = () => false;
+    const outcome = s.takeBackSteer(id);
+    await until(() => script.cancels.length === 1, "the cancel asked");
+    script.push(lifecycle(id, "completed")); // folded into the turn's last step
+    script.push(result(0.02));
+    script.push(lifecycle(first, "completed"));
+    await expect(outcome).resolves.toBe("read");
+    await until(() => ofType(events, "turn_end").length === 1, "turn_end");
+    await s.dispose();
+  });
+
+  it("the session closes while it waits for the CLI's word: read", async () => {
+    const { s, script, id } = await steered();
+    script.onCancel = () => false;
+    const outcome = s.takeBackSteer(id);
+    await until(() => script.cancels.length === 1, "the cancel asked");
+    await s.dispose();
+    await expect(outcome).resolves.toBe("read");
+  });
+
+  it("the CLI fails the request: kept (it still goes to Claude)", async () => {
+    const { s, events, script, id } = await steered();
+    script.onCancel = () => {
+      throw new Error("unsupported control request");
+    };
+    await expect(s.takeBackSteer(id)).resolves.toBe("kept");
+    expect(ofType(events, "steer_withdrawn")).toEqual([]);
+    script.push(lifecycle(id, "started"));
+    await until(() => ofType(events, "steer_read").length === 1, "it is read after all");
     await s.dispose();
   });
 });
