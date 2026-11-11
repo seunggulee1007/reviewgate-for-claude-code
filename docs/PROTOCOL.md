@@ -7234,7 +7234,9 @@ feature flag of its own, and on this machine both folded alike.
   "대기열에 추가" (after the turn, as before) and "중단하고 보내기". The hint reads "… — ↩로 바로 보내기". A refused
   `steer` (the turn ended meanwhile, the review is being collected) puts the message in the queue instead, so it is never
   lost. A message with images is queued: the CLI takes images only with a message of its own.
-- **Electron.** The same behavior.
+- **Electron.** The same behavior. Through 0.5.13 the main process's command allowlist (`src/main/ipcGuard.ts`) did not
+  list `steer`, so every steer was refused there and the message was queued instead (the renderer's fallback). It went
+  out after the turn, not into it.
 - **An open question (r1-composer M08).** While Claude's `AskUserQuestion` waits, a message steered into the turn only
   waits behind it: typing "y" and ↩ left the turn stuck until the card was found and clicked. So the message box answers
   the question instead. The question it answers is the oldest open `AskUserQuestion` while no other card is open (⌘↩ /
