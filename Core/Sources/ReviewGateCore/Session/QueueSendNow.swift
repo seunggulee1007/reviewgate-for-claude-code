@@ -1,0 +1,85 @@
+import Foundation
+
+// MARK: composer — docs/PROTOCOL.md §50.2: the queue as the terminal shows it — what waits in Claude's turn until it reads
+// it, and "Send now" on each queued message.
+
+/// `state.session.steering[]`: a message put into the running turn (§50 `steer`) that Claude has not read yet.
+public struct SteeringMessage: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let text: String
+    public var mentions: [String]
+
+    public init(id: String, text: String, mentions: [String] = []) {
+        self.id = id
+        self.text = text
+        self.mentions = mentions
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, text, mentions }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        text = try c.decode(String.self, forKey: .text)
+        mentions = (try? c.decodeIfPresent([String].self, forKey: .mentions)) ?? []
+    }
+}
+
+enum SteeringWire {
+    private enum SessionKeys: String, CodingKey { case steering }
+
+    /// `state.session.steering`, element by element (a malformed entry is skipped); empty on older engines.
+    static func messages(from decoder: Decoder) -> [SteeringMessage] {
+        guard let c = try? decoder.container(keyedBy: SessionKeys.self),
+              var list = try? c.nestedUnkeyedContainer(forKey: .steering) else { return [] }
+        var out: [SteeringMessage] = []
+        while !list.isAtEnd {
+            if let m = try? list.decode(SteeringMessage.self) { out.append(m) } else if (try? list.decode(JSONValue.self)) == nil { break }
+        }
+        return out
+    }
+}
+
+/// What a queued message's "Send now" does, as the terminal lets a queued message go at once.
+public enum QueuedSendNow: Sendable, Equatable {
+    /// Into the running turn (§50): Claude reads it after the current step.
+    case steer
+    /// Stop the turn and send it right after (§28): a message with images, or a turn that cannot take it.
+    case stopAndSend
+    /// It goes first and the queue goes on now (a pause, a hold).
+    case first
+
+    public static func action(for message: QueuedMessage, canSteer: Bool, running: Bool) -> QueuedSendNow {
+        if canSteer, message.images.isEmpty { return .steer }
+        return running ? .stopAndSend : .first
+    }
+}
+
+public extension AppState {
+    /// §50.2: what waits in Claude's turn, oldest first.
+    var steeringMessages: [SteeringMessage] { sessionInfo.steering }
+
+    /// What "Send now" on the queued message `id` would do now; nil when it is no longer queued.
+    func queuedSendNowAction(id: UUID) -> QueuedSendNow? {
+        guard let message = queuedMessages.first(where: { $0.id == id }) else { return nil }
+        return QueuedSendNow.action(for: message, canSteer: canSteer, running: isRunning)
+    }
+
+    /// §50.2 "바로 보내기" on a queued message: into the running turn, else stop the turn and send it, else it goes first
+    /// and the queue goes on now. The others keep their order.
+    func sendQueuedNow(id: UUID) {
+        guard let action = queuedSendNowAction(id: id), let message = queuedMessages.first(where: { $0.id == id }) else { return }
+        switch action {
+        case .steer:
+            queuedMessages.removeAll { $0.id == id }
+            Task { await steer(message.text, mentions: message.mentions) }
+        case .stopAndSend:
+            queuedMessages.removeAll { $0.id == id }
+            interruptAndSend(message.text, mentions: message.mentions, images: message.images)
+        case .first:
+            queuedMessages.removeAll { $0.id == id }
+            queuedMessages.insert(message, at: 0)
+            resumeQueue()
+        }
+    }
+}

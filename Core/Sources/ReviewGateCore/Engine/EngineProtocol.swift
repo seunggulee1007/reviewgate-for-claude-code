@@ -1289,6 +1289,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var peerInbox: [PeerMessage] = []
     /// §29: a turn the CLI runs that is not ours; `canSend` is false meanwhile.
     public var externalTurn: ExternalTurn?
+    /// MARK: composer — §50.2: messages put into the running turn that Claude has not read yet (empty on older engines).
+    public var steering: [SteeringMessage] = []
     /// §52: the background tasks running now, oldest first (empty on older engines).
     public var backgroundTasks: [BackgroundTaskInfo] = []
     // MARK: wave3 mac-session
@@ -1368,6 +1370,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         autoModel = AutoModelWire.choice(from: decoder)   // wave5 w5-model (§43.4)
         prePlanMode = TerminalModeWire.prePlanMode(from: decoder)   // wave6 w6-terminal (§44.1)
         backgroundTasks = BackgroundWire.tasks(from: decoder)   // §52
+        steering = SteeringWire.messages(from: decoder)   // MARK: composer (§50.2)
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.

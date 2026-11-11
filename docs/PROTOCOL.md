@@ -7326,6 +7326,11 @@ edit, move and remove, but no way to send one message now: it waited for the tur
   stops and the message goes right after it (§28, "중단하고 보내기"). Otherwise (the queue paused or held) it goes first and
   the queue goes on now. The tooltip says which of the three it does. The other messages keep their order. Nothing
   changes on the wire.
+- **Mac (Core).** `state.session.steering` decodes element by element (`SessionInfo.steering`,
+  `AppState.steeringMessages`); `QueuedSendNow.action`, `AppState.queuedSendNowAction(id:)` / `sendQueuedNow(id:)`
+  (`Session/QueueSendNow.swift`). A message sent with Stop and send takes the composer's one-message model, not the queued
+  message's own. Test `QueueSendNowTests`: the lenient decode, the list shown and cleared, the decision, into the turn with
+  its mentions, an image stops and sends, a paused queue sends that message first.
 - **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
   tooltip `sendNowHelp`). Test `queueSendNow.test.ts`: the decision; into the turn with the mentions; with an image, stop
   and send; a paused queue sends that message first.
