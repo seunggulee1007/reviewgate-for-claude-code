@@ -3376,7 +3376,9 @@ Rules for every subsection:
   subsection says so). A client before §36 ignores the fields and events. Both clients ship with their engine; the
   compatibility lines matter for mixed builds and for the lanes landing one by one. Until its lane lands, a command stays
   `unknown_command`. Electron's main process forwards only the commands listed in `clients/desktop/src/main/ipcGuard.ts`:
-  each desktop lane adds its own.
+  each desktop lane adds its own. `ipcGuard.test.ts` scans the renderer for every `engineRequest({ type })` and fails
+  on a type the list refuses. `steer` (§50), `unaccept` (Accept all's Undo) and `live_changes` / `live_diff` (§34.6) had
+  been left off, so on Windows they were refused before reaching the engine (fixed in 0.5.14).
 - **Read-only forks** — §36.10 side questions, §36.11 commit drafts, §36.13 pre-reviews — use the §21 machinery and its
   read-only policy (PreToolUse hook + `canUseTool`, deny wins in every mode, never a permission card;
   `disableAllHooks`; no MCP server — side questions have the user's since r2 M18, §21, the one-shot forks still none;
@@ -7234,7 +7236,9 @@ feature flag of its own, and on this machine both folded alike.
   "대기열에 추가" (after the turn, as before) and "중단하고 보내기". The hint reads "… — ↩로 바로 보내기". A refused
   `steer` (the turn ended meanwhile, the review is being collected) puts the message in the queue instead, so it is never
   lost. A message with images is queued: the CLI takes images only with a message of its own.
-- **Electron.** The same behavior.
+- **Electron.** The same behavior. Through 0.5.13 the main process's command allowlist (`src/main/ipcGuard.ts`) did not
+  list `steer`, so every steer was refused there and the message was queued instead (the renderer's fallback). It went
+  out after the turn, not into it.
 - **An open question (r1-composer M08).** While Claude's `AskUserQuestion` waits, a message steered into the turn only
   waits behind it: typing "y" and ↩ left the turn stuck until the card was found and clicked. So the message box answers
   the question instead. The question it answers is the oldest open `AskUserQuestion` while no other card is open (⌘↩ /
@@ -7343,7 +7347,7 @@ edit, move and remove, but no way to send one message now: it waited for the tur
   message's own. Test `QueueSendNowTests`: the lenient decode, the list shown and cleared, the decision, into the turn with
   its mentions, an image stops and sends, a paused queue sends that message first.
 - **Mac.** The queue bar (`ComposerQueueBar`) shows while anything waits: the messages in Claude's turn first, as dashed
-  chips with ↳ and no tools (the CLI has them: they cannot be edited or taken back), "Claude의 턴에 들어감 — 지금 단계가
+  chips with ↳ (since §50.3 with ✎ and ×: they can be taken back until Claude reads them), "Claude의 턴에 들어감 — 지금 단계가
   끝나면 Claude가 읽어요" when nothing else waits. Each queued chip has a paper plane ("바로 보내기"; its tooltip says
   which of the three it does), the context menu and the editor popover have "바로 보내기" too.
 - **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
@@ -7352,6 +7356,84 @@ edit, move and remove, but no way to send one message now: it waited for the tur
 - **Electron, what waits in the turn.** `QueueBar.tsx` shows `state.session.steering` first as dashed chips (↳, no tools)
   and the bar shows for them alone ("Claude의 턴에 들어감 — …"; Clear only with queued messages). Test
   `queueSendNow.test.ts` ("the queue bar").
+
+### 50.3 Taking a message back from Claude's turn
+
+The report: "대기열에 들어갔으면 삭제하거나 수정할 수 있게 해 줘야 하는 거 아니야? 기존보다 더 편하게 만들어야지". Since 0.5.13 ↩
+while Claude works puts the message into the turn (§50), and its dashed chip could neither be edited nor removed. In the
+terminal a message typed while Claude works waits in a queue and comes back into the input (↑) until Claude takes it.
+
+```ts
+// command: steer_take_back { messageId: string }   // refused steer_already_read | steer_take_back_failed
+```
+
+- **The CLI can take it back.** Its control request `cancel_async_message {message_uuid}` (SDK `Query.cancelAsyncMessage`,
+  0.3.270; not in the typings) drops a queued user message by uuid and answers `{cancelled}`. Read in the bundled CLI:
+  it removes the message from the command queue and writes `command_lifecycle {state: "cancelled"}` for it before the
+  reply. It answers `false` when the message was already dequeued for the turn, or is being folded into it right now
+  (its `isFoldInFlight` guard): that message then goes on to `started` / `completed`. A cancel that reaches the CLI
+  before the message itself is remembered and drops it on arrival (`cancelled`). So the engine does not hold messages
+  back to keep them editable (Claude would get them a step later than in the terminal): it asks the CLI, and the
+  message's own lifecycle frame has the last word. A message is never lost or sent twice: it is either dropped (no row)
+  or read (its row, §50.2).
+- **Session.** `ClaudeSession.takeBackSteer(uuid)` → `"taken" | "read" | "kept"`. Not waiting any more (`steer_read`
+  went out): `read`, the CLI is not asked. `cancelled: true` or the `cancelled` frame: `taken` — the session emits
+  `steer_withdrawn {uuid}`, and the turn's end no longer waits for that command (`peerTurnWaits`). `cancelled: false`:
+  the next frame settles it (`started` / `completed` → `read`, `cancelled` → `taken`); the turn's end or the session's
+  close settle it `read` (the engine shows it as sent then). A CLI without lifecycle frames: `false` is `read`. A CLI
+  that fails the request, or an SDK without the call: `kept` — the message still goes to Claude.
+- **Engine.** `steer_take_back {messageId}` (an `id` of `state.session.steering`) runs on a lane of its own (`steer`),
+  so a take-back waiting for the CLI's frame never holds up the turn's commands. `taken`: the message leaves
+  `state.session.steering` with no row. Refused `steer_already_read` ("Claude already read this message — it stays in
+  the chat") for `read` and for an id no longer waiting (read, or gone in with the turn's end), and
+  `steer_take_back_failed` for `kept` (it still waits). `steer_withdrawn` from the session drops the message too.
+- **Verified.** Engine `session.peer.test.ts` (§50.3 block): in time with the frame before the reply and after it (one
+  `steer_withdrawn`, the turn ends at its result), too late (started before: the CLI not asked), too late while folded
+  in (`cancelled: false`, then `started`), folded into the last step before the turn's end, the session closing, the
+  CLI failing the request. `w50.steer.test.ts`: taken (no row at the turn's end), too late (its row stays; asked again,
+  refused at once), after the turn ended, the CLI could not be asked, a waiting take-back leaves the main lane free.
+  Real CLI: `sidecar/test/driver-steer-takeback.mjs` (haiku, CLI 2.1.322), two turns in one session. In time: during a
+  `sleep 8` a message asking for "BANANA" is steered in, then taken back 1.5 s later. The take-back was `ok`, nothing
+  waited after it, the only row was the first message, there was one `turn_end`, and the reply was "A-DONE" with no
+  BANANA. Too late: during a `sleep 5` a message asking for "CHERRY" is taken back once its steered row came. The refusal
+  was `steer_already_read`, there were two rows (the second `steered`, the same turn) and no third, one `turn_end`, and
+  the reply was "B-DONE CHERRY". `driver-steer.mjs` passes as before.
+- **Mac (Core).** `AppState.takeBackSteering(id:toComposer:)` sends `steer_take_back` and says what became of it
+  (`taken`, `alreadyRead`, `failed`). While it waits the id is in `steeringTakingBack`. Taken with `toComposer` (Edit),
+  the text and its mentions go into the message box (`taskForComposer`); ↩ sends them again. Too late or failed, nothing
+  comes back (a copy would send it twice) and `steerTakeBackNotice` says why: "Claude가 이미 읽은 메시지예요 — 대화에 그대로
+  남아요" / "메시지를 되돌리지 못했어요 — Claude가 그대로 읽어요". `editQueuedInComposer(id:)` moves a queued message into the
+  box with its mentions and images. `pullBackLastWaiting()` is ↑ in an empty box: the last queued message, else the
+  last one in Claude's turn (taken back first); false when nothing waits (`canPullBackWaiting`). Test
+  `SteerTakeBackTests`: the command's JSON, taken (Edit into the box, × not), too late (the notice, nothing back, a gone
+  id not asked), failed, ↑ for a queued message first, then for the turn's, nothing waiting.
+- **Mac.** Each dashed chip in the queue bar has ✎ ("편집 — Claude의 턴에서 입력창으로 되돌려요 (빈 입력창에서 ↑도 돼요).
+  ↩로 다시 보내요") and × ("되돌리기 — Claude에게 가지 않아요"). A click on the chip is ✎ too, and its context menu has
+  "입력창에서 편집" and "되돌리기". While the take-back waits, a small spinner stands in for the tools ("Claude의 턴에서 되돌리는
+  중…"), and the menu items are off with that reason. The chip's tooltip says "Claude의 턴에 들어감 — 지금 단계가 끝나면
+  Claude가 읽어요. 그 전까지 클릭하면 편집, ×로 되돌릴 수 있어요." A take-back that comes too late or fails puts its notice in
+  the message box's notice line. Queued chips now show their edit in sight: a pencil ("이 대기 메시지 편집", opening the editor
+  popover as a click does) next to Send now and ×. Their tooltip adds "대기 중 — 클릭하면 편집, 빈 입력창에서 ↑를 누르면 마지막
+  메시지를 되돌려요", and their context menu gains "입력창에서 편집" (out of the queue into the box). ↑ in an empty message box
+  (not while browsing the history, not in a chat shown read-only) brings the last waiting message back
+  (`pullBackLastWaiting`). With nothing waiting, ↑ is the prompt history as before (§44.1). The bar lists one message
+  a row, as the terminal does above its input (more than three scroll within it). In the chat column at 1000 × 637
+  (356 pt), a row of chips had pushed the second chip's tools out of the window.
+- **Electron.** The same: store `takeBackSteering(id, toComposer)` (the ids waiting in `steerTakingBack`), and
+  `editQueuedInComposer(id)` (with its mentions and images, through `composerBridge`). `pullBackLastWaiting()` is ↑ in an
+  empty composer that is not browsing the history or showing another chat read-only. Too late or failed, a toast says
+  why. `QueueBar.tsx`: a dashed chip has ✎ and × with the Mac's tooltips (a click on its text is ✎); while it is being
+  taken back, "…" with "Claude의 턴에서 되돌리는 중…" stands in for them. Each chip has a context menu: for a dashed
+  one, 입력창에서 편집 / 되돌리기 (off with that reason while it waits); for a queued one, 편집… / 입력창에서 편집 / 바로
+  보내기 / 앞으로 이동 / 뒤로 이동 (off at the ends: "이미 대기열 맨 앞이에요" / "… 맨 뒤예요") / 제거. Queued chips show ✎
+  among their tools. The bar already wraps its chips, so the tools stay in the window. The main process allows
+  `steer_take_back` (`ipcGuard.ts`). Tests: `queueTakeBack.test.ts` covers in time (Edit hands the text and mentions over,
+  × does not), too late (the toast, nothing handed over, a gone id not asked), failed, and ↑ (the last queued message
+  first with its image, then the turn's, nothing waiting). `queueSendNow.test.ts` "the queue bar" checks ✎, × and the
+  waiting mark. `ipcGuard.test.ts`.
+- Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`; Core
+  `Session/QueueSendNow.swift`; App `UI/Chat/ComposerQueueBar.swift`, `UI/Chat/ChatComposer.swift`; Electron
+  `store.ts`, `components/chat/QueueBar.tsx`, `components/chat/Composer.tsx`, `main/ipcGuard.ts`).
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 

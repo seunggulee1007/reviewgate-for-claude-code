@@ -3,6 +3,8 @@
  * ‹ › to reorder, × to remove — plus the queue's state (sending next / waiting for the gate / paused with the reason
  * and Resume). Messages go out one at a time with the same gate as a plain Send. §50.1: a pause that ends by itself (the
  * API, the usage limit) says when, with [지금 보내기]; after the user's Stop the next message waits for [보내기].
+ * §50.3: a message in Claude's turn can be taken back (×) or brought back into the composer to edit (✎) until Claude
+ * reads it, as ↑ does in the terminal; every chip has the same tools in its context menu.
  */
 import { useEffect, useRef, useState } from "react";
 import { resetTimeText } from "../../errorCodes";
@@ -12,6 +14,7 @@ import { waitingOf } from "../../agentDetails"; // MARK: wave3 desktop-agents
 import { isEnter } from "../../ime";
 import { queuedSendNow } from "../../sendQueue";
 import { steerPossible } from "../../sendNow";
+import { useAgentContextMenu, type AgentMenuItem } from "../agents/AgentBits";
 
 const NO_STEERING: readonly { id: string; text: string }[] = [];
 
@@ -25,6 +28,7 @@ export function QueueBar() {
   const remove = useStore((s) => s.removeQueuedMessage);
   const move = useStore((s) => s.moveQueuedMessage);
   const sendNow = useStore((s) => s.sendQueuedNow); // MARK: composer
+  const toComposer = useStore((s) => s.editQueuedInComposer); // §50.3
   // MARK: composer — what "Send now" on a chip does (sendQueue.ts `queuedSendNow`), said on its tooltip.
   const canSteer = useStore((s) => steerPossible(s.state, false));
   const running = useStore((s) => s.state.gate.phase === "running");
@@ -78,15 +82,7 @@ export function QueueBar() {
       </div>
       <div className="queue-chips">
         {steering.map((m) => (
-          <span
-            key={m.id}
-            className="queue-chip steering"
-            title={`${m.text}\n\n${t("Already in Claude's turn — Claude reads it after the current step")}`}
-            data-testid="Queue steering chip"
-          >
-            <span className="queue-num" aria-hidden>↳</span>
-            <span className="queue-text truncate">{m.text}</span>
-          </span>
+          <SteeringChip key={m.id} id={m.id} text={m.text} />
         ))}
         {queue.items.map((m, i) =>
           editing === m.id ? (
@@ -111,38 +107,118 @@ export function QueueBar() {
               />
             </span>
           ) : (
-            <span key={m.id} className="queue-chip" data-testid="Queue chip">
-              <span className="queue-num">{i + 1}</span>
-              <button
-                type="button"
-                className="queue-text truncate"
-                title={`${m.text}\n\n${t("Click to edit")}`}
-                onClick={() => {
-                  setEditing(m.id);
-                  setText(m.text);
-                }}
-              >
-                {m.text}
-              </button>
-              <span className="queue-tools">
-                <button
-                  type="button"
-                  onClick={() => sendNow(m.id)}
-                  aria-label={t("Send now")}
-                  title={sendNowHelp(queuedSendNow(m, { canSteer, running }))}
-                  data-testid="Queue send now"
-                >
-                  ⏎
-                </button>
-                <button type="button" disabled={i === 0} onClick={() => move(m.id, -1)} aria-label={t("Move earlier")} title={t("Move earlier")}>‹</button>
-                <button type="button" disabled={i === queue.items.length - 1} onClick={() => move(m.id, 1)} aria-label={t("Move later")} title={t("Move later")}>›</button>
-                <button type="button" onClick={() => remove(m.id)} aria-label={t("Remove from queue")} title={t("Remove from queue")} data-testid="Queue remove">×</button>
-              </span>
-            </span>
+            <QueuedChip
+              key={m.id}
+              index={i}
+              count={queue.items.length}
+              text={m.text}
+              sendNowTitle={sendNowHelp(queuedSendNow(m, { canSteer, running }))}
+              onEdit={() => {
+                setEditing(m.id);
+                setText(m.text);
+              }}
+              onToComposer={() => toComposer(m.id)}
+              onSendNow={() => sendNow(m.id)}
+              onMove={(dir) => move(m.id, dir)}
+              onRemove={() => remove(m.id)}
+            />
           ),
         )}
       </div>
     </div>
+  );
+}
+
+/** §50.3: what a steering chip's tools say (and, while it is being taken back, why they wait). */
+export function takeBackHelp(): { edit: string; remove: string; busy: string; chip: string } {
+  return {
+    edit: t("Edit — takes it back from Claude's turn into the message box (↑ in an empty box does too); ↩ sends it again"),
+    remove: t("Take back — Claude never sees it"),
+    busy: t("Taking it back from Claude's turn…"),
+    chip: t("In Claude's turn — Claude reads it after the current step. Until then, click to edit it or × to take it back."),
+  };
+}
+
+/**
+ * composer §50.2: a message already in Claude's turn, waiting until Claude reads it. §50.3: until then ✎ (or a click)
+ * brings it back into the composer and × takes it back (the CLI drops it); too late, a toast says so and its row stays.
+ */
+function SteeringChip({ id, text }: { id: string; text: string }) {
+  const busy = useStore((s) => s.steerTakingBack.includes(id));
+  const takeBack = useStore((s) => s.takeBackSteering);
+  const help = takeBackHelp();
+  const items: AgentMenuItem[] = [
+    { label: t("Edit in Message Box"), onClick: () => void takeBack(id, true), disabled: busy ? help.busy : null, testId: "Queue steering menu edit" },
+    { label: t("Take Back"), onClick: () => void takeBack(id, false), disabled: busy ? help.busy : null, danger: true, testId: "Queue steering menu take back" },
+  ];
+  const menu = useAgentContextMenu(items);
+  return (
+    <span className={`queue-chip steering${busy ? " busy" : ""}`} data-testid="Queue steering chip" onContextMenu={menu.onContextMenu}>
+      <span className="queue-num" aria-hidden>↳</span>
+      <button
+        type="button"
+        className="queue-text truncate"
+        disabled={busy}
+        title={`${text}\n\n${busy ? help.busy : help.chip}`}
+        onClick={() => void takeBack(id, true)}
+      >
+        {text}
+      </button>
+      <span className="queue-tools">
+        {busy ? (
+          <span className="queue-busy" role="status" aria-label={help.busy} title={help.busy} data-testid="Queue steering busy">…</span>
+        ) : (
+          <>
+            <button type="button" onClick={() => void takeBack(id, true)} aria-label={t("Edit the message in Claude's turn")} title={help.edit} data-testid="Queue steering edit">✎</button>
+            <button type="button" onClick={() => void takeBack(id, false)} aria-label={t("Take back the message in Claude's turn")} title={help.remove} data-testid="Queue steering take back">×</button>
+          </>
+        )}
+      </span>
+      {menu.menu}
+    </span>
+  );
+}
+
+/** A queued message: click or ✎ to edit, ⏎ send now, ‹ › reorder, × remove — and the same in its context menu. */
+function QueuedChip(p: {
+  index: number;
+  count: number;
+  text: string;
+  sendNowTitle: string;
+  onEdit: () => void;
+  onToComposer: () => void;
+  onSendNow: () => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const first = p.index === 0;
+  const last = p.index === p.count - 1;
+  const items: AgentMenuItem[] = [
+    { label: t("Edit…"), onClick: p.onEdit, testId: "Queue menu edit" },
+    { label: t("Edit in Message Box"), onClick: p.onToComposer, testId: "Queue menu to composer" },
+    { label: t("Send Now"), onClick: p.onSendNow, testId: "Queue menu send now" },
+    { label: t("Move Earlier"), onClick: () => p.onMove(-1), disabled: first ? t("Already first in the queue") : null, testId: "Queue menu earlier" },
+    { label: t("Move Later"), onClick: () => p.onMove(1), disabled: last ? t("Already last in the queue") : null, testId: "Queue menu later" },
+    { label: t("Remove"), onClick: p.onRemove, danger: true, testId: "Queue menu remove" },
+  ];
+  const menu = useAgentContextMenu(items);
+  return (
+    <span className="queue-chip" data-testid="Queue chip" onContextMenu={menu.onContextMenu}>
+      <span className="queue-num">{p.index + 1}</span>
+      <button type="button" className="queue-text truncate" title={`${p.text}\n\n${t("Queued — click to edit; ↑ in an empty message box brings the last one back")}`} onClick={p.onEdit}>
+        {p.text}
+      </button>
+      <span className="queue-tools">
+        <button type="button" onClick={p.onEdit} aria-label={t("Edit queued message {0}", p.index + 1)} title={t("Edit this queued message")} data-testid="Queue edit button">✎</button>
+        <button type="button" onClick={p.onSendNow} aria-label={t("Send now")} title={p.sendNowTitle} data-testid="Queue send now">
+          ⏎
+        </button>
+        <button type="button" disabled={first} onClick={() => p.onMove(-1)} aria-label={t("Move earlier")} title={first ? t("Already first in the queue") : t("Move earlier")}>‹</button>
+        <button type="button" disabled={last} onClick={() => p.onMove(1)} aria-label={t("Move later")} title={last ? t("Already last in the queue") : t("Move later")}>›</button>
+        <button type="button" onClick={p.onRemove} aria-label={t("Remove from queue")} title={t("Remove from queue")} data-testid="Queue remove">×</button>
+      </span>
+      {menu.menu}
+    </span>
   );
 }
 

@@ -654,6 +654,8 @@ export type EngineCommand =
   | Cmd<"login_in_terminal", { host: string }>
   /** §50: a message into the turn that runs (as typing while Claude works in the terminal); `steer_unavailable:<why>` otherwise. */
   | Cmd<"steer", { text: string; mentions?: string[] }>
+  /** §50.3: takes back a message of `state.session.steering` before Claude reads it; `steer_already_read` / `steer_take_back_failed` otherwise. */
+  | Cmd<"steer_take_back", { messageId: string }>
   /** §52: stops a background task (`Query.stopTask`). */
   | Cmd<"task_stop", { taskId: string }>
   /** §52: Ctrl+B — the running Bash call (all foreground tasks without an id) goes on in the background; replies `task_background`. */

@@ -17138,6 +17138,38 @@
           }
         }
       }
+    },
+    "Claude already read this message — it stays in the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude already read this message — it stays in the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 이미 읽은 메시지예요 — 대화에 그대로 남아요"
+          }
+        }
+      }
+    },
+    "Couldn't take the message back — Claude still reads it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't take the message back — Claude still reads it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지를 되돌리지 못했어요 — Claude가 그대로 읽어요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

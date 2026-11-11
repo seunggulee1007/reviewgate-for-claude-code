@@ -96,3 +96,121 @@ import Testing
         #expect(app.queuedMessages.map(\.text) == ["first", "with a picture"])
     }
 }
+
+/// docs/PROTOCOL.md §50.3 on the Mac: a message in Claude's turn taken back before Claude reads it (× and Edit on its chip),
+/// and ↑ in an empty message box bringing the last waiting message back. Electron: queueTakeBack.test.ts.
+@Suite @MainActor struct SteerTakeBackTests {
+    private func makeState() -> AppState {
+        AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: UserDefaults(suiteName: "SteerTakeBackTests.\(UUID().uuidString)")!)
+    }
+
+    private func running(steering: [SteeringMessage]) -> ReviewState {
+        var s = ReviewState.empty
+        s.seq = 1
+        s.project = ProjectInfo(path: "/repo", root: "/repo", name: "repo", branch: "main", remoteURL: nil)
+        s.session = SessionInfo(open: true, starting: false, sessionId: "s", model: nil, capabilities: nil, pendingPermission: nil, canRestart: true)
+        s.session.steering = steering
+        s.gate = GateInfo(phase: .running, canSend: false, canRequestChanges: false, blockedReason: .running,
+                          collectError: nil, pendingCount: 0, changesRequestedCount: 0, isRequestingChanges: false,
+                          turnStartTree: "A1", turnEndTree: nil, lastReviewSummary: nil)
+        return s
+    }
+
+    private static let waiting = [SteeringMessage(id: "u1", text: "Also README", mentions: ["README.md"]), SteeringMessage(id: "u2", text: "then the tests")]
+
+    @Test func theCommandsJSON() throws {
+        let data = try JSONEncoder().encode(EngineCommandEnvelope(id: nil, command: .steerTakeBack(messageId: "u1")))
+        let sent = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(sent["type"] as? String == "steer_take_back")
+        #expect(sent["messageId"] as? String == "u1")
+    }
+
+    @Test func inTimeItIsGoneAndEditPutsItIntoTheMessageBox() async {
+        let app = makeState()
+        var sent: [EngineCommand] = []
+        app.requestSink = { sent.append($0) }
+        app.handle(.state(running(steering: Self.waiting)))
+        #expect(await app.takeBackSteering(id: "u1", toComposer: true) == .taken)
+        #expect(sent == [.steerTakeBack(messageId: "u1")])
+        #expect(app.taskForComposer?.text == "Also README")
+        #expect(app.taskForComposer?.mentions == ["README.md"])
+        #expect(app.steerTakeBackNotice == nil)
+        #expect(app.steeringTakingBack.isEmpty)
+        app.takeTaskForComposer(app.taskForComposer!.id)
+        #expect(await app.takeBackSteering(id: "u2", toComposer: false) == .taken)   // × — nothing comes back
+        #expect(app.taskForComposer == nil)
+    }
+
+    @Test func tooLateSaysSoAndNothingComesBack() async {
+        let app = makeState()
+        app.requestSink = { _ in throw EngineClientError.refused("steer_already_read: Claude already read this message", code: "steer_already_read") }
+        app.handle(.state(running(steering: Self.waiting)))
+        #expect(await app.takeBackSteering(id: "u1", toComposer: true) == .alreadyRead)
+        #expect(app.taskForComposer == nil)   // its row is in the chat: a copy in the box would send it twice
+        #expect(app.steerTakeBackNotice?.text == SteerTakeBackNotice.alreadyRead)
+        // No longer listed (read, or gone in with the turn's end): the same, without asking the engine.
+        var asked = false
+        app.requestSink = { _ in asked = true }
+        #expect(await app.takeBackSteering(id: "gone", toComposer: true) == .alreadyRead)
+        #expect(!asked)
+    }
+
+    @Test func aFailedTakeBackLeavesItWaiting() async {
+        let app = makeState()
+        app.requestSink = { _ in throw EngineClientError.refused("steer_take_back_failed: the CLI could not", code: "steer_take_back_failed") }
+        app.handle(.state(running(steering: Self.waiting)))
+        #expect(await app.takeBackSteering(id: "u2", toComposer: true) == .failed)
+        #expect(app.taskForComposer == nil)
+        #expect(app.steerTakeBackNotice?.text == SteerTakeBackNotice.failed)
+    }
+
+    @Test func upArrowBringsTheLastQueuedMessageBackFirst() {
+        let app = makeState()
+        var sent: [EngineCommand] = []
+        app.commandSink = { sent.append($0) }
+        app.requestSink = { sent.append($0) }
+        app.handle(.state(running(steering: Self.waiting)))
+        app.enqueue("first")
+        app.enqueue("second", mentions: ["src/cart.ts"])
+        #expect(app.canPullBackWaiting)
+        #expect(app.pullBackLastWaiting())
+        #expect(app.queuedMessages.map(\.text) == ["first"])
+        #expect(app.taskForComposer?.text == "second")
+        #expect(app.taskForComposer?.mentions == ["src/cart.ts"])
+        #expect(!sent.contains { if case .steerTakeBack = $0 { true } else { false } })
+    }
+
+    @Test func upArrowThenTakesBackTheLastMessageInClaudesTurn() async throws {
+        let app = makeState()
+        var sent: [EngineCommand] = []
+        app.requestSink = { sent.append($0) }
+        app.handle(.state(running(steering: Self.waiting)))
+        #expect(app.pullBackLastWaiting())
+        #expect(app.steeringTakingBack == ["u2"])   // its chip waits at once
+        for _ in 0..<50 where app.taskForComposer == nil { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(sent == [.steerTakeBack(messageId: "u2")])
+        #expect(app.taskForComposer?.text == "then the tests")
+    }
+
+    @Test func aQueuedMessageGoesBackIntoTheMessageBoxWithItsImages() {
+        let app = makeState()
+        app.commandSink = { _ in }
+        app.handle(.state(running(steering: [])))
+        let image = ComposerImage(mediaType: .png, data: Data([0x89, 0x50, 0x4E, 0x47]), name: "shot.png")
+        app.enqueue("first")
+        app.enqueue("look", mentions: ["a.ts"], images: [image])
+        let look = app.queuedMessages[1]
+        app.editQueuedInComposer(id: look.id)
+        #expect(app.queuedMessages.map(\.text) == ["first"])
+        #expect(app.taskForComposer?.text == "look")
+        #expect(app.taskForComposer?.mentions == ["a.ts"])
+        #expect(app.taskForComposer?.images.count == 1)
+    }
+
+    @Test func upArrowWithNothingWaitingIsTheHistory() {
+        let app = makeState()
+        app.handle(.state(running(steering: [])))
+        #expect(!app.canPullBackWaiting)
+        #expect(!app.pullBackLastWaiting())
+    }
+}

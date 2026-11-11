@@ -13,6 +13,9 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "cancel_git_init",
   "restart_session",
   "send",
+  // §50: a message into the running turn (↩ while Claude works); §50.3: taking it back before Claude reads it
+  "steer",
+  "steer_take_back",
   "request_changes",
   "interrupt",
   "permission_response",
@@ -25,6 +28,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "plan_follow",
   "accept",
   "accept_all",
+  "unaccept", // the Undo of "Accept all"'s toast
+  // §34.6 the running turn's changes so far (reads: the "진행 중 변경" section and its read-only diff)
+  "live_changes",
+  "live_diff",
   "reject",
   "reject_all",
   // §31.5 (wave1 desktop-review): empty the review list without touching files / dismiss the stale flag

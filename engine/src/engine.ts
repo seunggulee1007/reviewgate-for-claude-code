@@ -608,7 +608,7 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
   /** Chain uuid of the main session's last completed turn: where a side question forks while a turn runs (§21). */
@@ -1061,6 +1061,9 @@ export class ReviewEngine {
         return;
       case "steer": // §50
         this.steer(cmd.text, cmd.mentions);
+        return;
+      case "steer_take_back": // §50.3
+        await this.steerTakeBack(cmd.messageId);
         return;
       case "interrupt":
         await this.interruptTurn();
@@ -3510,6 +3513,38 @@ export class ReviewEngine {
     this.steering.push({ id, text: trimmed, ...(mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {}), turn: this.turn });
     this.log("info", `message put into turn ${this.turn}`);
     this.touch();
+  }
+
+  /**
+   * §50.3 `steer_take_back {messageId}`: a message put into the turn comes back before Claude reads it, as the terminal
+   * lets a queued message be pulled back (↑) or dropped. The CLI drops it (`cancel_async_message`): it leaves
+   * `state.session.steering` with no row. Refused `steer_already_read` when Claude has it (its row is in the chat, or comes
+   * with the turn's end) and `steer_take_back_failed` when the CLI could not be asked (it still waits; Claude reads it).
+   */
+  private async steerTakeBack(messageId: unknown): Promise<void> {
+    const id = typeof messageId === "string" ? messageId : "";
+    const session = this.session;
+    if (!id || !this.steering.some((m) => m.id === id)) {
+      throw new CommandRefused("steer_already_read: Claude already read this message — it stays in the chat", { code: "steer_already_read" });
+    }
+    if (!session?.takeBackSteer) throw new CommandRefused("steer_take_back_failed: this session cannot take a message back", { code: "steer_take_back_failed" });
+    const outcome = await session.takeBackSteer(id);
+    if (outcome === "taken") {
+      this.dropSteering(id);
+      this.log("info", `message taken back from turn ${this.turn}`);
+      return;
+    }
+    if (outcome === "read") {
+      throw new CommandRefused("steer_already_read: Claude already read this message — it stays in the chat", { code: "steer_already_read" });
+    }
+    throw new CommandRefused("steer_take_back_failed: the CLI could not take the message back — Claude still reads it", { code: "steer_take_back_failed" });
+  }
+
+  /** §50.3: a message taken back from the turn leaves the list without a row. */
+  private dropSteering(id: string): void {
+    const before = this.steering.length;
+    this.steering = this.steering.filter((m) => m.id !== id);
+    if (this.steering.length !== before) this.touch();
   }
 
   /**
@@ -6557,6 +6592,9 @@ export class ReviewEngine {
       case "steer_read": // MARK: composer — §50.2
         this.flushSteering(ev.uuid);
         return;
+      case "steer_withdrawn": // §50.3
+        this.dropSteering(ev.uuid);
+        return;
       case "commands_info":
         // §36.5: initialize's commands (no message needed), then each commands_changed; cached with the lists.
         this.applyCommands(ev.commands);
@@ -8372,7 +8410,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47)
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47)
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -8434,6 +8472,9 @@ function laneOf(cmd: EngineCommand): Lane {
     // the preview is a read for the sheet.
     case "workbench_create":
       return "workbench";
+    // §50.3: a take-back can wait for the CLI's next frame on that message — never behind (or holding up) the turn's lane.
+    case "steer_take_back":
+      return "steer";
     case "workbench_preview":
       return "query";
     default:
@@ -8468,6 +8509,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
   switch (type) {
     case "send":
     case "steer":
+    case "steer_take_back":
     case "request_changes":
     case "interrupt":
     case "set_model":

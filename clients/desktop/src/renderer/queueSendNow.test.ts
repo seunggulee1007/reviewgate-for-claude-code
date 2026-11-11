@@ -94,7 +94,7 @@ describe("a queued message sent now", () => {
 });
 
 describe("the queue bar (§50.2)", () => {
-  it("shows what waits in Claude's turn (no tools: it cannot be taken back) and Send now on each queued message", async () => {
+  it("shows what waits in Claude's turn (§50.3: with ✎ and × until Claude reads it) and Send now on each queued message", async () => {
     const useStore = await loadStore();
     const { createElement } = await import("react");
     const { renderToStaticMarkup } = await import("react-dom/server");
@@ -118,9 +118,21 @@ describe("the queue bar (§50.2)", () => {
     expect(html).toContain("Claude reads it after the current step");
     expect(html).not.toContain('data-testid="Queue send now"');
     expect(html).not.toContain('data-testid="Clear queue"');
+    // §50.3: it can be edited (back into the composer) or taken back, each with its tooltip.
+    expect(html).toContain('data-testid="Queue steering edit"');
+    expect(html).toContain('data-testid="Queue steering take back"');
+    const { takeBackHelp } = await import("./components/chat/QueueBar");
+    expect(html).toContain(takeBackHelp().remove);
+    // While it is being taken back, a waiting mark stands in for the tools.
+    Object.assign(init, { steerTakingBack: ["u1"] });
+    html = renderToStaticMarkup(createElement(QueueBar));
+    expect(html).toContain('data-testid="Queue steering busy"');
+    expect(html).not.toContain('data-testid="Queue steering take back"');
+    Object.assign(init, { steerTakingBack: [] });
     scene([{ id: 5, text: "then run the tests" }]);
     html = renderToStaticMarkup(createElement(QueueBar));
     expect(html).toContain('data-testid="Queue send now"');
     expect(html).toContain(sendNowHelp("steer").replace(/'/g, "&#x27;"));
+    expect(html).toContain('data-testid="Queue edit button"'); // §50.3: edit in sight, not only behind a click
   });
 });

@@ -74,6 +74,77 @@ describe("§50 steer", () => {
     expect(h.ofType("user_message").filter((e) => e.steered).map((e) => [e.text, e.turn])).toEqual([["second", turn], ["first", turn]]);
   });
 
+  it("§50.3 a take-back in time: it leaves the list with no row, and the turn's end brings none", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "send", text: "Fix the cart" });
+    await h.waitFor((s) => s.gate.phase === "running", "turn running");
+    await h.engine.request({ type: "steer", text: "first" });
+    await h.engine.request({ type: "steer", text: "second" });
+    await h.engine.request({ type: "steer_take_back", messageId: "steer-1" });
+    expect(h.session().takeBacks).toEqual(["steer-1"]);
+    expect((h.engine.state.session.steering ?? []).map((m) => m.text)).toEqual(["second"]);
+    h.session().emitTurnEnd();
+    await h.waitFor((s) => s.gate.phase !== "running" && s.gate.phase !== "collecting", "turn over");
+    expect(h.ofType("user_message").filter((e) => e.steered).map((e) => e.text)).toEqual(["second"]);
+  });
+
+  it("§50.3 too late: Claude read it — refused steer_already_read, its row stays", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "send", text: "Fix the cart" });
+    await h.waitFor((s) => s.gate.phase === "running", "turn running");
+    await h.engine.request({ type: "steer", text: "first" });
+    // The CLI started it while the take-back was on its way.
+    let answer: (o: "read") => void = () => {};
+    h.session().takeBackResult = new Promise((r) => (answer = r));
+    const asked = h.engine.request({ type: "steer_take_back", messageId: "steer-1" });
+    await h.waitFor(() => h.session().takeBacks.length === 1, "asked");
+    h.session().emit({ type: "steer_read", uuid: "steer-1" });
+    answer("read");
+    await expect(asked).rejects.toThrow(/steer_already_read/);
+    expect(h.engine.state.session.steering).toEqual([]);
+    expect(h.ofType("user_message").filter((e) => e.steered).map((e) => e.text)).toEqual(["first"]);
+    // Asked again (or for a message no longer waiting): refused at once, the CLI is not asked.
+    await expect(h.engine.request({ type: "steer_take_back", messageId: "steer-1" })).rejects.toThrow(/steer_already_read/);
+    expect(h.session().takeBacks).toEqual(["steer-1"]);
+  });
+
+  it("§50.3 after the turn ended: what waited went in with it — refused steer_already_read", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "send", text: "Fix the cart" });
+    await h.waitFor((s) => s.gate.phase === "running", "turn running");
+    await h.engine.request({ type: "steer", text: "first" });
+    h.session().emitTurnEnd();
+    await h.waitFor((s) => s.gate.phase !== "running" && s.gate.phase !== "collecting", "turn over");
+    await expect(h.engine.request({ type: "steer_take_back", messageId: "steer-1" })).rejects.toThrow(/steer_already_read/);
+    expect(h.session().takeBacks).toEqual([]);
+    expect(h.ofType("user_message").filter((e) => e.steered).map((e) => e.text)).toEqual(["first"]);
+  });
+
+  it("§50.3 the CLI could not be asked: refused steer_take_back_failed, it still waits", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "send", text: "Fix the cart" });
+    await h.waitFor((s) => s.gate.phase === "running", "turn running");
+    await h.engine.request({ type: "steer", text: "first" });
+    h.session().takeBackResult = "kept";
+    await expect(h.engine.request({ type: "steer_take_back", messageId: "steer-1" })).rejects.toThrow(/steer_take_back_failed/);
+    expect((h.engine.state.session.steering ?? []).map((m) => m.text)).toEqual(["first"]);
+  });
+
+  it("§50.3 a take-back that waits for the CLI does not hold up the turn's lane", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "send", text: "Fix the cart" });
+    await h.waitFor((s) => s.gate.phase === "running", "turn running");
+    await h.engine.request({ type: "steer", text: "first" });
+    let answer: (o: "taken") => void = () => {};
+    h.session().takeBackResult = new Promise((r) => (answer = r));
+    const asked = h.engine.request({ type: "steer_take_back", messageId: "steer-1" });
+    await h.engine.request({ type: "steer", text: "second" }); // the main lane is free
+    expect(h.session().steers).toHaveLength(2);
+    answer("taken");
+    await asked;
+    expect((h.engine.state.session.steering ?? []).map((m) => m.text)).toEqual(["second"]);
+  });
+
   it("refused when no turn runs, and for an empty message", async () => {
     const { h } = await opened();
     await expect(h.engine.request({ type: "steer", text: "hello" })).rejects.toThrow("steer_unavailable:not_running");

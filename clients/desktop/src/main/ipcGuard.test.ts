@@ -1,5 +1,25 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { isAppURL, isSafeExternalURL, validateCommand } from "./ipcGuard.js";
+
+/** Every command type the renderer sends with `engineRequest({ type: "…" })` (its tests aside). */
+function rendererCommandTypes(): Map<string, string> {
+  const root = fileURLToPath(new URL("../renderer/", import.meta.url));
+  const found = new Map<string, string>();
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, e.name);
+      if (e.isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) {
+        for (const m of readFileSync(path, "utf8").matchAll(/engineRequest(?:<[^>]*>)?\(\s*\{\s*type:\s*"([a-z_]+)"/g)) found.set(m[1]!, e.name);
+      }
+    }
+  };
+  walk(root);
+  return found;
+}
 
 describe("isAppURL", () => {
   const prod = { fileURL: "file:///Applications/ReviewGate.app/Contents/Resources/app.asar/dist/renderer/index.html" };
@@ -62,6 +82,22 @@ describe("isSafeExternalURL / validateCommand", () => {
     for (const type of ["list_files", "attachment_get", "set_model", "rewind", "compact", "interrupt"]) {
       expect(validateCommand({ type }).ok).toBe(true);
     }
+  });
+
+  it("allows steer (§50: ↩ while Claude works puts the message into the turn — refused here, it was only ever queued)", () => {
+    expect(validateCommand({ type: "steer", text: "Also check the README" }).ok).toBe(true);
+    expect(validateCommand({ type: "steer_take_back", messageId: "u1" }).ok).toBe(true); // §50.3
+  });
+
+  it("allows what the renderer sends: unaccept (Accept all's Undo) and the live changes of a running turn (§34.6)", () => {
+    for (const type of ["unaccept", "live_changes", "live_diff"]) expect(validateCommand({ type }).ok).toBe(true);
+  });
+
+  it("allows every command the renderer sends — a type left off the list is refused here, and the renderer's own tests mock this away", () => {
+    const types = rendererCommandTypes();
+    expect(types.size).toBeGreaterThan(40); // the scan found the renderer's calls
+    const refused = [...types].filter(([type]) => !validateCommand({ type }).ok).map(([type, file]) => `${type} (${file})`);
+    expect(refused).toEqual([]);
   });
 
   it("allows the peer message commands (§29)", () => {

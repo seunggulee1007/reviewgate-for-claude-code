@@ -237,6 +237,9 @@ public final class AppState {
     var debugBackgroundTasks: [BackgroundTaskInfo]?
     /// §49: a task handed to this worktree that the session could not take — the chat puts it into the composer (once per id).
     public internal(set) var taskForComposer: TaskComposerText?
+    /// §50.3: messages in Claude's turn being taken back (their chips wait), and why the last take-back did not happen.
+    public internal(set) var steeringTakingBack: Set<String> = []
+    public internal(set) var steerTakeBackNotice: SteerTakeBackNotice?
     /// r2-chats-cards M31 / M33 (§9): a new chat or switch asked for while Claude works — sent once the live chat is done.
     public internal(set) var pendingChatSwitch: PendingChatSwitch?
     /// The held switch is on its way (one at a time).

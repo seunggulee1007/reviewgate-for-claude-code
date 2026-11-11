@@ -34,8 +34,9 @@
 #                  open: Open Project… / Switch Project… / Open in New Window… in each state a window can be in (`open` lines).
 #                  composer: the message box against the terminal's input — ⌘V of an image from a private pasteboard
 #                  (a screenshot, Preview, a browser, a Finder copy; never the user's clipboard), "/" opening the slash
-#                  palette with every source and filtering it, the queue bar with what waits in Claude's turn (`composer`
-#                  lines; also part of SHOTS_LAYOUT=1).
+#                  palette with every source and filtering it, the queue bar with what waits in Claude's turn and its
+#                  edit / take-back tools, ↑ in an empty box bringing the last waiting message back (`composer` lines;
+#                  also part of SHOTS_LAYOUT=1).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT or JUMP in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
