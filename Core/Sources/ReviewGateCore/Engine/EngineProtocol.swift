@@ -429,6 +429,9 @@ public enum EngineCommand: Sendable, Equatable {
     /// §50: a message into the turn that runs (as typing while Claude works in the terminal); refused
     /// `steer_unavailable:<why>` when no turn of ours runs.
     case steer(text: String, mentions: [String] = [])
+    /// §50.3: takes back a message of `state.session.steering` before Claude reads it; refused `steer_already_read`
+    /// (Claude has it — its row is in the chat) or `steer_take_back_failed` (it still goes to Claude).
+    case steerTakeBack(messageId: String)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -687,6 +690,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .send: "send"
         case .sendWithModel: "send"   // wave5 w5-model (§43.4)
         case .steer: "steer"   // §50
+        case .steerTakeBack: "steer_take_back"   // §50.3
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .permissionResponse: "permission_response"
@@ -886,6 +890,8 @@ extension EngineCommand: Encodable {
             try c.encode(toolUseId, forKey: .toolUseId)
         case .taskStop, .taskBackground, .taskOutput:   // §52
             try encodeBackgroundFields(to: encoder)
+        case .steerTakeBack:   // §50.3
+            try encodeSteerTakeBackFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
              .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges:

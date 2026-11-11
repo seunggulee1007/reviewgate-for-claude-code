@@ -7388,7 +7388,17 @@ terminal a message typed while Claude works waits in a queue and comes back into
   in (`cancelled: false`, then `started`), folded into the last step before the turn's end, the session closing, the
   CLI failing the request. `w50.steer.test.ts`: taken (no row at the turn's end), too late (its row stays; asked again,
   refused at once), after the turn ended, the CLI could not be asked, a waiting take-back leaves the main lane free.
-- Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`).
+- **Mac (Core).** `AppState.takeBackSteering(id:toComposer:)` sends `steer_take_back` and says what became of it
+  (`taken`, `alreadyRead`, `failed`). While it waits the id is in `steeringTakingBack`. Taken with `toComposer` (Edit),
+  the text and its mentions go into the message box (`taskForComposer`); ↩ sends them again. Too late or failed, nothing
+  comes back (a copy would send it twice) and `steerTakeBackNotice` says why: "Claude가 이미 읽은 메시지예요 — 대화에 그대로
+  남아요" / "메시지를 되돌리지 못했어요 — Claude가 그대로 읽어요". `editQueuedInComposer(id:)` moves a queued message into the
+  box with its mentions and images. `pullBackLastWaiting()` is ↑ in an empty box: the last queued message, else the
+  last one in Claude's turn (taken back first); false when nothing waits (`canPullBackWaiting`). Test
+  `SteerTakeBackTests`: the command's JSON, taken (Edit into the box, × not), too late (the notice, nothing back, a gone
+  id not asked), failed, ↑ for a queued message first, then for the turn's, nothing waiting.
+- Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`; Core
+  `Session/QueueSendNow.swift`).
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
