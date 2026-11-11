@@ -78,6 +78,7 @@
     "ready": false,
     "peerInbound": "auto",
     "peerInbox": [],
+    "steering": [],
     "externalTurn": null,
     "backgroundTasks": [],
     "peerTurn": null,

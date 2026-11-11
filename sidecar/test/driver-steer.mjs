@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Real-CLI check for docs/PROTOCOL.md §50 (Send now): a message sent with `steer` while a turn runs reaches Claude in that
 // turn — its reply answers both, the file the second message asked for is in the same review, one turn_end, and the two
-// user rows share the turn number (the second marked steered). Through the bundled sidecar on a fresh scratch repository
+// user rows share the turn number (the second marked steered). Composer (§50.2): until the CLI starts the message it
+// waits in state.session.steering and has no row; at the end nothing waits. Through the bundled sidecar on a fresh scratch repository
 // (loadUserSettings off). One model call on RG_MODEL (default haiku).
 //
 //   node sidecar/test/driver-steer.mjs [scratchDir] [sidecar.mjs]   (default $TMPDIR/rg-steer, RE-CREATED)
@@ -98,18 +99,24 @@ try {
   await sleep(1500);
   const steer = await request({ type: "steer", text: "Also: create the file note.txt containing the single word steered, and put the word BANANA in your final reply." });
   observed.steerReply = steer.ok === false ? steer.error : "ok";
+  // composer (§50.2): it waits above the input (state.session.steering, no row yet) until the CLI starts it.
+  for (let i = 0; i < 30 && (state?.session.steering ?? []).length === 0; i++) await sleep(100); // the next snapshot
+  observed.waitingAfterSteer = (state?.session.steering ?? []).map((m) => m.text.slice(0, 20));
+  observed.rowsAtSteer = events.filter((e) => e.type === "user_message").length;
   await waitFor(() => events.some((e) => e.type === "turn_end"), "turn end");
   await waitFor(() => state?.gate.phase !== "running" && state?.gate.phase !== "collecting", "review collected");
   await sleep(1500);
   const users = events.filter((e) => e.type === "user_message");
   const text = events.filter((e) => e.type === "text_delta").map((e) => e.text ?? "").join("");
+  observed.waitingAtEnd = (state?.session.steering ?? []).length;
   observed.userRows = users.map((u) => ({ turn: u.turn, steered: u.steered ?? false, text: u.text.slice(0, 60) }));
   observed.turnEnds = events.filter((e) => e.type === "turn_end").length;
   observed.files = (state?.changedFiles ?? []).map((f) => f.path);
   observed.banana = /BANANA/.test(text) || JSON.stringify(events).includes("BANANA");
   log(JSON.stringify(observed));
   failed = observed.steerReply !== "ok" || observed.turnEnds !== 1 || users.length !== 2 || users[0].turn !== users[1].turn
-    || users[1].steered !== true || !observed.files.includes("note.txt") || !observed.banana;
+    || users[1].steered !== true || !observed.files.includes("note.txt") || !observed.banana
+    || observed.waitingAfterSteer.length !== 1 || observed.rowsAtSteer !== 1 || observed.waitingAtEnd !== 0;
 } catch (e) {
   failed = true;
   observed.error = e instanceof Error ? e.message : String(e);

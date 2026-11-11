@@ -338,14 +338,19 @@ describe("§50 a message put into the running turn (steerUser)", () => {
     const first = script.sent[0]!.uuid!;
     script.push(lifecycle(first, "queued"));
     script.push(lifecycle(first, "started"));
-    s.steerUser("Also check the README");
+    const id = s.steerUser("Also check the README");
     await until(() => script.sent.length === 2, "the message put in");
     const steered = script.sent[1]!;
     expect(steered.message.content).toBe("Also check the README");
     expect(steered.priority).toBe("next");
     expect(steered.uuid).not.toBe(first);
+    expect(id).toBe(steered.uuid); // composer (§50.2): the engine knows it by this id
     script.push(lifecycle(steered.uuid!, "queued"));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ofType(events, "steer_read")).toEqual([]); // queued: Claude has not read it yet
     script.push(lifecycle(steered.uuid!, "started"));
+    await until(() => ofType(events, "steer_read").length === 1, "steer_read");
+    expect(ofType(events, "steer_read")[0]).toEqual({ type: "steer_read", uuid: steered.uuid });
     script.push(lifecycle(steered.uuid!, "completed"));
     script.push(result(0.02, { user_message_uuids: [first, steered.uuid] }));
     script.push(lifecycle(first, "completed"));

@@ -7310,6 +7310,16 @@ The report: "메시지 바로 보내기, 대기열에 있는 거 보이는 거 �
 while Claude works waits above the input, can be edited or removed there, and can go at once. The app's queue bar had
 edit, move and remove, but no way to send one message now: it waited for the turn and every message before it.
 
+- **What waits in the turn (engine).** A message put into the turn (§50 `steer`) showed as a sent row at once, though
+  Claude reads it only after the current step: nothing said it was still waiting. It now waits in
+  `state.session.steering: [{id, text, mentions?}]` (oldest first) and has no row yet. When the CLI starts it
+  (`command_lifecycle` `started`, or `completed` when it was folded in), the session emits `steer_read {uuid}`. Its
+  `user_message {steered: true}` row is then recorded and emitted, with the number of the turn it went into, where
+  Claude read it. What the CLI never started goes in with the turn's end (or the session's close), in order.
+  `ClaudeSession.steerUser` returns the message's uuid (the `id`). Engine `flushSteering`; tests `w50.steer.test.ts`
+  (it waits, then its row; several in order; the rest at the turn's end) and `session.peer.test.ts` (`steer_read` on
+  `started`, not on `queued`). Real CLI 2.1.322 (`driver-steer.mjs`): right after the steer, `steering` had the message
+  and there was one row. At the end nothing waited and both rows had turn 1.
 - **Send now on each queued message.** Each queued message has "바로 보내기" (⏎). What it does depends on the turn
   (`queuedSendNow`). While a turn of ours runs and the message has no images, it goes into the turn (§50 `steer`, with
   its mentions) and leaves the queue. With images, or while the turn cannot take it (another session's turn), the turn

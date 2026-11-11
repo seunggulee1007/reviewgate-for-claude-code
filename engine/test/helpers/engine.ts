@@ -53,10 +53,11 @@ export class FakeClaudeSession implements ClaudeSessionLike {
   /** §50: messages put into the running turn. */
   readonly steers: string[] = [];
 
-  steerUser(text: string): void {
+  steerUser(text: string): string {
     if (this.refuseSends) throw this.refuseSends;
     if (!this.turnActive) throw new Error("no turn is running");
     this.steers.push(text);
+    return `steer-${this.steers.length}`;
   }
 
   async interrupt(): Promise<void> {

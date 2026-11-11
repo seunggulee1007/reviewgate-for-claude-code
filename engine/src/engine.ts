@@ -683,6 +683,8 @@ export class ReviewEngine {
   private peerChoice: PeerInboundMode | undefined;
   /** A turn the CLI runs that is not ours (`state.session.externalTurn`). */
   private externalTurn: ExternalTurn | null = null;
+  /** MARK: composer — §50.2: messages put into the running turn that Claude has not read yet (their rows wait for it). */
+  private steering: { id: string; text: string; mentions?: string[]; turn: number }[] = [];
   /** The running review turn is accepted peer messages. */
   private peerTurn: { messageIds: string[]; fromNames: string[] } | null = null;
   /** The unprompted turn running now delivered a peer message: a card says it, not the §18 banner. */
@@ -3494,18 +3496,34 @@ export class ReviewEngine {
     const mentions = this.sendOptions(mentionsIn, undefined).mentions ?? [];
     let outgoing = trimmed;
     if (mentions.length > 0) outgoing += `\n\nReferenced files: ${mentions.map((m) => mentionToken(m.path, m.kind)).join(" ")}`;
-    session.steerUser(outgoing);
-    const extras = mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {};
-    this.record({ kind: "user_message", text: trimmed, ...extras, steered: true });
-    this.emit({ type: "user_message", text: trimmed, turn: this.turn, ...extras, steered: true });
-    this.commitSlice.lastUserText = trimmed;
-    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
-    if (meta) {
-      meta.lastUserText = trimmed;
-      meta.updatedAt = new Date().toISOString();
-      this.persistSessions();
-    }
+    const id = session.steerUser(outgoing);
+    // MARK: composer — §50.2: it waits above the input, as in the terminal, until Claude reads it (`steer_read`); its row
+    // comes into the transcript then, where Claude read it.
+    this.steering.push({ id, text: trimmed, ...(mentions.length > 0 ? { mentions: mentions.map((m) => m.path) } : {}), turn: this.turn });
     this.log("info", `message put into turn ${this.turn}`);
+    this.touch();
+  }
+
+  /**
+   * MARK: composer — §50.2: steered messages Claude read (`id`), or every one left (the turn ended, the session closed):
+   * their user rows, recorded and emitted with the turn they went into, and the chat's last text follows them.
+   */
+  private flushSteering(id?: string): void {
+    const read = id === undefined ? this.steering : this.steering.filter((m) => m.id === id);
+    if (read.length === 0) return;
+    this.steering = id === undefined ? [] : this.steering.filter((m) => m.id !== id);
+    for (const m of read) {
+      const extras = m.mentions ? { mentions: m.mentions } : {};
+      this.record({ kind: "user_message", text: m.text, ...extras, steered: true });
+      this.emit({ type: "user_message", text: m.text, turn: m.turn, ...extras, steered: true });
+      this.commitSlice.lastUserText = m.text;
+      const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+      if (meta) {
+        meta.lastUserText = m.text;
+        meta.updatedAt = new Date().toISOString();
+        this.persistSessions();
+      }
+    }
     this.touch();
   }
 
@@ -6528,6 +6546,9 @@ export class ReviewEngine {
         return;
       }
       // MARK: wave3 engine-session
+      case "steer_read": // MARK: composer — §50.2
+        this.flushSteering(ev.uuid);
+        return;
       case "commands_info":
         // §36.5: initialize's commands (no message needed), then each commands_changed; cached with the lists.
         this.applyCommands(ev.commands);
@@ -6701,6 +6722,7 @@ export class ReviewEngine {
         this.touch();
         return;
       case "turn_end": {
+        this.flushSteering(); // MARK: composer (§50.2): what Claude had not started went in with this turn
         if (!this.gate.running) {
           // No turn of ours is running (closed abnormally already, or the CLI ran one on its own):
           // nothing to collect, and turnCount / cost / the gate stay as they are (§18).
@@ -6819,6 +6841,7 @@ export class ReviewEngine {
         return;
       }
       case "closed":
+        this.flushSteering(); // MARK: composer (§50.2)
         this.stopMcpPolling();
         this.session = null;
         this.sessionState.open = false;
@@ -8067,6 +8090,7 @@ export class ReviewEngine {
         ready: this.sessionState.open && !this.sessionState.starting && (this.sessionStart.ready === true || this.sessionStart.gotInfo),
         peerInbound: this.peerMode(),
         peerInbox: [...this.peerInbox.values()].map((m) => ({ ...m })),
+        steering: this.steering.map(({ id, text, mentions }) => ({ id, text, ...(mentions ? { mentions: [...mentions] } : {}) })), // MARK: composer (§50.2)
         externalTurn: this.externalTurn ? { ...this.externalTurn, peer: this.externalTurn.peer ? { ...this.externalTurn.peer } : null } : null,
         backgroundTasks: (this.sessionState.backgroundTasks ?? []).map((t) => ({ ...t })), // §52
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,
