@@ -60,8 +60,9 @@ final class TranscriptViewState {
 
     /// §45.1: where the rows made at once begin (`TranscriptPane.tailStart`). Rows crossing into the lazy stack get estimated
     /// heights there, and everything below them moves by the difference — under a still offset, the rows shown jump. So it is
-    /// set when the rows are (re)placed — a chat opened, shown or switched, rows put in front — and while that chat goes on
-    /// its new rows stay made at once; only past `TranscriptPane.tailCap` of them, following and not scrolling, does it move.
+    /// set when the rows are (re)placed — a chat opened, shown or switched, rows put in front — and otherwise moves on only
+    /// when a turn begins (its message glides in) or past `TranscriptPane.tailCap` rows made at once, and then only while
+    /// following and not scrolling: never as following resumes under the reader's own scroll.
     @ObservationIgnored private var tailStartKept = 0
     @ObservationIgnored private var tailFirstID: UUID?
 
@@ -71,8 +72,10 @@ final class TranscriptViewState {
         if first != tailFirstID || wanted < tailStartKept {
             tailStartKept = wanted
             tailFirstID = first
-        } else if follow, !userScrolling, entries.count - tailStartKept > TranscriptPane.tailCap {
-            tailStartKept = wanted
+        } else if follow, !userScrolling, wanted > tailStartKept {
+            var turnBegins = false
+            if case let .node(.row(item))? = entries.last, case .user = item { turnBegins = true }
+            if turnBegins || entries.count - tailStartKept > TranscriptPane.tailCap { tailStartKept = wanted }
         }
         return tailStartKept
     }
@@ -119,8 +122,8 @@ struct TranscriptPane: View {
     /// time (a row crosses it rarely).
     static let tailRows = 30
     static let tailStep = 10
-    /// More rows than this made at once (a long session's) and the boundary moves on anyway (following, not scrolling).
-    static let tailCap = 400
+    /// More rows than this made at once (a long turn's) and the boundary moves on mid-turn (following, not scrolling).
+    static let tailCap = 150
 
     /// Where the rows made at once begin: everything before it is lazy.
     static func tailStart(_ count: Int) -> Int {

@@ -6495,10 +6495,12 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   one, so the bottom has its rows' real heights whatever is estimated above (`TranscriptPane.tailStart`: at least the last
   30, the boundary moving ten at a time). Rows that cross into the lazy stack are estimated there, and everything below
   them moves by the difference under a still offset, so the boundary is set when the rows are placed — a chat opened,
-  shown or switched to, rows put in front, fewer rows — and a chat's new rows then stay made at once; only past 400 of
-  them, following and not scrolling, does it move on. (0.5.12 moved it whenever following resumed: a reader scrolling back
-  down to the newest row turned following on, and the rows shown were pushed down 1 185–1 607 pt — the transcript "reset"
-  upward on every scroll down.) The bottom marker takes the stack's bottom padding, so a pin to it is the content's very
+  shown or switched to, rows put in front, fewer rows — and otherwise moves on only when a turn begins (its message glides
+  in) or past 150 rows made at once, and then only while following and not scrolling. (0.5.12 also moved it whenever
+  following resumed: a reader scrolling back down to the newest row turned following on, and the rows shown were pushed
+  down 621–1 607 pt — the transcript "reset" upward on every scroll down. Never moving it during a chat instead made a long
+  session's stack hundreds of rows: 33–37 % of the main thread while an answer streamed, 18–27 % before, and 659–734 ms to
+  lay the chat out again, 327–376 ms before.) The bottom marker takes the stack's bottom padding, so a pin to it is the content's very
   end (a reader who reached the end was pulled 12 pt back up). Each row still observes what it draws (a streamed delta
   redraws the streaming row).
 - **The transcript holds still while rows change above the bottom** (r1x). Subagents at work (§52.2) add their calls to their
