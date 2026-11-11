@@ -27,7 +27,9 @@
 #                  minimised, another display, a new chat and back; `chat:` / `column:` lines, BLANK / OUT OF THE WINDOW);
 #                  cpu: the main thread's CPU while Claude works with agents, streaming or not, in front and behind
 #                  another app, and a new chat's time to its rows (`cpu:` lines); cards: the composer's shots (a review,
-#                  Claude's question and a permission card above the composer) six times over the layout check's transcript.
+#                  Claude's question and a permission card above the composer) six times over the layout check's transcript;
+#                  scrolldown: a long chat scrolled down to its end as a trackpad does, idle and streaming (`scrolldown:` lines,
+#                  a JUMP when the view went further from the newest row than the reader took it).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST or BLANK in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size

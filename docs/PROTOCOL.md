@@ -6524,7 +6524,11 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   layout check's transcript (a long chat, the scroll check's agents), each round with request ids of its own: beside the
   diff pane Claude's question leaves the transcript 108 pt, and it showed none of its rows in 6 of 38 question shots (6 of
   8 in the first round); a permission card leaves it 190 pt and never did. Then three permission cards at once leave it its
-  least room, 80 pt, four times (`cards-stacked-*.png`).
+  least room, 80 pt, four times (`cards-stacked-*.png`). `SHOTS_LAYOUT=scrolldown` (`ScreenshotTour.scrollDownChecks`)
+  leaves a 64-turn chat 5 000 pt above its end while 16 turns come in, then scrolls it down as a trackpad moves the clip
+  (40 pt every 16 ms, the transcript told the user scrolls) to the end, idle and while Claude streams, at 1000 × 637 with
+  and without the diff pane and at 1257 × 1104; a jump is the view going further from the newest row than the reader took
+  it.
 - **A breathing dot costs the window nothing** (0.5.12). The dot of a live agent — the HUD's "N agents running", an agent
   group's "Running" chip, the Changes tab while Claude works, a side question at work — breathed by a SwiftUI
   `repeatForever` animation, which updates and renders the window's whole view graph every frame (the transcript's scroll

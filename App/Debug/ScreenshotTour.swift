@@ -106,6 +106,10 @@ private final class Tour {
             do { try await cardsOnly(); finish(nil) } catch { finish(error) }
             return
         }
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "scrolldown" {
+            do { try await scrollDownChecks(); finish(nil) } catch { finish(error) }
+            return
+        }
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "cpu" {
             do { try await cpuChecks(); finish(nil) } catch { finish(error) }
             return
@@ -1005,6 +1009,123 @@ private final class Tour {
         }
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
         try await Task.sleep(for: .milliseconds(800))
+    }
+
+    /// `SHOTS_LAYOUT=scrolldown`: a reader scrolls down a long chat as with a trackpad — 40 pt steps every 16 ms, a gesture
+    /// that begins, changes and ends — from ~5 000 pt above the newest row to it, idle and while Claude streams, at 1000 × 637
+    /// with and without the diff pane and in a tall window. The clip's offset is read every 4 ms; any move up the reader did
+    /// not make is a jump ("JUMP" in the `scrolldown:` line).
+    private func scrollDownChecks() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        store.debugHandle((1...60).flatMap { Self.turnEvents($0, root: root) })
+        // Agents' groups among the rows (finished), as a long session has.
+        for n in 61...64 {
+            let agent = "toolu_down_agent_\(n)"
+            var events: [EngineEvent] = [.userMessage(text: "Check the cart with an agent (\(n))", turn: n),
+                                         .toolUse(id: agent, name: "Agent", input: .object(["subagent_type": .string("code-reviewer"), "description": .string("Review \(n)")]), file: nil)]
+            for i in 0..<12 {
+                let id = "\(agent)_call_\(i)"
+                events += [.toolUse(id: id, name: "Read", input: .object(["file_path": .string("\(root)/src/cart.ts")]), file: "\(root)/src/cart.ts", info: ToolUseInfo(parentToolUseId: agent)),
+                           .toolResult(toolUseId: id, isError: false, preview: "\(i) lines", info: ToolResultInfo(parentToolUseId: agent))]
+            }
+            events.append(.toolResult(toolUseId: agent, isError: false, preview: "done", info: { var i = ToolResultInfo(); i.agentEnded = true; return i }()))
+            store.debugHandle(events + Self.turnEvents(n, root: root).dropFirst())
+        }
+        try await Task.sleep(for: .milliseconds(1500))
+        let visible = window.screen?.visibleFrame ?? window.frame
+        var turn = 70
+        for (label, size, diff) in [("1000x637", NSSize(width: 1000, height: 637), false), ("1000x637-diff", NSSize(width: 1000, height: 637), true),
+                                    ("1257x1104", NSSize(width: 1257, height: 1104), false)] {
+            window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - size.height), size: size), display: true)
+            if diff { entry.model.toggleDiffTick += 1 }
+            try await Task.sleep(for: .milliseconds(1500))
+            transcript = nil
+            guard let chat = Self.chatScrollView(try scrollViews(window)) else { log("scrolldown: no chat scroll view"); continue }
+            for streaming in [false, true] {
+                // ~5 000 pt above the end (where a reader left it), then let it settle.
+                let clip = chat.contentView
+                clip.scroll(to: NSPoint(x: 0, y: max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height - 5000)))
+                chat.reflectScrolledClipView(clip)
+                try await Task.sleep(for: .milliseconds(900))
+                // While the reader is up there, Claude's turns add rows below (more than the rows made at once).
+                entry.model.chatTranscript.follow = false
+                for _ in 0..<16 { turn += 1; store.debugHandle(Self.turnEvents(turn, root: root)) }
+                try await Task.sleep(for: .milliseconds(900))
+                var samples: [(y: CGFloat, h: CGFloat)] = []
+                let sampler = Task { @MainActor in
+                    while !Task.isCancelled {
+                        samples.append((chat.contentView.bounds.minY, chat.documentView?.frame.height ?? 0))
+                        try? await Task.sleep(for: .milliseconds(4))
+                    }
+                }
+                var streamer: Task<Void, Never>?
+                if streaming {
+                    store.debugShowGate(.running)
+                    turn += 1
+                    let events = Self.turnEvents(turn, root: root) + Self.turnEvents(turn + 100, root: root)
+                    streamer = Task { @MainActor in
+                        for event in events {
+                            guard !Task.isCancelled else { return }
+                            store.debugHandle([event])
+                            try? await Task.sleep(for: .milliseconds(40))
+                        }
+                    }
+                }
+                try await gesture(chat, by: -40) {   // down to the end, and a few steps more against it
+                    (chat.documentView?.frame.height ?? 0) - clip.bounds.maxY < 2
+                }
+                try await Task.sleep(for: .milliseconds(800))
+                sampler.cancel()
+                streamer?.cancel()
+                store.debugShowGate(.idle)
+                // A jump: the view went further from the newest row than the reader took it — the rows shown moved down under
+                // the view (the distance to the content's end grew) while nothing was added (idle), or with the offset going
+                // up. A content that shrinks above the view at its end keeps showing the end: not a jump.
+                let vis = chat.contentView.bounds.height
+                var jumps: [String] = []
+                for (i, (a, b)) in zip(samples, samples.dropFirst()).enumerated() {
+                    let ea = a.h - a.y - vis, eb = b.h - b.y - vis
+                    if eb > ea + 4, !streaming || b.y < a.y - 4 {
+                        jumps.append("#\(i) end \(Int(ea))→\(Int(eb)) y \(Int(a.y))→\(Int(b.y)) h \(Int(a.h))→\(Int(b.h))")
+                    }
+                }
+                let end = samples.last.map { Int($0.h - $0.y - vis) } ?? -1
+                log("scrolldown \(label)\(streaming ? ", streaming" : ", idle"): \(samples.count) samples, \(jumps.count) jumps, \(end) pt from the end, "
+                    + "following \(entry.model.chatTranscript.follow ? "yes" : "no")" + (jumps.isEmpty ? " — steady" : " — JUMP: " + jumps.prefix(6).joined(separator: " | ")))
+                try await Task.sleep(for: .milliseconds(1500))
+            }
+            if diff { entry.model.toggleDiffTick += 1; try await Task.sleep(for: .milliseconds(1200)) }
+        }
+        try write(try render(window), "scrolldown")
+    }
+
+    /// A trackpad gesture on `chat`: the clip moved `by` pt (positive: up) every 16 ms until `done` and eight steps more.
+    private func gesture(_ chat: NSScrollView, by: Int32, until done: () -> Bool) async throws {
+        // As AppKit moves the clip for a trackpad gesture, with the transcript told the user is scrolling (its scroll phase):
+        // synthesised wheel events do not reach a window that is not in front.
+        let state = entry.model.chatTranscript
+        state.userScrolling = true
+        var extra = 8
+        for _ in 0..<400 {
+            if done() { extra -= 1 }
+            if extra == 0 { break }
+            let clip = chat.contentView
+            let end = max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height)
+            clip.scroll(to: NSPoint(x: 0, y: min(end, max(0, clip.bounds.minY - CGFloat(by)))))
+            chat.reflectScrolledClipView(clip)
+            try await Task.sleep(for: .milliseconds(16))
+        }
+        // The gesture ends: the transcript's own idle handling (follow when at the bottom).
+        state.userScrolling = false
+        state.follow = state.nearBottom
+        if state.follow { state.unseen = 0 }
     }
 
     /// `SHOTS_LAYOUT=cpu`: what the main thread spends while Claude works and nothing changes on screen but the HUD's clock and
