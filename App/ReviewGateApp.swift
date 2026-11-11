@@ -143,8 +143,8 @@ enum ProjectOpener {
     /// toolbar's folder, File › Open Recent, the recent list and a git candidate all ask what `requestSwitch` asks.
     static func open(_ url: URL, store: AppState) {
         if openElsewhereIfWindowGone(url, store: store) { return }
-        if store.projectURL != nil, let entry = WorkbenchRegistry.shared.entry(for: store) {
-            requestSwitch(to: url, store: store, pending: Bindable(entry.model).pendingSwitch)
+        if store.projectURL != nil {
+            requestSwitch(to: url, store: store)
             return
         }
         Task { await store.openProject(url) }
@@ -154,9 +154,10 @@ enum ProjectOpener {
     /// brings that window to the front, which says so (`sayAlreadyOpen`) — one in another window is not switched to (that
     /// would stop this session for a lock it cannot take). polish P1-chrome-03: a switch stops the session, so a turn
     /// running, a card waiting or work that would stop or be lost asks first (Core `QuitPrompt.projectChange`, "프로젝트를
-    /// 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are asked about by the caller's alert (via `pending`);
-    /// otherwise the store swaps sessions right away.
-    static func requestSwitch(to url: URL, store: AppState, pending: Binding<URL?>) {
+    /// 바꾸면 이 턴이 멈춰요."); otherwise files still pending review ask "Switch project?"; otherwise the store swaps sessions
+    /// right away. Both questions are AppKit sheets (`WorkSafetyAlerts`): the pending-review one was a SwiftUI `.alert`, whose
+    /// sheet SwiftUI closed from inside a layout pass — its close animation's nested run loop crashed the app (UpdateCycle).
+    static func requestSwitch(to url: URL, store: AppState) {
         if openElsewhereIfWindowGone(url, store: store) { return }
         let registry = WorkbenchRegistry.shared
         let target = AppSettings.projectKey(url)
@@ -179,7 +180,9 @@ enum ProjectOpener {
             return
         }
         if store.hasPendingReview {
-            pending.wrappedValue = url
+            WorkSafetyAlerts.askSwitchWithPendingReview(files: store.pendingFiles.count, in: registry.entry(for: store)?.window) {
+                Task { await store.switchProject(to: url) }
+            }
         } else {
             Task { await store.switchProject(to: url) }
         }
@@ -203,7 +206,7 @@ enum ProjectOpener {
     }
 
     /// "Switch Project…": the same folder picker as `choose`, routed through the pending-review confirmation.
-    static func chooseForSwitch(store: AppState, pending: Binding<URL?>) {
+    static func chooseForSwitch(store: AppState) {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -211,7 +214,7 @@ enum ProjectOpener {
         panel.prompt = String(localized: "Switch")
         panel.message = String(localized: "Choose a project folder to switch to")
         guard let url = pick(panel) else { return }
-        requestSwitch(to: url, store: store, pending: pending)
+        requestSwitch(to: url, store: store)
     }
 
     // MARK: Open in New Window (docs/M19-MULTIPROJECT.md)
@@ -373,7 +376,7 @@ struct FileCommands: Commands {
             .keyboardShortcut("o", modifiers: .command)
             Button("Switch Project…") {
                 if let focused {
-                    ProjectOpener.chooseForSwitch(store: focused.store, pending: Bindable(focused.model).pendingSwitch)
+                    ProjectOpener.chooseForSwitch(store: focused.store)
                 } else {
                     ProjectOpener.chooseForNewWindow(openWindow: openWindow)
                 }
@@ -448,7 +451,7 @@ private struct WorkbenchWindow: View {
 
     var body: some View {
         @Bindable var model = entry.model
-        MainWindow(tab: $model.tab, pendingSwitch: $model.pendingSwitch)
+        MainWindow(tab: $model.tab)
             .environment(entry.store)
             .environment(entry.store.pr)
             .environment(entry.model)

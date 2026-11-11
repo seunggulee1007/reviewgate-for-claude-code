@@ -140,6 +140,27 @@ enum WorkSafetyAlerts {
         }
     }
 
+    /// "Switch project?" with files still pending review (P1-chrome-03, after `QuitPrompt.projectChange` did not ask): a sheet on
+    /// `window` (app-modal without one), Cancel on Esc. §8 / §31.5: the review is saved and comes back on reopen. `go` runs on
+    /// Switch. An AppKit sheet like the other project questions — the SwiftUI `.alert` it was crashed the app when SwiftUI
+    /// closed its sheet from inside a layout pass.
+    static func askSwitchWithPendingReview(files: Int, in window: NSWindow?, then go: @escaping @MainActor () -> Void) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Switch project?")
+        alert.informativeText = String(localized: "\(files) files pending review. The review is saved and comes back when you reopen this project; the files stay on disk as they are.")
+        alert.addButton(withTitle: String(localized: "Switch"))
+        alert.addButton(withTitle: String(localized: "Cancel")).keyEquivalent = "\u{1b}"
+        guard let window, window.isVisible else {
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn { go() }
+            return
+        }
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { go() }
+        }
+    }
+
     /// Quit (⌘Q, the Dock): the question for every window, app-modal. True = quit; "Don't ask again" turns off
     /// `confirmQuit`.
     static func confirmQuit(_ prompt: QuitPrompt) -> Bool {

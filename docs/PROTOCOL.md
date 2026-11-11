@@ -6578,7 +6578,7 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   — idle, the project already open here or in another window, files pending review (also on the PRs tab), a turn running,
   a message typed, no project, a second window after the first one closed — and logs what each ended in (`open <case>:
   opened in this window / opened in a new window / asked — "…" / said — "…" / its window came forward / message — …`); SILENT
-  when none of these happened, which fails the run. Every window the tour opens logs under its folder, never to
+  when none of these happened, which fails the run. A question is answered as the user would: its Cancel button is clicked. Every window the tour opens logs under its folder, never to
   ~/Library/Logs/ReviewGate. `open-opening.png`: the empty window while an open is on its way.
 - **A breathing dot costs the window nothing** (0.5.12). The dot of a live agent — the HUD's "N agents running", an agent
   group's "Running" chip, the Changes tab while Claude works, a side question at work — breathed by a SwiftUI
@@ -8123,7 +8123,10 @@ and what stays. The decision and the words are one pure function on each client 
   window has open does the same.
   Mac: with a project open, ⌘O, the toolbar's folder, File › Open Recent, the recent list and a git candidate go through
   `ProjectOpener.requestSwitch` too (they used to open at once, past even the pending-review question), and Close Project
-  through `requestClose`; the question is a sheet on the window. A new window is opened with the folder plus a fragment of
+  through `requestClose`; the question is a sheet on the window. So is the pending-review one ("Switch project?",
+  `WorkSafetyAlerts.askSwitchWithPendingReview`, an AppKit sheet since it was a SwiftUI `.alert`: closing that alert
+  from its state, SwiftUI ended the sheet inside a layout pass and the sheet's close animation ran a nested run loop
+  that crashed the app — EXC_BAD_ACCESS in UpdateCycle). A new window is opened with the folder plus a fragment of
   its own (`ProjectOpener.newWindowValue`): SwiftUI brings forward the window it thinks shows a value, and a window closed
   earlier (AppKit keeps it, hidden) still matched the folders it had shown — Open in New Window… then opened nothing. An
   open aimed at a window that is gone (a menu that still names a closed window's store) opens in a window of its own. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and

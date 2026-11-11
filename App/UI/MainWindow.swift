@@ -23,8 +23,6 @@ struct MainWindow: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store
     @Binding var tab: MainTab
-    /// Set by the switcher / ⌘⇧O when files are still pending review; the alert below confirms the switch.
-    @Binding var pendingSwitch: URL?
     @Environment(WindowModel.self) private var model
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var confirmUnsafeInit = false
@@ -317,14 +315,6 @@ struct MainWindow: View {
         .modifier(CodeBrowserObservers(tab: $tab) { setDiffCollapsed(false, remember: false) })   // MARK: code-browser (§47)
         .onChange(of: model.toggleAgentPanelTick) { _, _ in
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
-        }
-        .alert("Switch project?", isPresented: Binding(get: { pendingSwitch != nil }, set: { if !$0 { pendingSwitch = nil } }),
-               presenting: pendingSwitch) { url in
-            Button("Switch") { Task { await store.switchProject(to: url) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            // §8 / §31.5: a pending review is saved and restored on reopen (only an accepted-only one is cleaned up).
-            Text("\(store.pendingFiles.count) files pending review. The review is saved and comes back when you reopen this project; the files stay on disk as they are.")
         }
         .sheet(isPresented: $showGitInit, onDismiss: { if store.needsGitInit { store.cancelGitInit() } }) {
             gitInitSheet
@@ -942,7 +932,7 @@ struct MainWindow: View {
                     if ProjectOpener.optionKeyDown {
                         ProjectOpener.openInNewWindow(url, openWindow: openWindow)
                     } else if !isCurrent {
-                        ProjectOpener.requestSwitch(to: url, store: store, pending: $pendingSwitch)
+                        ProjectOpener.requestSwitch(to: url, store: store)
                     }
                 } label: {
                     if isCurrent {

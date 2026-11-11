@@ -15,8 +15,6 @@ struct DiffJump: Equatable {
 @Observable
 final class WindowModel {
     var tab: MainTab = .changes
-    /// Project waiting for the "discard pending review?" confirmation (alert lives in `MainWindow`).
-    var pendingSwitch: URL?
     // M13: sheets / dialogs the Review and Workbenches menus open (the views bind to these).
     /// Accept-all summary sheet (audit 1.9).
     var showAcceptAll = false

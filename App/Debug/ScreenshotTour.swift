@@ -1955,7 +1955,9 @@ private final class Tour {
             for e in registry.entries {
                 if let sheet = e.window?.attachedSheet {
                     outcome = "asked — \"\(Self.texts(sheet.contentView).joined(separator: " / "))\""
-                    if e.model.pendingSwitch != nil { e.model.pendingSwitch = nil } else { e.window?.endSheet(sheet, returnCode: .alertSecondButtonReturn) }
+                    // As the user would: the question's Cancel (its Esc button) — never the window's state from outside.
+                    guard let cancel = Self.cancelButton(sheet.contentView) else { throw TourError("no Cancel in the question") }
+                    cancel.performClick(nil)
                     try await until("the question gone") { e.window?.attachedSheet == nil }
                     break
                 }
@@ -2007,6 +2009,15 @@ private final class Tour {
         ProjectOpener.debugPick = pick
         menu.performActionForItem(at: index)
         ProjectOpener.debugPick = nil
+    }
+
+    private static func cancelButton(_ view: NSView?) -> NSButton? {
+        guard let view else { return nil }
+        if let button = view as? NSButton,
+           button.keyEquivalent == "\u{1b}" || [CloseGuardText.cancelButton, String(localized: "Cancel")].contains(button.title) {
+            return button
+        }
+        return view.subviews.lazy.compactMap { cancelButton($0) }.first
     }
 
     private static func texts(_ view: NSView?) -> [String] {
