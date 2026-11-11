@@ -59,15 +59,19 @@ final class TranscriptViewState {
     @ObservationIgnored var pendingStreamFollow: Task<Void, Never>?
 
     /// §45.1: where the rows made at once begin (`TranscriptPane.tailStart`). Rows crossing into the lazy stack get estimated
-    /// heights there, which moves what is shown: it moves on only while following, when a turn begins (the message glides in)
-    /// or once more than `TranscriptPane.tailCap` rows are made at once — never under a reader scrolled up, never mid-turn.
+    /// heights there, and everything below them moves by the difference — under a still offset, the rows shown jump. So it is
+    /// set when the rows are (re)placed — a chat opened, shown or switched, rows put in front — and while that chat goes on
+    /// its new rows stay made at once; only past `TranscriptPane.tailCap` of them, following and not scrolling, does it move.
     @ObservationIgnored private var tailStartKept = 0
+    @ObservationIgnored private var tailFirstID: UUID?
 
     func tailStart(for entries: [ExploreFold.Entry]) -> Int {
         let wanted = TranscriptPane.tailStart(entries.count)
-        var turnBegins = false
-        if case let .node(.row(item))? = entries.last, case .user = item { turnBegins = true }
-        if wanted < tailStartKept || (follow && (turnBegins || entries.count - tailStartKept > TranscriptPane.tailCap)) {
+        let first = entries.first?.id
+        if first != tailFirstID || wanted < tailStartKept {
+            tailStartKept = wanted
+            tailFirstID = first
+        } else if follow, !userScrolling, entries.count - tailStartKept > TranscriptPane.tailCap {
             tailStartKept = wanted
         }
         return tailStartKept
@@ -115,8 +119,8 @@ struct TranscriptPane: View {
     /// time (a row crosses it rarely).
     static let tailRows = 30
     static let tailStep = 10
-    /// More rows than this made at once (a turn that keeps adding them) and the boundary moves on anyway.
-    static let tailCap = 120
+    /// More rows than this made at once (a long session's) and the boundary moves on anyway (following, not scrolling).
+    static let tailCap = 400
 
     /// Where the rows made at once begin: everything before it is lazy.
     static func tailStart(_ count: Int) -> Int {
@@ -150,9 +154,11 @@ struct TranscriptPane: View {
                     ForEach(entries[split...]) { entry in
                         TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
                     }
-                    Color.clear.frame(height: 1).id(Self.bottomID)
+                    // The marker takes the stack's bottom padding: pinned to it, the view is at the content's very end (pinned
+                    // to a 1 pt marker above the padding, a reader who scrolled to the end was pulled 12 pt back up).
+                    Color.clear.frame(height: 13).id(Self.bottomID)
                 }
-                .padding(12)
+                .padding([.top, .horizontal], 12)
             }
             // r1x — §45.1: while following, the newest row stays in view whenever the content's height changes — rows coming
             // into a group above the bottom (a subagent's calls), a row finishing in place, a group folding — at once, not
