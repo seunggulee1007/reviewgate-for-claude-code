@@ -1096,8 +1096,13 @@ private final class Tour {
                         }
                     }
                 }
-                try await gesture(chat, by: -40) {   // down to the end, and a few steps more against it
-                    (chat.documentView?.frame.height ?? 0) - clip.bounds.maxY < 2
+                var visual = ""
+                if streaming {
+                    try await gesture(chat, by: -40) {   // down to the end, and a few steps more against it
+                        (chat.documentView?.frame.height ?? 0) - clip.bounds.maxY < 2
+                    }
+                } else {
+                    visual = try await visualGesture(chat)
                 }
                 try await Task.sleep(for: .milliseconds(800))
                 sampler.cancel()
@@ -1115,13 +1120,80 @@ private final class Tour {
                     }
                 }
                 let end = samples.last.map { Int($0.h - $0.y - vis) } ?? -1
-                log("scrolldown \(label)\(streaming ? ", streaming" : ", idle"): \(samples.count) samples, \(jumps.count) jumps, \(end) pt from the end, "
-                    + "following \(entry.model.chatTranscript.follow ? "yes" : "no")" + (jumps.isEmpty ? " — steady" : " — JUMP: " + jumps.prefix(6).joined(separator: " | ")))
+                log("scrolldown \(label)\(streaming ? ", streaming" : ", idle"): \(samples.count) samples, \(jumps.count) jumps in the geometry, \(end) pt from the end, "
+                    + "following \(entry.model.chatTranscript.follow ? "yes" : "no")" + (jumps.isEmpty ? "" : " (" + jumps.prefix(6).joined(separator: " | ") + ")")
+                    + (streaming ? (jumps.isEmpty ? " — steady" : " — JUMP") : "; " + visual))
                 try await Task.sleep(for: .milliseconds(1500))
             }
             if diff { entry.model.toggleDiffTick += 1; try await Task.sleep(for: .milliseconds(1200)) }
         }
         try write(try render(window), "scrolldown")
+    }
+
+    /// The idle scroll down, watched: the clip moved down 40 pt a step to the end, the view drawn after each step and matched
+    /// with the one before — what is shown must move up by the 40 pt the reader scrolled, no more, no less ("JUMP" otherwise:
+    /// the rows shown moved under the reader). The geometry alone cannot tell rows made below the view from a move above it.
+    private func visualGesture(_ chat: NSScrollView) async throws -> String {
+        let state = entry.model.chatTranscript
+        state.userScrolling = true
+        defer {
+            state.userScrolling = false
+            state.follow = state.nearBottom
+            if state.follow { state.unseen = 0 }
+        }
+        func rows() -> [[Double]] {
+            let rect = chat.contentView.frame
+            guard let rep = chat.bitmapImageRepForCachingDisplay(in: rect) else { return [] }
+            chat.cacheDisplay(in: rect, to: rep)
+            let scale = Double(rep.pixelsHigh) / Double(rect.height)
+            return (0..<Int(rect.height)).map { y in
+                let py = min(rep.pixelsHigh - 1, Int(Double(y) * scale))
+                return (0..<16).map { bin in
+                    var sum = 0.0
+                    for k in 0..<4 {
+                        let px = min(rep.pixelsWide - 1, (bin * 4 + k) * rep.pixelsWide / 64)
+                        sum += Double(rep.colorAt(x: px, y: py)?.brightnessComponent ?? 0)
+                    }
+                    return sum / 4
+                }
+            }
+        }
+        /// How far the picture moved up from `a` to `b` (pt), and how well it matched (mean difference; 0 is identical).
+        func shift(_ a: [[Double]], _ b: [[Double]]) -> (Int, Double) {
+            var best = (0, Double.infinity)
+            for s in -120...240 {
+                var diff = 0.0, n = 0
+                for i in stride(from: 0, to: b.count, by: 3) where i + s >= 0 && i + s < a.count {
+                    for j in 0..<16 { diff += abs(a[i + s][j] - b[i][j]) }
+                    n += 1
+                }
+                guard n > b.count / 9 else { continue }
+                let d = diff / Double(n * 16)
+                if d < best.1 { best = (s, d) }
+            }
+            return best
+        }
+        var before = rows()
+        var steps = 0, off: [String] = []
+        while steps < 400 {
+            let clip = chat.contentView
+            let end = max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height)
+            let from = clip.bounds.minY
+            let to = min(end, from + 40)
+            if to - from < 1 { break }
+            clip.scroll(to: NSPoint(x: 0, y: to))
+            chat.reflectScrolledClipView(clip)
+            try await Task.sleep(for: .milliseconds(16))
+            let after = rows()
+            let (moved, err) = shift(before, after)
+            let expected = Int((to - from).rounded())
+            if abs(moved - expected) > 6 || err > 0.08 {
+                off.append("step \(steps): moved \(moved) pt of \(expected) (match \(String(format: "%.3f", err)), \(Int(end - to)) pt from the end)")
+            }
+            before = after
+            steps += 1
+        }
+        return "\(steps) steps watched, \(off.count) off" + (off.isEmpty ? " — steady" : " — JUMP: " + off.prefix(6).joined(separator: " | "))
     }
 
     /// A trackpad gesture on `chat`: the clip moved `by` pt (positive: up) every 16 ms until `done` and eight steps more.
@@ -1283,15 +1355,22 @@ private final class Tour {
         var ups = 0
         var worstUp: CGFloat = 0
         var farthest: CGFloat = 0
+        var atEnd: [String] = []
         for (a, b) in zip(samples, samples.dropFirst()) {
-            if b.y < a.y - 4 { ups += 1; worstUp = max(worstUp, a.y - b.y) }
+            // Up, and further from the end: a content that shrinks above a view at its end moves the offset, not the rows shown.
+            if b.y < a.y - 4 {
+                let (ga, gb) = (a.height - (a.y + a.visible), b.height - (b.y + b.visible))
+                if gb > ga + 4 { ups += 1; worstUp = max(worstUp, a.y - b.y) }
+                else { atEnd.append("\(Int(a.y - b.y)) pt (content \(Int(b.height - a.height)) pt, \(Int(ga))→\(Int(gb)) pt from the end)") }
+            }
             farthest = max(farthest, b.height - (b.y + b.visible))
         }
         if following {
             // At the bottom: the stack's bottom padding (12 pt) under the bottom marker.
             let gap = last.height - (last.y + last.visible)
             log("scroll \(what): \(samples.count) samples, moved up \(ups)× (worst \(Int(worstUp)) pt), farthest from the bottom \(Int(farthest)) pt, "
-                + "at the end \(Int(gap)) pt" + (ups > 0 || gap > 16 ? " — JUMP" : " — steady"))
+                + "at the end \(Int(gap)) pt" + (atEnd.isEmpty ? "" : "; the offset went up with the view kept at the end \(atEnd.count)×: " + atEnd.prefix(4).joined(separator: ", "))
+                + (ups > 0 || gap > 16 ? " — JUMP" : " — steady"))
         } else {
             let grew = last.height - first.height
             let moved = last.y - first.y
