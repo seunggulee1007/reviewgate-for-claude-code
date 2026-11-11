@@ -54,7 +54,8 @@ import type { PermissionRulesEvent } from "@reviewgate/engine";
 import type { AutoModelChoice } from "@reviewgate/engine"; // MARK: wave5 w5-model (§43.4)
 import { canAllowBeyondOnce, canRemember, hasPermissionRow, isPermissionPending, markPermissionRow, pendingPermissionsOf, requestsWithoutRow, sessionWithoutRequest, sessionWithRequest } from "./permissionQueue";
 import { importPatch, type ImportTarget } from "./terminalRules";
-import { editQueued, EMPTY_QUEUE, enqueue, moveQueued, nextToSend, pauseReasonForTurnEnd, removeQueued, sendExtras, type QueuedExtras, type QueueState } from "./sendQueue";
+import { editQueued, EMPTY_QUEUE, enqueue, moveQueued, nextToSend, pauseReasonForTurnEnd, queuedSendNow, removeQueued, sendExtras, type QueuedExtras, type QueueState } from "./sendQueue";
+import { steerPossible } from "./sendNow";
 // MARK: wave1 desktop-session
 import { appendErrorRow, clearsOnReady, errorTone, factsOf, queueRetryDelayMs, queueStopOf, requeuesSend, type ErrorFacts, type QueueStop } from "./sessionErrors";
 import { peerRowOf, type PeerRow } from "./peer";
@@ -492,6 +493,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   editQueuedMessage(id: number, text: string): void;
   removeQueuedMessage(id: number): void;
   moveQueuedMessage(id: number, dir: -1 | 1): void;
+  /** MARK: composer — a queued message goes now (`queuedSendNow`): into the running turn, stop and send, or first in line now. */
+  sendQueuedNow(id: number): void;
   resumeQueue(): void;
   clearQueue(): void;
   /**
@@ -1529,6 +1532,22 @@ export const useStore = create<Store>((set, get, api) => {
     },
     moveQueuedMessage(id, dir) {
       set((s) => ({ queue: { ...s.queue, items: moveQueued(s.queue.items, id, dir) } }));
+    },
+    sendQueuedNow(id) {
+      const s = get();
+      const m = s.queue.items.find((x) => x.id === id);
+      if (!m) return;
+      const how = queuedSendNow(m, { canSteer: steerPossible(s.state, false), running: s.state.gate.phase === "running" });
+      const rest = removeQueued(s.queue.items, id);
+      const { id: _id, text, ...extras } = m;
+      if (how === "first") {
+        set((x) => ({ queue: { ...x.queue, items: [m, ...rest] } }));
+        get().resumeQueue();
+        return;
+      }
+      set((x) => ({ queue: { ...x.queue, items: rest } }));
+      if (how === "steer") void get().steer(text, extras.mentions ? { mentions: extras.mentions } : {});
+      else get().interruptAndSend(text, extras);
     },
     resumeQueue() {
       if (queueResumeTimer) clearTimeout(queueResumeTimer);

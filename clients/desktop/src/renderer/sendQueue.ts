@@ -66,6 +66,18 @@ export function moveQueued(items: QueuedMessage[], id: number, dir: -1 | 1): Que
 }
 
 /**
+ * MARK: composer — what a queued message's "Send now" does, as the terminal lets a queued message go at once: into the
+ * running turn when it can take it (`canSteer`, §50; not with images — the CLI takes images only with a message of its
+ * own), else stop the turn and send it right after (§28), else it goes first and the queue goes on now (a pause, a hold).
+ */
+export type QueuedSendNow = "steer" | "stopAndSend" | "first";
+
+export function queuedSendNow(m: QueuedMessage, o: { canSteer: boolean; running: boolean }): QueuedSendNow {
+  if (o.canSteer && (m.attachments?.length ?? 0) === 0) return "steer";
+  return o.running ? "stopAndSend" : "first";
+}
+
+/**
  * A turn that ended this way pauses the queue (null = keep going). `interrupted` is skipped once after "Stop & send". §38.2:
  * the tool-call limit (`error_max_turns`) does not stop it — the limit counts per message, and the row offers [이어서 계속].
  */

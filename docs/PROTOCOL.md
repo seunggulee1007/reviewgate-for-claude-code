@@ -7304,6 +7304,22 @@ Electron the same); nothing changes on the wire, and a queued message passes the
   (`resumeAt`, `retries`, `afterStop`), the queue part of `store.ts`, `components/chat/QueueBar.tsx`. Tests: Core
   `QueueStopTests`; Electron `queueStopStore.test.ts`, `sessionErrors.test.ts`.
 
+### 50.2 The queue, as the terminal shows it (composer)
+
+The report: "메시지 바로 보내기, 대기열에 있는 거 보이는 거 — 그런 세세한 기능들이 안 돼". In the terminal a message typed
+while Claude works waits above the input, can be edited or removed there, and can go at once. The app's queue bar had
+edit, move and remove, but no way to send one message now: it waited for the turn and every message before it.
+
+- **Send now on each queued message.** Each queued message has "바로 보내기" (⏎). What it does depends on the turn
+  (`queuedSendNow`). While a turn of ours runs and the message has no images, it goes into the turn (§50 `steer`, with
+  its mentions) and leaves the queue. With images, or while the turn cannot take it (another session's turn), the turn
+  stops and the message goes right after it (§28, "중단하고 보내기"). Otherwise (the queue paused or held) it goes first and
+  the queue goes on now. The tooltip says which of the three it does. The other messages keep their order. Nothing
+  changes on the wire.
+- **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
+  tooltip `sendNowHelp`). Test `queueSendNow.test.ts`: the decision; into the turn with the mentions; with an image, stop
+  and send; a paused queue sends that message first.
+
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
 Three faults in the PR sheet came in one report:

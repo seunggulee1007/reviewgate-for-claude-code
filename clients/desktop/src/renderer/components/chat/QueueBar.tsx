@@ -10,6 +10,8 @@ import { t } from "../../i18n";
 import { cannotSendReason, useStore } from "../../store";
 import { waitingOf } from "../../agentDetails"; // MARK: wave3 desktop-agents
 import { isEnter } from "../../ime";
+import { queuedSendNow } from "../../sendQueue";
+import { steerPossible } from "../../sendNow";
 
 export function QueueBar() {
   const queue = useStore((s) => s.queue);
@@ -18,6 +20,10 @@ export function QueueBar() {
   const edit = useStore((s) => s.editQueuedMessage);
   const remove = useStore((s) => s.removeQueuedMessage);
   const move = useStore((s) => s.moveQueuedMessage);
+  const sendNow = useStore((s) => s.sendQueuedNow); // MARK: composer
+  // MARK: composer — what "Send now" on a chip does (sendQueue.ts `queuedSendNow`), said on its tooltip.
+  const canSteer = useStore((s) => steerPossible(s.state, false));
+  const running = useStore((s) => s.state.gate.phase === "running");
   const resume = useStore((s) => s.resumeQueue);
   const clear = useStore((s) => s.clearQueue);
   // MARK: wave3 desktop-agents — §36.4: the main turn waits on subagents → the queue goes out when they are done.
@@ -100,6 +106,15 @@ export function QueueBar() {
                 {m.text}
               </button>
               <span className="queue-tools">
+                <button
+                  type="button"
+                  onClick={() => sendNow(m.id)}
+                  aria-label={t("Send now")}
+                  title={sendNowHelp(queuedSendNow(m, { canSteer, running }))}
+                  data-testid="Queue send now"
+                >
+                  ⏎
+                </button>
                 <button type="button" disabled={i === 0} onClick={() => move(m.id, -1)} aria-label={t("Move earlier")} title={t("Move earlier")}>‹</button>
                 <button type="button" disabled={i === queue.items.length - 1} onClick={() => move(m.id, 1)} aria-label={t("Move later")} title={t("Move later")}>›</button>
                 <button type="button" onClick={() => remove(m.id)} aria-label={t("Remove from queue")} title={t("Remove from queue")} data-testid="Queue remove">×</button>
@@ -110,4 +125,13 @@ export function QueueBar() {
       </div>
     </div>
   );
+}
+
+/** MARK: composer — the chip's "Send now" tooltip: what it does now. */
+export function sendNowHelp(how: ReturnType<typeof queuedSendNow>): string {
+  return how === "steer"
+    ? t("Send now — into Claude's turn: Claude reads it after the current step")
+    : how === "stopAndSend"
+      ? t("Send now — stops Claude's turn and sends this message right after")
+      : t("Send now — this message goes first");
 }
