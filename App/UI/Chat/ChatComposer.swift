@@ -198,6 +198,9 @@ final class ComposerModel {
 /// The mention popover and the slash palette, over the transcript's bottom edge (they follow the draft and the caret).
 struct ComposerPalettes: View {
     @Environment(AppState.self) private var store
+    #if DEBUG
+    @Environment(WindowModel.self) private var model
+    #endif
     let composer: ComposerModel
 
     var body: some View {
@@ -216,6 +219,12 @@ struct ComposerPalettes: View {
                                 cached: store.capabilitiesAreCached, starting: store.isSessionStarting,
                                 onPick: { composer.pick($0, store: store) },
                                 onHover: { composer.paletteIndex = $0 })   // polish P4-composer-23
+            #if DEBUG
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugPaletteFrame = $0 }   // the composer check
+                .onAppear { model.debugPaletteRows = SlashCommandCatalog.flatten(sections).map(\.name) }
+                .onChange(of: SlashCommandCatalog.flatten(sections).map(\.name)) { _, rows in model.debugPaletteRows = rows }
+                .onDisappear { model.debugPaletteFrame = .zero; model.debugPaletteRows = [] }
+            #endif
         }
     }
 }
@@ -269,6 +278,10 @@ struct ChatComposer: View {
                                  onMove: { store.moveQueued(id: $0, by: $1) },
                                  onResume: { store.resumeQueue() },
                                  onClear: { store.clearQueue() })
+                #if DEBUG
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugQueueBarFrame = $0 }   // the composer check
+                    .onDisappear { model.debugQueueBarFrame = .zero }
+                #endif
             }
             if let warning = store.contextWarning {
                 ContextWarningBanner(warning: warning)

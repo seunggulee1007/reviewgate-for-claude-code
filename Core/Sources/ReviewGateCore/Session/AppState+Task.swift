@@ -59,6 +59,23 @@ extension AppState {
     /// The screenshot tour's layout check (App/Debug/ScreenshotTour.swift): the mode offer card as a first open shows it.
     public func debugShowDefaultModeOffer(_ mode: PermissionMode?) { defaultModeOffer = mode }
 
+    /// The composer check (§50.2): messages put into the running turn that Claude has not read yet.
+    public func debugShowSteering(_ messages: [SteeringMessage]) {
+        var snapshot = state
+        snapshot.session.steering = messages
+        state = snapshot
+    }
+
+    /// The composer check: the slash palette's commands as a session with plugins, skills and MCP prompts lists them.
+    public func debugShowCommands(_ commands: [SlashCommandInfo]) {
+        var snapshot = state
+        var caps = snapshot.session.capabilities ?? .empty
+        caps.commands = commands
+        caps.state = .ready
+        snapshot.session.capabilities = caps
+        state = snapshot
+    }
+
     /// The layout check (r1-composer): a review with `files` pending, or (`working`) a turn that runs beside it — the gate
     /// closed as the engine closes it then, so the composer shows Stop and 바로 보내기. The engine's next snapshot puts its
     /// own back.

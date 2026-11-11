@@ -193,6 +193,11 @@ final class WindowModel {
     @ObservationIgnored var debugSendFrame: CGRect = .zero
     /// r1-composer: the cards above the composer — `width` the height they are shown at, `height` the height they need.
     @ObservationIgnored var debugCardsHeights: CGSize = .zero
+    /// composer: the slash palette in the window (SwiftUI's global space; `.zero` while it is closed) and its rows.
+    @ObservationIgnored var debugPaletteFrame: CGRect = .zero
+    @ObservationIgnored var debugPaletteRows: [String] = []
+    /// composer: the queue bar above the box (`.zero` while it is not shown).
+    @ObservationIgnored var debugQueueBarFrame: CGRect = .zero
     #endif
 
     func reveal(toolUseId: String) {
