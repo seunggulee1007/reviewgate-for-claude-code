@@ -92,3 +92,35 @@ describe("a queued message sent now", () => {
     expect(ofType("send").map((c) => c.text)).toEqual(["second"]);
   });
 });
+
+describe("the queue bar (§50.2)", () => {
+  it("shows what waits in Claude's turn (no tools: it cannot be taken back) and Send now on each queued message", async () => {
+    const useStore = await loadStore();
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { QueueBar, sendNowHelp } = await import("./components/chat/QueueBar");
+    const init = useStore.getInitialState();
+    const state = init.state;
+    const scene = (items: { id: number; text: string }[]) =>
+      Object.assign(init, {
+        queue: { items, paused: null, inflight: false, awaitingTurn: false, skipInterruptPause: false },
+        state: {
+          ...state,
+          project: { path: "/p", root: "/p", name: "p", branch: "main", remoteURL: null },
+          session: { ...state.session, open: true, externalTurn: null, steering: [{ id: "u1", text: "Also update the README" }] },
+          gate: { ...state.gate, canSend: false, phase: "running", blockedReason: "running" },
+        },
+      });
+    scene([]);
+    let html = renderToStaticMarkup(createElement(QueueBar));
+    expect(html).toContain('data-testid="Queue steering chip"');
+    expect(html).toContain("Also update the README");
+    expect(html).toContain("Claude reads it after the current step");
+    expect(html).not.toContain('data-testid="Queue send now"');
+    expect(html).not.toContain('data-testid="Clear queue"');
+    scene([{ id: 5, text: "then run the tests" }]);
+    html = renderToStaticMarkup(createElement(QueueBar));
+    expect(html).toContain('data-testid="Queue send now"');
+    expect(html).toContain(sendNowHelp("steer").replace(/'/g, "&#x27;"));
+  });
+});

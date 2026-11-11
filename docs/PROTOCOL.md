@@ -7329,6 +7329,9 @@ edit, move and remove, but no way to send one message now: it waited for the tur
 - **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
   tooltip `sendNowHelp`). Test `queueSendNow.test.ts`: the decision; into the turn with the mentions; with an image, stop
   and send; a paused queue sends that message first.
+- **Electron, what waits in the turn.** `QueueBar.tsx` shows `state.session.steering` first as dashed chips (↳, no tools)
+  and the bar shows for them alone ("Claude의 턴에 들어감 — …"; Clear only with queued messages). Test
+  `queueSendNow.test.ts` ("the queue bar").
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 
