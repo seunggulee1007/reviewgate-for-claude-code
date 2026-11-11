@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func dockNewWindow() {
-        FolderHandoffRouter.shared.openWindow?(id: "workbench")
+        FolderHandoffRouter.shared.openWindow?(id: "workbench", value: ProjectOpener.newEmptyWindowValue())
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -239,7 +239,12 @@ enum ProjectOpener {
         return parts?.url ?? url
     }
 
-    static func folderOfWindowValue(_ value: URL) -> URL { URL(fileURLWithPath: value.path).standardizedFileURL }
+    /// The folder a window was opened for; nil for an empty window (`newEmptyWindowValue`).
+    static func folderOfWindowValue(_ value: URL) -> URL? { value.isFileURL ? URL(fileURLWithPath: value.path).standardizedFileURL : nil }
+
+    /// An empty window's value (New Window, the Dock's): one of its own. With no value SwiftUI brought forward the window
+    /// that had been opened without one — the launch window, whatever it showed since — and no new window came.
+    static func newEmptyWindowValue() -> URL { URL(string: "reviewgate-empty:\(UUID().uuidString)")! }
 
     /// A store whose window is gone (a menu that still names a closed window) would open the project where no one sees it,
     /// on an engine already stopped: `url` opens in a window of its own instead. False when the store's window is there.
@@ -367,7 +372,7 @@ struct FileCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Window") { openWindow(id: "workbench") }
+            Button("New Window") { openWindow(id: "workbench", value: ProjectOpener.newEmptyWindowValue()) }
                 .keyboardShortcut("n", modifiers: .command)
                 .accessibilityIdentifier("New Window")
             Button("Open Project…") {
@@ -475,7 +480,7 @@ private struct WorkbenchWindow: View {
                 handoff.openWindow = openWindow
                 handoff.beganOpening()
                 defer { handoff.finishedOpening() }
-                if let url = url.map(ProjectOpener.folderOfWindowValue) {
+                if let url = url.flatMap(ProjectOpener.folderOfWindowValue) {
                     // M19: the window comes back where this project was last seen.
                     entry.applySavedFrame(root: AppSettings.projectKey(url))
                     await entry.store.openProject(url)

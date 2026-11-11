@@ -1917,10 +1917,18 @@ private final class Tour {
         try await check("project closed -> B", b) { ProjectOpener.open(b, store: main.store) }
 
         // A second window, then the first one closed: the menus must act on the window left.
-        guard let openWindow = FolderHandoffRouter.shared.openWindow else { throw TourError("no openWindow") }
-        openWindow(id: "workbench")
-        try await until("a second window") { registry.entries.count == 2 && registry.entries.allSatisfy { $0.window != nil } }
-        guard let second = registry.entries.first(where: { $0 !== main }) else { throw TourError("no second window") }
+        // File › New Window (⌘N) must open one, whatever windows are open (with no value SwiftUI brought the launch window).
+        let windowsBefore = Set(registry.entries.map(ObjectIdentifier.init))
+        try menu("n", [.command], pick: b)
+        var newWindow: WorkbenchWindowEntry?
+        for _ in 0..<80 where newWindow == nil {
+            try await Task.sleep(for: .milliseconds(100))
+            newWindow = registry.entries.first { !windowsBefore.contains(ObjectIdentifier($0)) && $0.window != nil }
+        }
+        log("open menu New Window: " + (newWindow == nil ? "SILENT" : "opened a new window"))
+        guard let second = newWindow else { throw TourError("no second window") }
+        for extra in registry.entries where extra !== main && extra !== second { extra.window?.close() }
+        try await until("two windows") { registry.entries.count == 2 }
         second.window?.makeKeyAndOrderFront(nil)
         main.window?.close()
         try await until("the first window gone") { registry.entries.count == 1 }
