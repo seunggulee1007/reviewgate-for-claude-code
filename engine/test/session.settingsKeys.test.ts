@@ -8,6 +8,7 @@ import type { SessionEvent } from "../src/session/events.js";
 import { buildHooks, CLAUDE_CONFIG_ASK_REASON, type HookContext } from "../src/session/hooks.js";
 import { settingsEditRisk } from "../src/session/settingsDiff.js";
 import { makeRepo, makeTempDir, removeDir, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * M22 — docs/PROTOCOL.md §33.9: in auto mode an edit of Claude Code's settings.json / settings.local.json is decided by what
@@ -173,7 +174,7 @@ describe("the edit hook and canUseTool (M22, §33.9)", () => {
     const risky = { file_path: file, content: '{"permissions":{"allow":["WebFetch(domain:evil.example)"]}}' };
     expect(await pre(hooks, "Write", risky, "c2")).toEqual({ decision: "ask", reason: CLAUDE_CONFIG_ASK_REASON });
     void canUseTool("Write", risky, { ...opts, toolUseID: "c2" } as never);
-    for (let i = 0; i < 300 && !events.some((e) => e.type === "permission_request"); i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && !events.some((e) => e.type === "permission_request"); ) await new Promise((r) => setTimeout(r, 10));
     const req = events.find((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request")!;
     expect(req.reason).toMatchObject({ code: "claude_config", path: file, keys: ["permissions"] });
     await s.dispose();

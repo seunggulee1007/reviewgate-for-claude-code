@@ -6,6 +6,7 @@ import { appendCapped, HISTORY_CAP, HISTORY_FILE, historyView } from "../src/rev
 import { REF_TURN_END, REF_TURN_START, REVIEW_FILE, refNamespace, staleWorktreeNamespaces, turnRefs } from "../src/review/persist.js";
 import { makeHarness, type FakeClaudeSession, type Harness } from "./helpers/engine.js";
 import { makeTempDir, read, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 function makeRepo(): string {
   const dir = realpathSync(makeTempDir("rg-history"));
@@ -49,7 +50,7 @@ function refs(dir: string, prefix = "refs/reviewgate/"): string[] {
 }
 
 async function waitUntil(pred: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((r) => setTimeout(r, 10));

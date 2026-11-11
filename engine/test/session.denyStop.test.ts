@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeSession, USER_DENIED_MESSAGE } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §33.10 (r2-chats-cards M25), session side: a deny says what the terminal's "No" says — Claude stops
@@ -28,7 +29,7 @@ function session(): { s: ClaudeSession; events: SessionEvent[]; canUseTool: CanU
 const requests = (events: SessionEvent[]) => events.filter((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
 
 async function cards(events: SessionEvent[], n: number): Promise<Extract<SessionEvent, { type: "permission_request" }>[]> {
-  for (let i = 0; i < 500 && requests(events).length < n; i++) await new Promise((r) => setTimeout(r, 10));
+  for (const end = Date.now() + WAIT_MS; Date.now() < end && requests(events).length < n; ) await new Promise((r) => setTimeout(r, 10));
   return requests(events);
 }
 

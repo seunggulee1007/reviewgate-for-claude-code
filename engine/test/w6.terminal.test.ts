@@ -6,6 +6,7 @@ import type { PermissionMode } from "../src/protocol.js";
 import { SESSION_FILE, type PersistedSession } from "../src/review/persist.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §44.1 (MARK: wave6 w6-terminal), engine part: plan mode Claude enters on its own is followed (the chip,
@@ -43,7 +44,7 @@ function repo(): string {
 
 /** The project's stored session file, once it was written after `since` (its `savedAt`). */
 async function storedAfter(dir: string, since: string | null): Promise<PersistedSession> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     try {
       const o = JSON.parse(readFileSync(join(dir, ".git", SESSION_FILE), "utf8")) as PersistedSession;

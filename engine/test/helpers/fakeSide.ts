@@ -4,6 +4,7 @@ import type { SideQueryEvent, SideQueryOptions, SideQueryResult } from "../../sr
 import type { SideQueryLike } from "../../src/side/threads.js";
 import type { Harness } from "./engine.js";
 import { makeTempDir, sh, write } from "./repo.js";
+import { WAIT_MS } from "./wait.js";
 
 /** What a scripted side CLI does for one question (wave 3: §36.10–§36.13 tests; the §21 tests keep their own copy). */
 export type SideScript = (o: SideQueryOptions) => {
@@ -63,7 +64,7 @@ export function makeSideRepo(prefix = "rg-flow"): string {
   return dir;
 }
 
-export async function waitForEvent<T extends EngineEvent["type"]>(h: Harness, type: T, pred: (e: Extract<EngineEvent, { type: T }>) => boolean = () => true, timeoutMs = 5000): Promise<Extract<EngineEvent, { type: T }>> {
+export async function waitForEvent<T extends EngineEvent["type"]>(h: Harness, type: T, pred: (e: Extract<EngineEvent, { type: T }>) => boolean = () => true, timeoutMs = WAIT_MS): Promise<Extract<EngineEvent, { type: T }>> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const hit = h.ofType(type).find(pred);

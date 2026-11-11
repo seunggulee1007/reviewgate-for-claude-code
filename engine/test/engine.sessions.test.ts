@@ -7,6 +7,7 @@ import { NEW_CHAT_TITLE, sessionTitle, sessionTranscriptPath, sessionsIndexPath,
 import { TRANSCRIPT_FILE } from "../src/review/transcript.js";
 import { makeHarness, type FakeClaudeSession, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * Chat sessions (docs/M15-POLISH.md): `<gitdir>/reviewgate/sessions/` (index.json + one NDJSON per
@@ -59,7 +60,7 @@ async function turn(h: Harness, text: string, opts: { costUsd?: number; mutate?:
 }
 
 async function waitForFile(path: string, pred: (text: string) => boolean, what: string): Promise<string> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     try {
       const text = readFileSync(path, "utf8");

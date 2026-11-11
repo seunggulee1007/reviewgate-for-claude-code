@@ -4,6 +4,7 @@ import type { CanUseTool, HookCallback, HookInput, Options, Query, SDKMessage, S
 import { ClaudeSession, type SessionSettings } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §29 at the session level (audit peer-01, peer-03, peer-04): the CLI's peer frames — verified with CLI
@@ -87,7 +88,7 @@ function session(over: Partial<SessionSettings> = {}): { s: ClaudeSession; event
   return { s, events, script };
 }
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);

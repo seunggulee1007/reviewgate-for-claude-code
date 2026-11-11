@@ -8,6 +8,7 @@ import type { SideThread } from "../src/protocol.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { FakeSide, makeSideRepo, waitForEvent, type SideScript } from "./helpers/fakeSide.js";
 import { makeTempDir, removeDir, sh } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** docs/PROTOCOL.md §40.3 (wave4b w4b-side): side questions you can trust — web off, own session files cleaned, a fork that can be renewed. */
 
@@ -21,7 +22,7 @@ afterEach(async () => {
 const tick = () => new Promise((r) => setTimeout(r, 5));
 
 async function until(pred: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);
     await tick();

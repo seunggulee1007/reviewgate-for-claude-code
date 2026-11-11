@@ -8,6 +8,7 @@ import { REVIEW_FILE } from "../src/review/persist.js";
 import { sessionTranscriptPath } from "../src/review/sessions.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, read, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §34.1–34.5 (review round 2, the review half): the held B stays readable while a turn runs, accept during
@@ -79,7 +80,7 @@ async function firstTurn(h: Harness, dir: string): Promise<void> {
 }
 
 async function waitUntil(pred: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((r) => setTimeout(r, 10));

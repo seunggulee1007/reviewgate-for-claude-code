@@ -13,6 +13,7 @@ import {
 import { realpathLenient } from "../src/platform/paths.js";
 import { makeHarness } from "./helpers/engine.js";
 import { makeRepo, makeTempDir, removeDir, sh } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** docs/PROTOCOL.md §43.2: the sub-brain — Claude Code's auto memory of the repository, read only. */
 
@@ -239,7 +240,7 @@ describe("the engine's brain command", () => {
     s.emit({ type: "tool_use", id: "w-1", name: "Write", input: { file_path: join(mem, "reference_new.md"), content: "x" }, parentToolUseId: "agent-1", file: join(mem, "reference_new.md") });
     memo(mem, "reference_new", { name: "new", description: "새것" }, "");
     s.emit({ type: "tool_result", toolUseId: "w-1", isError: false, preview: "ok", parentToolUseId: "agent-1" });
-    const deadline = Date.now() + 5000;
+    const deadline = Date.now() + WAIT_MS;
     let changed: ReturnType<typeof h.ofType<"brain">>[number] | undefined;
     while (Date.now() < deadline) {
       changed = h.ofType("brain").find((e) => e.id === undefined && e.changes.length > 0);

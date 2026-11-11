@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildResultLine, CodeGraph, GODS_MAX, lastLine, parseGraphReport, type CodeGraphDeps } from "../src/board/codeGraph.js";
 import type { CodeGraphEvent } from "../src/protocol.js";
 import { makeBranchRepo, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** A made-up report in graphify's layout (the names are invented; only the shape follows a real one). */
 function report(commit = "1a2b3c4d", extra = ""): string {
@@ -172,7 +173,7 @@ function commitAll(dir: string, msg: string): string {
   return sh(dir, "rev-parse", "HEAD").trim();
 }
 
-async function until<T>(f: () => T | undefined, ms = 10_000): Promise<T> {
+async function until<T>(f: () => T | undefined, ms = WAIT_MS): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
     const v = f();

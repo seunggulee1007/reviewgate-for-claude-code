@@ -10,6 +10,7 @@ import { buildHooks, type HookContext } from "../src/session/hooks.js";
 import { gitWorktreeAddTarget } from "../src/session/reviewScope.js";
 import { GIT_ASK_REASON } from "../src/session/hooks.js";
 import { bashPath, makeRepo, removeDir, sh } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §33.4 (audit market-01): Claude Code's own worktree isolation (EnterWorktree, Agent `isolation:
@@ -365,7 +366,7 @@ describe("ClaudeSession worktree guard (§33.4)", () => {
     expect((await pre(hooks, "Agent", input, root, "ag1")).decision).toBe("ask");
     void canUseTool("Agent", input, { ...opts, toolUseID: "ag1" } as never);
     void canUseTool("Write", { file_path: join(sibling, "src", "x.ts"), content: "x" }, { ...opts, toolUseID: "w1" } as never);
-    for (let i = 0; i < 500 && events.filter((e) => e.type === "permission_request").length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && events.filter((e) => e.type === "permission_request").length < 2; ) await new Promise((r) => setTimeout(r, 10));
     const reqs = events.filter((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
     expect(reqs.map((r) => [r.toolName, r.reason?.code, r.reason?.path]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([
       ["Agent", "worktree_isolation", undefined],
@@ -381,13 +382,13 @@ describe("ClaudeSession worktree guard (§33.4)", () => {
     const canUseTool = (s as unknown as { canUseTool: CanUseTool }).canUseTool;
     // (A card would leave the call pending: the race says so instead of waiting for an answer that never comes.)
     const subagent = canUseTool("EnterWorktree", { name: "agent-wt" }, { ...opts, toolUseID: "s1", agentID: "a1" } as never);
-    expect(await Promise.race([subagent, new Promise((r) => setTimeout(() => r("a card is pending"), 3000))])).toMatchObject({
+    expect(await Promise.race([subagent, new Promise((r) => setTimeout(() => r("a card is pending"), WAIT_MS))])).toMatchObject({
       behavior: "deny",
       message: expect.stringMatching(/turned off agents that run outside this folder/),
     });
     expect((await pre(hooks, "EnterWorktree", { name: "feature-x" }, root, "e1")).decision).toBe("ask");
     void canUseTool("EnterWorktree", { name: "feature-x" }, { ...opts, toolUseID: "e1" } as never);
-    for (let i = 0; i < 500 && !events.some((e) => e.type === "permission_request"); i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && !events.some((e) => e.type === "permission_request"); ) await new Promise((r) => setTimeout(r, 10));
     const req = events.find((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
     expect(req?.toolName).toBe("EnterWorktree");
     expect(req?.reason).toMatchObject({ code: "worktree_command", path: join(root, ".claude", "worktrees", "feature-x") });

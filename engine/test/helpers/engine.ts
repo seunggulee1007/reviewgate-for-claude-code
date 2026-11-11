@@ -3,6 +3,7 @@ import type { Platform } from "../../src/platform/index.js";
 import type { Budget, EffortLevel, EngineEvent, HelloCommand, PermissionMode, ReviewState, Settings, TurnUsage } from "../../src/protocol.js";
 import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, SendUserOptions, SessionImage } from "../../src/session/claude.js";
 import type { SessionEvent, ToolFileEntry } from "../../src/session/events.js";
+import { WAIT_MS } from "./wait.js";
 
 /** Stands in for the Claude CLI: records sends, lets the test emit session events. */
 export class FakeClaudeSession implements ClaudeSessionLike {
@@ -275,7 +276,7 @@ export function makeHarness(opts: EngineOptions = {}, fake: FakeOptions = {}): H
     if (ev.type === "state") states.push(ev.state);
   });
   const settle = () => new Promise<void>((r) => setImmediate(() => setImmediate(r)));
-  const waitFor = async (pred: (s: ReviewState) => boolean, what = "condition", timeoutMs = 10_000): Promise<ReviewState> => {
+  const waitFor = async (pred: (s: ReviewState) => boolean, what = "condition", timeoutMs = WAIT_MS): Promise<ReviewState> => {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const s = engine.state;

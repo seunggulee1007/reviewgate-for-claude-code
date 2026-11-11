@@ -11,6 +11,7 @@ import type { TranscriptItem } from "../src/protocol.js";
 import type { ToolFileEntry } from "../src/session/events.js";
 import { makeHarness, type FakeClaudeSession, type Harness } from "./helpers/engine.js";
 import { makeTempDir, read, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §23–28: file mentions (`list_files`, `send.mentions`), image attachments (`send.attachments`,
@@ -433,7 +434,7 @@ describe("§27 compact / context warning, §28 interrupt", () => {
 
   it("interrupt waits until the turn ended and was collected, so a queued send goes out", async () => {
     const dir = track(makeRepo());
-    const h = harness({ interruptWaitMs: 5000 });
+    const h = harness({ interruptWaitMs: WAIT_MS });
     await h.hello();
     await h.open(dir);
     await h.engine.handle({ type: "send", text: "long job" });

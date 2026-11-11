@@ -92,7 +92,7 @@ describe("the chat left keeps its idle CLI (§9.1)", () => {
     const { h, first } = await opened(50);
     await turn(h, "one");
     await newChat(h, first);
-    await h.waitFor(() => h.sessions[0]!.disposed, "the parked CLI ended after its idle time", 3000);
+    await h.waitFor(() => h.sessions[0]!.disposed, "the parked CLI ended after its idle time");
   });
 
   it("never parked: a chat with a turn running (the switch waits for it), or with parking off (0)", async () => {

@@ -15,6 +15,7 @@ import {
 } from "../src/session/extensions.js";
 import { FakeClaudeSession, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 const dirs: string[] = [];
 const harnesses: Harness[] = [];
@@ -133,7 +134,7 @@ function session(settings: Partial<ConstructorParameters<typeof ClaudeSession>[0
   });
 }
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);

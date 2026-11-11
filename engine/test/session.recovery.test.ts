@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Options, Query, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { ClaudeSession } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §30 at the session level: `session_ready` once the CLI answered initialize (crash-4), and how a CLI
@@ -79,7 +80,7 @@ async function run(script: Script, resume?: string): Promise<SessionEvent[]> {
     queryFn: scripted(script).queryFn as never,
   });
   await s.start();
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!events.some((e) => e.type === "closed")) {
     if (Date.now() > deadline) throw new Error(`no closed event: ${JSON.stringify(events)}`);
     await new Promise((r) => setTimeout(r, 10));

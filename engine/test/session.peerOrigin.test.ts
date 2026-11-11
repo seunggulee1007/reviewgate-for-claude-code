@@ -3,6 +3,7 @@ import type { CanUseTool, Options, Query, SDKMessage, SDKUserMessage } from "@an
 import type { PeerSessionInfo } from "../src/protocol.js";
 import { ClaudeSession, type ClaudeSessionOptions } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §42.2 at the session level (audit peer-07, peer-08): every message the app writes for the user carries
@@ -59,7 +60,7 @@ function session(over: Partial<ClaudeSessionOptions> = {}) {
   return { s, events, sdk };
 }
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);

@@ -392,7 +392,7 @@ describe("§39.5: the engine — a worktree the CLI made in auto mode", () => {
     sh(main, "worktree", "add", "-q", "-b", "task-43", wt);
     write(wt, "work.txt", "done there before the move\n");
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: wt, reasonCode: "worktree_command", worktreesBefore: before });
-    await h.waitFor(() => h.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row", 10_000);
+    await h.waitFor(() => h.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row");
     expect(h.engine.state.workbenches.list.some((w) => w.path === wt)).toBe(true);
     const row = h.ofType("error").find((e) => e.code === "worktree_outside_review")!;
     expect(row).toMatchObject({ fatal: false, scope: "session", toolName: "Bash", path: wt });

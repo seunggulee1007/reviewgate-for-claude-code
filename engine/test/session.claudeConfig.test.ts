@@ -9,6 +9,7 @@ import type { SessionEvent } from "../src/session/events.js";
 import { ASK_REASON, buildHooks, CLAUDE_CONFIG_ASK_REASON, PLAN_MODE_EDIT_REASON, READ_ONLY_BASH_REASON, type HookContext } from "../src/session/hooks.js";
 import { bashClaudeConfigTarget, claudeConfigFile, inputClaudeConfigTarget, isClaudeConfigPath } from "../src/session/reviewScope.js";
 import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §33.9: Claude Code's own settings in the project — `.claude/settings.json`, `.claude/settings.local.json`
@@ -318,7 +319,7 @@ function session(root: string, extra: Record<string, unknown> = {}, remembered?:
 
 type Req = Extract<SessionEvent, { type: "permission_request" }>;
 async function nextRequest(events: SessionEvent[], n: number): Promise<Req> {
-  for (let i = 0; i < 500 && events.filter((e) => e.type === "permission_request").length < n; i++) await new Promise((r) => setTimeout(r, 10));
+  for (const end = Date.now() + WAIT_MS; Date.now() < end && events.filter((e) => e.type === "permission_request").length < n; ) await new Promise((r) => setTimeout(r, 10));
   return events.filter((e): e is Req => e.type === "permission_request")[n - 1]!;
 }
 

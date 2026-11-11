@@ -6,6 +6,7 @@ import { ClaudeSession } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { GIT_INTERNAL_REASON } from "../src/session/hooks.js";
 import { makeRepo, removeDir } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * M23 — docs/PROTOCOL.md §4, §33.3: an edit in `.git/` other than git's own data or ReviewGate's state ("install a pre-push
@@ -51,7 +52,7 @@ describe("canUseTool and .git/ (M23)", () => {
 
     void canUseTool("Write", { file_path: join(root, ".git", "hooks", "pre-push"), content: "#!/bin/sh\nnpm test\n" }, opts("w1"));
     void canUseTool("Edit", { file_path: join(root, ".git", "info", "exclude"), old_string: "#", new_string: "AGENTS.md" }, opts("w2"));
-    for (let i = 0; i < 300 && events.filter((e) => e.type === "permission_request").length < 2; i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && events.filter((e) => e.type === "permission_request").length < 2; ) await new Promise((r) => setTimeout(r, 10));
     const reqs = events.filter((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
     expect(reqs.map((r) => [r.toolName, r.reason?.code])).toEqual([
       ["Write", "outside_project"],

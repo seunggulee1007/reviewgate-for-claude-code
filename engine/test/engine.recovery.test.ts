@@ -116,7 +116,7 @@ describe("a refused start is recovered, not shown (crash-1 safety net, crash-5)"
     await h.engine.handle({ type: "send", text: "hello again" }); // the CLI never took it
     h.session().emit({ type: "error", message: "Claude Code process exited with code 1", fatal: true, code: "session_id_in_use", detail: IN_USE, exitCode: 1, signal: null });
     h.session().emit({ type: "closed", code: 1 });
-    const s = await h.waitFor((x) => x.session.open && h.sessions.length === 2, "resumed", 3000);
+    const s = await h.waitFor((x) => x.session.open && h.sessions.length === 2, "resumed", 30_000); // under the 60 s backoff: the recovery, not the backoff
     expect(h.sessions[1]!.opts.settings.resumeSessionId).toBe(ID);
     expect(h.sessions[1]!.opts.settings.sessionId).toBeUndefined();
     expect(h.sessions[1]!.sends.map((m) => m.text)).toEqual(["hello again"]);
@@ -158,7 +158,7 @@ describe("a refused start is recovered, not shown (crash-1 safety net, crash-5)"
     const notFound = `No conversation found with session ID: ${ID}`;
     h.session().emit({ type: "error", message: `Claude Code returned an error result: ${notFound}`, fatal: true, code: "resume_not_found", detail: notFound, exitCode: 1, signal: null });
     h.session().emit({ type: "closed", code: 1 });
-    const s = await h.waitFor((x) => x.session.open && h.sessions.length === 2, "new chat", 3000);
+    const s = await h.waitFor((x) => x.session.open && h.sessions.length === 2, "new chat", 30_000); // under the 60 s backoff: the recovery, not the backoff
     const fresh = s.sessions.currentId!;
     expect(fresh).not.toBe(ID);
     expect(h.sessions[1]!.opts.settings.sessionId).toBe(fresh);

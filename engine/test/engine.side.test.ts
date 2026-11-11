@@ -10,6 +10,7 @@ import { sessionTranscriptPath } from "../src/review/sessions.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { readOnlyContext } from "../src/session/reviewScope.js";
 import { bashPath, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** docs/PROTOCOL.md §21: side questions fork the main session read-only and never touch it. */
 
@@ -90,7 +91,7 @@ async function reviewedTurn(h: Harness, dir: string, lastUuid = "uuid-turn-1"): 
 }
 
 async function waitEvent<T extends EngineEvent["type"]>(h: Harness, type: T, pred: (e: Extract<EngineEvent, { type: T }>) => boolean = () => true): Promise<Extract<EngineEvent, { type: T }>> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     const hit = h.ofType(type).find(pred);
     if (hit) return hit;

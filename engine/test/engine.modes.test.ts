@@ -9,6 +9,7 @@ import { ClaudeSession } from "../src/session/claude.js";
 import { buildHooks, type HookContext } from "../src/session/hooks.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 function makeRepo(): string {
   const dir = realpathSync(makeTempDir("rg-modes"));
@@ -41,7 +42,7 @@ const sessionFile = (dir: string) => join(dir, ".git", SESSION_FILE);
 
 /** The session file is written behind the state: poll until `pred` holds. */
 async function waitForSessionFile(dir: string, pred: (o: PersistedSession) => boolean, what: string): Promise<PersistedSession> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     try {
       const o = JSON.parse(readFileSync(sessionFile(dir), "utf8")) as PersistedSession;

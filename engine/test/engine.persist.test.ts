@@ -9,6 +9,7 @@ const REF_TURN_END = turnRefs("main").end;
 import { sessionTranscriptPath } from "../src/review/sessions.js";
 import { makeHarness, type FakeClaudeSession, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** `main` with README.md + a committed `.gitignore` (build/) so ignored writes can be exercised. */
 function makeRepo(): string {
@@ -52,7 +53,7 @@ const reviewFile = (dir: string) => join(dir, ".git", REVIEW_FILE);
 
 /** The review / session files are written asynchronously behind the state: poll until `pred` holds on the parsed JSON. */
 async function waitForJSON(path: string, pred: (o: Record<string, unknown>) => boolean, what: string): Promise<Record<string, unknown>> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     try {
       const o = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
@@ -65,7 +66,7 @@ async function waitForJSON(path: string, pred: (o: Record<string, unknown>) => b
   }
 }
 async function waitUntil(pred: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((r) => setTimeout(r, 10));

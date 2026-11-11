@@ -21,6 +21,7 @@ import {
 } from "../src/session/permissionRules.js";
 import { isBroadBashPattern } from "../src/session/bashClass.js";
 import { makeTempDir, removeDir } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §33.5–33.8 (audit daily-04, SME-04, market-14): the user's Claude Code `permissions.allow` rules apply
@@ -188,7 +189,7 @@ describe("app allow patterns beyond Bash (§33.6)", () => {
     // MARK: r2-skills-side (M21): the CLI's own suggestions ride along — for Bash the only ones.
     const suggestions = [{ type: "addRules", behavior: "allow", destination: "localSettings", rules: [{ toolName: "Bash", ruleContent: "./mvnw test:*" }] }];
     void canUseTool("Bash", { command: "cd /work/acme && ./mvnw -q test 2>&1 | tail -30" }, { ...opts, toolUseID: "b2", suggestions } as never);
-    for (let i = 0; i < 300 && events.filter((e) => e.type === "permission_request").length < 3; i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && events.filter((e) => e.type === "permission_request").length < 3; ) await new Promise((r) => setTimeout(r, 10));
     const reqs = events.filter((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
     expect(reqs.find((r) => r.toolName.startsWith("mcp__"))!.allowPatterns).toEqual(["mcp__github__get_issue", "mcp__github__*"]);
     expect(reqs.find((r) => r.toolUseId === "b1")).not.toHaveProperty("allowPatterns");

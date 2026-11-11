@@ -8,6 +8,7 @@ import { SideQuery } from "../src/side/sideQuery.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { FakeSide, makeSideRepo, waitForEvent, type SideScript } from "./helpers/fakeSide.js";
 import { removeDir, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** docs/PROTOCOL.md §36.13 (market-04): Claude reviews the round first in a read-only fork; findings sit on the diff lines. */
 
@@ -58,7 +59,7 @@ type ReviewFile = { prereviews?: PreReviewEvent[] };
 
 /** The review file is written behind the git pins (serialized, best effort): poll until `pred` holds. */
 async function reviewFile(dir: string, pred: (f: ReviewFile) => boolean): Promise<ReviewFile> {
-  const deadline = Date.now() + 10_000;
+  const deadline = Date.now() + WAIT_MS;
   for (;;) {
     let f: ReviewFile = {};
     try {

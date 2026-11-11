@@ -8,6 +8,7 @@ import type { SessionEvent } from "../src/session/events.js";
 import { buildHooks, NESTED_REASON, type HookContext } from "../src/session/hooks.js";
 import { nestedRepoRoot } from "../src/session/reviewScope.js";
 import { makeRepo, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §33.3 (audit robustness-06): the snapshot records a submodule, a nested clone or a worktree under
@@ -88,7 +89,7 @@ describe("nested repositories under the root (§33.3, audit robustness-06)", () 
     const canUseTool = (s as unknown as { canUseTool: CanUseTool }).canUseTool;
     const nestedFile = join(root, ".claude", "worktrees", "wt1", "README.md");
     const pending = canUseTool("Edit", { file_path: nestedFile, old_string: "line1", new_string: "x" }, { ...opts, toolUseID: "e1" } as never);
-    for (let i = 0; i < 500 && !events.some((e) => e.type === "permission_request"); i++) await new Promise((r) => setTimeout(r, 10));
+    for (const end = Date.now() + WAIT_MS; Date.now() < end && !events.some((e) => e.type === "permission_request"); ) await new Promise((r) => setTimeout(r, 10));
     const req = events.find((e): e is Extract<SessionEvent, { type: "permission_request" }> => e.type === "permission_request");
     expect(req).toMatchObject({ toolName: "Edit", file: nestedFile, toolUseId: "e1", reason: { code: "nested_repository", path: join(root, ".claude", "worktrees", "wt1") } });
     expect(req!.reason!.message).toMatch(/nested/i);

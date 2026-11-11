@@ -204,7 +204,7 @@ describe("the moved chat's review baseline (§39.4)", () => {
     write(wt, "copied.txt", "copied\n");
     write(wt, "README.md", "line1\nchanged\nline3\n");
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b1", path: wt, reasonCode: "worktree_command" });
-    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the followed move", 10_000);
+    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the followed move");
     expect(src.ofType("chat_moved").at(-1)).toMatchObject({ sessionId: chatId, path: wt, baseline: "head", interrupted: true });
     // Followed: no "outside the review" warning for that command.
     expect(src.ofType("error").filter((e) => e.code === "worktree_outside_review")).toEqual([]);
@@ -244,7 +244,7 @@ describe("the moved chat's review baseline (§39.4)", () => {
     await src.settle();
     await src.engine.handle({ type: "permission_response", requestId: "r1", allow: true, follow: true });
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b3", path: wt, reasonCode: "worktree_command" });
-    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the followed move", 10_000);
+    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the followed move");
     expect(src.ofType("chat_moved").at(-1)).toMatchObject({ path: wt, baseline: "disk" });
     const dst = await opened(wt);
     expect(dst.engine.state.changedFiles).toEqual([]);
@@ -262,7 +262,7 @@ describe("the moved chat's review baseline (§39.4)", () => {
     await src.engine.handle({ type: "permission_response", requestId: "r1", allow: true });
     sh(main, "worktree", "add", "-q", "-b", "later", wt);
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b2", path: wt, reasonCode: "worktree_command" });
-    await src.waitFor((x) => x.workbenches.list.some((w) => w.path === wt), "the new worktree in the list (mid-turn)", 10_000);
+    await src.waitFor((x) => x.workbenches.list.some((w) => w.path === wt), "the new worktree in the list (mid-turn)");
     expect(src.engine.state.gate.phase).toBe("running");
     expect(src.ofType("error").find((e) => e.code === "worktree_outside_review")).toMatchObject({ path: wt });
     expect(src.ofType("chat_moved")).toEqual([]);
@@ -325,7 +325,7 @@ describe("the moved chat's review baseline (§39.4)", () => {
     sh(main, "worktree", "add", "-q", "-b", "issue-42", wt);
     write(wt, "copied.txt", "copied\n");
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "Bash", toolUseId: "b7", path: parsed, reasonCode: "worktree_command" });
-    await src.waitFor(() => src.ofType("chat_moved").length > 0 || src.ofType("error").some((e) => e.code === "chat_move_failed"), "the followed move", 10_000);
+    await src.waitFor(() => src.ofType("chat_moved").length > 0 || src.ofType("error").some((e) => e.code === "chat_move_failed"), "the followed move");
     expect(src.ofType("error").filter((e) => e.code === "chat_move_failed")).toEqual([]);
     expect(src.ofType("chat_moved").at(-1)).toMatchObject({ path: wt, baseline: "head" });
   });

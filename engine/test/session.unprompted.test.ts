@@ -8,6 +8,7 @@ import type { SessionEvent } from "../src/session/events.js";
 import { buildHooks, READ_ONLY_BASH_REASON, UNPROMPTED_AGENT_REASON, UNPROMPTED_REASON, unpromptedBlocked, type HookContext } from "../src/session/hooks.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §18: Claude Code can run a turn on its own (a background task finished, the CLI
@@ -145,7 +146,7 @@ const toolUse = (msgId: string, id: string, name: string, input: Record<string, 
 const resultMsg = (totalCostUsd: number): SDKMessage =>
   ({ type: "result", subtype: "success", session_id: SID, usage: { input_tokens: 1, output_tokens: 1 }, duration_ms: 5, total_cost_usd: totalCostUsd }) as unknown as SDKMessage;
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);

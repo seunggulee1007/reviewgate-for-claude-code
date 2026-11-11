@@ -57,7 +57,7 @@ describe("EnterWorktree: the chat follows (M05b, §39.4)", () => {
     sh(main, "worktree", "add", "-q", "-b", "worktree-acme-42", wt);
     write(wt, "README.md", "line1\nchanged\nline3\n");
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "EnterWorktree", toolUseId: "e1", path: wt, branch: "worktree-acme-42", reasonCode: "worktree_command", worktreesBefore: before });
-    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the move", 10_000);
+    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the move");
     expect(src.ofType("chat_moved").at(-1)).toMatchObject({ sessionId: chatId, path: wt, baseline: "head", interrupted: true });
     expect(s.interrupts).toBe(1);
     // Followed: no "outside the review" row for it.
@@ -83,7 +83,7 @@ describe("EnterWorktree: the chat follows (M05b, §39.4)", () => {
     await src.engine.handle({ type: "send", text: "work in a worktree" });
     sh(main, "worktree", "add", "-q", "-b", "worktree-acme-7", wt);
     src.session().emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "EnterWorktree", toolUseId: "e2", path: wt, reasonCode: "worktree_command" });
-    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the move", 10_000);
+    await src.waitFor(() => src.ofType("chat_moved").length > 0, "the move");
     expect(handoff(wt, chatId).followUp).toBe("The working folder moved to acme-7. Please continue what you were doing.");
   });
 
@@ -97,7 +97,7 @@ describe("EnterWorktree: the chat follows (M05b, §39.4)", () => {
     const s = src.session();
     const before = parseWorktreeList(sh(main, "worktree", "list", "--porcelain"));
     s.emit({ type: "scope_notice", code: "worktree_outside_review", toolName: "EnterWorktree", toolUseId: "e3", path: existing, reasonCode: "worktree_command", worktreesBefore: before });
-    await src.waitFor(() => src.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row", 10_000);
+    await src.waitFor(() => src.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row");
     expect(src.ofType("error").find((e) => e.code === "worktree_outside_review")).toMatchObject({ toolName: "EnterWorktree", path: existing, fatal: false });
     expect(src.ofType("chat_moved")).toEqual([]);
     expect(src.engine.state.gate.phase).toBe("running");
@@ -117,7 +117,7 @@ describe("ExitWorktree: the chat follows back (M05b, §39.4)", () => {
     await h.engine.handle({ type: "set_permission_mode", mode: "auto" });
     await h.engine.handle({ type: "send", text: "finish and leave the worktree" });
     h.session().emit({ type: "scope_notice", code: "worktree_exited", toolName: "ExitWorktree", toolUseId: "x1", path: main });
-    await h.waitFor(() => h.ofType("chat_moved").length > 0, "the move back", 10_000);
+    await h.waitFor(() => h.ofType("chat_moved").length > 0, "the move back");
     expect(h.ofType("chat_moved").at(-1)).toMatchObject({ sessionId: chatId, path: main, baseline: "disk", interrupted: true });
     expect(handoff(main, chatId).followUp).toBe(`작업 폴더를 옮겼어요 (${main.split(/[\\/]/).pop()}). 하던 일을 이어서 해 줘.`);
     // The worktree stays (its review is here).
@@ -132,7 +132,7 @@ describe("ExitWorktree: the chat follows back (M05b, §39.4)", () => {
     const h = await opened(wt);
     await h.engine.handle({ type: "send", text: "leave the worktree" });
     h.session().emit({ type: "scope_notice", code: "worktree_exited", toolName: "ExitWorktree", toolUseId: "x2", path: main });
-    await h.waitFor(() => h.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row", 10_000);
+    await h.waitFor(() => h.ofType("error").some((e) => e.code === "worktree_outside_review"), "the row");
     expect(h.ofType("error").find((e) => e.code === "worktree_outside_review")).toMatchObject({ toolName: "ExitWorktree", path: main });
     expect(h.ofType("chat_moved")).toEqual([]);
 

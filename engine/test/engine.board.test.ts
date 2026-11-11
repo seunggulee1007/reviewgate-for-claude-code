@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { CodeGraphEvent } from "../src/protocol.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeBranchRepo, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 const harnesses: Harness[] = [];
 const dirs: string[] = [];
@@ -63,7 +64,7 @@ describe("§43.3 code graph through the engine", () => {
     expect(started.build).toMatchObject({ running: true });
     write(bin, "go", "");
     const done = await new Promise<CodeGraphEvent>((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error("no finished build")), 10_000);
+      const t = setTimeout(() => reject(new Error("no finished build")), WAIT_MS);
       const check = () => {
         const ev = h.ofType("code_graph").find((e) => e.build && !e.build.running && e.id === undefined);
         if (ev) {

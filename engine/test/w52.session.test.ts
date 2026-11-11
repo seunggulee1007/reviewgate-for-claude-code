@@ -4,6 +4,7 @@ import { ClaudeSession, type SessionSettings } from "../src/session/claude.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
 import { outputPathOf, taskKind } from "../src/session/background.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /**
  * docs/PROTOCOL.md §52 at the session level, with the frames CLI 2.1.318 sends (verified over stream-json, haiku):
@@ -69,7 +70,7 @@ function session(over: Partial<SessionSettings> = {}): { s: ClaudeSession; event
   return { s, events, script };
 }
 
-const until = async (pred: () => boolean, what: string, ms = 3000): Promise<void> => {
+const until = async (pred: () => boolean, what: string, ms = WAIT_MS): Promise<void> => {
   const deadline = Date.now() + ms;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out: ${what}`);
