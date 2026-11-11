@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -61,7 +61,7 @@ export function removeDir(dir: string): void {
 
 /**
  * `renameSync` of a folder a git process may still have open (Windows refuses it with EPERM / EBUSY / EACCES while the
- * engine's own git work after a command — snapshot pins, the persisted review — finishes): retried for up to 5 s.
+ * engine's own git work after a command — snapshot pins, the persisted review — finishes): retried for up to 5 s; a leftover folder at `to` is removed first.
  */
 export async function renameWhenFree(from: string, to: string): Promise<void> {
   for (let attempt = 0; ; attempt++) {
@@ -70,7 +70,10 @@ export async function renameWhenFree(from: string, to: string): Promise<void> {
       return;
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
-      if (attempt >= 50 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) throw e;
+      if (attempt >= 50 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES" && code !== "ENOTEMPTY" && code !== "EEXIST")) throw e;
+      // A folder cannot be renamed onto a non-empty one (ENOTEMPTY / EEXIST; EPERM on Windows): the engine's bookkeeping may
+      // have made a fresh `.git` while the real one was hidden, so what is in the way is cleared and the rename retried.
+      if (existsSync(to)) removeDir(to);
       await new Promise((r) => setTimeout(r, 100));
     }
   }

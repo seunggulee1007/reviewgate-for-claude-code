@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { REVIEW_FILE, turnRefs } from "../src/review/persist.js";
 import { STALE_REVIEW_MS } from "../src/engine.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, read, removeDir, renameWhenFree, sh, write } from "./helpers/repo.js";
+import { WAIT_MS } from "./helpers/wait.js";
 
 /** The harness clock (`makeHarness` pins `now` to it). */
 const NOW = 1_700_000_000_000;
@@ -47,7 +48,7 @@ const ref = (dir: string, name: string): string | null => {
   }
 };
 async function until(pred: () => boolean, what: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + WAIT_MS;
   while (!pred()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     await new Promise((r) => setTimeout(r, 10));
@@ -241,9 +242,6 @@ describe("a review restored after work outside the app (daily-01, §31)", () => 
     h.session().emitTurnEnd();
     await h.waitFor((x) => x.gate.phase === "collect_failed", "collect failure");
     await expect(h.engine.request({ type: "finish_review" })).rejects.toThrow("collect_failed");
-    // The failed collection's own bookkeeping may have written under .git while it was hidden, making a fresh .git
-    // folder that the rename back cannot replace (ENOTEMPTY on Linux).
-    rmSync(join(dir, ".git"), { recursive: true, force: true });
     await renameWhenFree(join(dir, ".git-hidden"), join(dir, ".git"));
   });
 });
