@@ -8036,8 +8036,11 @@ and what stays. The decision and the words are one pure function on each client 
   "리뷰 대기·메모·작성 중인 메시지는 다시 열면 그대로 있어요." [닫기] [취소].
 - **Switching or closing a window's project** (P1-chrome-03) stops its session the same way, so it asks the same way:
   "프로젝트를 바꾸면 이 턴이 멈춰요." / "프로젝트를 닫으면 이 턴이 멈춰요." [전환] / [프로젝트 닫기] [취소]. The pending-review
-  question ("Switch project?") comes only when this one did not ask. The project already open in the window does nothing,
-  and one open in another window comes to the front instead — a switch would stop this session for a lock it cannot take.
+  question ("Switch project?") comes only when this one did not ask. The project already open in the window brings the
+  window forward and says "acme-shop is already open in this window" ("acme-shop 프로젝트는 이미 이 창에 열려 있어요", a toast —
+  0.5.12 did nothing at all, and the folder picker looked broken); one open in another window comes to the front instead,
+  with the same words — a switch would stop this session for a lock it cannot take. Open in New Window… for a folder a
+  window has open does the same.
   Mac: with a project open, ⌘O, the toolbar's folder, File › Open Recent, the recent list and a git candidate go through
   `ProjectOpener.requestSwitch` too (they used to open at once, past even the pending-review question), and Close Project
   through `requestClose`; the question is a sheet on the window. Windows client: the store's `requestSwitch` (File › Open / Open Recent / Switch Project…, the sidebar's projects) and

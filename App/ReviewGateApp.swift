@@ -149,16 +149,24 @@ enum ProjectOpener {
         Task { await store.openProject(url) }
     }
 
-    /// Switch flow (header menu, ⌘⇧O, and `open` with a project open). The project already open here does nothing; one open
-    /// in another window comes to the front instead (switching would stop this session for a lock it cannot take). polish
-    /// P1-chrome-03: a switch stops the session, so a turn running, a card waiting or work that would stop or be lost asks
-    /// first (Core `QuitPrompt.projectChange`, "프로젝트를 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are
-    /// asked about by the caller's alert (via `pending`); otherwise the store swaps sessions right away.
+    /// Switch flow (header menu, ⌘⇧O, and `open` with a project open). The project already open here, or in another window,
+    /// brings that window to the front, which says so (`sayAlreadyOpen`) — one in another window is not switched to (that
+    /// would stop this session for a lock it cannot take). polish P1-chrome-03: a switch stops the session, so a turn
+    /// running, a card waiting or work that would stop or be lost asks first (Core `QuitPrompt.projectChange`, "프로젝트를
+    /// 바꾸면 이 턴이 멈춰요."); otherwise files still pending review are asked about by the caller's alert (via `pending`);
+    /// otherwise the store swaps sessions right away.
     static func requestSwitch(to url: URL, store: AppState, pending: Binding<URL?>) {
         let registry = WorkbenchRegistry.shared
         let target = AppSettings.projectKey(url)
-        if store.projectURL.map(AppSettings.projectKey) == target { return }
-        if let other = registry.entry(for: url), other.store !== store, other.focus() { return }
+        if store.projectURL.map(AppSettings.projectKey) == target {
+            registry.entry(for: store)?.focus()
+            sayAlreadyOpen(url)
+            return
+        }
+        if let other = registry.entry(for: url), other.store !== store, other.focus() {
+            sayAlreadyOpen(url)
+            return
+        }
         if let entry = registry.entry(for: store),
            let prompt = QuitPrompt.projectChange(entry.quitState, .switchProject,
                                                  confirmWhileWorking: AppSettings.confirmCloseWhileWorking()) {
@@ -210,8 +218,17 @@ enum ProjectOpener {
     /// brought to the front (never a duplicate, never the takeover alert).
     static func openInNewWindow(_ url: URL, openWindow: OpenWindowAction) {
         let target = url.standardizedFileURL
-        if WorkbenchRegistry.shared.focusWindow(for: target) { return }
+        if WorkbenchRegistry.shared.focusWindow(for: target) {
+            sayAlreadyOpen(target)
+            return
+        }
         openWindow(id: "workbench", value: target)
+    }
+
+    /// An open that finds the project already open ends with its window in front saying so — the window may be the one in
+    /// front already, where coming forward shows nothing (0.5.12 did nothing at all for the project open in this window).
+    private static func sayAlreadyOpen(_ url: URL) {
+        Toast.show(String(localized: "\(url.lastPathComponent) is already open in this window"), systemImage: "info.circle.fill")
     }
 
     /// "Open in New Window…" (⌘⇧N): the folder picker, then `openInNewWindow`.
