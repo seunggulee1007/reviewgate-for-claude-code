@@ -7345,7 +7345,7 @@ edit, move and remove, but no way to send one message now: it waited for the tur
   message's own. Test `QueueSendNowTests`: the lenient decode, the list shown and cleared, the decision, into the turn with
   its mentions, an image stops and sends, a paused queue sends that message first.
 - **Mac.** The queue bar (`ComposerQueueBar`) shows while anything waits: the messages in Claude's turn first, as dashed
-  chips with ↳ and no tools (the CLI has them: they cannot be edited or taken back), "Claude의 턴에 들어감 — 지금 단계가
+  chips with ↳ (since §50.3 with ✎ and ×: they can be taken back until Claude reads them), "Claude의 턴에 들어감 — 지금 단계가
   끝나면 Claude가 읽어요" when nothing else waits. Each queued chip has a paper plane ("바로 보내기"; its tooltip says
   which of the three it does), the context menu and the editor popover have "바로 보내기" too.
 - **Electron.** `sendQueue.ts` `queuedSendNow`, store `sendQueuedNow`, `QueueBar.tsx` (the ⏎ button on each chip, its
@@ -7399,8 +7399,20 @@ terminal a message typed while Claude works waits in a queue and comes back into
   last one in Claude's turn (taken back first); false when nothing waits (`canPullBackWaiting`). Test
   `SteerTakeBackTests`: the command's JSON, taken (Edit into the box, × not), too late (the notice, nothing back, a gone
   id not asked), failed, ↑ for a queued message first, then for the turn's, nothing waiting.
+- **Mac.** Each dashed chip in the queue bar has ✎ ("편집 — Claude의 턴에서 입력창으로 되돌려요 (빈 입력창에서 ↑도 돼요).
+  ↩로 다시 보내요") and × ("되돌리기 — Claude에게 가지 않아요"). A click on the chip is ✎ too, and its context menu has
+  "입력창에서 편집" and "되돌리기". While the take-back waits, a small spinner stands in for the tools ("Claude의 턴에서 되돌리는
+  중…"), and the menu items are off with that reason. The chip's tooltip says "Claude의 턴에 들어감 — 지금 단계가 끝나면
+  Claude가 읽어요. 그 전까지 클릭하면 편집, ×로 되돌릴 수 있어요." A take-back that comes too late or fails puts its notice in
+  the message box's notice line. Queued chips now show their edit in sight: a pencil ("이 대기 메시지 편집", opening the editor
+  popover as a click does) next to Send now and ×. Their tooltip adds "대기 중 — 클릭하면 편집, 빈 입력창에서 ↑를 누르면 마지막
+  메시지를 되돌려요", and their context menu gains "입력창에서 편집" (out of the queue into the box). ↑ in an empty message box
+  (not while browsing the history, not in a chat shown read-only) brings the last waiting message back
+  (`pullBackLastWaiting`). With nothing waiting, ↑ is the prompt history as before (§44.1). The bar lists one message
+  a row, as the terminal does above its input (more than three scroll within it). In the chat column at 1000 × 637
+  (356 pt), a row of chips had pushed the second chip's tools out of the window.
 - Owner: steer take-back (engine `session/claude.ts` `takeBackSteer`, `engine.ts` `steerTakeBack`, `protocol.ts`; Core
-  `Session/QueueSendNow.swift`).
+  `Session/QueueSendNow.swift`; App `UI/Chat/ComposerQueueBar.swift`, `UI/Chat/ChatComposer.swift`).
 
 ## 51. The PR sheet: names on every field, and "AI로 채우기"
 

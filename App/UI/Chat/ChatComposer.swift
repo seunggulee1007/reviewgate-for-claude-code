@@ -267,6 +267,9 @@ struct ChatComposer: View {
             if !store.queuedMessages.isEmpty || store.sendAfterInterrupt != nil || !store.steeringMessages.isEmpty {
                 ComposerQueueBar(messages: store.queuedMessages,
                                  steering: store.steeringMessages,   // MARK: composer (§50.2)
+                                 takingBack: store.steeringTakingBack,   // §50.3
+                                 onTakeBack: { id, edit in Task { await store.takeBackSteering(id: id, toComposer: edit) } },
+                                 onEditInComposer: { store.editQueuedInComposer(id: $0) },
                                  stopAndSend: store.sendAfterInterrupt,
                                  pausedReason: store.queuePausedReason,
                                  holdReason: store.queueHoldReason,
@@ -470,6 +473,10 @@ struct ChatComposer: View {
                 composer.mentions = []
                 composer.closePalette()
             }
+        }
+        // §50.3: a take-back that came too late (or failed) says so where the user typed.
+        .onChange(of: store.steerTakeBackNotice?.id) { _, _ in
+            if let notice = store.steerTakeBackNotice { composer.notice = notice.text }
         }
         .onChange(of: store.taskForComposer?.id, initial: true) { _, _ in
             guard let handed = store.taskForComposer else { return }
@@ -1211,6 +1218,11 @@ struct ChatComposer: View {
             // prompt or Esc gives it back), or in a recalled prompt: the previous prompt.
             // MARK: wave7 w7-chat — §45.1: elsewhere the caret just moves; the history is not even read.
             guard onFirstLine || composer.draft.isEmpty else { return false }
+            // §50.3: as in the terminal, ↑ in an empty box first brings back the last message waiting (queued, else in
+            // Claude's turn) to edit; with nothing waiting it walks the prompt history.
+            if composer.draft.isEmpty, !composer.history.isBrowsing, store.viewingChat == nil, store.canPullBackWaiting {
+                return store.pullBackLastWaiting()
+            }
             if !composer.history.isBrowsing { composer.history.refresh(entries: store.promptHistory) }
             guard let recalled = composer.history.up(draft: composer.draft, caretOnFirstLine: onFirstLine) else { return false }
             composer.setDraftFromHistory(recalled)

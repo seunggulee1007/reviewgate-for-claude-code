@@ -31507,6 +31507,198 @@
           }
         }
       }
+    },
+    "Edit — takes it back from Claude's turn into the message box (↑ in an empty box does too); ↩ sends it again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit — takes it back from Claude's turn into the message box (↑ in an empty box does too); ↩ sends it again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "편집 — Claude의 턴에서 입력창으로 되돌려요 (빈 입력창에서 ↑도 돼요). ↩로 다시 보내요"
+          }
+        }
+      }
+    },
+    "Take back — Claude never sees it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take back — Claude never sees it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "되돌리기 — Claude에게 가지 않아요"
+          }
+        }
+      }
+    },
+    "Taking it back from Claude's turn…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taking it back from Claude's turn…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 턴에서 되돌리는 중…"
+          }
+        }
+      }
+    },
+    "Edit the message in Claude's turn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the message in Claude's turn"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 턴에 들어간 메시지 편집"
+          }
+        }
+      }
+    },
+    "Take back the message in Claude's turn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take back the message in Claude's turn"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 턴에 들어간 메시지 되돌리기"
+          }
+        }
+      }
+    },
+    "In Claude's turn — Claude reads it after the current step. Until then, click to edit it or × to take it back.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In Claude's turn — Claude reads it after the current step. Until then, click to edit it or × to take it back."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 턴에 들어감 — 지금 단계가 끝나면 Claude가 읽어요. 그 전까지 클릭하면 편집, ×로 되돌릴 수 있어요."
+          }
+        }
+      }
+    },
+    "Edit in Message Box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit in Message Box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력창에서 편집"
+          }
+        }
+      }
+    },
+    "Take Back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take Back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "되돌리기"
+          }
+        }
+      }
+    },
+    "Edit this queued message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit this queued message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 대기 메시지 편집"
+          }
+        }
+      }
+    },
+    "Edit queued message %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit queued message %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 메시지 %lld 편집"
+          }
+        }
+      }
+    },
+    "Queued — click to edit; ↑ in an empty message box brings the last one back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued — click to edit; ↑ in an empty message box brings the last one back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중 — 클릭하면 편집, 빈 입력창에서 ↑를 누르면 마지막 메시지를 되돌려요"
+          }
+        }
+      }
+    },
+    "Takes it out of the queue into the message box; ↩ sends it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takes it out of the queue into the message box; ↩ sends it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기열에서 빼서 입력창에 넣어요. ↩로 보내요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -4,13 +4,19 @@ import ReviewGateCore
 /// Messages queued while Claude is busy, as chips above the composer: click to edit, move earlier / later, send now, remove.
 /// A status line says when they go out — or why they stopped (an error; "Resume" restarts). §50.1: a stop that goes on by
 /// itself (the API, the usage limit) says when, with "지금 보내기". MARK: composer — §50.2: the messages already put into
-/// Claude's turn wait here too until Claude reads them, as the terminal shows them above its input.
+/// Claude's turn wait here too until Claude reads them, as the terminal shows them above its input. §50.3: until then
+/// each can be taken back (×) or brought back into the message box to edit (✎), as ↑ does in the terminal.
 struct ComposerQueueBar: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store
     let messages: [QueuedMessage]
     /// MARK: composer — §50.2: put into the running turn, not read by Claude yet.
     var steering: [SteeringMessage] = []
+    /// §50.3: the ones being taken back (their chips wait), and the take-back (`toComposer`: Edit).
+    var takingBack: Set<String> = []
+    var onTakeBack: (String, Bool) -> Void = { _, _ in }
+    /// §50.3: a queued message into the message box (Edit in Message Box).
+    var onEditInComposer: (UUID) -> Void = { _ in }
     let stopAndSend: String?
     let pausedReason: String?
     let holdReason: String?
@@ -78,21 +84,37 @@ struct ComposerQueueBar: View {
                 }
             }
             .font(.caption)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(steering) { message in steeringChip(message) }   // MARK: composer (§50.2)
-                    if let stopAndSend {
-                        chip(index: nil, text: stopAndSend, id: nil)
-                    }
-                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                        chip(index: index, text: message.text, id: message.id)
-                    }
-                }
-                .padding(.vertical, 1)
+            // §50.3: one message a row, as the terminal lists them above its input — every message's tools stay in sight in
+            // the narrow chat column (a row of chips scrolled the later ones and their tools out of the window). More than
+            // `visibleRows` scroll within the bar.
+            if rowCount > Self.visibleRows {
+                ScrollView(.vertical) { chipRows }
+                    .frame(height: CGFloat(Self.visibleRows) * Self.rowHeight + CGFloat(Self.visibleRows - 1) * Self.rowSpacing)
+            } else {
+                chipRows
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Message queue")
+    }
+
+    private static let visibleRows = 3
+    private static let rowHeight: CGFloat = 24
+    private static let rowSpacing: CGFloat = 4
+
+    private var rowCount: Int { steering.count + messages.count + (stopAndSend == nil ? 0 : 1) }
+
+    private var chipRows: some View {
+        VStack(alignment: .leading, spacing: Self.rowSpacing) {
+            ForEach(steering) { message in steeringChip(message) }   // MARK: composer (§50.2)
+            if let stopAndSend {
+                chip(index: nil, text: stopAndSend, id: nil)
+            }
+            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                chip(index: index, text: message.text, id: message.id)
+            }
+        }
+        .padding(.vertical, 1)
     }
 
     private var statusText: String {
@@ -113,22 +135,63 @@ struct ComposerQueueBar: View {
         }
     }
 
-    /// MARK: composer — §50.2: a message already in Claude's turn — it can no longer be edited or taken back.
+    /// §50.3: what a steering chip's tools say (and, while it is being taken back, why they wait).
+    static let takeBackEditHelp = String(localized: "Edit — takes it back from Claude's turn into the message box (↑ in an empty box does too); ↩ sends it again")
+    static let takeBackRemoveHelp = String(localized: "Take back — Claude never sees it")
+    static let takingBackHelp = String(localized: "Taking it back from Claude's turn…")
+
+    /// MARK: composer — §50.2: a message already in Claude's turn, waiting until Claude reads it. §50.3: until then ✎ brings
+    /// it back into the message box and × takes it back (the CLI drops it); too late, the box says so and its row stays.
     private func steeringChip(_ message: SteeringMessage) -> some View {
-        HStack(spacing: 5) {
+        let busy = takingBack.contains(message.id)
+        return HStack(spacing: 5) {
             Image(systemName: "arrow.turn.down.right").font(.caption).foregroundStyle(.secondary)
             Text(verbatim: message.text.replacingOccurrences(of: "\n", with: " "))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: 150, alignment: .leading)   // narrower than a queued chip: the queued ones keep their tools in sight
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if busy {
+                ProgressView().controlSize(.mini)
+                    .help(Self.takingBackHelp)
+                    .accessibilityLabel(Self.takingBackHelp)
+            } else {
+                Button { onTakeBack(message.id, true) } label: {
+                    Image(systemName: "pencil").font(.caption2.weight(.bold))
+                }
+                .buttonStyle(IconButtonStyle(padding: 2))
+                .padding(.vertical, -2)
+                .foregroundStyle(.secondary)
+                .help(Self.takeBackEditHelp)
+                .accessibilityLabel("Edit the message in Claude's turn")
+                .accessibilityIdentifier("Edit steering message")
+                Button { onTakeBack(message.id, false) } label: {
+                    Image(systemName: "xmark").font(.caption2.weight(.bold))
+                }
+                .buttonStyle(IconButtonStyle(padding: 2))
+                .padding(.vertical, -2)
+                .foregroundStyle(.secondary)
+                .help(Self.takeBackRemoveHelp)
+                .accessibilityLabel("Take back the message in Claude's turn")
+                .accessibilityIdentifier("Take back steering message")
+            }
         }
         .padding(.leading, 6).padding(.trailing, 8).padding(.vertical, 4)
         .overlay(Capsule().strokeBorder(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
         .contentShape(Capsule())
-        .help(Text(verbatim: message.text + "\n\n" + String(localized: "Already in Claude's turn — Claude reads it after the current step")))
-        .accessibilityElement(children: .combine)
+        .onTapGesture { if !busy { onTakeBack(message.id, true) } }
+        .help(Text(verbatim: message.text + "\n\n" + (busy ? Self.takingBackHelp : String(localized: "In Claude's turn — Claude reads it after the current step. Until then, click to edit it or × to take it back."))))
+        .contextMenu {
+            Button("Edit in Message Box") { onTakeBack(message.id, true) }
+                .disabled(busy)
+                .help(busy ? Self.takingBackHelp : Self.takeBackEditHelp)
+            Divider()
+            Button("Take Back", role: .destructive) { onTakeBack(message.id, false) }
+                .disabled(busy)
+                .help(busy ? Self.takingBackHelp : Self.takeBackRemoveHelp)
+        }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Steering message")
     }
 
@@ -150,8 +213,18 @@ struct ComposerQueueBar: View {
                 .font(.callout)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: 220, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let id {
+                // §50.3: edit in sight, not only behind a click on the chip.
+                Button { editing = id } label: {
+                    Image(systemName: "pencil").font(.caption2.weight(.bold))
+                }
+                .buttonStyle(IconButtonStyle(padding: 2))
+                .padding(.vertical, -2)
+                .foregroundStyle(.secondary)
+                .help("Edit this queued message")
+                .accessibilityLabel("Edit queued message \(index.map { $0 + 1 } ?? 0)")
+                .accessibilityIdentifier("Edit queued message")
                 // MARK: composer — §50.2: as in the terminal, a queued message can go at once.
                 Button { onSendNow(id) } label: {
                     Image(systemName: "paperplane").font(.caption2.weight(.bold))
@@ -170,6 +243,7 @@ struct ComposerQueueBar: View {
                 .foregroundStyle(.secondary)
                 .help("Remove from the queue")
                 .accessibilityLabel("Remove queued message \(index.map { $0 + 1 } ?? 0)")
+                .accessibilityIdentifier("Remove queued message")
             }
         }
         .padding(.leading, 6).padding(.trailing, 8).padding(.vertical, 4)
@@ -177,7 +251,7 @@ struct ComposerQueueBar: View {
         .overlay(Capsule().strokeBorder(Color.accentColor.wash(colorScheme, light: isNext ? 0.55 : 0.25, dark: isNext ? 0.65 : 0.30)))
         .contentShape(Capsule())
         .onTapGesture { if let id { editing = id } }
-        .help(Text(verbatim: text))
+        .help(Text(verbatim: id == nil ? text : text + "\n\n" + String(localized: "Queued — click to edit; ↑ in an empty message box brings the last one back")))
         .popover(isPresented: Binding(get: { id != nil && editing == id }, set: { if !$0 { editing = nil } }), arrowEdge: .top) {
             if let id, let index {
                 QueuedMessageEditor(text: text, index: index, count: messages.count,
@@ -191,6 +265,8 @@ struct ComposerQueueBar: View {
         .contextMenu {
             if let id, let index {
                 Button("Edit…") { editing = id }
+                Button("Edit in Message Box") { onEditInComposer(id) }   // §50.3
+                    .help("Takes it out of the queue into the message box; ↩ sends it")
                 Button("Send Now") { onSendNow(id) }   // MARK: composer (§50.2)
                 Button("Move Earlier") { onMove(id, -1) }.disabled(index == 0)
                 Button("Move Later") { onMove(id, 1) }.disabled(index == messages.count - 1)
