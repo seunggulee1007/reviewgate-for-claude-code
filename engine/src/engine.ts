@@ -1079,6 +1079,14 @@ export class ReviewEngine {
         this.record({ kind: "permission", requestId: cmd.requestId, toolName: pending.toolName, allow: cmd.allow, ...(pending.file !== undefined ? { file: pending.file } : {}) });
         // r2-chats-cards M25 (§33.10): no message = the terminal's "No"; `skip` goes on without the call; `interrupt` stops the turn.
         const denyMessage = cmd.message ?? (!cmd.allow && cmd.skip === true ? USER_SKIPPED_MESSAGE : undefined);
+        // A worktree command runs only once the list of worktrees before it is read: with a slow git (Windows) the list
+        // could land after the command, and the "one worktree added" fallback of a followed move found none.
+        const before = cmd.allow && pending.toolUseId ? this.worktreeBeforeCommand.get(pending.toolUseId) : undefined;
+        if (before) {
+          let timer: NodeJS.Timeout | undefined;
+          await Promise.race([before, new Promise<void>((resolve) => { timer = setTimeout(resolve, 2000); })]); // a git that hangs never holds the answer longer
+          clearTimeout(timer);
+        }
         session.respondPermission(cmd.requestId, cmd.allow, denyMessage, cmd.updatedInput, { interrupt: !cmd.allow && cmd.interrupt === true });
         // §33.2 / §33.3: a card with a reason, SendMessage, a worktree / plan tool or a question keeps asking — `remember`
         // from an older client stores nothing for it (and would answer nothing: hooks.autoAllowReason).
