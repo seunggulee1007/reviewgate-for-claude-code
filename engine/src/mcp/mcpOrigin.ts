@@ -95,6 +95,8 @@ export type McpOriginContext = {
   claudeJson: string;
   index: McpFileIndex;
   windows: boolean;
+  /** §42.3: the file of each server the engine gives a worktree from a `.mcp.json` above its main checkout (mcpInherit.ts). */
+  inherited?: ReadonlyMap<string, { file: string }>;
   /** Test seam: whether the CLI may rewrite `file`. */
   isWritable?: (file: string) => Promise<boolean>;
 };
@@ -113,7 +115,7 @@ export async function mcpOriginOf(server: McpServerInfo, ctx: McpOriginContext):
     case "local":
       return { file: ctx.claudeJson, place: "home", removable: true };
     case "project": {
-      const file = await ctx.index.projectFileOf(server.name, ctx.root);
+      const file = (await ctx.index.projectFileOf(server.name, ctx.root)) ?? ctx.inherited?.get(server.name)?.file ?? null;
       if (!file) return { file: null, place: null, removable: false, reason: "not_found", command: mcpRemoveCommand(server.name, "project", null, ctx.windows) };
       const place = isInsidePath(file, resolve(ctx.root)) ? "project" : "parent";
       if (!(await (ctx.isWritable ?? writable)(file))) {

@@ -5649,6 +5649,23 @@ type ClaudeMdEvent = { type: "claude_md"; id?; path; relPath; kind: "project" | 
   file and says every project and workbench under that folder loses the server; a row that cannot be removed opens the
   same confirmation with the reason and [명령 복사] (the `command`). ReviewGate itself writes no MCP file: the CLI does,
   and only for the file the user confirmed; `~/.claude.json` / `~/.claude/settings*.json` are never written by the app.
+- **A workbench outside the project keeps the project's parent servers.** The CLI reads the `.mcp.json` of its working
+  folder and of every folder above it (not the filesystem root; CLI 2.1.322, `claude mcp list` and an SDK session alike),
+  so in a worktree that is not below the main checkout — a managed workbench in `~/.reviewgate/worktrees/…` — the servers of
+  `/work/acme/.mcp.json` above the project `/work/acme/app` were missing altogether while a folder above both (`~/.mcp.json`)
+  still loaded; the terminal in `/work/acme/app` and Claude Code's own worktrees (inside the repository) have them. When the
+  project is such a worktree (its git common dir is `<main>/.git` and the cwd is not `<main>` or below it), the engine
+  (`mcp/mcpInherit.ts`) reads the `.mcp.json` of every folder above `<main>` that is not also above the cwd, root-most
+  first with a nearer file winning, expands `${VAR}` / `${VAR:-default}` with the session's environment, leaves out the
+  names the session already has (its own `.mcp.json` walk, user / local scope, plugins, session-scope servers) and the
+  ones `disabledMcpjsonServers` rejects (user settings, the cwd's `.claude/settings.json` and, with §36.6,
+  `settings.local.json`), and gives them to the session with the session-scope servers in one `setMcpServers` set at the
+  first MCP poll — the side questions' server set (§21) includes them. Their `mcp_status` rows say `scope` / `source`
+  `"project"` (the CLI reports them `dynamic`), and `origin` names their own file (`place: "parent"`), so they can be turned
+  off, and removed in their folder (`mcp_remove {file}`), like any parent folder's server. The main checkout itself, and a
+  worktree below it, get nothing extra. In an SDK session the CLI approves a `.mcp.json` server by itself (no prompt) unless
+  settings reject it, so no approval step of the app's is involved; a server the terminal would ask about once is not
+  dropped here. Real-CLI check: `sidecar/test/driver-parent-mcp.mjs`.
 - **Off for every workbench.** `mcp_toggle {scope: "repository"}` keeps the choice in
   `<git common dir>/reviewgate/mcp-repository.json` `{version: 1, disabled}` (engine `mcp/mcpScopes.ts`); the worktree's own
   `<git dir>/reviewgate/mcp.json` gains `enabled` — on here although the repository turns it off (written only when there

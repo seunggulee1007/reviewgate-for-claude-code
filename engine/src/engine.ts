@@ -240,6 +240,7 @@ import { agentHistoryFromRows } from "./session/agentHistoryRows.js"; // MARK: w
 import type { ModelCost } from "./protocol.js"; // MARK: wave4d w4d-agents2 (§42.4)
 // MARK: wave4d w4d-config — §42.3
 import { McpFileIndex, mcpOriginOf } from "./mcp/mcpOrigin.js";
+import { inheritedMcpFiles, inheritedMcpServers, mainCheckoutOf, rejectedMcpjsonServers, type InheritedMcpServer } from "./mcp/mcpInherit.js";
 import { applyMcpToggle, loadRepoToggles, loadWorktreeToggles, mcpOffBy, mcpOffNames, repoTogglesStamp, saveRepoToggle, saveWorktreeToggles, type McpToggles } from "./mcp/mcpScopes.js";
 import { claudeJsonPath } from "./session/localSettings.js";
 import { describeMemoryFile, instructionTarget, projectInstructionFiles, readInstruction, subagentList, writeInstruction } from "./instructions/claudeMd.js";
@@ -630,6 +631,8 @@ export class ReviewEngine {
   private readonly mcpDisabled = new Set<string>();
   /** `mcp_add {scope:"session"}` servers of the open project, re-applied when a new session starts. */
   private readonly mcpSessionServers = new Map<string, McpAddConfig>();
+  /** §42.3: the servers of the `.mcp.json` files above the main checkout a worktree outside it would lose (mcpInherit.ts). */
+  private mcpInherited = new Map<string, InheritedMcpServer>();
   /** A project / user server was added or removed since the session started: it applies at the next session start. */
   private mcpRestartRequired = false;
   private readonly mcpAuthNotified = new Set<string>();
@@ -3109,6 +3112,7 @@ export class ReviewEngine {
     this.mcpAuthWaiting.clear();
     this.cliAgents = null;
     this.mcpSessionServers.clear();
+    this.mcpInherited = new Map();
     this.mcpRestartRequired = false;
     this.mcpLast = [];
     this.mcpLastJson = "";
@@ -5661,7 +5665,15 @@ export class ReviewEngine {
   /** Re-applies the project's disabled servers and the session-scope servers to a new session; true when anything changed. */
   private async applyMcpPrefs(session: ClaudeSessionLike, raw: RawMcpStatus[]): Promise<boolean> {
     let changed = false;
-    if (this.mcpSessionServers.size > 0 && typeof session.setMcpServers === "function") {
+    // Only a worktree outside its main checkout reads anything (no await otherwise: a toggle made meanwhile is not raced).
+    const main = this.outsideMainCheckout();
+    this.mcpInherited = main
+      ? await this.inheritedMcp(raw, main).catch((e) => {
+          this.log("warn", `mcp: reading the .mcp.json files above the main checkout failed: ${errorMessage(e)}`);
+          return new Map<string, InheritedMcpServer>();
+        })
+      : new Map();
+    if ((this.mcpSessionServers.size > 0 || this.mcpInherited.size > 0) && typeof session.setMcpServers === "function") {
       try {
         await withTimeout(session.setMcpServers(this.sdkSessionServers()), MCP_CALL_TIMEOUT_MS, "setMcpServers");
         changed = true;
@@ -5684,7 +5696,43 @@ export class ReviewEngine {
   }
 
   private sdkSessionServers(): Record<string, never> {
-    return Object.fromEntries([...this.mcpSessionServers].map(([n, c]) => [n, sdkMcpConfig(c)])) as Record<string, never>;
+    return this.sdkServersWith(this.mcpSessionServers);
+  }
+
+  /** The SDK's server set (`setMcpServers` replaces it whole): the inherited `.mcp.json` servers, then the session-scope `servers`. */
+  private sdkServersWith(servers: ReadonlyMap<string, McpAddConfig>): Record<string, never> {
+    const out: Record<string, unknown> = {};
+    for (const [n, sv] of this.mcpInherited) out[n] = sv.config;
+    for (const [n, c] of servers) out[n] = sdkMcpConfig(c);
+    return out as Record<string, never>;
+  }
+
+  /**
+   * §42.3: in a worktree outside the main checkout (a managed workbench) the `.mcp.json` servers of the folders above the
+   * main checkout, as the terminal there has them — not the names the session already has, nor ones settings reject.
+   */
+  private async inheritedMcp(raw: RawMcpStatus[], main: string): Promise<Map<string, InheritedMcpServer>> {
+    const cwd = this.project!.path;
+    const env = this.childEnv();
+    const settings = [
+      ...(this.ext?.loadUser ? [join(claudeConfigDir(env), "settings.json")] : []),
+      join(cwd, ".claude", "settings.json"),
+      ...(this.ext?.loadLocal ? [join(cwd, ".claude", "settings.local.json")] : []),
+    ];
+    const skip = await rejectedMcpjsonServers(settings);
+    // The CLI's own servers stay; `dynamic` ones are what an earlier `setMcpServers` set (plugins are `plugin:…`).
+    for (const r of raw) if (r.scope !== "dynamic" || r.name.startsWith("plugin:")) skip.add(r.name);
+    for (const n of this.mcpSessionServers.keys()) skip.add(n);
+    const found = await inheritedMcpServers(cwd, main, { skip, env });
+    if (found.size > 0) this.log("info", `mcp: ${found.size} server(s) from .mcp.json files above ${main}`);
+    return found;
+  }
+
+  /** The main checkout when the project is a worktree outside it with `.mcp.json` folders the CLI does not walk; else null. */
+  private outsideMainCheckout(): string | null {
+    const cwd = this.project?.path;
+    const main = this.projectCommonDir ? mainCheckoutOf(this.projectCommonDir) : null;
+    return cwd && main && inheritedMcpFiles(cwd, main).length > 0 ? main : null;
   }
 
   private mcpEvent(): McpStatusEvent {
@@ -5745,7 +5793,7 @@ export class ReviewEngine {
   private async mcpAdd(name: string, scope: McpScope, config: McpAddConfig): Promise<McpStatusEvent> {
     if (scope === "session") {
       const next = new Map(this.mcpSessionServers).set(name, config);
-      const servers = Object.fromEntries([...next].map(([n, c]) => [n, sdkMcpConfig(c)])) as Record<string, never>;
+      const servers = this.sdkServersWith(next);
       let errors: Record<string, string> = {};
       await this.mcpCall("setMcpServers", async (s) => {
         errors = (await s.setMcpServers!(servers)).errors ?? {};
@@ -5764,7 +5812,7 @@ export class ReviewEngine {
       if (!this.mcpSessionServers.has(name)) throw new CommandRefused(`unknown_mcp_server:${name}`);
       const next = new Map(this.mcpSessionServers);
       next.delete(name);
-      const servers = Object.fromEntries([...next].map(([n, c]) => [n, sdkMcpConfig(c)])) as Record<string, never>;
+      const servers = this.sdkServersWith(next);
       await this.mcpCall("setMcpServers", (s) => s.setMcpServers!(servers), name);
       this.mcpSessionServers.delete(name);
       return this.mcpStatusReply();
@@ -5900,8 +5948,10 @@ export class ReviewEngine {
     const out: McpServerInfo[] = [];
     for (const sv of servers) {
       const offBy = sv.disabledByUser ? mcpOffBy(this.mcpToggles, sv.name) : null;
-      const origin = root ? await mcpOriginOf(sv, { root, claudeJson, index: this.mcpFiles, windows: this.platform.isWindows }).catch(() => undefined) : undefined;
-      out.push({ ...sv, ...(origin ? { origin } : {}), ...(offBy ? { disabledIn: offBy } : {}), ...(this.mcpAuthWaiting.has(sv.name) && sv.status === "needs-auth" ? { authWaiting: true as const } : {}) });
+      // §42.3: a server from a `.mcp.json` above the main checkout reaches the CLI as an SDK server — it is a project one.
+      const inherited = !sv.sessionAdded && this.mcpInherited.has(sv.name) ? { scope: "project", source: "project" as const } : {};
+      const origin = root ? await mcpOriginOf({ ...sv, ...inherited }, { root, claudeJson, index: this.mcpFiles, windows: this.platform.isWindows, inherited: this.mcpInherited }).catch(() => undefined) : undefined;
+      out.push({ ...sv, ...inherited, ...(origin ? { origin } : {}), ...(offBy ? { disabledIn: offBy } : {}), ...(this.mcpAuthWaiting.has(sv.name) && sv.status === "needs-auth" ? { authWaiting: true as const } : {}) });
     }
     return out;
   }
@@ -5909,9 +5959,15 @@ export class ReviewEngine {
   /** The folder `claude mcp remove --scope project` runs in for `file` — the server's own `.mcp.json`, as found now. */
   private async mcpRemoveFolder(name: string, file: string): Promise<string> {
     const root = this.project?.path;
-    const found = root ? await this.mcpFiles.projectFileOf(name, root) : null;
+    const found = root ? (await this.mcpFiles.projectFileOf(name, root)) ?? (await this.inheritedFileOf(name)) : null;
     if (!found || !samePath(found, file)) throw new CommandRefused(`mcp_origin_changed:${name}`, { code: "mcp_origin_changed" });
     return dirname(found);
+  }
+
+  /** §42.3: the inherited server's `.mcp.json` when it still names `name` (re-read: removing goes by the file as it is now). */
+  private async inheritedFileOf(name: string): Promise<string | null> {
+    const file = this.mcpInherited.get(name)?.file;
+    return file && (await this.mcpFiles.names(file))?.has(name) ? file : null;
   }
 
   private applyInstructionExtensions(root: string, configDir: string): void {
