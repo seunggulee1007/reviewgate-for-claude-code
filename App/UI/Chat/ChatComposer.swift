@@ -255,6 +255,31 @@ struct ChatComposer: View {
         InputHeightHandle.limits(dragged: draggedHeight, window: windowHeight)
     }
 
+    /// The queue bar, apart from `body`: inline, its closures made the Release build's type checker give up (0.5.14).
+    /// Its tools' frames go to the composer check in DEBUG builds only, where `debugQueueTools` exists.
+    private var queueBar: ComposerQueueBar {
+        var bar = ComposerQueueBar(messages: store.queuedMessages,
+                         steering: store.steeringMessages,   // MARK: composer (§50.2)
+                         takingBack: store.steeringTakingBack,   // §50.3
+                         onTakeBack: { id, edit in Task { await store.takeBackSteering(id: id, toComposer: edit) } },
+                         onEditInComposer: { store.editQueuedInComposer(id: $0) },
+                         stopAndSend: store.sendAfterInterrupt,
+                         pausedReason: store.queuePausedReason,
+                         holdReason: store.queueHoldReason,
+                         waitingOnAgents: store.waitingOnAgents != nil,   // wave3 mac-agents (§36.4)
+                         onUpdate: { store.updateQueued(id: $0, text: $1) },
+                         onRemove: { store.removeQueued(id: $0) },
+                         onSendNow: { store.sendQueuedNow(id: $0) },   // MARK: composer (§50.2)
+                         sendNowAction: { store.queuedSendNowAction(id: $0) },
+                         onMove: { store.moveQueued(id: $0, by: $1) },
+                         onResume: { store.resumeQueue() },
+                         onClear: { store.clearQueue() })
+        #if DEBUG
+        bar.debugToolFrame = { model.debugQueueTools[$0] = $1 }   // the composer check (§50.3)
+        #endif
+        return bar
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ViewingChatBar()   // MARK: wave4b w4b-tabs — §39.2 "이 채팅을 보는 중이에요 — 보내면 이 채팅으로 이어가요"
@@ -265,23 +290,7 @@ struct ChatComposer: View {
                 CollectFailedNotice(detail: failure)   // r2-review-flow M30: the input stays open; Retry right here
             }
             if !store.queuedMessages.isEmpty || store.sendAfterInterrupt != nil || !store.steeringMessages.isEmpty {
-                ComposerQueueBar(messages: store.queuedMessages,
-                                 steering: store.steeringMessages,   // MARK: composer (§50.2)
-                                 takingBack: store.steeringTakingBack,   // §50.3
-                                 onTakeBack: { id, edit in Task { await store.takeBackSteering(id: id, toComposer: edit) } },
-                                 onEditInComposer: { store.editQueuedInComposer(id: $0) },
-                                 stopAndSend: store.sendAfterInterrupt,
-                                 pausedReason: store.queuePausedReason,
-                                 holdReason: store.queueHoldReason,
-                                 waitingOnAgents: store.waitingOnAgents != nil,   // wave3 mac-agents (§36.4)
-                                 onUpdate: { store.updateQueued(id: $0, text: $1) },
-                                 onRemove: { store.removeQueued(id: $0) },
-                                 onSendNow: { store.sendQueuedNow(id: $0) },   // MARK: composer (§50.2)
-                                 sendNowAction: { store.queuedSendNowAction(id: $0) },
-                                 onMove: { store.moveQueued(id: $0, by: $1) },
-                                 onResume: { store.resumeQueue() },
-                                 onClear: { store.clearQueue() },
-                                 debugToolFrame: { model.debugQueueTools[$0] = $1 })   // the composer check (§50.3)
+                queueBar
                 #if DEBUG
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugQueueBarFrame = $0 }   // the composer check
                     .onDisappear { model.debugQueueBarFrame = .zero }
