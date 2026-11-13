@@ -3,14 +3,15 @@
  * client allowlist (src/main/ipcGuard.ts) before they reach `ReviewEngine`; URLs handed to the shell
  * must be http(s). `rg:e2e:*` handlers live in src/main/e2e.ts and exist only under `--e2e`.
  */
-import { BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type WebContents } from "electron";
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type WebContents } from "electron";
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
 import type { AppSettings, EditorKind, McpConfigFileResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
-import { openInEditor } from "./editor.js";
 import { createMcpJson, isMcpConfigPath, mcpConfigMtime } from "./mcpConfigFile.js";
+import { openInEditor, vscodePath } from "./editor.js";
+import { finishDraftEdit, startDraftEdit } from "./draftEditor.js"; // §56.3
 import { isOpenableMarkdown } from "./markdownOpen.js"; // MARK: wave4d w4d-config (§42.3)
 import { isOpenableGraphHtml } from "./graphOpen.js"; // MARK: wave5 w5-graph (§43.3)
 // MARK: wave3 desktop-flow
@@ -231,6 +232,21 @@ export function installIPC(deps: Deps): void {
   });
   ipcMain.handle("rg:logError", (evt, message: unknown) => {
     if (typeof message === "string") logLine(`w${evt.sender.id}`, "error", `renderer: ${message.slice(0, 16_000)}`);
+  });
+  // MARK: composer parity — §56.3 Ctrl+G: the draft in an external editor; its saves go back to the window that asked.
+  ipcMain.handle("rg:draftEditStart", async (evt, text: unknown) => {
+    if (typeof text !== "string") return { ok: false, error: "not_text" };
+    const sender = evt.sender;
+    const code = await vscodePath();
+    return startDraftEdit(text, {
+      temp: app.getPath("temp"), env: process.env, platform: process.platform, code,
+      send: (ev) => {
+        if (!sender.isDestroyed()) sender.send("rg:draftEdit", ev);
+      },
+    });
+  });
+  ipcMain.handle("rg:draftEditFinish", (_e, id: unknown) => {
+    if (typeof id === "string") finishDraftEdit(id);
   });
   ipcMain.handle("rg:copyText", (_e, text: unknown) => {
     if (typeof text === "string" && text.length <= 1_000_000) clipboard.writeText(text);

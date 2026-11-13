@@ -47,6 +47,10 @@ import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal 
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
+import { BtwOverlay } from "./BtwOverlay"; // §56.1
+import { btwNothingYet, btwQuestion, useBtw } from "../../btw";
+import { ExternalEditBar } from "./ExternalEditBar"; // §56.3
+import { isExternalEditKey, useExternalEdit } from "../../externalEdit";
 import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
@@ -78,7 +82,10 @@ export function Composer() {
   const requestChanges = useStore((s) => s.requestChanges);
   const restartSession = useStore((s) => s.restartSession);
   const enqueueMessage = useStore((s) => s.enqueueMessage);
-  const pullBackLastWaiting = useStore((s) => s.pullBackLastWaiting); // §50.3
+  const pullBackWaiting = useStore((s) => s.pullBackWaiting); // §56.2
+  const interruptGivingBack = useStore((s) => s.interruptGivingBack); // §56.2
+  // §56.2: something waits that Esc would give back (the queue, or a message in Claude's turn not being taken back).
+  const unsentWaiting = useStore((s) => s.queue.items.length > 0 || (s.state.session.steering ?? []).some((m) => !s.steerTakingBack.includes(m.id)));
   const interruptAndSend = useStore((s) => s.interruptAndSend);
   const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
@@ -212,11 +219,12 @@ export function Composer() {
     });
   };
   // MARK: wave3 desktop-agents — §36.1 "메인으로 보내기": the report lands after the draft, focused, for the user's own words.
-  useComposerInsert((text, chips) => {
+  useComposerInsert((text, chips, at) => {
     // wave6 w6-terminal (§44.1): while a recalled prompt is shown, the report joins the draft typed before ↑.
     const parked = navRef.current.index !== null ? navRef.current.saved : null;
     setNav(IDLE_NAV);
-    setDraft((d) => joinDraft(parked ?? d, text));
+    // §56.2: messages Esc / ↑ gave back go in front of what is typed.
+    setDraft((d) => (at === "front" ? ((parked ?? d).trim() === "" ? text : joinDraft(text, parked ?? d)) : joinDraft(parked ?? d, text)));
     // r2-chats-cards M31 / M33 (§9): a held message that will not go out comes back with its mentions and images.
     if (chips) {
       setMentions((m) => addMentions(m, chips.mentions).list);
@@ -230,8 +238,8 @@ export function Composer() {
       const el = inputRef.current;
       if (!el) return;
       el.focus();
-      el.selectionStart = el.selectionEnd = el.value.length;
-      el.scrollTop = el.scrollHeight;
+      el.selectionStart = el.selectionEnd = at === "front" ? text.length : el.value.length;
+      if (at !== "front") el.scrollTop = el.scrollHeight;
     });
   });
   // MARK: §49 — the task taken from here started in its workbench: its text leaves this composer (unless edited since).
@@ -275,6 +283,18 @@ export function Composer() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [splitOpen]);
 
+  // MARK: composer parity — §56.3 Ctrl+G: the draft out in an external editor; each save replaces it.
+  const external = useExternalEdit(
+    (text) => {
+      setNav(IDLE_NAV);
+      setDraft(text);
+    },
+    (why) => setAttachErrors([why]),
+  );
+  const editExternally = () => {
+    if (viewing || external.editing) return;
+    void external.start(draft);
+  };
   const { caps, cached } = capabilitiesOf({ state, cachedCapabilities });
   // §22: the live MCP list when the engine sent one, else what the session reported at start.
   const mcpLive = useStore((s) => (s.mcp.loaded ? s.mcp.servers : null));
@@ -325,6 +345,19 @@ export function Composer() {
   const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null, settings?.returnSends !== false, cardForText !== null);
 
   const token = slashToken(draft);
+  // MARK: composer parity — §56.1 /btw: the answer over the box, a question that got none, and the chat it belongs to.
+  const btwOverlay = useBtw((s) => s.overlay);
+  const btwFailure = useBtw((s) => s.failure);
+  const askBtw = useBtw((s) => s.ask);
+  const showLastBtw = useBtw((s) => s.showLast);
+  const dismissBtw = useBtw((s) => s.dismiss);
+  const liveChatId = useStore((s) => s.state.sessions?.currentId ?? s.state.session.sessionId ?? null);
+  useEffect(() => {
+    if (!btwFailure) return;
+    setAttachErrors([btwFailure.text]);
+    setDraft((d) => (d.length === 0 ? `/btw ${btwFailure.question}` : d));
+  }, [btwFailure]);
+  useEffect(() => dismissBtw(), [liveChatId, dismissBtw]);
   // MARK: r1-composer M14 — the palette works while Claude works or the session starts too (a pick goes into the draft).
   const paletteVisible = slashPaletteShows({ projectOpen: state.project !== null, dismissed: paletteDismissed, forced: paletteForced, token });
 
@@ -490,8 +523,33 @@ export function Composer() {
     inputRef.current?.focus();
   };
 
+  /**
+   * §56.1: `/btw <question>` is the app's command, whatever the turn does: asked on the side (the answer opens over the
+   * box), never sent, queued or put into the turn; `/btw` alone shows this chat's last answer again. False for any other text.
+   */
+  const takeBtw = (): boolean => {
+    const q = btwQuestion(draft);
+    if (q === null) return false;
+    setSplitOpen(false);
+    if (state.project === null) {
+      setAttachErrors([t("Open a project first (⌘O)")]);
+      return true;
+    }
+    setDraft("");
+    closePalette();
+    setNav(IDLE_NAV);
+    if (q === "") {
+      if (!showLastBtw(liveChatId)) setAttachErrors([btwNothingYet()]);
+    } else {
+      void askBtw(q, liveChatId);
+    }
+    inputRef.current?.focus();
+    return true;
+  };
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
+    if (takeBtw()) return; // §56.1
     if (!canSend || draft.trim().length === 0) return;
     if (viewing) {
       // wave4b w4b-tabs (§39.2): move the session to this chat first; a refused switch gives the text back.
@@ -522,6 +580,7 @@ export function Composer() {
 
   /** "Add to queue": sent in order once a plain Send is allowed again. */
   const doQueue = () => {
+    if (takeBtw()) return; // §56.1
     if (!queueMode || !hasText) return;
     setDraft("");
     closePalette();
@@ -537,6 +596,7 @@ export function Composer() {
    */
   const doSteer = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!canSteer || !hasText) return;
     const text = draft;
     const sentMentions = mentions;
@@ -557,6 +617,7 @@ export function Composer() {
    */
   const doAnswer = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!question) return;
     if (!hasText) {
       if (!questionReady) return;
@@ -583,6 +644,7 @@ export function Composer() {
   /** r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as its instruction; the text leaves the box. */
   const doDenyWithText = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     const text = draft.trim();
     if (!cardForText || text.length === 0) return;
     useStore.getState().respondPermission(cardForText, false, text);
@@ -602,6 +664,7 @@ export function Composer() {
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!running || !hasText) return;
     setDraft("");
     closePalette();
@@ -618,6 +681,7 @@ export function Composer() {
   };
 
   const sendAccepting = () => {
+    if (takeBtw()) return; // §56.1
     if (!acceptAndSend || draft.trim().length === 0) return;
     const count = pending;
     setDraft("");
@@ -658,6 +722,12 @@ export function Composer() {
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposing(e)) return; // wave4 w4-input (polish-11): the IME's own Enter / Tab / arrows
+    // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
+    if (btwOverlay?.kind === "answered" && draft === "" && (isEnter(e) || e.key === " ") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      dismissBtw();
+      return;
+    }
     // MARK: wave6 w6-terminal — §44.1: Shift+Tab cycles the mode like the terminal (default → accept edits → plan → auto);
     // only here — everywhere else Shift+Tab still moves the focus back.
     if (isModeCycleKey(e)) {
@@ -667,6 +737,12 @@ export function Composer() {
     }
     // MARK: §52 — Ctrl+B in an empty box while a turn runs: the running command goes on in the background (otherwise
     // Ctrl+B does what it did — toggles the sidebar).
+    // §56.3: Ctrl+G, as in the terminal — the draft in an external editor.
+    if (isExternalEditKey(e) && !viewing) {
+      e.preventDefault();
+      editExternally();
+      return;
+    }
     if (isBackgroundKey(e, { draftEmpty: draft.trim().length === 0, turnRunning: running, enabled: backgroundWorkOn(settings), viewing: viewing !== null })) {
       e.preventDefault();
       noteBackgroundKey();
@@ -759,9 +835,9 @@ export function Composer() {
     if (!paletteVisible) {
       const el = e.currentTarget;
       const caret = el.selectionStart === el.selectionEnd ? el.selectionStart : null;
-      // §50.3: as in the terminal, ↑ in an empty box first brings back the last message waiting (queued, else in Claude's
-      // turn) to edit; with nothing waiting it walks the prompt history.
-      if (e.key === "ArrowUp" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && draft === "" && nav.index === null && !viewing && pullBackLastWaiting()) {
+      // §56.2: as in the terminal, ↑ in an empty box first brings back every message waiting (in Claude's turn, then the
+      // queue) to edit; with nothing waiting it walks the prompt history.
+      if (e.key === "ArrowUp" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && draft === "" && nav.index === null && !viewing && pullBackWaiting()) {
         e.preventDefault();
         return;
       }
@@ -780,10 +856,15 @@ export function Composer() {
           e.preventDefault();
           setNav(step.nav);
           showDraft(step.draft, step.caret);
+        } else if (btwOverlay !== null) {
+          e.preventDefault(); // §56.1: the side answer first, then the turn
+          dismissBtw();
         } else if (running && !viewing) {
           // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (Ctrl+. does too).
+          // §56.2: with messages waiting, what Claude has not read comes back into the box with the stop.
           e.preventDefault();
-          interrupt();
+          if (unsentWaiting) void interruptGivingBack();
+          else interrupt();
         }
       }
       return;
@@ -792,6 +873,7 @@ export function Composer() {
       case "Enter":
       case "Tab":
         e.preventDefault();
+        if (isEnter(e) && token?.toLowerCase() === "btw" && takeBtw()) break; // §56.1: `/btw` typed out runs at once
         if (entries.length === 0) closePalette();
         else pick(entries[Math.min(paletteIndex, entries.length - 1)]!);
         break;
@@ -866,6 +948,8 @@ export function Composer() {
         </div>
       )}
       {dropping && <div className="drop-hint" aria-hidden="true">{t("Drop files to mention them, or images to attach")}</div>}
+      <BtwOverlay /* §56.1: the /btw answer, over the box */ />
+      <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
       <textarea
         ref={inputRef}
         className="composer-input"
@@ -938,6 +1022,20 @@ export function Composer() {
         >
           <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 4.5 5.8 9.2a1.5 1.5 0 0 0 2.1 2.1l5-5a3 3 0 0 0-4.2-4.2l-5.2 5.2a4.5 4.5 0 0 0 6.4 6.4L14 9.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {images.length > 0 && <span className="num">{images.length}</span>}
+        </button>
+        <button
+          type="button"
+          className="attach-btn plain"
+          disabled={viewing !== null || external.editing !== null}
+          onClick={editExternally}
+          title={viewing !== null ? t("Go back to the running chat to edit its message")
+            : external.editing !== null ? t("The message is open in an editor — Done or Cancel above the box")
+            : t("Edit the message in an external editor (⌃G) — each save comes back here")}
+          aria-label={t("Edit in an external editor")}
+          data-testid="Edit in an external editor"
+        >
+          {/* §56.3: the Mac's square.and.pencil */}
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 9v4.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5H7M11.5 2.5l2 2L8 10H6V8z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         {runAsTask && (
           <button

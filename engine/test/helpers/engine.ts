@@ -1,7 +1,7 @@
 import { ReviewEngine, type EngineOptions } from "../../src/engine.js";
 import type { Platform } from "../../src/platform/index.js";
 import type { Budget, EffortLevel, EngineEvent, HelloCommand, PermissionMode, ReviewState, Settings, TurnUsage } from "../../src/protocol.js";
-import type { ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage, SteerTakeBack } from "../../src/session/claude.js";
+import type { BtwAnswer, BtwExchange, ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage, SteerTakeBack } from "../../src/session/claude.js";
 import type { SessionEvent, ToolFileEntry } from "../../src/session/events.js";
 import { WAIT_MS } from "./wait.js";
 
@@ -73,6 +73,33 @@ export class FakeClaudeSession implements ClaudeSessionLike {
 
   async interrupt(): Promise<void> {
     this.interrupts += 1;
+  }
+
+  /**
+   * §56.2: a CLI that drops what waits with the interrupt (`cancel_queued`) — off: `interruptTakingBack` answers null; on:
+   * the uuids it drops (`cancelQueuedResult`, default every message put into the turn), each `steer_withdrawn`.
+   */
+  cancelQueued = false;
+  cancelQueuedResult: string[] | null = null;
+  interruptsTakingBack = 0;
+
+  async interruptTakingBack(): Promise<string[] | null> {
+    if (!this.cancelQueued) return null;
+    this.interruptsTakingBack += 1;
+    const ids = this.cancelQueuedResult ?? this.steers.map((_, i) => `steer-${i + 1}`);
+    for (const id of ids) this.emit({ type: "steer_withdrawn", uuid: id });
+    return ids;
+  }
+
+  /** §56.1: /btw questions the session was asked, and what the next one answers (an Error: the CLI refused it). */
+  readonly sideQuestions: { question: string; history: BtwExchange[] }[] = [];
+  sideQuestionResult: BtwAnswer | null | Error | Promise<BtwAnswer | null> = { response: "side answer", synthetic: false };
+
+  async askSideQuestion(question: string, history: readonly BtwExchange[]): Promise<BtwAnswer | null> {
+    this.sideQuestions.push({ question, history: [...history] });
+    const r = await this.sideQuestionResult;
+    if (r instanceof Error) throw r;
+    return r;
   }
 
   /** §36.5: `reloadPlugins` calls, and what they answer (null: the CLI held the reload). */

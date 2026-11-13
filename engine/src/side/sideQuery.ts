@@ -170,6 +170,8 @@ export type SideQueryOptions = {
   maxTurns?: number;
   /** Replaces `SIDE_SYSTEM_PROMPT` as the system-prompt append. */
   system?: string;
+  /** §56.1: the built-in tools the CLI offers (`[]`: none — a /btw answered from the conversation alone). Default: all. */
+  tools?: string[];
   /**
    * MARK: r2-skills-side — §21 (M18): the user's MCP servers start as in the main session (`settingSources`, plus the
    * session-added `servers`; `denied` — the ones the user turned off — stay off), and its MCP tools that only read may run
@@ -250,6 +252,7 @@ export class SideQuery {
       ...(o.mcp ? { mcpServers: o.mcp.servers } : { mcpServers: {}, strictMcpConfig: true }),
       includePartialMessages: true,
       maxTurns: o.maxTurns ?? 30,
+      ...(o.tools ? { tools: o.tools } : {}),
       ...(o.persistSession === false ? { persistSession: false } : {}),
       hooks: { PreToolUse: [{ hooks: [pre] }] },
       canUseTool: this.canUseTool,

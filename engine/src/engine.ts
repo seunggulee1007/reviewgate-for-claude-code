@@ -197,6 +197,8 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import type { BtwAnswerEvent, InterruptedEvent } from "./protocol.js";
+import { BTW_SYSTEM, BTW_TIMEOUT_MS, BtwHistory, btwForkPrompt, MAX_BTW_QUESTION } from "./side/btw.js"; // §56.1
 import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
 import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
 import { headHunks, splitContent, type HeadFile } from "./git/commitHunks.js"; // §53
@@ -609,9 +611,11 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
+  /** §56.1: the current chat's /btw exchanges (in memory: the CLI keeps none for an SDK session). */
+  private readonly btwHistory = new BtwHistory();
   /** Chain uuid of the main session's last completed turn: where a side question forks while a turn runs (§21). */
   private lastForkPoint: { sessionId: string; uuid: string } | null = null;
   // ---- MCP (§22)
@@ -1069,7 +1073,8 @@ export class ReviewEngine {
         await this.steerTakeBack(cmd.messageId);
         return;
       case "interrupt":
-        await this.interruptTurn();
+        if (cmd.takeBack === true) return this.interruptTurn(true); // §56.2
+        await this.interruptTurn(false);
         return;
       case "permission_response": {
         const session = this.session;
@@ -1386,6 +1391,8 @@ export class ReviewEngine {
         return this.prFileLinesEvent(cmd.filename);
       case "file_image":
         return this.fileImageEvent(cmd.path);
+      case "btw_ask": // §56.1
+        return this.btwAsk(cmd.question);
       // ---- §21 side questions
       case "side_ask": {
         // MARK: r2-skills-side — §21 (M18): a skill / slash command the session knows runs in the main conversation only.
@@ -3544,6 +3551,54 @@ export class ReviewEngine {
     throw new CommandRefused("steer_take_back_failed: the CLI could not take the message back — Claude still reads it", { code: "steer_take_back_failed" });
   }
 
+  /**
+   * §56.1 `btw_ask {question}`: `/btw` as in the terminal — the live CLI answers from the conversation as it is, with no
+   * tools, while the turn runs (`side_question`, with the chat's earlier /btw exchanges). A session that cannot (none yet,
+   * an older CLI, a refusal) leaves it to a one-shot fork of the chat with no tools. Nothing joins the chat or its history.
+   */
+  private async btwAsk(question: unknown): Promise<BtwAnswerEvent> {
+    const q = typeof question === "string" ? question.trim() : "";
+    if (!q) throw new CommandRefused("empty_question");
+    if (q.length > MAX_BTW_QUESTION) throw new CommandRefused(`question_too_long:${q.length} > ${MAX_BTW_QUESTION}`, { code: "question_too_long" });
+    this.requireProject();
+    const chatId = this.currentSessionId;
+    const history = this.btwHistory.of(chatId);
+    const fail = (why: string) => new CommandRefused(`btw_failed:${why}`, { code: "btw_failed" });
+    let answer: { text: string; via: "session" | "fork"; synthetic: boolean } | null = null;
+    const session = this.session;
+    if (session?.askSideQuestion) {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(new Error("timed out")), BTW_TIMEOUT_MS);
+      timer.unref?.();
+      try {
+        const a = await session.askSideQuestion(q, history, abort.signal);
+        if (a === null) throw fail("cancelled");
+        answer = { text: a.response, via: "session", synthetic: a.synthetic };
+      } catch (e) {
+        if (e instanceof CommandRefused) throw e;
+        if (abort.signal.aborted) throw fail(`no answer in ${Math.round(BTW_TIMEOUT_MS / 1000)} s`);
+        this.log("warn", `/btw: the session could not answer (${errorMessage(e)}) — a fork of the chat answers`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (!answer) {
+      const run = await this.side.startDetached({
+        key: `btw:${randomUUID()}`,
+        prompt: btwForkPrompt(q, history),
+        options: { persistSession: false, allowWeb: false, system: BTW_SYSTEM, maxTurns: 1, tools: [] },
+      });
+      const result = await run.done;
+      if (result.stopReason === "interrupted") throw fail("cancelled");
+      if (result.error) throw fail(firstLineOf(result.error));
+      if (!result.text.trim()) throw fail("empty answer");
+      answer = { text: result.text.trim(), via: "fork", synthetic: false };
+    }
+    if (!answer.synthetic) this.btwHistory.add(chatId, { question: q, response: answer.text });
+    this.log("info", `/btw answered (${answer.via})`);
+    return { type: "btw_answer", question: q, answer: answer.text, via: answer.via, ...(answer.synthetic ? { synthetic: true as const } : {}) };
+  }
+
   /** §50.3: a message taken back from the turn leaves the list without a row. */
   private dropSteering(id: string): void {
     const before = this.steering.length;
@@ -4849,16 +4904,55 @@ export class ReviewEngine {
    * `interrupt`: `Query.interrupt()` (an open permission card is denied with it), then waits — at most
    * `interruptWaitMs` — until the turn ended (`turn_end{stopReason:"interrupted"}`) and its changes were collected,
    * so a `send` queued right behind it goes out ("중단하고 보내기"). A no-op without a running turn.
+   *
+   * §56.2 `takeBack` (Esc with unsent messages, as in the terminal): what waits in the turn (`state.session.steering`) is
+   * taken back with it — in the interrupt itself (`interrupt {cancel_queued: true}`) when the CLI can, else one by one
+   * (`steer_take_back`) before the interrupt. Replies `interrupted` with the messages taken back and the ids Claude has.
    */
-  private async interruptTurn(): Promise<void> {
+  private async interruptTurn(takeBack: false): Promise<undefined>;
+  private async interruptTurn(takeBack: true): Promise<InterruptedEvent>;
+  private async interruptTurn(takeBack: boolean): Promise<InterruptedEvent | undefined> {
     const session = this.session;
-    if (!this.gate.running || !session) return;
-    await session.interrupt();
+    const waiting = takeBack ? [...this.steering] : [];
+    const reply = (taken: Set<string>): InterruptedEvent | undefined => takeBack
+      ? { type: "interrupted", takenBack: waiting.filter((m) => taken.has(m.id)).map((m) => ({ id: m.id, text: m.text, ...(m.mentions ? { mentions: m.mentions } : {}) })), read: waiting.filter((m) => !taken.has(m.id)).map((m) => m.id) }
+      : undefined;
+    if (!this.gate.running || !session) return reply(new Set());
+    let taken = new Set<string>();
+    if (waiting.length > 0) {
+      taken = await this.interruptTakingBack(session, waiting.map((m) => m.id));
+      for (const id of taken) this.dropSteering(id);
+      this.log("info", `interrupt: ${taken.size} of ${waiting.length} waiting message(s) taken back`);
+    } else {
+      await session.interrupt();
+    }
     const deadline = Date.now() + this.interruptWaitMs;
     while ((this.gate.running || this.gate.collecting) && Date.now() < deadline && !this.closed) {
       await new Promise((r) => setTimeout(r, 20));
     }
     if (this.gate.running) this.log("warn", `interrupt: the turn was still running after ${this.interruptWaitMs} ms`);
+    return reply(taken);
+  }
+
+  /**
+   * §56.2: interrupts `session` and takes back the messages `ids` waiting in its turn → the ones Claude will never read. One
+   * request when the CLI can; else each is taken back (`takeBackSteer`), the interrupt goes out once they answered — or
+   * after `TAKE_BACK_BEFORE_INTERRUPT_MS`: one being folded in waits for its next frame, which the interrupt brings — and
+   * the outcomes are read once settled (the turn's end settles the rest; never longer than `interruptWaitMs`).
+   */
+  private async interruptTakingBack(session: ClaudeSessionLike, ids: string[]): Promise<Set<string>> {
+    const viaCli = session.interruptTakingBack ? await session.interruptTakingBack() : null;
+    if (viaCli !== null) {
+      this.log("info", "interrupt: the CLI drops what waits with it (cancel_queued)");
+      return new Set(viaCli.filter((id) => ids.includes(id)));
+    }
+    this.log("info", "interrupt: taking back what waits one by one (no cancel_queued)");
+    const kept = (ms: number) => new Promise<"kept">((r) => setTimeout(() => r("kept"), ms).unref?.());
+    const outcomes = ids.map((id) => (session.takeBackSteer ? session.takeBackSteer(id) : Promise.resolve<"kept">("kept")).catch(() => "kept" as const));
+    await Promise.race([Promise.all(outcomes), kept(TAKE_BACK_BEFORE_INTERRUPT_MS)]);
+    await session.interrupt();
+    const settled = await Promise.all(outcomes.map((o) => Promise.race([o, kept(this.interruptWaitMs)])));
+    return new Set(ids.filter((_, i) => settled[i] === "taken"));
   }
 
   // ------------------------------------------------------------------ §26 checkpoints / rewind
@@ -7479,7 +7573,7 @@ export class ReviewEngine {
 
   /** Stops the running turn (an open card is denied with it) and waits until it ended and its changes were collected. */
   private async settleForMove(): Promise<void> {
-    if (this.gate.running && this.session) await this.interruptTurn();
+    if (this.gate.running && this.session) await this.interruptTurn(false);
     if (this.gate.running) this.endTurnAbnormally("chat moved");
     // The stopped turn's changes are collected here first (a big worktree takes a while; every git call is capped).
     const deadline = Date.now() + Math.max(this.interruptWaitMs, CHAT_MOVE_COLLECT_WAIT_MS);
@@ -8466,7 +8560,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47)
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer" | "btw"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); §56.1 btw
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -8531,6 +8625,9 @@ function laneOf(cmd: EngineCommand): Lane {
     // §50.3: a take-back can wait for the CLI's next frame on that message — never behind (or holding up) the turn's lane.
     case "steer_take_back":
       return "steer";
+    // §56.1: /btw is answered while the turn runs — never behind (or holding up) the turn's lane or the side forks.
+    case "btw_ask":
+      return "btw";
     case "workbench_preview":
       return "query";
     default:
@@ -8609,6 +8706,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "commit_draft": // MARK: wave3 engine-flow
     case "commit_split_draft": // §53
     case "pr_ai_draft": // §51
+    case "btw_ask": // §56.1
     case "prereview_start":
     case "prereview_cancel":
     case "prereview_dismiss":
@@ -8663,6 +8761,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
 type PlannedCommit = { message: string; whole: string[]; blobs: SeriesBlob[]; files: string[]; parts: { path: string; hunks: number[] | null }[] };
 
 /** §52.1: how long a turn Claude started waits for the collection / revert in flight before it is taken. */
+/** §56.2: how long Esc's take-back one by one (a CLI without `cancel_queued`) waits for the CLI before it interrupts. */
+const TAKE_BACK_BEFORE_INTERRUPT_MS = 1500;
 const AUTO_TURN_WAIT_MS = 60_000;
 /** §52.1: how long it waits for a message sent meanwhile to go out (its turn is the one it joins). */
 const AUTO_TURN_JOIN_MS = 5_000;

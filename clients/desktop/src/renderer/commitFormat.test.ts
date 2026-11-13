@@ -76,7 +76,9 @@ describe("/clear in the palette", () => {
       { name: "clear", description: "Clear conversation history and free up context", argumentHint: "", isSkill: false, aliases: ["reset", "new"], group: { kind: "builtin" } },
       { name: "compact", description: "Clear conversation history but keep a summary", argumentHint: "", isSkill: false, aliases: [], group: { kind: "builtin" } },
     ]);
-    expect(out[0]!.description).toBe("Opens a new chat in the app — this chat stays in the list");
-    expect(out[1]!.description).toBe("Clear conversation history but keep a summary");
+    const of = (name: string) => out.find((e) => e.name === name)!.description;
+    expect(of("clear")).toBe("Opens a new chat in the app — this chat stays in the list");
+    expect(of("compact")).toBe("Clear conversation history but keep a summary");
+    expect(out.map((e) => e.name)).toEqual(["btw", "clear", "compact"]); // §56.1: /btw is the app's, always listed
   });
 });

@@ -283,6 +283,10 @@ export type ToolchainInfo = { platform: NodeJS.Platform; electron: string; node:
 
 /** `window.rg` — what the preload exposes (src/preload.ts). */
 export type McpConfigFileResult = { ok: boolean; mtime: number | null; error?: "refused" | "missing" | "failed" };
+/** §56.3: the external editor opened (`name`; `waits`: its closing ends the editing), or why not. */
+export type DraftEditStart = { ok: true; id: string; name: string; waits: boolean } | { ok: false; error: string };
+/** §56.3: a save of the draft `id` (`text`), the editor closed (`done`), or it failed to start (`error`). */
+export type DraftEditEvent = { id: string; text?: string; done?: true; error?: string };
 
 export type RGBridge = {
   send(cmd: EngineCommand): void;
@@ -359,6 +363,12 @@ export type RGBridge = {
   removeRecentProject?(path: string | null): Promise<AppSettings>;
   /** Puts text on the system clipboard (main's `clipboard`; works without a secure-context Clipboard API). */
   copyText(text: string): Promise<void>;
+  // MARK: composer parity — §56.3 Ctrl+G (optional: a test's bridge stub has none)
+  /** Writes the draft to a temp .md file and opens it in the external editor; each save comes back by `onDraftEdit`. */
+  draftEditStart?(text: string): Promise<DraftEditStart>;
+  /** Done / Cancel: stops watching that draft and removes its file. */
+  draftEditFinish?(id: string): Promise<void>;
+  onDraftEdit?(cb: (ev: DraftEditEvent) => void): () => void;
   // MARK: polish p-foundation — seeds (optional: a test's bridge stub has none)
   /** P1-chrome-24: where a dropped `File` is on disk (`webUtils.getPathForFile`; "" for one that is not a file on disk). */
   pathForFile?(file: File): string;

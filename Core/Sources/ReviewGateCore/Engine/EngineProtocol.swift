@@ -432,12 +432,16 @@ public enum EngineCommand: Sendable, Equatable {
     /// §50.3: takes back a message of `state.session.steering` before Claude reads it; refused `steer_already_read`
     /// (Claude has it — its row is in the chat) or `steer_take_back_failed` (it still goes to Claude).
     case steerTakeBack(messageId: String)
+    /// §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `.btwAnswer`.
+    case btwAsk(question: String)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
     /// `noteIds`: only these unsent notes (a note's "send only this"); nil sends every unsent note.
     case requestChanges(extra: String? = nil, noteIds: [String]? = nil)
     case interrupt
+    /// §56.2 Esc with messages waiting: `interrupt {takeBack: true}` — what waits in the turn is taken back with it → `.interrupted`.
+    case interruptTakeBack
     /// M16: `remember` auto-allows the same tool + command prefix for the rest of the session.
     case permissionResponse(requestId: String, allow: Bool, message: String? = nil, updatedInput: JSONValue? = nil, remember: Bool = false)
     /// r2-chats-cards M25 (§33.10): `permission_response {allow: false}` — the terminal's "No" (no message), "건너뛰고 계속"
@@ -691,8 +695,10 @@ public enum EngineCommand: Sendable, Equatable {
         case .sendWithModel: "send"   // wave5 w5-model (§43.4)
         case .steer: "steer"   // §50
         case .steerTakeBack: "steer_take_back"   // §50.3
+        case .btwAsk: "btw_ask"   // §56.1
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
+        case .interruptTakeBack: "interrupt"   // §56.2
         case .permissionResponse: "permission_response"
         case .permissionDeny: "permission_response"   // r2-chats-cards M25 (§33.10)
         case .forgetAllows: "forget_allows"
@@ -892,6 +898,10 @@ extension EngineCommand: Encodable {
             try encodeBackgroundFields(to: encoder)
         case .steerTakeBack:   // §50.3
             try encodeSteerTakeBackFields(to: encoder)
+        case .btwAsk:   // §56.1
+            try encodeBtwFields(to: encoder)
+        case .interruptTakeBack:   // §56.2
+            try encodeInterruptTakeBackFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
              .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges:
@@ -2838,6 +2848,10 @@ public enum EngineEvent: Sendable, Equatable {
     case prDraft(PRDraftReply)
     /// §51: reply to `pr_ai_draft`.
     case prAiDraft(PRAiDraftReply)
+    /// §56.1: reply to `btw_ask`.
+    case btwAnswer(BtwAnswer)
+    /// §56.2: reply to `interrupt {takeBack: true}`.
+    case interrupted(InterruptedReply)
     // MARK: §53 commits in meaningful units
     /// Reply to `commit_hunks`.
     case commitHunks(CommitHunksReply)
@@ -2906,6 +2920,8 @@ public enum EngineEvent: Sendable, Equatable {
         case let .commitFormat(reply): reply.id   // wave4c w4c-commit
         case let .prDraft(reply): reply.id
         case let .prAiDraft(reply): reply.id   // §51
+        case let .btwAnswer(reply): reply.id   // §56.1
+        case let .interrupted(reply): reply.id   // §56.2
         case let .commitHunks(reply): reply.id   // §53
         case let .commitSplitDraft(reply): reply.id
         case let .committedSeries(reply): reply.id
@@ -3123,6 +3139,10 @@ extension EngineEvent: Decodable {
             self = .commitFormat(try CommitFormatReply(from: decoder))
         case "pr_draft":
             self = .prDraft(try PRDraftReply(from: decoder))
+        case "interrupted":   // §56.2
+            self = .interrupted(try InterruptedReply(from: decoder))
+        case "btw_answer":   // §56.1
+            self = .btwAnswer(try BtwAnswer(from: decoder))
         case "pr_ai_draft":   // §51
             self = .prAiDraft(try PRAiDraftReply(from: decoder))
         case "commit_hunks":   // §53

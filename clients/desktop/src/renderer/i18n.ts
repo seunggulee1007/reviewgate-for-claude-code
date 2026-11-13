@@ -43,6 +43,7 @@ const KEY_MAP: [RegExp, string][] = [
   [/⌘,/g, "Ctrl+,"],
   [/⌘([A-Z.\[\]])/g, "Ctrl+$1"],
   [/⌘([1-9])/g, "Ctrl+$1"], // wave4 w4-input (polish-06): ⌘1…⌘9, the chat tabs
+  [/⌃([A-Z])/g, "Ctrl+$1"], // §56.3: ⌃G, the draft in an external editor
   [/⌥-/g, "Alt-"],
   // wave3 check-clients: ⌫ is a Mac glyph — "⌘⌫ …" and a built "Ctrl+⌫" hint read Backspace on Windows / Linux.
   [/⌘⌫/g, "Ctrl+Backspace"],

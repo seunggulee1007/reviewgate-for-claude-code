@@ -184,6 +184,11 @@ export type PluginReload = { commands: unknown; plugins: { name: string; path: s
 /** §50.3: what became of a take-back (`ClaudeSessionLike.takeBackSteer`). */
 export type SteerTakeBack = "taken" | "read" | "kept";
 
+/** §56.1: an earlier /btw question and its answer (an element of the CLI's `side_question.history`). */
+export type BtwExchange = { question: string; response: string };
+/** §56.1: the CLI's answer to `side_question` (`synthetic`: a note of the CLI's own, not the model's answer). */
+export type BtwAnswer = { response: string; synthetic: boolean };
+
 export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text; `opts` (r2-skills-side): a slash command it runs. */
@@ -199,7 +204,21 @@ export interface ClaudeSessionLike {
    * "kept" — the CLI could not be asked, the message still goes to Claude. Absent on doubles without it.
    */
   takeBackSteer?(uuid: string): Promise<SteerTakeBack>;
+  /**
+   * §56.2: Esc with unsent messages — interrupts the turn and drops, in the same request, every message put into it that
+   * Claude has not read (`interrupt {cancel_queued: true}`, capability `interrupt_cancel_queued_v1`). Resolves with the
+   * uuids dropped (each also `steer_withdrawn`); null when this CLI cannot (nothing was asked: take them back one by one,
+   * then `interrupt`). Absent on doubles without it.
+   */
+  interruptTakingBack?(): Promise<string[] | null>;
   interrupt(): Promise<void>;
+  /**
+   * §56.1 `/btw`: a side question answered from this session's own context, with no tools, while a turn runs or not —
+   * the CLI's `side_question` (SDK `Query.askSideQuestion`, 0.3.270, not in the typings). `history`: the earlier /btw
+   * exchanges of this chat, oldest first. Null when the CLI cancelled it (`signal`); rejects when the CLI refused it or
+   * cannot be asked. Absent on doubles without it.
+   */
+  askSideQuestion?(question: string, history: readonly BtwExchange[], signal?: AbortSignal): Promise<BtwAnswer | null>;
   /** A deny without `message` is the CLI's own "No" (§33.10); `opts.interrupt` also ends the turn (main agent only). */
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts?: DenyOptions): void;
   setBudget(budget: Budget): void;
@@ -405,6 +424,8 @@ export class ClaudeSession implements ClaudeSessionLike {
   private steerWaiting = new Set<string>();
   /** §50.3: take-backs waiting for the CLI's word on a message (its lifecycle frame, or the turn's end). */
   private steerTakeBacks = new Map<string, (outcome: SteerTakeBack) => void>();
+  /** §56.2: the CLI's `capabilities` (system/init): `interrupt_cancel_queued_v1` lets an interrupt drop what waits. */
+  private cliCapabilities = new Set<string>();
   /** Released peer messages whose command started / delivered its body this turn. */
   private peerStarted = new Set<string>();
   private peerDelivered = new Set<string>();
@@ -947,6 +968,40 @@ export class ClaudeSession implements ClaudeSessionLike {
     } catch (e) {
       this.opts.log("warn", `interrupt failed: ${String(e)}`);
     }
+  }
+
+  /**
+   * §56.2: see `ClaudeSessionLike.interruptTakingBack`. The CLI cancels every queued (and pending-dispatch) command with
+   * the abort and lists them under `cancelled`, each with a `cancelled` lifecycle frame — written before the response or
+   * after it; whichever comes first withdraws the message (once).
+   */
+  async interruptTakingBack(): Promise<string[] | null> {
+    if (!this.q) return [];
+    if (!this.cliCapabilities.has("interrupt_cancel_queued_v1")) return null;
+    const waiting = new Set(this.steerWaiting);
+    this.interruptRequested = true;
+    for (const p of [...this.pendingPermissions.values()]) p.resolve({ behavior: "deny", message: "Interrupted by user", interrupt: true }, true);
+    let cancelled: string[] = [];
+    try {
+      const interrupt = this.q.interrupt as unknown as (o: { cancelQueued: boolean }) => Promise<{ cancelled?: unknown } | undefined>;
+      const receipt = await interrupt.call(this.q, { cancelQueued: true });
+      cancelled = Array.isArray(receipt?.cancelled) ? receipt.cancelled.filter((id): id is string => typeof id === "string") : [];
+    } catch (e) {
+      this.opts.log("warn", `interrupt (cancel_queued) failed: ${String(e)}`);
+    }
+    const taken = cancelled.filter((id) => waiting.has(id));
+    for (const id of taken) this.withdrawSteer(id); // a no-op for one its `cancelled` frame withdrew already
+    return taken;
+  }
+
+  /** §56.1: see `ClaudeSessionLike.askSideQuestion`. */
+  async askSideQuestion(question: string, history: readonly BtwExchange[], signal?: AbortSignal): Promise<BtwAnswer | null> {
+    if (!this.q || this.disposing) throw new Error("session not started");
+    const q = this.q as unknown as { askSideQuestion?: (question: string, o?: { history?: BtwExchange[]; signal?: AbortSignal }) => Promise<BtwAnswer | null> };
+    if (typeof q.askSideQuestion !== "function") throw new Error("this SDK cannot ask a side question");
+    const answer = await q.askSideQuestion(question, { ...(history.length > 0 ? { history: [...history] } : {}), ...(signal ? { signal } : {}) });
+    if (answer === null || typeof answer.response !== "string") return null;
+    return { response: answer.response, synthetic: answer.synthetic === true };
   }
 
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts: DenyOptions = {}): void {
@@ -1579,6 +1634,7 @@ export class ClaudeSession implements ClaudeSessionLike {
           if (this.canAdopt() && !this.turnActive && this.externalCommands.size === 0) this.beginAutoTurn(this.bgNotice ? "background" : "continue", null);
           this.currentSessionId = msg.session_id;
           this.currentModel = msg.model;
+          if (Array.isArray(msg.capabilities)) this.cliCapabilities = new Set(msg.capabilities.filter((c): c is string => typeof c === "string"));
           this.followCliMode(msg.permissionMode); // MARK: wave6 w6-terminal (§44.1)
           this.noteCliPermissionMode(msg.permissionMode); // MARK: wave4b w4b-auto (§39.5)
           this.emit({

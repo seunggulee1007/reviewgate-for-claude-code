@@ -137,13 +137,18 @@ public enum SlashCommandCatalog {
         for command in caps.commands where seen.insert(command.name).inserted {
             // wave4c w4c-commit (§41.1): /clear is the app's new chat — the palette says so.
             out.append(SlashCommandEntry(name: command.name,
-                                         description: command.name == "clear" ? TeamFormat.clearDescription : firstLine(command.description),
+                                         description: command.name == "clear" ? TeamFormat.clearDescription
+                                             : command.name == BtwCommand.name ? BtwCommand.description : firstLine(command.description),
                                          argumentHint: command.argumentHint.trimmingCharacters(in: .whitespacesAndNewlines),
                                          isSkill: skills.contains(command.name), aliases: command.aliases,
                                          group: group(for: command)))
         }
         for name in caps.skills + caps.slashCommands where !name.isEmpty && seen.insert(name).inserted {
             out.append(SlashCommandEntry(name: name, isSkill: skills.contains(name), group: inferredGroup(name, plugins: plugins)))
+        }
+        // §56.1: /btw is the app's own (the CLI lists it to the terminal only).
+        if seen.insert(BtwCommand.name).inserted {
+            out.append(SlashCommandEntry(name: BtwCommand.name, description: BtwCommand.description, argumentHint: "<question>", group: .builtin))
         }
         return out.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }

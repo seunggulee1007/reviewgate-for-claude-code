@@ -164,34 +164,6 @@ import Testing
         #expect(app.steerTakeBackNotice?.text == SteerTakeBackNotice.failed)
     }
 
-    @Test func upArrowBringsTheLastQueuedMessageBackFirst() {
-        let app = makeState()
-        var sent: [EngineCommand] = []
-        app.commandSink = { sent.append($0) }
-        app.requestSink = { sent.append($0) }
-        app.handle(.state(running(steering: Self.waiting)))
-        app.enqueue("first")
-        app.enqueue("second", mentions: ["src/cart.ts"])
-        #expect(app.canPullBackWaiting)
-        #expect(app.pullBackLastWaiting())
-        #expect(app.queuedMessages.map(\.text) == ["first"])
-        #expect(app.taskForComposer?.text == "second")
-        #expect(app.taskForComposer?.mentions == ["src/cart.ts"])
-        #expect(!sent.contains { if case .steerTakeBack = $0 { true } else { false } })
-    }
-
-    @Test func upArrowThenTakesBackTheLastMessageInClaudesTurn() async throws {
-        let app = makeState()
-        var sent: [EngineCommand] = []
-        app.requestSink = { sent.append($0) }
-        app.handle(.state(running(steering: Self.waiting)))
-        #expect(app.pullBackLastWaiting())
-        #expect(app.steeringTakingBack == ["u2"])   // its chip waits at once
-        for _ in 0..<50 where app.taskForComposer == nil { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(sent == [.steerTakeBack(messageId: "u2")])
-        #expect(app.taskForComposer?.text == "then the tests")
-    }
-
     @Test func aQueuedMessageGoesBackIntoTheMessageBoxWithItsImages() {
         let app = makeState()
         app.commandSink = { _ in }
@@ -205,12 +177,5 @@ import Testing
         #expect(app.taskForComposer?.text == "look")
         #expect(app.taskForComposer?.mentions == ["a.ts"])
         #expect(app.taskForComposer?.images.count == 1)
-    }
-
-    @Test func upArrowWithNothingWaitingIsTheHistory() {
-        let app = makeState()
-        app.handle(.state(running(steering: [])))
-        #expect(!app.canPullBackWaiting)
-        #expect(!app.pullBackLastWaiting())
     }
 }

@@ -205,7 +205,7 @@ function QueuedChip(p: {
   return (
     <span className="queue-chip" data-testid="Queue chip" onContextMenu={menu.onContextMenu}>
       <span className="queue-num">{p.index + 1}</span>
-      <button type="button" className="queue-text truncate" title={`${p.text}\n\n${t("Queued — click to edit; ↑ in an empty message box brings the last one back")}`} onClick={p.onEdit}>
+      <button type="button" className="queue-text truncate" title={`${p.text}\n\n${t("Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back")}`} onClick={p.onEdit}>
         {p.text}
       </button>
       <span className="queue-tools">

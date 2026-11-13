@@ -64,7 +64,7 @@ describe("slash palette entries (§36.5)", () => {
   it("an engine before §36 sends names only: skills flagged, a <plugin>: prefix of a known plugin groups it", () => {
     const old: SessionCapabilities = { slashCommands: ["compact", "writer-kit:writer-notes"], skills: ["writer-kit:writer-notes", "my-skill"], plugins: ["writer-kit"], mcpServers: [] };
     const all = slashEntries(old);
-    expect(names(all)).toEqual(["compact", "my-skill", "writer-kit:writer-notes"]);
+    expect(names(all)).toEqual(["btw", "compact", "my-skill", "writer-kit:writer-notes"]); // §56.1: /btw is the app's
     expect(all.find((e) => e.name === "writer-kit:writer-notes")).toMatchObject({ isSkill: true, group: { kind: "plugin", name: "writer-kit" } });
     expect(all.find((e) => e.name === "compact")?.group).toEqual({ kind: "other" });
     expect(slashEntries(null)).toEqual([]);
@@ -84,9 +84,11 @@ describe("palette sections (§36.5)", () => {
     expect(plain.map((s) => s.group.kind)).toEqual(["builtin", "mine", "project", "plugin", "mcp", "other"]);
     const sections = slashSections(all, "", ["deploy", "gone-command", "mcp"]);
     expect(names(sections[0]!.entries)).toEqual(["deploy", "mcp"]);
-    // A recent one is not repeated in its own group; the groups it emptied (built-in, project) are left out.
-    expect(sections.map((s) => s.group.kind)).toEqual(["recent", "mine", "plugin", "mcp", "other"]);
-    expect(names(sections[4]!.entries)).toEqual(["old-name-only", "weird"]);
+    // A recent one is not repeated in its own group; the group it emptied (project) is left out — built-in keeps the
+    // app's /btw (§56.1).
+    expect(sections.map((s) => s.group.kind)).toEqual(["recent", "builtin", "mine", "plugin", "mcp", "other"]);
+    expect(names(sections[1]!.entries)).toEqual(["btw"]);
+    expect(names(sections[5]!.entries)).toEqual(["old-name-only", "weird"]);
     const flat = flattenSections(sections);
     expect(new Set(names(flat)).size).toBe(flat.length);
     expect(flat.length).toBe(all.length);

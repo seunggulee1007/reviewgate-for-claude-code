@@ -59,7 +59,7 @@ import Testing
         #expect(sections.map(\.group) == [.recent, .builtin, .project, .plugin("oh-my-claudecode"), .plugin("writer-kit"), .mcp("github"), .other])
         #expect(sections.first?.entries.map(\.name) == ["review", "mcp"])   // recency order; an unknown name is skipped
         let builtin = sections.first { $0.group == .builtin }
-        #expect(builtin?.entries.map(\.name) == ["compact"])   // a recent command is not repeated in its group
+        #expect(builtin?.entries.map(\.name) == ["btw", "compact"])   // a recent command is not repeated in its group; §56.1 /btw is the app's
         #expect(sections.first { $0.group == .mine } == nil)   // its only command is in "recent"
         #expect(SlashCommandCatalog.flatten(sections).count == entries.count)
         // At most five recent commands.

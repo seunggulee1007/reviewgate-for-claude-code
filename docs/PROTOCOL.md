@@ -8481,3 +8481,130 @@ styles. A screen that uses them gets these without a change of its own.
   tooltip goes. A tooltip a component set wins: on the element itself it is left alone; on a row around it, it stays
   under the whole text, or alone when it already holds that text. Fields, the code editor, an inline span (it cuts
   nothing) and `data-no-auto-title` get none.
+
+## 56. The message box as the terminal's
+
+Three things a terminal user reaches for in Claude Code's input that the message box lacked.
+
+### 56.1 `/btw` — a side question while Claude works
+
+In the terminal `/btw <question>` asks a quick question next to the conversation: a separate instance answers from the
+conversation as it is, with no tools, while the main turn goes on; the answer is shown apart and never joins the
+conversation. The app's side question panel (§21, ⌥⌘S) forks a whole CLI process with read-only tools — slower, and a
+thread of its own. Typing `/btw …` sent it to the main conversation as a plain message.
+
+```ts
+// command: btw_ask { question: string }            // reply: btw_answer
+type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string;
+                        via: "session" | "fork"; synthetic?: true };
+// refused: empty_question | question_too_long (> 20 000 chars) | no_project | btw_failed:<why>
+```
+
+- **The live CLI answers.** The CLI's control request `side_question {question, history?}` (SDK `Query.askSideQuestion`,
+  0.3.270; not in the typings) runs the terminal's /btw in the running session: a fork of the main thread's own context
+  (its prompt cache), `maxTurns: 1`, every tool denied ("Side questions cannot use tools"), no transcript; it reports
+  `control_request_progress` frames (ignored) and answers `{response, synthetic}`. It runs beside the turn, so it works
+  while Claude works. In an SDK session the CLI keeps no /btw history: `history` (`[{question, response}]`) is the
+  engine's — the current chat's earlier exchanges, at most 10, in memory, none after a chat switch (`side/btw.ts`). A
+  `synthetic` answer (the CLI's own note — the model tried to call a tool, an API error) is shown but not handed on.
+- **Fallback.** No session yet, an SDK or CLI without the request, or a refusal: a one-shot fork of the chat
+  (`SideThreads.startDetached`, as a commit draft §36.11) with **no tools** (`tools: []`), `maxTurns: 1`, no session file,
+  no MCP server, no web, the earlier exchanges written into its prompt and a system-prompt append saying what the
+  CLI's reminder says (`BTW_SYSTEM`). `via: "fork"`; its cost goes to `hud.sideCostUSD`.
+- **Never in the way.** `btw_ask` runs on a lane of its own: it never waits behind — or holds up — a send, a steer, an
+  interrupt or a side fork. Nothing is sent to the turn, nothing joins the transcript, `hud.turnCount` or the prompt
+  history. An answer slower than 3 minutes is refused `btw_failed:no answer in 180 s` (the CLI's request is cancelled); a
+  cancelled one `btw_failed:cancelled`; a failed fork `btw_failed:<its first line>`.
+- **Clients.** The message box takes `/btw <question>` as the app's command (as `/clear`, §41.1) — at any time, a turn
+  running, a permission card or a question of Claude's open included; it never goes to the queue, the turn or the prompt
+  history. The palette lists `/btw` (Built-in: "Ask a quick side question — Claude keeps working; the answer stays out of
+  the chat", hint `<question>`; ↩ on `/btw` typed out runs it). The answer opens over the message box, never in the
+  transcript: `/btw`, the question, the answer (Markdown, selectable), "Answered without tools from the conversation so far
+  — not added to the chat" ("…by a copy of the conversation…" for a fork), Copy and Close, and a context menu (Copy the
+  answer, Copy the question, Close). Esc closes it (before Esc stops the turn); ↩ or Space in an empty box closes it too.
+  `/btw` alone shows the chat's last answer again (none yet: "No side answer yet — type /btw and your question"); another
+  chat closes it. While it waits: "Asking on the side…" with Cancel (the answer is dropped when it comes). A refusal shows
+  in the notice line ("Claude could not answer the side question: …") and `/btw <question>` comes back into an empty box.
+  Electron: the same (`renderer/btw.ts`, `BtwOverlay.tsx`; the refusal in the composer's error line, Ctrl for ⌘).
+- **Verified** (CLI 2.1.323, `sidecar/test/driver-btw.mjs`, haiku): during a `sleep 15` turn, a question about the code
+  word the first message gave was answered `via: "session"` in 1.3 s ("PAPAYA") with the turn still running; a second
+  question ("What did I ask you on the side?") was answered from the first exchange ("You asked for the code word."). The
+  turn ended once with its own reply ("A-DONE"); its only row is the first message, and neither question reached it.
+
+### 56.2 Esc gives back what Claude has not read
+
+In the terminal, Esc while Claude works stops the turn and puts every message typed meanwhile that Claude has not read
+back into the input, to edit and send again. In the app Esc only interrupted: messages put into the turn (§50) that Claude
+had not read stayed in the CLI's command queue and ran as the next turn, and the app's queue (§50.1) went on sending.
+
+```ts
+// command: interrupt { takeBack?: boolean }        // with takeBack the reply is `interrupted`; without it `result` as before
+type InterruptedEvent = { type: "interrupted"; id?: string;
+                          takenBack: { id: string; text: string; mentions?: string[] }[];   // in order, never read
+                          read: string[] };                                                // waited, but Claude has them
+```
+
+- **One request when the CLI can.** CLI 2.1.x advertises `interrupt_cancel_queued_v1` in `system/init.capabilities`: the
+  interrupt control request then takes `cancel_queued: true` (SDK `Query.interrupt({cancelQueued: true})`, 0.3.270; the
+  argument is not in the typings) and cancels, with the abort, every uuid-stamped command still queued or already dequeued
+  for the next turn — each closed with a `cancelled` lifecycle frame and listed in the receipt's `cancelled`. The session
+  (`ClaudeSession.interruptTakingBack`) withdraws each waiting message it lists (`steer_withdrawn`, once, whether its frame
+  or the receipt comes first) and answers the uuids; a message being folded into the step is cancelled too (the abort means
+  the fold never delivers it). Uuids it never sent (cron, an auto-resume) are ignored. A failed request takes nothing back.
+- **Otherwise one by one.** A CLI without the capability (`interruptTakingBack` → null): every waiting message is taken back
+  (`takeBackSteer`, §50.3); the interrupt goes out once they all answered, or after 1.5 s (one being folded in waits for its
+  next frame, which the interrupt brings); their outcomes are read once settled — the turn's end settles the rest, never
+  longer than `interruptWaitMs`. `taken` ones are in `takenBack`, the rest in `read`.
+- **The reply.** The messages taken back leave `state.session.steering` with no row; `takenBack` carries their text and
+  mentions in the order they were put in, for the clients to give back. `read`: those Claude has (their rows come with the
+  turn's end, §50.2). Nothing waiting: a plain interrupt, `interrupted {takenBack: [], read: []}`; no turn running: the same
+  reply, nothing interrupted. `interrupt` without `takeBack` is exactly as before (`result`; what waits stays and runs next).
+- **Clients.** Esc in the message box while Claude works, with something waiting — a message in Claude's turn (not being
+  taken back) or anything in the app's queue —, stops the turn with `interrupt {takeBack: true}` (with nothing waiting it is
+  the plain `interrupt`, as before; the Stop button and ⌘. stay plain). The whole queue leaves the queue at once (it does
+  not go on after the stop); once the reply came, the messages taken back and then the queued ones — in order, one per
+  paragraph — go into the message box **in front of** what is typed, with their mentions and the queued ones' images
+  (`TaskComposerText.atFront`). Those Claude already read stay in the chat, and the notice line says so ("Claude already
+  read this message — it stays in the chat", or "…N of the waiting messages — they stay in the chat"). A failed interrupt
+  still gives the queue back. **↑ in an empty box** (not while browsing the history) brings back everything waiting the
+  same way without stopping the turn: each message in Claude's turn is taken back (`steer_take_back`, §50.3), then the
+  queue; it used to bring back only the last one. The queue chips' tooltip says so. Electron: the same (store
+  `interruptGivingBack` / `pullBackWaiting`, `insertIntoComposer(…, "front")`; what Claude read says so in a toast).
+- **Verified** (CLI 2.1.323, `sidecar/test/driver-esc-takeback.mjs`, haiku): during a `sleep 10` turn two messages were
+  put in, then `interrupt {takeBack: true}`. The engine took the cancel_queued way (the CLI advertises
+  `interrupt_cancel_queued_v1`); the reply gave both back in order, none read; nothing waited after it; the turn ended once,
+  `interrupted`, with only the first message's row; and in the 8 s after it neither message ran as a turn of its own (no
+  second turn_end, neither word in any reply). The one-by-one way is the §50.3 take-back, verified by
+  `driver-steer-takeback.mjs`, followed by the plain interrupt; the engine tests cover it.
+
+### 56.3 Ctrl+G — the draft in an external editor
+
+In the terminal Ctrl+G opens the prompt being typed in `$VISUAL` / `$EDITOR` and takes the edited text back when the
+editor closes. A long instruction is easier to write there. This is the clients' own (no engine command).
+
+- **Keys.** ⌃G in the message box (Mac; AppKit binds nothing to it there), Ctrl+G on Windows. Also while Claude works; not
+  from another chat shown read-only. Pressed again while editing: nothing.
+- **The file.** The draft (mentions and images stay as chips in the box) is written to `draft-<id>.md` in the app's own
+  temp folder: `<system temp>/ReviewGate/drafts/` (Mac `FileManager.temporaryDirectory`, Windows `app.getPath("temp")`).
+  It is removed when the editing ends.
+- **Which editor** (Mac `DraftEditor.launch`, Windows `draftEditorLaunch`): `$VISUAL`, else `$EDITOR`, when it can open a
+  window — a terminal editor (vi, vim, nvim, nano, emacs without `-c`, micro, helix, …) has no terminal from the app and is
+  passed over; a known GUI editor gets the flag that makes its command wait (`code`/`cursor`/`zed` `--wait`, `subl`/`mate`
+  `-w`, `mvim` `-f`, …) unless it has one. It runs through the shell with the file appended, so the user's own quoting
+  holds. Else VS Code's `code --wait` when found (PATH, the usual install folders). Else the system's text editor: Mac
+  `open -t` (the default text editor, named in the bar), Windows Notepad (it waits), elsewhere `xdg-open`. A GUI app
+  started from the Dock or the Start menu has the variables only when they are set for it (a terminal-launched app
+  inherits the shell's).
+- **The round trip.** The file is polled (every 400 ms, by its modification date: an editor that saves by writing a new
+  file in place is seen too); each save goes into the box, trailing newlines trimmed. An editor that waits ends the
+  editing when it closes (one last read). One that does not (`open -t`) ends with Done.
+- **While editing** a bar over the box says "Editing in <editor>… — each save comes into the message box" with **Done**
+  (what was saved stays) and **Cancel** (the box gets back the draft from before Ctrl+G), each with a tooltip, the same in
+  its context menu. The editor's window is the user's to close. An editor that cannot start says why in the notice line.
+- **Electron.** The main process does the file and the editor (`main/draftEditor.ts`): `rg:draftEditStart(text)` →
+  `{ok, id, name, waits}`, each save and the editor's end to that window as `rg:draftEdit {id, text?, done?, error?}`
+  (`fs.watchFile`, 400 ms), `rg:draftEditFinish(id)` for Done / Cancel and when the editing ends. `code` is found as for
+  Open in Editor (`where.exe` / the usual folders), a `.cmd` shim through cmd.exe with every argument quoted. The renderer
+  (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
+  it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
+  on the Mac.

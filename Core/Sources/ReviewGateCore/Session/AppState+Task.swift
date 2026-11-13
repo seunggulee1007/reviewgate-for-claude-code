@@ -37,12 +37,15 @@ public struct TaskComposerText: Sendable, Equatable {
     /// r2-chats-cards M31 / M33 (§9): a held message handed back brings its chips with it (a task's text has none).
     public let mentions: [String]
     public let images: [ComposerImage]
+    /// §56.2: messages given back go in front of what is typed (a task's text and the rest join after it).
+    public let atFront: Bool
 
-    public init(id: UUID = UUID(), text: String, mentions: [String] = [], images: [ComposerImage] = []) {
+    public init(id: UUID = UUID(), text: String, mentions: [String] = [], images: [ComposerImage] = [], atFront: Bool = false) {
         self.id = id
         self.text = text
         self.mentions = mentions
         self.images = images
+        self.atFront = atFront
     }
 }
 

@@ -3585,6 +3585,38 @@
         }
       }
     },
+    "Answered without tools by a copy of the conversation — not added to the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered without tools by a copy of the conversation — not added to the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화 사본이 도구 없이 답했어요 — 대화에는 남지 않아요"
+          }
+        }
+      }
+    },
+    "Answered without tools from the conversation so far — not added to the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered without tools from the conversation so far — not added to the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금까지의 대화로 도구 없이 답했어요 — 대화에는 남지 않아요"
+          }
+        }
+      }
+    },
     "Answered: %@": {
       "localizations": {
         "en": {
@@ -4397,6 +4429,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "종료하기 전에 묻기"
+          }
+        }
+      }
+    },
+    "Asking on the side…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asking on the side…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "곁질문 답을 기다리는 중…"
+          }
+        }
+      }
+    },
+    "Close (esc · ↩ · space) — /btw alone shows it again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close (esc · ↩ · space) — /btw alone shows it again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "닫기 (esc · ↩ · space) — /btw만 입력하면 다시 보여요"
+          }
+        }
+      }
+    },
+    "Close the side answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the side answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "곁질문 답 닫기"
           }
         }
       }
@@ -8679,6 +8759,22 @@
         }
       }
     },
+    "Copy the answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy the answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답 복사"
+          }
+        }
+      }
+    },
     "Copy the code block": {
       "localizations": {
         "en": {
@@ -8867,6 +8963,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메시지 복사"
+          }
+        }
+      }
+    },
+    "Copy the question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy the question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문 복사"
           }
         }
       }
@@ -9123,6 +9235,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "워크벤치를 제거하지 못했습니다"
+          }
+        }
+      }
+    },
+    "Couldn't open %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open %@: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 열지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Couldn't write the draft for the editor: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't write the draft for the editor: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "편집기에 넘길 메시지를 쓰지 못했어요: %@"
           }
         }
       }
@@ -10327,6 +10471,22 @@
         }
       }
     },
+    "Edit in an external editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit in an external editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 편집"
+          }
+        }
+      }
+    },
     "Edit it here; you see the change before it is saved": {
       "localizations": {
         "en": {
@@ -10339,6 +10499,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "여기서 고쳐요. 저장하기 전에 바뀐 내용을 보여 줘요"
+          }
+        }
+      }
+    },
+    "Edit the message in an external editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the message in an external editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 메시지 편집"
+          }
+        }
+      }
+    },
+    "Edit the message in an external editor (⌃G) — each save comes back here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the message in an external editor (⌃G) — each save comes back here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 메시지 편집 (⌃G) — 저장할 때마다 여기로 돌아와요"
           }
         }
       }
@@ -10371,6 +10563,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수정한 메시지"
+          }
+        }
+      }
+    },
+    "Editing in %@… — each save comes into the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing in %@… — each save comes into the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 편집 중… — 저장할 때마다 입력란으로 들어와요"
           }
         }
       }
@@ -11914,6 +12122,22 @@
         }
       }
     },
+    "Go back to the running chat to edit its message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to edit its message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 채팅으로 돌아가서 메시지를 편집하세요"
+          }
+        }
+      }
+    },
     "Go back to the running chat; this one stays in its tab": {
       "localizations": {
         "en": {
@@ -13008,6 +13232,22 @@
         }
       }
     },
+    "In the message box — each save comes back into it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box — each save comes back into it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서 — 저장할 때마다 입력란으로 돌아와요"
+          }
+        }
+      }
+    },
     "In the message box, while Claude works": {
       "localizations": {
         "en": {
@@ -13020,6 +13260,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메시지 입력란에서, Claude가 작업 중일 때"
+          }
+        }
+      }
+    },
+    "In the message box, while Claude works — messages Claude has not read come back into the box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box, while Claude works — messages Claude has not read come back into the box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서, Claude가 작업 중일 때 — Claude가 아직 읽지 않은 메시지는 입력란으로 돌아와요"
           }
         }
       }
@@ -19650,6 +19906,22 @@
         }
       }
     },
+    "Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중 — 클릭하면 편집해요. 빈 입력창에서 ↑ (또는 Claude 작업 중 Esc)를 누르면 기다리던 메시지가 모두 돌아와요"
+          }
+        }
+      }
+    },
     "Queues your message; it is sent when Claude is free. The menu has “Stop and send” (⌥⌘↩). (%@)": {
       "localizations": {
         "en": {
@@ -25094,6 +25366,38 @@
         }
       }
     },
+    "Stop editing outside and put back the message as it was before ⌃G": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop editing outside and put back the message as it was before ⌃G"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집을 끝내고 ⌃G 전의 메시지로 되돌려요"
+          }
+        }
+      }
+    },
+    "Stop editing outside — what you saved stays in the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop editing outside — what you saved stays in the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집 끝내기 — 저장한 내용은 입력란에 남아요"
+          }
+        }
+      }
+    },
     "Stop this agent": {
       "localizations": {
         "en": {
@@ -25138,6 +25442,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 답변을 중지합니다. 스레드는 남습니다"
+          }
+        }
+      }
+    },
+    "Stop waiting — the answer is dropped when it comes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop waiting — the answer is dropped when it comes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리지 않아요 — 답이 와도 버려요"
           }
         }
       }
@@ -26290,6 +26610,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메인 워크트리의 그래프"
+          }
+        }
+      }
+    },
+    "The message is open in an editor — Done or Cancel above the box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The message is open in an editor — Done or Cancel above the box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지가 편집기에 열려 있어요 — 입력란 위의 완료나 취소를 누르세요"
           }
         }
       }
@@ -30155,6 +30491,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 워크벤치 창"
+          }
+        }
+      }
+    },
+    "the default text editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the default text editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 텍스트 편집기"
           }
         }
       }

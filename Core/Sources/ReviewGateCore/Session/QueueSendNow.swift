@@ -129,10 +129,11 @@ public extension AppState {
     /// §50.3: the message `id` in Claude's turn comes back before Claude reads it, as the terminal lets a queued message be
     /// pulled back or dropped. `toComposer`: its text and mentions go into the message box (Edit; ↩ sends it again). Too
     /// late — Claude read it — says so (`steerTakeBackNotice`) and its row stays in the chat; nothing is lost or sent twice.
+    /// `quiet` (§56.2, several at once): the caller says it once for all of them.
     @discardableResult
-    func takeBackSteering(id: String, toComposer: Bool) async -> SteerTakeBackOutcome {
+    func takeBackSteering(id: String, toComposer: Bool, quiet: Bool = false) async -> SteerTakeBackOutcome {
         guard let message = steeringMessages.first(where: { $0.id == id }) else {
-            steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.alreadyRead)
+            if !quiet { steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.alreadyRead) }
             return .alreadyRead
         }
         guard !steeringTakingBack.contains(id) else { return .failed }
@@ -142,11 +143,11 @@ public extension AppState {
             try await request(.steerTakeBack(messageId: id))
         } catch let error as EngineClientError where error.refusalCode == "steer_already_read" {
             appendLog("[info] take-back too late: Claude already read the message")
-            steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.alreadyRead)
+            if !quiet { steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.alreadyRead) }
             return .alreadyRead
         } catch {
             appendLog("[warn] take-back failed: \(error.localizedDescription)")
-            steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.failed)
+            if !quiet { steerTakeBackNotice = SteerTakeBackNotice(text: SteerTakeBackNotice.failed) }
             return .failed
         }
         if toComposer { taskForComposer = TaskComposerText(text: message.text, mentions: message.mentions) }
@@ -160,26 +161,10 @@ public extension AppState {
         taskForComposer = TaskComposerText(text: message.text, mentions: message.mentions, images: message.images)
     }
 
-    /// §50.3: something waits that ↑ in an empty message box would bring back (`pullBackLastWaiting`).
+    /// §50.3: something waits that ↑ in an empty message box would bring back (§56.2 `pullBackWaiting`).
     var canPullBackWaiting: Bool {
         !queuedMessages.isEmpty || steeringMessages.contains { !steeringTakingBack.contains($0.id) }
     }
 
-    /// §50.3, as ↑ in the terminal's empty input: the last message waiting comes back into the message box — the last
-    /// queued one (with its mentions and images), else the last one in Claude's turn (taken back first). False when
-    /// nothing waits (↑ then walks the prompt history as before).
-    @discardableResult
-    func pullBackLastWaiting() -> Bool {
-        if let last = queuedMessages.last {
-            editQueuedInComposer(id: last.id)
-            return true
-        }
-        guard let last = steeringMessages.last(where: { !steeringTakingBack.contains($0.id) }) else { return false }
-        steeringTakingBack.insert(last.id)   // the chip waits at once; `takeBackSteering` takes it from here
-        Task {
-            steeringTakingBack.remove(last.id)
-            await takeBackSteering(id: last.id, toComposer: true)
-        }
-        return true
-    }
+
 }

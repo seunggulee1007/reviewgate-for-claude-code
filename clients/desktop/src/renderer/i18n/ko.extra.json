@@ -982,5 +982,6 @@
   "Already last in the queue": "이미 대기열 맨 뒤예요",
   "Could not open {0}": "{0}을(를) 열지 못했습니다",
   "Click to show it in the file manager — it is a large file that also holds your other Claude Code state": "클릭하면 파일 관리자에서 보여 줍니다 — 크고, 다른 Claude Code 상태도 들어 있는 파일입니다",
-  "Show the file that defines this server in the file manager": "이 서버를 정의한 파일을 파일 관리자에서 보기"
+  "Show the file that defines this server in the file manager": "이 서버를 정의한 파일을 파일 관리자에서 보기",
+  "Side answer": "곁질문 답"
 }

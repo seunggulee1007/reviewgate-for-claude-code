@@ -1007,31 +1007,78 @@ private final class Tour {
             log("composer queue tool \(name) (\(what)): \(NSStringFromRect(frame))" + (frame.width <= 0 ? " — LOST (not shown)" : inWindow ? " — shown" : " — OUT OF THE WINDOW"))
         }
         try write(try render(window), "composer-queue")
-        // ↑ in an empty box, as in the terminal: the last queued message comes back to edit.
+        // §56.2: ↑ in an empty box, as in the terminal, brings back everything waiting: the queued message comes back to
+        // edit, and the turn's is taken back — this made-up one is not in the engine's list, so the engine says Claude read
+        // it already and the box says so (only the queued one comes back).
+        composer.notice = nil
         setComposerText("", in: window)
         window.makeFirstResponder(box)
         box.doCommand(by: #selector(NSResponder.moveUp(_:)))
-        try await Task.sleep(for: .milliseconds(500))
-        let pulled = box.string == "Then run the unit tests and fix what fails" && store.queuedMessages.isEmpty
-        log("composer queue ↑: \(pulled ? "the queued message is back in the box" : "LOST (box \"\(box.string)\", \(store.queuedMessages.count) queued)")")
-        try write(try render(window), "composer-queue-up")
-        // ↑ again on an empty box with only the turn's message waiting: it is taken back — this made-up one is not in the
-        // engine's list, so the engine says Claude read it already, and the box says so (nothing comes back).
-        setComposerText("", in: window)
-        box.doCommand(by: #selector(NSResponder.moveUp(_:)))
         var notice: String?
-        for _ in 0..<30 {
+        for _ in 0..<40 {
             try await Task.sleep(for: .milliseconds(100))
             notice = composer.notice
-            if notice != nil { break }
+            if notice != nil, !box.string.isEmpty { break }
         }
-        let late = notice == SteerTakeBackNotice.alreadyRead && box.string.isEmpty
-        log("composer queue ↑ (in Claude's turn, too late): " + (late ? "the box says \"\(notice ?? "")\"" : "LOST (notice \(notice ?? "none"), box \"\(box.string)\")"))
-        try write(try render(window), "composer-queue-late")
+        let pulled = box.string == "Then run the unit tests and fix what fails" && store.queuedMessages.isEmpty
+        log("composer queue ↑: " + (pulled ? "the queued message is back in the box" : "LOST (box \"\(box.string)\", \(store.queuedMessages.count) queued)")
+            + (notice == SteerTakeBackNotice.alreadyRead ? "; the box says the turn's one was read already" : " — LOST (notice \(notice ?? "none"))"))
+        try write(try render(window), "composer-queue-up")
         composer.notice = nil
-        store.clearQueue()
         store.debugShowSteering([])
+
+        // §56.2: Esc while Claude works with a message queued: the turn stops and the queued message comes back in front of
+        // what is typed (no turn runs in the engine here, so it gives back nothing of the turn's). One main-actor step from
+        // the made-up working state to Esc: an engine snapshot in between would let the queue send it for real.
+        setComposerText("and keep the changelog short", in: window)
+        store.debugShowComposerState(working: true, files: files)
+        store.enqueue("Run the linter too")
+        let queuedBeforeEsc = store.queuedMessages.count
+        box.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+        let wanted = "Run the linter too\n\nand keep the changelog short"
+        for _ in 0..<40 where box.string != wanted {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        let given = box.string == wanted && store.queuedMessages.isEmpty
+        log("composer Esc (\(queuedBeforeEsc) queued, text typed): " + (given ? "the queued message is back in front of the typed text, the queue empty"
+                                                       : "LOST (box \"\(box.string)\", \(store.queuedMessages.count) queued)"))
+        try write(try render(window), "composer-esc")
+        store.clearQueue()
         store.debugShowGate(.idle)
+        setComposerText("", in: window)
+
+        // §56.1 /btw: asked on the side of the live session; the answer opens over the box, Esc closes it, `/btw` alone
+        // brings it back, ↩ in the empty box closes it again.
+        setComposerText("/btw What is 2 + 2? Answer with the number only.", in: window)
+        box.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        var answer: BtwAnswer?
+        for _ in 0..<900 {
+            if case let .answered(a) = store.btwOverlay { answer = a; break }
+            if store.btwFailure != nil { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try await Task.sleep(for: .milliseconds(600))
+        let btwFrame = entry.model.debugBtwFrame
+        let btwInside = btwFrame.width > 0 && btwFrame.maxX <= room.width + 0.5 && btwFrame.minY >= -0.5
+        log("composer /btw: " + (answer.map { "answered \($0.viaFork ? "by a fork" : "by the live session") (\"\($0.answer.prefix(40))\"), box \"\(box.string)\"" }
+                                ?? "LOST (\(store.btwFailure?.text ?? "no answer"))")
+            + ", overlay \(NSStringFromRect(btwFrame))" + (btwInside ? " — shown" : " — LOST (not in the window)"))
+        try write(try render(window), "composer-btw")
+        box.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+        try await Task.sleep(for: .milliseconds(300))
+        let escClosed = store.btwOverlay == nil
+        setComposerText("/btw", in: window)
+        try await Task.sleep(for: .milliseconds(300))
+        box.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        try await Task.sleep(for: .milliseconds(300))
+        var again = false
+        if case .answered = store.btwOverlay { again = box.string.isEmpty }
+        box.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        try await Task.sleep(for: .milliseconds(300))
+        let enterClosed = store.btwOverlay == nil
+        log("composer /btw keys: Esc " + (escClosed ? "closed it" : "LOST (still open)") + ", /btw alone " + (again ? "showed it again" : "LOST")
+            + ", ↩ in the empty box " + (enterClosed ? "closed it" : "LOST (still open)"))
+        store.dismissBtw()
     }
 
     /// What a session with the user's settings lists (made-up names): built-in, mine, the project's, a plugin's skill with its
