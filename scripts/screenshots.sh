@@ -314,7 +314,12 @@ plist "Delete :CFBundleURLTypes"
 plist "Delete :CFBundleDocumentTypes"
 plist "Delete :UIDesignRequiresCompatibility"
 [ "$(sw_vers -productVersion | cut -d. -f1)" -lt 26 ] || plist "Add :UIDesignRequiresCompatibility bool true"
-codesign --force --sign - "$APP" 2>/dev/null || die "cannot re-sign $APP"
+# Signed with the Apple Development certificate when there is one: macOS then knows every build as the same app and
+# asks once for a folder the claude it starts reads (a Desktop folder in the user's Claude Code settings). An ad hoc
+# signature is a new app to macOS each build, and it asked again after every build.
+codesign --force --sign "Apple Development" "$APP" 2>/dev/null \
+  || codesign --force --sign - "$APP" 2>/dev/null || die "cannot re-sign $APP"
+codesign -d -r- "$APP" 2>&1 | grep -q 'cdhash H"' && say "signed ad hoc: macOS may ask again for folders after this build"
 
 # --- the tour ---------------------------------------------------------------------------------------------------------
 
