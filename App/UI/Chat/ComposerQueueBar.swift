@@ -259,7 +259,7 @@ struct ComposerQueueBar: View {
         .overlay(Capsule().strokeBorder(Color.accentColor.wash(colorScheme, light: isNext ? 0.55 : 0.25, dark: isNext ? 0.65 : 0.30)))
         .contentShape(Capsule())
         .onTapGesture { if let id { editing = id } }
-        .help(Text(verbatim: id == nil ? text : text + "\n\n" + String(localized: "Queued — click to edit; ↑ in an empty message box brings the last one back")))
+        .help(Text(verbatim: id == nil ? text : text + "\n\n" + String(localized: "Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back")))
         .popover(isPresented: Binding(get: { id != nil && editing == id }, set: { if !$0 { editing = nil } }), arrowEdge: .top) {
             if let id, let index {
                 QueuedMessageEditor(text: text, index: index, count: messages.count,

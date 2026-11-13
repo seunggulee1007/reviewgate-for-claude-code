@@ -8517,6 +8517,16 @@ type InterruptedEvent = { type: "interrupted"; id?: string;
   mentions in the order they were put in, for the clients to give back. `read`: those Claude has (their rows come with the
   turn's end, §50.2). Nothing waiting: a plain interrupt, `interrupted {takenBack: [], read: []}`; no turn running: the same
   reply, nothing interrupted. `interrupt` without `takeBack` is exactly as before (`result`; what waits stays and runs next).
+- **Clients.** Esc in the message box while Claude works, with something waiting — a message in Claude's turn (not being
+  taken back) or anything in the app's queue —, stops the turn with `interrupt {takeBack: true}` (with nothing waiting it is
+  the plain `interrupt`, as before; the Stop button and ⌘. stay plain). The whole queue leaves the queue at once (it does
+  not go on after the stop); once the reply came, the messages taken back and then the queued ones — in order, one per
+  paragraph — go into the message box **in front of** what is typed, with their mentions and the queued ones' images
+  (`TaskComposerText.atFront`). Those Claude already read stay in the chat, and the notice line says so ("Claude already
+  read this message — it stays in the chat", or "…N of the waiting messages — they stay in the chat"). A failed interrupt
+  still gives the queue back. **↑ in an empty box** (not while browsing the history) brings back everything waiting the
+  same way without stopping the turn: each message in Claude's turn is taken back (`steer_take_back`, §50.3), then the
+  queue; it used to bring back only the last one. The queue chips' tooltip says so.
 - **Verified** (CLI 2.1.323, `sidecar/test/driver-esc-takeback.mjs`, haiku): during a `sleep 10` turn two messages were
   put in, then `interrupt {takeBack: true}`. The engine took the cancel_queued way (the CLI advertises
   `interrupt_cancel_queued_v1`); the reply gave both back in order, none read; nothing waited after it; the turn ended once,

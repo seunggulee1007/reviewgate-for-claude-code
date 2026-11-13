@@ -98,7 +98,7 @@ public enum ShortcutTable {
             ShortcutRow("Accept the pending files and send", mac: "⌘⇧↩", windows: "Ctrl+Shift+Enter"),
             ShortcutRow("Stop", mac: "⌘.", windows: "Ctrl+."),
             // MARK: wave6 w6-terminal — §44.1: the terminal's keys in the message box
-            ShortcutRow("Stop", mac: "Esc", windows: "Esc", note: "In the message box, while Claude works"),
+            ShortcutRow("Stop", mac: "Esc", windows: "Esc", note: "In the message box, while Claude works — messages Claude has not read come back into the box"),   // §56.2
             ShortcutRow("Commands", mac: "⌘/", windows: "Ctrl+/"),
             ShortcutRow("Previous / next prompt", mac: "↑ / ↓", windows: "↑ / ↓", note: "On the first / last line of the message box"),
             ShortcutRow("Switch the permission mode", mac: "⇧⇥", windows: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto"),

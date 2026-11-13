@@ -13136,6 +13136,22 @@
         }
       }
     },
+    "In the message box, while Claude works — messages Claude has not read come back into the box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box, while Claude works — messages Claude has not read come back into the box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서, Claude가 작업 중일 때 — Claude가 아직 읽지 않은 메시지는 입력란으로 돌아와요"
+          }
+        }
+      }
+    },
     "In the message box: default → accept edits → plan → auto": {
       "localizations": {
         "en": {
@@ -19758,6 +19774,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대기 메시지 %1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Queued — click to edit; ↑ in an empty message box (or Esc while Claude works) brings everything waiting back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중 — 클릭하면 편집해요. 빈 입력창에서 ↑ (또는 Claude 작업 중 Esc)를 누르면 기다리던 메시지가 모두 돌아와요"
           }
         }
       }

@@ -182,6 +182,14 @@ final class ComposerModel {
         return true
     }
 
+    /// §56.2: messages Esc or ↑ gave back go in front of what is typed (one per paragraph), the caret after them.
+    func takeGivenBack(_ text: String) {
+        let base = history.cancel() ?? draft
+        draft = base.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? text : text + "\n\n" + base
+        caretRequest = (text as NSString).length
+        inputFocused = true
+    }
+
     /// wave3 mac-flow / mac-agents: a draft handed over by another view (PR comments §36.14, an agent's report §36.1 —
     /// `WindowModel.insertIntoComposer`) joins what is typed — never sent by itself.
     func takeComposerDraft(_ model: WindowModel) {
@@ -493,7 +501,7 @@ struct ChatComposer: View {
         .onChange(of: store.taskForComposer?.id, initial: true) { _, _ in
             guard let handed = store.taskForComposer else { return }
             store.takeTaskForComposer(handed.id)
-            model.insertIntoComposer(handed.text)
+            if handed.atFront { composer.takeGivenBack(handed.text) } else { model.insertIntoComposer(handed.text) }   // §56.2
             // r2-chats-cards M31 / M33 (§9): a held message called off comes back with its mentions and images.
             composer.addMentions(handed.mentions)
             let room = max(0, ComposerImage.maxCount - composer.images.count)
@@ -1269,10 +1277,10 @@ struct ChatComposer: View {
             // prompt or Esc gives it back), or in a recalled prompt: the previous prompt.
             // MARK: wave7 w7-chat — §45.1: elsewhere the caret just moves; the history is not even read.
             guard onFirstLine || composer.draft.isEmpty else { return false }
-            // §50.3: as in the terminal, ↑ in an empty box first brings back the last message waiting (queued, else in
-            // Claude's turn) to edit; with nothing waiting it walks the prompt history.
+            // §56.2: as in the terminal, ↑ in an empty box first brings back every message waiting (in Claude's turn, then
+            // the queue) to edit; with nothing waiting it walks the prompt history.
             if composer.draft.isEmpty, !composer.history.isBrowsing, store.viewingChat == nil, store.canPullBackWaiting {
-                return store.pullBackLastWaiting()
+                return store.pullBackWaiting()
             }
             if !composer.history.isBrowsing { composer.history.refresh(entries: store.promptHistory) }
             guard let recalled = composer.history.up(draft: composer.draft, caretOnFirstLine: onFirstLine) else { return false }
@@ -1294,7 +1302,11 @@ struct ChatComposer: View {
             if let restored = composer.history.cancel() { composer.setDraftFromHistory(restored); return true }
             if store.btwOverlay != nil { store.dismissBtw(); return true }   // §56.1: the side answer first, then the turn
             // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (⌘. does too).
-            if store.isRunning, store.viewingChat == nil { store.interrupt(); return true }
+            // §56.2: with messages waiting, what Claude has not read comes back into the box with the stop.
+            if store.isRunning, store.viewingChat == nil {
+                if store.hasUnsentWaiting { Task { await store.interruptGivingBack() } } else { store.interrupt() }
+                return true
+            }
             return false
         }
     }
