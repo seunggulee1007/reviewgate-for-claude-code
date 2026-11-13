@@ -2225,6 +2225,22 @@
         }
       }
     },
+    "Ask a quick side question — Claude keeps working; the answer stays out of the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask a quick side question — Claude keeps working; the answer stays out of the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "곁질문을 빠르게 해요 — Claude는 하던 일을 계속하고, 답은 대화에 남지 않아요"
+          }
+        }
+      }
+    },
     "Ask before every tool that is not read-only": {
       "localizations": {
         "en": {
@@ -3037,6 +3053,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 이 변경을 %@에 커밋했어요. 파일은 리뷰에 그대로 있어요. 거절하면 작업 트리만 되돌리고 커밋은 남아요(git reset --soft로 되돌릴 수 있어요)."
+          }
+        }
+      }
+    },
+    "Claude could not answer the side question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not answer the side question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 곁질문에 답하지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude could not answer the side question: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude could not answer the side question: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 곁질문에 답하지 못했어요: %@"
           }
         }
       }
@@ -6243,6 +6291,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "일반"
+          }
+        }
+      }
+    },
+    "No side answer yet — type /btw and your question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No side answer yet — type /btw and your question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 곁질문 답이 없어요 — /btw 뒤에 질문을 적어요"
           }
         }
       }

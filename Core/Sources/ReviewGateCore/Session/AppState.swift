@@ -240,6 +240,12 @@ public final class AppState {
     /// §50.3: messages in Claude's turn being taken back (their chips wait), and why the last take-back did not happen.
     public internal(set) var steeringTakingBack: Set<String> = []
     public internal(set) var steerTakeBackNotice: SteerTakeBackNotice?
+    /// §56.1 /btw: the overlay over the message box, the question in flight (nil: none, or cancelled), the chat's last answer
+    /// (`/btw` alone shows it again) and why the last question got none.
+    public internal(set) var btwOverlay: BtwOverlay?
+    var btwAsking: UUID?
+    var lastBtw: (chat: String?, answer: BtwAnswer)?
+    public internal(set) var btwFailure: BtwFailure?
     /// r2-chats-cards M31 / M33 (§9): a new chat or switch asked for while Claude works — sent once the live chat is done.
     public internal(set) var pendingChatSwitch: PendingChatSwitch?
     /// The held switch is on its way (one at a time).
@@ -2161,6 +2167,8 @@ public final class AppState {
         case .historyCleanup:   // MARK: wave4b w4b-bigturn — §39.1: consumed by `historyCleanup(keep:apply:)`
             break
         case .commitFormat, .prDraft, .prAiDraft, .taskOutput, .taskBackground:   // MARK: wave4c w4c-commit — §41.1 (§51, §52): replies, consumed by their requests
+            break
+        case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
         case .commitHunks, .commitSplitDraft, .committedSeries:   // §53: replies, consumed by their requests
             break
