@@ -5681,6 +5681,17 @@ type ClaudeMdEvent = { type: "claude_md"; id?; path; relPath; kind: "project" | 
   normal connect (it opens no browser); the row and the banner say "터미널에서 로그인하면 자동으로 다시 연결해요" and keep
   [재연결]. On Windows the console starts in the project (`Platform.openTerminal(command, cwd)`), so `claude /mcp` lists its
   project / local servers.
+- **Opening the file that defines a server (client only, no wire change).** `origin.file` is the path the row's context menu
+  and "⋯" menu open: **Open Config File** (the editor the diff's "Open in Editor" remembered, else the system's app for the
+  file) and **Show in Finder / Explorer**; the "Defined in …" line is a link to the same. For `~/.claude.json` (large,
+  holds other state) Show in Finder comes first, the line reveals it instead of opening it, and Open carries a caution
+  tooltip. A row without `origin.file` (plugin, claude.ai, managed, an older engine) keeps both items disabled with the
+  reason. The section's **Open .mcp.json** opens the project's own file; when it is not there the client asks, then
+  writes `{"mcpServers": {}}` (never over an existing file) and opens it. The engine only sets `restartRequired` for
+  what it changes itself, so the client notes the modification time of each file it opened and compares it when the app
+  comes back to the front: a save shows the same restart banner (cleared by Restart now or a project change) and asks
+  for `mcp_status`. Windows: main-process `rg:mcpConfigFile` (`stat` / `open` / `create`), accepting only an absolute
+  `.mcp.json` / `.claude.json` (`create`: `.mcp.json` only).
 - **What an instruction file is (SME-14).** `memoryFiles[].kind` (engine `instructions/claudeMd.ts` `instructionKind`, one
   rule): `<config>/CLAUDE.md` user, `<cwd>/CLAUDE.md` / `.claude/CLAUDE.md` project, `<cwd>/CLAUDE.local.md` local, a
   CLAUDE.md / CLAUDE.local.md in a folder above parent, below the root nested, `.claude/rules/**` rules, anything under
