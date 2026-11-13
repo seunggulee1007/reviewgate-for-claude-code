@@ -409,6 +409,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .btw-overlay .btw-question { flex: 1; min-width: 0; color: var(--fg-2); font-size: 12px; }
 .btw-overlay .btw-wait { color: var(--fg-3); font-size: 12px; white-space: nowrap; }
 .btw-overlay .btw-body { max-height: 220px; overflow: auto; user-select: text; }
+/* §56.3 "Editing in …" while the draft is out in an external editor (Ctrl+G) */
+.external-edit { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 8px; border-radius: 6px; background: var(--elevated); border: 1px solid var(--border); font-size: 12px; color: var(--fg-2); }
 .logbox { font-family: var(--mono); font-size: 11px; white-space: pre-wrap; background: var(--bg-2); border-radius: 6px; padding: 6px; height: 140px; overflow: auto; user-select: text; }
 .popover { position: absolute; z-index: 40; bottom: 100%; left: 0; width: 320px; max-height: 420px; overflow: auto; background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow); padding: 12px; font-size: 12.5px; }
 

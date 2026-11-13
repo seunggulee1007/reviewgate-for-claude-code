@@ -49,6 +49,8 @@ import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
 import { BtwOverlay } from "./BtwOverlay"; // §56.1
 import { btwNothingYet, btwQuestion, useBtw } from "../../btw";
+import { ExternalEditBar } from "./ExternalEditBar"; // §56.3
+import { isExternalEditKey, useExternalEdit } from "../../externalEdit";
 import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
@@ -281,6 +283,18 @@ export function Composer() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [splitOpen]);
 
+  // MARK: composer parity — §56.3 Ctrl+G: the draft out in an external editor; each save replaces it.
+  const external = useExternalEdit(
+    (text) => {
+      setNav(IDLE_NAV);
+      setDraft(text);
+    },
+    (why) => setAttachErrors([why]),
+  );
+  const editExternally = () => {
+    if (viewing || external.editing) return;
+    void external.start(draft);
+  };
   const { caps, cached } = capabilitiesOf({ state, cachedCapabilities });
   // §22: the live MCP list when the engine sent one, else what the session reported at start.
   const mcpLive = useStore((s) => (s.mcp.loaded ? s.mcp.servers : null));
@@ -723,6 +737,12 @@ export function Composer() {
     }
     // MARK: §52 — Ctrl+B in an empty box while a turn runs: the running command goes on in the background (otherwise
     // Ctrl+B does what it did — toggles the sidebar).
+    // §56.3: Ctrl+G, as in the terminal — the draft in an external editor.
+    if (isExternalEditKey(e) && !viewing) {
+      e.preventDefault();
+      editExternally();
+      return;
+    }
     if (isBackgroundKey(e, { draftEmpty: draft.trim().length === 0, turnRunning: running, enabled: backgroundWorkOn(settings), viewing: viewing !== null })) {
       e.preventDefault();
       noteBackgroundKey();
@@ -929,6 +949,7 @@ export function Composer() {
       )}
       {dropping && <div className="drop-hint" aria-hidden="true">{t("Drop files to mention them, or images to attach")}</div>}
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
+      <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
       <textarea
         ref={inputRef}
         className="composer-input"
@@ -1001,6 +1022,20 @@ export function Composer() {
         >
           <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 4.5 5.8 9.2a1.5 1.5 0 0 0 2.1 2.1l5-5a3 3 0 0 0-4.2-4.2l-5.2 5.2a4.5 4.5 0 0 0 6.4 6.4L14 9.6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
           {images.length > 0 && <span className="num">{images.length}</span>}
+        </button>
+        <button
+          type="button"
+          className="attach-btn plain"
+          disabled={viewing !== null || external.editing !== null}
+          onClick={editExternally}
+          title={viewing !== null ? t("Go back to the running chat to edit its message")
+            : external.editing !== null ? t("The message is open in an editor — Done or Cancel above the box")
+            : t("Edit the message in an external editor (⌃G) — each save comes back here")}
+          aria-label={t("Edit in an external editor")}
+          data-testid="Edit in an external editor"
+        >
+          {/* §56.3: the Mac's square.and.pencil */}
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 9v4.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5H7M11.5 2.5l2 2L8 10H6V8z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         {runAsTask && (
           <button

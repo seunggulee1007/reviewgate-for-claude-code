@@ -5,7 +5,7 @@
  */
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { EngineCommand, EngineEvent, PartialSeries } from "@reviewgate/engine";
-import type { AppSettings, EditorKind, ExecutableKind, MenuAction, NotifyRequest, ProjectUI, RGBridge, UpdateStatus } from "./shared/ipc.js";
+import type { AppSettings, DraftEditEvent, EditorKind, ExecutableKind, MenuAction, NotifyRequest, ProjectUI, RGBridge, UpdateStatus } from "./shared/ipc.js";
 import type { NotificationClick } from "./shared/ipc.js"; // MARK: wave4b w4-notify
 import type { WorkbenchSetupReport } from "./shared/flowSettings.js"; // MARK: wave3 desktop-flow
 import type { CloseGuardExtras } from "./shared/closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
@@ -81,6 +81,14 @@ const bridge: RGBridge = {
   toolchainInfo: () => ipcRenderer.invoke("rg:toolchainInfo"),
   logError: (message: string) => ipcRenderer.invoke("rg:logError", message),
   copyText: (text: string) => ipcRenderer.invoke("rg:copyText", text),
+  // MARK: composer parity — §56.3 Ctrl+G: the draft in an external editor, each save back here
+  draftEditStart: (text: string) => ipcRenderer.invoke("rg:draftEditStart", text),
+  draftEditFinish: (id: string) => ipcRenderer.invoke("rg:draftEditFinish", id),
+  onDraftEdit: (cb: (ev: DraftEditEvent) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, ev: DraftEditEvent) => cb(ev);
+    ipcRenderer.on("rg:draftEdit", listener);
+    return () => ipcRenderer.removeListener("rg:draftEdit", listener);
+  },
   // MARK: polish p-foundation — P1-chrome-24 a dropped folder's path, P4-composer-40 an image to the clipboard
   pathForFile: (file: File) => webUtils.getPathForFile(file),
   copyImage: (dataUrl: string) => ipcRenderer.invoke("rg:copyImage", dataUrl),

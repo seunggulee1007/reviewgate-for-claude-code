@@ -8559,3 +8559,10 @@ editor closes. A long instruction is easier to write there. This is the clients'
 - **While editing** a bar over the box says "Editing in <editor>… — each save comes into the message box" with **Done**
   (what was saved stays) and **Cancel** (the box gets back the draft from before Ctrl+G), each with a tooltip, the same in
   its context menu. The editor's window is the user's to close. An editor that cannot start says why in the notice line.
+- **Electron.** The main process does the file and the editor (`main/draftEditor.ts`): `rg:draftEditStart(text)` →
+  `{ok, id, name, waits}`, each save and the editor's end to that window as `rg:draftEdit {id, text?, done?, error?}`
+  (`fs.watchFile`, 400 ms), `rg:draftEditFinish(id)` for Done / Cancel and when the editing ends. `code` is found as for
+  Open in Editor (`where.exe` / the usual folders), a `.cmd` shim through cmd.exe with every argument quoted. The renderer
+  (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
+  it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
+  on the Mac.

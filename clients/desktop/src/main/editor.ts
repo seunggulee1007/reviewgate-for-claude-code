@@ -48,7 +48,7 @@ async function locate(names: string[], candidates: string[]): Promise<string | n
 let vscode: string | null | undefined;
 let idea: string | null | undefined;
 
-async function vscodePath(): Promise<string | null> {
+export async function vscodePath(): Promise<string | null> {
   if (vscode === undefined) vscode = await locate(process.platform === "win32" ? ["code.cmd", "code"] : ["code"], VSCODE_CANDIDATES[process.platform] ?? []);
   return vscode;
 }
