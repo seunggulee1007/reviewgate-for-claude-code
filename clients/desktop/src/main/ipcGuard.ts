@@ -16,6 +16,8 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   // §50: a message into the running turn (↩ while Claude works); §50.3: taking it back before Claude reads it
   "steer",
   "steer_take_back",
+  // §56.1: /btw — a side question answered apart (own lane)
+  "btw_ask",
   "request_changes",
   "interrupt",
   "permission_response",

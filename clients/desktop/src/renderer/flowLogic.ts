@@ -258,6 +258,8 @@ export function flowRefusalText(code: string, detail: string): string | null {
       return d ? t("Claude could not fill in the PR: {0}", d) : t("Claude could not fill in the PR");
     case "empty_base": // §51 (the PR sheet's Fill with Claude; the app's own words elsewhere)
       return t("Choose a base branch first");
+    case "btw_failed": // §56.1
+      return d ? t("Claude could not answer the side question: {0}", d) : t("Claude could not answer the side question");
     case "fetch_failed":
       return d ? t("Could not fetch from the remote: {0}", d) : t("Could not fetch from the remote");
     case "no_review":

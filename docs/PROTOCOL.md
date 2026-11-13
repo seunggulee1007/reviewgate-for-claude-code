@@ -8483,6 +8483,7 @@ type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answe
   `/btw` alone shows the chat's last answer again (none yet: "No side answer yet — type /btw and your question"); another
   chat closes it. While it waits: "Asking on the side…" with Cancel (the answer is dropped when it comes). A refusal shows
   in the notice line ("Claude could not answer the side question: …") and `/btw <question>` comes back into an empty box.
+  Electron: the same (`renderer/btw.ts`, `BtwOverlay.tsx`; the refusal in the composer's error line, Ctrl for ⌘).
 - **Verified** (CLI 2.1.323, `sidecar/test/driver-btw.mjs`, haiku): during a `sleep 15` turn, a question about the code
   word the first message gave was answered `via: "session"` in 1.3 s ("PAPAYA") with the turn still running; a second
   question ("What did I ask you on the side?") was answered from the first exchange ("You asked for the code word."). The

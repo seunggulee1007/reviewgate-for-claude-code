@@ -47,6 +47,8 @@ import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal 
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
+import { BtwOverlay } from "./BtwOverlay"; // §56.1
+import { btwNothingYet, btwQuestion, useBtw } from "../../btw";
 import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
@@ -325,6 +327,19 @@ export function Composer() {
   const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null, settings?.returnSends !== false, cardForText !== null);
 
   const token = slashToken(draft);
+  // MARK: composer parity — §56.1 /btw: the answer over the box, a question that got none, and the chat it belongs to.
+  const btwOverlay = useBtw((s) => s.overlay);
+  const btwFailure = useBtw((s) => s.failure);
+  const askBtw = useBtw((s) => s.ask);
+  const showLastBtw = useBtw((s) => s.showLast);
+  const dismissBtw = useBtw((s) => s.dismiss);
+  const liveChatId = useStore((s) => s.state.sessions?.currentId ?? s.state.session.sessionId ?? null);
+  useEffect(() => {
+    if (!btwFailure) return;
+    setAttachErrors([btwFailure.text]);
+    setDraft((d) => (d.length === 0 ? `/btw ${btwFailure.question}` : d));
+  }, [btwFailure]);
+  useEffect(() => dismissBtw(), [liveChatId, dismissBtw]);
   // MARK: r1-composer M14 — the palette works while Claude works or the session starts too (a pick goes into the draft).
   const paletteVisible = slashPaletteShows({ projectOpen: state.project !== null, dismissed: paletteDismissed, forced: paletteForced, token });
 
@@ -490,8 +505,33 @@ export function Composer() {
     inputRef.current?.focus();
   };
 
+  /**
+   * §56.1: `/btw <question>` is the app's command, whatever the turn does: asked on the side (the answer opens over the
+   * box), never sent, queued or put into the turn; `/btw` alone shows this chat's last answer again. False for any other text.
+   */
+  const takeBtw = (): boolean => {
+    const q = btwQuestion(draft);
+    if (q === null) return false;
+    setSplitOpen(false);
+    if (state.project === null) {
+      setAttachErrors([t("Open a project first (⌘O)")]);
+      return true;
+    }
+    setDraft("");
+    closePalette();
+    setNav(IDLE_NAV);
+    if (q === "") {
+      if (!showLastBtw(liveChatId)) setAttachErrors([btwNothingYet()]);
+    } else {
+      void askBtw(q, liveChatId);
+    }
+    inputRef.current?.focus();
+    return true;
+  };
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
+    if (takeBtw()) return; // §56.1
     if (!canSend || draft.trim().length === 0) return;
     if (viewing) {
       // wave4b w4b-tabs (§39.2): move the session to this chat first; a refused switch gives the text back.
@@ -522,6 +562,7 @@ export function Composer() {
 
   /** "Add to queue": sent in order once a plain Send is allowed again. */
   const doQueue = () => {
+    if (takeBtw()) return; // §56.1
     if (!queueMode || !hasText) return;
     setDraft("");
     closePalette();
@@ -537,6 +578,7 @@ export function Composer() {
    */
   const doSteer = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!canSteer || !hasText) return;
     const text = draft;
     const sentMentions = mentions;
@@ -557,6 +599,7 @@ export function Composer() {
    */
   const doAnswer = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!question) return;
     if (!hasText) {
       if (!questionReady) return;
@@ -583,6 +626,7 @@ export function Composer() {
   /** r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as its instruction; the text leaves the box. */
   const doDenyWithText = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     const text = draft.trim();
     if (!cardForText || text.length === 0) return;
     useStore.getState().respondPermission(cardForText, false, text);
@@ -602,6 +646,7 @@ export function Composer() {
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
+    if (takeBtw()) return; // §56.1
     if (!running || !hasText) return;
     setDraft("");
     closePalette();
@@ -618,6 +663,7 @@ export function Composer() {
   };
 
   const sendAccepting = () => {
+    if (takeBtw()) return; // §56.1
     if (!acceptAndSend || draft.trim().length === 0) return;
     const count = pending;
     setDraft("");
@@ -658,6 +704,12 @@ export function Composer() {
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposing(e)) return; // wave4 w4-input (polish-11): the IME's own Enter / Tab / arrows
+    // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
+    if (btwOverlay?.kind === "answered" && draft === "" && (isEnter(e) || e.key === " ") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      dismissBtw();
+      return;
+    }
     // MARK: wave6 w6-terminal — §44.1: Shift+Tab cycles the mode like the terminal (default → accept edits → plan → auto);
     // only here — everywhere else Shift+Tab still moves the focus back.
     if (isModeCycleKey(e)) {
@@ -780,6 +832,9 @@ export function Composer() {
           e.preventDefault();
           setNav(step.nav);
           showDraft(step.draft, step.caret);
+        } else if (btwOverlay !== null) {
+          e.preventDefault(); // §56.1: the side answer first, then the turn
+          dismissBtw();
         } else if (running && !viewing) {
           // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (Ctrl+. does too).
           e.preventDefault();
@@ -792,6 +847,7 @@ export function Composer() {
       case "Enter":
       case "Tab":
         e.preventDefault();
+        if (isEnter(e) && token?.toLowerCase() === "btw" && takeBtw()) break; // §56.1: `/btw` typed out runs at once
         if (entries.length === 0) closePalette();
         else pick(entries[Math.min(paletteIndex, entries.length - 1)]!);
         break;
@@ -866,6 +922,7 @@ export function Composer() {
         </div>
       )}
       {dropping && <div className="drop-hint" aria-hidden="true">{t("Drop files to mention them, or images to attach")}</div>}
+      <BtwOverlay /* §56.1: the /btw answer, over the box */ />
       <textarea
         ref={inputRef}
         className="composer-input"
