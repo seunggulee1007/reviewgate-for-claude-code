@@ -75,6 +75,22 @@ export class FakeClaudeSession implements ClaudeSessionLike {
     this.interrupts += 1;
   }
 
+  /**
+   * §56.2: a CLI that drops what waits with the interrupt (`cancel_queued`) — off: `interruptTakingBack` answers null; on:
+   * the uuids it drops (`cancelQueuedResult`, default every message put into the turn), each `steer_withdrawn`.
+   */
+  cancelQueued = false;
+  cancelQueuedResult: string[] | null = null;
+  interruptsTakingBack = 0;
+
+  async interruptTakingBack(): Promise<string[] | null> {
+    if (!this.cancelQueued) return null;
+    this.interruptsTakingBack += 1;
+    const ids = this.cancelQueuedResult ?? this.steers.map((_, i) => `steer-${i + 1}`);
+    for (const id of ids) this.emit({ type: "steer_withdrawn", uuid: id });
+    return ids;
+  }
+
   /** §56.1: /btw questions the session was asked, and what the next one answers (an Error: the CLI refused it). */
   readonly sideQuestions: { question: string; history: BtwExchange[] }[] = [];
   sideQuestionResult: BtwAnswer | null | Error | Promise<BtwAnswer | null> = { response: "side answer", synthetic: false };

@@ -31,11 +31,14 @@ type Script = {
   /** §56.1: `side_question` — what was asked (question, options), and the CLI's answer. */
   sideQuestions: { question: string; o: unknown }[];
   onSideQuestion: (question: string) => Promise<unknown> | unknown;
+  /** §56.2: what each `interrupt` was asked with, and the CLI's receipt. */
+  interrupts: unknown[];
+  onInterrupt: (o: unknown) => Promise<unknown> | unknown;
 };
 
 function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }) => Query; script: Script } {
   let onFlag: (s: Record<string, unknown>) => void = () => {};
-  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [], cancels: [], onCancel: () => false, sideQuestions: [], onSideQuestion: () => ({ response: "answer", synthetic: false }) };
+  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [], cancels: [], onCancel: () => false, sideQuestions: [], onSideQuestion: () => ({ response: "answer", synthetic: false }), interrupts: [], onInterrupt: () => undefined };
   const queryFn = (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }): Query => {
     script.options = args.options;
     void (async () => {
@@ -65,7 +68,10 @@ function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage
       [Symbol.asyncIterator]() {
         return this;
       },
-      interrupt: async () => undefined,
+      interrupt: async (o?: unknown) => {
+        script.interrupts.push(o);
+        return script.onInterrupt(o);
+      },
       initializationResult: () => Promise.resolve({}),
       cancelAsyncMessage: async (id: string) => {
         script.cancels.push(id);
@@ -548,5 +554,69 @@ describe("§56.1 /btw on the live session (askSideQuestion)", () => {
   it("not started: rejects (the engine forks instead)", async () => {
     const { s } = session();
     await expect(s.askSideQuestion("q", [])).rejects.toThrow(/not started/);
+  });
+});
+
+describe("§56.2 Esc takes back what waits in the turn (interruptTakingBack)", () => {
+  const init = (capabilities: string[]) => ({ type: "system", subtype: "init", session_id: SID, model: "claude-x", cwd: "/tmp", tools: [], mcp_servers: [], slash_commands: [], permissionMode: "default", capabilities, uuid: "i-1" });
+
+  /** A turn running with two steered messages the CLI has queued, on a CLI with `capabilities`. */
+  async function waiting(capabilities: string[]) {
+    const { s, events, script } = session();
+    await s.start();
+    s.sendUser("Run the tests", "tree-A");
+    await until(() => script.sent.length === 1, "first message");
+    const first = script.sent[0]!.uuid!;
+    script.push(init(capabilities));
+    script.push(lifecycle(first, "queued"));
+    script.push(lifecycle(first, "started"));
+    const a = s.steerUser("Also check the README");
+    const b = s.steerUser("And the changelog");
+    await until(() => script.sent.length === 3, "the messages put in");
+    script.push(lifecycle(a, "queued"));
+    script.push(lifecycle(b, "queued"));
+    await until(() => ofType(events, "session_info").length === 1, "init read");
+    return { s, events, script, a, b };
+  }
+
+  it("cancel_queued: one request interrupts and drops them; the receipt and the frames withdraw each once", async () => {
+    const { s, events, script, a, b } = await waiting(["interrupt_receipt_v1", "interrupt_cancel_queued_v1"]);
+    script.onInterrupt = () => {
+      script.push(lifecycle(a, "cancelled")); // one frame before the receipt, the other after it
+      setTimeout(() => script.push(lifecycle(b, "cancelled")), 5);
+      return { still_queued: [], cancelled: [a, b, "internal-cron"] };
+    };
+    await expect(s.interruptTakingBack()).resolves.toEqual([a, b]);
+    expect(script.interrupts).toEqual([{ cancelQueued: true }]);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(ofType(events, "steer_withdrawn").map((e) => e.uuid)).toEqual([a, b]);
+    expect(ofType(events, "steer_read")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("one already read is not taken back (not in the receipt, or read before)", async () => {
+    const { s, events, script, a, b } = await waiting(["interrupt_cancel_queued_v1"]);
+    script.push(lifecycle(a, "started"));
+    await until(() => ofType(events, "steer_read").length === 1, "a read");
+    script.onInterrupt = () => ({ still_queued: [], cancelled: [b] });
+    await expect(s.interruptTakingBack()).resolves.toEqual([b]);
+    await s.dispose();
+  });
+
+  it("a CLI without the capability: null, nothing asked (the engine takes them back one by one)", async () => {
+    const { s, script } = await waiting(["interrupt_receipt_v1"]);
+    await expect(s.interruptTakingBack()).resolves.toBeNull();
+    expect(script.interrupts).toEqual([]);
+    await s.dispose();
+  });
+
+  it("the request fails: nothing taken back", async () => {
+    const { s, events, script } = await waiting(["interrupt_cancel_queued_v1"]);
+    script.onInterrupt = () => {
+      throw new Error("boom");
+    };
+    await expect(s.interruptTakingBack()).resolves.toEqual([]);
+    expect(ofType(events, "steer_withdrawn")).toEqual([]);
+    await s.dispose();
   });
 });

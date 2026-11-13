@@ -8488,3 +8488,32 @@ type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answe
   word the first message gave was answered `via: "session"` in 1.3 s ("PAPAYA") with the turn still running; a second
   question ("What did I ask you on the side?") was answered from the first exchange ("You asked for the code word."). The
   turn ended once with its own reply ("A-DONE"); its only row is the first message, and neither question reached it.
+
+### 56.2 Esc gives back what Claude has not read
+
+In the terminal, Esc while Claude works stops the turn and puts every message typed meanwhile that Claude has not read
+back into the input, to edit and send again. In the app Esc only interrupted: messages put into the turn (§50) that Claude
+had not read stayed in the CLI's command queue and ran as the next turn, and the app's queue (§50.1) went on sending.
+
+```ts
+// command: interrupt { takeBack?: boolean }        // with takeBack the reply is `interrupted`; without it `result` as before
+type InterruptedEvent = { type: "interrupted"; id?: string;
+                          takenBack: { id: string; text: string; mentions?: string[] }[];   // in order, never read
+                          read: string[] };                                                // waited, but Claude has them
+```
+
+- **One request when the CLI can.** CLI 2.1.x advertises `interrupt_cancel_queued_v1` in `system/init.capabilities`: the
+  interrupt control request then takes `cancel_queued: true` (SDK `Query.interrupt({cancelQueued: true})`, 0.3.270; the
+  argument is not in the typings) and cancels, with the abort, every uuid-stamped command still queued or already dequeued
+  for the next turn — each closed with a `cancelled` lifecycle frame and listed in the receipt's `cancelled`. The session
+  (`ClaudeSession.interruptTakingBack`) withdraws each waiting message it lists (`steer_withdrawn`, once, whether its frame
+  or the receipt comes first) and answers the uuids; a message being folded into the step is cancelled too (the abort means
+  the fold never delivers it). Uuids it never sent (cron, an auto-resume) are ignored. A failed request takes nothing back.
+- **Otherwise one by one.** A CLI without the capability (`interruptTakingBack` → null): every waiting message is taken back
+  (`takeBackSteer`, §50.3); the interrupt goes out once they all answered, or after 1.5 s (one being folded in waits for its
+  next frame, which the interrupt brings); their outcomes are read once settled — the turn's end settles the rest, never
+  longer than `interruptWaitMs`. `taken` ones are in `takenBack`, the rest in `read`.
+- **The reply.** The messages taken back leave `state.session.steering` with no row; `takenBack` carries their text and
+  mentions in the order they were put in, for the clients to give back. `read`: those Claude has (their rows come with the
+  turn's end, §50.2). Nothing waiting: a plain interrupt, `interrupted {takenBack: [], read: []}`; no turn running: the same
+  reply, nothing interrupted. `interrupt` without `takeBack` is exactly as before (`result`; what waits stays and runs next).

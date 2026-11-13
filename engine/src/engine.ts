@@ -197,7 +197,7 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
-import type { BtwAnswerEvent } from "./protocol.js";
+import type { BtwAnswerEvent, InterruptedEvent } from "./protocol.js";
 import { BTW_SYSTEM, BTW_TIMEOUT_MS, BtwHistory, btwForkPrompt, MAX_BTW_QUESTION } from "./side/btw.js"; // §56.1
 import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
 import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
@@ -1073,7 +1073,8 @@ export class ReviewEngine {
         await this.steerTakeBack(cmd.messageId);
         return;
       case "interrupt":
-        await this.interruptTurn();
+        if (cmd.takeBack === true) return this.interruptTurn(true); // §56.2
+        await this.interruptTurn(false);
         return;
       case "permission_response": {
         const session = this.session;
@@ -4903,16 +4904,55 @@ export class ReviewEngine {
    * `interrupt`: `Query.interrupt()` (an open permission card is denied with it), then waits — at most
    * `interruptWaitMs` — until the turn ended (`turn_end{stopReason:"interrupted"}`) and its changes were collected,
    * so a `send` queued right behind it goes out ("중단하고 보내기"). A no-op without a running turn.
+   *
+   * §56.2 `takeBack` (Esc with unsent messages, as in the terminal): what waits in the turn (`state.session.steering`) is
+   * taken back with it — in the interrupt itself (`interrupt {cancel_queued: true}`) when the CLI can, else one by one
+   * (`steer_take_back`) before the interrupt. Replies `interrupted` with the messages taken back and the ids Claude has.
    */
-  private async interruptTurn(): Promise<void> {
+  private async interruptTurn(takeBack: false): Promise<undefined>;
+  private async interruptTurn(takeBack: true): Promise<InterruptedEvent>;
+  private async interruptTurn(takeBack: boolean): Promise<InterruptedEvent | undefined> {
     const session = this.session;
-    if (!this.gate.running || !session) return;
-    await session.interrupt();
+    const waiting = takeBack ? [...this.steering] : [];
+    const reply = (taken: Set<string>): InterruptedEvent | undefined => takeBack
+      ? { type: "interrupted", takenBack: waiting.filter((m) => taken.has(m.id)).map((m) => ({ id: m.id, text: m.text, ...(m.mentions ? { mentions: m.mentions } : {}) })), read: waiting.filter((m) => !taken.has(m.id)).map((m) => m.id) }
+      : undefined;
+    if (!this.gate.running || !session) return reply(new Set());
+    let taken = new Set<string>();
+    if (waiting.length > 0) {
+      taken = await this.interruptTakingBack(session, waiting.map((m) => m.id));
+      for (const id of taken) this.dropSteering(id);
+      this.log("info", `interrupt: ${taken.size} of ${waiting.length} waiting message(s) taken back`);
+    } else {
+      await session.interrupt();
+    }
     const deadline = Date.now() + this.interruptWaitMs;
     while ((this.gate.running || this.gate.collecting) && Date.now() < deadline && !this.closed) {
       await new Promise((r) => setTimeout(r, 20));
     }
     if (this.gate.running) this.log("warn", `interrupt: the turn was still running after ${this.interruptWaitMs} ms`);
+    return reply(taken);
+  }
+
+  /**
+   * §56.2: interrupts `session` and takes back the messages `ids` waiting in its turn → the ones Claude will never read. One
+   * request when the CLI can; else each is taken back (`takeBackSteer`), the interrupt goes out once they answered — or
+   * after `TAKE_BACK_BEFORE_INTERRUPT_MS`: one being folded in waits for its next frame, which the interrupt brings — and
+   * the outcomes are read once settled (the turn's end settles the rest; never longer than `interruptWaitMs`).
+   */
+  private async interruptTakingBack(session: ClaudeSessionLike, ids: string[]): Promise<Set<string>> {
+    const viaCli = session.interruptTakingBack ? await session.interruptTakingBack() : null;
+    if (viaCli !== null) {
+      this.log("info", "interrupt: the CLI drops what waits with it (cancel_queued)");
+      return new Set(viaCli.filter((id) => ids.includes(id)));
+    }
+    this.log("info", "interrupt: taking back what waits one by one (no cancel_queued)");
+    const kept = (ms: number) => new Promise<"kept">((r) => setTimeout(() => r("kept"), ms).unref?.());
+    const outcomes = ids.map((id) => (session.takeBackSteer ? session.takeBackSteer(id) : Promise.resolve<"kept">("kept")).catch(() => "kept" as const));
+    await Promise.race([Promise.all(outcomes), kept(TAKE_BACK_BEFORE_INTERRUPT_MS)]);
+    await session.interrupt();
+    const settled = await Promise.all(outcomes.map((o) => Promise.race([o, kept(this.interruptWaitMs)])));
+    return new Set(ids.filter((_, i) => settled[i] === "taken"));
   }
 
   // ------------------------------------------------------------------ §26 checkpoints / rewind
@@ -7533,7 +7573,7 @@ export class ReviewEngine {
 
   /** Stops the running turn (an open card is denied with it) and waits until it ended and its changes were collected. */
   private async settleForMove(): Promise<void> {
-    if (this.gate.running && this.session) await this.interruptTurn();
+    if (this.gate.running && this.session) await this.interruptTurn(false);
     if (this.gate.running) this.endTurnAbnormally("chat moved");
     // The stopped turn's changes are collected here first (a big worktree takes a while; every git call is capped).
     const deadline = Date.now() + Math.max(this.interruptWaitMs, CHAT_MOVE_COLLECT_WAIT_MS);
@@ -8721,6 +8761,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
 type PlannedCommit = { message: string; whole: string[]; blobs: SeriesBlob[]; files: string[]; parts: { path: string; hunks: number[] | null }[] };
 
 /** §52.1: how long a turn Claude started waits for the collection / revert in flight before it is taken. */
+/** §56.2: how long Esc's take-back one by one (a CLI without `cancel_queued`) waits for the CLI before it interrupts. */
+const TAKE_BACK_BEFORE_INTERRUPT_MS = 1500;
 const AUTO_TURN_WAIT_MS = 60_000;
 /** §52.1: how long it waits for a message sent meanwhile to go out (its turn is the one it joins). */
 const AUTO_TURN_JOIN_MS = 5_000;
