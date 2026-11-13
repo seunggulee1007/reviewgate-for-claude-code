@@ -8473,3 +8473,7 @@ type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answe
   interrupt or a side fork. Nothing is sent to the turn, nothing joins the transcript, `hud.turnCount` or the prompt
   history. An answer slower than 3 minutes is refused `btw_failed:no answer in 180 s` (the CLI's request is cancelled); a
   cancelled one `btw_failed:cancelled`; a failed fork `btw_failed:<its first line>`.
+- **Verified** (CLI 2.1.323, `sidecar/test/driver-btw.mjs`, haiku): during a `sleep 15` turn, a question about the code
+  word the first message gave was answered `via: "session"` in 1.3 s ("PAPAYA") with the turn still running; a second
+  question ("What did I ask you on the side?") was answered from the first exchange ("You asked for the code word."). The
+  turn ended once with its own reply ("A-DONE"); its only row is the first message, and neither question reached it.
