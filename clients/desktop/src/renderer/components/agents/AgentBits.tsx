@@ -85,7 +85,7 @@ export function StopAgentButton({ node, className = "", label = false }: { node:
   );
 }
 
-export type AgentMenuItem = { label: string; onClick: () => void; disabled?: string | null; danger?: boolean; testId: string };
+export type AgentMenuItem = { label: string; onClick: () => void; disabled?: string | null; /** the tooltip of an item that can be chosen */ hint?: string; danger?: boolean; testId: string };
 
 /** MARK: wave5 w5-fixes — §43.5: the side panel opens on "why was this agent started" at its call. */
 function askWhyAgent(toolUseId: string): void {
@@ -169,7 +169,7 @@ export function PointerMenu({ at, items, onClose }: { at: { x: number; y: number
           role="menuitem"
           aria-disabled={it.disabled ? true : undefined}
           className={`item ${it.disabled ? "disabled" : ""} ${it.danger ? "danger" : ""}`}
-          title={it.disabled ?? undefined}
+          title={it.disabled ?? it.hint ?? undefined}
           onClick={(e) => {
             e.stopPropagation();
             if (it.disabled) return;

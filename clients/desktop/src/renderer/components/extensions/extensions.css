@@ -47,6 +47,9 @@
 .mcp-row .spinner { width: 10px; height: 10px; }
 .mcp-row button.small { font-size: 11px; padding: 0 8px; }
 .mcp-source { flex: none; }
+.mcp-origin { background: none; border: 0; padding: 0; font: inherit; text-align: left; cursor: pointer; max-width: 100%; }
+.mcp-origin:hover:not(:disabled) { text-decoration: underline; }
+.mcp-origin:disabled { cursor: default; }
 .mcp-error { white-space: pre-wrap; word-break: break-word; user-select: text; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .mcp-keys { color: var(--fg-3); }
 .mcp-tools { display: flex; flex-wrap: wrap; gap: 3px 10px; max-height: 120px; overflow: auto; color: var(--fg-2); padding: 2px 0 0 2px; }

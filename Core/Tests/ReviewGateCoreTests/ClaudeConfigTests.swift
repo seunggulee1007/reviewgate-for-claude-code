@@ -48,6 +48,33 @@ import Testing
         #expect(store.mcp.supportsRepositoryToggle)
     }
 
+    @Test func aSavedConfigFileOpenedFromTheListNeedsARestart() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mcp-open-\(UUID().uuidString)").path
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let file = McpConfigFile.projectFile(root: dir)
+        #expect(file.hasSuffix("/.mcp.json"))
+        #expect(McpConfigFile.createEmpty(at: file))
+        #expect(try String(contentsOfFile: file, encoding: .utf8) == McpConfigFile.emptyMcpJson)
+        // An existing file is never overwritten.
+        try "{\"mcpServers\": {\"a\": {}}}".write(toFile: file, atomically: true, encoding: .utf8)
+        #expect(McpConfigFile.createEmpty(at: file))
+        #expect(try String(contentsOfFile: file, encoding: .utf8).contains("\"a\""))
+
+        let mcp = McpStore()
+        mcp.configOpened(file)
+        #expect(!mcp.checkConfigEdited())
+        #expect(!mcp.needsRestart)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(60)], ofItemAtPath: file)
+        #expect(mcp.checkConfigEdited())
+        #expect(mcp.needsRestart)
+        #expect(!mcp.checkConfigEdited())   // the save is counted once
+        mcp.configRestarted()
+        #expect(!mcp.needsRestart)
+        #expect(McpConfigFile.isHomeConfig("/Users/dev/.claude.json"))
+        #expect(!McpConfigFile.isHomeConfig("/work/acme/.mcp.json"))
+    }
+
     @Test func commandsEncodeTheNewFields() throws {
         func json(_ cmd: EngineCommand) throws -> [String: Any] {
             try JSONSerialization.jsonObject(with: JSONEncoder().encode(cmd)) as! [String: Any]

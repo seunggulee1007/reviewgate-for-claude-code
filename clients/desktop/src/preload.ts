@@ -62,6 +62,7 @@ const bridge: RGBridge = {
   openExternal: (url: string) => ipcRenderer.invoke("rg:openExternal", url),
   openLog: () => ipcRenderer.invoke("rg:openLog"),
   showItemInFolder: (path: string) => ipcRenderer.invoke("rg:showItemInFolder", path),
+  mcpConfigFile: (action: "stat" | "open" | "create", path: string) => ipcRenderer.invoke("rg:mcpConfigFile", action, path),
   openMarkdown: (path: string) => ipcRenderer.invoke("rg:openMarkdown", path), // MARK: wave4d w4d-config (§42.3)
   openGraphHtml: (path: string) => ipcRenderer.invoke("rg:openGraphHtml", path), // MARK: wave5 w5-graph (§43.3)
   getSettings: () => ipcRenderer.invoke("rg:getSettings"),

@@ -7,9 +7,10 @@ import { BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, 
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
-import type { AppSettings, EditorKind, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
+import type { AppSettings, EditorKind, McpConfigFileResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
 import { openInEditor } from "./editor.js";
+import { createMcpJson, isMcpConfigPath, mcpConfigMtime } from "./mcpConfigFile.js";
 import { isOpenableMarkdown } from "./markdownOpen.js"; // MARK: wave4d w4d-config (§42.3)
 import { isOpenableGraphHtml } from "./graphOpen.js"; // MARK: wave5 w5-graph (§43.3)
 // MARK: wave3 desktop-flow
@@ -98,6 +99,20 @@ export function installIPC(deps: Deps): void {
   });
   ipcMain.handle("rg:openLog", () => shell.openPath(logDir()));
   ipcMain.handle("rg:showItemInFolder", (_e, path: string) => shell.showItemInFolder(path));
+  // Settings › MCP servers: stat / open / create the file that defines a server (`.mcp.json`, `.claude.json`), nothing else.
+  ipcMain.handle("rg:mcpConfigFile", async (evt, action: unknown, path: unknown): Promise<McpConfigFileResult> => {
+    if (!isMcpConfigPath(path) || (action !== "stat" && action !== "open" && action !== "create")) {
+      logLine(`w${evt.sender.id}`, "warn", "blocked mcpConfigFile: not a .mcp.json / .claude.json");
+      return { ok: false, mtime: null, error: "refused" };
+    }
+    if (action === "create") {
+      const made = createMcpJson(path);
+      return { ok: made !== "failed", mtime: mcpConfigMtime(path), ...(made === "failed" ? { error: "failed" as const } : {}) };
+    }
+    const mtime = mcpConfigMtime(path);
+    if (action === "open" && mtime !== null) await openInEditor(path, 1, loadSettings().preferredEditor, "default-app");
+    return { ok: mtime !== null, mtime, ...(mtime === null ? { error: "missing" as const } : {}) };
+  });
   // MARK: wave4d w4d-config — §42.3: an instruction file in the default app (a Markdown file that exists, nothing else).
   ipcMain.handle("rg:openMarkdown", (evt, path: unknown) => {
     if (isOpenableMarkdown(path)) return shell.openPath(path);

@@ -73,8 +73,8 @@ function run(exe: string, args: string[]): void {
   child.unref();
 }
 
-/** Returns the editor that was used (so the renderer can remember it), or null when none could be found. */
-export async function openInEditor(absolutePath: string, line: number | null, preferred: EditorKind = "auto"): Promise<EditorKind | null> {
+/** Returns the editor that was used (`fallback` "default-app": no editor found → the system's app for the file, not Explorer) (so the renderer can remember it), or null when none could be found. */
+export async function openInEditor(absolutePath: string, line: number | null, preferred: EditorKind = "auto", fallback: "reveal" | "default-app" = "reveal"): Promise<EditorKind | null> {
   // Renderer input: only an absolute path (no NUL / newline) and a positive line reach a spawn.
   if (typeof absolutePath !== "string" || !isAbsolute(absolutePath) || /[\0\r\n]/.test(absolutePath)) return null;
   if (line !== null && !(Number.isInteger(line) && line > 0)) line = null;
@@ -94,7 +94,8 @@ export async function openInEditor(absolutePath: string, line: number | null, pr
       return "idea";
     }
     if (kind === "explorer") {
-      shell.showItemInFolder(absolutePath);
+      if (fallback === "default-app") void shell.openPath(absolutePath);
+      else shell.showItemInFolder(absolutePath);
       return "explorer";
     }
   }

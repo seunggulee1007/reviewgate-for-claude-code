@@ -241,6 +241,28 @@ public enum InstructionText {
     }
 }
 
+public enum McpConfigFile {
+    /// What a new `.mcp.json` starts with.
+    public static let emptyMcpJson = "{\"mcpServers\": {}}\n"
+
+    /// `~/.claude.json`: large, and it holds other state than MCP servers (projects, history, settings).
+    public static func isHomeConfig(_ path: String) -> Bool { (path as NSString).lastPathComponent == ".claude.json" }
+
+    /// The file's modification time; nil when it does not exist.
+    public static func modified(_ path: String) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+    }
+
+    /// The project's own `.mcp.json`.
+    public static func projectFile(root: String) -> String { (root as NSString).appendingPathComponent(".mcp.json") }
+
+    /// Writes `emptyMcpJson` unless the file exists; false when it could not.
+    public static func createEmpty(at path: String) -> Bool {
+        guard !FileManager.default.fileExists(atPath: path) else { return true }
+        return (try? emptyMcpJson.write(toFile: path, atomically: true, encoding: .utf8)) != nil
+    }
+}
+
 public enum McpOriginText {
     /// `~/…` for a path in the home folder.
     public static func abbreviate(_ path: String) -> String {
