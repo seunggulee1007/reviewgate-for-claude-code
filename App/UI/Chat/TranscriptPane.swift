@@ -149,6 +149,7 @@ struct TranscriptPane: View {
                             header(restored: restored, proxy: proxy)
                             ForEach(entries[..<split]) { entry in
                                 TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
+                                    .transcriptRowFrame(entry.id)
                             }
                         }
                     } else {
@@ -156,10 +157,12 @@ struct TranscriptPane: View {
                     }
                     ForEach(entries[split...]) { entry in
                         TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
+                            .transcriptRowFrame(entry.id)
                     }
                     // The marker takes the stack's bottom padding: pinned to it, the view is at the content's very end (pinned
                     // to a 1 pt marker above the padding, a reader who scrolled to the end was pulled 12 pt back up).
                     Color.clear.frame(height: 13).id(Self.bottomID)
+                        .transcriptBottomFrame()
                 }
                 .padding([.top, .horizontal], 12)
             }

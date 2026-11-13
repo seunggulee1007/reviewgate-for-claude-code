@@ -6591,7 +6591,16 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   leaves a 64-turn chat 5 000 pt above its end while 16 turns come in, then scrolls it down as a trackpad moves the clip
   (40 pt every 16 ms, the transcript told the user scrolls) to the end, idle and while Claude streams, at 1000 × 637 with
   and without the diff pane and at 1257 × 1104; a jump is the view going further from the newest row than the reader took
-  it.
+  it. `SHOTS_LAYOUT=overlap` (`ScreenshotTour.overlapChecks`) loads a 36-turn session of rich turns — Claude's question
+  answered, an MCP server's calls, Bash calls (one failing every other turn), answers with a heading, a list and two tables,
+  turn summaries and ends — then has more such turns begin and stream while following (the rows made at once move into
+  the lazy stack as each begins), scrolls up while turns come and back down as a trackpad does, resizes the window and
+  opens the diff pane. After each step it lays the window out as a window on screen is before it is drawn (a quiet window
+  is never drawn by AppKit: its views wait for a display that does not come, and a picture taken as it is mixes old and
+  new; the run draws it at the screen's pace), scrolls a point and back so every row on screen reports its frame
+  (DEBUG-only `TranscriptRowFrames`, nothing in a release build), and says OVERLAP when two rows on screen were laid out
+  over one another, an answer's AppKit text or table lies in no row's frame, or a text is taller than its frame, still so
+  1.5 s later.
   `SHOTS_LAYOUT=open` (`ScreenshotTour.openChecks`) runs Open Project… / Switch Project… / Open in New Window… (their menu
   items, the folder picker answered by `ProjectOpener.debugPick`) and `ProjectOpener.open` in each state a window can be in
   — idle, the project already open here or in another window, files pending review (also on the PRs tab), a turn running,
