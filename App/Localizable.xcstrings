@@ -9239,6 +9239,38 @@
         }
       }
     },
+    "Couldn't open %@: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open %@: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 열지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Couldn't write the draft for the editor: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't write the draft for the editor: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "편집기에 넘길 메시지를 쓰지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Create PR": {
       "localizations": {
         "en": {
@@ -10439,6 +10471,22 @@
         }
       }
     },
+    "Edit in an external editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit in an external editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 편집"
+          }
+        }
+      }
+    },
     "Edit it here; you see the change before it is saved": {
       "localizations": {
         "en": {
@@ -10451,6 +10499,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "여기서 고쳐요. 저장하기 전에 바뀐 내용을 보여 줘요"
+          }
+        }
+      }
+    },
+    "Edit the message in an external editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the message in an external editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 메시지 편집"
+          }
+        }
+      }
+    },
+    "Edit the message in an external editor (⌃G) — each save comes back here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the message in an external editor (⌃G) — each save comes back here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집기에서 메시지 편집 (⌃G) — 저장할 때마다 여기로 돌아와요"
           }
         }
       }
@@ -10483,6 +10563,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수정한 메시지"
+          }
+        }
+      }
+    },
+    "Editing in %@… — each save comes into the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing in %@… — each save comes into the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 편집 중… — 저장할 때마다 입력란으로 들어와요"
           }
         }
       }
@@ -12026,6 +12122,22 @@
         }
       }
     },
+    "Go back to the running chat to edit its message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to edit its message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 채팅으로 돌아가서 메시지를 편집하세요"
+          }
+        }
+      }
+    },
     "Go back to the running chat; this one stays in its tab": {
       "localizations": {
         "en": {
@@ -13116,6 +13228,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "현재 리뷰에 포함됨"
+          }
+        }
+      }
+    },
+    "In the message box — each save comes back into it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box — each save comes back into it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서 — 저장할 때마다 입력란으로 돌아와요"
           }
         }
       }
@@ -25190,6 +25318,38 @@
         }
       }
     },
+    "Stop editing outside and put back the message as it was before ⌃G": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop editing outside and put back the message as it was before ⌃G"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집을 끝내고 ⌃G 전의 메시지로 되돌려요"
+          }
+        }
+      }
+    },
+    "Stop editing outside — what you saved stays in the message box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop editing outside — what you saved stays in the message box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외부 편집 끝내기 — 저장한 내용은 입력란에 남아요"
+          }
+        }
+      }
+    },
     "Stop this agent": {
       "localizations": {
         "en": {
@@ -26402,6 +26562,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메인 워크트리의 그래프"
+          }
+        }
+      }
+    },
+    "The message is open in an editor — Done or Cancel above the box": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The message is open in an editor — Done or Cancel above the box"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지가 편집기에 열려 있어요 — 입력란 위의 완료나 취소를 누르세요"
           }
         }
       }
@@ -30267,6 +30443,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 워크벤치 창"
+          }
+        }
+      }
+    },
+    "the default text editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the default text editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 텍스트 편집기"
           }
         }
       }

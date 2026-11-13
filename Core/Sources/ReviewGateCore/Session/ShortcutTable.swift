@@ -103,6 +103,7 @@ public enum ShortcutTable {
             ShortcutRow("Previous / next prompt", mac: "↑ / ↓", windows: "↑ / ↓", note: "On the first / last line of the message box"),
             ShortcutRow("Switch the permission mode", mac: "⇧⇥", windows: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto"),
             ShortcutRow("Run the command in the background", mac: "⌃B", windows: "Ctrl+B", note: "In an empty message box, while a command runs"),   // §52
+            ShortcutRow("Edit the message in an external editor", mac: "⌃G", windows: "Ctrl+G", note: "In the message box — each save comes back into it"),   // §56.3
         ]),
         ShortcutSection("Permission and plan cards", note: "From an empty message box, or with the card focused — never while you type", rows: [
             ShortcutRow("Allow once", mac: "⌘↩", windows: "Ctrl+Enter"),

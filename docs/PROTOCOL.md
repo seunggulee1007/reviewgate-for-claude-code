@@ -8534,3 +8534,28 @@ type InterruptedEvent = { type: "interrupted"; id?: string;
   `interrupted`, with only the first message's row; and in the 8 s after it neither message ran as a turn of its own (no
   second turn_end, neither word in any reply). The one-by-one way is the §50.3 take-back, verified by
   `driver-steer-takeback.mjs`, followed by the plain interrupt; the engine tests cover it.
+
+### 56.3 Ctrl+G — the draft in an external editor
+
+In the terminal Ctrl+G opens the prompt being typed in `$VISUAL` / `$EDITOR` and takes the edited text back when the
+editor closes. A long instruction is easier to write there. This is the clients' own (no engine command).
+
+- **Keys.** ⌃G in the message box (Mac; AppKit binds nothing to it there), Ctrl+G on Windows. Also while Claude works; not
+  from another chat shown read-only. Pressed again while editing: nothing.
+- **The file.** The draft (mentions and images stay as chips in the box) is written to `draft-<id>.md` in the app's own
+  temp folder: `<system temp>/ReviewGate/drafts/` (Mac `FileManager.temporaryDirectory`, Windows `app.getPath("temp")`).
+  It is removed when the editing ends.
+- **Which editor** (Mac `DraftEditor.launch`, Windows `draftEditorLaunch`): `$VISUAL`, else `$EDITOR`, when it can open a
+  window — a terminal editor (vi, vim, nvim, nano, emacs without `-c`, micro, helix, …) has no terminal from the app and is
+  passed over; a known GUI editor gets the flag that makes its command wait (`code`/`cursor`/`zed` `--wait`, `subl`/`mate`
+  `-w`, `mvim` `-f`, …) unless it has one. It runs through the shell with the file appended, so the user's own quoting
+  holds. Else VS Code's `code --wait` when found (PATH, the usual install folders). Else the system's text editor: Mac
+  `open -t` (the default text editor, named in the bar), Windows Notepad (it waits), elsewhere `xdg-open`. A GUI app
+  started from the Dock or the Start menu has the variables only when they are set for it (a terminal-launched app
+  inherits the shell's).
+- **The round trip.** The file is polled (every 400 ms, by its modification date: an editor that saves by writing a new
+  file in place is seen too); each save goes into the box, trailing newlines trimmed. An editor that waits ends the
+  editing when it closes (one last read). One that does not (`open -t`) ends with Done.
+- **While editing** a bar over the box says "Editing in <editor>… — each save comes into the message box" with **Done**
+  (what was saved stays) and **Cancel** (the box gets back the draft from before Ctrl+G), each with a tooltip, the same in
+  its context menu. The editor's window is the user's to close. An editor that cannot start says why in the notice line.

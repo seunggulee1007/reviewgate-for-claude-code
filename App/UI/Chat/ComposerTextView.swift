@@ -39,6 +39,8 @@ enum ComposerKey: Equatable {
     case pageUp, pageDown
     /// §56.1: Space typed into an empty message box — closes the /btw answer over it (otherwise a space).
     case space
+    /// §56.3: ⌃G — the draft in an external editor, as Ctrl+G in the terminal (AppKit binds nothing to it in a text view).
+    case controlG
 }
 
 /// What a paste or a drop brought into the composer (§23 mentions / §24 images).
@@ -265,6 +267,10 @@ final class ComposerNSTextView: NSTextView {
         if string.isEmpty, !hasMarkedText(), let coordinator,
            event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
            event.charactersIgnoringModifiers == " ", coordinator.parent.onKey(.space) {
+            return
+        }
+        if !hasMarkedText(), let coordinator, event.modifierFlags.intersection([.command, .control, .option, .shift]) == .control,
+           event.charactersIgnoringModifiers?.lowercased() == "g", coordinator.parent.onKey(.controlG) {
             return
         }
         super.keyDown(with: event)

@@ -35,6 +35,8 @@ final class ComposerModel {
     var dropHover = false
     /// ↑ / ↓ in an empty composer: this project's previous prompts.
     @ObservationIgnored var history = PromptHistoryNavigator(entries: [])
+    /// §56.3: ⌃G — the draft out in an external editor.
+    let externalEditor = ComposerExternalEditor()
     // MARK: r1-composer M12 — the window keeps this composer (§38.1)
     /// The chat the draft belongs to (`AppState.draftChatId` when the composer last followed it): the chat may have changed
     /// while the chat column was away (the PRs tab, an engine that stopped).
@@ -323,6 +325,7 @@ struct ChatComposer: View {
                 .accessibilityIdentifier("Composer notice")
             }
             ComposerBtwSlot()   // §56.1: the /btw answer, over the box
+            ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
             inputBox
             if store.canPickPermissionMode {
                 ComposerModeLineView()   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드 (shift+tab 전환)"
@@ -1000,6 +1003,17 @@ struct ChatComposer: View {
         return true
     }
 
+    /// §56.3: ⌃G, as Ctrl+G in the terminal — the draft goes out to an external editor and each save comes back here.
+    private func startExternalEdit() {
+        let editor = composer.externalEditor
+        guard !editor.isEditing else { return }
+        let started = editor.start(draft: composer.draft) { [composer] text in
+            composer.draft = text
+            composer.caretRequest = (text as NSString).length
+        }
+        if !started { composer.notice = editor.failure }
+    }
+
     /// §56.1: the /btw answer is shown and the box is empty — ↩ and Space close it (Esc always does).
     private var closesBtwAnswer: Bool {
         guard composer.draft.isEmpty, case .answered = store.btwOverlay else { return false }
@@ -1168,6 +1182,17 @@ struct ChatComposer: View {
                   : String(localized: "Mention a file or folder (@) — or drag files from Changes or Finder here"))
             .accessibilityLabel("Mention a file")
             .accessibilityIdentifier("Mention a file")
+            Button {
+                startExternalEdit()
+            } label: {
+                Image(systemName: "square.and.pencil")
+            }
+            .disabled(store.viewingChat != nil || composer.externalEditor.isEditing)
+            .help(store.viewingChat != nil ? String(localized: "Go back to the running chat to edit its message")
+                  : composer.externalEditor.isEditing ? String(localized: "The message is open in an editor — Done or Cancel above the box")
+                  : String(localized: "Edit the message in an external editor (⌃G) — each save comes back here"))
+            .accessibilityLabel("Edit in an external editor")
+            .accessibilityIdentifier("Edit in an external editor")
             if runAsTaskEnabled {   // §49
                 Button {
                     model.runAsTask(Self.taskText(draft: composer.draft, mentions: composer.mentions))
@@ -1210,7 +1235,7 @@ struct ChatComposer: View {
                 composer.mentionDismissed = true
                 return true
             case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-                 .optionEnter, .digit, .pageUp, .pageDown, .space:
+                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG:
                 break
             }
         }
@@ -1226,6 +1251,10 @@ struct ChatComposer: View {
         case .space:
             guard closesBtwAnswer else { return false }   // §56.1
             store.dismissBtw()
+            return true
+        case .controlG:
+            guard store.viewingChat == nil else { return false }   // §56.3
+            startExternalEdit()
             return true
         case .pageUp, .pageDown:
             // polish P3-transcript-17: a page of the conversation from the message box (the transcript scrolls by the tick).
