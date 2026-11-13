@@ -21,6 +21,9 @@ public final class McpStore {
     public private(set) var authRequiredServer: String?
     /// False once the engine answered `unknown_command` / `mcp_unsupported`.
     public private(set) var isSupported = true
+    /// A config file the user opened from here changed on disk (see `configOpened`): the running session reads it at its next start.
+    public private(set) var configEdited = false
+    @ObservationIgnored private var openedConfigs: [String: Date?] = [:]
     @ObservationIgnored weak var app: AppState?
 
     public init() {}
@@ -82,6 +85,32 @@ public final class McpStore {
     public func dismissError() { errorText = nil }
     public func dismissAuthRequired() { authRequiredServer = nil }
 
+    // MARK: Config files
+
+    /// The restart banner: the engine's own flag, or a config file the user edited after opening it here.
+    public var needsRestart: Bool { restartRequired || configEdited }
+
+    /// The user opened `path` from here: remember its modification time, so `checkConfigEdited` can tell a save.
+    public func configOpened(_ path: String) { openedConfigs[path] = .some(McpConfigFile.modified(path)) }
+
+    /// Compares the opened files' modification times (the app came back to the front). True when one was saved since.
+    @discardableResult
+    public func checkConfigEdited() -> Bool {
+        var changed = false
+        for (path, before) in openedConfigs where McpConfigFile.modified(path) != before {
+            openedConfigs[path] = .some(McpConfigFile.modified(path))
+            changed = true
+        }
+        if changed { configEdited = true }
+        return changed
+    }
+
+    /// The session restarted (or was asked to): what was edited is read now.
+    public func configRestarted() { configEdited = false }
+
+    /// A failure of an action outside the engine (the file to open is gone), in the user's words.
+    public func report(_ text: String) { errorText = text }
+
     // MARK: Events
 
     func apply(servers list: [McpServerInfo], restartRequired: Bool) {
@@ -100,6 +129,8 @@ public final class McpStore {
     func reset() {
         servers = []
         restartRequired = false
+        configEdited = false
+        openedConfigs = [:]
         loaded = false
         busy = []
         errorText = nil

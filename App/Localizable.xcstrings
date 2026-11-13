@@ -31699,6 +31699,230 @@
           }
         }
       }
+    },
+    "That file no longer exists: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That file no longer exists: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일이 더 이상 없습니다: %@"
+          }
+        }
+      }
+    },
+    "ReviewGate does not know which file defines this server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate does not know which file defines this server"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 서버를 정의한 파일을 ReviewGate가 알지 못합니다"
+          }
+        }
+      }
+    },
+    "Opens ~/.claude.json — a large file that also holds your other Claude Code state. Edit it with care.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens ~/.claude.json — a large file that also holds your other Claude Code state. Edit it with care."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "~/.claude.json을 엽니다 — 크고, 다른 Claude Code 상태도 들어 있는 파일입니다. 조심해서 고치세요."
+          }
+        }
+      }
+    },
+    "Open the file that defines this server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the file that defines this server"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 서버를 정의한 파일 열기"
+          }
+        }
+      }
+    },
+    "Open Config File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Config File"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 파일 열기"
+          }
+        }
+      }
+    },
+    "Show the file that defines this server in Finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the file that defines this server in Finder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 서버를 정의한 파일을 Finder에서 보기"
+          }
+        }
+      }
+    },
+    "Open .mcp.json": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open .mcp.json"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".mcp.json 열기"
+          }
+        }
+      }
+    },
+    "Open the project's .mcp.json — you can create it if it is not there yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the project's .mcp.json — you can create it if it is not there yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트의 .mcp.json 열기 — 아직 없으면 만들 수 있습니다"
+          }
+        }
+      }
+    },
+    "Create .mcp.json?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create .mcp.json?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".mcp.json을 만들까요?"
+          }
+        }
+      }
+    },
+    "Create and Open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create and Open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "만들고 열기"
+          }
+        }
+      }
+    },
+    "This project has no .mcp.json yet. ReviewGate creates it with an empty server list and opens it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project has no .mcp.json yet. ReviewGate creates it with an empty server list and opens it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에는 아직 .mcp.json이 없습니다. 빈 서버 목록으로 만들고 엽니다."
+          }
+        }
+      }
+    },
+    "Could not create %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not create %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 만들지 못했습니다"
+          }
+        }
+      }
+    },
+    "Click to show it in Finder — it is a large file that also holds your other Claude Code state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click to show it in Finder — it is a large file that also holds your other Claude Code state"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클릭하면 Finder에서 보여 줍니다 — 크고, 다른 Claude Code 상태도 들어 있는 파일입니다"
+          }
+        }
+      }
+    },
+    "Click to open the file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click to open the file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클릭하면 파일을 엽니다"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

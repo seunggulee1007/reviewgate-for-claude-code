@@ -27,6 +27,7 @@ struct McpServersSection: View {
                     .padding(.horizontal, 5).padding(.vertical, 0.5)
                     .background(Color.secondary.opacity(0.15), in: Capsule())
                 Spacer(minLength: 4)
+                McpConfigHeaderButton(compact: compact)
                 if mcp.isSupported, store.isSessionOpen {
                     Button {
                         Task { await mcp.refresh() }
@@ -47,7 +48,7 @@ struct McpServersSection: View {
                         .accessibilityIdentifier("MCP add server")
                 }
             }
-            if mcp.restartRequired { restartBanner }
+            if mcp.needsRestart { restartBanner }
             if let server = mcp.authRequiredServer, !server.isEmpty { authBanner(server) }
             if let error = mcp.errorText {
                 HStack(alignment: .top, spacing: 6) {
@@ -113,7 +114,7 @@ struct McpServersSection: View {
             Text("The MCP change applies from the next session").font(.callout.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
-            Button("Restart now") { store.restartSession() }
+            Button("Restart now") { mcp.configRestarted(); store.restartSession() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .disabled(!store.canRestartSession || store.isRunning)
@@ -208,14 +209,7 @@ struct McpServersSection: View {
             }
             // MARK: wave4d w4d-config — §42.3: the file that defines it (a folder above the project: every project under it).
             if let origin = McpOriginText.line(server) {
-                Text(verbatim: origin)
-                    .font(.caption2)
-                    .foregroundStyle(server.isFromParentFolder ? Color.orange : Color.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
-                    .padding(.leading, 13)
-                    .help(Text(verbatim: server.origin?.file ?? ""))
-                    .accessibilityIdentifier("MCP origin \(server.name)")
+                originLabel(origin, server)
             }
             if server.authWaiting, server.status == .needsAuth {
                 Text(verbatim: McpOriginText.waitingForLogin)
@@ -242,6 +236,7 @@ struct McpServersSection: View {
             }
         }
         .padding(.vertical, 3)
+        .contextMenu { McpConfigItems(mcp: mcp, file: server.origin?.file) }
         .opacity(server.isOff ? 0.65 : 1)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("MCP \(server.name)")
@@ -330,8 +325,34 @@ struct McpServersSection: View {
         }
         if mcp.supportsRepositoryToggle { repositoryItems(server) }   // wave4d w4d-config (§42.3)
         Divider()
+        McpConfigItems(mcp: mcp, file: server.origin?.file)
+        Divider()
         Button("Remove…", systemImage: "trash", role: .destructive) { removeCandidate = server }
             .disabled(!canAskRemove(server))
+    }
+
+    /// "Defined in …" — a click opens the file (`~/.claude.json` only reveals it: it is large and holds other state).
+    @ViewBuilder
+    private func originLabel(_ text: String, _ server: McpServerInfo) -> some View {
+        let file = server.origin?.file
+        let home = file.map(McpConfigFile.isHomeConfig) ?? false
+        let hint = home
+            ? String(localized: "Click to show it in Finder — it is a large file that also holds your other Claude Code state")
+            : String(localized: "Click to open the file")
+        let label = Text(verbatim: text)
+            .font(.caption2)
+            .foregroundStyle(server.isFromParentFolder ? Color.orange : Color.secondary)
+            .lineLimit(2)
+            .truncationMode(.middle)
+        Button {
+            guard let file else { return }
+            if home { McpConfigOpener.reveal(file) } else { McpConfigOpener.open(file, mcp: mcp) }
+        } label: { label }
+            .buttonStyle(.plain)
+            .onHover { inside in if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+            .padding(.leading, 13)
+            .help(Text(verbatim: "\(file ?? "")\n\(hint)"))
+            .accessibilityIdentifier("MCP origin \(server.name)")
     }
 
     // MARK: wave4d w4d-config — §42.3
