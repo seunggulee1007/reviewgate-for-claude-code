@@ -197,6 +197,8 @@ import { deleteSession as sdkDeleteSession, renameSession as sdkRenameSession } 
 import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
+import type { BtwAnswerEvent } from "./protocol.js";
+import { BTW_SYSTEM, BTW_TIMEOUT_MS, BtwHistory, btwForkPrompt, MAX_BTW_QUESTION } from "./side/btw.js"; // §56.1
 import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
 import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
 import { headHunks, splitContent, type HeadFile } from "./git/commitHunks.js"; // §53
@@ -609,9 +611,11 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
+  /** §56.1: the current chat's /btw exchanges (in memory: the CLI keeps none for an SDK session). */
+  private readonly btwHistory = new BtwHistory();
   /** Chain uuid of the main session's last completed turn: where a side question forks while a turn runs (§21). */
   private lastForkPoint: { sessionId: string; uuid: string } | null = null;
   // ---- MCP (§22)
@@ -1386,6 +1390,8 @@ export class ReviewEngine {
         return this.prFileLinesEvent(cmd.filename);
       case "file_image":
         return this.fileImageEvent(cmd.path);
+      case "btw_ask": // §56.1
+        return this.btwAsk(cmd.question);
       // ---- §21 side questions
       case "side_ask": {
         // MARK: r2-skills-side — §21 (M18): a skill / slash command the session knows runs in the main conversation only.
@@ -3542,6 +3548,54 @@ export class ReviewEngine {
       throw new CommandRefused("steer_already_read: Claude already read this message — it stays in the chat", { code: "steer_already_read" });
     }
     throw new CommandRefused("steer_take_back_failed: the CLI could not take the message back — Claude still reads it", { code: "steer_take_back_failed" });
+  }
+
+  /**
+   * §56.1 `btw_ask {question}`: `/btw` as in the terminal — the live CLI answers from the conversation as it is, with no
+   * tools, while the turn runs (`side_question`, with the chat's earlier /btw exchanges). A session that cannot (none yet,
+   * an older CLI, a refusal) leaves it to a one-shot fork of the chat with no tools. Nothing joins the chat or its history.
+   */
+  private async btwAsk(question: unknown): Promise<BtwAnswerEvent> {
+    const q = typeof question === "string" ? question.trim() : "";
+    if (!q) throw new CommandRefused("empty_question");
+    if (q.length > MAX_BTW_QUESTION) throw new CommandRefused(`question_too_long:${q.length} > ${MAX_BTW_QUESTION}`, { code: "question_too_long" });
+    this.requireProject();
+    const chatId = this.currentSessionId;
+    const history = this.btwHistory.of(chatId);
+    const fail = (why: string) => new CommandRefused(`btw_failed:${why}`, { code: "btw_failed" });
+    let answer: { text: string; via: "session" | "fork"; synthetic: boolean } | null = null;
+    const session = this.session;
+    if (session?.askSideQuestion) {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(new Error("timed out")), BTW_TIMEOUT_MS);
+      timer.unref?.();
+      try {
+        const a = await session.askSideQuestion(q, history, abort.signal);
+        if (a === null) throw fail("cancelled");
+        answer = { text: a.response, via: "session", synthetic: a.synthetic };
+      } catch (e) {
+        if (e instanceof CommandRefused) throw e;
+        if (abort.signal.aborted) throw fail(`no answer in ${Math.round(BTW_TIMEOUT_MS / 1000)} s`);
+        this.log("warn", `/btw: the session could not answer (${errorMessage(e)}) — a fork of the chat answers`);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    if (!answer) {
+      const run = await this.side.startDetached({
+        key: `btw:${randomUUID()}`,
+        prompt: btwForkPrompt(q, history),
+        options: { persistSession: false, allowWeb: false, system: BTW_SYSTEM, maxTurns: 1, tools: [] },
+      });
+      const result = await run.done;
+      if (result.stopReason === "interrupted") throw fail("cancelled");
+      if (result.error) throw fail(firstLineOf(result.error));
+      if (!result.text.trim()) throw fail("empty answer");
+      answer = { text: result.text.trim(), via: "fork", synthetic: false };
+    }
+    if (!answer.synthetic) this.btwHistory.add(chatId, { question: q, response: answer.text });
+    this.log("info", `/btw answered (${answer.via})`);
+    return { type: "btw_answer", question: q, answer: answer.text, via: answer.via, ...(answer.synthetic ? { synthetic: true as const } : {}) };
   }
 
   /** §50.3: a message taken back from the turn leaves the list without a row. */
@@ -8466,7 +8520,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47)
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer" | "btw"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); §56.1 btw
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -8531,6 +8585,9 @@ function laneOf(cmd: EngineCommand): Lane {
     // §50.3: a take-back can wait for the CLI's next frame on that message — never behind (or holding up) the turn's lane.
     case "steer_take_back":
       return "steer";
+    // §56.1: /btw is answered while the turn runs — never behind (or holding up) the turn's lane or the side forks.
+    case "btw_ask":
+      return "btw";
     case "workbench_preview":
       return "query";
     default:
@@ -8609,6 +8666,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "commit_draft": // MARK: wave3 engine-flow
     case "commit_split_draft": // §53
     case "pr_ai_draft": // §51
+    case "btw_ask": // §56.1
     case "prereview_start":
     case "prereview_cancel":
     case "prereview_dismiss":

@@ -656,6 +656,8 @@ export type EngineCommand =
   | Cmd<"steer", { text: string; mentions?: string[] }>
   /** §50.3: takes back a message of `state.session.steering` before Claude reads it; `steer_already_read` / `steer_take_back_failed` otherwise. */
   | Cmd<"steer_take_back", { messageId: string }>
+  /** §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `btw_answer`. */
+  | Cmd<"btw_ask", { question: string }>
   /** §52: stops a background task (`Query.stopTask`). */
   | Cmd<"task_stop", { taskId: string }>
   /** §52: Ctrl+B — the running Bash call (all foreground tasks without an id) goes on in the background; replies `task_background`. */
@@ -1800,6 +1802,8 @@ export type SideToolUseEvent = { type: "side_tool_use"; threadId: string; id: st
 export type SideToolResultEvent = { type: "side_tool_result"; threadId: string; toolUseId: string; isError: boolean; preview: string; denied?: true };
 export type SideTurnEndEvent = { type: "side_turn_end"; threadId: string; costUSD: number; durationMs: number; stopReason: string };
 /** §21: reply to `side_promote_draft` (and `side_promote` without `text`): an editable instruction for the main agent. */
+/** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
+export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
 export type SidePromoteDraftEvent = { type: "side_promote_draft"; id?: string; threadId: string; text: string };
 /** §23: reply to `list_files`. */
 export type FilesEvent = { type: "files"; id?: string; query: string; items: FileItem[] };
@@ -1951,6 +1955,7 @@ export type EngineEvent =
   | SideToolResultEvent
   | SideTurnEndEvent
   | SidePromoteDraftEvent
+  | BtwAnswerEvent // §56.1
   | McpStatusEvent
   | FilesEvent
   | AttachmentEvent
@@ -2039,6 +2044,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "status_line" } ? StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   : C extends { type: "project_file" } ? ProjectFileEvent // MARK: code-browser (§47)
   : C extends { type: "project_search" } ? ProjectSearchEvent
+  : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : ResultEvent & { ok: true };
 
 export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileContentEvent | PRCreatedEvent | CommittedEvent | ToolOutputEvent | ReviewHistoryEvent | HistoryDiffEvent
@@ -2055,7 +2061,8 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | BrainEvent | BrainMemoryEvent // MARK: wave5 w5-brain (§43.2)
   | CodeGraphEvent // MARK: wave5 w5-graph (§43.3)
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
-  | ProjectFileEvent | ProjectSearchEvent; // MARK: code-browser (§47)
+  | ProjectFileEvent | ProjectSearchEvent // MARK: code-browser (§47)
+  | BtwAnswerEvent; // §56.1
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow
 // Types only (docs/PROTOCOL.md §36). Owners: engine-agents §36.1–36.4, engine-session §36.5–36.9, engine-flow §36.10–36.14.

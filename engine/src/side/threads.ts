@@ -98,7 +98,7 @@ export type DetachedRun = {
   key: string;
   prompt: string;
   /** On top of `SideHost.launch()` (`env` is merged). */
-  options?: Partial<Pick<SideQueryOptions, "env" | "extraTools" | "allowWeb" | "maxTurns" | "system" | "persistSession" | "model">>;
+  options?: Partial<Pick<SideQueryOptions, "env" | "extraTools" | "allowWeb" | "maxTurns" | "system" | "persistSession" | "model" | "tools">>;
   onEvent?: (ev: SideQueryEvent) => void;
 };
 

@@ -28,11 +28,14 @@ type Script = {
   /** §50.3: `cancel_async_message` — the uuids asked for, and how the CLI answers (the frames it sends first). */
   cancels: string[];
   onCancel: (id: string) => Promise<boolean> | boolean;
+  /** §56.1: `side_question` — what was asked (question, options), and the CLI's answer. */
+  sideQuestions: { question: string; o: unknown }[];
+  onSideQuestion: (question: string) => Promise<unknown> | unknown;
 };
 
 function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }) => Query; script: Script } {
   let onFlag: (s: Record<string, unknown>) => void = () => {};
-  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [], cancels: [], onCancel: () => false };
+  const script: Script = { options: undefined, push: () => {}, end: () => {}, flags: [], onFlag: (f) => (onFlag = f), sent: [], cancels: [], onCancel: () => false, sideQuestions: [], onSideQuestion: () => ({ response: "answer", synthetic: false }) };
   const queryFn = (args: { prompt: AsyncIterable<SDKUserMessage>; options?: Options }): Query => {
     script.options = args.options;
     void (async () => {
@@ -67,6 +70,10 @@ function scriptedSdk(): { queryFn: (args: { prompt: AsyncIterable<SDKUserMessage
       cancelAsyncMessage: async (id: string) => {
         script.cancels.push(id);
         return script.onCancel(id);
+      },
+      askSideQuestion: async (question: string, o: unknown) => {
+        script.sideQuestions.push({ question, o });
+        return script.onSideQuestion(question);
       },
       applyFlagSettings: async (s: Record<string, unknown>) => {
         script.flags.push(s);
@@ -506,5 +513,40 @@ describe("§50.3 taking back a message put into the turn (takeBackSteer)", () =>
     script.push(lifecycle(id, "started"));
     await until(() => ofType(events, "steer_read").length === 1, "it is read after all");
     await s.dispose();
+  });
+});
+
+describe("§56.1 /btw on the live session (askSideQuestion)", () => {
+  it("asks the CLI's side_question with the earlier exchanges while the turn runs; the turn is not touched", async () => {
+    const { s, events, script } = session();
+    await s.start();
+    s.sendUser("Run the tests", "tree-A");
+    await until(() => script.sent.length === 1, "first message");
+    script.onSideQuestion = () => ({ response: "It returns the total.", synthetic: false });
+    const history = [{ question: "q0", response: "a0" }];
+    await expect(s.askSideQuestion("what does sum() return?", history)).resolves.toEqual({ response: "It returns the total.", synthetic: false });
+    expect(script.sideQuestions).toEqual([{ question: "what does sum() return?", o: { history } }]);
+    expect(script.sent).toHaveLength(1);
+    expect(s.isTurnActive).toBe(true);
+    expect(ofType(events, "turn_end")).toEqual([]);
+    await s.dispose();
+  });
+
+  it("no history: none sent; cancelled: null; a refusal rejects", async () => {
+    const { s, script } = session();
+    await s.start();
+    script.onSideQuestion = () => null;
+    await expect(s.askSideQuestion("q", [])).resolves.toBeNull();
+    expect(script.sideQuestions[0]!.o).toEqual({});
+    script.onSideQuestion = () => {
+      throw new Error("Unsupported control request subtype: side_question");
+    };
+    await expect(s.askSideQuestion("q", [])).rejects.toThrow(/side_question/);
+    await s.dispose();
+  });
+
+  it("not started: rejects (the engine forks instead)", async () => {
+    const { s } = session();
+    await expect(s.askSideQuestion("q", [])).rejects.toThrow(/not started/);
   });
 });

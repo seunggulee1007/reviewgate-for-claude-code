@@ -8439,3 +8439,37 @@ styles. A screen that uses them gets these without a change of its own.
   tooltip goes. A tooltip a component set wins: on the element itself it is left alone; on a row around it, it stays
   under the whole text, or alone when it already holds that text. Fields, the code editor, an inline span (it cuts
   nothing) and `data-no-auto-title` get none.
+
+## 56. The message box as the terminal's
+
+Three things a terminal user reaches for in Claude Code's input that the message box lacked.
+
+### 56.1 `/btw` — a side question while Claude works
+
+In the terminal `/btw <question>` asks a quick question next to the conversation: a separate instance answers from the
+conversation as it is, with no tools, while the main turn goes on; the answer is shown apart and never joins the
+conversation. The app's side question panel (§21, ⌥⌘S) forks a whole CLI process with read-only tools — slower, and a
+thread of its own. Typing `/btw …` sent it to the main conversation as a plain message.
+
+```ts
+// command: btw_ask { question: string }            // reply: btw_answer
+type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string;
+                        via: "session" | "fork"; synthetic?: true };
+// refused: empty_question | question_too_long (> 20 000 chars) | no_project | btw_failed:<why>
+```
+
+- **The live CLI answers.** The CLI's control request `side_question {question, history?}` (SDK `Query.askSideQuestion`,
+  0.3.270; not in the typings) runs the terminal's /btw in the running session: a fork of the main thread's own context
+  (its prompt cache), `maxTurns: 1`, every tool denied ("Side questions cannot use tools"), no transcript; it reports
+  `control_request_progress` frames (ignored) and answers `{response, synthetic}`. It runs beside the turn, so it works
+  while Claude works. In an SDK session the CLI keeps no /btw history: `history` (`[{question, response}]`) is the
+  engine's — the current chat's earlier exchanges, at most 10, in memory, none after a chat switch (`side/btw.ts`). A
+  `synthetic` answer (the CLI's own note — the model tried to call a tool, an API error) is shown but not handed on.
+- **Fallback.** No session yet, an SDK or CLI without the request, or a refusal: a one-shot fork of the chat
+  (`SideThreads.startDetached`, as a commit draft §36.11) with **no tools** (`tools: []`), `maxTurns: 1`, no session file,
+  no MCP server, no web, the earlier exchanges written into its prompt and a system-prompt append saying what the
+  CLI's reminder says (`BTW_SYSTEM`). `via: "fork"`; its cost goes to `hud.sideCostUSD`.
+- **Never in the way.** `btw_ask` runs on a lane of its own: it never waits behind — or holds up — a send, a steer, an
+  interrupt or a side fork. Nothing is sent to the turn, nothing joins the transcript, `hud.turnCount` or the prompt
+  history. An answer slower than 3 minutes is refused `btw_failed:no answer in 180 s` (the CLI's request is cancelled); a
+  cancelled one `btw_failed:cancelled`; a failed fork `btw_failed:<its first line>`.

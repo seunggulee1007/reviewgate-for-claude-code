@@ -184,6 +184,11 @@ export type PluginReload = { commands: unknown; plugins: { name: string; path: s
 /** §50.3: what became of a take-back (`ClaudeSessionLike.takeBackSteer`). */
 export type SteerTakeBack = "taken" | "read" | "kept";
 
+/** §56.1: an earlier /btw question and its answer (an element of the CLI's `side_question.history`). */
+export type BtwExchange = { question: string; response: string };
+/** §56.1: the CLI's answer to `side_question` (`synthetic`: a note of the CLI's own, not the model's answer). */
+export type BtwAnswer = { response: string; synthetic: boolean };
+
 export interface ClaudeSessionLike {
   start(): Promise<void>;
   /** `images` (§24) go out as image content blocks before the text; `opts` (r2-skills-side): a slash command it runs. */
@@ -200,6 +205,13 @@ export interface ClaudeSessionLike {
    */
   takeBackSteer?(uuid: string): Promise<SteerTakeBack>;
   interrupt(): Promise<void>;
+  /**
+   * §56.1 `/btw`: a side question answered from this session's own context, with no tools, while a turn runs or not —
+   * the CLI's `side_question` (SDK `Query.askSideQuestion`, 0.3.270, not in the typings). `history`: the earlier /btw
+   * exchanges of this chat, oldest first. Null when the CLI cancelled it (`signal`); rejects when the CLI refused it or
+   * cannot be asked. Absent on doubles without it.
+   */
+  askSideQuestion?(question: string, history: readonly BtwExchange[], signal?: AbortSignal): Promise<BtwAnswer | null>;
   /** A deny without `message` is the CLI's own "No" (§33.10); `opts.interrupt` also ends the turn (main agent only). */
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts?: DenyOptions): void;
   setBudget(budget: Budget): void;
@@ -947,6 +959,16 @@ export class ClaudeSession implements ClaudeSessionLike {
     } catch (e) {
       this.opts.log("warn", `interrupt failed: ${String(e)}`);
     }
+  }
+
+  /** §56.1: see `ClaudeSessionLike.askSideQuestion`. */
+  async askSideQuestion(question: string, history: readonly BtwExchange[], signal?: AbortSignal): Promise<BtwAnswer | null> {
+    if (!this.q || this.disposing) throw new Error("session not started");
+    const q = this.q as unknown as { askSideQuestion?: (question: string, o?: { history?: BtwExchange[]; signal?: AbortSignal }) => Promise<BtwAnswer | null> };
+    if (typeof q.askSideQuestion !== "function") throw new Error("this SDK cannot ask a side question");
+    const answer = await q.askSideQuestion(question, { ...(history.length > 0 ? { history: [...history] } : {}), ...(signal ? { signal } : {}) });
+    if (answer === null || typeof answer.response !== "string") return null;
+    return { response: answer.response, synthetic: answer.synthetic === true };
   }
 
   respondPermission(requestId: string, allow: boolean, message?: string, updatedInput?: Record<string, unknown>, opts: DenyOptions = {}): void {
