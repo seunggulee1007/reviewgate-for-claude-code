@@ -58,26 +58,89 @@ final class TranscriptViewState {
     @ObservationIgnored var lastRowFollow: ContinuousClock.Instant?
     @ObservationIgnored var pendingStreamFollow: Task<Void, Never>?
 
-    /// §45.1: where the rows made at once begin (`TranscriptPane.tailStart`). Rows crossing into the lazy stack get estimated
-    /// heights there, and everything below them moves by the difference — under a still offset, the rows shown jump. So it is
-    /// set when the rows are (re)placed — a chat opened, shown or switched, rows put in front — and otherwise moves on only
-    /// when a turn begins (its message glides in) or past `TranscriptPane.tailCap` rows made at once, and then only while
-    /// following and not scrolling: never as following resumes under the reader's own scroll.
+    /// §45.1: the first row shown (`TranscriptPane.tailStart`); the rows before it are not made — [이전 대화 더 보기] above
+    /// the rows shows them, ⌘F, a reveal or a jump the rows around theirs (`show(around:of:)`). Every row shown is made at once: in a
+    /// lazy stack, rows of very different heights (an answer with tables, a one-line call) were placed by estimate, the
+    /// content's end moved away from a reader scrolling down to it (1 807 pt in one step) and rows were drawn over one
+    /// another. Rows leaving the top move the rows shown, so it moves on only when a turn begins (its message glides in) or
+    /// past `TranscriptPane.tailCap` rows shown, and then only while following and not scrolling; it is set when the rows
+    /// are (re)placed — a chat opened, shown or switched — and rows put in front ([이전 대화 더 보기] of the engine) are shown.
     @ObservationIgnored private var tailStartKept = 0
     @ObservationIgnored private var tailFirstID: UUID?
+    /// Where the rows shown end, when a jump went far back (⌘F, a reveal): the rows after them are not made either, and
+    /// "↓ Latest" shows the newest again (`showLatest`). nil: the rows shown run to the newest.
+    @ObservationIgnored private(set) var tailEndKept: Int?
+    @ObservationIgnored private var latestAsked = false
+    /// Bumped when other rows are asked for: the pane draws again (where they begin and end is not observed — it is worked
+    /// out while the pane is drawn).
+    private var shownTick = 0
+
+    /// True while the rows shown stop before the newest: their end is not the transcript's, and reaching it is not following.
+    var cutShort: Bool { tailEndKept != nil }
 
     func tailStart(for entries: [ExploreFold.Entry]) -> Int {
+        _ = shownTick
         let wanted = TranscriptPane.tailStart(entries.count)
         let first = entries.first?.id
-        if first != tailFirstID || wanted < tailStartKept {
-            tailStartKept = wanted
+        if first != tailFirstID || latestAsked {
+            // Rows put in front of the ones there (the engine's earlier page) are shown with them; another chat starts anew.
+            let prepended = !latestAsked && (tailFirstID.map { old in entries.dropFirst().contains { $0.id == old } } ?? false)
+            tailStartKept = prepended ? 0 : wanted
+            tailEndKept = nil
             tailFirstID = first
-        } else if follow, !userScrolling, wanted > tailStartKept {
+            latestAsked = false
+        } else if wanted < tailStartKept {
+            tailStartKept = wanted   // fewer rows (a rewind): at least `tailRows` shown
+            tailEndKept = nil
+        } else if tailEndKept == nil, follow, !userScrolling, wanted > tailStartKept {
             var turnBegins = false
             if case let .node(.row(item))? = entries.last, case .user = item { turnBegins = true }
             if turnBegins || entries.count - tailStartKept > TranscriptPane.tailCap { tailStartKept = wanted }
         }
         return tailStartKept
+    }
+
+    /// Where the rows shown end (`tailStart(for:)` first).
+    func tailEnd(for entries: [ExploreFold.Entry]) -> Int {
+        guard let end = tailEndKept else { return entries.count }
+        guard end < entries.count else {
+            tailEndKept = nil   // rows went (a rewind): the rows shown run to the newest again
+            return entries.count
+        }
+        return max(end, tailStartKept)
+    }
+
+    /// [이전 대화 더 보기]: `count` more rows before the first one shown.
+    func showEarlier(_ count: Int) {
+        tailStartKept = max(0, tailStartKept - count)
+        shownTick += 1
+    }
+
+    /// [다음 대화 더 보기]: `count` more rows after the last one shown (all of them, near the newest).
+    func showLater(_ count: Int, of total: Int) {
+        guard let end = tailEndKept else { return }
+        tailEndKept = end + count >= TranscriptPane.tailStart(total) ? nil : end + count
+        shownTick += 1
+    }
+
+    /// The newest rows again, after a jump far back ("↓ Latest").
+    func showLatest() {
+        guard cutShort else { return }
+        latestAsked = true
+        shownTick += 1
+    }
+
+    /// Shows the rows around entry `index` of `total` when it is not shown: from a step before it, `2 × tailRows` rows — to
+    /// the newest when that reaches them (the rows between are never all made at once). False when it was shown.
+    @discardableResult
+    func show(around index: Int, of total: Int) -> Bool {
+        if index >= tailStartKept, index < tailEndKept ?? total { return false }
+        let start = max(0, index - index % TranscriptPane.tailStep - TranscriptPane.tailStep)
+        tailStartKept = min(start, TranscriptPane.tailStart(total))
+        let end = start + 2 * TranscriptPane.tailRows
+        tailEndKept = end >= TranscriptPane.tailStart(total) ? nil : end
+        shownTick += 1
+        return true
     }
 
     func isMatch(_ id: UUID) -> Bool { findVisible && matchSet.contains(id) }
@@ -118,14 +181,16 @@ struct TranscriptPane: View {
 
     static let bottomID = "bottom"
 
-    /// §45.1: the newest rows are made at once, below the lazy stack — at least this many, the boundary moving `tailStep` rows at a
-    /// time (a row crosses it rarely).
-    static let tailRows = 30
+    /// §45.1: the newest rows are shown, every one made at once — at least this many (each press of [이전 대화 더 보기]
+    /// shows as many more), the first one moving `tailStep` rows at a time. About as many rows as the lazy stack made keep
+    /// the main thread as light while an answer streams: 26–29 % with 50 (the lazy stack 25–26 %), 31–33 % with 80, 37 %
+    /// with 200; the chat laid out again in 383 / 435 / 757 ms (357 ms).
+    static let tailRows = 50
     static let tailStep = 10
-    /// More rows than this made at once (a long turn's) and the boundary moves on mid-turn (following, not scrolling).
-    static let tailCap = 150
+    /// More rows than this shown (a long turn's) and the first one moves on mid-turn (following, not scrolling).
+    static let tailCap = 100
 
-    /// Where the rows made at once begin: everything before it is lazy.
+    /// Where the rows shown begin.
     static func tailStart(_ count: Int) -> Int {
         count > tailRows ? (count - tailRows) / tailStep * tailStep : 0
     }
@@ -137,29 +202,35 @@ struct TranscriptPane: View {
         // MARK: wave4b w4b-tabs — §39.2 (market-12): a run of reads / searches is one "탐색: …" row
         let entries = showExploreDetail ? shown.model.nodes.map(ExploreFold.Entry.node) : shown.model.entries
         let split = view.tailStart(for: entries)
+        let end = view.tailEnd(for: entries)
         ScrollViewReader { proxy in
             ScrollView {
-                // §45.1: the newest rows and the bottom marker are not lazy. A card above the composer leaves the transcript
-                // ~100 pt; the lazy stack, making a row or two, re-estimated the rows it had not made (13 220 → 157 724 →
-                // 13 817 pt in 30 ms) and following them the view ended where no row was made — blank — or far above the
-                // newest row. The rows at the bottom now have their real heights, whatever the stack above estimates.
+                // §45.1: no lazy stack. A card above the composer leaves the transcript ~100 pt; a lazy stack, making a row
+                // or two, re-estimated the rows it had not made (13 220 → 157 724 → 13 817 pt in 30 ms) and following them
+                // the view ended where no row was made — blank — or far above the newest row; scrolling down, the end moved
+                // away as rows were made. Every row shown has its real height.
                 VStack(alignment: .leading, spacing: 10) {
+                    header(restored: restored, proxy: proxy, hidden: split)
                     if split > 0 {
-                        LazyVStack(alignment: .leading, spacing: 10) {
-                            header(restored: restored, proxy: proxy)
-                            ForEach(entries[..<split]) { entry in
-                                TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
-                            }
+                        // The rows before the first shown one, a page at a time; the view stays on the row that was on top.
+                        EarlierRowsButton(later: false, count: split) {
+                            let first = entries[split].id
+                            view.showEarlier(Self.tailRows)
+                            DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
                         }
-                    } else {
-                        header(restored: restored, proxy: proxy)
                     }
-                    ForEach(entries[split...]) { entry in
+                    ForEach(entries[split..<end]) { entry in
                         TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
+                            .transcriptRowFrame(entry.id)
+                    }
+                    if end < entries.count {
+                        // After a jump far back: the rows after the last one shown, a page at a time ("↓ Latest": the newest).
+                        EarlierRowsButton(later: true, count: entries.count - end) { view.showLater(Self.tailRows, of: entries.count) }
                     }
                     // The marker takes the stack's bottom padding: pinned to it, the view is at the content's very end (pinned
                     // to a 1 pt marker above the padding, a reader who scrolled to the end was pulled 12 pt back up).
                     Color.clear.frame(height: 13).id(Self.bottomID)
+                        .transcriptBottomFrame()
                 }
                 .padding([.top, .horizontal], 12)
             }
@@ -174,7 +245,7 @@ struct TranscriptPane: View {
                 geo.contentOffset.y + geo.containerSize.height >= geo.contentSize.height - 32
             } action: { _, near in
                 view.nearBottom = near
-                if near {
+                if near, !view.cutShort {   // §45.1: the end of rows cut short is not the newest
                     if !view.follow { view.follow = true }
                     if view.unseen != 0 { view.unseen = 0 }
                 }
@@ -187,7 +258,7 @@ struct TranscriptPane: View {
                     // Only a scroll the user made decides whether to keep following (content growth does not).
                     if view.userScrolling {
                         view.userScrolling = false
-                        view.follow = view.nearBottom
+                        view.follow = view.nearBottom && !view.cutShort
                         if view.follow, view.unseen != 0 { view.unseen = 0 }
                     }
                 default:
@@ -205,6 +276,7 @@ struct TranscriptPane: View {
                 // the window kept (r1-composer M12: back from the PRs tab), whose last scroll may have been cut off.
                 view.userScrolling = false
                 view.seenCount = store.transcript.count
+                view.showLatest()   // §45.1: not rows a jump far back cut short
                 DispatchQueue.main.async { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .background { TranscriptFollower(view: view, proxy: proxy) }
@@ -256,6 +328,7 @@ struct TranscriptPane: View {
             .onChange(of: store.transcriptJumpItem) { _, item in
                 guard let item else { return }
                 view.follow = false
+                _ = showRow(item.id)   // §45.1: a row before the first one shown
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                     withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item.id, anchor: .center) }
                 }
@@ -271,16 +344,16 @@ struct TranscriptPane: View {
     }
 
     /// What sits above the rows: the imported-session note, the shown chat's bar, [이전 대화 더 보기], the empty state and the
-    /// restored divider.
+    /// restored divider. `hidden`: rows before the first shown one (the engine's earlier page comes after them).
     @ViewBuilder
-    private func header(restored: Set<UUID>, proxy: ScrollViewProxy) -> some View {
+    private func header(restored: Set<UUID>, proxy: ScrollViewProxy, hidden: Int) -> some View {
         ImportedChatNote()   // wave3 mac-session (§36.9): a terminal session imported here — the gate applies from now on
         // MARK: wave4b w4b-tabs — §39.2 another chat's saved rows, read-only: loading / [이전 대화 더 보기]
         if let viewed = store.viewingChat {
             ViewedChatHeader(viewed: viewed)
         }
         // MARK: wave4 w4-history — §38.3 [이전 대화 더 보기]: the rows before the oldest shown one, the view kept on it
-        if store.viewingChat == nil, store.transcriptPaging.canLoadEarlier, !store.transcript.isEmpty {
+        if store.viewingChat == nil, hidden == 0, store.transcriptPaging.canLoadEarlier, !store.transcript.isEmpty {
             EarlierMessagesButton { first in DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) } }
         }
         if store.viewingChat == nil, store.transcript.isEmpty {
@@ -339,9 +412,11 @@ struct TranscriptPane: View {
         for g in groups { view.groupExpansion[g] = true }
         openRuns { $0.contains(row: id) }   // wave4b w4b-tabs (market-12): a folded run around the match opens
         view.follow = false
-        // The outermost group's head first (the transcript's stack is lazy), then the row inside it.
+        let shownNow = showRow(id)   // §45.1: a match before the first row shown
+        // The outermost group's head first, then the row inside it.
         let outer = groups.first.flatMap { model.index.calls[$0]?.rowID }
         Task { @MainActor in
+            if shownNow { try? await Task.sleep(for: .milliseconds(80)) }   // its rows are laid out first
             if let outer { proxy.scrollTo(outer, anchor: .top) }
             try? await Task.sleep(for: .milliseconds(outer == nil ? 60 : 120))   // let an expanded group lay out its rows first
             withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
@@ -362,8 +437,10 @@ struct TranscriptPane: View {
             if model.index.calls[toolUseId]?.spawnsAgent == true { view.groupExpansion[toolUseId] = true }
         }
         view.flashToolUseId = toolUseId
+        let shownNow = showRow(rowID)   // §45.1: a call before the first row shown
         let outer = groups.first.flatMap { model.index.calls[$0]?.rowID }
         Task { @MainActor in
+            if shownNow { try? await Task.sleep(for: .milliseconds(80)) }
             if let outer { proxy.scrollTo(outer, anchor: .top) }
             try? await Task.sleep(for: .milliseconds(120))
             withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(rowID, anchor: .center) }
@@ -380,8 +457,10 @@ struct TranscriptPane: View {
         }) else { return }
         view.follow = false
         view.flashPermissionId = requestId
-        withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(row.id, anchor: .center) }
+        let shownNow = showRow(row.id)   // §45.1: a card before the first row shown
         Task { @MainActor in
+            if shownNow { try? await Task.sleep(for: .milliseconds(80)) }
+            withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(row.id, anchor: .center) }
             try? await Task.sleep(for: .milliseconds(1600))
             if view.flashPermissionId == requestId { view.flashPermissionId = nil }
         }
@@ -402,8 +481,31 @@ struct TranscriptPane: View {
             }
             guard let row = AttentionReveal.row(for: target, in: store.viewingChat?.rows ?? store.transcript) else { return }
             view.follow = false
-            withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(row, anchor: .top) }
+            let delay = showRow(row) ? 0.08 : 0   // §45.1: a summary before the first row shown
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(row, anchor: .top) }
+            }
         }
+    }
+
+    /// §45.1: shows the rows around the entry holding row `id` (a subagent's row: its group's) when it is not shown. True
+    /// when it was not: the caller lets the rows lay out before it scrolls there.
+    private func showRow(_ id: UUID) -> Bool {
+        let model = cache.shown(store).model
+        let entries = showExploreDetail ? model.nodes.map(ExploreFold.Entry.node) : model.entries
+        var target = id
+        if let outer = TranscriptSearch.enclosingGroups(ofRow: id, in: model.nodes)?.first, let call = model.index.calls[outer]?.rowID {
+            target = call
+        }
+        guard let position = model.positions[target] else { return false }
+        var index: Int?
+        for (i, entry) in entries.enumerated() {
+            guard let p = model.positions[entry.id] else { continue }
+            if p > position { break }
+            index = i
+        }
+        guard let index else { return false }
+        return view.show(around: index, of: entries.count)
     }
 
     // MARK: Fixed rows
@@ -540,7 +642,13 @@ private struct LatestPill: View {
             Button {
                 view.follow = true
                 view.unseen = 0
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+                if view.cutShort {
+                    // §45.1: after a jump far back the newest rows are shown again first, then the view goes to them.
+                    view.showLatest()
+                    DispatchQueue.main.async { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+                }
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.down")

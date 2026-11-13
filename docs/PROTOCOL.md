@@ -6559,6 +6559,25 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   lay the chat out again, 327–376 ms before.) The bottom marker takes the stack's bottom padding, so a pin to it is the content's very
   end (a reader who reached the end was pulled 12 pt back up). Each row still observes what it draws (a streamed delta
   redraws the streaming row).
+  No row is lazy any more (after 0.5.14). In a long session a reader far up — the "Latest" pill showing — who scrolled down
+  to the newest row as a trackpad does saw the end move away ("infinite scroll"): the lazy stack swapped its estimates for
+  the real heights of the rows it made, rows as different as an answer with tables and a one-line call, and the content
+  grew 2 859 pt in 8 of 233 steps at 1257 × 1104 (1 425 pt in one step). On those steps rows were also drawn over one
+  another: a fourteen-row table's AppKit scroll view laid out 80 pt over the turn summary below its answer, the next
+  layout pass putting it back. Every row shown is now made at once in one plain stack — the newest 50
+  (`TranscriptPane.tailRows`), the first one moving on as the boundary did: when a turn begins or past 100 rows shown,
+  following and not scrolling, and set when the rows are placed. [이전 대화 더 보기] above them (`EarlierRowsButton`) shows 50
+  more, the view kept on the row that was on top. ⌘F, a reveal, a permission card, a notification's summary and a history
+  match whose row is not shown show the rows around it first (`TranscriptPane.showRow`, `TranscriptViewState.show(around:of:)`):
+  100 rows from a step before it — never every row up to the newest, which made a thousand rows at once and held the main
+  thread for seconds — with [다음 대화 더 보기] under them; their end is not the newest, so reaching it does not follow, and
+  "↓ Latest" (or the chat shown again) brings the newest rows back. The engine's own [이전 대화 더 보기] (§38.3) comes once
+  every row is shown, and the rows it puts in front are shown with the others. Fifty rows are about what the lazy stack made, and
+  the main thread stays as light (`SHOTS_LAYOUT=cpulong`, drawn at the screen's pace): 26–29 % while an answer streams and
+  383 ms to lay the chat out again, against 25–26 % and 357 ms with the lazy stack (80 rows: 31–33 %, 435 ms; 200 rows:
+  37 %, 757 ms). `SHOTS_LAYOUT=overlap`: at both sizes the content no longer grows under the scroll, the rows shown never
+  move under the reader, and no rows overlap in 186 checks and 666 scroll steps (3 before). An agent group's own rows stay
+  lazy while it is open (rows of one kind; the reveal makes them at once).
 - **The transcript holds still while rows change above the bottom** (r1x). Subagents at work (§52.2) add their calls to their
   groups — above the bottom when several run — rows finish in place, a notice counts ×N, a group folds when its agent ends.
   Following, the view was left wherever that put it: 608 pt above the newest row after three agents' calls, because the
@@ -6591,7 +6610,19 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   leaves a 64-turn chat 5 000 pt above its end while 16 turns come in, then scrolls it down as a trackpad moves the clip
   (40 pt every 16 ms, the transcript told the user scrolls) to the end, idle and while Claude streams, at 1000 × 637 with
   and without the diff pane and at 1257 × 1104; a jump is the view going further from the newest row than the reader took
-  it.
+  it. `SHOTS_LAYOUT=overlap` (`ScreenshotTour.overlapChecks`) loads a 36-turn session of rich turns — Claude's question
+  answered, an MCP server's calls, Bash calls (one failing every other turn), answers with a heading, a list and two tables,
+  turn summaries and ends — then has more such turns begin and stream while following (the rows made at once move into
+  the lazy stack as each begins), scrolls up while turns come and back down as a trackpad does, resizes the window and
+  opens the diff pane. After each step it lays the window out as a window on screen is before it is drawn (a quiet window
+  is never drawn by AppKit: its views wait for a display that does not come, and a picture taken as it is mixes old and
+  new; the run draws it at the screen's pace), scrolls a point and back so every row on screen reports its frame
+  (DEBUG-only `TranscriptRowFrames`, nothing in a release build), and says OVERLAP when two rows on screen were laid out
+  over one another, an answer's AppKit text or table lies in no row's frame, or a text is taller than its frame. First
+  (`ScreenshotTour.scrollFeel`) the reader is 6 000 pt up with the "Latest" pill showing while two turns come, and
+  scrolls down to the end as a trackpad does and back up, at 1000 × 637 and 1257 × 1104, the window laid out, drawn and
+  checked after every 40 pt step; `scrollfeel` lines count the steps the content grew, how far the end moved away from
+  a reader going down to it (ENDLESS past 40 pt) and how far the rows shown moved under the reader (JUMP past 40 pt).
   `SHOTS_LAYOUT=open` (`ScreenshotTour.openChecks`) runs Open Project… / Switch Project… / Open in New Window… (their menu
   items, the folder picker answered by `ProjectOpener.debugPick`) and `ProjectOpener.open` in each state a window can be in
   — idle, the project already open here or in another window, files pending review (also on the PRs tab), a turn running,

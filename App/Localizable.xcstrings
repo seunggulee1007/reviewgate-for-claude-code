@@ -23942,6 +23942,54 @@
         }
       }
     },
+    "Show later messages": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show later messages"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 대화 더 보기"
+          }
+        }
+      }
+    },
+    "Show the later rows of this chat (%lld more)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the later rows of this chat (%lld more)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 다음 행 보기 (%lld개 더)"
+          }
+        }
+      }
+    },
+    "Show the earlier rows of this chat (%lld more)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the earlier rows of this chat (%lld more)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 이전 행 보기 (%lld개 더)"
+          }
+        }
+      }
+    },
     "Show every read and search": {
       "localizations": {
         "en": {

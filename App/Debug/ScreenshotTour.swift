@@ -113,6 +113,11 @@ private final class Tour {
             do { try await scrollDownChecks(); finish(nil) } catch { finish(error) }
             return
         }
+        // `SHOTS_LAYOUT=overlap`: rows laid out over one another in a long session of rich turns (`overlap:` lines).
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "overlap" {
+            do { try await overlapChecks(); finish(nil) } catch { finish(error) }
+            return
+        }
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "cpu" {
             do { try await cpuChecks(); finish(nil) } catch { finish(error) }
             return
@@ -1421,6 +1426,10 @@ private final class Tour {
         window.orderFrontRegardless()
         defer { window.level = .normal }
         AppSettings.setAppearance(.dark)
+        // A quiet window is never drawn by AppKit: drawn here at the screen's pace, so what is measured includes the layout
+        // and drawing a window on screen does every frame.
+        let pump = ScreenshotTour.quiet ? Self.drawAtScreenPace(window) : nil
+        defer { pump?.invalidate() }
         let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
         let visible = window.screen?.visibleFrame ?? window.frame
         window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - 1104), size: NSSize(width: 1257, height: 1104)), display: true)
@@ -1610,6 +1619,446 @@ private final class Tour {
                .toolUse(id: test, name: "Bash", input: .object(["command": .string("npm test"), "description": .string("Run the tests")]), file: nil),
                .toolResult(toolUseId: test, isError: false, preview: "✔ applies SAVE10 (2ms)\n✔ FREESHIP removes shipping (1ms)\n✔ rejects unknown codes (1ms)\nℹ tests 12\nℹ pass 12")]
             + answer("Step \(turn) is done: the codes stack in order and all 12 tests pass.")
+    }
+
+    // MARK: Overlap (`SHOTS_LAYOUT=overlap`)
+
+    /// Lays `window` out and draws it 60 times a second, as AppKit does a window on screen (it never draws a quiet one).
+    private static func drawAtScreenPace(_ window: NSWindow) -> Timer {
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in MainActor.assumeIsolated { window.displayIfNeeded() } }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
+    }
+
+    /// `SHOTS_LAYOUT=overlap`: a long made-up session of rich turns (`richTurn`) — Claude's question answered, an MCP server's
+    /// calls, Bash calls and a failing one, long answers with headings, a list and two tables, turn summaries — then more such
+    /// turns begin and stream while following (the rows made at once move into the lazy stack as each begins), the reader
+    /// scrolls up and back down while turns come, the window changes size and the diff pane opens. After each step the rows on
+    /// screen are matched with each other (`overlapCheck`): two rows laid out over one another, an answer's AppKit text or
+    /// table in no row's frame, or a text taller than its frame, is an OVERLAP (`overlap:` lines,
+    /// `overlap-<n>.png`).
+    private func overlapChecks() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        guard TranscriptRowFrames.enabled else { throw TourError("the rows' frames are not recorded (not a .screenshots build?)") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        // A window on screen is laid out and drawn every frame; a quiet one is never drawn by AppKit (its views wait for a
+        // display that does not come), so it is drawn here at the screen's pace — what is checked is what a user would see.
+        let pump = Self.drawAtScreenPace(window)
+        defer { pump.invalidate() }
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        for n in 1...36 { await richTurn(n, root: root, gap: nil) }
+        let visible = window.screen?.visibleFrame ?? window.frame
+        func resize(_ size: NSSize) async throws {
+            window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - size.height), size: size), display: true)
+            try await Task.sleep(for: .milliseconds(1200))
+        }
+        try await resize(NSSize(width: 1000, height: 637))
+        guard let chat = Self.chatScrollView(try scrollViews(window)) else { throw TourError("overlap: no chat scroll view") }
+        var turn = 36, marked = 0, checks = 0
+        func check(_ label: String) async throws {
+            try await Task.sleep(for: .milliseconds(350))
+            checks += 1
+            marked += try await overlapCheck(label, chat: chat, window: window, nudge: true)
+        }
+        try await check("opened")
+        // 0) The reader is far up (the "Latest" pill showing, turns coming below) and scrolls down to the newest row as a
+        // trackpad does, then back up — at the laptop size and in a tall window. Checked after every step.
+        for (label, size) in [("1000x637", NSSize(width: 1000, height: 637)), ("1257x1104", NSSize(width: 1257, height: 1104))] {
+            try await resize(size)
+            for _ in 0..<2 { turn += 1; await richTurn(turn, root: root, gap: nil) }
+            try await Task.sleep(for: .milliseconds(600))
+            marked += try await scrollFeel(label, chat: chat, window: window) { turn += 1; await self.richTurn(turn, root: root, gap: nil) }
+        }
+        try await resize(NSSize(width: 1000, height: 637))
+        /// A turn as the engine sends it, checked as it goes: its message glides in, its calls and answer come and the
+        /// answer turns into markdown at the turn's end.
+        func liveTurn(_ label: String) async throws {
+            turn += 1
+            store.debugShowGate(.running)
+            await richTurn(turn, root: root, gap: .milliseconds(90)) { step in try? await check("\(label) turn \(turn) \(step)") }
+            store.debugShowGate(.idle)
+            try await check("\(label) turn \(turn) ended")
+        }
+        // 1) Following at the laptop size: turns begin one after another.
+        entry.model.chatTranscript.follow = true
+        for _ in 0..<6 { try await liveTurn("following") }
+        // 2) The reader scrolls up, turns come below, the reader scrolls back down to the newest row.
+        for round in 0..<2 {
+            let clip = chat.contentView
+            clip.scroll(to: NSPoint(x: 0, y: max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height - 2500 - CGFloat(round) * 1500)))
+            chat.reflectScrolledClipView(clip)
+            entry.model.chatTranscript.follow = false
+            try await check("scrolled up \(round)")
+            for _ in 0..<2 { turn += 1; await richTurn(turn, root: root, gap: nil) }
+            try await check("scrolled up \(round), turns below")
+            // Down to the newest row as a trackpad does (`gesture`), a look every 240 pt.
+            let state = entry.model.chatTranscript
+            state.userScrolling = true
+            for step in 1...400 {
+                let end = max(0, (chat.documentView?.frame.height ?? 0) - clip.bounds.height)
+                if end - clip.bounds.minY < 1 { break }
+                clip.scroll(to: NSPoint(x: 0, y: min(end, clip.bounds.minY + 40)))
+                chat.reflectScrolledClipView(clip)
+                try await Task.sleep(for: .milliseconds(16))
+                if step % 6 == 0 { try await check("scrolling down \(round) step \(step)") }
+            }
+            state.userScrolling = false
+            state.follow = state.nearBottom
+            if state.follow { state.unseen = 0 }
+            try await check("scrolled down \(round)")
+            try await liveTurn("after scrolling down \(round)")
+        }
+        // 3) The window changes size (rows rewrap), a turn at each size; the diff pane opens beside the chat and closes.
+        for (label, size) in [("1257x1104", NSSize(width: 1257, height: 1104)), ("800x637", NSSize(width: 800, height: 637)),
+                              ("1000x637", NSSize(width: 1000, height: 637))] {
+            try await resize(size)
+            try await check("resized \(label)")
+            try await liveTurn("at \(label)")
+        }
+        entry.model.toggleDiffTick += 1
+        try await Task.sleep(for: .milliseconds(1200))
+        try await check("diff pane open")
+        try await liveTurn("beside the diff")
+        entry.model.toggleDiffTick += 1
+        try await Task.sleep(for: .milliseconds(1200))
+        try await check("diff pane closed")
+        // 4) Following again: more turns, the boundary moving on with each.
+        for _ in 0..<6 { try await liveTurn("following again") }
+        // 5) ⌘F to a row long before the first one shown (§45.1): the rows around it are shown — not every row up to the
+        // newest — and the view goes to it; then "↓ Latest" brings the newest rows back.
+        let state = entry.model.chatTranscript
+        entry.model.findTick += 1
+        try await Task.sleep(for: .milliseconds(300))
+        let asked = ContinuousClock.now
+        state.findQuery = "Step 3: "
+        try await Task.sleep(for: .milliseconds(10))
+        let took = ContinuousClock.now - asked   // the main thread was busy that long with the query's rows
+        try await Task.sleep(for: .milliseconds(1200))
+        if let match = state.currentMatch {
+            _ = try await overlapCheck("find", chat: chat, window: window, nudge: true)
+            let row = TranscriptRowFrames.rows[match].flatMap { $0.generation == TranscriptRowFrames.generation ? $0.frame : nil }
+            let shown = row.map { $0.maxY > 0 && $0.minY < chat.contentView.bounds.height } ?? false
+            let views = try views(ProseNSTextView.self, in: window, minSize: 0).count
+            log("overlap find a row of turn 3: " + (shown ? "shown at y \(Int(row?.minY ?? 0))" : "LOST — not on screen")
+                + ", \(views) answer texts made, the query's job took \(took.formatted(.units(allowed: [.milliseconds])))"
+                + (state.cutShort ? ", the newest rows not made" : ""))
+        } else {
+            log("overlap find a row of turn 3: no match — LOST")
+        }
+        state.findQuery = ""
+        state.findVisible = false
+        // "↓ Latest" (`LatestPill`): the newest rows again, following.
+        state.follow = true
+        state.unseen = 0
+        state.showLatest()
+        try await Task.sleep(for: .milliseconds(100))
+        turn += 1
+        await richTurn(turn, root: root, gap: nil)
+        try await Task.sleep(for: .milliseconds(900))
+        let fromEnd = (chat.documentView?.frame.height ?? 0) - chat.contentView.bounds.maxY
+        log("overlap latest after the find: \(Int(fromEnd)) pt from the end, following \(state.follow ? "yes" : "no")"
+            + (fromEnd < 2 && !state.cutShort ? "" : " — LOST"))
+        log("overlap: \(checks) checks, \(marked) overlaps" + (marked == 0 ? " — clear" : " — OVERLAP"))
+        try write(try render(window), "overlap")
+    }
+
+    /// The rows on screen laid out over one another (by more than 1 pt); an answer's AppKit parts — its text, a table's
+    /// scroll view — outside every row's frame (drawn where no row was laid out for them: over other rows); an answer's
+    /// text taller than its frame (the rest draws over what lies below). The window is laid out first, as a window on screen
+    /// is before it is drawn (a quiet one is never drawn by AppKit), and scrolled a point and back: every row on screen
+    /// reports its frame anew, so a frame no view stands for any more is not taken for a row. Returns how many it found; the
+    /// window's picture is kept when there are any. `nudge` false: the caller just scrolled under a new generation and laid
+    /// the window out (a step of a scroll), and only a finding is logged.
+    private func overlapCheck(_ label: String, chat: NSScrollView, window: NSWindow, nudge: Bool) async throws -> Int {
+        let clip = chat.contentView
+        if nudge {
+            TranscriptRowFrames.generation += 1
+            let y = clip.bounds.minY
+            for offset in [y >= 1 ? -1 : 1, 0] as [CGFloat] {
+                clip.scroll(to: NSPoint(x: 0, y: y + offset))
+                chat.reflectScrolledClipView(clip)
+                window.contentView?.superview?.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(40))
+            }
+            window.contentView?.superview?.layoutSubtreeIfNeeded()
+        }
+        let generation = TranscriptRowFrames.generation
+        let height = clip.bounds.height
+        var rows: [(id: UUID, frame: CGRect)] = []
+        var marker: CGRect?
+        for row in TranscriptRowFrames.rows.values where row.generation == generation {
+            if row.id == TranscriptRowFrames.bottomMarker { marker = row.frame; continue }
+            if row.frame.height > 0, row.frame.maxY > 0, row.frame.minY < height { rows.append((row.id, row.frame)) }
+        }
+        rows.sort { $0.frame.minY < $1.frame.minY }
+        var hits: [String] = []
+        for (i, a) in rows.enumerated() {
+            for b in rows[(i + 1)...] {
+                let over = min(a.frame.maxY, b.frame.maxY) - max(a.frame.minY, b.frame.minY)
+                if over > 1 {
+                    let first = "\(rowKind(a.id)) y \(Int(a.frame.minY))–\(Int(a.frame.maxY))"
+                    let second = "\(rowKind(b.id)) y \(Int(b.frame.minY))–\(Int(b.frame.maxY))"
+                    hits.append("\(first) over \(second) (\(Int(over)) pt)")
+                }
+            }
+        }
+        // The AppKit views in the rows, in the rows' space: the content ends where the bottom marker does.
+        var hosted: [(name: String, view: NSView)] = []
+        if let doc = chat.documentView, let marker {
+            for text in try views(ProseNSTextView.self, in: window, minSize: 0) where text.isDescendant(of: doc) {
+                hosted.append(("text \"\(text.string.prefix(20))\"", text))
+            }
+            for scroll in try views(NSScrollView.self, in: window, minSize: 0) where scroll !== chat && scroll.isDescendant(of: doc) {
+                hosted.append(("scroll view", scroll))
+            }
+            let shift = marker.maxY - doc.frame.height   // rows' y = document y (from the top) + shift
+            for (name, view) in hosted {
+                var frame = view.convert(view.bounds, to: doc)
+                if !doc.isFlipped { frame.origin.y = doc.bounds.height - frame.maxY }
+                let minY = frame.minY + shift, maxY = frame.maxY + shift
+                guard maxY > 0, minY < height else { continue }
+                if !rows.contains(where: { minY >= $0.frame.minY - 2 && maxY <= $0.frame.maxY + 2 }) {
+                    var near: [String] = []
+                    for row in rows where min(maxY, row.frame.maxY) - max(minY, row.frame.minY) > 1 {
+                        near.append("\(rowKind(row.id)) y \(Int(row.frame.minY))–\(Int(row.frame.maxY))")
+                    }
+                    hits.append("\(name) y \(Int(minY))–\(Int(maxY)) in no row (over \(near.joined(separator: ", ")))")
+                }
+                // A text frame shorter than its text draws the rest over what lies below it.
+                if let text = view as? ProseNSTextView, let layout = text.layoutManager, let container = text.textContainer {
+                    let used = layout.usedRect(for: container)
+                    if used.height > text.bounds.height + 1 || used.width > text.bounds.width + 1 {
+                        let size = "\(Int(used.width))×\(Int(used.height))", box = "\(Int(text.bounds.width))×\(Int(text.bounds.height))"
+                        hits.append("\(name): \(size) pt of text in a \(box) pt frame")
+                    }
+                }
+            }
+        }
+        overlapShots += hits.isEmpty ? 0 : 1
+        let counts = "\(rows.count) rows, \(hosted.count) AppKit views" + (marker == nil ? " (no bottom marker)" : "")
+        if nudge || !hits.isEmpty {
+            log("overlap \(label): \(counts)" + (hits.isEmpty ? " — clear" : " — OVERLAP: " + hits.prefix(6).joined(separator: " | ")))
+        }
+        if !hits.isEmpty, overlapShots <= 16 { try write(try render(window), "overlap-\(overlapShots)") }
+        return hits.count
+    }
+
+    private var overlapShots = 0
+
+    /// The reader far up the transcript with the "Latest" pill showing (turns came below, `addTurn`), scrolling down to the
+    /// newest row as a trackpad moves the clip (40 pt every 16 ms; the transcript told the user scrolls), then back up as
+    /// far. After every step the window is laid out and drawn, as on screen, and checked (`overlapCheck`). Logged: how often
+    /// and by how much the content grew or shrank under the scroll, how far the end moved away from a reader going down to
+    /// it ("ENDLESS" past 40 pt), and how far the rows shown moved from where the scroll put them going up ("JUMP" past
+    /// 40 pt). Returns the overlaps.
+    private func scrollFeel(_ label: String, chat: NSScrollView, window: NSWindow, addTurn: () async -> Void) async throws -> Int {
+        let clip = chat.contentView, state = entry.model.chatTranscript
+        func docHeight() -> CGFloat { chat.documentView?.frame.height ?? 0 }
+        func end() -> CGFloat { docHeight() - clip.bounds.maxY }
+        let frame = window.contentView?.superview
+        // Far up, the reader's own scroll (following ends), then turns come below: the pill counts them.
+        // (Placed again while a glide to the newest row, started before, carries it back down.)
+        for _ in 0..<3 where end() < 4000 {
+            state.userScrolling = true
+            clip.scroll(to: NSPoint(x: 0, y: max(0, docHeight() - clip.bounds.height - 6000)))
+            chat.reflectScrolledClipView(clip)
+            state.userScrolling = false
+            state.follow = false
+            try await Task.sleep(for: .milliseconds(800))
+        }
+        await addTurn()
+        await addTurn()
+        try await Task.sleep(for: .milliseconds(900))
+        let pill = !state.follow ? "pill showing (\(state.unseen) new)" : "following (no pill)"
+        var overlaps = 0, blind = 0
+        /// One step of `by` pt (positive: down); what the content and the clip did.
+        /// `shift`: how far the rows on screen moved in the content during the step (0: they moved only by the scroll).
+        func step(_ by: CGFloat, _ what: String, _ n: Int) async throws -> (grew: CGFloat, shift: CGFloat) {
+            let before = (h: docHeight(), y: clip.bounds.minY)
+            let shown = Dictionary(TranscriptRowFrames.rows.values.filter { $0.generation == TranscriptRowFrames.generation
+                && $0.frame.maxY > 0 && $0.frame.minY < clip.bounds.height }.map { ($0.id, $0.frame.minY) }) { a, _ in a }
+            let target = min(max(0, before.y + by), max(0, before.h - clip.bounds.height))
+            TranscriptRowFrames.generation += 1
+            clip.scroll(to: NSPoint(x: 0, y: target))
+            chat.reflectScrolledClipView(clip)
+            frame?.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            try await Task.sleep(for: .milliseconds(16))
+            overlaps += try await overlapCheck("\(label) scrolling \(what) step \(n)", chat: chat, window: window, nudge: false)
+            let scrolled = clip.bounds.minY - before.y
+            var shifts: [CGFloat] = []
+            for row in TranscriptRowFrames.rows.values where row.generation == TranscriptRowFrames.generation {
+                if let y = shown[row.id] { shifts.append(row.frame.minY - y + scrolled) }
+            }
+            shifts.sort()
+            if shifts.isEmpty { blind += 1 }   // no row seen before and after: the step tells nothing
+            return (docHeight() - before.h, shifts.isEmpty ? 0 : shifts[shifts.count / 2])
+        }
+        // Down to the end.
+        state.userScrolling = true
+        let startHeight = docHeight(), startEnd = end()
+        var steps = 0, grewSteps = 0, shrankSteps = 0, grown: CGFloat = 0, away: CGFloat = 0, worstAway: CGFloat = 0
+        var shiftSteps = 0, worstShift: CGFloat = 0
+        while end() > 1, steps < 800 {
+            let before = end()
+            let (grew, shift) = try await step(40, "down", steps)
+            if grew > 0.5 { grewSteps += 1; grown += grew } else if grew < -0.5 { shrankSteps += 1 }
+            if abs(shift) > 1 { shiftSteps += 1; worstShift = max(worstShift, abs(shift)) }
+            // How much further the end is than 40 pt nearer (or at the end): the end moving away from the reader.
+            let further = end() - max(0, before - 40)
+            if further > 0.5 { away += further; worstAway = max(worstAway, further) }
+            steps += 1
+        }
+        state.userScrolling = false
+        state.follow = state.nearBottom
+        log("scrollfeel \(label) down, \(pill): \(steps) steps from \(Int(startEnd)) pt above the end (content \(Int(startHeight)) → \(Int(docHeight())) pt); "
+            + "content grew in \(grewSteps) steps by \(Int(grown)) pt, shrank in \(shrankSteps); the end moved away by \(Int(away)) pt "
+            + "(worst step \(Int(worstAway)) pt); the rows shown moved under the reader in \(shiftSteps) steps (worst \(Int(worstShift)) pt)"
+            + (away > 40 ? " — ENDLESS" : "") + (worstShift > 40 ? " — JUMP" : "") + (away <= 40 && worstShift <= 40 ? " — steady" : ""))
+        try await Task.sleep(for: .milliseconds(600))
+        // Back up as far: the rows shown must move by what the reader scrolled, no more (content changing above them).
+        state.userScrolling = true
+        state.follow = false
+        var upSteps = 0, upGrew = 0, upShiftSteps = 0, upShift: CGFloat = 0, upWorst: CGFloat = 0
+        let upFrom = docHeight()
+        while upSteps < steps, clip.bounds.minY > 1 {
+            let (grew, shift) = try await step(-40, "up", upSteps)
+            if abs(grew) > 0.5 { upGrew += 1 }
+            if abs(shift) > 1 { upShiftSteps += 1; upShift += shift; upWorst = max(upWorst, abs(shift)) }
+            upSteps += 1
+        }
+        state.userScrolling = false
+        log("scrollfeel \(label) up: \(upSteps) steps (content \(Int(upFrom)) → \(Int(docHeight())) pt, changed in \(upGrew) steps); "
+            + "the rows shown moved under the reader in \(upShiftSteps) steps, \(Int(upShift)) pt in all (worst \(Int(upWorst)) pt)"
+            + (upWorst > 40 ? " — JUMP" : " — steady") + (overlaps > 0 ? "; \(overlaps) overlaps on the way" : "")
+            + "; \(blind) of \(steps + upSteps) steps saw no row before and after")
+        // Back to the newest row, following.
+        clip.scroll(to: NSPoint(x: 0, y: max(0, docHeight() - clip.bounds.height)))
+        chat.reflectScrolledClipView(clip)
+        state.follow = true
+        state.unseen = 0
+        try await Task.sleep(for: .milliseconds(800))
+        return overlaps
+    }
+
+    /// What kind of row `id` is, for the log.
+    private func rowKind(_ id: UUID) -> String {
+        guard let item = store.transcript.first(where: { $0.id == id }) else { return "run/group" }
+        let kind = String(String(describing: item).prefix { $0 != "(" })
+        if case let .toolUse(_, _, name, _, _, _) = item { return "toolUse \(name)" }
+        if case let .toolResult(_, _, isError, _, _) = item { return isError ? "toolResult error" : "toolResult" }
+        return kind
+    }
+
+    /// One made-up turn of a long session: a request (a long one every third turn), Claude's question answered, two calls to an
+    /// MCP server, Bash calls (one failing every other turn), a long answer — a heading, a list and two tables — and the turn's
+    /// end with its summary card. `gap`: the events come that far apart, the answer in bursts of words, and `checkpoint` is
+    /// called at the turn's milestones; nil: all at once.
+    private func richTurn(_ n: Int, root: String, gap: Duration?, checkpoint: (String) async -> Void = { _ in }) async {
+        func send(_ events: [EngineEvent]) async {
+            guard let gap else { return store.debugHandle(events) }
+            for event in events {
+                store.debugHandle([event])
+                try? await Task.sleep(for: gap)
+            }
+        }
+        func answer(_ text: String) -> [EngineEvent] {
+            guard gap != nil else { return [.textDelta(text: text)] }
+            let words = text.split(separator: " ", omittingEmptySubsequences: false)
+            return stride(from: 0, to: words.count, by: 8).map { i in
+                .textDelta(text: (i == 0 ? "" : " ") + words[i..<min(words.count, i + 8)].joined(separator: " "))
+            }
+        }
+        let file = "\(root)/src/\(n % 2 == 0 ? "cart" : "pricing").ts"
+        let request = n % 3 == 0
+            ? "Step \(n): the codes should stack in the order they were entered.\n\nAlso:\n- keep FREESHIP apart from the percentage codes\n- reject an unknown code with its name in the message\n- look up what the notes say about stacking first\n\nThen run the tests and tell me what changed."
+            : "Step \(n): check the notes on discount stacking and make the cart follow them."
+        await send([.userMessage(text: request, turn: n)])
+        await checkpoint("began")
+        await send(answer("I'll look the rules up in the notes first."))
+        let search = "toolu_notes_search_\(n)", page = "toolu_notes_page_\(n)"
+        await send([.toolUse(id: search, name: "mcp__notes__search_pages", input: .object(["query": .string("discount stacking \(n)")]), file: nil),
+                    .toolResult(toolUseId: search, isError: false, preview: "3 pages: Discount rules, Checkout FAQ, Release notes 0.\(n)"),
+                    .toolUse(id: page, name: "mcp__notes__get_page", input: .object(["page_id": .string("p-\(1000 + n)")]), file: nil),
+                    .toolResult(toolUseId: page, isError: false, preview: "Discount rules\n- percentage codes first\n- shipping codes last\n- at most two codes")])
+        // Claude asks; the answer comes back from the message box.
+        let question = Self.question(id: "tour-overlap-question-\(n)")
+        await send([.permissionRequest(question)])
+        await checkpoint("asked")
+        store.answerQuestions(requestId: question.requestId, answers: ["Where should the discount codes live?": "src/pricing.ts"])
+        try? await Task.sleep(for: gap ?? .zero)
+        await checkpoint("answered")
+        let read = "toolu_overlap_read_\(n)", test = "toolu_overlap_test_\(n)", stat = "toolu_overlap_stat_\(n)"
+        let failing = n % 2 == 0
+        await send([.toolUse(id: read, name: "Read", input: .object(["file_path": .string(file)]), file: file),
+                    .toolResult(toolUseId: read, isError: false, preview: (1...8).map { "\($0)\texport const line\($0) = \($0 * 10);" }.joined(separator: "\n")),
+                    .toolUse(id: test, name: "Bash", input: .object(["command": .string("npm test -- --test-name-pattern cart"), "description": .string("Run the cart tests")]), file: nil),
+                    .toolResult(toolUseId: test, isError: failing,
+                                preview: failing ? "Error: Command failed with exit code 1\n✖ rejects unknown codes (3ms)\n  AssertionError: expected UnknownCodeError" : "✔ applies SAVE10 (2ms)\nℹ tests 12\nℹ pass 12"),
+                    .toolUse(id: stat, name: "Bash", input: .object(["command": .string("git diff --stat")]), file: nil),
+                    .toolResult(toolUseId: stat, isError: false, preview: " src/pricing.ts | 14 ++++++++------\n 1 file changed, 8 insertions(+), 6 deletions(-)")])
+        // Turns differ as a real session's do: some run a dozen commands, some none more.
+        for i in 0..<[0, 6, 1, 12][n % 4] {
+            let id = "toolu_overlap_log_\(n)_\(i)"
+            await send([.toolUse(id: id, name: "Bash", input: .object(["command": .string("git log --oneline -\(i + 2) -- src/cart.ts")]), file: nil),
+                        .toolResult(toolUseId: id, isError: i % 5 == 4, preview: (0...i).map { "a1b2c3\($0) Cart change \($0)" }.joined(separator: "\n"))])
+        }
+        await checkpoint("calls")
+        // A one-line answer every third turn, a very long one (a third table of fourteen rows) every third.
+        if n % 3 == 1 {
+            await send(answer("Done: step \(n) changed nothing else."))
+        } else {
+            await send(answer(longAnswer(n, failing: failing) + (n % 3 == 2 ? "\n\n" + Self.longTable(n) : "")))
+        }
+        await checkpoint("answer streamed")
+        let summaryFiles = [TurnSummary.File(path: "src/pricing.ts", adds: 8, dels: 6)]
+        await send([.turnSummary(TurnSummary(turn: n, files: summaryFiles)),
+                    .turnEnd(stopReason: "end_turn", usage: Usage(inputTokens: 1200 + n, outputTokens: 640, costUsd: 0.24, durationMs: 36_600),
+                             files: 0, added: 0, deleted: 0)])
+        await checkpoint("ended")
+    }
+
+    /// A markdown table of fourteen rows, for the long answers.
+    private static func longTable(_ n: Int) -> String {
+        "### Every code tried in step \(n)\n\n| # | Code | Cart | Total before | Total after | Note |\n| ---: | --- | --- | ---: | ---: | --- |\n"
+            + (1...14).map { "| \($0) | CODE\($0) | cart \($0 % 4) | $\(20 + $0).00 | $\(18 + $0).50 | \($0 % 3 == 0 ? "applied after shipping, as the notes ask for shipping codes" : "ok") |" }
+            .joined(separator: "\n")
+    }
+
+    private func longAnswer(_ n: Int, failing: Bool) -> String {
+        """
+        ## Step \(n): how the codes stack
+
+        The notes say percentage codes come first and shipping codes last. Today the cart takes **SAVE10** off after \
+        shipping, so the order the codes were entered in decides the total. I changed `applyCodes` so that:
+
+        - percentage codes come first, in the order they were entered;
+        - `FREESHIP` only zeroes the shipping line, wherever it was entered;
+        - an unknown code throws `UnknownCodeError` with the code in its message;
+        - at most two codes apply, as the notes ask.
+
+        | Code | Kind | Applied | Effect on a $40.00 cart |
+        | --- | --- | :---: | ---: |
+        | SAVE10 | percentage | 1st | −$4.00 |
+        | WELCOME5 | percentage | 2nd | −$1.80 |
+        | FREESHIP | shipping | last | −$5.99 |
+        | BOGUS | unknown | — | `UnknownCodeError` |
+
+        ### What the tests say
+
+        | Test | Before | After | Note |
+        | --- | :---: | :---: | --- |
+        | applies SAVE10 | ✔ | ✔ | unchanged |
+        | stacks two percentage codes | ✖ | ✔ | the order entered is kept, whatever the kind of the code that came first |
+        | rejects unknown codes | ✖ | \(failing ? "✖" : "✔") | \(failing ? "still failing: the error is thrown before the code is named" : "the message names the code") |
+
+        \(failing ? "One test still fails; I'll fix the message next." : "All 12 tests pass.")
+        """
     }
 
     /// The transcript's scroll view in `image`: what it shows of its content, and how much of that is drawn ("BLANK": nothing).
