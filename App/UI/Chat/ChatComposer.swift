@@ -314,6 +314,7 @@ struct ChatComposer: View {
                 .transition(.opacity)
                 .accessibilityIdentifier("Composer notice")
             }
+            ComposerBtwSlot()   // §56.1: the /btw answer, over the box
             inputBox
             if store.canPickPermissionMode {
                 ComposerModeLineView()   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드 (shift+tab 전환)"
@@ -417,6 +418,7 @@ struct ChatComposer: View {
         .registersUnsavedWork("composerImages") {
             composer.images.isEmpty ? nil : String(localized: "\(composer.images.count) attached images will be lost.")
         }
+        .modifier(ComposerBtwHooks(composer: composer))   // §56.1
         .onChange(of: composer.draft) { _, _ in
             composer.paletteDismissed = false
             composer.paletteForced = false   // ⌘/ over a typed draft: typing on is a message, not a filter — ↩ stays a newline
@@ -776,6 +778,7 @@ struct ChatComposer: View {
     /// r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as the instruction (no interrupt: Claude
     /// follows it in the same turn); the text leaves the box like a sent message.
     private func denyWithDraft(_ card: PermissionRequest) {
+        if takeBtw() { return }   // §56.1
         let text = trimmedDraft
         guard !text.isEmpty else { return }
         store.denyPermission(requestId: card.requestId, .instruction(text))
@@ -809,6 +812,7 @@ struct ChatComposer: View {
 
     /// Plain Send: the message goes out and the review list stays exactly as it is.
     private func send() {
+        if takeBtw() { return }   // §56.1
         let text = composer.draft
         if store.viewingChat != nil { sendInViewedChat(text); return }   // wave4b w4b-tabs (§39.2)
         guard store.canSend, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -838,6 +842,7 @@ struct ChatComposer: View {
 
     /// §50 "바로 보내기": the draft goes into the running turn (refused by the engine, it waits in the queue).
     private func steerDraft() {
+        if takeBtw() { return }   // §56.1
         guard !trimmedDraft.isEmpty else { return }
         let text = composer.draft
         let (mentions, _) = composer.takeInputs(history: store.promptHistory)
@@ -852,6 +857,7 @@ struct ChatComposer: View {
     /// card goes out once every question has an answer), or with an empty box the card goes as it is. Never steered: a
     /// message in the turn would only wait behind the open question. Mentions and images stay for the next message.
     private func answerQuestion(_ open: OpenQuestion) {
+        if takeBtw() { return }   // §56.1
         let id = open.requestId
         var draft = transcript.questionDrafts[id] ?? QuestionDraft()
         guard !trimmedDraft.isEmpty else {
@@ -881,6 +887,7 @@ struct ChatComposer: View {
     }
 
     private func queueDraft() {
+        if takeBtw() { return }   // §56.1
         guard !trimmedDraft.isEmpty else { return }
         let (queuedMentions, queuedImages) = composer.takeInputs(history: store.promptHistory)
         store.enqueue(composer.draft, mentions: queuedMentions, images: queuedImages)
@@ -891,6 +898,7 @@ struct ChatComposer: View {
 
     /// "중단하고 보내기" (§28): interrupt, then this message right behind it.
     private func stopAndSend() {
+        if takeBtw() { return }   // §56.1
         guard store.isRunning, !trimmedDraft.isEmpty else { return }
         let (sentMentions, sentImages) = composer.takeInputs(history: store.promptHistory)
         store.interruptAndSend(composer.draft, mentions: sentMentions, images: sentImages)
@@ -949,6 +957,7 @@ struct ChatComposer: View {
     /// queued while it restarts). It never answers a permission card — a stray Return must not allow a command — and an empty
     /// draft stays as it is. r2-review-flow M30: false when nothing could take the text (the caller says why).
     private func sendFromReturn() -> Bool {
+        if takeBtw() { return true }   // §56.1: before a question or a card takes the text
         // r1-composer M08: ↩ answers Claude's open question (with an empty box: sends its card as it is).
         if let question {
             answerQuestion(question)
@@ -962,6 +971,31 @@ struct ChatComposer: View {
             return true
         }
         return perform(sendAction)
+    }
+
+    /// §56.1: `/btw <question>` is the app's command, whatever the turn does: asked on the side (the answer opens over the
+    /// box), never sent, queued or put into the turn; `/btw` alone shows the last answer again. False for any other text.
+    private func takeBtw() -> Bool {
+        guard let question = BtwCommand.question(in: composer.draft) else { return false }
+        guard store.projectInfo != nil else {
+            composer.notice = String(localized: "Open a project first (⌘O)")
+            return true
+        }
+        composer.draft = ""
+        composer.closePalette()
+        composer.inputFocused = true
+        if question.isEmpty {
+            if !store.showLastBtw() { composer.notice = BtwCommand.nothingYet }
+        } else {
+            Task { await store.askBtw(question) }
+        }
+        return true
+    }
+
+    /// §56.1: the /btw answer is shown and the box is empty — ↩ and Space close it (Esc always does).
+    private var closesBtwAnswer: Bool {
+        guard composer.draft.isEmpty, case .answered = store.btwOverlay else { return false }
+        return true
     }
 
     /// r2-review-flow M30: does what ↩ / ⌘↩ decided; false for `.nothing`.
@@ -1168,7 +1202,7 @@ struct ChatComposer: View {
                 composer.mentionDismissed = true
                 return true
             case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-                 .optionEnter, .digit, .pageUp, .pageDown:
+                 .optionEnter, .digit, .pageUp, .pageDown, .space:
                 break
             }
         }
@@ -1181,6 +1215,10 @@ struct ChatComposer: View {
             return true
         case let .digit(number):
             return pickQuestionOption(number)   // r1-composer M08
+        case .space:
+            guard closesBtwAnswer else { return false }   // §56.1
+            store.dismissBtw()
+            return true
         case .pageUp, .pageDown:
             // polish P3-transcript-17: a page of the conversation from the message box (the transcript scrolls by the tick).
             guard !paletteVisible else { return false }
@@ -1211,6 +1249,9 @@ struct ChatComposer: View {
             }
             return true
         case .enter, .tab:
+            // §56.1: ↩ in an empty box closes the /btw answer; `/btw` typed out runs at once instead of the palette's pick.
+            if key == .enter, closesBtwAnswer { store.dismissBtw(); return true }
+            if key == .enter, paletteVisible, composer.slashToken?.lowercased() == BtwCommand.name { return takeBtw() }
             guard paletteVisible else { return key == .enter && returnSends ? (sendFromReturn() || explainUnsent()) : false }
             let entries = composer.paletteEntries(store)
             guard !entries.isEmpty else { composer.closePalette(); return true }
@@ -1251,6 +1292,7 @@ struct ChatComposer: View {
         case .escape:
             if paletteVisible { composer.closePalette(); return true }
             if let restored = composer.history.cancel() { composer.setDraftFromHistory(restored); return true }
+            if store.btwOverlay != nil { store.dismissBtw(); return true }   // §56.1: the side answer first, then the turn
             // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (⌘. does too).
             if store.isRunning, store.viewingChat == nil { store.interrupt(); return true }
             return false

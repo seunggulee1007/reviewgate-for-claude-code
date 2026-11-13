@@ -8473,6 +8473,16 @@ type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answe
   interrupt or a side fork. Nothing is sent to the turn, nothing joins the transcript, `hud.turnCount` or the prompt
   history. An answer slower than 3 minutes is refused `btw_failed:no answer in 180 s` (the CLI's request is cancelled); a
   cancelled one `btw_failed:cancelled`; a failed fork `btw_failed:<its first line>`.
+- **Clients.** The message box takes `/btw <question>` as the app's command (as `/clear`, §41.1) — at any time, a turn
+  running, a permission card or a question of Claude's open included; it never goes to the queue, the turn or the prompt
+  history. The palette lists `/btw` (Built-in: "Ask a quick side question — Claude keeps working; the answer stays out of
+  the chat", hint `<question>`; ↩ on `/btw` typed out runs it). The answer opens over the message box, never in the
+  transcript: `/btw`, the question, the answer (Markdown, selectable), "Answered without tools from the conversation so far
+  — not added to the chat" ("…by a copy of the conversation…" for a fork), Copy and Close, and a context menu (Copy the
+  answer, Copy the question, Close). Esc closes it (before Esc stops the turn); ↩ or Space in an empty box closes it too.
+  `/btw` alone shows the chat's last answer again (none yet: "No side answer yet — type /btw and your question"); another
+  chat closes it. While it waits: "Asking on the side…" with Cancel (the answer is dropped when it comes). A refusal shows
+  in the notice line ("Claude could not answer the side question: …") and `/btw <question>` comes back into an empty box.
 - **Verified** (CLI 2.1.323, `sidecar/test/driver-btw.mjs`, haiku): during a `sleep 15` turn, a question about the code
   word the first message gave was answered `via: "session"` in 1.3 s ("PAPAYA") with the turn still running; a second
   question ("What did I ask you on the side?") was answered from the first exchange ("You asked for the code word."). The

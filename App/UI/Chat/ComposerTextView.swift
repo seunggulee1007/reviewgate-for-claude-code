@@ -37,6 +37,8 @@ enum ComposerKey: Equatable {
     case digit(Int)
     /// r2-review-flow — polish P3-transcript-17: PageUp / PageDown (fn↑ / fn↓) page the conversation, not the message box.
     case pageUp, pageDown
+    /// §56.1: Space typed into an empty message box — closes the /btw answer over it (otherwise a space).
+    case space
 }
 
 /// What a paste or a drop brought into the composer (§23 mentions / §24 images).
@@ -258,6 +260,11 @@ final class ComposerNSTextView: NSTextView {
            event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
            let typed = event.charactersIgnoringModifiers, typed.count == 1, let digit = Int(typed), (1...9).contains(digit),
            coordinator.parent.onKey(.digit(digit)) {
+            return
+        }
+        if string.isEmpty, !hasMarkedText(), let coordinator,
+           event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
+           event.charactersIgnoringModifiers == " ", coordinator.parent.onKey(.space) {
             return
         }
         super.keyDown(with: event)

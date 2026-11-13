@@ -3585,6 +3585,38 @@
         }
       }
     },
+    "Answered without tools by a copy of the conversation — not added to the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered without tools by a copy of the conversation — not added to the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화 사본이 도구 없이 답했어요 — 대화에는 남지 않아요"
+          }
+        }
+      }
+    },
+    "Answered without tools from the conversation so far — not added to the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered without tools from the conversation so far — not added to the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금까지의 대화로 도구 없이 답했어요 — 대화에는 남지 않아요"
+          }
+        }
+      }
+    },
     "Answered: %@": {
       "localizations": {
         "en": {
@@ -4397,6 +4429,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "종료하기 전에 묻기"
+          }
+        }
+      }
+    },
+    "Asking on the side…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asking on the side…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "곁질문 답을 기다리는 중…"
+          }
+        }
+      }
+    },
+    "Close (esc · ↩ · space) — /btw alone shows it again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close (esc · ↩ · space) — /btw alone shows it again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "닫기 (esc · ↩ · space) — /btw만 입력하면 다시 보여요"
+          }
+        }
+      }
+    },
+    "Close the side answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the side answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "곁질문 답 닫기"
           }
         }
       }
@@ -8679,6 +8759,22 @@
         }
       }
     },
+    "Copy the answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy the answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답 복사"
+          }
+        }
+      }
+    },
     "Copy the code block": {
       "localizations": {
         "en": {
@@ -8867,6 +8963,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메시지 복사"
+          }
+        }
+      }
+    },
+    "Copy the question": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy the question"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문 복사"
           }
         }
       }
@@ -25090,6 +25202,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 답변을 중지합니다. 스레드는 남습니다"
+          }
+        }
+      }
+    },
+    "Stop waiting — the answer is dropped when it comes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop waiting — the answer is dropped when it comes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리지 않아요 — 답이 와도 버려요"
           }
         }
       }
