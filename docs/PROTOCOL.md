@@ -8517,3 +8517,9 @@ type InterruptedEvent = { type: "interrupted"; id?: string;
   mentions in the order they were put in, for the clients to give back. `read`: those Claude has (their rows come with the
   turn's end, §50.2). Nothing waiting: a plain interrupt, `interrupted {takenBack: [], read: []}`; no turn running: the same
   reply, nothing interrupted. `interrupt` without `takeBack` is exactly as before (`result`; what waits stays and runs next).
+- **Verified** (CLI 2.1.323, `sidecar/test/driver-esc-takeback.mjs`, haiku): during a `sleep 10` turn two messages were
+  put in, then `interrupt {takeBack: true}`. The engine took the cancel_queued way (the CLI advertises
+  `interrupt_cancel_queued_v1`); the reply gave both back in order, none read; nothing waited after it; the turn ended once,
+  `interrupted`, with only the first message's row; and in the 8 s after it neither message ran as a turn of its own (no
+  second turn_end, neither word in any reply). The one-by-one way is the §50.3 take-back, verified by
+  `driver-steer-takeback.mjs`, followed by the plain interrupt; the engine tests cover it.
