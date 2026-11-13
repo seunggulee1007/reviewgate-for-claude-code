@@ -98,11 +98,18 @@ struct ComposerBtwOverlay: View {
 /// §56.1: the overlay's place above the message box (a view of its own, so the composer's body stays small).
 struct ComposerBtwSlot: View {
     @Environment(AppState.self) private var store
+    #if DEBUG
+    @Environment(WindowModel.self) private var model
+    #endif
 
     var body: some View {
         if let overlay = store.btwOverlay {
             ComposerBtwOverlay(overlay: overlay)
                 .transition(.opacity)
+                #if DEBUG
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugBtwFrame = $0 }   // the composer check
+                .onDisappear { model.debugBtwFrame = .zero }
+                #endif
         }
     }
 }

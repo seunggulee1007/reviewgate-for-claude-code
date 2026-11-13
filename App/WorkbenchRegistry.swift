@@ -198,6 +198,8 @@ final class WindowModel {
     @ObservationIgnored var debugQueueBarFrame: CGRect = .zero
     /// §50.3: the queue bar's tools by name (`steer.edit`, `steer.takeBack`, `queued.edit`, `queued.remove`; `.zero` when gone).
     @ObservationIgnored var debugQueueTools: [String: CGRect] = [:]
+    /// §56.1: the /btw answer over the box (`.zero` while it is not shown).
+    @ObservationIgnored var debugBtwFrame: CGRect = .zero
     #endif
 
     func reveal(toolUseId: String) {
