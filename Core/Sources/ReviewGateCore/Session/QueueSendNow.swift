@@ -161,27 +161,10 @@ public extension AppState {
         taskForComposer = TaskComposerText(text: message.text, mentions: message.mentions, images: message.images)
     }
 
-    /// §50.3: something waits that ↑ in an empty message box would bring back (`pullBackLastWaiting`; §56.2 `pullBackWaiting`).
+    /// §50.3: something waits that ↑ in an empty message box would bring back (§56.2 `pullBackWaiting`).
     var canPullBackWaiting: Bool {
         !queuedMessages.isEmpty || steeringMessages.contains { !steeringTakingBack.contains($0.id) }
     }
 
-    /// §50.3, as ↑ in the terminal's empty input: the last message waiting comes back into the message box — the last
-    /// queued one (with its mentions and images), else the last one in Claude's turn (taken back first). False when
-    /// nothing waits (↑ then walks the prompt history as before).
-    @discardableResult
-    func pullBackLastWaiting() -> Bool {
-        if let last = queuedMessages.last {
-            editQueuedInComposer(id: last.id)
-            return true
-        }
-        guard let last = steeringMessages.last(where: { !steeringTakingBack.contains($0.id) }) else { return false }
-        steeringTakingBack.insert(last.id)   // the chip waits at once; `takeBackSteering` takes it from here
-        Task {
-            steeringTakingBack.remove(last.id)
-            await takeBackSteering(id: last.id, toComposer: true)
-        }
-        return true
-    }
 
 }
