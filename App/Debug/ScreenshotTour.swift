@@ -1729,6 +1729,40 @@ private final class Tour {
         try await check("diff pane closed")
         // 4) Following again: more turns, the boundary moving on with each.
         for _ in 0..<6 { try await liveTurn("following again") }
+        // 5) ⌘F to a row long before the first one shown (§45.1): the rows around it are shown — not every row up to the
+        // newest — and the view goes to it; then "↓ Latest" brings the newest rows back.
+        let state = entry.model.chatTranscript
+        entry.model.findTick += 1
+        try await Task.sleep(for: .milliseconds(300))
+        let asked = ContinuousClock.now
+        state.findQuery = "Step 3: "
+        try await Task.sleep(for: .milliseconds(10))
+        let took = ContinuousClock.now - asked   // the main thread was busy that long with the query's rows
+        try await Task.sleep(for: .milliseconds(1200))
+        if let match = state.currentMatch {
+            _ = try await overlapCheck("find", chat: chat, window: window, nudge: true)
+            let row = TranscriptRowFrames.rows[match].flatMap { $0.generation == TranscriptRowFrames.generation ? $0.frame : nil }
+            let shown = row.map { $0.maxY > 0 && $0.minY < chat.contentView.bounds.height } ?? false
+            let views = try views(ProseNSTextView.self, in: window, minSize: 0).count
+            log("overlap find a row of turn 3: " + (shown ? "shown at y \(Int(row?.minY ?? 0))" : "LOST — not on screen")
+                + ", \(views) answer texts made, the query's job took \(took.formatted(.units(allowed: [.milliseconds])))"
+                + (state.cutShort ? ", the newest rows not made" : ""))
+        } else {
+            log("overlap find a row of turn 3: no match — LOST")
+        }
+        state.findQuery = ""
+        state.findVisible = false
+        // "↓ Latest" (`LatestPill`): the newest rows again, following.
+        state.follow = true
+        state.unseen = 0
+        state.showLatest()
+        try await Task.sleep(for: .milliseconds(100))
+        turn += 1
+        await richTurn(turn, root: root, gap: nil)
+        try await Task.sleep(for: .milliseconds(900))
+        let fromEnd = (chat.documentView?.frame.height ?? 0) - chat.contentView.bounds.maxY
+        log("overlap latest after the find: \(Int(fromEnd)) pt from the end, following \(state.follow ? "yes" : "no")"
+            + (fromEnd < 2 && !state.cutShort ? "" : " — LOST"))
         log("overlap: \(checks) checks, \(marked) overlaps" + (marked == 0 ? " — clear" : " — OVERLAP"))
         try write(try render(window), "overlap")
     }

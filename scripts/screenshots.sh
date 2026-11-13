@@ -38,7 +38,8 @@
 #                  row's frame, or a text taller than its frame, is an OVERLAP (`overlap` lines, overlap-<n>.png); first it
 #                  scrolls down from far up (the "Latest" pill showing) to the end and back up, checked after every step:
 #                  the end moving away from the reader by more than 40 pt is ENDLESS, rows shown moving under the reader
-#                  JUMP (`scrollfeel` lines).
+#                  JUMP (`scrollfeel` lines); last, ⌘F to a row far before the rows shown and "↓ Latest" back (LOST when
+#                  either does not end on its row).
 #                  composer: the message box against the terminal's input — ⌘V of an image from a private pasteboard
 #                  (a screenshot, Preview, a browser, a Finder copy; never the user's clipboard), "/" opening the slash
 #                  palette with every source and filtering it, the queue bar with what waits in Claude's turn and its
