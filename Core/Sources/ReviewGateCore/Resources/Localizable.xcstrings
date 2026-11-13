@@ -3009,6 +3009,22 @@
         }
       }
     },
+    "Claude already read %lld of the waiting messages — they stay in the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude already read %lld of the waiting messages — they stay in the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리던 메시지 중 %lld개는 Claude가 이미 읽었어요 — 대화에 그대로 남아요"
+          }
+        }
+      }
+    },
     "Claude changed this again after you rejected it, so it was not reverted: %@": {
       "localizations": {
         "en": {

@@ -2170,6 +2170,8 @@ public final class AppState {
             break
         case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
+        case .interrupted:   // §56.2: consumed by `interruptGivingBack`
+            break
         case .commitHunks, .commitSplitDraft, .committedSeries:   // §53: replies, consumed by their requests
             break
         case .fileLines, .fileImage:   // MARK: wave4c w4c-review — §41.3 replies, consumed by the request that asked
