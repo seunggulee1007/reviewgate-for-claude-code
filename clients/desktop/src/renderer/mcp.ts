@@ -10,6 +10,8 @@ import { t } from "./i18n";
 export type McpState = {
   servers: McpServerInfo[];
   restartRequired: boolean;
+  /** A config file opened from the list was saved since (src/renderer/mcpConfig.ts): the session reads it at its next start. */
+  configEdited?: boolean;
   /** MARK: wave4d w4d-config — §42.3: the engine keeps a choice for every workbench of the repository. */
   repositoryToggle?: boolean;
   /** At least one `mcp_status` arrived (else the dialog falls back to `extensions.mcpServers`). */

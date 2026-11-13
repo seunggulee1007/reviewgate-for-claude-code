@@ -31,6 +31,7 @@ import type { Store } from "./store";
 // MARK: r2-skills-side — §21 (M18) a skill goes to the main chat; P3-transcript-28 drafts kept per chat
 import { EMPTY_DRAFTS, loadDrafts, mainOnlyRequest, saveDrafts, shownCommand, withDraft, type SideDrafts, type SideMainOnly } from "./sideMainOnly";
 import { nextToSend } from "./sendQueue";
+import { createAndOpenMcpJson, forgetOpenedConfigs, openConfigFile, openedConfigSaved } from "./mcpConfig";
 
 /** What the side panel shows: the thread list, one thread, or a new question about `anchor`. */
 export type SideView =
@@ -106,6 +107,14 @@ export type SideSlice = {
   mcpRemove(name: string, scope: McpScope, file?: string): Promise<string | null>;
   mcpAuth(name: string): Promise<void>;
   dismissMcpNotice(): void;
+  /** Opens the file that defines a server (the editor, else the default app); a failure goes to `mcpNotice`. */
+  mcpOpenConfig(path: string): Promise<void>;
+  /** A `.mcp.json` that is not there yet is created (the caller asked the user) and opened. */
+  mcpCreateProjectFile(path: string): Promise<void>;
+  /** The app came back to the front: a saved config file shows the restart banner and refreshes the list. */
+  mcpCheckConfigEdited(): Promise<void>;
+  /** The session was asked to restart: what was edited is read now. */
+  mcpConfigRestarted(): void;
 };
 
 const LAST = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
@@ -232,6 +241,7 @@ export const createSideSlice: StateCreator<Store, [], [], SideSlice> = (set, get
     },
 
     resetSide() {
+      forgetOpenedConfigs();
       set({ side: EMPTY_SIDE, sideView: { kind: "list" }, sideAsking: false, sideNotice: null, promoteDraft: null, sideQueued: {}, mcp: EMPTY_MCP, mcpNotice: null, sideMainOnly: {}, sideDrafts: EMPTY_DRAFTS });
     },
 
@@ -443,6 +453,20 @@ export const createSideSlice: StateCreator<Store, [], [], SideSlice> = (set, get
     },
     dismissMcpNotice() {
       set({ mcpNotice: null });
+    },
+    async mcpOpenConfig(path) {
+      set({ mcpNotice: await openConfigFile(path) });
+    },
+    async mcpCreateProjectFile(path) {
+      set({ mcpNotice: await createAndOpenMcpJson(path) });
+    },
+    async mcpCheckConfigEdited() {
+      if (!(await openedConfigSaved())) return;
+      set((s) => ({ mcp: { ...s.mcp, configEdited: true } }));
+      await get().mcpRefresh();
+    },
+    mcpConfigRestarted() {
+      set((s) => ({ mcp: { ...s.mcp, configEdited: false } }));
     },
   };
 };

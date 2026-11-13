@@ -282,6 +282,8 @@ export type NotificationClick = { kind: NotifyKind; target?: NotifyTarget };
 export type ToolchainInfo = { platform: NodeJS.Platform; electron: string; node: string; chrome: string };
 
 /** `window.rg` — what the preload exposes (src/preload.ts). */
+export type McpConfigFileResult = { ok: boolean; mtime: number | null; error?: "refused" | "missing" | "failed" };
+
 export type RGBridge = {
   send(cmd: EngineCommand): void;
   request<C extends EngineCommand>(cmd: C): Promise<ReplyFor<C>>;
@@ -298,6 +300,11 @@ export type RGBridge = {
   /** Opens the main process log folder (userData/logs) in the file manager. */
   openLog(): Promise<void>;
   showItemInFolder(path: string): Promise<void>;
+  /**
+   * Settings › MCP servers: the file that defines a server (`.mcp.json` / `.claude.json`, absolute). `stat` → its modification
+   * time, `open` → in the editor (else the default app), `create` → a new `.mcp.json` with an empty server list.
+   */
+  mcpConfigFile?(action: "stat" | "open" | "create", path: string): Promise<McpConfigFileResult>;
   /** MARK: wave4d w4d-config — §42.3: a Markdown file in the system's default app; "" when opened, else why not. */
   openMarkdown?(path: string): Promise<string>;
   /** MARK: wave5 w5-graph — §43.3: graphify's graph.html in the default browser; "" when opened, else why not. */

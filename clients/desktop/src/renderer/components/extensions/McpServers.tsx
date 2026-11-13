@@ -12,6 +12,9 @@ import { configLine, EMPTY_FORM, mcpSourceLabel, mcpStatusLabel, mcpTone, scopeH
 import { isFromParentFolder, isOffForRepository, notRemovableReason, originLine, parentRemoveHelp, removeScope, terminalCommand } from "../../claudeConfig";
 import { isRunning, useStore } from "../../store";
 import { knowsSessionTools, updateReason } from "../../sessionTools"; // MARK: wave3 desktop-session
+import { isHomeConfig, mcpJsonExists, openHelp, originHint, projectMcpJson } from "../../mcpConfig";
+import { revealInFolderLabel } from "../../platformWords";
+import { AgentMenuButton, useAgentContextMenu, type AgentMenuItem } from "../agents/AgentBits";
 
 export function McpServers() {
   const mcp = useStore((s) => s.mcp);
@@ -24,10 +27,24 @@ export function McpServers() {
   const sessionOpen = useStore((s) => s.state.session.open);
   const [adding, setAdding] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const root = useStore((s) => s.state.project?.root ?? null);
+  const openConfig = useStore((s) => s.mcpOpenConfig);
+  const createProjectFile = useStore((s) => s.mcpCreateProjectFile);
+  const checkConfigEdited = useStore((s) => s.mcpCheckConfigEdited);
+  const configRestarted = useStore((s) => s.mcpConfigRestarted);
+  const [askCreate, setAskCreate] = useState(false);
+  const projectFile = root ? projectMcpJson(root, window.rg?.sep || "/") : null;
 
   useEffect(() => {
     if (sessionOpen) void refresh();
   }, [sessionOpen, refresh]);
+
+  // The window came back to the front: a config file opened from here may have been saved.
+  useEffect(() => {
+    const onFocus = () => void checkConfigEdited();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [checkConfigEdited]);
 
   const servers = mcp.loaded ? sortServers(mcp.servers) : [];
   const count = mcp.loaded ? servers.length : (fallback?.length ?? 0);
@@ -38,6 +55,16 @@ export function McpServers() {
         <span>{t("MCP servers")}</span>
         <span className="faint num">{count}</span>
         <span className="spacer" />
+        <button
+          type="button"
+          className="plain small"
+          disabled={!projectFile}
+          onClick={() => projectFile && void mcpJsonExists(projectFile).then((there) => (there ? openConfig(projectFile) : setAskCreate(true)))}
+          title={t("Open the project's .mcp.json — you can create it if it is not there yet")}
+          data-testid="MCP open project file"
+        >
+          {t("Open .mcp.json")}
+        </button>
         <button
           type="button"
           className="plain small"
@@ -55,10 +82,19 @@ export function McpServers() {
           + {t("Add server")}
         </button>
       </h4>
-      {mcp.restartRequired && (
+      {askCreate && projectFile && (
+        <div className="banner blue mcp-banner" data-testid="MCP create project file">
+          <span className="grow">{t("Create .mcp.json?")} {t("This project has no .mcp.json yet. ReviewGate creates it with an empty server list and opens it.")}</span>
+          <button type="button" className="small primary" onClick={() => (setAskCreate(false), void createProjectFile(projectFile))} data-testid="MCP create project file confirm">
+            {t("Create and Open")}
+          </button>
+          <button type="button" className="plain small" onClick={() => setAskCreate(false)}>{t("Cancel")}</button>
+        </div>
+      )}
+      {(mcp.restartRequired || mcp.configEdited) && (
         <div className="banner blue mcp-banner" data-testid="MCP restart banner">
           <span className="grow">{t("A Claude Code config file changed — the running session picks it up after a restart.")}</span>
-          <button type="button" className="small primary" disabled={!canRestart} onClick={() => void restartSession()} title={canRestart ? undefined : t("Wait for Claude to finish the turn")} data-testid="MCP restart now">
+          <button type="button" className="small primary" disabled={!canRestart} onClick={() => (configRestarted(), void restartSession())} title={canRestart ? undefined : t("Wait for Claude to finish the turn")} data-testid="MCP restart now">
             {t("Restart now")}
           </button>
         </div>
@@ -116,9 +152,21 @@ function ServerRow({ server: s }: { server: McpServerInfo }) {
   const command = terminalCommand(s);
   const [copied, setCopied] = useState(false);
   const line = configLine(s);
+  const openConfig = useStore((st) => st.mcpOpenConfig);
+  const file = s.origin?.file ?? null;
+  const home = !!file && isHomeConfig(file);
+  const noFile = t("ReviewGate does not know which file defines this server");
+  const configItems: AgentMenuItem[] = [
+    { label: t("Open Config File"), onClick: () => file && void openConfig(file), disabled: file ? null : noFile, hint: openHelp(file), testId: `MCP open config ${s.name}` },
+    { label: revealInFolderLabel(window.rg?.platform ?? ""), onClick: () => file && void window.rg.showItemInFolder(file), disabled: file ? null : noFile, hint: t("Show the file that defines this server in the file manager"), testId: `MCP show config ${s.name}` },
+  ];
+  // `~/.claude.json` is large and holds other state: showing it comes first.
+  const configMenu = home ? [configItems[1], configItems[0]] : configItems;
+  const ctx = useAgentContextMenu(configMenu);
   const keys = [...(s.config?.envKeys ?? []).map((k) => `${k}=…`), ...(s.config?.headerKeys ?? []).map((k) => `${k}: …`)];
   return (
-    <li className={`mcp-row ${enabled ? "" : "off"}`} data-testid={`MCP ${s.name}`} data-status={s.status}>
+    <li className={`mcp-row ${enabled ? "" : "off"}`} data-testid={`MCP ${s.name}`} data-status={s.status} onContextMenu={ctx.onContextMenu}>
+      {ctx.menu}
       <label className="switch" title={enabled ? t("Turn off for this project (kept across sessions)") : t("Turn on")}>
         <input type="checkbox" checked={enabled} disabled={!!busy} onChange={(e) => void toggle(s.name, e.target.checked)} data-testid={`MCP toggle ${s.name}`} />
         <span className="track" aria-hidden="true" />
@@ -142,9 +190,16 @@ function ServerRow({ server: s }: { server: McpServerInfo }) {
           </div>
         )}
         {origin && (
-          <div className={`tiny truncate ${isFromParentFolder(s) ? "orange" : "faint"}`} title={s.origin?.file ?? undefined} data-testid={`MCP origin ${s.name}`}>
+          <button
+            type="button"
+            className={`mcp-origin tiny truncate ${isFromParentFolder(s) ? "orange" : "faint"}`}
+            title={file ? `${file}\n${originHint(file)}` : undefined}
+            disabled={!file}
+            onClick={() => file && (home ? void window.rg.showItemInFolder(file) : void openConfig(file))}
+            data-testid={`MCP origin ${s.name}`}
+          >
             {origin}
-          </div>
+          </button>
         )}
         {s.authWaiting && s.status === "needs-auth" && <div className="caption muted">{t("Log in in Terminal — ReviewGate reconnects the server once the login took. Not yet? Reconnect.")}</div>}
         {s.error && <div className="caption red mcp-error" title={s.error}>{s.error}</div>}
@@ -155,6 +210,7 @@ function ServerRow({ server: s }: { server: McpServerInfo }) {
             </button>
           )}
           <span className="spacer" />
+          <AgentMenuButton items={configMenu} testId={`MCP config menu ${s.name}`} />
           {s.status === "needs-auth" && (
             <button type="button" className="small primary" disabled={!!busy} onClick={() => void auth(s.name)} title={t("Opens Terminal with claude /mcp, where you log in; ReviewGate then reconnects the server")} data-testid={`MCP auth ${s.name}`}>
               {t("Sign in")}
