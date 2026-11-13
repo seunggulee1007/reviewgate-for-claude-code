@@ -1426,6 +1426,10 @@ private final class Tour {
         window.orderFrontRegardless()
         defer { window.level = .normal }
         AppSettings.setAppearance(.dark)
+        // A quiet window is never drawn by AppKit: drawn here at the screen's pace, so what is measured includes the layout
+        // and drawing a window on screen does every frame.
+        let pump = ScreenshotTour.quiet ? Self.drawAtScreenPace(window) : nil
+        defer { pump?.invalidate() }
         let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
         let visible = window.screen?.visibleFrame ?? window.frame
         window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - 1104), size: NSSize(width: 1257, height: 1104)), display: true)
@@ -1619,6 +1623,13 @@ private final class Tour {
 
     // MARK: Overlap (`SHOTS_LAYOUT=overlap`)
 
+    /// Lays `window` out and draws it 60 times a second, as AppKit does a window on screen (it never draws a quiet one).
+    private static func drawAtScreenPace(_ window: NSWindow) -> Timer {
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in MainActor.assumeIsolated { window.displayIfNeeded() } }
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
+    }
+
     /// `SHOTS_LAYOUT=overlap`: a long made-up session of rich turns (`richTurn`) — Claude's question answered, an MCP server's
     /// calls, Bash calls and a failing one, long answers with headings, a list and two tables, turn summaries — then more such
     /// turns begin and stream while following (the rows made at once move into the lazy stack as each begins), the reader
@@ -1637,8 +1648,7 @@ private final class Tour {
         AppSettings.setAppearance(.dark)
         // A window on screen is laid out and drawn every frame; a quiet one is never drawn by AppKit (its views wait for a
         // display that does not come), so it is drawn here at the screen's pace — what is checked is what a user would see.
-        let pump = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in MainActor.assumeIsolated { window.displayIfNeeded() } }
-        RunLoop.main.add(pump, forMode: .common)
+        let pump = Self.drawAtScreenPace(window)
         defer { pump.invalidate() }
         let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
         for n in 1...36 { await richTurn(n, root: root, gap: nil) }
