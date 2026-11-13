@@ -35,14 +35,16 @@
 #                  overlap: a long session of rich turns (a question answered, MCP and Bash calls, answers with tables, turn
 #                  summaries) while turns begin and stream, the reader scrolls up and down, the window resizes and the diff pane
 #                  opens; after each step two rows on screen laid out over one another, an answer's text or table in no
-#                  row's frame, or a text taller than its frame, still so 1.5 s later, is an OVERLAP (`overlap` lines,
-#                  overlap-<n>.png).
+#                  row's frame, or a text taller than its frame, is an OVERLAP (`overlap` lines, overlap-<n>.png); first it
+#                  scrolls down from far up (the "Latest" pill showing) to the end and back up, checked after every step:
+#                  the end moving away from the reader by more than 40 pt is ENDLESS, rows shown moving under the reader
+#                  JUMP (`scrollfeel` lines).
 #                  composer: the message box against the terminal's input — ⌘V of an image from a private pasteboard
 #                  (a screenshot, Preview, a browser, a Finder copy; never the user's clipboard), "/" opening the slash
 #                  palette with every source and filtering it, the queue bar with what waits in Claude's turn and its
 #                  edit / take-back tools, ↑ in an empty box bringing the last waiting message back (`composer` lines;
 #                  also part of SHOTS_LAYOUT=1).
-#                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP or OVERLAP in tour.log fails the run (exit 1)
+#                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
 #   SHOTS_VISIBLE  1: a SHOTS_LAYOUT run shows its windows and comes to the front as the README run does. By default it is
@@ -370,12 +372,12 @@ if [ -n "${SHOTS_LAYOUT:-}" ]; then   # the layout / scroll check: its PNGs stay
   say "layout shots: $(ls "$RAW"/*.png | tr '\n' ' ')"
   # What the check marks fails the run (§49.2, §45.1): a part taller than the window, a card cut, the send button out of
   # the window, a typed message lost, a transcript that shows none of its rows.
-  marked="$(grep -E 'TALLER|— CUT|OUT OF THE WINDOW|LOST|BLANK|SILENT|— JUMP|— OVERLAP' "$RAW/tour.log" || true)"
+  marked="$(grep -E 'TALLER|— CUT|OUT OF THE WINDOW|LOST|BLANK|SILENT|— JUMP|— OVERLAP|— ENDLESS' "$RAW/tour.log" || true)"
   if [ -n "$marked" ]; then
     printf '%s\n' "$marked" >&2
-    die "the layout check failed: $(printf '%s\n' "$marked" | wc -l | tr -d ' ') marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT / JUMP / OVERLAP; log: $RAW/tour.log)"
+    die "the layout check failed: $(printf '%s\n' "$marked" | wc -l | tr -d ' ') marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT / JUMP / OVERLAP / ENDLESS; log: $RAW/tour.log)"
   fi
-  say "layout check: nothing marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT / JUMP / OVERLAP)"
+  say "layout check: nothing marked (TALLER / CUT / OUT OF THE WINDOW / LOST / BLANK / SILENT / JUMP / OVERLAP / ENDLESS)"
   exit 0
 fi
 

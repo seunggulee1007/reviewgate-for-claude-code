@@ -6599,8 +6599,11 @@ No wire change: client only (Core `Session/`, Mac `App/UI/Chat`, `Agents`, `Side
   is never drawn by AppKit: its views wait for a display that does not come, and a picture taken as it is mixes old and
   new; the run draws it at the screen's pace), scrolls a point and back so every row on screen reports its frame
   (DEBUG-only `TranscriptRowFrames`, nothing in a release build), and says OVERLAP when two rows on screen were laid out
-  over one another, an answer's AppKit text or table lies in no row's frame, or a text is taller than its frame, still so
-  1.5 s later.
+  over one another, an answer's AppKit text or table lies in no row's frame, or a text is taller than its frame. First
+  (`ScreenshotTour.scrollFeel`) the reader is 6 000 pt up with the "Latest" pill showing while two turns come, and
+  scrolls down to the end as a trackpad does and back up, at 1000 × 637 and 1257 × 1104, the window laid out, drawn and
+  checked after every 40 pt step; `scrollfeel` lines count the steps the content grew, how far the end moved away from
+  a reader going down to it (ENDLESS past 40 pt) and how far the rows shown moved under the reader (JUMP past 40 pt).
   `SHOTS_LAYOUT=open` (`ScreenshotTour.openChecks`) runs Open Project… / Switch Project… / Open in New Window… (their menu
   items, the folder picker answered by `ProjectOpener.debugPick`) and `ProjectOpener.open` in each state a window can be in
   — idle, the project already open here or in another window, files pending review (also on the PRs tab), a turn running,

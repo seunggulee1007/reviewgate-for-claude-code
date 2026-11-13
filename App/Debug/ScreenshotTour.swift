@@ -1624,7 +1624,7 @@ private final class Tour {
     /// turns begin and stream while following (the rows made at once move into the lazy stack as each begins), the reader
     /// scrolls up and back down while turns come, the window changes size and the diff pane opens. After each step the rows on
     /// screen are matched with each other (`overlapCheck`): two rows laid out over one another, an answer's AppKit text or
-    /// table in no row's frame, or a text taller than its frame, still so 1.5 s later, is an OVERLAP (`overlap:` lines,
+    /// table in no row's frame, or a text taller than its frame, is an OVERLAP (`overlap:` lines,
     /// `overlap-<n>.png`).
     private func overlapChecks() async throws {
         try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
@@ -1650,16 +1650,21 @@ private final class Tour {
         try await resize(NSSize(width: 1000, height: 637))
         guard let chat = Self.chatScrollView(try scrollViews(window)) else { throw TourError("overlap: no chat scroll view") }
         var turn = 36, marked = 0, checks = 0
-        /// Once what changed is laid out and drawn (a row half-way through an update is not what stays on screen).
-        /// What still overlaps 1.5 s later stays on screen (OVERLAP); what is gone by then was a passing frame (logged only).
         func check(_ label: String) async throws {
             try await Task.sleep(for: .milliseconds(350))
             checks += 1
-            guard try await overlapCheck(label, chat: chat, window: window, settled: false) > 0 else { return }
-            try await Task.sleep(for: .milliseconds(1500))
-            marked += try await overlapCheck(label + ", 1.5 s later", chat: chat, window: window, settled: true)
+            marked += try await overlapCheck(label, chat: chat, window: window, nudge: true)
         }
         try await check("opened")
+        // 0) The reader is far up (the "Latest" pill showing, turns coming below) and scrolls down to the newest row as a
+        // trackpad does, then back up — at the laptop size and in a tall window. Checked after every step.
+        for (label, size) in [("1000x637", NSSize(width: 1000, height: 637)), ("1257x1104", NSSize(width: 1257, height: 1104))] {
+            try await resize(size)
+            for _ in 0..<2 { turn += 1; await richTurn(turn, root: root, gap: nil) }
+            try await Task.sleep(for: .milliseconds(600))
+            marked += try await scrollFeel(label, chat: chat, window: window) { turn += 1; await self.richTurn(turn, root: root, gap: nil) }
+        }
+        try await resize(NSSize(width: 1000, height: 637))
         /// A turn as the engine sends it, checked as it goes: its message glides in, its calls and answer come and the
         /// answer turns into markdown at the turn's end.
         func liveTurn(_ label: String) async throws {
@@ -1723,19 +1728,22 @@ private final class Tour {
     /// text taller than its frame (the rest draws over what lies below). The window is laid out first, as a window on screen
     /// is before it is drawn (a quiet one is never drawn by AppKit), and scrolled a point and back: every row on screen
     /// reports its frame anew, so a frame no view stands for any more is not taken for a row. Returns how many it found; the
-    /// window's picture is kept when there are any. `settled`: the second look, whose findings fail the run.
-    private func overlapCheck(_ label: String, chat: NSScrollView, window: NSWindow, settled: Bool) async throws -> Int {
+    /// window's picture is kept when there are any. `nudge` false: the caller just scrolled under a new generation and laid
+    /// the window out (a step of a scroll), and only a finding is logged.
+    private func overlapCheck(_ label: String, chat: NSScrollView, window: NSWindow, nudge: Bool) async throws -> Int {
         let clip = chat.contentView
-        TranscriptRowFrames.generation += 1
-        let generation = TranscriptRowFrames.generation
-        let y = clip.bounds.minY
-        for offset in [y >= 1 ? -1 : 1, 0] as [CGFloat] {
-            clip.scroll(to: NSPoint(x: 0, y: y + offset))
-            chat.reflectScrolledClipView(clip)
+        if nudge {
+            TranscriptRowFrames.generation += 1
+            let y = clip.bounds.minY
+            for offset in [y >= 1 ? -1 : 1, 0] as [CGFloat] {
+                clip.scroll(to: NSPoint(x: 0, y: y + offset))
+                chat.reflectScrolledClipView(clip)
+                window.contentView?.superview?.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(40))
+            }
             window.contentView?.superview?.layoutSubtreeIfNeeded()
-            try await Task.sleep(for: .milliseconds(40))
         }
-        window.contentView?.superview?.layoutSubtreeIfNeeded()
+        let generation = TranscriptRowFrames.generation
         let height = clip.bounds.height
         var rows: [(id: UUID, frame: CGRect)] = []
         var marker: CGRect?
@@ -1789,13 +1797,110 @@ private final class Tour {
         }
         overlapShots += hits.isEmpty ? 0 : 1
         let counts = "\(rows.count) rows, \(hosted.count) AppKit views" + (marker == nil ? " (no bottom marker)" : "")
-        let verdict = hits.isEmpty ? " — clear" : (settled ? " — OVERLAP: " : " — overlapping: ") + hits.prefix(6).joined(separator: " | ")
-        log("overlap \(label): \(counts)" + verdict)
+        if nudge || !hits.isEmpty {
+            log("overlap \(label): \(counts)" + (hits.isEmpty ? " — clear" : " — OVERLAP: " + hits.prefix(6).joined(separator: " | ")))
+        }
         if !hits.isEmpty, overlapShots <= 16 { try write(try render(window), "overlap-\(overlapShots)") }
         return hits.count
     }
 
     private var overlapShots = 0
+
+    /// The reader far up the transcript with the "Latest" pill showing (turns came below, `addTurn`), scrolling down to the
+    /// newest row as a trackpad moves the clip (40 pt every 16 ms; the transcript told the user scrolls), then back up as
+    /// far. After every step the window is laid out and drawn, as on screen, and checked (`overlapCheck`). Logged: how often
+    /// and by how much the content grew or shrank under the scroll, how far the end moved away from a reader going down to
+    /// it ("ENDLESS" past 40 pt), and how far the rows shown moved from where the scroll put them going up ("JUMP" past
+    /// 40 pt). Returns the overlaps.
+    private func scrollFeel(_ label: String, chat: NSScrollView, window: NSWindow, addTurn: () async -> Void) async throws -> Int {
+        let clip = chat.contentView, state = entry.model.chatTranscript
+        func docHeight() -> CGFloat { chat.documentView?.frame.height ?? 0 }
+        func end() -> CGFloat { docHeight() - clip.bounds.maxY }
+        let frame = window.contentView?.superview
+        // Far up, the reader's own scroll (following ends), then turns come below: the pill counts them.
+        // (Placed again while a glide to the newest row, started before, carries it back down.)
+        for _ in 0..<3 where end() < 4000 {
+            state.userScrolling = true
+            clip.scroll(to: NSPoint(x: 0, y: max(0, docHeight() - clip.bounds.height - 6000)))
+            chat.reflectScrolledClipView(clip)
+            state.userScrolling = false
+            state.follow = false
+            try await Task.sleep(for: .milliseconds(800))
+        }
+        await addTurn()
+        await addTurn()
+        try await Task.sleep(for: .milliseconds(900))
+        let pill = !state.follow ? "pill showing (\(state.unseen) new)" : "following (no pill)"
+        var overlaps = 0, blind = 0
+        /// One step of `by` pt (positive: down); what the content and the clip did.
+        /// `shift`: how far the rows on screen moved in the content during the step (0: they moved only by the scroll).
+        func step(_ by: CGFloat, _ what: String, _ n: Int) async throws -> (grew: CGFloat, shift: CGFloat) {
+            let before = (h: docHeight(), y: clip.bounds.minY)
+            let shown = Dictionary(TranscriptRowFrames.rows.values.filter { $0.generation == TranscriptRowFrames.generation
+                && $0.frame.maxY > 0 && $0.frame.minY < clip.bounds.height }.map { ($0.id, $0.frame.minY) }) { a, _ in a }
+            let target = min(max(0, before.y + by), max(0, before.h - clip.bounds.height))
+            TranscriptRowFrames.generation += 1
+            clip.scroll(to: NSPoint(x: 0, y: target))
+            chat.reflectScrolledClipView(clip)
+            frame?.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
+            try await Task.sleep(for: .milliseconds(16))
+            overlaps += try await overlapCheck("\(label) scrolling \(what) step \(n)", chat: chat, window: window, nudge: false)
+            let scrolled = clip.bounds.minY - before.y
+            var shifts: [CGFloat] = []
+            for row in TranscriptRowFrames.rows.values where row.generation == TranscriptRowFrames.generation {
+                if let y = shown[row.id] { shifts.append(row.frame.minY - y + scrolled) }
+            }
+            shifts.sort()
+            if shifts.isEmpty { blind += 1 }   // no row seen before and after: the step tells nothing
+            return (docHeight() - before.h, shifts.isEmpty ? 0 : shifts[shifts.count / 2])
+        }
+        // Down to the end.
+        state.userScrolling = true
+        let startHeight = docHeight(), startEnd = end()
+        var steps = 0, grewSteps = 0, shrankSteps = 0, grown: CGFloat = 0, away: CGFloat = 0, worstAway: CGFloat = 0
+        var shiftSteps = 0, worstShift: CGFloat = 0
+        while end() > 1, steps < 800 {
+            let before = end()
+            let (grew, shift) = try await step(40, "down", steps)
+            if grew > 0.5 { grewSteps += 1; grown += grew } else if grew < -0.5 { shrankSteps += 1 }
+            if abs(shift) > 1 { shiftSteps += 1; worstShift = max(worstShift, abs(shift)) }
+            // How much further the end is than 40 pt nearer (or at the end): the end moving away from the reader.
+            let further = end() - max(0, before - 40)
+            if further > 0.5 { away += further; worstAway = max(worstAway, further) }
+            steps += 1
+        }
+        state.userScrolling = false
+        state.follow = state.nearBottom
+        log("scrollfeel \(label) down, \(pill): \(steps) steps from \(Int(startEnd)) pt above the end (content \(Int(startHeight)) → \(Int(docHeight())) pt); "
+            + "content grew in \(grewSteps) steps by \(Int(grown)) pt, shrank in \(shrankSteps); the end moved away by \(Int(away)) pt "
+            + "(worst step \(Int(worstAway)) pt); the rows shown moved under the reader in \(shiftSteps) steps (worst \(Int(worstShift)) pt)"
+            + (away > 40 ? " — ENDLESS" : "") + (worstShift > 40 ? " — JUMP" : "") + (away <= 40 && worstShift <= 40 ? " — steady" : ""))
+        try await Task.sleep(for: .milliseconds(600))
+        // Back up as far: the rows shown must move by what the reader scrolled, no more (content changing above them).
+        state.userScrolling = true
+        state.follow = false
+        var upSteps = 0, upGrew = 0, upShiftSteps = 0, upShift: CGFloat = 0, upWorst: CGFloat = 0
+        let upFrom = docHeight()
+        while upSteps < steps, clip.bounds.minY > 1 {
+            let (grew, shift) = try await step(-40, "up", upSteps)
+            if abs(grew) > 0.5 { upGrew += 1 }
+            if abs(shift) > 1 { upShiftSteps += 1; upShift += shift; upWorst = max(upWorst, abs(shift)) }
+            upSteps += 1
+        }
+        state.userScrolling = false
+        log("scrollfeel \(label) up: \(upSteps) steps (content \(Int(upFrom)) → \(Int(docHeight())) pt, changed in \(upGrew) steps); "
+            + "the rows shown moved under the reader in \(upShiftSteps) steps, \(Int(upShift)) pt in all (worst \(Int(upWorst)) pt)"
+            + (upWorst > 40 ? " — JUMP" : " — steady") + (overlaps > 0 ? "; \(overlaps) overlaps on the way" : "")
+            + "; \(blind) of \(steps + upSteps) steps saw no row before and after")
+        // Back to the newest row, following.
+        clip.scroll(to: NSPoint(x: 0, y: max(0, docHeight() - clip.bounds.height)))
+        chat.reflectScrolledClipView(clip)
+        state.follow = true
+        state.unseen = 0
+        try await Task.sleep(for: .milliseconds(800))
+        return overlaps
+    }
 
     /// What kind of row `id` is, for the log.
     private func rowKind(_ id: UUID) -> String {
@@ -1853,8 +1958,36 @@ private final class Tour {
                                 preview: failing ? "Error: Command failed with exit code 1\n✖ rejects unknown codes (3ms)\n  AssertionError: expected UnknownCodeError" : "✔ applies SAVE10 (2ms)\nℹ tests 12\nℹ pass 12"),
                     .toolUse(id: stat, name: "Bash", input: .object(["command": .string("git diff --stat")]), file: nil),
                     .toolResult(toolUseId: stat, isError: false, preview: " src/pricing.ts | 14 ++++++++------\n 1 file changed, 8 insertions(+), 6 deletions(-)")])
+        // Turns differ as a real session's do: some run a dozen commands, some none more.
+        for i in 0..<[0, 6, 1, 12][n % 4] {
+            let id = "toolu_overlap_log_\(n)_\(i)"
+            await send([.toolUse(id: id, name: "Bash", input: .object(["command": .string("git log --oneline -\(i + 2) -- src/cart.ts")]), file: nil),
+                        .toolResult(toolUseId: id, isError: i % 5 == 4, preview: (0...i).map { "a1b2c3\($0) Cart change \($0)" }.joined(separator: "\n"))])
+        }
         await checkpoint("calls")
-        await send(answer("""
+        // A one-line answer every third turn, a very long one (a third table of fourteen rows) every third.
+        if n % 3 == 1 {
+            await send(answer("Done: step \(n) changed nothing else."))
+        } else {
+            await send(answer(longAnswer(n, failing: failing) + (n % 3 == 2 ? "\n\n" + Self.longTable(n) : "")))
+        }
+        await checkpoint("answer streamed")
+        let summaryFiles = [TurnSummary.File(path: "src/pricing.ts", adds: 8, dels: 6)]
+        await send([.turnSummary(TurnSummary(turn: n, files: summaryFiles)),
+                    .turnEnd(stopReason: "end_turn", usage: Usage(inputTokens: 1200 + n, outputTokens: 640, costUsd: 0.24, durationMs: 36_600),
+                             files: 0, added: 0, deleted: 0)])
+        await checkpoint("ended")
+    }
+
+    /// A markdown table of fourteen rows, for the long answers.
+    private static func longTable(_ n: Int) -> String {
+        "### Every code tried in step \(n)\n\n| # | Code | Cart | Total before | Total after | Note |\n| ---: | --- | --- | ---: | ---: | --- |\n"
+            + (1...14).map { "| \($0) | CODE\($0) | cart \($0 % 4) | $\(20 + $0).00 | $\(18 + $0).50 | \($0 % 3 == 0 ? "applied after shipping, as the notes ask for shipping codes" : "ok") |" }
+            .joined(separator: "\n")
+    }
+
+    private func longAnswer(_ n: Int, failing: Bool) -> String {
+        """
         ## Step \(n): how the codes stack
 
         The notes say percentage codes come first and shipping codes last. Today the cart takes **SAVE10** off after \
@@ -1881,13 +2014,7 @@ private final class Tour {
         | rejects unknown codes | ✖ | \(failing ? "✖" : "✔") | \(failing ? "still failing: the error is thrown before the code is named" : "the message names the code") |
 
         \(failing ? "One test still fails; I'll fix the message next." : "All 12 tests pass.")
-        """))
-        await checkpoint("answer streamed")
-        let summaryFiles = [TurnSummary.File(path: "src/pricing.ts", adds: 8, dels: 6)]
-        await send([.turnSummary(TurnSummary(turn: n, files: summaryFiles)),
-                    .turnEnd(stopReason: "end_turn", usage: Usage(inputTokens: 1200 + n, outputTokens: 640, costUsd: 0.24, durationMs: 36_600),
-                             files: 0, added: 0, deleted: 0)])
-        await checkpoint("ended")
+        """
     }
 
     /// The transcript's scroll view in `image`: what it shows of its content, and how much of that is drawn ("BLANK": nothing).
