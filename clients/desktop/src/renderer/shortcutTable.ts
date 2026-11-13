@@ -85,7 +85,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Accept the pending files and send", mac: "⌘⇧↩", win: "Ctrl+Shift+Enter" },
       { action: "Stop", mac: "⌘.", win: "Ctrl+." },
       // MARK: wave6 w6-terminal — §44.1: the terminal's keys in the message box
-      { action: "Stop", mac: "Esc", win: "Esc", note: "In the message box, while Claude works" },
+      { action: "Stop", mac: "Esc", win: "Esc", note: "In the message box, while Claude works — messages Claude has not read come back into the box" }, // §56.2
       { action: "Commands", mac: "⌘/", win: "Ctrl+/" },
       { action: "Previous / next prompt", mac: "↑ / ↓", win: "↑ / ↓", note: "On the first / last line of the message box" },
       { action: "Switch the permission mode", mac: "⇧⇥", win: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto" },

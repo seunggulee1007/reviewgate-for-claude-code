@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EngineCommand, ReviewState } from "@reviewgate/engine";
 
 /** What reached the composer (composerBridge `insertIntoComposer`): text, mentions, images. */
-const handed = vi.hoisted(() => [] as { text: string; mentions: string[]; images: number }[]);
+const handed = vi.hoisted(() => [] as { text: string; mentions: string[]; images: number; at?: "front" }[]);
 vi.mock("./composerBridge", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./composerBridge")>()),
-  insertIntoComposer: (text: string, chips?: { mentions: string[]; images: unknown[] }) => {
-    handed.push({ text, mentions: chips?.mentions ?? [], images: chips?.images.length ?? 0 });
+  insertIntoComposer: (text: string, chips?: { mentions: string[]; images: unknown[] }, at?: "end" | "front") => {
+    handed.push({ text, mentions: chips?.mentions ?? [], images: chips?.images.length ?? 0, ...(at === "front" ? { at } : {}) });
     return true;
   },
 }));
@@ -106,31 +106,66 @@ describe("taking a message back from Claude's turn (§50.3)", () => {
   });
 });
 
-describe("↑ in an empty composer (§50.3)", () => {
+describe("↑ in an empty composer (§56.2)", () => {
   beforeEach(() => {
     sent.length = 0;
     handed.length = 0;
     answer = () => ({ ok: true, reply: { type: "result", ok: true } });
   });
 
-  it("brings the last queued message back first (with its mentions and images), then the turn's", async () => {
+  it("brings every waiting message back in front of the draft: the turn's (taken back), then the queue, with mentions and images", async () => {
     const useStore = await loadStore();
+    const { useToast } = await import("./toast");
+    useToast.setState({ text: null } as never);
     running(useStore, WAITING, [{ id: 1, text: "first" }, { id: 2, text: "look", mentions: ["a.ts"], attachments: [IMAGE] }]);
-    expect(useStore.getState().pullBackLastWaiting()).toBe(true);
-    expect(useStore.getState().queue.items.map((m) => m.id)).toEqual([1]);
-    expect(handed).toEqual([{ text: "look", mentions: ["a.ts"], images: 1 }]);
-    expect(useStore.getState().pullBackLastWaiting()).toBe(true);
+    answer = (c) => (c.type === "steer_take_back" && c.messageId === "u1" ? { ok: false, error: "steer_already_read: read", code: "steer_already_read" } : { ok: true, reply: { type: "result", ok: true } });
+    expect(useStore.getState().pullBackWaiting()).toBe(true);
     expect(useStore.getState().queue.items).toEqual([]);
-    expect(ofType("steer_take_back")).toEqual([]);
-    expect(useStore.getState().pullBackLastWaiting()).toBe(true); // now the turn's last message
     await flush();
-    expect(ofType("steer_take_back")).toEqual([{ type: "steer_take_back", messageId: "u2" }]);
-    expect(handed.at(-1)).toEqual({ text: "then the tests", mentions: [], images: 0 });
+    expect(ofType("steer_take_back").map((c) => c.messageId)).toEqual(["u1", "u2"]);
+    expect(ofType("interrupt")).toEqual([]); // the turn goes on
+    expect(handed).toEqual([{ text: "then the tests\n\nfirst\n\nlook", mentions: ["a.ts"], images: 1, at: "front" }]);
+    expect(useToast.getState().text).toBe("Claude already read this message — it stays in the chat"); // u1, said once
   });
 
   it("with nothing waiting it is the prompt history (false)", async () => {
     const useStore = await loadStore();
     running(useStore, []);
-    expect(useStore.getState().pullBackLastWaiting()).toBe(false);
+    expect(useStore.getState().pullBackWaiting()).toBe(false);
+  });
+});
+
+describe("Esc with messages waiting (§56.2)", () => {
+  beforeEach(() => {
+    sent.length = 0;
+    handed.length = 0;
+  });
+
+  it("interrupts taking back; what Claude never read and the whole queue come back in front, in order", async () => {
+    const useStore = await loadStore();
+    running(useStore, WAITING, [{ id: 1, text: "first" }, { id: 2, text: "look", mentions: ["a.ts"], attachments: [IMAGE] }]);
+    answer = () => ({ ok: true, reply: { type: "interrupted", takenBack: [{ id: "u1", text: "Also README", mentions: ["README.md"] }, { id: "u2", text: "then the tests" }], read: [] } });
+    await useStore.getState().interruptGivingBack();
+    expect(ofType("interrupt")).toEqual([{ type: "interrupt", takeBack: true }]);
+    expect(useStore.getState().queue.items).toEqual([]); // the queue does not go on after the stop
+    expect(handed).toEqual([{ text: "Also README\n\nthen the tests\n\nfirst\n\nlook", mentions: ["README.md", "a.ts"], images: 1, at: "front" }]);
+  });
+
+  it("those Claude already read stay; a toast says how many", async () => {
+    const useStore = await loadStore();
+    const { useToast } = await import("./toast");
+    running(useStore, WAITING);
+    answer = () => ({ ok: true, reply: { type: "interrupted", takenBack: [], read: ["u1", "u2"] } });
+    await useStore.getState().interruptGivingBack();
+    expect(handed).toEqual([]);
+    expect(useToast.getState().text).toBe("Claude already read 2 of the waiting messages — they stay in the chat");
+  });
+
+  it("a refused interrupt still gives the queue back; not running: nothing at all", async () => {
+    const useStore = await loadStore();
+    running(useStore, [], [{ id: 1, text: "first" }]);
+    answer = () => ({ ok: false, error: "boom" });
+    await useStore.getState().interruptGivingBack();
+    expect(handed).toEqual([{ text: "first", mentions: [], images: 0, at: "front" }]);
   });
 });

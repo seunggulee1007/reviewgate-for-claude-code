@@ -10,19 +10,22 @@ import type { DraftImage } from "./composerAttach";
 /** r2-chats-cards M31 / M33 (§9): the chips a held message had in the composer — given back with its text. */
 export type ComposerChips = { mentions: string[]; mentionDirs: Record<string, true>; images: DraftImage[] };
 
-type Listener = (text: string, chips?: ComposerChips) => void;
+/** Where the text goes: after the draft (default), or §56.2 in front of it (messages given back by Esc / ↑). */
+export type InsertAt = "end" | "front";
+
+type Listener = (text: string, chips?: ComposerChips, at?: InsertAt) => void;
 
 let listener: Listener | null = null;
 let pending: string | null = null;
 let pendingChips: ComposerChips | null = null;
 
 /** Hands `text` (and `chips`) to the composer → true when one took it now (false: it waits for the next composer). */
-export function insertIntoComposer(text: string, chips?: ComposerChips): boolean {
+export function insertIntoComposer(text: string, chips?: ComposerChips, at: InsertAt = "end"): boolean {
   if (listener) {
-    listener(text, chips);
+    listener(text, chips, at);
     return true;
   }
-  pending = pending ? joinDraft(pending, text) : text;
+  pending = pending ? (at === "front" ? joinDraft(text, pending) : joinDraft(pending, text)) : text;
   if (chips) {
     pendingChips = pendingChips
       ? { mentions: [...pendingChips.mentions, ...chips.mentions], mentionDirs: { ...pendingChips.mentionDirs, ...chips.mentionDirs }, images: [...pendingChips.images, ...chips.images] }
@@ -36,7 +39,7 @@ export function useComposerInsert(onInsert: Listener): void {
   const ref = useRef(onInsert);
   ref.current = onInsert;
   useEffect(() => {
-    const own: Listener = (text, chips) => ref.current(text, chips);
+    const own: Listener = (text, chips, at) => ref.current(text, chips, at);
     listener = own;
     if (pending !== null) {
       const waiting = pending;

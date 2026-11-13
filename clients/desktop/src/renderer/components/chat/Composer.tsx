@@ -80,7 +80,10 @@ export function Composer() {
   const requestChanges = useStore((s) => s.requestChanges);
   const restartSession = useStore((s) => s.restartSession);
   const enqueueMessage = useStore((s) => s.enqueueMessage);
-  const pullBackLastWaiting = useStore((s) => s.pullBackLastWaiting); // §50.3
+  const pullBackWaiting = useStore((s) => s.pullBackWaiting); // §56.2
+  const interruptGivingBack = useStore((s) => s.interruptGivingBack); // §56.2
+  // §56.2: something waits that Esc would give back (the queue, or a message in Claude's turn not being taken back).
+  const unsentWaiting = useStore((s) => s.queue.items.length > 0 || (s.state.session.steering ?? []).some((m) => !s.steerTakingBack.includes(m.id)));
   const interruptAndSend = useStore((s) => s.interruptAndSend);
   const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
@@ -214,11 +217,12 @@ export function Composer() {
     });
   };
   // MARK: wave3 desktop-agents — §36.1 "메인으로 보내기": the report lands after the draft, focused, for the user's own words.
-  useComposerInsert((text, chips) => {
+  useComposerInsert((text, chips, at) => {
     // wave6 w6-terminal (§44.1): while a recalled prompt is shown, the report joins the draft typed before ↑.
     const parked = navRef.current.index !== null ? navRef.current.saved : null;
     setNav(IDLE_NAV);
-    setDraft((d) => joinDraft(parked ?? d, text));
+    // §56.2: messages Esc / ↑ gave back go in front of what is typed.
+    setDraft((d) => (at === "front" ? ((parked ?? d).trim() === "" ? text : joinDraft(text, parked ?? d)) : joinDraft(parked ?? d, text)));
     // r2-chats-cards M31 / M33 (§9): a held message that will not go out comes back with its mentions and images.
     if (chips) {
       setMentions((m) => addMentions(m, chips.mentions).list);
@@ -232,8 +236,8 @@ export function Composer() {
       const el = inputRef.current;
       if (!el) return;
       el.focus();
-      el.selectionStart = el.selectionEnd = el.value.length;
-      el.scrollTop = el.scrollHeight;
+      el.selectionStart = el.selectionEnd = at === "front" ? text.length : el.value.length;
+      if (at !== "front") el.scrollTop = el.scrollHeight;
     });
   });
   // MARK: §49 — the task taken from here started in its workbench: its text leaves this composer (unless edited since).
@@ -811,9 +815,9 @@ export function Composer() {
     if (!paletteVisible) {
       const el = e.currentTarget;
       const caret = el.selectionStart === el.selectionEnd ? el.selectionStart : null;
-      // §50.3: as in the terminal, ↑ in an empty box first brings back the last message waiting (queued, else in Claude's
-      // turn) to edit; with nothing waiting it walks the prompt history.
-      if (e.key === "ArrowUp" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && draft === "" && nav.index === null && !viewing && pullBackLastWaiting()) {
+      // §56.2: as in the terminal, ↑ in an empty box first brings back every message waiting (in Claude's turn, then the
+      // queue) to edit; with nothing waiting it walks the prompt history.
+      if (e.key === "ArrowUp" && !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && draft === "" && nav.index === null && !viewing && pullBackWaiting()) {
         e.preventDefault();
         return;
       }
@@ -837,8 +841,10 @@ export function Composer() {
           dismissBtw();
         } else if (running && !viewing) {
           // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (Ctrl+. does too).
+          // §56.2: with messages waiting, what Claude has not read comes back into the box with the stop.
           e.preventDefault();
-          interrupt();
+          if (unsentWaiting) void interruptGivingBack();
+          else interrupt();
         }
       }
       return;

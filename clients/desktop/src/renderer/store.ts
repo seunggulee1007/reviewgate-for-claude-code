@@ -103,6 +103,7 @@ import type { FileWhy } from "@reviewgate/engine";
 // MARK: wave4b w4b-tabs — §39.2 the engine's exploration mark on tool rows (exploreFold.ts)
 import { exploreMetaOf, type ExploreMeta } from "./exploreFold";
 import { insertIntoComposer } from "./composerBridge";
+import { givenBack, readNotice } from "./escTakeBack"; // §56.2
 import { storedToDraft } from "./composerAttach"; // §50.3: a queued message's images back in the composer // MARK: §49 a task the session could not take goes into the composer
 import { stampRestored, stampRow } from "./rowTimes"; // MARK: polish p-foundation (P3-transcript-25)
 // MARK: polish p-foundation — the polish lanes' own slices (their state goes there, not here)
@@ -143,6 +144,14 @@ export type ChatItem =
 
 let nextId = 1;
 /** A new row id — stamped now in the row-time table (polish p-foundation, P3-transcript-25: rowTimes.ts). */
+/** §56.2: the messages Esc / ↑ give back go into the composer in front of the draft, with their mentions and images. */
+function giveBack(steered: readonly { text: string; mentions?: string[] }[], queued: readonly { text: string; mentions?: string[]; attachments?: SendAttachment[] }[]): void {
+  const back = givenBack(steered, queued);
+  if (!back) return;
+  const images = back.attachments.map((a, i) => storedToDraft(t("Image {0}", i + 1), a, Math.floor((a.dataBase64.length * 3) / 4)));
+  insertIntoComposer(back.text, { mentions: back.mentions, mentionDirs: {}, images }, "front");
+}
+
 const uid = (): number => {
   const id = nextId++;
   stampRow(id);
@@ -522,14 +531,21 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
    * reads it. `toComposer` (Edit): its text and mentions go into the composer; ↩ sends them again. Too late (Claude read
    * it, its row is in the chat) or failed: a toast says so and nothing comes back (a copy would send it twice).
    */
-  takeBackSteering(id: string, toComposer: boolean): Promise<"taken" | "alreadyRead" | "failed">;
+  takeBackSteering(id: string, toComposer: boolean, quiet?: boolean): Promise<"taken" | "alreadyRead" | "failed">;
   /** §50.3: a queued message leaves the queue for the composer, with its mentions and images. */
   editQueuedInComposer(id: number): void;
   /**
-   * §50.3, as ↑ in the terminal's empty input: the last queued message comes back into the composer, else the last one in
-   * Claude's turn (taken back first). False when nothing waits (↑ walks the prompt history then).
+   * §56.2 (Mac `AppState.pullBackWaiting`), as ↑ in the terminal's empty input: every message waiting comes back into the
+   * composer in front of the draft — the ones in Claude's turn (taken back first; the turn goes on), then the whole queue,
+   * with their mentions and images. False when nothing waits (↑ walks the prompt history then).
    */
-  pullBackLastWaiting(): boolean;
+  pullBackWaiting(): boolean;
+  /**
+   * §56.2 (Mac `AppState.interruptGivingBack`): Esc while Claude works with messages waiting — the turn stops and what
+   * Claude has not read (taken back with the interrupt) and the whole queue (it does not go on) come back into the composer
+   * in front of the draft, in order. Those Claude already read stay in the chat; a toast says so.
+   */
+  interruptGivingBack(): Promise<void>;
   /**
    * "Always allow in this project" on the card of `requestId`: saves `pattern` (a Bash pattern or one of the request's
    * §33.6 `allowPatterns`) to this project's allow patterns, then allows that request. Never for a reason / SendMessage card.
@@ -1655,10 +1671,10 @@ export const useStore = create<Store>((set, get, api) => {
       }
     },
 
-    async takeBackSteering(id, toComposer) {
+    async takeBackSteering(id, toComposer, quiet = false) {
       const message = (get().state.session.steering ?? []).find((m) => m.id === id);
       if (!message) {
-        showToast(t("Claude already read this message — it stays in the chat"));
+        if (!quiet) showToast(t("Claude already read this message — it stays in the chat"));
         return "alreadyRead";
       }
       if (get().steerTakingBack.includes(id)) return "failed";
@@ -1669,7 +1685,7 @@ export const useStore = create<Store>((set, get, api) => {
         const r = refusalOf(e);
         const late = r.code === "steer_already_read";
         appendLog(late ? "[info] take-back too late: Claude already read the message" : `[warn] take-back failed: ${r.error}`);
-        showToast(late ? t("Claude already read this message — it stays in the chat") : t("Couldn't take the message back — Claude still reads it"));
+        if (!quiet) showToast(late ? t("Claude already read this message — it stays in the chat") : t("Couldn't take the message back — Claude still reads it"));
         return late ? "alreadyRead" : "failed";
       } finally {
         set((s) => ({ steerTakingBack: s.steerTakingBack.filter((x) => x !== id) }));
@@ -1686,18 +1702,48 @@ export const useStore = create<Store>((set, get, api) => {
       insertIntoComposer(m.text, { mentions: m.mentions ?? [], mentionDirs: {}, images });
     },
 
-    pullBackLastWaiting() {
+    pullBackWaiting() {
       const s = get();
-      const last = s.queue.items.at(-1);
-      if (last) {
-        s.editQueuedInComposer(last.id);
-        return true;
-      }
+      const queued = s.queue.items;
       const steering = (s.state.session.steering ?? []).filter((m) => !s.steerTakingBack.includes(m.id));
-      const turn = steering.at(-1);
-      if (!turn) return false;
-      void s.takeBackSteering(turn.id, true);
+      if (queued.length === 0 && steering.length === 0) return false;
+      s.clearQueue();
+      void (async () => {
+        const taken: typeof steering = [];
+        let read = 0;
+        for (const m of steering) {
+          if ((await get().takeBackSteering(m.id, false, true)) === "taken") taken.push(m);
+          else read += 1;
+        }
+        giveBack(taken, queued);
+        const why = readNotice(read);
+        if (why) showToast(why);
+      })();
       return true;
+    },
+
+    async interruptGivingBack() {
+      const s = get();
+      if (s.state.gate.phase !== "running") return;
+      const queued = s.queue.items;
+      s.clearQueue();
+      const waiting = (s.state.session.steering ?? []).length;
+      s.armInterruptWatch(); // wave4 w4-safety — robustness-07, as a plain stop
+      let taken: { id: string; text: string; mentions?: string[] }[] = [];
+      let read = 0;
+      try {
+        const r = await engineRequest({ type: "interrupt", takeBack: true });
+        if (r.type === "interrupted") {
+          taken = r.takenBack;
+          read = r.read.length;
+        }
+      } catch (e: unknown) {
+        appendLog(`[warn] interrupt (take back): ${refusalOf(e).error}`);
+      }
+      appendLog(`[info] Esc: ${taken.length} of ${waiting} waiting in the turn and ${queued.length} queued given back`);
+      giveBack(taken, queued);
+      const why = readNotice(read);
+      if (why) showToast(why);
     },
 
     async allowAlwaysInProject(requestId, pattern) {

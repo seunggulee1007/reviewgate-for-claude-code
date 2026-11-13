@@ -8526,7 +8526,8 @@ type InterruptedEvent = { type: "interrupted"; id?: string;
   read this message — it stays in the chat", or "…N of the waiting messages — they stay in the chat"). A failed interrupt
   still gives the queue back. **↑ in an empty box** (not while browsing the history) brings back everything waiting the
   same way without stopping the turn: each message in Claude's turn is taken back (`steer_take_back`, §50.3), then the
-  queue; it used to bring back only the last one. The queue chips' tooltip says so.
+  queue; it used to bring back only the last one. The queue chips' tooltip says so. Electron: the same (store
+  `interruptGivingBack` / `pullBackWaiting`, `insertIntoComposer(…, "front")`; what Claude read says so in a toast).
 - **Verified** (CLI 2.1.323, `sidecar/test/driver-esc-takeback.mjs`, haiku): during a `sleep 10` turn two messages were
   put in, then `interrupt {takeBack: true}`. The engine took the cancel_queued way (the CLI advertises
   `interrupt_cancel_queued_v1`); the reply gave both back in order, none read; nothing waited after it; the turn ended once,
