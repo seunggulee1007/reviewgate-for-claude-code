@@ -8688,3 +8688,26 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
   user's, the project's (`.claude/settings.json`, `.claude/settings.local.json`) or the managed settings say
   `disableAllHooks: true`, or the managed settings `allowManagedHooksOnly`: our hooks would never run and the review would
   silently see nothing. The engine never overrides them.
+
+**The hook server** (`session/hookServer.ts`). One per engine, created at the first `terminal_spec`, listening on
+`127.0.0.1` on a port the system picks, closed when the engine is disposed. `POST /hook` with the header
+`X-ReviewGate-Token: <token>`; the body is the CLI's hook JSON. Every answer is `application/json`:
+
+| Case | Status | Body |
+|---|---|---|
+| Missing or wrong token (`timingSafeEqual` on equal-length buffers) | 401 | `{}` |
+| Path other than `/hook` | 404 | `{}` |
+| Method other than POST | 405 | `{}` |
+| Body over 16 MiB (declared, or counted while streaming) | 413 | `{}` |
+| Invalid JSON, or not an object | 400 | `{}` |
+| The chat's handler failed | 500 | `{}` (fails closed on UserPromptSubmit / PreToolUse) |
+| Valid request | 200 | the decision JSON (§57.4) |
+
+- **One token per spawn.** Each `terminal_spec` issues a fresh token (32 random bytes, hex) routed to the current
+  terminal chat and retires the chat's previous one; switching chats or closing the project retires it too.
+- **Retired token** (an earlier spawn, a chat switched away from): 200 with a blocking answer — UserPromptSubmit
+  `{decision: "block", reason}`, PreToolUse `permissionDecision: "deny"` with the same reason ("This terminal is no longer
+  connected to ReviewGate's review. Restart it from its tab."), every other event `{}`. The last 64 retired tokens are
+  remembered; older ones get 401 (non-blocking for the CLI except where `onFailure: "block"` makes it block).
+- **The token sits in claude's env**, so a command Claude runs could post a hook. Accepted for Stage 1: B is tree-based, so
+  a forged hook cannot hide a change; the server is 127.0.0.1 only and the token changes per spawn.
