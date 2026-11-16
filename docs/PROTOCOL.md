@@ -8626,7 +8626,8 @@ editor closes. A long instruction is easier to write there. This is the clients'
   `CLAUDE_CODE_*` keys. After the start: IUTF8 on the PTY, then `terminal_started {pid}`.
 - **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
   shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
-  SIGKILL after 3 s; text typed and not sent is lost); showing another chat read-only does not. A terminal chat shown
+  SIGKILL after 3 s; text typed and not sent is lost), then sends `terminal_exited` (accepted for a chat the engine left);
+  showing another chat read-only does not. A terminal chat shown
   read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
   PTYs. A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),

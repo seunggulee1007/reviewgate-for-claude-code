@@ -126,7 +126,12 @@ final class TerminalHub {
         for (id, host) in chatHosts where id != current || !store.isTerminalChat {
             chatHosts[id] = nil
             enginePIDAtSpawn[id] = nil
-            Task { await host.stop() }
+            let wasRunning = host.state.isRunning
+            Task { [weak store] in
+                await host.stop()
+                // The engine takes it for a chat it left already (it stopped that session with the switch).
+                if wasRunning { store?.terminalExited(sessionId: id, exitCode: nil) }
+            }
         }
         specErrors = specErrors.filter { $0.key == current }
         guard let current, store.isTerminalChat else { return }
