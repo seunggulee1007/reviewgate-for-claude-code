@@ -39,6 +39,12 @@ struct ViewMenuCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.command, .option])
                 .disabled(!menu.hasProject)
                 .accessibilityIdentifier("View menu Toggle side panel")
+            // MARK: terminal-chat (§57.6): shells in the project folder under the diff and the chat. The key works inside a
+            // terminal too (TerminalHub's key monitor: a terminal would take ⌃` as NUL).
+            Button("Toggle Terminal Panel") { focused?.model.shell.toggle() }
+                .keyboardShortcut("`", modifiers: .control)
+                .disabled(!menu.hasProject || onPRs)
+                .accessibilityIdentifier("View menu Toggle terminal panel")
             Divider()
             // polish P1-chrome-20: the sidebar's tabs from the keyboard (⌘1…⌘9 are the chat tabs).
             ForEach(Array(MainTab.allCases.enumerated()), id: \.element) { index, tab in

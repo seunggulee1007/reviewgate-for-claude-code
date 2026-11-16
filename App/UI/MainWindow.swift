@@ -178,33 +178,38 @@ struct MainWindow: View {
                         // The edge tab stays while the pane is open, so the way back (collapse) is where expand was. The
                         // chat is the split's trailing pane open or closed: one view, so the message being typed, the
                         // transcript's scroll position and the focus survive the diff pane opening (a review begins) or closing.
-                        HStack(spacing: 0) {
-                            diffEdgeTab
-                            Divider()
-                            // r1-composer M11: in a laptop window the chat keeps 380 pt beside the diff (the diff the rest, down
-                            // to 240) — squeezed to ~311 pt its composer lost the send button past the window's edge.
-                            SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 380, leadingFloor: 240, collapsed: diffCollapsed,
-                                      onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
-                                if store.codeBrowser.isOpen {
-                                    // MARK: code-browser (§47): a project file, read-only, until "Back to review".
-                                    ProjectFileView()
-                                } else if tab == .history || store.historySelection != nil {
-                                    // §14: a past round's file, read-only, until "Back to current review".
-                                    HistoryDiffView { tab = .changes }
-                                } else if store.liveSelection != nil {
-                                    // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
-                                    LiveDiffView()
-                                } else {
-                                    // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
-                                    DiffView(
-                                        file: store.selectedFile,
-                                        diff: store.selectedDiff,
-                                        truncated: store.selectedDiffTruncated,
-                                        isReviewLocked: store.isReviewLocked)
+                        // MARK: terminal-chat (§57.6): the bottom terminal panel (⌃`) under the diff and the chat.
+                        VSplitView {
+                            HStack(spacing: 0) {
+                                diffEdgeTab
+                                Divider()
+                                // r1-composer M11: in a laptop window the chat keeps 380 pt beside the diff (the diff the rest, down
+                                // to 240) — squeezed to ~311 pt its composer lost the send button past the window's edge.
+                                SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 380, leadingFloor: 240, collapsed: diffCollapsed,
+                                          onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
+                                    if store.codeBrowser.isOpen {
+                                        // MARK: code-browser (§47): a project file, read-only, until "Back to review".
+                                        ProjectFileView()
+                                    } else if tab == .history || store.historySelection != nil {
+                                        // §14: a past round's file, read-only, until "Back to current review".
+                                        HistoryDiffView { tab = .changes }
+                                    } else if store.liveSelection != nil {
+                                        // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
+                                        LiveDiffView()
+                                    } else {
+                                        // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
+                                        DiffView(
+                                            file: store.selectedFile,
+                                            diff: store.selectedDiff,
+                                            truncated: store.selectedDiffTruncated,
+                                            isReviewLocked: store.isReviewLocked)
+                                    }
+                                } trailing: {
+                                    ChatView()
                                 }
-                            } trailing: {
-                                ChatView()
                             }
+                            .frame(minHeight: 200)
+                            if model.shell.visible { ShellPanelView() }
                         }
                     }
                     .inspector(isPresented: inspectorVisible) {

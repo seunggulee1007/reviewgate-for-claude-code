@@ -8651,3 +8651,19 @@ editor closes. A long instruction is easier to write there. This is the clients'
   (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
 - **Not in Stage 1.** The change budget (§54), the guard's ask cards and the per-turn model are not applied to a terminal
   chat; the TUI's `/rewind` restores files outside ReviewGate's snapshots (the next turn shows them as changed).
+
+### 57.6 The Mac app: the terminal panel
+
+- **What it is.** Shell tabs under the diff and the chat, as in VS Code / Cursor — the window's own, inside the project
+  branch of the window only (not on the PRs tab). Each tab is the user's login shell (`-l`, execName `-<shell>`) in the
+  window's project folder (its worktree or workbench), read when the tab is made; the environment is the terminal chat's
+  base (§57.5) without any `RG_*` and without `CLAUDE_CODE_NATIVE_CURSOR`. The panel never talks to the engine.
+- **⌃` / View › Toggle Terminal Panel.** Hidden → shown with the keyboard in its shell (a first tab when there is none);
+  shown with the keyboard in it → hidden, the keyboard back to the chat (its terminal, else the message box); shown
+  without the keyboard → the keyboard to it. The menu item carries the key for discoverability; a local key monitor
+  (keyCode 50, exactly ⌃, in this window) takes it first, because a terminal would send ⌃` to its program as NUL.
+- **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s). A shell that exits 0 (`exit`, ⌃D) closes its
+  tab; any other end stays as "exited (n)" with Restart / Close. The last tab closing hides the panel. Hiding the panel or
+  switching tabs never ends a shell; closing the window or quitting does. The panel's height is remembered.
+- **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
+  with no `-l` / `-i`, so no dotfiles run in a tour.

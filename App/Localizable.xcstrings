@@ -269,6 +269,22 @@
         }
       }
     },
+    "%@ — in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — %2$@"
+          }
+        }
+      }
+    },
     "%@ — not found": {
       "localizations": {
         "en": {
@@ -4685,6 +4701,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "곁질문 답 닫기"
+          }
+        }
+      }
+    },
+    "Close the terminal ‘%@’": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the terminal ‘%@’"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 ‘%@’ 닫기"
+          }
+        }
+      }
+    },
+    "Close this terminal tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this terminal tab"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널 탭 닫기"
+          }
+        }
+      }
+    },
+    "Close this terminal — its shell ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this terminal — its shell ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널 닫기 — 셸이 종료돼요"
           }
         }
       }
@@ -11111,6 +11175,22 @@
         }
       }
     },
+    "exited (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "exited (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "종료됨 (%lld)"
+          }
+        }
+      }
+    },
     "Expand": {
       "localizations": {
         "en": {
@@ -12569,6 +12649,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "엔진 로그 숨기기 — 오류 배너의 ‘로그 보기’나 도움말 › ‘엔진 로그 보기’로 다시 열어요"
+          }
+        }
+      }
+    },
+    "Hide the terminal panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the terminal panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 패널 숨기기"
+          }
+        }
+      }
+    },
+    "Hide the terminal panel (⌃`) — its shells keep running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the terminal panel (⌃`) — its shells keep running"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 패널 숨기기 (⌃`) — 셸은 계속 실행돼요"
           }
         }
       }
@@ -15616,6 +15728,22 @@
         }
       }
     },
+    "New terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널"
+          }
+        }
+      }
+    },
     "New Terminal Chat": {
       "localizations": {
         "en": {
@@ -15644,6 +15772,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "새 터미널 채팅 대기 중"
+          }
+        }
+      }
+    },
+    "New terminal in the project folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New terminal in the project folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 새 터미널"
           }
         }
       }
@@ -25510,6 +25654,22 @@
         }
       }
     },
+    "Start a new shell in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a new shell in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 새 셸 시작"
+          }
+        }
+      }
+    },
     "Start Claude Code again in this terminal — the conversation is resumed": {
       "localizations": {
         "en": {
@@ -26482,6 +26642,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널 Claude 에게 이 이름으로 보내라고 하면 이 창으로 메시지가 와요. %@"
+          }
+        }
+      }
+    },
+    "Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널"
           }
         }
       }
@@ -27522,6 +27698,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 워크벤치의 셋업 명령이 10분이 지나 중지됐습니다. 그 밖의 준비는 끝났습니다."
+          }
+        }
+      }
+    },
+    "The shell exited (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shell exited (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸이 종료됐어요 (%lld)"
+          }
+        }
+      }
+    },
+    "The shell was stopped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The shell was stopped"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸이 중지됐어요"
           }
         }
       }

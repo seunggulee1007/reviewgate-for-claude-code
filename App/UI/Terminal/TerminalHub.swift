@@ -19,6 +19,7 @@ final class TerminalHub {
     private(set) var lastActivity = Date()
     @ObservationIgnored private weak var store: AppState?
     @ObservationIgnored private var enginePIDAtSpawn: [String: Int32] = [:]
+    @ObservationIgnored private var keyMonitor: Any?
 
     /// Wires the window's store: Stop (⌘.) on a terminal chat becomes Esc in its PTY; the hub follows the live chat.
     func attach(store: AppState) {
@@ -63,6 +64,29 @@ final class TerminalHub {
     /// Quit: SIGTERM to every PTY without waiting (the app is going away).
     func terminateAll() {
         for host in chatHosts.values where host.view.process.running { host.view.terminate() }
+    }
+
+    /// §57.6: ⌃` in `window()` toggles the terminal panel whatever has the keyboard. SwiftTerm hands only ⌘ keys to the
+    /// menu, so inside a terminal ⌃` would reach the program as NUL; this monitor takes it first (keyCode 50, the key left
+    /// of 1 on any layout, with exactly ⌃).
+    func installShellToggle(window: @escaping @MainActor () -> NSWindow?, toggle: @escaping @MainActor () -> Void) {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                guard event.keyCode == 50,
+                      event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .function, .numericPad]) == .control,
+                      let mine = window(), event.window === mine else { return false }
+                toggle()
+                return true
+            }
+            return handled ? nil : event
+        }
+    }
+
+    /// The window is gone: its key monitor goes with it.
+    func removeShellToggle() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
     }
 
     // MARK: Following the live chat
