@@ -209,7 +209,6 @@ struct MainWindow: View {
                                 }
                             }
                             .frame(minHeight: 200, maxHeight: .infinity)
-                            .layoutPriority(1)
                             if model.shell.visible { ShellPanelView() }
                         }
                     }

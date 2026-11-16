@@ -41,8 +41,10 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
     @ObservationIgnored var onExit: ((Int32?) -> Void)?
     @ObservationIgnored private var stopping = false
 
-    init() {
-        view = ReviewTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 480))
+    /// `size`: the view's size before it is laid out — near the real one, so the first lines a program prints are not
+    /// pushed out of sight when the view shrinks to its place.
+    init(size: NSSize = NSSize(width: 800, height: 480)) {
+        view = ReviewTerminalView(frame: NSRect(origin: .zero, size: size))
         configure(view)
     }
 

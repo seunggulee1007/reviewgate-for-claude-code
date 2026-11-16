@@ -46,7 +46,8 @@ final class ShellPanelModel {
     /// The panel's `+`: a new shell in the project folder.
     func newTab() {
         guard let folder = cwd() else { return }
-        let host = TerminalHost()
+        let height = UserDefaults.standard.object(forKey: "terminalPanelHeight") as? Double ?? 220
+        let host = TerminalHost(size: NSSize(width: 900, height: max(80, height - 40)))
         opened += 1
         let shell = TerminalHub.debugShell ?? TerminalLaunch.userLoginShell()
         let tab = Tab(host: host, name: "\((shell as NSString).lastPathComponent) \(opened)", cwd: folder)
@@ -173,6 +174,7 @@ struct ShellPanelView: View {
             }
         }
         .frame(minHeight: 80, idealHeight: height, maxHeight: height)
+        .layoutPriority(1)   // its height first; the review and the chat keep the rest (200 pt at least)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Shell panel")
     }
