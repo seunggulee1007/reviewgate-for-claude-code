@@ -8657,3 +8657,34 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
   turn; `cli_not_found` as elsewhere.
 - **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
+
+### 57.3 The hooks and the hook server
+
+**What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id" | "--resume", <cliSessionId ?? id>,
+"--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
+`--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
+ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
+"already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
+reverted on disk. `env` is `{ RG_HOOK_TOKEN: <32 random bytes, hex> }`. The settings are an argv string, never a file,
+and hold no token:
+
+```json
+{"hooks":{
+ "UserPromptSubmit":[{"hooks":[H(120,"block")]}],
+ "PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(60,"block")]}],
+ "PostToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(120)]}],
+ "PostToolUseFailure":[{"matcher":"Bash","hooks":[H(120)]}],
+ "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
+ "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
+H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
+            "allowedEnvVars":["RG_HOOK_TOKEN"],"timeout":t[,"onFailure":"block"]}
+```
+
+- The CLI interpolates `${RG_HOOK_TOKEN}` from its env only because `allowedEnvVars` names it.
+- `onFailure: "block"` (CLI 2.1.295+) is only on UserPromptSubmit and PreToolUse: an engine that is gone blocks prompts and
+  write tools instead of letting them through unreviewed. Never on Stop, where "block" means "keep Claude going".
+- `SessionStart` has no http hooks (the CLI does not run them), so the first hook is the first prompt's.
+- **Preflight.** `terminal_spec` is refused `terminal_cli_too_old` below 2.1.295 and `terminal_hooks_disabled` when the
+  user's, the project's (`.claude/settings.json`, `.claude/settings.local.json`) or the managed settings say
+  `disableAllHooks: true`, or the managed settings `allowManagedHooksOnly`: our hooks would never run and the review would
+  silently see nothing. The engine never overrides them.
