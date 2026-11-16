@@ -540,6 +540,17 @@ public enum EngineCommand: Sendable, Equatable {
     case refresh(scope: [RefreshScope]? = nil)
     case sessionList
     case sessionNew
+    // MARK: terminal-chat (§57)
+    /// §57.1: `session_new {kind: "terminal"}` — a new chat whose column is the real `claude` TUI (mac only).
+    case sessionNewTerminal
+    /// §57.1: how to start `claude` for the current terminal chat → `.terminalSpec` (a fresh hook token each time).
+    case terminalSpec(sessionId: String)
+    /// §57.1: the app's PTY runs it (`pid` of the exec'd claude).
+    case terminalStarted(sessionId: String, pid: Int32)
+    /// §57.1: the app's PTY ended (nil: by a signal); an open review turn ends.
+    case terminalExited(sessionId: String, exitCode: Int32?)
+    /// §57.1: "Review now" — ends the open turn; refused `no_turn` when none is open.
+    case terminalEndTurn(sessionId: String)
     case sessionOpen(id: String)
     case sessionRename(id: String, title: String)
     case sessionArchive(id: String, archived: Bool)
@@ -757,6 +768,11 @@ public enum EngineCommand: Sendable, Equatable {
         case .refresh: "refresh"
         case .sessionList: "session_list"
         case .sessionNew: "session_new"
+        case .sessionNewTerminal: "session_new"   // MARK: terminal-chat (§57)
+        case .terminalSpec: "terminal_spec"
+        case .terminalStarted: "terminal_started"
+        case .terminalExited: "terminal_exited"
+        case .terminalEndTurn: "terminal_end_turn"
         case .sessionOpen: "session_open"
         case .sessionRename: "session_rename"
         case .sessionArchive: "session_archive"
@@ -900,6 +916,8 @@ extension EngineCommand: Encodable {
             try encodeSteerTakeBackFields(to: encoder)
         case .btwAsk:   // §56.1
             try encodeBtwFields(to: encoder)
+        case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn:   // §57
+            try encodeTerminalChatFields(to: encoder)
         case .interruptTakeBack:   // §56.2
             try encodeInterruptTakeBackFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .retryCollect, .branches,
@@ -1326,6 +1344,9 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var prePlanMode: PermissionMode?
     /// `capabilities` is the engine's cache of an earlier session (M16), not this session's yet.
     public var capabilitiesCached = false
+    // MARK: terminal-chat (§57)
+    /// §57.1: the terminal chat's hook link; nil for a chat-kind session and on older engines.
+    public var terminal: TerminalSessionInfo?
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1387,6 +1408,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         prePlanMode = TerminalModeWire.prePlanMode(from: decoder)   // wave6 w6-terminal (§44.1)
         backgroundTasks = BackgroundWire.tasks(from: decoder)   // §52
         steering = SteeringWire.messages(from: decoder)   // MARK: composer (§50.2)
+        terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
@@ -2318,6 +2340,11 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
     public var movedTo: ChatMoveRef?
     /// §39.4: came from another worktree — reviewed here from the move on.
     public var movedFrom: ChatMoveRef?
+    // MARK: terminal-chat (§57)
+    /// §57.1: what the chat runs; set once by `session_new`, never changes (missing or unknown → `.chat`).
+    public var kind: SessionKind = .chat
+    /// §57.1: the CLI conversation the terminal last ran when it differs from `id` (`/clear` or `/resume` in the TUI).
+    public var cliSessionId: String?
 
     public init(id: String, title: String, createdAt: String = "", updatedAt: String = "", turns: Int = 0, costUSD: Double = 0,
                 lastUserText: String = "", archived: Bool = false, resumeFailed: Bool = false) {
@@ -2363,6 +2390,7 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
         imported = (try? c.decodeIfPresent(ImportedSession.self, forKey: .imported)) ?? nil   // wave3 mac-session
         movedTo = (try? c.decodeIfPresent(ChatMoveRef.self, forKey: .movedTo)) ?? nil   // wave4b w4b-follow
         movedFrom = (try? c.decodeIfPresent(ChatMoveRef.self, forKey: .movedFrom)) ?? nil
+        (kind, cliSessionId) = TerminalChatWire.meta(from: decoder)   // MARK: terminal-chat (§57)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -2380,6 +2408,7 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
         try c.encodeIfPresent(imported, forKey: .imported)   // wave3 mac-session
         try c.encodeIfPresent(movedTo, forKey: .movedTo)   // wave4b w4b-follow
         try c.encodeIfPresent(movedFrom, forKey: .movedFrom)
+        try TerminalChatWire.encode(kind: kind, cliSessionId: cliSessionId, to: encoder)   // MARK: terminal-chat (§57)
     }
 }
 
@@ -2850,6 +2879,8 @@ public enum EngineEvent: Sendable, Equatable {
     case prAiDraft(PRAiDraftReply)
     /// §56.1: reply to `btw_ask`.
     case btwAnswer(BtwAnswer)
+    /// §57.1: reply to `terminal_spec` (never broadcast).
+    case terminalSpec(TerminalSpec)
     /// §56.2: reply to `interrupt {takeBack: true}`.
     case interrupted(InterruptedReply)
     // MARK: §53 commits in meaningful units
@@ -2921,6 +2952,7 @@ public enum EngineEvent: Sendable, Equatable {
         case let .prDraft(reply): reply.id
         case let .prAiDraft(reply): reply.id   // §51
         case let .btwAnswer(reply): reply.id   // §56.1
+        case let .terminalSpec(reply): reply.id   // §57
         case let .interrupted(reply): reply.id   // §56.2
         case let .commitHunks(reply): reply.id   // §53
         case let .commitSplitDraft(reply): reply.id
@@ -3143,6 +3175,8 @@ extension EngineEvent: Decodable {
             self = .interrupted(try InterruptedReply(from: decoder))
         case "btw_answer":   // §56.1
             self = .btwAnswer(try BtwAnswer(from: decoder))
+        case "terminal_spec":   // §57
+            self = .terminalSpec(try TerminalSpec(from: decoder))
         case "pr_ai_draft":   // §51
             self = .prAiDraft(try PRAiDraftReply(from: decoder))
         case "commit_hunks":   // §53

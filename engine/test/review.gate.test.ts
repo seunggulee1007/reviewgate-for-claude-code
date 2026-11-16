@@ -2,7 +2,7 @@ import { mkdirSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
-import type { ReviewGate } from "../src/review/gate.js";
+import { ReviewGate as ReviewGateClass, type ReviewGate } from "../src/review/gate.js";
 import { requestChangesMessage } from "../src/review/notes.js";
 import { FakeClaudeSession, makeHarness, testSettings, type Harness } from "./helpers/engine.js";
 import { fileExists, makeBranchRepo, makeTempDir, read, removeDir, renameWhenFree, sh, write } from "./helpers/repo.js";
@@ -906,4 +906,54 @@ describe("requestChangesMessage", () => {
     );
     expect(requestChangesMessage([], null)).toBe("[Review gate] Requested changes on this turn's diff. Keep the other changes as they are.");
   });
+});
+
+describe("ReviewGate.beginSendParts (§57)", () => {
+  type Seed = { accepted?: string[]; rejected?: string[]; partial?: string[]; answering?: boolean; notes?: { body: string; sent?: boolean }[] };
+  function seeded(seed: Seed): ReviewGate {
+    const g = new ReviewGateClass();
+    const raw = g as unknown as { acceptedPaths: string[]; rejectedPaths: string[]; partiallyRejectedPaths: string[] };
+    raw.acceptedPaths = [...(seed.accepted ?? [])];
+    raw.rejectedPaths = [...(seed.rejected ?? [])];
+    raw.partiallyRejectedPaths = [...(seed.partial ?? [])];
+    g.isAnsweringReview = seed.answering ?? false;
+    g.reviewNotes = (seed.notes ?? []).map((n, i) => ({
+      id: `n${i}`,
+      path: "a.txt",
+      line: 1,
+      side: "new" as const,
+      excerpt: "x",
+      body: n.body,
+      ...(n.sent ? { sent: { turn: 1, at: "2026-01-01T00:00:00Z" } } : {}),
+    }));
+    return g;
+  }
+  const seeds: [string, Seed][] = [
+    ["nothing", {}],
+    ["a summary", { accepted: ["a.txt"], rejected: ["b.txt"], partial: ["c.txt"] }],
+    ["an answer with unsent notes", { accepted: ["a.txt"], answering: true, notes: [{ body: "fix" }, { body: "old", sent: true }] }],
+    ["notes only", { answering: true, notes: [{ body: "only" }] }],
+  ];
+  for (const [name, seed] of seeds) {
+    for (const keep of [false, true]) {
+      for (const text of ["do it", ""]) {
+        it(`${name}, keepSummary=${keep}, text=${JSON.stringify(text)}: beginSend is the parts joined, with the same side effects`, () => {
+          const a = seeded(seed);
+          const b = seeded(seed);
+          const whole = a.beginSend(text, keep);
+          const { summary, notes } = b.beginSendParts(keep);
+          let joined = summary !== null ? summary + "\n\n" + text : text;
+          if (notes !== null) joined += "\n\n" + notes;
+          expect(joined).toBe(whole);
+          expect(b.running).toBe(true);
+          expect(b.lastReviewSummary).toBe(a.lastReviewSummary);
+          expect(b.reviewNotes).toEqual(a.reviewNotes);
+          if (!keep && (seed.accepted || seed.rejected)) expect(summary).toMatch(/^\[Review gate\] /);
+          if (keep || !(seed.accepted || seed.rejected)) expect(summary).toBeNull();
+          if (seed.answering && !keep && seed.notes?.some((n) => !n.sent)) expect(notes).toContain("Notes the user left on the diff");
+          else expect(notes).toBeNull();
+        });
+      }
+    }
+  }
 });

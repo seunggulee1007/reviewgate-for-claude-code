@@ -120,6 +120,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         AppUpdateController.shared.appWillTerminate()   // MARK: app-update (§48): an update left waiting detaches its image
+        for entry in WorkbenchRegistry.shared.entries {   // MARK: terminal-chat (§57.5 / §57.6)
+            entry.model.terminals.terminateAll()
+            entry.model.shell.terminateAll()
+        }
     }
 }
 
@@ -474,6 +478,22 @@ private struct WorkbenchWindow: View {
                 #endif
                 WorkbenchRegistry.shared.register(entry)
                 AttentionCenter.shared.attach(entry)
+                entry.model.terminals.attach(store: entry.store)   // MARK: terminal-chat (§57.5)
+                // MARK: terminal-chat (§57.6): the bottom panel's shells start in the window's project folder; ⌃` anywhere in
+                // the window toggles it, and hiding it gives the keyboard back to the chat.
+                entry.model.shell.cwd = { [weak entry] in entry?.store.projectURL?.path }
+                entry.model.shell.focusChat = { [weak entry] in
+                    guard let entry else { return }
+                    if entry.store.shownChatIsTerminal, entry.store.viewingChat == nil {
+                        entry.model.terminals.focus(chatId: entry.store.currentSessionId)
+                    } else {
+                        entry.model.chatComposer.inputFocused = true
+                    }
+                }
+                entry.model.terminals.installShellToggle(window: { [weak entry] in entry?.window }) { [weak entry] in
+                    guard let entry, entry.store.projectURL != nil, entry.model.tab != .prs else { return }
+                    entry.model.shell.toggle()
+                }
                 entry.store.confirmSideSwitch = SideSwitchAlert.confirm   // wave4b w4b-side (§40.3)
                 // wave3 mac-session: hand-offs wait while this window opens its first project.
                 let handoff = FolderHandoffRouter.shared
@@ -514,7 +534,14 @@ private struct WorkbenchWindow: View {
                 WorkbenchRegistry.shared.unregister(entry)
                 WorkbenchRegistry.shared.persistOpenWindows()
                 let store = entry.store
-                Task { await store.shutdown() }
+                let terminals = entry.model.terminals   // MARK: terminal-chat (§57.5): the window's PTYs end with it
+                let shell = entry.model.shell   // §57.6
+                terminals.removeShellToggle()
+                Task {
+                    await shell.stopAll()
+                    await terminals.stopAll()
+                    await store.shutdown()
+                }
             }
     }
 

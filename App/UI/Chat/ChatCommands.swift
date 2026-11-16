@@ -20,6 +20,11 @@ struct ChatCommands: Commands {
                 .keyboardShortcut("t", modifiers: .command)
                 .disabled(!menu.hasProject || menu.newChatBlocked)   // r2-chats-cards M31: while Claude works it waits for the turn
                 .accessibilityIdentifier("Chat menu New chat")
+            // MARK: terminal-chat (§57.5): the real Claude Code in the chat column; as ⌘T it waits while Claude works.
+            Button("New Terminal Chat") { if let store { Task { await store.newTerminalChat() } } }
+                .keyboardShortcut("t", modifiers: [.control, .command])
+                .disabled(!menu.hasProject || menu.newChatBlocked)
+                .accessibilityIdentifier("Chat menu New terminal chat")
             // As the tab's ×: a chat shown read-only hands back to the live one; the live chat's tab waits for a switch.
             Button("Close Chat Tab") {
                 if let store, let model, let id = store.shownChatId {
@@ -42,7 +47,7 @@ struct ChatCommands: Commands {
                 .accessibilityIdentifier("Chat menu Stop")
             Button("Commands…") { model?.commandsTick += 1 }
                 .keyboardShortcut("/", modifiers: .command)
-                .disabled(!menu.hasProject)
+                .disabled(!menu.hasProject || menu.shownChatIsTerminal)   // §57.5: the TUI's own / commands
             Button("Chat History…") { model?.showChatHistoryTick += 1 }
                 .keyboardShortcut("y", modifiers: .command)
                 .disabled(!menu.hasChatSessions)
@@ -65,7 +70,7 @@ struct ChatCommands: Commands {
             }
             .disabled(!menu.canPickPermissionMode)
             Button("Attach Images…") { model?.attachImagesTick += 1 }
-                .disabled(!menu.hasProject)
+                .disabled(!menu.hasProject || menu.shownChatIsTerminal)   // §57.5: paste or drop images into the terminal
             if !menu.chatTabs.isEmpty { Divider() }
             ForEach(Array(menu.chatTabs.enumerated()), id: \.element.id) { index, tab in
                 Button(tab.title.isEmpty ? String(localized: "New chat") : tab.title) { focused?.model.chatTabRequest = tab.id }

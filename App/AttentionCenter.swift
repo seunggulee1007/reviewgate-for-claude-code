@@ -192,7 +192,7 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     private func updateBadge() {
         let (label, waiting) = withObservationTracking {
             let stores = WorkbenchRegistry.shared.stores
-            let waitingStores = stores.filter { $0.pendingPermission != nil || $0.pendingPlan != nil }
+            let waitingStores = stores.filter { $0.pendingPermission != nil || $0.pendingPlan != nil || $0.terminalWaiting != nil }   // §57.5
             // §31: changes from outside the app are not Claude's work waiting for review — not counted.
             let label = DockBadge.label(pendingCounts: stores.map { $0.dockBadgeCount }, anyWaiting: !waitingStores.isEmpty)
             return (label, Set(waitingStores.compactMap { $0.projectURL.map(AppSettings.projectKey) }))

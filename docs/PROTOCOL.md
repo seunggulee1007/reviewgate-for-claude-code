@@ -8608,3 +8608,228 @@ editor closes. A long instruction is easier to write there. This is the clients'
   (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
   it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
   on the Mac.
+
+## 57. Terminal chat
+
+A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The
+engine never spawns it: it tells the app how to start it (`terminal_spec`), receives Claude Code's http hooks on
+127.0.0.1, and maps them onto the review gate — snapshot A at the prompt, B at the stop, the turn diff, accept / reject
+and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1.
+
+### 57.1 The contract
+
+```ts
+type SessionKind = "chat" | "terminal";
+// SessionMeta gains:
+  kind?: SessionKind;          // absent = "chat"; set once by session_new, never changes; written only when "terminal"
+  cliSessionId?: string;       // the CLI conversation the terminal last ran when it differs from `id` (/clear, /resume in the TUI)
+// commands
+session_new { kind?: SessionKind }
+terminal_spec { sessionId }                        // reply: terminal_spec; each call issues a fresh hook token (the previous is retired)
+terminal_started { sessionId; pid: number }        // the app's PTY runs it (pid of the exec'd claude)
+terminal_exited { sessionId; exitCode: number | null }  // the PTY ended; an open review turn ends (stopReason "terminal_exited")
+terminal_end_turn { sessionId }                    // "Review now": ends the open turn; refused `no_turn` when none is open
+type TerminalSpecEvent = { type: "terminal_spec"; id?: string; sessionId: string;
+  argv: string[];                  // argv[0] = the claude executable (absolute when found); never holds the token
+  env: Record<string, string>;     // added to the PTY env; only RG_* / CLAUDE_CODE_* keys; holds RG_HOOK_TOKEN
+  cwd: string;
+  resume: boolean };               // true: argv has --resume <id>; false: --session-id <id>
+type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
+type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
+  waiting: TerminalWaiting | null; interruptSuspected: boolean };
+// SessionState gains:  terminal?: TerminalSessionState | null   (null / absent for a chat-kind session)
+```
+
+- **No new broadcast event.** `terminal_spec` is a reply only; everything else rides on `state.session.terminal` and the
+  existing turn events. The other `terminal_*` commands reply `result`.
+- **`state.session.terminal`.** `running`: `terminal_started` came for the current spawn and no `terminal_exited` since.
+  `hooksSeen`: a hook with the current spawn's token arrived. `promptId`: the open review turn's `prompt_id` (null: none
+  open, or a turn Claude started itself). `waiting`: Claude Code waits for the user in the TUI (Notification
+  `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
+  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
+- **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
+  (`send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
+  `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
+  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
+  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
+  is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
+  local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
+  turn; `cli_not_found` as elsewhere.
+- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
+
+### 57.2 Lifecycle and resume
+
+- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
+  chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project`, `restart_session` —
+  the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
+  state). Such a session is never parked (§9.1): switching away stops it and retires its token.
+- **Spawn.** The app asks `terminal_spec {sessionId}` for the current chat (refused `terminal_not_current` otherwise),
+  runs `argv` in its PTY with `env` and `cwd`, then sends `terminal_started {sessionId, pid}` (`running`; the pid is
+  never reported as another Claude in the worktree, §31). `terminal_exited {sessionId, exitCode}` when the PTY ends: an
+  open turn ends (`terminal_exited`) and is collected; `running` turns false. `terminal_exited` for a chat that is no
+  longer the current terminal chat is accepted and does nothing (switching away already ended it).
+- **Resume.** `terminal_spec` resumes (`--resume`) once the chat is resumable — it ran a prompt (`lastUserText`,
+  `cliKnown`: set when a prompt is adopted), or the CLI has its record — else it starts the chat's id
+  (`--session-id`). A `/clear` or `/resume` inside the TUI changes the conversation: the next hook's `session_id` becomes
+  the chat's `cliSessionId` (persisted; removed again when it is the chat's own id), and the spec resumes that one. The
+  chat keeps its id (it is never renamed after the CLI's id, as a chat is). After an app restart the engine reopens the
+  current chat; the app sees `kind: "terminal"` and asks for a spec.
+- **Restart in a tab.** The app ends the PTY, sends `terminal_exited`, asks for a new spec (the old token is retired: a
+  stale terminal's prompts are blocked and its write tools denied) and spawns again.
+- **The engine restarts** (its sidecar died): the port changes, so a running terminal's hooks fail — closed where it
+  matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
+
+**What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id" | "--resume", <cliSessionId ?? id>,
+"--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
+`--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
+ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
+"already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
+reverted on disk. `env` is `{ RG_HOOK_TOKEN: <32 random bytes, hex> }`. The settings are an argv string, never a file,
+and hold no token:
+
+```json
+{"hooks":{
+ "UserPromptSubmit":[{"hooks":[H(120,"block")]}],
+ "PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(60,"block")]}],
+ "PostToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(120)]}],
+ "PostToolUseFailure":[{"matcher":"Bash","hooks":[H(120)]}],
+ "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
+ "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
+H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
+            "allowedEnvVars":["RG_HOOK_TOKEN"],"timeout":t[,"onFailure":"block"]}
+```
+
+- The CLI interpolates `${RG_HOOK_TOKEN}` from its env only because `allowedEnvVars` names it.
+- `onFailure: "block"` (CLI 2.1.295+) is only on UserPromptSubmit and PreToolUse: an engine that is gone blocks prompts and
+  write tools instead of letting them through unreviewed. Never on Stop, where "block" means "keep Claude going".
+- `SessionStart` has no http hooks (the CLI does not run them), so the first hook is the first prompt's.
+- **Preflight.** `terminal_spec` is refused `terminal_cli_too_old` below 2.1.295 and `terminal_hooks_disabled` when the
+  user's, the project's (`.claude/settings.json`, `.claude/settings.local.json`) or the managed settings say
+  `disableAllHooks: true`, or the managed settings `allowManagedHooksOnly`: our hooks would never run and the review would
+  silently see nothing. The engine never overrides them.
+
+**The hook server** (`session/hookServer.ts`). One per engine, created at the first `terminal_spec`, listening on
+`127.0.0.1` on a port the system picks, closed when the engine is disposed. `POST /hook` with the header
+`X-ReviewGate-Token: <token>`; the body is the CLI's hook JSON. Every answer is `application/json`:
+
+| Case | Status | Body |
+|---|---|---|
+| Missing or wrong token (`timingSafeEqual` on equal-length buffers) | 401 | `{}` |
+| Path other than `/hook` | 404 | `{}` |
+| Method other than POST | 405 | `{}` |
+| Body over 16 MiB (declared, or counted while streaming) | 413 | `{}` |
+| Invalid JSON, or not an object | 400 | `{}` |
+| The chat's handler failed | 500 | `{}` (fails closed on UserPromptSubmit / PreToolUse) |
+| Valid request | 200 | the decision JSON (§57.4) |
+
+- **One token per spawn.** Each `terminal_spec` issues a fresh token (32 random bytes, hex) routed to the current
+  terminal chat and retires the chat's previous one; switching chats or closing the project retires it too.
+- **Retired token** (an earlier spawn, a chat switched away from): 200 with a blocking answer — UserPromptSubmit
+  `{decision: "block", reason}`, PreToolUse `permissionDecision: "deny"` with the same reason ("This terminal is no longer
+  connected to ReviewGate's review. Restart it from its tab."), every other event `{}`. The last 64 retired tokens are
+  remembered; older ones get 401 (non-blocking for the CLI except where `onFailure: "block"` makes it block).
+- **The token sits in claude's env**, so a command Claude runs could post a hook. Accepted for Stage 1: B is tree-based, so
+  a forged hook cannot hide a change; the server is 127.0.0.1 only and the token changes per spawn.
+
+### 57.4 Turns: how the hooks map onto the review
+
+`session/terminalSession.ts` is the terminal chat's session object: it never starts the CLI, it turns hooks into the
+session events a chat's CLI session gives, so snapshot A / B, the turn diff, accept / reject, `state`, `turn_end` and
+`turn_summary` are the chat's. On every hook: `hooksSeen`; a `session_id` other than the one expected (`/clear`,
+`/resume` inside the TUI) becomes the chat's `cliSessionId` (the chat keeps its id; `turn_end` carries the chat's id);
+`waiting` is cleared (but by a Notification).
+
+| Hook | What happens | Answer |
+|---|---|---|
+| UserPromptSubmit | A turn still open with another `prompt_id` ends first (`interrupted`, the Esc rule). The engine adopts the prompt as a review turn (below) | `additionalContext` when there is a review summary / unsent notes; `{decision:"block", reason}` when the review cannot start |
+| PreToolUse (Edit, Write, MultiEdit, NotebookEdit, Bash) | No turn open (Claude goes on by itself: a user's Stop hook that blocked, a background task's result): taken as a turn Claude started (§52.1, `auto_turn_start {trigger:"continue"}`), A first. Bash: the base snapshot (not for a read-only command) and the call's window (§31) | `{}` (the TUI's own permission flow runs); refused: `permissionDecision:"deny"` (the unprompted-turn reason) |
+| PostToolUse (edit tools) | The file is the turn's (`tool_use` with `file`, `tool_result`); an edit the review does not see (outside the project, a nested repository, Claude's memory) goes to `changedOutside` | `{}` |
+| PostToolUse / PostToolUseFailure (Bash) | The post-Bash snapshot: `tool_files` (what changed inside the call's window), `bash_snapshot`, the rows. `is_interrupt` sets `interruptSuspected` | `{}` |
+| Stop | The open turn ends: `turn_end {stopReason:"end_turn"}` (no usage, no budget) → snapshot B, the review. `background_tasks` it names go first, so the next turn keeps A (§52) | `{}` at once — the next prompt waits for the collection |
+| StopFailure | As Stop with `stopReason:"stop_failure:<error>"`, and a non-fatal `error {code:"api_error"}` | `{}` |
+| Notification | `permission_prompt` / `agent_needs_input` → `waiting {kind:"permission"}`; `elicitation_dialog` → `{kind:"question"}`; `idle_prompt` ends an open turn (`interrupted`) | `{}` |
+| SessionEnd | An open turn ends (`session_end`) | `{}` |
+
+- **Adopting a prompt** mirrors `send` without sending: the collection in flight first (bounded by 100 s, under the
+  hook's 120 s), then the gate's checks (the prompt is blocked with the reason the message box would show), snapshot A
+  (kept while a review stands — the prompt answers it, as a question during a review does in a chat), the review summary
+  and unsent notes as `additionalContext` (a prompt starting with "/" keeps them for the next one), the `user_message`
+  row and the title. The PreToolUse hook gets the turn's tree for Bash attribution. Any failure blocks the prompt with
+  the reason.
+- **Esc gives no Stop** (Claude Code does not run Stop on a user interrupt). An interrupted turn stays running —
+  accept / reject stay locked, the diff shows live changes — until the first of: the next prompt with a new `prompt_id`,
+  Notification `idle_prompt`, SessionEnd, the PTY's exit (`terminal_exited`), or "Review now" (`terminal_end_turn`).
+  Closing early is safe: B is a tree, and a later tool call of the same prompt opens a continuation turn through the
+  PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
+- **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
+  `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
+  set, or when the gate has run a turn with no hook for 60 s.
+- **Waiting.** `state.session.terminal.waiting` is set by the Notification hook (`permission_prompt` /
+  `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
+  any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
+  notification); Stop needs nothing new (the running → reviewing change already notifies).
+- **Not in Stage 1:** the change budget (§54) and the PreToolUse guard (asks, cards, git and scope checks) do not apply to
+  a terminal chat — the TUI's own permission flow decides. A TUI `/rewind` restores files from the CLI's own history,
+  outside ReviewGate's snapshots: what it restores shows as the next turn's changes.
+
+### 57.5 The Mac app: the terminal chat
+
+- **Opening one.** Chat › New Terminal Chat (⌃⌘T), the chat tabs' ⋯ menu, or the right-click of their `+`. It is held
+  while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중"). The existing chat UI
+  stays the default.
+- **The column.** When the chat on screen is a terminal chat, the chat column keeps its tab strip and shows the terminal
+  (SwiftTerm) instead of the transcript, the HUD, the cards and the composer: Claude Code draws its own. The diff, the
+  changed files and accept / reject around it are unchanged. A terminal chat's tab has a terminal symbol, and an orange
+  dot while its Claude Code is not running (exited, or disconnected from the engine).
+- **The PTY** (`TerminalLaunch`, Core). The user's login shell (`getpwuid`) runs `-l -i -c 'exec <argv…>'` (each word
+  POSIX-quoted, so `${RG_HOOK_TOKEN}` in the settings stays literal for the CLI) in `spec.cwd`, with an environment built
+  from scratch: `HOME USER LOGNAME SHELL TMPDIR PATH` of the app (every parent `CLAUDE*` dropped), `TERM=xterm-256color`,
+  `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`, `LANG` / `LC_CTYPE=en_US.UTF-8`,
+  `CLAUDE_CODE_NATIVE_CURSOR=1` (the IME's candidate window follows the input caret), then only the spec's `RG_*` /
+  `CLAUDE_CODE_*` keys. After the start: IUTF8 on the PTY, then `terminal_started {pid}`.
+- **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
+  shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
+  SIGKILL after 3 s; text typed and not sent is lost), then sends `terminal_exited` (accepted for a chat the engine left);
+  showing another chat read-only does not. A terminal chat shown
+  read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
+  PTYs. A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
+- **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),
+  "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
+  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
+  changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
+- **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
+  with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
+  restarting. Nothing types into the TUI for the user.
+- **Engine restart.** A running terminal is never killed: the strip turns orange ("ReviewGate가 다시 시작됐어요 …") and
+  Restart takes a new spec (its hooks fail closed meanwhile).
+- **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt`. Commands…, Attach
+  Images…, the permission mode, Find in Chat and Review › Request Changes are off for a terminal chat (the TUI has its
+  own). Continue in Terminal is not offered for a terminal chat.
+- **Attention.** `waiting` turning on is a permission / question attention event once per wait (`term:<chat>:<since>`):
+  a notification while the window is behind, the Dock's "!". A click shows the live chat and gives its terminal the
+  keyboard.
+- **Keys.** The terminal's view keeps the fixes of the M0 spike: ⌘C copies only the terminal's own selection (Claude
+  Code's fullscreen view copies its own on select; Copy never beeps nor clears the clipboard), ⌥ is Meta only on Enter /
+  Esc / Tab / Backspace and arrows, so ⌥Return during 한 reaches the input method (Hanja), and the input method's reads and
+  replacements before the caret work on the cursor row. The marked-text overlay neither blanks the rest of the line
+  (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
+- **Not in Stage 1.** The change budget (§54), the guard's ask cards and the per-turn model are not applied to a terminal
+  chat; the TUI's `/rewind` restores files outside ReviewGate's snapshots (the next turn shows them as changed).
+
+### 57.6 The Mac app: the terminal panel
+
+- **What it is.** Shell tabs under the diff and the chat, as in VS Code / Cursor — the window's own, inside the project
+  branch of the window only (not on the PRs tab). Each tab is the user's login shell (`-l`, execName `-<shell>`) in the
+  window's project folder (its worktree or workbench), read when the tab is made; the environment is the terminal chat's
+  base (§57.5) without any `RG_*` and without `CLAUDE_CODE_NATIVE_CURSOR`. The panel never talks to the engine.
+- **⌃` / View › Toggle Terminal Panel.** Hidden → shown with the keyboard in its shell (a first tab when there is none);
+  shown with the keyboard in it → hidden, the keyboard back to the chat (its terminal, else the message box); shown
+  without the keyboard → the keyboard to it. The menu item carries the key for discoverability; a local key monitor
+  (keyCode 50, exactly ⌃, in this window) takes it first, because a terminal would send ⌃` to its program as NUL.
+- **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s). A shell that exits 0 (`exit`, ⌃D) closes its
+  tab; any other end stays as "exited (n)" with Restart / Close. The last tab closing hides the panel. Hiding the panel or
+  switching tabs never ends a shell; closing the window or quitting does. Its top edge drags to resize it (the
+  window keeps 200 pt above); the height is remembered.
+- **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
+  with no `-l` / `-i`, so no dotfiles run in a tour.

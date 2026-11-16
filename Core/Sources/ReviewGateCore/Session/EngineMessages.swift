@@ -96,6 +96,7 @@ public enum EngineMessages {
         let detail = detail(of: raw, code: code)
         if let text = PeerText.refusal(code: code, detail: detail) { return text }   // wave1 mac-session (§29)
         if let text = AutoModeText.refusal(code: code) { return text }   // wave4b w4b-auto (§39.5)
+        if let text = TerminalChatText.refusal(code: code) { return text }   // MARK: terminal-chat (§57.1)
         // Failures whose `error` is the underlying (English) text rather than `code:<detail>`.
         let underlying = plainGitFailure(detail.isEmpty && raw != code && codeWord(raw) != code ? raw : detail)
         switch code {

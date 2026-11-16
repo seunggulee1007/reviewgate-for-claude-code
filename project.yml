@@ -9,6 +9,10 @@ options:
 packages:
   ReviewGateCore:
     path: Core
+  # §57: the terminal chat's and the shell panel's terminal emulator (App target only; Core stays free of it).
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm.git
+    exactVersion: 1.99.3
 targets:
   ReviewGate:
     type: application
@@ -25,6 +29,7 @@ targets:
         optional: true
     dependencies:
       - package: ReviewGateCore
+      - package: SwiftTerm
     preBuildScripts:
       - name: Build sidecar
         script: |

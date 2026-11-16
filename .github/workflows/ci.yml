@@ -97,5 +97,5 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Debug \
-            -derivedDataPath build CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM="" build | tail -40
+            -derivedDataPath build -skipPackagePluginValidation CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM="" build | tail -40
           test -f build/Build/Products/Debug/ReviewGate.app/Contents/Resources/dist/sidecar.mjs

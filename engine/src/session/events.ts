@@ -168,6 +168,15 @@ export type SessionEvent =
   | ({ type: "git_result" } & GitCommandResult)
   // MARK: wave4 w4-longwork — §38.2: a usage window of the subscription changed (`rate_limit_event`).
   | { type: "rate_limit_info"; window: RateLimitWindow }
+  // §57 terminal chat (TerminalSession only):
+  /** The user submitted a prompt in the TUI (UserPromptSubmit): the engine adopts it as a review turn and answers it (`answerPrompt`). */
+  | { type: "terminal_prompt"; prompt: string; promptId: string | null }
+  /** Claude Code waits for the user in the TUI (Notification: `permission_prompt`, `elicitation_dialog`, …). */
+  | { type: "terminal_attention"; notificationType: string; message: string; title?: string }
+  /** The TUI runs another CLI conversation (`/clear`, `/resume`): the chat's `cliSessionId`. */
+  | { type: "terminal_session_id"; sessionId: string }
+  /** `TerminalSession.state` changed (a touch only). */
+  | { type: "terminal_state" }
   | { type: "closed"; code: number };
 
 export type SessionLog = (level: LogLevel, message: string) => void;

@@ -659,6 +659,14 @@ export type EngineCommand =
   | Cmd<"steer_take_back", { messageId: string }>
   /** §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `btw_answer`. */
   | Cmd<"btw_ask", { question: string }>
+  /** §57: how to start `claude` for the current terminal chat; replies `terminal_spec`. Each call issues a fresh hook token (the previous one is retired). */
+  | Cmd<"terminal_spec", { sessionId: string }>
+  /** §57: the app's PTY runs it (pid of the exec'd claude). */
+  | Cmd<"terminal_started", { sessionId: string; pid: number }>
+  /** §57: the app's PTY ended; an open review turn ends (`stopReason: "terminal_exited"`). */
+  | Cmd<"terminal_exited", { sessionId: string; exitCode: number | null }>
+  /** §57: "Review now" — ends the open turn (Esc left it open); refused `no_turn` when none is open. */
+  | Cmd<"terminal_end_turn", { sessionId: string }>
   /** §52: stops a background task (`Query.stopTask`). */
   | Cmd<"task_stop", { taskId: string }>
   /** §52: Ctrl+B — the running Bash call (all foreground tasks without an id) goes on in the background; replies `task_background`. */
@@ -676,7 +684,7 @@ export type EngineCommand =
   | Cmd<"push">
   | Cmd<"refresh", { scope?: RefreshScope[] }>
   | Cmd<"session_list">
-  | Cmd<"session_new">
+  | Cmd<"session_new", { kind?: SessionKind }>
   // `sessionId`, not `id`: `id` is the reply-correlation field of every command.
   | Cmd<"session_open", { sessionId: string }>
   | Cmd<"session_rename", { sessionId: string; title: string }>
@@ -900,6 +908,9 @@ export type RefreshScope = "review" | "branches" | "workbenches" | "pr" | "accou
 
 export type EngineCommandType = EngineCommand["type"];
 
+/** §57: what a chat runs — the app's chat UI (`chat`, the default) or the real `claude` TUI in a terminal (`terminal`). */
+export type SessionKind = "chat" | "terminal";
+
 // ---------------------------------------------------------------- Engine → App
 
 export type GatePhase = "idle" | "starting" | "running" | "collecting" | "collect_failed" | "reverting" | "reviewing";
@@ -1005,6 +1016,25 @@ export type SessionState = {
   // MARK: wave5 w5-model
   /** §43.4: the model the running / last turn was given (auto, this message's pick, or back to the chip's); absent before one. */
   autoModel?: AutoModelChoice | null;
+  /** §57: the terminal chat's live state; null / absent for a chat-kind session. */
+  terminal?: TerminalSessionState | null;
+};
+
+/** §57: Claude Code waits for the user in the TUI (a permission dialog, a question). */
+export type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
+
+/** §57: `state.session.terminal` of a terminal chat. */
+export type TerminalSessionState = {
+  /** terminal_started seen for the current spawn, no terminal_exited since. */
+  running: boolean;
+  /** A hook with the current spawn's token arrived. */
+  hooksSeen: boolean;
+  /** prompt_id of the open review turn (null: none open, or a turn Claude started itself). */
+  promptId: string | null;
+  /** Claude Code waits for the user in the TUI (Notification permission_prompt / elicitation_dialog); cleared by the next hook. */
+  waiting: TerminalWaiting | null;
+  /** A tool call ended `is_interrupt` (Esc) and no Stop came: the turn stays open until the next prompt, idle_prompt, End turn or exit. */
+  interruptSuspected: boolean;
 };
 
 export type ToolchainState = {
@@ -1378,6 +1408,10 @@ export type SessionMeta = {
   // MARK: wave4d w4d-plan
   /** §42.1: the plan file this chat's "plan vs actual" follows (`plan_follow`; absolute). */
   planFile?: string;
+  /** §57: absent = "chat". Set once by `session_new`; never changes. Written only when "terminal". */
+  kind?: SessionKind;
+  /** §57: the CLI conversation the terminal last ran when it differs from `id` (`/clear` or `/resume` inside the TUI); `terminal_spec` resumes this one. */
+  cliSessionId?: string;
 };
 
 export type SessionsState = {
@@ -1810,6 +1844,19 @@ export type SideTurnEndEvent = { type: "side_turn_end"; threadId: string; costUS
 export type InterruptedEvent = { type: "interrupted"; id?: string; takenBack: { id: string; text: string; mentions?: string[] }[]; read: string[] };
 /** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
+/** §57: reply to `terminal_spec` — how the app starts `claude` in its PTY (a reply only, never broadcast). */
+export type TerminalSpecEvent = {
+  type: "terminal_spec";
+  id?: string;
+  sessionId: string;
+  /** argv[0] = the claude executable (absolute when found). Never holds the token. */
+  argv: string[];
+  /** Added to the PTY env; only keys starting RG_ or CLAUDE_CODE_. Holds RG_HOOK_TOKEN. */
+  env: Record<string, string>;
+  cwd: string;
+  /** true: argv has `--resume <id>`; false: `--session-id <id>`. */
+  resume: boolean;
+};
 export type SidePromoteDraftEvent = { type: "side_promote_draft"; id?: string; threadId: string; text: string };
 /** §23: reply to `list_files`. */
 export type FilesEvent = { type: "files"; id?: string; query: string; items: FileItem[] };
@@ -1963,6 +2010,7 @@ export type EngineEvent =
   | SidePromoteDraftEvent
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
+  | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
   | AttachmentEvent
@@ -2053,6 +2101,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "project_search" } ? ProjectSearchEvent
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
+  : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
 
 export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileContentEvent | PRCreatedEvent | CommittedEvent | ToolOutputEvent | ReviewHistoryEvent | HistoryDiffEvent
@@ -2071,7 +2120,8 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   | ProjectFileEvent | ProjectSearchEvent // MARK: code-browser (§47)
   | BtwAnswerEvent // §56.1
-  | InterruptedEvent; // §56.2
+  | InterruptedEvent // §56.2
+  | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow
 // Types only (docs/PROTOCOL.md §36). Owners: engine-agents §36.1–36.4, engine-session §36.5–36.9, engine-flow §36.10–36.14.

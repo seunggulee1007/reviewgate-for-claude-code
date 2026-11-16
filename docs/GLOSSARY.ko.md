@@ -26,6 +26,8 @@ Mac(App/·Core 의 Localizable.xcstrings)과 Electron(ko.extra.json → gen-i18n
 | Agent Board | 관제판 | 에이전트 · 서브브레인 · 코드 그래프 탭이 있는 창(§43). Mac 창 › 관제판(⌥⌘B), Windows 보기 › 관제판(Ctrl+Alt+B). "대시보드"는 쓰지 않는다 |
 | Sub-brain | 서브브레인 | Claude Code 의 자동 메모리(저장소마다 하나, 워크벤치가 같이 쓴다, §43.2). 폴더를 말할 때만 "자동 메모리 폴더" |
 | Code graph | 코드 그래프 | graphify 가 만든 리포트(§43.3). 다시 만드는 것은 "다시 빌드" |
+| Terminal chat | 터미널 채팅 | 채팅 칸이 앱의 채팅 UI 대신 진짜 Claude Code(TUI)인 채팅(§57). 리뷰·수락·거절은 채팅과 같다. "터미널 세션"은 쓰지 않는다 |
+| Terminal panel | 터미널 패널 | 창 아래의 셸 탭 패널(§57.6, ⌃`). 터미널 채팅과 섞지 않는다 |
 | Status line | 상태줄 | 사용자의 Claude Code `statusLine` 명령이 그린 줄(§44.2). 입력창 아래. 앱 자체의 HUD 와 섞지 않는다. 설정 이름은 "Claude Code 상태줄" |
 
 경과 시간은 "3분 20초 · 1시간 2분 · 12.3초"(영어는 "3m 20s"), Mac 은 Core 의 `ElapsedFormat`, Electron 은 `formatElapsed`.

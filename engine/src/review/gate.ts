@@ -935,24 +935,34 @@ export class ReviewGate {
    * Follow with `snapshotStart()`; on failure call `abortTurn()`.
    */
   beginSend(trimmed: string, keepSummary = false): string {
+    const { summary, notes } = this.beginSendParts(keepSummary);
+    let outgoing = summary !== null ? summary + "\n\n" + trimmed : trimmed;
+    if (notes !== null) outgoing += "\n\n" + notes;
+    return outgoing;
+  }
+
+  /**
+   * §57: `beginSend` with its parts apart — the review-summary prefix (consumed) and the unsent notes' context, each null
+   * when there is none — for a terminal chat, where the user typed the prompt and both go out as `additionalContext`.
+   * The same side effects as `beginSend`.
+   */
+  beginSendParts(keepSummary = false): { summary: string | null; notes: string | null } {
     // A fresh snapshot A follows: the previous review round is over (accepted files stay on disk).
     if (!this.isAnsweringReview && !this.isRequestingChanges) this.completeRound();
-    let outgoing = trimmed;
     // `keepSummary`: a slash command (`/compact`, §27) must start with "/" — the summary waits for the next real message.
     const summary = keepSummary ? null : this.lastReviewSummary;
     if (summary !== null) {
-      outgoing = summary + "\n\n" + trimmed;
       this.acceptedPaths = [];
       this.rejectedPaths = [];
       this.partiallyRejectedPaths = [];
     }
     // A question during a review: the unsent notes go along as context ("메모 반영해줘"); they stay unsent.
     const unsent = this.isAnsweringReview && !keepSummary ? this.reviewNotes.filter((n) => !n.sent) : [];
-    if (unsent.length > 0) outgoing += "\n\n" + unsentNotesContext(unsent);
+    const notes = unsent.length > 0 ? unsentNotesContext(unsent) : null;
     this.lastReject = null; // MARK: wave4c w4c-trust — §41.2: sending ends the reject undo
     if (!this.isAnsweringReview) this.reviewNotes = [];
     this.running = true;
-    return outgoing;
+    return { summary, notes };
   }
 
   /** `snapshotStart()` will keep the current A (a change request / an answer to a standing review). */

@@ -1345,6 +1345,22 @@
         }
       }
     },
+    "A new terminal chat opens once Claude is done in '%@'": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new terminal chat opens once Claude is done in '%@'"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "'%@' 채팅의 작업이 끝나면 새 터미널 채팅이 열려요"
+          }
+        }
+      }
+    },
     "A pre-review is already running": {
       "localizations": {
         "en": {
@@ -3021,6 +3037,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "기다리던 메시지 중 %lld개는 Claude가 이미 읽었어요 — 대화에 그대로 남아요"
+          }
+        }
+      }
+    },
+    "Claude asked a question in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude asked a question in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 터미널에서 질문했어요"
           }
         }
       }
@@ -6311,6 +6343,22 @@
         }
       }
     },
+    "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 설정에서 hook이 꺼져 있어서(disableAllHooks 또는 allowManagedHooksOnly) ReviewGate가 터미널 채팅을 리뷰할 수 없어요"
+          }
+        }
+      }
+    },
     "No side answer yet — type /btw and your question": {
       "localizations": {
         "en": {
@@ -8391,6 +8439,22 @@
         }
       }
     },
+    "No turn is open — there is nothing to review yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No turn is open — there is nothing to review yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열린 턴이 없어요 — 아직 리뷰할 게 없어요"
+          }
+        }
+      }
+    },
     "Node.js (node) was not found. Install Node.js, or set its path in Settings › General › Toolchain overrides › node path, then reopen the project.": {
       "localizations": {
         "en": {
@@ -9379,6 +9443,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "허용이 필요해요"
+          }
+        }
+      }
+    },
+    "Permission needed in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission needed in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널에서 허용이 필요해요"
           }
         }
       }
@@ -11971,6 +12051,38 @@
         }
       }
     },
+    "Terminal chats need Claude Code 2.1.295 or later — update it with `claude update`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal chats need Claude Code 2.1.295 or later — update it with `claude update`"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에는 Claude Code 2.1.295 이상이 필요해요 — `claude update`로 업데이트하세요"
+          }
+        }
+      }
+    },
+    "Terminal chats need the Mac app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal chats need the Mac app"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅은 Mac 앱에서만 쓸 수 있어요"
+          }
+        }
+      }
+    },
     "Test": {
       "localizations": {
         "en": {
@@ -13667,6 +13779,22 @@
         }
       }
     },
+    "This chat runs Claude Code in a terminal — do it there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat runs Claude Code in a terminal — do it there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 터미널에서 Claude Code를 실행해요 — 터미널에서 해 주세요"
+          }
+        }
+      }
+    },
     "This Claude Code version does not support messages from other sessions": {
       "localizations": {
         "en": {
@@ -14399,6 +14527,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 작업은 아직 보여 줄 출력이 없어요."
+          }
+        }
+      }
+    },
+    "This terminal chat is not the live chat anymore — continue in it first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This terminal chat is not the live chat anymore — continue in it first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널 채팅은 더 이상 실행 중인 채팅이 아니에요 — 먼저 이 채팅으로 이어가세요"
           }
         }
       }
