@@ -44,6 +44,26 @@ import Testing
         #expect(AcceptAllRules.acceptedToast(3) == "Accepted 3 files")
     }
 
+    @Test func acceptAndContinueAcceptsThePendingFilesAndSendsTheFixedMessage() {
+        let app = makeStore()
+        var sent: [EngineCommand] = []
+        app.commandSink = { sent.append($0) }
+        app.handle(.state(snapshot(seq: 1, phase: .reviewing, reviewEndTree: "b", files: [file("a.txt"), file("b.txt", .accepted)], canSend: true)))
+        #expect(app.canAcceptAndContinue)
+        #expect(app.acceptAndContinue())
+        #expect(sent.last == .send(text: "Continue.", acceptPending: true))
+
+        // A changes-requested file goes through Request changes: nothing is sent.
+        app.handle(.state(snapshot(seq: 2, phase: .reviewing, reviewEndTree: "b", files: [file("a.txt"), file("c.txt", .changesRequested)], canSend: true)))
+        #expect(!app.canAcceptAndContinue && !app.acceptAndContinue())
+        // Nothing pending, or Claude working (the gate closed): nothing to accept, nothing sent.
+        app.handle(.state(snapshot(seq: 3, phase: .reviewing, reviewEndTree: "b", files: [file("a.txt", .accepted)], canSend: true)))
+        #expect(!app.acceptAndContinue())
+        app.handle(.state(snapshot(seq: 4, phase: .running, reviewEndTree: "b", files: [file("a.txt")])))
+        #expect(!app.acceptAndContinue())
+        #expect(sent.count == 1)
+    }
+
     @Test func theCommitSheetListsPendingFilesAfterTheAcceptedOnesAndAcceptsTheTickedOnes() {
         var ignored = file("ignored.json")
         ignored.ignored = true

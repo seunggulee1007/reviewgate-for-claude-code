@@ -77,6 +77,28 @@ extension AppState {
     }
 }
 
+// MARK: - Accept N & Continue: the review closed and Claude told to go on, with nothing typed
+
+public enum AcceptContinueRules {
+    /// What "Accept N & Continue" sends. The engine puts the review summary ("[Review gate] Accepted: …") in front of it, so
+    /// Claude learns what was accepted; the words are Claude's, never translated.
+    public static let message = "Continue."
+}
+
+extension AppState {
+    /// "Accept N & Continue" is offered: "Accept N & Send" is, from the running chat (not one shown read-only).
+    public var canAcceptAndContinue: Bool { canAcceptAndSend && viewingChat == nil }
+
+    /// Accepts every pending file and sends `AcceptContinueRules.message` — one `send {acceptPending: true}`, as
+    /// "Accept N & Send" does. False when it is not offered (nothing sent).
+    @discardableResult
+    public func acceptAndContinue() -> Bool {
+        guard canAcceptAndContinue else { return false }
+        send(AcceptContinueRules.message, acceptPending: true)
+        return true
+    }
+}
+
 // MARK: - M28 the commit sheet accepts as it commits
 
 extension AppState {

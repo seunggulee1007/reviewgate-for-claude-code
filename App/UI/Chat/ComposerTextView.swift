@@ -18,7 +18,7 @@ enum ComposerKey: Equatable {
     case backtab
     /// ⌘/ — the slash palette.
     case commandSlash
-    /// ⌘⇧↩ — "Accept N & Send".
+    /// ⌘⇧↩ — "Accept N & Send" ("Accept N & Continue" with nothing typed).
     case commandShiftEnter
     // MARK: wave1 mac-perms — polish-01: the card shortcuts reach the chat only from this text view (no window-wide keys).
     /// ⌘↩ — send / queue the draft, or allow the oldest permission card when the draft is empty.
