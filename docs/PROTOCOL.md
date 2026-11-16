@@ -8711,3 +8711,37 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
   remembered; older ones get 401 (non-blocking for the CLI except where `onFailure: "block"` makes it block).
 - **The token sits in claude's env**, so a command Claude runs could post a hook. Accepted for Stage 1: B is tree-based, so
   a forged hook cannot hide a change; the server is 127.0.0.1 only and the token changes per spawn.
+
+### 57.4 Turns: how the hooks map onto the review
+
+`session/terminalSession.ts` is the terminal chat's session object: it never starts the CLI, it turns hooks into the
+session events a chat's CLI session gives, so snapshot A / B, the turn diff, accept / reject, `state`, `turn_end` and
+`turn_summary` are the chat's. On every hook: `hooksSeen`; a `session_id` other than the one expected (`/clear`,
+`/resume` inside the TUI) becomes the chat's `cliSessionId` (the chat keeps its id; `turn_end` carries the chat's id);
+`waiting` is cleared (but by a Notification).
+
+| Hook | What happens | Answer |
+|---|---|---|
+| UserPromptSubmit | A turn still open with another `prompt_id` ends first (`interrupted`, the Esc rule). The engine adopts the prompt as a review turn (below) | `additionalContext` when there is a review summary / unsent notes; `{decision:"block", reason}` when the review cannot start |
+| PreToolUse (Edit, Write, MultiEdit, NotebookEdit, Bash) | No turn open (Claude goes on by itself: a user's Stop hook that blocked, a background task's result): taken as a turn Claude started (§52.1, `auto_turn_start {trigger:"continue"}`), A first. Bash: the base snapshot (not for a read-only command) and the call's window (§31) | `{}` (the TUI's own permission flow runs); refused: `permissionDecision:"deny"` (the unprompted-turn reason) |
+| PostToolUse (edit tools) | The file is the turn's (`tool_use` with `file`, `tool_result`); an edit the review does not see (outside the project, a nested repository, Claude's memory) goes to `changedOutside` | `{}` |
+| PostToolUse / PostToolUseFailure (Bash) | The post-Bash snapshot: `tool_files` (what changed inside the call's window), `bash_snapshot`, the rows. `is_interrupt` sets `interruptSuspected` | `{}` |
+| Stop | The open turn ends: `turn_end {stopReason:"end_turn"}` (no usage, no budget) → snapshot B, the review. `background_tasks` it names go first, so the next turn keeps A (§52) | `{}` at once — the next prompt waits for the collection |
+| StopFailure | As Stop with `stopReason:"stop_failure:<error>"`, and a non-fatal `error {code:"api_error"}` | `{}` |
+| Notification | `permission_prompt` / `agent_needs_input` → `waiting {kind:"permission"}`; `elicitation_dialog` → `{kind:"question"}`; `idle_prompt` ends an open turn (`interrupted`) | `{}` |
+| SessionEnd | An open turn ends (`session_end`) | `{}` |
+
+- **Adopting a prompt** mirrors `send` without sending: the collection in flight first (bounded by 100 s, under the
+  hook's 120 s), then the gate's checks (the prompt is blocked with the reason the message box would show), snapshot A
+  (kept while a review stands — the prompt answers it, as a question during a review does in a chat), the review summary
+  and unsent notes as `additionalContext` (a prompt starting with "/" keeps them for the next one), the `user_message`
+  row and the title. The PreToolUse hook gets the turn's tree for Bash attribution. Any failure blocks the prompt with
+  the reason.
+- **Esc gives no Stop** (Claude Code does not run Stop on a user interrupt). An interrupted turn stays running —
+  accept / reject stay locked, the diff shows live changes — until the first of: the next prompt with a new `prompt_id`,
+  Notification `idle_prompt`, SessionEnd, the PTY's exit (`terminal_exited`), or "Review now" (`terminal_end_turn`).
+  Closing early is safe: B is a tree, and a later tool call of the same prompt opens a continuation turn through the
+  PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
+- **Not in Stage 1:** the change budget (§54) and the PreToolUse guard (asks, cards, git and scope checks) do not apply to
+  a terminal chat — the TUI's own permission flow decides. A TUI `/rewind` restores files from the CLI's own history,
+  outside ReviewGate's snapshots: what it restores shows as the next turn's changes.
