@@ -2170,6 +2170,8 @@ public final class AppState {
             break
         case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
+        case .terminalSpec:   // §57: consumed by `terminalSpec()`
+            break
         case .interrupted:   // §56.2: consumed by `interruptGivingBack`
             break
         case .commitHunks, .commitSplitDraft, .committedSeries:   // §53: replies, consumed by their requests
