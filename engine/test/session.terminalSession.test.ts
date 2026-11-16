@@ -120,6 +120,15 @@ describe("TerminalSession", () => {
     expect(r.ts.state.promptId).toBeNull(); // a turn Claude started itself
   });
 
+  it("the engine taking the turn after the calls were denied (their wait ran out) ends it at once", async () => {
+    const r = rig();
+    r.ts.autoTurnReady(true, await r.tree());
+    expect(r.of("turn_end").map((e) => e.stopReason)).toEqual(["adopt_timeout"]);
+    expect(r.ts.isTurnActive).toBe(false);
+    r.ts.autoTurnReady(false);
+    expect(r.of("turn_end")).toHaveLength(1);
+  });
+
   it("an edit tool's PostToolUse gives the touched file and its rows; Stop gives turn_end with it", async () => {
     const r = rig();
     await r.hook(ups("p1"));

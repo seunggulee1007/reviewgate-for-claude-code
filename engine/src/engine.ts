@@ -259,6 +259,13 @@ import { resolveStatusLine, type StatusLineResolution } from "./statusline/setti
 import { readManagedPolicy, type ManagedPolicy } from "./statusline/managed.js";
 import { ContextWindows } from "./statusline/contextWindows.js";
 import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffort, repoOfRemote, type StatusLineSnapshot } from "./statusline/input.js";
+// MARK: terminal-chat (§57)
+import { HookServer, RETIRED_REASON } from "./session/hookServer.js";
+import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js";
+import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
+import { defaultScratchDirs } from "./session/reviewScope.js";
+import { compareVersions } from "./platform/toolchain.js";
+import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
 export { ENGINE_VERSION };
 export { CommandRefused } from "./errors.js";
 
@@ -314,7 +321,26 @@ export type EngineOptions = {
   statusLineTiming?: { debounceMs?: number; maxWaitMs?: number; recheckMs?: number; timeoutMs?: number; minIntervalMs?: number };
   /** MARK: r2-peers — §52.1: how long a turn Claude starts itself waits for the gate (a collection, its retry; default 60 000 ms; test seam). */
   autoTurnWaitMs?: number;
+  /** §57: how long a terminal chat's prompt waits for the gate (the collection in flight; default 100 000 ms, under the hook's 120 s). */
+  terminalPromptWaitMs?: number;
 };
+
+/** MARK: terminal-chat — §57: default of `EngineOptions.terminalPromptWaitMs` (the UserPromptSubmit hook gives up at 120 s). */
+export const TERMINAL_PROMPT_WAIT_MS = 100_000;
+/** §57.1: what the TUI does itself in a terminal chat — refused `terminal_chat` (and `side_promote {as: "message"}`). */
+const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
+  "send", "steer", "steer_take_back", "btw_ask", "interrupt", "request_changes", "permission_response", "set_permission_mode",
+  "set_model", "plan_response", "plan_follow", "rewind", "compact", "peer_accept", "task_stop", "task_background", "stop_agent",
+  "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
+]);
+
+/** §57.4: what a terminal prompt the gate cannot take is blocked with (the TUI shows it; the user sends it again). */
+function terminalBlockedReason(code: string): string {
+  if (code === "collecting" || code === "reverting") return "ReviewGate is still collecting the last turn's changes. Send the prompt again in a moment.";
+  if (code === "running" || code === "awaiting_permission" || code === "external_turn") return "ReviewGate still has a turn running. Send the prompt again once it ended.";
+  if (code === "git_init_needed") return "ReviewGate needs this folder to be a git repository before it can review a turn.";
+  return `ReviewGate cannot start a review now (${code}). Send the prompt again in a moment.`;
+}
 
 /** Default of `EngineOptions.interruptWaitMs`. */
 export const INTERRUPT_WAIT_MS = 15_000;
@@ -446,6 +472,10 @@ export class ReviewEngine {
   private gitInit: EngineSlices["gitInit"] = null;
   private session: ClaudeSessionLike | null = null;
   private sessionState: EngineSlices["session"] = emptySession();
+  // MARK: terminal-chat (§57)
+  /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
+  private hookServer: HookServer | null = null;
+  private readonly terminalPromptWaitMs: number;
   /** `permission_response { remember: true }` keys (docs/M16-FRICTION.md §2); shared live with the Claude session's hooks. */
   private readonly rememberedAllows = new Set<string>();
   /** Release-2 review (§33.7): when each remembered key joined the set, and the newest clear of the repository's file applied. */
@@ -835,6 +865,7 @@ export class ReviewEngine {
     this.runClaudeFn = opts.runClaude;
     this.interruptWaitMs = opts.interruptWaitMs ?? INTERRUPT_WAIT_MS;
     this.autoTurnWaitMs = opts.autoTurnWaitMs ?? AUTO_TURN_WAIT_MS; // MARK: r2-peers (§52.1)
+    this.terminalPromptWaitMs = opts.terminalPromptWaitMs ?? TERMINAL_PROMPT_WAIT_MS; // MARK: terminal-chat (§57)
     this.parkIdleMs = opts.parkIdleMs ?? PARK_IDLE_MS;
     // MARK: wave3 engine-session (§36.7, §36.8)
     this.extensionsAutoRetryMs = opts.extensionsAutoRetryMs ?? EXTENSIONS_AUTO_RETRY_MS;
@@ -975,6 +1006,8 @@ export class ReviewEngine {
         && !this.gate.hasPendingReview && this.gate.unsentNoteCount === 0 && !this.gate.isRequestingChanges && this.gate.changedFiles.length > 0;
       if (this.parked) await this.disposeParked(this.parked, "the engine stops"); // r2-chats-cards M33 (§9.1)
       await this.stopSession();
+      await this.hookServer?.close(); // MARK: terminal-chat (§57)
+      this.hookServer = null;
       if (done) {
         this.gate.completeRound();
         this.persistChain = this.persistChain.then(() => this.clearPersistedReview()).catch((e) => this.log("warn", `persist: ${errorMessage(e)}`));
@@ -1006,6 +1039,10 @@ export class ReviewEngine {
   // ------------------------------------------------------------------ dispatch
 
   private async dispatch(cmd: EngineCommand): Promise<ReplyEvent | undefined> {
+    // MARK: terminal-chat — §57.1: the TUI does these itself in a terminal chat.
+    if (this.terminal && (TERMINAL_REFUSED.has(cmd.type) || (cmd.type === "side_promote" && cmd.as === "message"))) {
+      throw new CommandRefused(`terminal_chat:${cmd.type}`, { code: "terminal_chat" });
+    }
     switch (cmd.type) {
       case "hello": {
         this.clientEnv = { ...(cmd.env ?? {}) };
@@ -1332,8 +1369,24 @@ export class ReviewEngine {
         this.touch();
         return;
       case "session_new":
-        await this.sessionNew();
+        await this.sessionNew(cmd.kind);
         return;
+      // MARK: terminal-chat (§57)
+      case "terminal_spec":
+        return this.terminalSpec(cmd.sessionId);
+      case "terminal_started": {
+        const pid = cmd.pid;
+        if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) throw new CommandRefused("invalid_pid", { code: "invalid_pid" });
+        this.requireTerminal(cmd.sessionId).started(pid);
+        return;
+      }
+      case "terminal_exited": {
+        // A chat already switched away from has no terminal any more: nothing to end.
+        const ts = this.terminal;
+        if (ts && ts.chatId === cmd.sessionId && this.currentSessionId === cmd.sessionId) ts.ptyExited();
+        else this.log("debug", `terminal_exited for ${cmd.sessionId}: not the current terminal chat (nothing to end)`);
+        return;
+      }
       case "session_open":
         await this.sessionOpen(cmd.sessionId);
         return;
@@ -2317,9 +2370,14 @@ export class ReviewEngine {
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
   }
 
-  private async sessionNew(): Promise<void> {
+  private async sessionNew(kind?: SessionKind): Promise<void> {
+    // MARK: terminal-chat — §57.1: a terminal chat needs the app's PTY (Mac only in Stage 1).
+    const terminal = kind === "terminal";
+    if (terminal && this.lockOwner.client !== "mac" && this.lockOwner.client !== "test") {
+      throw new CommandRefused(`terminal_unsupported:${this.lockOwner.client}`, { code: "terminal_unsupported" });
+    }
     this.guardSessionSwitch();
-    await this.switchSession(this.sessions!.create(), false);
+    await this.switchSession(this.sessions!.create(undefined, undefined, terminal ? "terminal" : undefined), false);
   }
 
   private async sessionOpen(id: string): Promise<void> {
@@ -2388,7 +2446,8 @@ export class ReviewEngine {
       && !this.gate.running && !this.gate.collecting && !this.gate.reverting && this.externalTurn === null && this.adoptQueue === null
       && st.pendingPermissions.length === 0 && st.pendingPlan === null && (st.backgroundTasks ?? []).length === 0
       && this.agents.foregroundRunning === 0 && !this.agents.list.some((n) => n.isBackground && ["pending", "running", "paused"].includes(n.status))
-      && this.heldPeers().length === 0 && this.recordOnlyNext === null && !this.openChatIsRecord() && this.checkpoints.pendingFork === null;
+      && this.heldPeers().length === 0 && this.recordOnlyNext === null && !this.openChatIsRecord() && this.checkpoints.pendingFork === null
+      && this.terminal === null; // MARK: terminal-chat (§57): its CLI is the app's PTY — never parked, its token retired
   }
 
   /** The chat switched away from: its CLI parked, idle (the one parked before goes), else stopped as before. */
@@ -2467,8 +2526,176 @@ export class ReviewEngine {
 
   /** Every CLI of this engine (the live one and a parked one): never "another Claude in this worktree" (§31.4, §36.9). */
   private ownCliPids(): Set<number> | null {
+    // §57: a terminal chat's session carries its PTY's claude pid (`terminal_started`).
     const pids = [this.session?.pid, this.parked?.session.pid].filter((p): p is number => p !== undefined);
     return pids.length > 0 ? new Set(pids) : null;
+  }
+
+  // MARK: terminal-chat (§57)
+
+  /** The live session when the current chat is a terminal chat. */
+  private get terminal(): TerminalSession | null {
+    return this.session instanceof TerminalSession ? this.session : null;
+  }
+
+  /** §57.1: the current chat's terminal session, or `terminal_not_current`. */
+  private requireTerminal(sessionId: string): TerminalSession {
+    const ts = this.terminal;
+    if (!ts || ts.chatId !== sessionId || this.currentSessionId !== sessionId) {
+      throw new CommandRefused(`terminal_not_current:${sessionId}`, { code: "terminal_not_current" });
+    }
+    return ts;
+  }
+
+  /** §57.2: a terminal chat starts nothing — its session only waits for the hooks of the PTY the app runs. */
+  private async startTerminalSession(meta: SessionMeta, cwd: string): Promise<void> {
+    this.sessionStart = { resume: null, gotInfo: false };
+    const ts: TerminalSession = new TerminalSession({
+      chatId: meta.id,
+      cliSessionId: meta.cliSessionId ?? meta.id,
+      cwd,
+      ignorePatterns: [...this.settings.ignorePatterns],
+      // A little longer than the engine's own bound, so the prompt gets the engine's reason, not the session's.
+      promptWaitMs: this.terminalPromptWaitMs + 10_000,
+      plansDir: join(claudeConfigDir(this.childEnv()), "plans"),
+      scratchDirs: defaultScratchDirs(),
+      emit: (ev) => this.onSessionEvent(ts, ev),
+      log: (level, msg) => this.log(level, msg),
+    });
+    this.session = ts;
+    this.sessionState.open = true;
+    this.sessionState.starting = false;
+    this.sessionState.sessionId = meta.id;
+    await ts.start();
+    this.log("info", `terminal chat ${meta.id}: waiting for the app's terminal`);
+    this.touch();
+  }
+
+  /** §57.1 / §57.3 `terminal_spec`: how the app starts claude — preflight, a fresh token (the previous one retired), argv. */
+  private async terminalSpec(sessionId: string): Promise<TerminalSpecEvent> {
+    const project = this.project;
+    if (!project || this.gitInit !== null || !this.sessions) throw new CommandRefused("no_project");
+    const ts = this.requireTerminal(sessionId);
+    const tc = await this.locate();
+    if (!tc.claude) throw new CommandRefused("cli_not_found", { code: "cli_not_found" });
+    const version = parseCliVersion(tc.claudeVersion);
+    if (version === null || compareVersions(version, MIN_TERMINAL_CLI) < 0) {
+      throw new CommandRefused(`terminal_cli_too_old:${version ?? "unknown"} (needs ${MIN_TERMINAL_CLI})`, { code: "terminal_cli_too_old" });
+    }
+    const configDir = claudeConfigDir(this.childEnv());
+    const managed = (this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir })).settings;
+    const off = hooksDisabled({ configDir, projectDir: project.path, managed });
+    if (off) throw new CommandRefused(`terminal_hooks_disabled:${off}`, { code: "terminal_hooks_disabled" });
+    const server = (this.hookServer ??= new HookServer((msg) => this.log("debug", msg)));
+    await server.start();
+    if (this.session !== ts || this.closed) throw new CommandRefused(`terminal_not_current:${sessionId}`, { code: "terminal_not_current" });
+    const token = server.issue(ts);
+    ts.setToken(token, (t) => server.retire(t));
+    const meta = this.requireSession(sessionId);
+    const resume = meta.cliSessionId !== undefined || this.isResumable(meta);
+    const argv = terminalArgv({ claude: tc.claude, id: meta.cliSessionId ?? meta.id, resume, settingsJson: JSON.stringify(hookSettings(server.url)) });
+    this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
+    this.touch();
+    return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
+  }
+
+  /** §57: the TUI runs another CLI conversation (`/clear`, `/resume`): the chat resumes that one from now on. */
+  private onTerminalSessionId(cliId: string): void {
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (!meta) return;
+    if (cliId === meta.id) delete meta.cliSessionId;
+    else meta.cliSessionId = cliId;
+    meta.cliKnown = true;
+    this.log("info", `terminal chat ${meta.id}: the terminal runs conversation ${cliId}`);
+    this.persistSessions();
+    this.touch();
+  }
+
+  /** Waits (≤ `deadline`) until no collection, revert or retry is in flight for the terminal's session. */
+  private async terminalGateSettled(ts: TerminalSession, deadline: number): Promise<void> {
+    const left = (): number => Math.max(0, deadline - Date.now());
+    if (this.collection) await Promise.race([this.collection.catch(() => undefined), pause(left())]);
+    while ((this.gate.collecting || this.gate.reverting || this.collectRetryPending()) && this.session === ts && Date.now() < deadline) await pause(50);
+  }
+
+  /**
+   * §57.4: the user submitted a prompt in the TUI — taken as `send` takes a message, minus sending it: the collection in
+   * flight first, the gate's checks, snapshot A (kept while a review stands), the review summary and unsent notes as the
+   * hook's `additionalContext`, the turn's start. The hook waits for the answer; any failure blocks the prompt with why.
+   */
+  private async adoptTerminalPrompt(ts: TerminalSession, ev: Extract<SessionEvent, { type: "terminal_prompt" }>): Promise<void> {
+    const answer = (a: PromptAnswer): void => {
+      if (this.session === ts) ts.answerPrompt(a);
+    };
+    const trimmed = ev.prompt.trim();
+    let started = false;
+    try {
+      const deadline = Date.now() + this.terminalPromptWaitMs;
+      await this.terminalGateSettled(ts, deadline);
+      if (this.session !== ts || this.closed) return answer({ ok: false, reason: RETIRED_REASON });
+      if (this.gate.running && !ts.isTurnActive) {
+        // The session has no turn open but the gate still runs one (it was never closed): it ends now, then the prompt.
+        this.log("warn", "terminal: a review turn without an open terminal turn ends before the next prompt");
+        this.endTurnAbnormally("interrupted");
+        await this.terminalGateSettled(ts, deadline);
+        if (this.session !== ts || this.closed) return answer({ ok: false, reason: RETIRED_REASON });
+      }
+      const slices = this.slices();
+      if (!this.gate.checkpoint || !canSend(slices)) return answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
+      await this.followHeadMove();
+      await this.gate.prepareAnswer(this.takeBgCarry());
+      const keptA = this.gate.keepsTurnStart;
+      this.gate.running = true;
+      let tree: string;
+      try {
+        tree = await this.gate.snapshotStart();
+      } catch (e) {
+        this.gate.abortTurn();
+        this.touch();
+        this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
+        return answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+      }
+      const skippedAtStart = this.gate.snapshotSkipped;
+      this.sessionState.pendingPlan = null;
+      this.proposedPlanKeys.clear();
+      // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
+      const command = trimmed.startsWith("/");
+      const { summary, notes } = this.gate.beginSendParts(command);
+      const parts = [summary, notes].filter((p): p is string => p !== null);
+      const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+      if (!command) {
+        this.commitSlice.lastUserText = trimmed;
+        if (meta) {
+          if (meta.title === NEW_CHAT_TITLE) meta.title = sessionTitle(trimmed);
+          meta.lastUserText = trimmed;
+        }
+      }
+      if (meta) {
+        meta.updatedAt = new Date().toISOString();
+        meta.cliKnown = true; // the CLI has this conversation now: the terminal resumes it from here on
+        this.persistSessions();
+      }
+      this.beginTurn(trimmed);
+      this.gate.snapshotSkipped = skippedAtStart;
+      await this.noteTurnStartState();
+      await this.startRecord(keptA ? null : tree);
+      this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
+      if (this.session !== ts) throw new Error("the terminal chat was left");
+      started = true;
+      answer({ ok: true, additionalContext: parts.length > 0 ? parts.join("\n\n") : null, checkpointTree: this.turnHookTree(tree) });
+      this.touch();
+      await this.checkConcurrent("send");
+    } catch (e) {
+      this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
+      if (!started && this.gate.running) {
+        this.gate.abortTurn();
+        this.dropRecord();
+        this.hud.turnStartedAt = null;
+        this.setIdle();
+        this.touch();
+      }
+      if (!started) answer({ ok: false, reason: `ReviewGate could not start the review: ${firstLineOf(errorMessage(e))}` });
+    }
   }
 
   // MARK: wave2 check-engine — §35.4 record-only chats
@@ -3145,6 +3372,9 @@ export class ReviewEngine {
 
   /** `resume` continues that Claude session; otherwise a fresh one, pre-named `sessionId` when given (docs/M15-POLISH.md). */
   private async startSession(cwd: string, resume: string | null = null, sessionId: string | null = null): Promise<void> {
+    // MARK: terminal-chat — §57.2: a terminal chat's CLI is the app's PTY; the engine only takes its hooks.
+    const current = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (current?.kind === "terminal") return this.startTerminalSession(current, cwd);
     this.sessionState.starting = true;
     this.setCapabilitiesState("starting"); // MARK: wave3 engine-session (§36.5)
     // §26: a rewind fork the CLI has not materialized yet starts as a fork again (whatever the caller asked for).
@@ -7003,6 +7233,17 @@ export class ReviewEngine {
       case "git_result": // MARK: r1-git (§46)
         this.onGitResult(ev);
         return;
+      // MARK: terminal-chat (§57)
+      case "terminal_prompt":
+        if (source instanceof TerminalSession) void this.adoptTerminalPrompt(source, ev);
+        return;
+      case "terminal_session_id":
+        this.onTerminalSessionId(ev.sessionId);
+        return;
+      case "terminal_attention":
+      case "terminal_state":
+        this.touch();
+        return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
         // §29 (audit peer-04): a peer message the CLI delivered by itself has its card — no banner, no paused queue.
@@ -8291,6 +8532,7 @@ export class ReviewEngine {
         backgroundTasks: (this.sessionState.backgroundTasks ?? []).map((t) => ({ ...t })), // §52
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,
         ...this.planSourceSlice(), // MARK: wave4d w4d-plan (§42.1)
+        ...(this.terminal ? { terminal: this.terminal.state } : {}), // MARK: terminal-chat (§57)
       },
       toolchain: this.toolchain,
       gate: this.gate,

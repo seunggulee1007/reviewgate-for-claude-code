@@ -8658,7 +8658,27 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   turn; `cli_not_found` as elsewhere.
 - **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
 
-### 57.3 The hooks and the hook server
+### 57.2 Lifecycle and resume
+
+- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
+  chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project`, `restart_session` —
+  the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
+  state). Such a session is never parked (§9.1): switching away stops it and retires its token.
+- **Spawn.** The app asks `terminal_spec {sessionId}` for the current chat (refused `terminal_not_current` otherwise),
+  runs `argv` in its PTY with `env` and `cwd`, then sends `terminal_started {sessionId, pid}` (`running`; the pid is
+  never reported as another Claude in the worktree, §31). `terminal_exited {sessionId, exitCode}` when the PTY ends: an
+  open turn ends (`terminal_exited`) and is collected; `running` turns false. `terminal_exited` for a chat that is no
+  longer the current terminal chat is accepted and does nothing (switching away already ended it).
+- **Resume.** `terminal_spec` resumes (`--resume`) once the chat is resumable — it ran a prompt (`lastUserText`,
+  `cliKnown`: set when a prompt is adopted), or the CLI has its record — else it starts the chat's id
+  (`--session-id`). A `/clear` or `/resume` inside the TUI changes the conversation: the next hook's `session_id` becomes
+  the chat's `cliSessionId` (persisted; removed again when it is the chat's own id), and the spec resumes that one. The
+  chat keeps its id (it is never renamed after the CLI's id, as a chat is). After an app restart the engine reopens the
+  current chat; the app sees `kind: "terminal"` and asks for a spec.
+- **Restart in a tab.** The app ends the PTY, sends `terminal_exited`, asks for a new spec (the old token is retired: a
+  stale terminal's prompts are blocked and its write tools denied) and spawns again.
+- **The engine restarts** (its sidecar died): the port changes, so a running terminal's hooks fail — closed where it
+  matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
 
 **What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id" | "--resume", <cliSessionId ?? id>,
 "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or

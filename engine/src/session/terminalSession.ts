@@ -151,6 +151,15 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   /** §52 path: the engine took (true, with A's tree) or refused (false) the turn a write tool started. */
   autoTurnReady(ok: boolean, checkpointTree?: string): void {
+    if (!this.adoption) {
+      // The calls stopped waiting (denied) before the engine took the turn: it ends at once, so the gate opens again.
+      if (ok && !this.disposed && !this.open) {
+        this.opts.log("warn", "terminal: the review turn started after its tool call was denied; ending it");
+        this.open = { promptId: null, hookPromptId: null, openedAt: this.now() };
+        this.closeTurn("adopt_timeout");
+      }
+      return;
+    }
     this.settleAdoption(ok ? { ok, ...(checkpointTree !== undefined ? { tree: checkpointTree } : {}) } : { ok });
   }
 
