@@ -27094,6 +27094,38 @@
         }
       }
     },
+    "The terminal could not start %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal could not start %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널에서 %@을(를) 시작하지 못했어요"
+          }
+        }
+      }
+    },
+    "The terminal could not start: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal could not start: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널을 시작하지 못했어요: %@"
+          }
+        }
+      }
+    },
     "The terminal starts in %@ mode (permissions.defaultMode)": {
       "localizations": {
         "en": {

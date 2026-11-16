@@ -1,0 +1,183 @@
+import AppKit
+import Observation
+import ReviewGateCore
+@preconcurrency import SwiftTerm
+
+// MARK: terminal-chat (§57.5)
+/// One terminal view and the PTY it runs. The host owns the view, so re-renders, the PRs tab or a closed panel never end
+/// the process; `TerminalContainer` only shows it. A restart makes a fresh view (a clean screen and scrollback).
+@MainActor @Observable
+final class TerminalHost: LocalProcessTerminalViewDelegate {
+    enum State: Equatable {
+        case idle
+        case starting
+        case running(pid: Int32)
+        /// `quickNoHooks`: it ended within 10 s and no hook ever came (Claude Code's trust question answered "No", a CLI
+        /// that failed at once) — the chat's overlay explains.
+        case exited(code: Int32?, quickNoHooks: Bool)
+        case failed(String)
+
+        var isRunning: Bool {
+            switch self {
+            case .starting, .running: true
+            case .idle, .exited, .failed: false
+            }
+        }
+    }
+
+    private(set) var state: State = .idle
+    /// Bumped for each new view (`TerminalContainer` re-attaches; delayed focus calls of an older start do nothing).
+    private(set) var generation = 0
+    /// What the program set with OSC 0/2 (the shell panel's tab title).
+    private(set) var title = ""
+    /// The engine restarted while this PTY ran (its hooks now fail closed): the chat offers Restart.
+    var disconnected = false
+    private(set) var view: ReviewTerminalView
+    @ObservationIgnored private var startedAt: Date?
+    @ObservationIgnored private var exitWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Asked when the PTY ends: did any hook arrive for this spawn (`quickNoHooks`)?
+    @ObservationIgnored var hooksSeen: (() -> Bool)?
+    /// The PTY ended (after `state` changed); not called for a `stop()` of the host's own.
+    @ObservationIgnored var onExit: ((Int32?) -> Void)?
+    @ObservationIgnored private var stopping = false
+
+    init() {
+        view = ReviewTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 480))
+        configure(view)
+    }
+
+    /// Starts `launch` in a fresh view; returns the child's pid (nil when it could not start).
+    @discardableResult
+    func start(launch: TerminalLaunch) -> Int32? {
+        let fresh = ReviewTerminalView(frame: view.frame)
+        configure(fresh)
+        view.processDelegate = nil
+        view.stopCaretObservation()
+        if view.process.running { view.terminate() }
+        view = fresh
+        generation += 1
+        disconnected = false
+        state = .starting
+        startedAt = Date()
+        fresh.startProcess(executable: launch.executable, args: launch.args, environment: launch.env,
+                           execName: launch.execName, currentDirectory: launch.cwd)
+        let pid = fresh.process.shellPid
+        guard pid > 0 else {
+            state = .failed(String(localized: "The terminal could not start \(launch.executable)"))
+            return nil
+        }
+        fresh.enableUTF8LineEditing()
+        state = .running(pid: pid)
+        let gen = generation
+        // Once it is on screen: the keyboard goes to the new terminal (never NSApp.activate — only this window's responder).
+        for delay in [0.3, 1.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, gen == self.generation else { return }
+                    self.focus()
+                }
+            }
+        }
+        return pid
+    }
+
+    /// Ends the PTY: SIGTERM, then SIGKILL after 3 s. Returns once it is reaped (or at once when nothing runs).
+    func stop() async {
+        guard view.process.running else { return }
+        stopping = true
+        defer { stopping = false }
+        let pid = view.process.shellPid
+        view.terminate()
+        let ended = await waitForExit(seconds: 3)
+        if !ended, pid > 0 {
+            kill(pid, SIGKILL)
+            _ = await waitForExit(seconds: 2)
+        }
+    }
+
+    /// `stop()` and `start(launch:)`.
+    @discardableResult
+    func restart(launch: TerminalLaunch) async -> Int32? {
+        await stop()
+        return start(launch: launch)
+    }
+
+    /// Types `text` into the PTY (the screenshot tour's fake claude only; the user types themselves).
+    func send(text: String) {
+        view.send(data: ArraySlice(Array(text.utf8)))
+    }
+
+    /// Esc into the PTY: Stop (⌘.) on a terminal chat — the TUI stops Claude as in any terminal.
+    func sendEscape() {
+        view.send(data: [0x1b])
+    }
+
+    /// The keyboard goes to the terminal when its window shows it (`makeFirstResponder` only; the app is never activated).
+    func focus() {
+        guard let window = view.window, window.firstResponder !== view else { return }
+        window.makeFirstResponder(view)
+    }
+
+    /// The terminal has the keyboard.
+    var isFocused: Bool { view.window?.firstResponder === view }
+
+    /// The visible screen's text, one line per row (the tour's checks).
+    func screenLines(scrollback: Int = 500) -> [String] {
+        view.terminalContentSnapshot(region: .history(maximumScrollbackRows: scrollback))?.rows.map(\.text) ?? []
+    }
+
+    private func configure(_ v: ReviewTerminalView) {
+        v.processDelegate = self
+        v.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        v.nativeBackgroundColor = NSColor(calibratedRed: 0.08, green: 0.08, blue: 0.09, alpha: 1)
+        v.nativeForegroundColor = NSColor(calibratedWhite: 0.9, alpha: 1)
+        v.caretColor = NSColor.systemTeal
+        // ⌥ is Meta only on Enter / Esc / Tab / Backspace and arrows outside a composition, so ⌥Return during 한 reaches
+        // the input method (Hanja) and ⌥-letters type their characters.
+        v.optionAsMetaKey = false
+        v.optionAsMetaKeyForFunctionalKeys = true
+    }
+
+    private func waitForExit(seconds: Double) async -> Bool {
+        guard view.process.running else { return true }
+        let gen = generation
+        let timeout = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            self?.resumeWaiters()
+        }
+        await withCheckedContinuation { exitWaiters.append($0) }
+        timeout.cancel()
+        return gen != generation || !view.process.running
+    }
+
+    private func resumeWaiters() {
+        let waiters = exitWaiters
+        exitWaiters = []
+        waiters.forEach { $0.resume() }
+    }
+
+    // MARK: LocalProcessTerminalViewDelegate
+
+    func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
+
+    func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        guard source === view else { return }
+        self.title = title
+    }
+
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+
+    func processFailedToStart(source: TerminalView, error: LocalProcessError) {
+        guard source === view else { return }
+        state = .failed(String(localized: "The terminal could not start: \(String(describing: error))"))
+        resumeWaiters()
+    }
+
+    func processTerminated(source: TerminalView, exitCode: Int32?) {
+        guard source === view else { return }
+        let quick = startedAt.map { Date().timeIntervalSince($0) < 10 } ?? false
+        state = .exited(code: exitCode, quickNoHooks: quick && hooksSeen?() != true)
+        resumeWaiters()
+        if !stopping { onExit?(exitCode) }
+    }
+}
