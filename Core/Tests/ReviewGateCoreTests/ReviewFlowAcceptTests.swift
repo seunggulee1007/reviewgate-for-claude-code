@@ -64,6 +64,20 @@ import Testing
         #expect(sent.count == 1)
     }
 
+    @Test func acceptAndContinueIsNotOfferedInATerminalChat() {
+        let app = makeStore()
+        var sent: [EngineCommand] = []
+        app.commandSink = { sent.append($0) }
+        var s = snapshot(seq: 1, phase: .reviewing, reviewEndTree: "b", files: [file("a.txt")], canSend: true)
+        var term = SessionMeta(id: "s", title: "In the terminal")
+        term.kind = .terminal
+        s.sessions = SessionsInfo(list: [term], currentId: "s", openTabIds: ["s"])
+        app.handle(.state(s))
+        #expect(app.isTerminalChat)
+        #expect(!app.canAcceptAndContinue && !app.acceptAndContinue())
+        #expect(sent.isEmpty)
+    }
+
     @Test func theCommitSheetListsPendingFilesAfterTheAcceptedOnesAndAcceptsTheTickedOnes() {
         var ignored = file("ignored.json")
         ignored.ignored = true

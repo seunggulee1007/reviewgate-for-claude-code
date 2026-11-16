@@ -86,8 +86,9 @@ public enum AcceptContinueRules {
 }
 
 extension AppState {
-    /// "Accept N & Continue" is offered: "Accept N & Send" is, from the running chat (not one shown read-only).
-    public var canAcceptAndContinue: Bool { canAcceptAndSend && viewingChat == nil }
+    /// "Accept N & Continue" is offered: "Accept N & Send" is, from the running chat (not one shown read-only), and that chat
+    /// is not a terminal chat (§57: its messages are typed into the TUI; the engine refuses `send` there).
+    public var canAcceptAndContinue: Bool { canAcceptAndSend && viewingChat == nil && !isTerminalChat }
 
     /// Accepts every pending file and sends `AcceptContinueRules.message` — one `send {acceptPending: true}`, as
     /// "Accept N & Send" does. False when it is not offered (nothing sent).

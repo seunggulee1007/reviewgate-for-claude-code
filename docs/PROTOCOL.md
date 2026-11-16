@@ -8858,4 +8858,6 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
   be on another tab). The confirm is off, with the send's reason as its tooltip, while Claude cannot take the message.
 - **Tooltips.** "Accepts the N pending file(s), then tells Claude to continue (⌘⇧↩)", or with the sheet "Shows a summary of
   the N pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)"; AX "Accept and continue".
+- **Not in a terminal chat** (§57): its column has no message box (the TUI is the composer) and `canAcceptAndContinue` is
+  false there, so neither the button nor ⌘⇧↩ can send — the engine would refuse `send` with `terminal_chat` anyway.
 - **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.
