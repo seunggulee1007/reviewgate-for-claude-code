@@ -136,6 +136,7 @@ enum ProjectOpener {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.canCreateDirectories = true   // New Folder: a new project starts in a folder made here
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder")
@@ -214,6 +215,7 @@ enum ProjectOpener {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.canCreateDirectories = true   // New Folder: a new project starts in a folder made here
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Switch")
         panel.message = String(localized: "Choose a project folder to switch to")
@@ -269,6 +271,7 @@ enum ProjectOpener {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.canCreateDirectories = true   // New Folder: a new project starts in a folder made here
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Open")
         panel.message = String(localized: "Choose a project folder to open in a new window")

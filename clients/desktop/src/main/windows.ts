@@ -340,7 +340,8 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
 export async function openInNewWindow(path?: string, parent?: BrowserWindow | null): Promise<void> {
   let target = path;
   if (!target) {
-    const options: Electron.OpenDialogOptions = { properties: ["openDirectory"], title: t("Open in New Window") }; // MARK: wave4d w4d-windows
+    // MARK: wave4d w4d-windows; "createDirectory" (macOS: the New Folder button) as Open Project has it.
+    const options: Electron.OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], title: t("Open in New Window") };
     const owner = parent ?? BrowserWindow.getFocusedWindow();
     const r = owner ? await dialog.showOpenDialog(owner, options) : await dialog.showOpenDialog(options);
     if (r.canceled || r.filePaths.length === 0) return;

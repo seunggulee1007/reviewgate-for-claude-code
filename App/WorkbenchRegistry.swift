@@ -18,6 +18,9 @@ final class WindowModel {
     // M13: sheets / dialogs the Review and Workbenches menus open (the views bind to these).
     /// Accept-all summary sheet (audit 1.9).
     var showAcceptAll = false
+    /// The same summary sheet opened by the message box's "Accept N & Continue" (the composer presents it: the review list
+    /// may be on another tab); its confirm accepts and tells Claude to continue.
+    var showAcceptAllContinue = false
     /// Reject-all confirmation.
     var showRejectAll = false
     /// Commit accepted sheet (M12).

@@ -775,7 +775,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   `accepted`, the turn starts. Refused like a plain send while `running` / `collecting` / `reverting`
   (`gate_closed:<reason>`, nothing accepted; M30, §3: after a failed collection it accepts against the held B and sends) and with `gate_closed:changes_requested` when any file is `changesRequested` (use
   `request_changes`; nothing accepted). `acceptPending` on an open gate is a plain send. It is **never** the default: clients
-  send it only from a separate, explicitly labelled "Accept N & Send" action (Mac: menu button next to Send, ⌘⇧↩; Electron:
+  send it only from a separate, explicitly labelled "Accept N & Send" action (Mac: menu button next to Send, ⌘⇧↩ — "Accept N & Continue" with nothing typed, §58; Electron:
   split-button dropdown, Ctrl/⌘+Shift+Enter) — M28: at once, no confirmation (a toast says what was accepted). The plain Send button (AX "Send") leaves the
   review exactly as it is — a message sent while files await review is a question, answered against the same snapshot A
   ("Question during a review", §3).
@@ -8009,6 +8009,9 @@ The pieces the other lanes build on (lane p-foundation), and what they changed w
   ("ko" / "en"; it was always "en"): Narrator and NVDA read Korean with a Korean voice, and Chromium shapes and breaks
   Korean lines as Korean. `t()` spells ⇧⇥ (the permission mode's key) as Windows does, Shift+Tab, like ⇧↩ → Shift+Enter
   (§42.5).
+- **A project folder can be made where it is chosen.** Every folder picker that opens a project — Open (⌘O), Switch
+  Project…, Open in New Window… — has New Folder (Mac `canCreateDirectories`; Electron `createDirectory`, which only the
+  macOS dialog needs — the Windows one always can). The image attach picker chooses files and has none.
 
 ### 55.2 The chat-move notice (lane r2-guards)
 
@@ -8833,3 +8836,26 @@ session events a chat's CLI session gives, so snapshot A / B, the turn diff, acc
   window keeps 200 pt above); the height is remembered.
 - **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
   with no `-l` / `-i`, so no dotfiles run in a tour.
+
+## 58. Accept N & Continue
+
+After a turn its changes wait in the review, and accepting them tells Claude nothing until the next message (the engine
+puts `gate.lastReviewSummary` in front of it, §10). To let Claude go on the user typed "accepted, continue" every turn. This
+is the clients' own (no engine command): one `send {text: "Continue.", acceptPending: true}`.
+
+- **Where.** The message box's "Accept N & Send" reads **"Accept N & Continue"** while the box is empty (no text, mention or
+  image; anything typed brings "& Send" back) — the same rules offer it (`canAcceptAndSend`: files pending, none
+  changes-requested, a message can be sent; not from another chat shown read-only). One click on it, or ⌘⇧↩ in the box (the
+  "& Send" key), runs it; its menu and the narrow row's "⋯" carry the same item with the key. Only there: the review list's
+  모두 수락 and Review › Accept All… stay accepts that send nothing.
+- **What it sends.** `AcceptContinueRules.message` = `Continue.` — the engine accepts every pending file and sends
+  `[Review gate] Accepted: …` + `"\n\n"` + `Continue.`, so Claude learns what was accepted and goes on. The text is fixed
+  English (Claude's words, never translated); it joins the prompt history as any message. A toast says "Accepted N files —
+  Claude continues"; there is no undo (the turn has started, as with Accept N & Send).
+- **The summary sheet.** Unlike "& Send" (M28: at once), a pending file never looked at, changed since, or sensitive
+  (`acceptAllNeedsSheet`) opens the Accept all summary sheet first — nothing was typed, so the click is an Accept all; its
+  confirm reads "Accept N & Continue" and continues, Cancel sends nothing. The message box presents it (the review list may
+  be on another tab). The confirm is off, with the send's reason as its tooltip, while Claude cannot take the message.
+- **Tooltips.** "Accepts the N pending file(s), then tells Claude to continue (⌘⇧↩)", or with the sheet "Shows a summary of
+  the N pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)"; AX "Accept and continue".
+- **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.

@@ -18,6 +18,24 @@ enum AcceptAllAction {
                    action: Toast.Action(title: AcceptAllRules.undoTitle) { [weak store] in store?.unaccept(paths: paths) })
         ReviewUndo.accepted(paths, store: store, name: String(localized: "Accept all"))
     }
+
+    /// "Accept N & Continue" (the message box, ⌘⇧↩ with nothing typed): the same summary sheet first when a file still needs
+    /// a look — its confirm then continues —, else at once.
+    static func runContinuing(store: AppState, model: WindowModel) {
+        guard store.canAcceptAndContinue else { return }
+        if store.acceptAllNeedsSheet {
+            model.showAcceptAllContinue = true
+        } else {
+            continueNow(store: store)
+        }
+    }
+
+    /// Accepts every pending file and tells Claude to continue, in one send; no undo — the turn has started (as Accept N & Send).
+    static func continueNow(store: AppState) {
+        let count = store.pendingFiles.count
+        guard store.acceptAndContinue() else { return }
+        Toast.show(String(localized: "Accepted \(count) files — Claude continues"))
+    }
 }
 
 /// polish P2-review-23: Edit › Undo (⌘Z, outside a text field) takes a review decision back, as the menu names it
@@ -69,6 +87,8 @@ struct AcceptAllSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store
     @Environment(\.dismiss) private var dismiss
+    /// Opened by "Accept N & Continue": the confirm accepts and tells Claude to continue, in one send.
+    var continues = false
 
     private var files: [ChangedFile] { store.pendingFiles }
     /// wave2 mac-flow (§34.5): by content — a file that changed after it was viewed is not "viewed".
@@ -131,14 +151,28 @@ struct AcceptAllSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("Accept all cancel")
-                Button("Accept all") {
-                    AcceptAllAction.acceptNow(store: store)   // r2-review-flow M28: with the same undo toast
-                    dismiss()
+                if continues {
+                    Button("Accept \(files.count) & Continue") {
+                        AcceptAllAction.continueNow(store: store)
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(files.isEmpty || !store.canAcceptAndContinue)
+                    // Off while Claude cannot take the message (it started a turn meanwhile, …): the reason, as Send gives it.
+                    .help((store.canAcceptAndContinue ? nil : store.cannotSendReason)
+                          ?? String(localized: "Accepts the \(files.count) pending file(s), then tells Claude to continue"))
+                    .accessibilityIdentifier("Accept all continue")
+                } else {
+                    Button("Accept all") {
+                        AcceptAllAction.acceptNow(store: store)   // r2-review-flow M28: with the same undo toast
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(files.isEmpty || store.isAcceptLocked)   // wave2 mac-flow: also during a turn (§34.2)
+                    .accessibilityIdentifier("Accept all confirm")
                 }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(files.isEmpty || store.isAcceptLocked)   // wave2 mac-flow: also during a turn (§34.2)
-                .accessibilityIdentifier("Accept all confirm")
             }
             if let reason = store.acceptLockReason {
                 // wave2 mac-flow: a blocked confirm says why (a collection or a revert in flight).

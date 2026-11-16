@@ -430,6 +430,11 @@ struct ChatComposer: View {
             composer.images.isEmpty ? nil : String(localized: "\(composer.images.count) attached images will be lost.")
         }
         .modifier(ComposerBtwHooks(composer: composer))   // §56.1
+        // "Accept N & Continue" with a file still to look at: the Accept all summary first (here — the review list may be on
+        // another tab).
+        .sheet(isPresented: Binding(get: { model.showAcceptAllContinue }, set: { model.showAcceptAllContinue = $0 })) {
+            AcceptAllSheet(continues: true)
+        }
         .onChange(of: composer.draft) { _, _ in
             composer.paletteDismissed = false
             composer.paletteForced = false   // ⌘/ over a typed draft: typing on is a message, not a filter — ↩ stays a newline
@@ -566,7 +571,12 @@ struct ChatComposer: View {
                             .disabled(!store.canRequestChanges)
                             .accessibilityIdentifier("Request changes")
                     }
-                    if accept {
+                    if accept, continuesEmpty {
+                        Button("Accept \(store.pendingFiles.count) & Continue") { acceptAndContinueTapped() }
+                            .keyboardShortcut(measuring ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
+                            .help(acceptAndContinueHelp)
+                            .accessibilityIdentifier("Accept and continue")
+                    } else if accept {
                         Button("Accept \(store.pendingFiles.count) & Send") { acceptAndSendTapped() }
                             .keyboardShortcut(.return, modifiers: [.command, .shift])
                             .disabled(trimmedDraft.isEmpty)
@@ -578,8 +588,12 @@ struct ChatComposer: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .help(request && accept ? String(localized: "Request changes (\(store.unsentNotes.count)) · Accept \(store.pendingFiles.count) & Send")
-                      : request ? String(localized: "Request changes (\(store.unsentNotes.count))") : String(localized: "Accept \(store.pendingFiles.count) & Send"))
+                .help(request && accept ? (continuesEmpty
+                        ? String(localized: "Request changes (\(store.unsentNotes.count)) · Accept \(store.pendingFiles.count) & Continue")
+                        : String(localized: "Request changes (\(store.unsentNotes.count)) · Accept \(store.pendingFiles.count) & Send"))
+                      : request ? String(localized: "Request changes (\(store.unsentNotes.count))")
+                      : continuesEmpty ? String(localized: "Accept \(store.pendingFiles.count) & Continue")
+                      : String(localized: "Accept \(store.pendingFiles.count) & Send"))
                 .accessibilityLabel("More send options")
                 .accessibilityIdentifier("Composer more")
             }
@@ -598,7 +612,24 @@ struct ChatComposer: View {
                     .accessibilityLabel("Request changes")
                     .accessibilityIdentifier("Request changes")
             }
-            if accept {
+            if accept, continuesEmpty {
+                // Nothing typed: one click accepts and tells Claude to continue (the engine puts what was accepted in front of
+                // it) — no "accepted, go on" to type every turn. The menu holds the same item with its key.
+                Menu {
+                    Button("Accept \(store.pendingFiles.count) & Continue") { acceptAndContinueTapped() }
+                        .keyboardShortcut(measuring ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
+                        .accessibilityIdentifier("Accept and continue")
+                } label: {
+                    Text("Accept \(store.pendingFiles.count) & Continue")
+                } primaryAction: {
+                    acceptAndContinueTapped()
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(acceptAndContinueHelp)
+                .accessibilityLabel("Accept and continue")
+                .accessibilityIdentifier("Accept and continue menu")
+            } else if accept {
                 // A separate, explicitly labelled action: accepting is never a side effect of Send.
                 Menu {
                     Button("Accept \(store.pendingFiles.count) & Send") { acceptAndSendTapped() }
@@ -739,6 +770,13 @@ struct ChatComposer: View {
     /// "Accept N & Send" is a separate, explicit action next to Send; plain Send never accepts anything.
     private var acceptAndSend: Bool { store.canAcceptAndSend }
     private var trimmedDraft: String { composer.draft.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// Nothing in the box — no text, mention or image: "Accept N & Send" reads "Accept N & Continue" (nothing typed is lost).
+    private var continuesEmpty: Bool { trimmedDraft.isEmpty && composer.mentions.isEmpty && composer.images.isEmpty }
+    private var acceptAndContinueHelp: String {
+        store.acceptAllNeedsSheet
+            ? String(localized: "Shows a summary of the \(store.pendingFiles.count) pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)")
+            : String(localized: "Accepts the \(store.pendingFiles.count) pending file(s), then tells Claude to continue (⌘⇧↩)")
+    }
 
     /// r2-chats-cards M33 (§9): from a chat shown read-only while Claude works in the live one — the send waits for it.
     private var viewingWaitHint: String {
@@ -1089,6 +1127,16 @@ struct ChatComposer: View {
         sendAccepting()
     }
 
+    /// "Accept N & Continue" (⌘⇧↩ with nothing typed): every pending file accepted and Claude told to go on — the Accept all
+    /// summary sheet first when a file still needs a look (`AcceptAllAction.runContinuing`).
+    private func acceptAndContinueTapped() {
+        guard store.canAcceptAndContinue, continuesEmpty else { return }
+        composer.closePalette()
+        transcript.follow = true
+        AcceptAllAction.runContinuing(store: store, model: model)
+        composer.inputFocused = true
+    }
+
     private func sendAccepting() {
         let text = composer.draft
         guard acceptAndSend, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -1273,8 +1321,9 @@ struct ChatComposer: View {
         case .commandEnter, .optionCommandEnter, .commandDelete:
             return handleCardShortcut(key)   // wave1 mac-perms (polish-01)
         case .commandShiftEnter:
-            // ⌘⇧↩ is the explicit "Accept N & Send"; plain ⌘↩ never accepts (`handleCardShortcut`).
-            acceptAndSendTapped()
+            // ⌘⇧↩ is the explicit "Accept N & Send" — "Accept N & Continue" with nothing typed; plain ⌘↩ never accepts
+            // (`handleCardShortcut`).
+            if continuesEmpty { acceptAndContinueTapped() } else { acceptAndSendTapped() }
             return true
         case .commandSlash:
             // ⌘/ again closes it (the "/" it put in an empty draft goes with it).
