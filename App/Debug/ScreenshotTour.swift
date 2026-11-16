@@ -137,6 +137,11 @@ private final class Tour {
             do { try await composerOnly(); finish(nil) } catch { finish(error) }
             return
         }
+        // MARK: terminal-chat (§57): `SHOTS_LAYOUT=terminal` — the terminal chat and the shell panel on a fake claude.
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
+            do { try await terminalOnly(); finish(nil) } catch { finish(error) }
+            return
+        }
         // `SHOTS_LAYOUT=blank`: only the blank-chat check in tall windows.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "blank" {
             do { try await blankOnly(); finish(nil) } catch { finish(error) }
@@ -2603,6 +2608,198 @@ private final class Tour {
             guard git.terminationStatus == 0 else { throw TourError("git \(args) failed in \(dir.path)") }
         }
         return dir.standardizedFileURL
+    }
+
+    // MARK: terminal-chat (§57) — `SHOTS_LAYOUT=terminal`
+
+    /// The terminal chat and the shell panel on a fake `claude` (scripts/screenshots.sh writes it; it never runs the real
+    /// one) in `/bin/sh` without dotfiles (`REVIEWGATE_TERMINAL_SHELL`). `terminal:` lines in tour.log; a step that did not
+    /// happen is SILENT (nothing came) or LOST (the wrong thing came). Nothing touches the pasteboard: copy is checked
+    /// through `validateUserInterfaceItem` and `getSelection` only.
+    private func terminalOnly() async throws {
+        try await wait("project open", timeout: 180) { $0.projectURL != nil && !$0.isStarting }
+        guard let window = entry.window else { throw TourError("no window") }
+        // No `place()`: a quiet run never activates the app or orders its window in front.
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1280, height: 800)), display: true)
+        AppSettings.setAppearance(.dark)
+        let hub = entry.model.terminals
+        let demo = store.projectURL?.path ?? ""
+
+        // 1. A new terminal chat shows the fake's banner.
+        guard await store.newTerminalChat() else { return log("terminal: New Terminal Chat refused — SILENT") }
+        try await wait("terminal chat is the live chat", timeout: 30) { $0.isTerminalChat && $0.shownChatIsTerminal }
+        guard let chatId = store.currentSessionId else { return log("terminal: no chat id — SILENT") }
+        let bannerShown = await waitFor(seconds: 10) { hub.host(for: chatId)?.screenText().contains("fake-claude session=") == true }
+        guard bannerShown, let host = hub.host(for: chatId) else {
+            let why = hub.specErrors[chatId] ?? hub.host(for: chatId).map { "\($0.state)" } ?? "no terminal"
+            return log("terminal: banner — SILENT (\(why))")
+        }
+        let firstBanner = Self.banner(host)
+        log("terminal: banner shown — \(firstBanner ?? "?")")
+
+        // 2. A prompt typed into the PTY becomes a review turn with notes.txt.
+        host.send(text: "add a note\r")
+        let reviewed = await waitFor(seconds: 30) { [store] in
+            store.gatePhase == .reviewing && store.changedFiles.contains { $0.path == "notes.txt" }
+        }
+        log("terminal: first prompt → " + (reviewed ? "review with notes.txt" : "— SILENT (phase \(store.gatePhase), files \(store.changedFiles.map(\.path)))"))
+        log("terminal: hooks seen \(store.terminalInfo?.hooksSeen == true), running \(store.terminalInfo?.running == true)")
+        try await Task.sleep(for: .milliseconds(1200))
+        try write(try render(window), "terminal-chat-review-dark")
+
+        // 3. Reject it; the next prompt's context says so.
+        if reviewed, let file = store.changedFiles.first(where: { $0.path == "notes.txt" }) {
+            store.reject(file)
+            let rejected = await waitFor(seconds: 20) { [store] in !store.changedFiles.contains { $0.path == "notes.txt" && $0.state == .pending } }
+            log("terminal: reject notes.txt → \(rejected ? "rejected" : "still pending")")
+            host.send(text: "add another note\r")
+            let told = await waitFor(seconds: 30) {
+                let text = host.screenText()
+                return text.contains("context: [Review gate]") && text.contains("Rejected")
+            }
+            log("terminal: second prompt's context " + (told ? "names the rejected file" : "— LOST (\(Self.lastLines(host, 6)))"))
+            _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing }
+        } else {
+            log("terminal: reject step skipped — LOST (no review to reject)")
+        }
+
+        // 4. The shell panel: ⌃` shows it, the shell's folder is the project's.
+        entry.model.shell.toggle()
+        let shellUp = await waitFor(seconds: 10) { [model = entry.model] in
+            model.shell.visible && model.shell.selected?.host.screenText().isEmpty == false
+        }
+        guard shellUp, let shell = entry.model.shell.selected?.host else {
+            return log("terminal: shell panel — SILENT (visible \(entry.model.shell.visible), tabs \(entry.model.shell.tabs.count))")
+        }
+        // A quiet window lays the new panel out lazily: until it has its height the shell has one row, and what it prints
+        // then scrolls away before the shot.
+        _ = await waitFor(seconds: 5) { shell.view.frame.height > 100 }
+        shell.send(text: "pwd\r")
+        let pwdOK = await waitFor(seconds: 10) { shell.screenLines().contains { $0.trimmingCharacters(in: .whitespaces) == demo } }
+        log("terminal: shell pwd " + (pwdOK ? "is the project folder" : "— LOST (\(Self.lastLines(shell, 4)))"))
+        try await Task.sleep(for: .milliseconds(800))
+        let size = { (h: TerminalHost) in "\(Int(h.view.frame.width))×\(Int(h.view.frame.height)) pt, \(h.view.terminalDimensions.cols)×\(h.view.terminalDimensions.rows) cells" }
+        log("terminal: INFO shell view \(size(shell)), chat view \(size(host))")
+        try write(try render(window), "shell-panel-dark")
+
+        // 5. The input method in the shell's `cat` (cooked mode: what the kernel's line editing makes of it).
+        shell.send(text: "exec cat\r")
+        try await Task.sleep(for: .milliseconds(600))
+        await imeChecks(shell.view)
+        _ = await waitFor(seconds: 5) { shell.screenLines().filter { $0 == "가韓" }.count >= 1 }
+        let ime = imeResults(shell)
+        for (name, ok) in ime { log("terminal: ime \(name) " + (ok ? "ok" : "— LOST")) }
+        if ime.contains(where: { !$0.1 }) { log("terminal: INFO shell rows: \(Self.lastLines(shell, 12))") }
+        let v = shell.view
+        let copyItem = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        v.selectNone()
+        log("terminal: copy enabled without a selection " + (v.validateUserInterfaceItem(copyItem) ? "ok" : "— LOST"))
+        v.selectAll()
+        log("terminal: selection text " + ((v.getSelection() ?? "").contains("한글") ? "has 한글" : "— LOST"))
+        v.selectNone()
+
+        // 6. ⌃` again: the panel has the keyboard in a focused window, else it is focused first. Best effort through the
+        // app's own event path (never CGEvent): logged INFO when this window is not key (a quiet run).
+        let shellModel = entry.model.shell
+        let before = shellModel.visible
+        if let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: ProcessInfo.processInfo.systemUptime,
+                                      windowNumber: window.windowNumber, context: nil, characters: "\0", charactersIgnoringModifiers: "`",
+                                      isARepeat: false, keyCode: 50) {
+            NSApp.sendEvent(key)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        log("terminal: INFO ⌃` key event — panel visible \(before) → \(shellModel.visible), window key \(window.isKeyWindow)")
+        // The toggle itself: shown → (focus →) hidden → shown again with its shell still there.
+        if shellModel.visible { shellModel.toggle() }
+        if shellModel.visible { shellModel.toggle() }
+        let hidden = !shellModel.visible
+        shellModel.toggle()
+        let back = shellModel.visible && shellModel.tabs.count == 1 && shellModel.selected?.host.state.isRunning == true
+        log("terminal: toggle " + (hidden && back ? "hides and shows the panel, its shell kept" : "— LOST (hidden \(hidden), back \(back))"))
+
+        // 7. /exit ends the fake; Restart resumes the same conversation.
+        host.send(text: "/exit\r")
+        let exited = await waitFor(seconds: 10) { if case .exited = host.state { true } else { false } }
+        log("terminal: /exit → " + (exited ? "exited (\(host.state))" : "— SILENT (\(host.state))"))
+        try await Task.sleep(for: .milliseconds(600))
+        try write(try render(window), "terminal-chat-exited-dark")
+        await hub.restart(chatId: chatId)
+        let resumed = await waitFor(seconds: 15) { hub.host(for: chatId)?.screenText().contains("resume=true") == true }
+        let second = hub.host(for: chatId).flatMap { Self.banner($0) }
+        let sameId = second.map { Self.sessionId($0) } == firstBanner.map { Self.sessionId($0) }
+        log("terminal: restart → " + (resumed && sameId ? "resumed \(second ?? "")" : "— LOST (\(second ?? "no banner"))"))
+        try await Task.sleep(for: .milliseconds(800))
+        try write(try render(window), "terminal-chat-restarted-dark")
+        await entry.model.shell.stopAll()
+        await hub.stopAll()
+    }
+
+    private var imeOutcome: [(String, Bool)] = []
+
+    /// M0's checks against `cat`: a mark / commit of 한글 (nothing sent while only marked), `unmarkText` committing, the
+    /// Hanja reads and replacement before the caret, and the #825 mask over the composed cells only.
+    private func imeChecks(_ v: ReviewTerminalView) async {
+        imeOutcome = []
+        let none = NSRange(location: NSNotFound, length: 0)
+        func mark(_ s: String) { v.setMarkedText(s, selectedRange: NSRange(location: (s as NSString).length, length: 0), replacementRange: none) }
+        func commit(_ s: String) { v.insertText(s, replacementRange: none) }
+        for m in ["ㅎ", "하", "한"] { mark(m) }
+        let cells = v.cellWidth
+        let overlay = v.markedOverlay
+        let exclusion = overlay?.textContainer?.exclusionPaths.first?.bounds.width ?? 0
+        let maskWidth = overlay?.layer?.mask?.frame.width ?? -1
+        imeOutcome.append(("#825 mask covers 2 cells", cells > 0 && abs(maskWidth - ceil(exclusion + 2 * cells)) < 1.5))
+        commit("한"); mark("ㄱ"); mark("그"); mark("글"); commit("글")
+        v.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        // cat answers each line after the tty echoed it: wait for the answer before typing on, or the next echo lands first.
+        func rows(_ text: String) -> Int { (v.terminalContentSnapshot(region: .history(maximumScrollbackRows: 500))?.rows ?? []).filter { $0.text == text }.count }
+        _ = await waitFor(seconds: 3) { rows("한글") >= 2 }
+        mark("가"); v.unmarkText()
+        imeOutcome.append(("unmarkText commits", !v.hasMarkedText()))
+        v.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        _ = await waitFor(seconds: 3) { rows("가") >= 2 }
+        commit("가"); mark("한"); commit("한")
+        _ = await waitFor(seconds: 3) { v.textBeforeCursor().hasSuffix("가한") }
+        let sel = v.selectedRange()
+        let read = v.attributedSubstring(forProposedRange: NSRange(location: max(0, sel.location - 10), length: min(10, sel.location)), actualRange: nil)?.string ?? ""
+        imeOutcome.append(("Hanja reads 가한 before the caret", read.hasSuffix("가한")))
+        if !read.hasSuffix("가한") { log("terminal: INFO Hanja read \(read.debugDescription) at \(NSStringFromRange(sel)), row \(v.textBeforeCursor().debugDescription)") }
+        v.insertText("韓", replacementRange: NSRange(location: sel.location - 1, length: 1))
+        v.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+    }
+
+    private func imeResults(_ shell: TerminalHost) -> [(String, Bool)] {
+        let lines = shell.screenLines()
+        return imeOutcome + [
+            ("한글 typed and read back", lines.filter { $0 == "한글" }.count >= 2),
+            ("unmarkText's 가 read back", lines.filter { $0 == "가" }.count >= 2),
+            ("Hanja replaced 한 with 韓", lines.contains("가韓")),
+        ]
+    }
+
+    private func waitFor(seconds: Double, _ done: () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + .milliseconds(Int(seconds * 1000))
+        while ContinuousClock.now < deadline {
+            if done() { return true }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return done()
+    }
+
+    /// The fake's first line, `fake-claude session=<id> resume=<bool>`.
+    private static func banner(_ host: TerminalHost) -> String? {
+        let text = host.screenText()   // the line may wrap
+        guard let start = text.range(of: "fake-claude session="), let flag = text[start.upperBound...].range(of: " resume=") else { return nil }
+        let value = text[flag.upperBound...].hasPrefix("true") ? "true" : "false"
+        return String(text[start.lowerBound..<flag.upperBound]) + value
+    }
+
+    private static func sessionId(_ banner: String) -> String {
+        banner.components(separatedBy: "session=").last?.components(separatedBy: " ").first ?? ""
+    }
+
+    private static func lastLines(_ host: TerminalHost, _ n: Int) -> String {
+        host.screenLines().filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.suffix(n).joined(separator: " ⏎ ")
     }
 
     // MARK: Ending

@@ -128,6 +128,9 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.terminalContentSnapshot(region: .history(maximumScrollbackRows: scrollback))?.rows.map(\.text) ?? []
     }
 
+    /// The screen's rows joined without breaks, so a line the terminal wrapped reads whole (the tour's checks).
+    func screenText() -> String { screenLines().joined() }
+
     private func configure(_ v: ReviewTerminalView) {
         v.processDelegate = self
         v.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)

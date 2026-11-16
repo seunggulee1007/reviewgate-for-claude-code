@@ -46,6 +46,13 @@
 #                  edit / take-back tools, ↑ in an empty box bringing everything waiting back, Esc giving the queue back in
 #                  front of the typed text, /btw asked of the live session and its answer over the box (`composer` lines;
 #                  also part of SHOTS_LAYOUT=1).
+#                  terminal: the terminal chat and the bottom shell panel (§57) on a fake `claude` this script writes to
+#                  SHOTS_DIR/fakebin (never the real one; `claudePath` in the build's own defaults) under a plain /bin/sh
+#                  (REVIEWGATE_TERMINAL_SHELL: no login or interactive shell, no dotfiles): the banner, a prompt typed into
+#                  the PTY becoming a review, a reject named in the next prompt's context, the shell tab's folder, the
+#                  input method in `cat` (한글, a commit on focus loss, Hanja, the #825 mask), copy without the pasteboard,
+#                  ⌃`, /exit and Restart resuming the same conversation (`terminal:` lines; terminal-chat-*.png,
+#                  shell-panel-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
@@ -81,7 +88,7 @@ case "$(cd "$SHOTS_DIR" 2>/dev/null && pwd -P || echo "$SHOTS_DIR")/" in
   "$HOME/"|"$HOME/.reviewgate/"*|//) die "SHOTS_DIR must be a scratch folder of its own (not \$HOME, not ~/.reviewgate)";;
 esac
 command -v xcodegen >/dev/null || die "xcodegen missing (brew install xcodegen)"
-command -v claude >/dev/null || die "the Claude Code CLI is missing"
+[ "${SHOTS_LAYOUT:-}" = terminal ] || command -v claude >/dev/null || die "the Claude Code CLI is missing"
 NODE_DIR="$("$ROOT/scripts/find-node.sh")" || die "Node.js >= 24 not found"
 PATH="$NODE_DIR:$PATH"
 
@@ -286,7 +293,60 @@ commit "2026-10-21T09:05:00+0000" "Free shipping from \$50"
 
 rm -rf "$DATA" "$RAW"
 mkdir -p "$DATA" "$RAW"
-CLI_VERSION="$(claude --version | awk '{print $1}')"
+CLAUDE_BIN=claude
+if [ "${SHOTS_LAYOUT:-}" = terminal ]; then
+  # §57 terminal tour: a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
+  # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
+  # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It never reads or writes ~/.claude. Run as the
+  # app's chat CLI (stream-json) it fails at once: this tour has no chat-kind turn.
+  mkdir -p "$SHOTS_DIR/fakebin"
+  CLAUDE_BIN="$SHOTS_DIR/fakebin/claude"
+  cat > "$CLAUDE_BIN" <<'EOF'
+#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
+const { join } = require("node:path");
+const { randomUUID } = require("node:crypto");
+const readline = require("node:readline");
+const argv = process.argv.slice(2);
+if (argv.includes("--version")) { console.log("2.1.325 (Claude Code)"); process.exit(0); }
+if (argv.some((a) => a.includes("stream-json"))) { console.error("fake-claude: only the terminal chat is faked"); process.exit(1); }
+const value = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined; };
+const resume = argv.includes("--resume");
+const session = value(resume ? "--resume" : "--session-id");
+let url;
+try { url = JSON.parse(value("--settings") ?? "{}").hooks.Stop[0].hooks[0].url; } catch { url = undefined; }
+const token = process.env.RG_HOOK_TOKEN ?? "";
+if (!session || !url) { console.error("fake-claude: no session or hook url"); process.exit(2); }
+console.log(`fake-claude session=${session} resume=${resume}`);
+const post = async (body) => {
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "X-ReviewGate-Token": token },
+    body: JSON.stringify({ session_id: session, cwd: process.cwd(), ...body }) });
+  return res.json().catch(() => ({}));
+};
+let n = 0;
+const rl = readline.createInterface({ input: process.stdin, terminal: false });
+rl.on("line", async (line) => {
+  rl.pause();
+  if (line.trim() === "/exit") process.exit(0);
+  const promptId = randomUUID();
+  const answer = await post({ hook_event_name: "UserPromptSubmit", prompt: line, prompt_id: promptId });
+  if (answer.decision === "block") { console.log(`blocked: ${answer.reason}`); rl.resume(); return; }
+  const context = (answer.hookSpecificOutput?.additionalContext ?? "").replace(/\s+/g, " ");
+  console.log(context ? `context: ${context.slice(0, 200)}` : "context: none");
+  const file = join(process.cwd(), "notes.txt");
+  n += 1;
+  appendFileSync(file, `note ${n}: ${line}\n`);
+  const toolUseId = `toolu_fake_${n}`;
+  await post({ hook_event_name: "PostToolUse", tool_name: "Write", tool_input: { file_path: file, content: line },
+    tool_response: { filePath: file }, tool_use_id: toolUseId, prompt_id: promptId });
+  await post({ hook_event_name: "Stop", prompt_id: promptId, stop_hook_active: false });
+  console.log("done");
+  rl.resume();
+});
+EOF
+  chmod +x "$CLAUDE_BIN"
+fi
+CLI_VERSION="$("$CLAUDE_BIN" --version | awk '{print $1}')"
 ENGINE_VERSION="$(sed -n 's/.*ENGINE_VERSION = "\(.*\)".*/\1/p' "$ROOT/engine/src/version.ts")"
 node "$ROOT/scripts/verified-cli.mjs" record "$DATA" "$CLI_VERSION" "$ENGINE_VERSION" tour   # no "unverified CLI" banner
 
@@ -300,6 +360,7 @@ w notificationsOffNoticeDismissed -bool true
 w confirmCloseWhileWorking -bool false       # the tour's quit never waits on an alert
 w reopenLastProjects -bool false
 w worktreeRoot -string "$DATA/worktrees"
+[ "$CLAUDE_BIN" = claude ] || w claudePath -string "$CLAUDE_BIN"   # §57 terminal tour: the fake, never the real one
 w defaultModeOffered -data "$(printf '["%s"]' "$DEMO_DIR" | xxd -p | tr -d '\n')"
 
 # --- the build --------------------------------------------------------------------------------------------------------
@@ -355,6 +416,7 @@ env -i HOME="$HOME" USER="$USER" LOGNAME="${LOGNAME:-$USER}" SHELL="${SHELL:-/bi
   --env "REVIEWGATE_SCREENSHOT_QUIET=$QUIET" \
   --env "REVIEWGATE_SCREENSHOT_TOUR=$RAW" --env "REVIEWGATE_SCREENSHOT_PROMPT=${SHOTS_PROMPT:-}" \
   --env "REVIEWGATE_SCREENSHOT_MODEL=${SHOTS_MODEL:-}" --env "REVIEWGATE_SCREENSHOT_LAYOUT=${SHOTS_LAYOUT:-}" \
+  --env "REVIEWGATE_TERMINAL_SHELL=/bin/sh" \
   --args -AppleLanguages "($UI_LANG)" -AppleLocale "$UI_LOCALE" -ApplePersistenceIgnoreState YES &
 OPEN_PID=$!
 waited=0
