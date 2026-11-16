@@ -4161,6 +4161,22 @@
         }
       }
     },
+    "Ask ReviewGate's engine again how to start Claude Code for this chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask ReviewGate's engine again how to start Claude Code for this chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 Claude Code를 시작하는 방법을 ReviewGate 엔진에 다시 물어요"
+          }
+        }
+      }
+    },
     "Ask this now": {
       "localizations": {
         "en": {
@@ -4445,6 +4461,198 @@
           "stringUnit": {
             "state": "translated",
             "value": "곁질문 답을 기다리는 중…"
+          }
+        }
+      }
+    },
+    "Chat menu — new terminal chat, history, continue in terminal, import a CLI session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat menu — new terminal chat, history, continue in terminal, import a CLI session"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "채팅 메뉴 — 새 터미널 채팅, 기록, 터미널에서 이어가기, CLI 세션 가져오기"
+          }
+        }
+      }
+    },
+    "Claude Code asked you a question in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code asked you a question in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 터미널에서 질문했어요"
+          }
+        }
+      }
+    },
+    "Claude Code could not start here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not start here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "여기서 Claude Code를 시작하지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude Code exited (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code exited (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 종료됐어요 (%lld)"
+          }
+        }
+      }
+    },
+    "Claude Code is not running in this terminal — Restart it in the chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code is not running in this terminal — Restart it in the chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널에서 Claude Code가 실행 중이 아니에요 — 채팅에서 다시 시작하세요"
+          }
+        }
+      }
+    },
+    "Claude Code is starting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code is starting"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 시작하는 중이에요"
+          }
+        }
+      }
+    },
+    "Claude Code itself in this column (⌃⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code itself in this column (⌃⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 칸에서 Claude Code를 그대로 실행 (⌃⌘T)"
+          }
+        }
+      }
+    },
+    "Claude Code reports each prompt and edit to ReviewGate; accept or reject the changes as in a chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code reports each prompt and edit to ReviewGate; accept or reject the changes as in a chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 프롬프트와 편집을 ReviewGate에 알려요. 채팅에서처럼 변경을 수락하거나 거절하세요"
+          }
+        }
+      }
+    },
+    "Claude Code stopped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code stopped"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 중지됨"
+          }
+        }
+      }
+    },
+    "Claude Code waits for your permission in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code waits for your permission in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 터미널에서 허용을 기다려요"
+          }
+        }
+      }
+    },
+    "Claude Code was stopped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code was stopped"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 중지됐어요"
+          }
+        }
+      }
+    },
+    "Claude is working — the review opens when it stops": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — the review opens when it stops"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 멈추면 리뷰가 열려요"
           }
         }
       }
@@ -10663,6 +10871,22 @@
         }
       }
     },
+    "End this turn and review its changes now — after Esc Claude Code sends no end of turn, so the turn stays open until the next prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End this turn and review its changes now — after Esc Claude Code sends no end of turn, so the turn stays open until the next prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 턴을 끝내고 지금 변경을 리뷰해요 — Esc로 멈추면 Claude Code가 턴 끝을 알리지 않아서 다음 프롬프트까지 턴이 열려 있어요"
+          }
+        }
+      }
+    },
     "Ended": {
       "localizations": {
         "en": {
@@ -12736,6 +12960,22 @@
         }
       }
     },
+    "If it asked whether to trust this folder, choose Yes after restarting — ReviewGate cannot review a folder Claude Code does not trust": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If it asked whether to trust this folder, choose Yes after restarting — ReviewGate cannot review a folder Claude Code does not trust"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 신뢰할지 물었다면, 다시 시작한 뒤 Yes를 고르세요 — Claude Code가 신뢰하지 않는 폴더는 ReviewGate가 리뷰할 수 없어요"
+          }
+        }
+      }
+    },
     "If notifications do not appear, check Focus (Do Not Disturb) in Control Center too.": {
       "localizations": {
         "en": {
@@ -13516,6 +13756,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대화 내용은 보이지만, 이어서 보내는 메시지는 새 채팅으로 가요."
+          }
+        }
+      }
+    },
+    "Its terminal runs while it is the live chat. Continue in it to start Claude Code again — the conversation is resumed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its terminal runs while it is the live chat. Continue in it to start Claude Code again — the conversation is resumed."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널은 이 채팅이 실행 중인 채팅일 때만 돌아가요. 이 채팅으로 이어가면 Claude Code가 다시 시작되고 대화도 이어져요."
           }
         }
       }
@@ -18399,6 +18655,22 @@
         }
       }
     },
+    "Opens once Claude is done (⌃⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens once Claude is done (⌃⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 작업이 끝나면 열려요 (⌃⌘T)"
+          }
+        }
+      }
+    },
     "Opens Terminal with `%@`. Press Refresh once the browser flow completes.": {
       "localizations": {
         "en": {
@@ -21157,6 +21429,38 @@
         }
       }
     },
+    "Restart Claude Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Claude Code"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 다시 시작"
+          }
+        }
+      }
+    },
+    "Restart Claude Code in this terminal — the conversation is resumed; text typed and not sent is lost": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Claude Code in this terminal — the conversation is resumed; text typed and not sent is lost"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널에서 Claude Code를 다시 시작해요 — 대화는 이어지고, 입력만 하고 보내지 않은 글은 사라져요"
+          }
+        }
+      }
+    },
     "Restart now": {
       "localizations": {
         "en": {
@@ -21744,6 +22048,22 @@
     "Review note": {
       "shouldTranslate": false
     },
+    "Review now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 리뷰"
+          }
+        }
+      }
+    },
     "Review requested": {
       "localizations": {
         "en": {
@@ -21846,6 +22166,22 @@
         }
       }
     },
+    "Reviewed by ReviewGate — each turn's changes show on the left": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewed by ReviewGate — each turn's changes show on the left"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 리뷰해요 — 턴마다 변경이 왼쪽에 나와요"
+          }
+        }
+      }
+    },
     "ReviewGate also retries once by itself the next time Claude is idle.": {
       "localizations": {
         "en": {
@@ -21858,6 +22194,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 한가해지면 ReviewGate가 한 번 더 스스로 다시 시도합니다."
+          }
+        }
+      }
+    },
+    "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 Claude Code에서 받은 게 없어요 — 첫 프롬프트부터 리뷰를 시작해요"
           }
         }
       }
@@ -21894,6 +22246,22 @@
         }
       }
     },
+    "ReviewGate restarted — this terminal is no longer reviewed. Restart it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate restarted — this terminal is no longer reviewed. Restart it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 다시 시작됐어요 — 이 터미널은 더 이상 리뷰되지 않아요. 다시 시작하세요"
+          }
+        }
+      }
+    },
     "ReviewGate runs Claude in a folder and gates every change behind your review.": {
       "localizations": {
         "en": {
@@ -21906,6 +22274,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영됩니다."
+          }
+        }
+      }
+    },
+    "ReviewGate takes a snapshot when you send a prompt and shows the turn's changes once Claude stops": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate takes a snapshot when you send a prompt and shows the turn's changes once Claude stops"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트를 보내면 ReviewGate가 스냅샷을 찍고, Claude가 멈추면 이번 턴의 변경을 보여 줘요"
           }
         }
       }
@@ -25126,6 +25510,22 @@
         }
       }
     },
+    "Start Claude Code again in this terminal — the conversation is resumed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Claude Code again in this terminal — the conversation is resumed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널에서 Claude Code를 다시 시작해요 — 대화는 이어져요"
+          }
+        }
+      }
+    },
     "Start in %@ mode like the terminal?": {
       "localizations": {
         "en": {
@@ -25186,6 +25586,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "사용자 설정 없이 시작됨 — 클릭해서 자세히 보기"
+          }
+        }
+      }
+    },
+    "Starting Claude Code…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting Claude Code…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 시작하는 중…"
           }
         }
       }
@@ -26086,6 +26502,38 @@
         }
       }
     },
+    "Terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅"
+          }
+        }
+      }
+    },
+    "Terminal chat — Claude Code itself runs in this chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal chat — Claude Code itself runs in this chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅 — 이 채팅에서 Claude Code가 그대로 실행돼요"
+          }
+        }
+      }
+    },
     "Test": {
       "localizations": {
         "en": {
@@ -26258,6 +26706,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude CLI의 기본 모델"
+          }
+        }
+      }
+    },
+    "The engine that reviews this terminal restarted, so Claude Code's prompts and edits are refused until you restart the terminal (the conversation is resumed)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The engine that reviews this terminal restarted, so Claude Code's prompts and edits are refused until you restart the terminal (the conversation is resumed)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널을 리뷰하는 엔진이 다시 시작돼서, 터미널을 다시 시작할 때까지 Claude Code의 프롬프트와 편집이 거부돼요 (대화는 이어져요)"
           }
         }
       }
@@ -27378,6 +27842,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 이후 이 브랜치에 커밋이 없어요"
+          }
+        }
+      }
+    },
+    "This chat runs Claude Code in a terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat runs Claude Code in a terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 터미널에서 Claude Code를 실행해요"
           }
         }
       }
@@ -29186,6 +29666,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "권한 대기"
+          }
+        }
+      }
+    },
+    "Waiting for the first prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for the first prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "첫 프롬프트를 기다리는 중"
           }
         }
       }

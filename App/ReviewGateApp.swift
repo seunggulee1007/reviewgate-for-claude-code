@@ -120,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         AppUpdateController.shared.appWillTerminate()   // MARK: app-update (§48): an update left waiting detaches its image
+        for entry in WorkbenchRegistry.shared.entries { entry.model.terminals.terminateAll() }   // MARK: terminal-chat (§57.5)
     }
 }
 
@@ -474,6 +475,7 @@ private struct WorkbenchWindow: View {
                 #endif
                 WorkbenchRegistry.shared.register(entry)
                 AttentionCenter.shared.attach(entry)
+                entry.model.terminals.attach(store: entry.store)   // MARK: terminal-chat (§57.5)
                 entry.store.confirmSideSwitch = SideSwitchAlert.confirm   // wave4b w4b-side (§40.3)
                 // wave3 mac-session: hand-offs wait while this window opens its first project.
                 let handoff = FolderHandoffRouter.shared
@@ -514,7 +516,11 @@ private struct WorkbenchWindow: View {
                 WorkbenchRegistry.shared.unregister(entry)
                 WorkbenchRegistry.shared.persistOpenWindows()
                 let store = entry.store
-                Task { await store.shutdown() }
+                let terminals = entry.model.terminals   // MARK: terminal-chat (§57.5): the window's PTYs end with it
+                Task {
+                    await terminals.stopAll()
+                    await store.shutdown()
+                }
             }
     }
 

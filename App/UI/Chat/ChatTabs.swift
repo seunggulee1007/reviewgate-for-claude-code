@@ -44,7 +44,8 @@ struct ChatTabStrip: View {
                                     hasDraft: hasDraft(tab.id),
                                     onSelect: { open(tab) },
                                     onClose: { close(tab) },   // wave4b w4b-tabs: a shown chat hands back first
-                                    isLive: tab.id == store.currentSessionId && store.viewingChat != nil)
+                                    isLive: tab.id == store.currentSessionId && store.viewingChat != nil,
+                                    terminal: terminalBadge(tab))   // MARK: terminal-chat (§57.5)
                                 .id(tab.id)
                                 .onHover { inside in if inside { hoveredTab = tab.id } else if hoveredTab == tab.id { hoveredTab = nil } }
                                 .contextMenu { tabMenu(tab) }
@@ -93,6 +94,11 @@ struct ChatTabStrip: View {
                                                                      : String(localized: "New chat") + " (⌘T)"))   // wave4 w4-input: Chat → New chat
                 .accessibilityLabel("New chat")
                 .accessibilityIdentifier("New chat")
+                // MARK: terminal-chat (§57.5): the other kind of chat from the same button.
+                .contextMenu {
+                    Button("New Terminal Chat", systemImage: "terminal") { Task { await store.newTerminalChat() } }
+                        .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
+                }
             if store.pendingChatSwitch != nil { PendingChatSwitchChip() }   // r2-chats-cards M31 / M33 (§9)
             Menu {
                 // polish P4-composer-34: every open tab, the ones scrolled out of sight too.
@@ -105,12 +111,22 @@ struct ChatTabStrip: View {
                         }
                     }
                 }
+                // MARK: terminal-chat (§57.5): the real Claude Code in the chat column, reviewed as a chat is.
+                Button {
+                    Task { await store.newTerminalChat() }
+                } label: {
+                    Label("New Terminal Chat", systemImage: "terminal")
+                    Text(store.chatSwitchWaits ? String(localized: "Opens once Claude is done (⌃⌘T)") : String(localized: "Claude Code itself in this column (⌃⌘T)"))
+                }
+                .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
+                .accessibilityIdentifier("Chat menu new terminal chat")
                 Button("History…") { showHistory = true }
                     .accessibilityIdentifier("Chat history")
                 if let current = store.sessions.first(where: { $0.id == store.currentSessionId }) {
                     Divider()
                     Text(verbatim: current.title)
-                    continueInTerminalItem(current)   // wave3 mac-session (§36.9); polish PX-03: why not, as its subtitle
+                    // §57.5: a terminal chat runs in a terminal already.
+                    if current.kind != .terminal { continueInTerminalItem(current) }   // wave3 mac-session (§36.9); polish PX-03: why not, as its subtitle
                 }
                 if store.sessionTools.sessionsSupported {   // wave3 mac-session (§36.9)
                     Divider()
@@ -123,7 +139,7 @@ struct ChatTabStrip: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Chat menu — history, continue in terminal, import a CLI session")   // polish P4-composer-33
+            .help("Chat menu — new terminal chat, history, continue in terminal, import a CLI session")   // polish P4-composer-33
             .accessibilityLabel("Chat menu")
             .accessibilityIdentifier("Chat history")
         }
@@ -242,8 +258,21 @@ struct ChatTabStrip: View {
             model.showChatHistoryTick += 1
         }
         Button(tab.archived ? "Unarchive" : "Archive") { store.archiveChat(id: tab.id, archived: !tab.archived) }
-        Divider()
-        ContinueInTerminalMenuItem(meta: tab) { continueRequest = $0 }   // wave3 mac-session (§36.9)
+        if tab.kind != .terminal {   // §57.5: a terminal chat runs in a terminal already
+            Divider()
+            ContinueInTerminalMenuItem(meta: tab) { continueRequest = $0 }   // wave3 mac-session (§36.9)
+        }
+    }
+
+    /// MARK: terminal-chat (§57.5) — a terminal chat's tab: the terminal symbol, and whether its Claude Code has exited.
+    private func terminalBadge(_ tab: SessionMeta) -> ChatTab.TerminalBadge? {
+        guard tab.kind == .terminal else { return nil }
+        guard let host = model.terminals.host(for: tab.id) else { return .plain }
+        if host.disconnected { return .stopped }
+        switch host.state {
+        case .exited, .failed: return .stopped
+        case .idle, .starting, .running: return .plain
+        }
     }
 }
 
@@ -372,6 +401,10 @@ private struct ChatTab: View {
     // MARK: wave4b w4b-tabs
     /// §39.2: Claude's session is on this chat while another one is shown (a hollow dot when it is idle).
     var isLive = false
+    // MARK: terminal-chat (§57.5)
+    enum TerminalBadge { case plain, stopped }
+    /// A terminal chat (nil: a chat); `.stopped`: its Claude Code exited or lost ReviewGate — Restart is in the chat.
+    var terminal: TerminalBadge?
     @State private var hovering = false
 
     var body: some View {
@@ -385,6 +418,19 @@ private struct ChatTab: View {
                     } else if isLive {
                         Circle().strokeBorder(Color.accentColor, lineWidth: 1.5).frame(width: 7, height: 7)
                             .accessibilityIdentifier("Chat tab live")
+                    }
+                    if let terminal {
+                        Image(systemName: "terminal")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .help(String(localized: "Terminal chat — Claude Code itself runs in this chat"))
+                            .accessibilityLabel(Text("Terminal chat"))
+                        if terminal == .stopped {
+                            Circle().fill(Color.orange).frame(width: 6, height: 6)
+                                .help(String(localized: "Claude Code is not running in this terminal — Restart it in the chat"))
+                                .accessibilityLabel(Text("Claude Code stopped"))
+                                .accessibilityIdentifier("Chat tab terminal stopped")
+                        }
                     }
                     Text(verbatim: title)
                         .font(.callout.weight(isCurrent ? .semibold : .regular))

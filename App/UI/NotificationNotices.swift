@@ -111,6 +111,13 @@ extension WindowModel {
     /// it shows the chat `AttentionReveal.chatToShow` picks, as a tab click does.
     func openFromNotification(_ target: AttentionTarget, store: AppState) {
         if !tab.showsReview { tab = .changes }
+        // MARK: terminal-chat (§57.5): Claude Code waits in the terminal — show it and give it the keyboard.
+        if store.isTerminalChat, target.chatId == nil || target.chatId == store.currentSessionId {
+            if store.viewingChat != nil { store.stopViewing() }
+            let terminals = self.terminals
+            DispatchQueue.main.async { terminals.focus(chatId: store.currentSessionId) }
+            return
+        }
         let show = AttentionReveal.chatToShow(for: target, currentChatId: store.currentSessionId, openTabIds: store.openTabs.map(\.id))
         guard let show, show != store.shownChatId else { revealNotified(target); return }
         if show == store.currentSessionId {

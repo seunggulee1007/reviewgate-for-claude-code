@@ -101,7 +101,9 @@ struct EditMenuFindCommands: Commands {
                 else { model.findTick += 1 }
             }
                 .keyboardShortcut(fileOpen ? nil : KeyboardShortcut("f", modifiers: .command))
-                .disabled(focused?.store.menuState.hasProject != true)
+                // MARK: terminal-chat (§57.5): a terminal chat has no transcript here (the History tab's search stays).
+                .disabled(focused?.store.menuState.hasProject != true
+                          || (focused?.store.menuState.shownChatIsTerminal == true && focused?.model.tab != .history))
                 .accessibilityIdentifier("Edit menu Find in chat")
             // polish P3-transcript-17: the next / previous match of the chat's find, with its bar closed too.
             Button("Find Next") { focused?.model.transcriptFindNextTick += 1 }
@@ -215,7 +217,7 @@ struct ReviewCommands: Commands {
                 .accessibilityIdentifier("Review menu Ask about selection")
             Button("Request Changes") { model?.requestChangesTick += 1 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true)
+                .disabled(!menu.hasProject || model?.tab.showsReview != true || menu.isTerminalChat)   // §57.5: tell Claude Code in its terminal
                 .accessibilityIdentifier("Review menu Request changes")
             Button("Commit Accepted…") { model?.showCommit = true }
                 .keyboardShortcut("k", modifiers: [.command, .shift])

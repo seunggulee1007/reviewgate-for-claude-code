@@ -49,12 +49,21 @@ extension AppState {
 
     /// The PTY runs `claude` for `sessionId` (its pid, so the engine never counts it as another Claude).
     public func terminalStarted(sessionId: String, pid: Int32) {
-        fire(.terminalStarted(sessionId: sessionId, pid: pid))
+        reportTerminal(.terminalStarted(sessionId: sessionId, pid: pid))
     }
 
     /// The PTY of `sessionId` ended (nil: by a signal); the engine ends an open turn.
     public func terminalExited(sessionId: String, exitCode: Int32?) {
-        fire(.terminalExited(sessionId: sessionId, exitCode: exitCode))
+        reportTerminal(.terminalExited(sessionId: sessionId, exitCode: exitCode))
+    }
+
+    /// A PTY report the user did nothing for: a refusal (the chat was switched away meanwhile — the engine retired that
+    /// terminal already) is only logged, never an error row.
+    private func reportTerminal(_ command: EngineCommand) {
+        if let commandSink { commandSink(command); return }
+        Task {
+            do { try await request(command) } catch { appendLog("[warn] \(command.type): \(error.localizedDescription)") }
+        }
     }
 
     /// "Review now": ends the turn Esc left open. A refusal (`no_turn`: it closed meanwhile) becomes a non-fatal row.

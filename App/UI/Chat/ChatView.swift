@@ -15,6 +15,21 @@ struct ChatView: View {
     private var transcript: TranscriptViewState { model.chatTranscript }
 
     var body: some View {
+        // MARK: terminal-chat (§57.5): a terminal chat's column is the real Claude Code — the tabs stay, the transcript, the
+        // HUD, the cards and the composer are the TUI's own.
+        if store.shownChatIsTerminal {
+            VStack(spacing: 0) {
+                ChatHeader()
+                Divider()
+                TerminalChatView()
+            }
+            .clipped()
+        } else {
+            chatColumn
+        }
+    }
+
+    private var chatColumn: some View {
         // §49.2: a short window (a new workbench's, or one with the mode offer up) never pushes the HUD or the composer out
         // of sight — the transcript gives way first, then the cards above the composer scroll.
         ChatColumnLayout {

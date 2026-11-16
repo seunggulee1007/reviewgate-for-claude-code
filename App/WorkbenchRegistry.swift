@@ -136,6 +136,9 @@ final class WindowModel {
     /// to Claude join the draft kept here.
     let chatComposer = ComposerModel()
     let chatTranscript = TranscriptViewState()
+    // MARK: terminal-chat (§57.5)
+    /// The window's terminal chats: their PTYs live here, so the PRs tab or a re-render never ends one.
+    let terminals = TerminalHub()
     // MARK: polish p-foundation — seeds the polish lanes fill in (types and helpers: App/UI/Common/WindowSeeds.swift)
     /// P2-review-19: Review › "메모 추가…" (⌥⌘N) asks the diff for the composer; the diff says whether it can open one now.
     var addNoteTick = 0

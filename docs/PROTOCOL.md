@@ -8608,3 +8608,46 @@ editor closes. A long instruction is easier to write there. This is the clients'
   (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
   it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
   on the Mac.
+
+### 57.5 The Mac app: the terminal chat
+
+- **Opening one.** Chat › New Terminal Chat (⌃⌘T), the chat tabs' ⋯ menu, or the right-click of their `+`. It is held
+  while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중"). The existing chat UI
+  stays the default.
+- **The column.** When the chat on screen is a terminal chat, the chat column keeps its tab strip and shows the terminal
+  (SwiftTerm) instead of the transcript, the HUD, the cards and the composer: Claude Code draws its own. The diff, the
+  changed files and accept / reject around it are unchanged. A terminal chat's tab has a terminal symbol, and an orange
+  dot while its Claude Code is not running (exited, or disconnected from the engine).
+- **The PTY** (`TerminalLaunch`, Core). The user's login shell (`getpwuid`) runs `-l -i -c 'exec <argv…>'` (each word
+  POSIX-quoted, so `${RG_HOOK_TOKEN}` in the settings stays literal for the CLI) in `spec.cwd`, with an environment built
+  from scratch: `HOME USER LOGNAME SHELL TMPDIR PATH` of the app (every parent `CLAUDE*` dropped), `TERM=xterm-256color`,
+  `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`, `LANG` / `LC_CTYPE=en_US.UTF-8`,
+  `CLAUDE_CODE_NATIVE_CURSOR=1` (the IME's candidate window follows the input caret), then only the spec's `RG_*` /
+  `CLAUDE_CODE_*` keys. After the start: IUTF8 on the PTY, then `terminal_started {pid}`.
+- **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
+  shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
+  SIGKILL after 3 s; text typed and not sent is lost); showing another chat read-only does not. A terminal chat shown
+  read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
+  PTYs. A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
+- **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),
+  "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
+  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
+  changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
+- **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
+  with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
+  restarting. Nothing types into the TUI for the user.
+- **Engine restart.** A running terminal is never killed: the strip turns orange ("ReviewGate가 다시 시작됐어요 …") and
+  Restart takes a new spec (its hooks fail closed meanwhile).
+- **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt`. Commands…, Attach
+  Images…, the permission mode, Find in Chat and Review › Request Changes are off for a terminal chat (the TUI has its
+  own). Continue in Terminal is not offered for a terminal chat.
+- **Attention.** `waiting` turning on is a permission / question attention event once per wait (`term:<chat>:<since>`):
+  a notification while the window is behind, the Dock's "!". A click shows the live chat and gives its terminal the
+  keyboard.
+- **Keys.** The terminal's view keeps the fixes of the M0 spike: ⌘C copies only the terminal's own selection (Claude
+  Code's fullscreen view copies its own on select; Copy never beeps nor clears the clipboard), ⌥ is Meta only on Enter /
+  Esc / Tab / Backspace and arrows, so ⌥Return during 한 reaches the input method (Hanja), and the input method's reads and
+  replacements before the caret work on the cursor row. The marked-text overlay neither blanks the rest of the line
+  (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
+- **Not in Stage 1.** The change budget (§54), the guard's ask cards and the per-turn model are not applied to a terminal
+  chat; the TUI's `/rewind` restores files outside ReviewGate's snapshots (the next turn shows them as changed).
