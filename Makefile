@@ -37,7 +37,7 @@ gen:
 	xcodegen generate
 
 build: gen sidecar
-	xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Debug -derivedDataPath build build | tail -20
+	xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Debug -derivedDataPath build -skipPackagePluginValidation build | tail -20
 
 run: build
 	open build/Build/Products/Debug/ReviewGate.app

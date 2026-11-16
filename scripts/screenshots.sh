@@ -307,7 +307,7 @@ w defaultModeOffered -data "$(printf '["%s"]' "$DEMO_DIR" | xxd -p | tr -d '\n')
 say "building (Debug, $BUNDLE_ID) → $DERIVED"
 "$ROOT/scripts/build-sidecar.sh"
 (cd "$ROOT" && xcodegen generate --quiet)
-xcodebuild -project "$ROOT/ReviewGate.xcodeproj" -scheme ReviewGate -configuration Debug -derivedDataPath "$DERIVED" \
+xcodebuild -project "$ROOT/ReviewGate.xcodeproj" -scheme ReviewGate -configuration Debug -derivedDataPath "$DERIVED" -skipPackagePluginValidation \
   PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= SKIP_SIDECAR_BUILD=YES \
   build > "$SHOTS_DIR/xcodebuild.log" 2>&1 || { tail -30 "$SHOTS_DIR/xcodebuild.log"; die "xcodebuild failed (log: $SHOTS_DIR/xcodebuild.log)"; }
 [ -f "$APP/Contents/Resources/dist/sidecar.mjs" ] || die "the build has no sidecar"

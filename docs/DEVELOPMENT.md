@@ -37,8 +37,12 @@ certificate, both of team QW7DJ7FBDT. Without them, sign ad hoc:
 ```sh
 xcodegen generate
 xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Release -derivedDataPath build \
-  CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM="" build
+  -skipPackagePluginValidation CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM="" build
 ```
+
+`-skipPackagePluginValidation`: SwiftTerm (the terminal chat's and the shell panel's terminal, pinned exact in
+project.yml) runs a build-tool plugin that only writes its version string. Xcode asks once to trust it
+("Trust & Enable"); command-line builds skip that question with this flag.
 
 A `.app` you received from someone else (ad hoc or not notarized) opens only after its quarantine attribute is removed:
 

@@ -251,7 +251,7 @@ make sidecar || die "make sidecar failed"
 wait_for_other_builds
 BUILD_LOG="$DERIVED/release-xcodebuild.log"
 say "xcodebuild Release (log: $BUILD_LOG)"
-xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Release -derivedDataPath "$DERIVED" build \
+xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Release -derivedDataPath "$DERIVED" -skipPackagePluginValidation build \
   > "$BUILD_LOG" 2>&1 || { tail -n 30 "$BUILD_LOG" >&2; die "xcodebuild failed (log: $BUILD_LOG)"; }
 grep -q '\*\* BUILD SUCCEEDED \*\*' "$BUILD_LOG" || die "xcodebuild did not report BUILD SUCCEEDED (log: $BUILD_LOG)"
 # Nothing else may write the products while they are checked and packaged.
