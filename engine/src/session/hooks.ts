@@ -959,7 +959,7 @@ function toolInput(input: HookInput): Record<string, unknown> {
   return ti && typeof ti === "object" ? (ti as Record<string, unknown>) : {};
 }
 
-function toolFile(input: Record<string, unknown>, cwd: string): string | undefined {
+export function toolFile(input: Record<string, unknown>, cwd: string): string | undefined {
   const p = input.file_path ?? input.notebook_path;
   return typeof p === "string" && p.length > 0 ? resolveToolPath(p, cwd) : undefined;
 }
@@ -980,7 +980,7 @@ async function treeNumstat(
 }
 
 /** Starts the execution window of a Bash / MCP call (§31); finished by `finishWindow` in PostToolUse(Failure). */
-function openWindow(ctx: HookContext, input: HookInput, command?: string): void {
+export function openWindow(ctx: HookContext, input: HookInput, command?: string): void {
   const id = (input as { tool_use_id?: unknown }).tool_use_id;
   const name = (input as { tool_name?: unknown }).tool_name;
   if (!ctx.toolWindows || typeof id !== "string" || typeof name !== "string") return;
@@ -992,7 +992,7 @@ function openWindow(ctx: HookContext, input: HookInput, command?: string): void 
  * Ends the call's window. `duration_ms` (tool execution only, CLI 2.1.308) moves the start up to when the tool
  * really ran, so the time a permission card stayed open is not part of it.
  */
-function finishWindow(ctx: HookContext, input: HookInput): ToolWindow | undefined {
+export function finishWindow(ctx: HookContext, input: HookInput): ToolWindow | undefined {
   const id = (input as { tool_use_id?: unknown }).tool_use_id;
   const w = typeof id === "string" ? ctx.toolWindows?.get(id) : undefined;
   if (!w) return undefined;
@@ -1004,7 +1004,7 @@ function finishWindow(ctx: HookContext, input: HookInput): ToolWindow | undefine
 }
 
 /** Files (absolute, ignorePatterns skipped) that differ between two snapshot trees. */
-async function changedBetween(cp: GitCheckpoint, a: string, b: string, ignorePatterns: string[]): Promise<string[]> {
+export async function changedBetween(cp: GitCheckpoint, a: string, b: string, ignorePatterns: string[]): Promise<string[]> {
   if (a === b) return [];
   const files: string[] = [];
   for (const f of await cp.changes(a, b)) {
@@ -1019,7 +1019,7 @@ async function changedBetween(cp: GitCheckpoint, a: string, b: string, ignorePat
  * diffed against, so Bash file attribution never picks up what earlier turns left on disk (a request-changes turn keeps
  * the old A).
  */
-async function bashBaseline(ctx: HookContext): Promise<void> {
+export async function bashBaseline(ctx: HookContext): Promise<void> {
   if (!ctx.onBashFiles || !ctx.checkpointTree || ctx.bashBaseTree !== undefined) return;
   try {
     if (!ctx.checkpoint) ctx.checkpoint = await openCheckpoint(ctx.cwd);

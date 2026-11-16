@@ -90,6 +90,12 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "btw_ask", question: "why?" }).ok).toBe(true); // §56.1
   });
 
+  it("rejects the terminal chat commands (§57: Mac only in Stage 1 — Windows has no PTY for them)", () => {
+    for (const type of ["terminal_spec", "terminal_started", "terminal_exited", "terminal_end_turn"]) {
+      expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(false);
+    }
+  });
+
   it("allows what the renderer sends: unaccept (Accept all's Undo) and the live changes of a running turn (§34.6)", () => {
     for (const type of ["unaccept", "live_changes", "live_diff"]) expect(validateCommand({ type }).ok).toBe(true);
   });
