@@ -114,12 +114,29 @@ final class ShellPanelModel {
 /// The panel under the diff and the chat: a tab bar (each tab's shell, `+`, hide) over the selected shell.
 struct ShellPanelView: View {
     @Environment(WindowModel.self) private var model
-    /// The panel's height as last dragged (every window; the split keeps it while it is shown).
+    /// The panel's height as last dragged (every window).
     @AppStorage("terminalPanelHeight") private var height = 220.0
+    /// The height when the drag on the edge began.
+    @State private var dragStart: Double?
 
     var body: some View {
         let shell = model.shell
         VStack(spacing: 0) {
+            // The top edge: drag to make the panel taller or shorter (the window keeps 200 pt above it).
+            Divider()
+                .frame(height: 5)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { drag in
+                        let start = dragStart ?? height
+                        dragStart = start
+                        height = min(max(start - drag.translation.height, 120), 900)
+                    }
+                    .onEnded { _ in dragStart = nil })
+                .help(String(localized: "Drag to resize the terminal panel"))
+                .accessibilityHidden(true)
             HStack(spacing: 2) {
                 Text("Terminal").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     .padding(.trailing, 6)
@@ -155,10 +172,7 @@ struct ShellPanelView: View {
                 Color.clear
             }
         }
-        .frame(minHeight: 120, idealHeight: height)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
-            if h >= 120, abs(h - height) > 4 { height = h }
-        }
+        .frame(minHeight: 80, idealHeight: height, maxHeight: height)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Shell panel")
     }

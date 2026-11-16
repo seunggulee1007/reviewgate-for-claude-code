@@ -10631,6 +10631,22 @@
         }
       }
     },
+    "Drag to resize the terminal panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to resize the terminal panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "드래그해서 터미널 패널 크기 조절"
+          }
+        }
+      }
+    },
     "Each reply is limited to %lld files / %lld lines; you'll review the diff before continuing.": {
       "localizations": {
         "en": {

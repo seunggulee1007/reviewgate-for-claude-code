@@ -179,7 +179,7 @@ struct MainWindow: View {
                         // chat is the split's trailing pane open or closed: one view, so the message being typed, the
                         // transcript's scroll position and the focus survive the diff pane opening (a review begins) or closing.
                         // MARK: terminal-chat (§57.6): the bottom terminal panel (⌃`) under the diff and the chat.
-                        VSplitView {
+                        VStack(spacing: 0) {
                             HStack(spacing: 0) {
                                 diffEdgeTab
                                 Divider()
@@ -208,7 +208,8 @@ struct MainWindow: View {
                                     ChatView()
                                 }
                             }
-                            .frame(minHeight: 200)
+                            .frame(minHeight: 200, maxHeight: .infinity)
+                            .layoutPriority(1)
                             if model.shell.visible { ShellPanelView() }
                         }
                     }

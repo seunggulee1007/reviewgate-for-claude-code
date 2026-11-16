@@ -8829,6 +8829,7 @@ session events a chat's CLI session gives, so snapshot A / B, the turn diff, acc
   (keyCode 50, exactly ⌃, in this window) takes it first, because a terminal would send ⌃` to its program as NUL.
 - **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s). A shell that exits 0 (`exit`, ⌃D) closes its
   tab; any other end stays as "exited (n)" with Restart / Close. The last tab closing hides the panel. Hiding the panel or
-  switching tabs never ends a shell; closing the window or quitting does. The panel's height is remembered.
+  switching tabs never ends a shell; closing the window or quitting does. Its top edge drags to resize it (the
+  window keeps 200 pt above); the height is remembered.
 - **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
   with no `-l` / `-i`, so no dotfiles run in a tour.
