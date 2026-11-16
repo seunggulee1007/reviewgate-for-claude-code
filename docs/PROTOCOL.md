@@ -8009,6 +8009,9 @@ The pieces the other lanes build on (lane p-foundation), and what they changed w
   ("ko" / "en"; it was always "en"): Narrator and NVDA read Korean with a Korean voice, and Chromium shapes and breaks
   Korean lines as Korean. `t()` spells ⇧⇥ (the permission mode's key) as Windows does, Shift+Tab, like ⇧↩ → Shift+Enter
   (§42.5).
+- **A project folder can be made where it is chosen.** Every folder picker that opens a project — Open (⌘O), Switch
+  Project…, Open in New Window… — has New Folder (Mac `canCreateDirectories`; Electron `createDirectory`, which only the
+  macOS dialog needs — the Windows one always can). The image attach picker chooses files and has none.
 
 ### 55.2 The chat-move notice (lane r2-guards)
 
