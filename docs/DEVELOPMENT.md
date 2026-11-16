@@ -44,6 +44,12 @@ xcodebuild -project ReviewGate.xcodeproj -scheme ReviewGate -configuration Relea
 project.yml) runs a build-tool plugin that only writes its version string. Xcode asks once to trust it
 ("Trust & Enable"); command-line builds skip that question with this flag.
 
+The App's package pins (SwiftTerm, the packages its manifest pulls in, Highlightr through Core) are `project.resolved`;
+`xcodegen generate` copies it into `ReviewGate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`
+(project.yml `postGenCommand`). Without a file there Xcode writes the whole graph into `Core/Package.resolved`, which is
+Core's own (`swift test --package-path Core` writes it back). After changing a remote package in project.yml, build once
+and copy the workspace's file back over `project.resolved`.
+
 A `.app` you received from someone else (ad hoc or not notarized) opens only after its quarantine attribute is removed:
 
 ```sh

@@ -6,6 +6,13 @@ options:
   xcodeVersion: "26.0"
   createIntermediateGroups: true
   developmentLanguage: en
+  # The App's package pins (SwiftTerm and what its manifest pulls in, Highlightr through Core) live in project.resolved and
+  # go into the project's workspace on every generate. Without a Package.resolved there, Xcode writes the whole graph
+  # into the local package's file (Core/Package.resolved), which `swift test --package-path Core` then writes back.
+  # After changing a remote package below: build once, then copy the workspace's file back over project.resolved.
+  postGenCommand: >-
+    mkdir -p ReviewGate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm &&
+    cp project.resolved ReviewGate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 packages:
   ReviewGateCore:
     path: Core
