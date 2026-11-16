@@ -775,7 +775,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   `accepted`, the turn starts. Refused like a plain send while `running` / `collecting` / `reverting`
   (`gate_closed:<reason>`, nothing accepted; M30, §3: after a failed collection it accepts against the held B and sends) and with `gate_closed:changes_requested` when any file is `changesRequested` (use
   `request_changes`; nothing accepted). `acceptPending` on an open gate is a plain send. It is **never** the default: clients
-  send it only from a separate, explicitly labelled "Accept N & Send" action (Mac: menu button next to Send, ⌘⇧↩ — "Accept N & Continue" with nothing typed, §57; Electron:
+  send it only from a separate, explicitly labelled "Accept N & Send" action (Mac: menu button next to Send, ⌘⇧↩ — "Accept N & Continue" with nothing typed, §58; Electron:
   split-button dropdown, Ctrl/⌘+Shift+Enter) — M28: at once, no confirmation (a toast says what was accepted). The plain Send button (AX "Send") leaves the
   review exactly as it is — a message sent while files await review is a question, answered against the same snapshot A
   ("Question during a review", §3).
@@ -8612,7 +8612,7 @@ editor closes. A long instruction is easier to write there. This is the clients'
   it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
   on the Mac.
 
-## 57. Accept N & Continue
+## 58. Accept N & Continue
 
 After a turn its changes wait in the review, and accepting them tells Claude nothing until the next message (the engine
 puts `gate.lastReviewSummary` in front of it, §10). To let Claude go on the user typed "accepted, continue" every turn. This
