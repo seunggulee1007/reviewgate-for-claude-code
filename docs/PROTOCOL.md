@@ -8608,3 +8608,52 @@ editor closes. A long instruction is easier to write there. This is the clients'
   (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
   it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
   on the Mac.
+
+## 57. Terminal chat
+
+A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The
+engine never spawns it: it tells the app how to start it (`terminal_spec`), receives Claude Code's http hooks on
+127.0.0.1, and maps them onto the review gate — snapshot A at the prompt, B at the stop, the turn diff, accept / reject
+and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1.
+
+### 57.1 The contract
+
+```ts
+type SessionKind = "chat" | "terminal";
+// SessionMeta gains:
+  kind?: SessionKind;          // absent = "chat"; set once by session_new, never changes; written only when "terminal"
+  cliSessionId?: string;       // the CLI conversation the terminal last ran when it differs from `id` (/clear, /resume in the TUI)
+// commands
+session_new { kind?: SessionKind }
+terminal_spec { sessionId }                        // reply: terminal_spec; each call issues a fresh hook token (the previous is retired)
+terminal_started { sessionId; pid: number }        // the app's PTY runs it (pid of the exec'd claude)
+terminal_exited { sessionId; exitCode: number | null }  // the PTY ended; an open review turn ends (stopReason "terminal_exited")
+terminal_end_turn { sessionId }                    // "Review now": ends the open turn; refused `no_turn` when none is open
+type TerminalSpecEvent = { type: "terminal_spec"; id?: string; sessionId: string;
+  argv: string[];                  // argv[0] = the claude executable (absolute when found); never holds the token
+  env: Record<string, string>;     // added to the PTY env; only RG_* / CLAUDE_CODE_* keys; holds RG_HOOK_TOKEN
+  cwd: string;
+  resume: boolean };               // true: argv has --resume <id>; false: --session-id <id>
+type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
+type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
+  waiting: TerminalWaiting | null; interruptSuspected: boolean };
+// SessionState gains:  terminal?: TerminalSessionState | null   (null / absent for a chat-kind session)
+```
+
+- **No new broadcast event.** `terminal_spec` is a reply only; everything else rides on `state.session.terminal` and the
+  existing turn events. The other `terminal_*` commands reply `result`.
+- **`state.session.terminal`.** `running`: `terminal_started` came for the current spawn and no `terminal_exited` since.
+  `hooksSeen`: a hook with the current spawn's token arrived. `promptId`: the open review turn's `prompt_id` (null: none
+  open, or a turn Claude started itself). `waiting`: Claude Code waits for the user in the TUI (Notification
+  `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
+  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
+- **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
+  (`send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
+  `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
+  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
+  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
+  is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
+  local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
+  turn; `cli_not_found` as elsewhere.
+- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.

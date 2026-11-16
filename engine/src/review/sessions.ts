@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { SessionMeta, TranscriptItem } from "../protocol.js";
+import type { SessionKind, SessionMeta, TranscriptItem } from "../protocol.js";
 import { readJSON, writeAtomicJSON } from "./persist.js";
 import { TRANSCRIPT_FILE, TranscriptStore } from "./transcript.js";
 
@@ -72,6 +72,8 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...normalizeMove("movedTo", o.movedTo), // MARK: wave4b w4b-follow (§39.4)
     ...normalizeMove("movedFrom", o.movedFrom),
     ...(typeof o.planFile === "string" && o.planFile ? { planFile: o.planFile } : {}), // MARK: wave4d w4d-plan (§42.1)
+    ...(o.kind === "terminal" ? { kind: "terminal" as const } : {}), // §57: "chat" (the default) is never written
+    ...(typeof o.cliSessionId === "string" && o.cliSessionId ? { cliSessionId: o.cliSessionId } : {}),
   };
 }
 
@@ -160,9 +162,9 @@ export class SessionIndex {
     return this.sessions.find((s) => s.id === id);
   }
 
-  /** A fresh "New chat" (id = new uuid unless given). */
-  create(id: string = randomUUID(), now: string = new Date().toISOString()): SessionMeta {
-    const meta: SessionMeta = { id, title: NEW_CHAT_TITLE, createdAt: now, updatedAt: now, turns: 0, costUSD: 0, lastUserText: null };
+  /** A fresh "New chat" (id = new uuid unless given); §57 `kind` "terminal" for a terminal chat ("chat" is not stored). */
+  create(id: string = randomUUID(), now: string = new Date().toISOString(), kind?: SessionKind): SessionMeta {
+    const meta: SessionMeta = { id, title: NEW_CHAT_TITLE, createdAt: now, updatedAt: now, turns: 0, costUSD: 0, lastUserText: null, ...(kind === "terminal" ? { kind } : {}) };
     this.sessions.push(meta);
     return meta;
   }

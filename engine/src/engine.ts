@@ -8696,6 +8696,10 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "brain": // MARK: wave5 w5-brain (§43.2)
     case "brain_read":
     case "status_line": // MARK: wave6 w6-statusline (§44.2)
+    case "terminal_spec": // §57
+    case "terminal_started":
+    case "terminal_exited":
+    case "terminal_end_turn":
       return "session";
     case "side_ask":
     case "side_list":
