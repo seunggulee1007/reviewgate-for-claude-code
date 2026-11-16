@@ -282,6 +282,7 @@ struct PendingChatSwitchChip: View {
     private func label(_ pending: PendingChatSwitch) -> String {
         switch pending {
         case .newChat: String(localized: "New chat waits")
+        case .newTerminalChat: String(localized: "New terminal chat waits")   // MARK: terminal-chat (§57.5)
         case let .openChat(id, _): String(localized: "Waits: \(store.chatTitle(id: id))")
         }
     }

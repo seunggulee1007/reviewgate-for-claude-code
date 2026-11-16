@@ -11,6 +11,8 @@ import Foundation
 public enum PendingChatSwitch: Equatable, Sendable {
     /// [+] / ⌘T / 새 채팅: a fresh chat once the turn is over.
     case newChat
+    /// MARK: terminal-chat (§57.5) — ⌃⌘T / 새 터미널 채팅: a fresh terminal chat once the turn is over.
+    case newTerminalChat
     /// [이 채팅으로 이어가기], or messages sent from that chat (`messages`, in order — they go out right after the switch;
     /// none: only the switch).
     case openChat(id: String, messages: [QueuedMessage])
@@ -46,6 +48,8 @@ extension AppState {
         switch pending {
         case .newChat:
             return String(localized: "A new chat opens once Claude is done in '\(live)'", bundle: .module)
+        case .newTerminalChat:
+            return String(localized: "A new terminal chat opens once Claude is done in '\(live)'", bundle: .module)
         case let .openChat(id, messages):
             let target = chatTitle(id: id)
             return messages.isEmpty
@@ -99,6 +103,8 @@ extension AppState {
             switch pending {
             case .newChat:
                 _ = await self.switchSession(.sessionNew)
+            case .newTerminalChat:
+                _ = await self.switchSession(.sessionNewTerminal)
             case let .openChat(id, messages):
                 let switched = await self.switchSession(.sessionOpen(id: id))
                 if switched { self.queueHeldMessages(messages) } else { self.handBackHeldMessages(messages) }

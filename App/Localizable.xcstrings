@@ -15360,6 +15360,38 @@
         }
       }
     },
+    "New Terminal Chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Terminal Chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널 채팅"
+          }
+        }
+      }
+    },
+    "New terminal chat waits": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New terminal chat waits"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널 채팅 대기 중"
+          }
+        }
+      }
+    },
     "New Window": {
       "localizations": {
         "en": {
@@ -28018,6 +28050,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "사이드바 보기/숨기기"
+          }
+        }
+      }
+    },
+    "Toggle Terminal Panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Terminal Panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 패널 보기/숨기기"
           }
         }
       }

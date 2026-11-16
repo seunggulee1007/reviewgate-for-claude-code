@@ -77,6 +77,12 @@ public struct MenuState: Equatable, Sendable {
     /// The permission mode and whether it can be picked now (Chat › 권한 모드).
     public var permissionMode: PermissionMode = .default
     public var canPickPermissionMode = false
+    // MARK: terminal-chat (§57.5)
+    /// The live chat runs Claude Code in a terminal: Stop goes to its PTY; Request Changes is refused by the engine.
+    public var isTerminalChat = false
+    /// The chat on screen is a terminal chat: no message box — Commands…, Attach Images…, Find in Chat and the
+    /// permission mode are the TUI's own.
+    public var shownChatIsTerminal = false
 
     public init() {}
 
@@ -112,6 +118,8 @@ public struct MenuState: Equatable, Sendable {
         hasChatSessions = store.hasChatSessions
         shownChatId = store.shownChatId
         permissionMode = store.scheduledPermissionMode ?? store.permissionMode
-        canPickPermissionMode = store.canPickPermissionMode
+        isTerminalChat = store.isTerminalChat
+        shownChatIsTerminal = store.shownChatIsTerminal
+        canPickPermissionMode = store.canPickPermissionMode && !isTerminalChat && !shownChatIsTerminal
     }
 }

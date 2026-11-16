@@ -35,6 +35,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Zoom In", mac: "⌘+", win: "Ctrl+=" }, // r2-review-flow (polish)
       { action: "Zoom Out", mac: "⌘-", win: "Ctrl+-" }, // r2-review-flow (polish)
       { action: "Actual Size", mac: "⌘0", win: "Ctrl+0" }, // r2-review-flow (polish)
+      { action: "Toggle Terminal Panel", mac: "⌃`", win: "—", note: "Mac app only" }, // MARK: terminal-chat (§57.6)
     ],
   },
   {
@@ -73,6 +74,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
     title: "Chat",
     rows: [
       { action: "New chat", mac: "⌘T", win: "Ctrl+T" },
+      { action: "New Terminal Chat", mac: "⌃⌘T", win: "—", note: "Mac app only" }, // MARK: terminal-chat (§57.5)
       { action: "Close Chat Tab", mac: "⌘⇧W", win: "Ctrl+Shift+W" },
       { action: "Chat tabs 1–9", mac: "⌘1…⌘9", win: "Ctrl+1…Ctrl+9" },
       // MARK: r2-chats-cards — polish PX-19 / P4-composer-05

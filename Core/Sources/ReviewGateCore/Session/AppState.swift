@@ -178,6 +178,11 @@ public final class AppState {
     private var turnInFlight = false
     /// Called for events that need the user (notifications, `AttentionEvent`); the app filters by window focus.
     @ObservationIgnored public var onAttention: (@MainActor (AttentionEvent) -> Void)?
+    // MARK: terminal-chat (§57)
+    /// Stop (⌘.) on a terminal chat: the App writes Esc to its PTY (the TUI stops Claude as in any terminal).
+    @ObservationIgnored public var onTerminalInterrupt: (@MainActor () -> Void)?
+    /// The terminal wait last raised as attention (`terminalSnapshotApplied`), so each wait is raised once.
+    @ObservationIgnored var lastTerminalWaitingKey: String?
     // MARK: wave1 mac-session
     /// M7: the message the last `send` carried and when — back to the front of the queue when the engine fails it.
     @ObservationIgnored var recentSend: (message: QueuedMessage, at: Date)?
@@ -872,6 +877,8 @@ public final class AppState {
     /// §28: `interrupt` also answers an open permission card (deny) — the card shows that right away.
     public func interrupt() {
         guard isRunning else { return }
+        // MARK: terminal-chat (§57.5): the TUI owns the turn — Esc into its PTY, as typed.
+        if isTerminalChat { onTerminalInterrupt?(); return }
         markPendingPermissionInterrupted()
         fire(.interrupt)
         armInterruptWatch()   // wave4 w4-safety (robustness-07): "Force restart" when the stop does not stop
@@ -1069,6 +1076,7 @@ public final class AppState {
             if let event = turnFinishedAttention(pending: pending, key: "turn:\(state.seq)") { onAttention?(event) }
         }
         longWorkSnapshotApplied()   // wave4 w4-longwork (§38.2): "풀리면 이어서 하기" fires once the session is idle
+        terminalSnapshotApplied()   // MARK: terminal-chat (§57.5): the TUI waits for the user
         drainQueue()
         if projectChanged { pendingChatSwitch = nil }   // r2-chats-cards M31: it was for the project that was open
         drainPendingChatSwitch()   // r2-chats-cards M31 / M33 (§9): a held switch once the live chat is done
