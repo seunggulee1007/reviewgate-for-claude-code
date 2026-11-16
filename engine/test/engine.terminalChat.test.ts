@@ -248,6 +248,58 @@ describe("terminal chats (§57)", () => {
     expect(s2.argv.slice(1, 3)).toEqual(["--resume", "cli-after-clear"]);
   });
 
+  it("Notification: waiting is set (permission / question) and cleared by the next hook", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await hook(s, { hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use Bash" });
+    let st = await r.h.waitFor((x) => x.session.terminal?.waiting !== null, "waiting");
+    expect(st.session.terminal?.waiting).toMatchObject({ kind: "permission", message: "Claude needs your permission to use Bash" });
+    await hook(s, ups("p1"));
+    st = await r.h.waitFor((x) => x.session.terminal?.waiting === null, "cleared");
+    await hook(s, { hook_event_name: "Notification", notification_type: "elicitation_dialog", message: "Which one?" });
+    st = await r.h.waitFor((x) => x.session.terminal?.waiting !== null, "question");
+    expect(st.session.terminal?.waiting?.kind).toBe("question");
+  });
+
+  it("the Esc rule: an interrupted turn stays running; Review now (terminal_end_turn) collects it; no_turn after", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await hook(s, ups("p1"));
+    write(r.dir, "esc.txt", "esc\n");
+    await hook(s, { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "echo esc > esc.txt" }, tool_use_id: "b1", prompt_id: "p1" });
+    await hook(s, { hook_event_name: "PostToolUseFailure", tool_name: "Bash", tool_input: { command: "echo esc > esc.txt" }, tool_use_id: "b1", error: "Interrupted by user", is_interrupt: true });
+    const st = await r.h.waitFor((x) => x.session.terminal?.interruptSuspected === true, "interrupt suspected");
+    expect(st.gate.phase).toBe("running"); // no Stop on Esc: the turn stays open
+    await r.h.engine.handle({ type: "terminal_end_turn", sessionId: id });
+    await r.h.waitFor((x) => x.gate.phase === "reviewing", "collected");
+    expect(r.h.engine.state.changedFiles.map((f) => f.path)).toEqual(["esc.txt"]);
+    expect(r.h.engine.state.session.terminal).toMatchObject({ interruptSuspected: false, promptId: null });
+    expect(await refusal(r.h, { type: "terminal_end_turn", sessionId: id })).toMatchObject({ ok: false, code: "no_turn" });
+    expect(await refusal(r.h, { type: "terminal_end_turn", sessionId: "other" })).toMatchObject({ ok: false, code: "terminal_not_current" });
+  });
+
+  it("the Esc rule: idle_prompt ends the open turn; a new prompt_id ends it before the next one starts", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await hook(s, ups("p1"));
+    write(r.dir, "one.txt", "1\n");
+    await hook(s, { hook_event_name: "Notification", notification_type: "idle_prompt", message: "Claude is waiting for your input" });
+    await r.h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "one.txt"), "idle_prompt collected");
+    await r.h.engine.handle({ type: "accept_all" });
+
+    await hook(s, ups("p2"));
+    write(r.dir, "two.txt", "2\n");
+    // The user pressed Esc, then typed a new prompt: p2's turn is collected first, then p3 starts.
+    expect(await hook(s, ups("p3"))).toBeDefined();
+    const st = await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p3", "p3 running");
+    expect(r.h.ofType("turn_end")).toHaveLength(2);
+    expect(r.h.ofType("user_message").map((e) => e.text)).toEqual(["add a note", "add a note", "add a note"]);
+    expect(st.changedFiles.map((f) => f.path)).toContain("two.txt"); // p2's review stands while p3 answers it
+  });
+
   it("a write tool with no prompt (Claude went on by itself) is taken as a turn of its own", async () => {
     const r = await rig();
     const id = await newTerminal(r);

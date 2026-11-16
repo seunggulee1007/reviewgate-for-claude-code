@@ -1387,6 +1387,9 @@ export class ReviewEngine {
         else this.log("debug", `terminal_exited for ${cmd.sessionId}: not the current terminal chat (nothing to end)`);
         return;
       }
+      case "terminal_end_turn": // §57.4 "Review now": a turn Esc left open ends here
+        if (!this.requireTerminal(cmd.sessionId).endTurnByUser()) throw new CommandRefused("no_turn", { code: "no_turn" });
+        return;
       case "session_open":
         await this.sessionOpen(cmd.sessionId);
         return;
@@ -7241,6 +7244,10 @@ export class ReviewEngine {
         this.onTerminalSessionId(ev.sessionId);
         return;
       case "terminal_attention":
+        // §57.1: `state.session.terminal.waiting` (the session's) — the app badges the Dock and notifies from it.
+        this.log("info", `terminal waits for the user (${ev.notificationType}): ${ev.message}`);
+        this.touch();
+        return;
       case "terminal_state":
         this.touch();
         return;

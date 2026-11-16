@@ -8762,6 +8762,13 @@ session events a chat's CLI session gives, so snapshot A / B, the turn diff, acc
   Notification `idle_prompt`, SessionEnd, the PTY's exit (`terminal_exited`), or "Review now" (`terminal_end_turn`).
   Closing early is safe: B is a tree, and a later tool call of the same prompt opens a continuation turn through the
   PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
+- **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
+  `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
+  set, or when the gate has run a turn with no hook for 60 s.
+- **Waiting.** `state.session.terminal.waiting` is set by the Notification hook (`permission_prompt` /
+  `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
+  any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
+  notification); Stop needs nothing new (the running → reviewing change already notifies).
 - **Not in Stage 1:** the change budget (§54) and the PreToolUse guard (asks, cards, git and scope checks) do not apply to
   a terminal chat — the TUI's own permission flow decides. A TUI `/rewind` restores files from the CLI's own history,
   outside ReviewGate's snapshots: what it restores shows as the next turn's changes.
