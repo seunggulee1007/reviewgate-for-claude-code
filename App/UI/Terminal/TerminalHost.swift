@@ -51,6 +51,10 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
     /// Starts `launch` in a fresh view; returns the child's pid (nil when it could not start).
     @discardableResult
     func start(launch: TerminalLaunch) -> Int32? {
+        // Who has the keyboard now: the delayed focus below only moves it when nobody took it meanwhile.
+        let window = view.window
+        let atSpawn = window.map { Self.keyHolder($0.firstResponder) } ?? nil
+        let old = view
         let fresh = ReviewTerminalView(frame: view.frame)
         configure(fresh)
         view.processDelegate = nil
@@ -71,11 +75,14 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         fresh.enableUTF8LineEditing()
         state = .running(pid: pid)
         let gen = generation
-        // Once it is on screen: the keyboard goes to the new terminal (never NSApp.activate — only this window's responder).
+        // Once it is on screen: the keyboard goes to the new terminal (never NSApp.activate — only this window's responder)
+        // — unless the user put it somewhere else meanwhile (a field they clicked: Return would otherwise go to the TUI).
         for delay in [0.3, 1.5] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak atSpawn, weak old] in
                 MainActor.assumeIsolated {
-                    guard let self, gen == self.generation else { return }
+                    guard let self, gen == self.generation, let w = self.view.window else { return }
+                    let now = Self.keyHolder(w.firstResponder)
+                    guard now == nil || now === w || now === w.contentView || now === atSpawn || now === old || now === self.view else { return }
                     self.focus()
                 }
             }
@@ -118,6 +125,12 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
     func focus() {
         guard let window = view.window, window.firstResponder !== view else { return }
         window.makeFirstResponder(view)
+    }
+
+    /// Who holds the keyboard: a text field's shared field editor stands for the field it edits.
+    private static func keyHolder(_ responder: NSResponder?) -> NSResponder? {
+        if let text = responder as? NSText, text.isFieldEditor, let field = text.delegate as? NSResponder { return field }
+        return responder
     }
 
     /// The terminal has the keyboard.
