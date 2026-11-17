@@ -17916,18 +17916,18 @@
         }
       }
     },
-    "One pattern per line (mvnw, .mvn/**, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.": {
+    "One pattern per line (.env, .env.*, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "One pattern per line (mvnw, .mvn/**, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git."
+            "value": "One pattern per line (.env, .env.*, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "한 줄에 패턴 하나(mvnw, .mvn/**, config/local/*.yml). 이 worktree에서 추적하지 않거나 무시된 파일만 복사합니다 — 추적 중인 파일과 .git은 복사하지 않습니다."
+            "value": "한 줄에 패턴 하나(.env, .env.*, config/local/*.yml). 이 worktree에서 추적하지 않거나 무시된 파일만 복사합니다 — 추적 중인 파일과 .git은 복사하지 않습니다."
           }
         }
       }
@@ -29638,18 +29638,18 @@
         }
       }
     },
-    "Untracked or ignored files (mvnw, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.": {
+    "Untracked or ignored files (.env, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Untracked or ignored files (mvnw, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude."
+            "value": "Untracked or ignored files (.env, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "추적하지 않거나 무시된 파일(mvnw, 로컬 설정 등)은 워크벤치 준비의 패턴이나 .worktreeinclude에 맞으면 복사됩니다."
+            "value": "추적하지 않거나 무시된 파일(.env, 로컬 설정 등)은 워크벤치 준비의 패턴이나 .worktreeinclude에 맞으면 복사됩니다."
           }
         }
       }

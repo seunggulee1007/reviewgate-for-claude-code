@@ -117,7 +117,7 @@ struct WorkbenchSetupSection: View {
             }
             if preview?.copy.isEmpty == true {
                 Text(setup.copy.isEmpty && setup.useWorktreeInclude
-                     ? String(localized: "Untracked or ignored files (mvnw, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.")
+                     ? String(localized: "Untracked or ignored files (.env, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.")
                      : String(localized: "Nothing in this worktree matches the patterns of Workbench setup."))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -249,13 +249,13 @@ struct WorkbenchSetupEditor: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
                 .accessibilityLabel("Files to copy")
                 .accessibilityIdentifier("Workbench copy patterns")
-            Text("One pattern per line (mvnw, .mvn/**, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.")
+            Text("One pattern per line (.env, .env.*, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Toggle("Also copy what .worktreeinclude lists", isOn: $setup.useWorktreeInclude)
                 .accessibilityIdentifier("Workbench use worktreeinclude")
             Text("Setup command").font(.subheadline.weight(.semibold))
-            TextField("Setup command", text: $setup.setupCommand, prompt: Text(verbatim: "./mvnw -q -o compile"))
+            TextField("Setup command", text: $setup.setupCommand, prompt: Text(verbatim: "npm ci"))
                 .textFieldStyle(.roundedBorder)
                 .font(.body.monospaced())
                 .accessibilityIdentifier("Workbench setup command field")
