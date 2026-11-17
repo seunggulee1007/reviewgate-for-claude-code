@@ -905,6 +905,27 @@ private final class Tour {
         defer { window.level = .normal }
         AppSettings.setAppearance(.dark)
         try await composerTerminalChecks(window)
+        try await diffHeaderChecks(window)
+    }
+
+    /// A regular chat's review at the laptop's 1000 × 637 and the smallest window: the diff pane beside the chat is ~300 pt,
+    /// and its header's Accept must stay inside it (the secondary controls fold into "⋯"). `diff header` lines; CUT when
+    /// Accept is past the pane's edge, LOST when no header showed. diff-header-<size>.png.
+    private func diffHeaderChecks(_ window: NSWindow) async throws {
+        let files = [ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        store.debugShowComposerState(working: false, files: files)
+        store.selectedPath = "src/cart.ts"
+        defer { store.debugShowGate(.idle) }
+        for size in [NSSize(width: 1000, height: 637), NSSize(width: 900, height: 512)] {
+            entry.model.debugAcceptFrame = .zero
+            window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
+            try await Task.sleep(for: .milliseconds(1500))
+            let header = entry.model.debugDiffHeaderFrame, accept = entry.model.debugAcceptFrame
+            let inside = accept.width > 0 && accept.minX >= header.minX - 0.5 && accept.maxX <= header.maxX + 0.5
+            log("diff header \(Int(size.width))x\(Int(size.height)): pane header \(NSStringFromRect(header)), Accept \(NSStringFromRect(accept))"
+                + (header.width <= 0 ? " — LOST (no diff header)" : inside ? " — Accept inside the pane" : " — CUT (Accept past the pane's edge)"))
+            try write(try render(window), "diff-header-\(Int(size.width))x\(Int(size.height))")
+        }
     }
 
     /// What the terminal's input does, checked in the message box at the laptop size. `composer paste <source>`: ⌘V through

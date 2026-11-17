@@ -47,7 +47,9 @@
 #                  front of the typed text, /btw asked of the live session and its answer over the box, /mcp's list over
 #                  two servers added to the live session for it (a tiny node stdio server the tour writes, and one that
 #                  cannot start): reconnect, off and on, the typed `/mcp disable|enable <name>`, the filter and the empty
-#                  state (`composer` lines; also part of SHOTS_LAYOUT=1).
+#                  state (`composer` lines; also part of SHOTS_LAYOUT=1); then a regular chat's review at 1000 × 637 and
+#                  900 × 512, its diff header's Accept inside the ~300 pt diff pane (`diff header` lines; CUT past its
+#                  edge; diff-header-*.png).
 #                  terminal: the terminal chat and the bottom shell panel (§57) on a fake `claude` this script writes to
 #                  SHOTS_DIR/fakebin (never the real one; `claudePath` in the build's own defaults) under a plain /bin/sh
 #                  (REVIEWGATE_TERMINAL_SHELL: no login or interactive shell, no dotfiles): the banner, a prompt typed into
