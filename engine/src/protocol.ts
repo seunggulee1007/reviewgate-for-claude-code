@@ -410,6 +410,13 @@ export type Settings = {
    * per project, as `loadLocalSettings`; live).
    */
   allowedProjectStatusLine?: string;
+  // MARK: terminal-default — §57.7
+  /**
+   * §57.7: the kind of the chat the engine makes by itself when a project has none (its first open, a lost current chat).
+   * `"terminal"` is taken only from the mac and test clients (anything else: `"chat"`); absent = `"chat"`. `session_new`
+   * never reads it — the client names the kind it wants (live).
+   */
+  newChatKind?: SessionKind;
 };
 
 // ---------------------------------------------------------------- §34 review round 2

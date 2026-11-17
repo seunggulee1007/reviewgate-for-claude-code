@@ -49,13 +49,13 @@ function fakeClaude(version = "2.1.325"): string {
 
 type Rig = { h: Harness; dir: string; config: string; claude: string };
 
-async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string } = {}): Promise<Rig> {
+async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal" } = {}): Promise<Rig> {
   const dir = o.dir ?? makeRepo();
   const config = o.config ?? temp("rg-term-config");
   const claude = fakeClaude(o.version);
   const h = makeHarness({ env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY });
   harnesses.push(h);
-  await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com" } });
+  await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
   await h.settle();
   const opened = await h.open(dir);
   expect(opened.session.open).toBe(true);
@@ -122,6 +122,30 @@ describe("terminal chats (§57)", () => {
     const again = await rig({ dir: r.dir, config: r.config });
     expect(again.h.engine.state.sessions.currentId).toBe(id);
     expect(again.h.engine.state.session.terminal).toBeDefined();
+  });
+
+  it("§57.7 newChatKind: a project with no chat opens with a terminal chat (Mac); other clients and session_new keep chats", async () => {
+    const mac = await rig({ newChatKind: "terminal" });
+    const first = mac.h.engine.state;
+    expect(first.sessions.list.find((m) => m.id === first.sessions.currentId)?.kind).toBe("terminal");
+    expect(first.session.terminal).toBeDefined();
+    // session_new names its kind itself: none is a chat whatever the default.
+    await mac.h.engine.handle({ type: "session_new" });
+    const chat = await mac.h.waitFor((s) => s.session.terminal === undefined && s.sessions.currentId !== first.sessions.currentId, "chat");
+    expect(chat.sessions.list.find((m) => m.id === chat.sessions.currentId)?.kind).toBeUndefined();
+    // An existing chat keeps its kind: reopened with the default on, the chat is still the current one and a chat.
+    await mac.h.engine.dispose();
+    const again = await rig({ dir: mac.dir, config: mac.config, newChatKind: "terminal" });
+    expect(again.h.engine.state.sessions.currentId).toBe(chat.sessions.currentId);
+    expect(again.h.engine.state.session.terminal).toBeUndefined();
+    // Windows never gets a terminal chat from the setting (it cannot run one).
+    const win = await rig({ client: "windows", newChatKind: "terminal" });
+    const w = win.h.engine.state;
+    expect(w.sessions.list.find((m) => m.id === w.sessions.currentId)?.kind).toBeUndefined();
+    expect(w.session.terminal).toBeUndefined();
+    // Absent = chat.
+    const plain = await rig();
+    expect(plain.h.engine.state.session.terminal).toBeUndefined();
   });
 
   it("terminal_spec: the claude argv, the token in env only, the project folder", async () => {

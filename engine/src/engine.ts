@@ -2324,7 +2324,9 @@ export class ReviewEngine {
       if (taskIn.mode) this.restoreMode(taskIn.mode);
     }
     const existing = stored.sessionId ? idx.get(stored.sessionId) : undefined;
-    const current = received ?? (planIn || taskIn ? idx.create() : undefined) ?? existing ?? idx.create();
+    // MARK: terminal-default — §57.7: a project with no chat gets the client's default kind; a plan or a task handed here
+    // is sent for the user, so its fresh chat stays a chat.
+    const current = received ?? (planIn || taskIn ? idx.create() : undefined) ?? existing ?? idx.create(undefined, undefined, this.firstChatKind());
     this.openTabIds = [...new Set(stored.openTabIds.filter((id) => idx.get(id) !== undefined))];
     this.bindSession(current);
     await this.side.load(current.id);
@@ -2382,10 +2384,19 @@ export class ReviewEngine {
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
   }
 
+  /** §57.7: the kind of a chat the engine makes by itself — `settings.newChatKind`, terminal only for the Mac (and tests). */
+  private firstChatKind(): SessionKind | undefined {
+    return this.settings.newChatKind === "terminal" && this.terminalClient() ? "terminal" : undefined;
+  }
+
+  private terminalClient(): boolean {
+    return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
+  }
+
   private async sessionNew(kind?: SessionKind): Promise<void> {
     // MARK: terminal-chat — §57.1: a terminal chat needs the app's PTY (Mac only in Stage 1).
     const terminal = kind === "terminal";
-    if (terminal && this.lockOwner.client !== "mac" && this.lockOwner.client !== "test") {
+    if (terminal && !this.terminalClient()) {
       throw new CommandRefused(`terminal_unsupported:${this.lockOwner.client}`, { code: "terminal_unsupported" });
     }
     this.guardSessionSwitch();
