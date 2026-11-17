@@ -8844,9 +8844,9 @@ chat's id);
 
 ### 57.5 The Mac app: the terminal chat
 
-- **Opening one.** Chat › New Terminal Chat (⌃⌘T), the chat tabs' ⋯ menu, or the right-click of their `+`. It is held
-  while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중"). The existing chat UI
-  stays the default.
+- **Opening one.** ⌘T / the tabs' `+` / a project's first chat while Settings › "새 채팅 종류" is 터미널 (the default,
+  §57.7), Chat › New Terminal Chat (⌃⌘T) always, the chat tabs' ⋯ menu, or the right-click of their `+`. It is held
+  while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중").
 - **The column.** When the chat on screen is a terminal chat, the chat column keeps its tab strip and shows the terminal
   (SwiftTerm) instead of the transcript, the HUD, the cards and the composer: Claude Code draws its own. The changed files
   and accept / reject are unchanged. A terminal chat's tab has a terminal symbol, and an orange dot while its Claude Code
@@ -8902,7 +8902,10 @@ chat's id);
   changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
-  restarting. Nothing types into the TUI for the user.
+  restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter).
+- **Before the first hook** the strip reads "Claude Code가 이 폴더를 신뢰할지 물으면 Yes를 고르세요" (accent colour; narrow:
+  "폴더를 신뢰할지 물으면 Yes"): the first run in a folder asks with "No, exit" selected, and No ends Claude Code — the hint
+  is on screen before the user presses Return. Its tooltip says it starts reviewing with the first prompt.
 - **Engine restart.** A running terminal is never killed: the strip turns orange ("ReviewGate가 다시 시작됐어요 …") and
   Restart takes a new spec (its hooks fail closed meanwhile).
 - **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt` — not while a shell of
@@ -8939,6 +8942,55 @@ chat's id);
   window keeps 200 pt above); the height is remembered.
 - **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
   with no `-l` / `-i`, so no dotfiles run in a tour.
+
+### 57.7 Default kind and flows that send for you
+
+From 0.5.16 a new chat is a terminal chat: the chat UI imitates Claude Code and always lags, the terminal chat runs the
+real TUI. The chat UI stays one menu item away; chats keep the kind they were made with (nothing migrates).
+
+- **The setting.** Settings › 세션 › "새 채팅 종류": 터미널 (default) / 채팅 — user defaults `newChatKind`
+  (`SessionKind.rawValue`; absent or unknown = terminal). Its tooltip says what each kind is. A change goes to every
+  window's engine at once (`set_settings {newChatKind}`).
+- **The engine** (`Settings.newChatKind`, live): the kind of the chat the engine makes by itself when a project has none —
+  its first open (a new project, a new workbench's window), or a current chat that is gone. `"terminal"` only from the
+  `mac` and `test` clients; any other client gets a chat (the Windows client never sends it and has no terminal chat;
+  `session_new {kind:"terminal"}` from it stays `terminal_unsupported`). `session_new` never reads it: the client names
+  the kind. A chat the engine makes to send something itself is always a chat: a plan handed over (§42.1), a task handed
+  to its workbench (§49), the fallback after a failed resume (§30), a rewind's fork (§38.3), `/clear` in a chat (§41.1).
+- **Entry points on the Mac** (all held while Claude works, §9):
+
+  | Entry | Opens |
+  |---|---|
+  | ⌘T, Chat › New Chat, the tabs' `+`, the error banner's 새 채팅 (`AppState.newChat()`) | the default kind |
+  | A project's first chat (open, New Window, a new workbench) | the default kind (the engine, above) |
+  | Chat › New Terminal Chat (⌃⌘T), `+`'s right-click, the ⋯ menu | a terminal chat |
+  | Chat › New Chat (Classic) (⌃⌥⌘T), `+`'s right-click, the ⋯ menu | a chat |
+  | Run as Task, a plan implemented in a new chat, Continue in Terminal (Terminal.app, §36.9) | a chat / unchanged |
+
+  `+`'s tooltip names the kind it opens and points at the right-click and the setting; its VoiceOver label is "새 터미널
+  채팅" or "새 채팅". ⌥⌘T is macOS's Show / Hide Toolbar, so the classic item takes ⌃⌥⌘T.
+- **Flows that send for you.** The app never types into a terminal chat's PTY on its own (no auto-Enter). Each flow that
+  puts text in front of Claude, decided:
+
+  | Flow | In a terminal chat |
+  |---|---|
+  | Run as Task (§49) | its workbench's chat is a chat (the engine sends the task); the sheet says so |
+  | Plan handoff / "implement in a new chat" (§42.1) | a chat (engine); plan cards never show in a terminal chat |
+  | Accept N & Continue (§58), Accept & Send, the queue, steer, /btw, Stop and send | no message box — not offered (`canAcceptAndContinue` false; the engine refuses `send` / `steer` / `btw_ask` with `terminal_chat`) |
+  | Peer messages (§29) | the TUI receives them itself; `peer_accept` refused `terminal_chat` |
+  | Chat move's "continue there" (§39.4) | `chat_move` refused `terminal_chat` |
+  | PR comments "Send to Claude" / "Send all unresolved" (§36.14) | **pasted** into the target window's terminal (its tooltip says "붙여넣어요 … Return") |
+  | An agent's "Send to main chat" (§36.1) | **pasted** into the terminal |
+  | Side question "Send the question to the main conversation" (§40.3) | **"질문을 터미널에 붙여넣기"** |
+  | Side question promote as a message (§21) | the sheet's button is **"터미널에 붙여넣기"** (no accept toggle); a note stays a note |
+
+  **Paste into the terminal** (`AppState.pasteIntoTerminal` → `TerminalHub`): only on that click, only into the live
+  terminal chat, only when its Claude Code runs and has bracketed paste on — `ESC[200~ text ESC[201~` (`TerminalPaste`:
+  a `ESC[201~` inside is dropped, line breaks are CR inside the brackets), never followed by Enter; the terminal takes
+  the keyboard and a toast says "터미널에 붙여넣었어요 — 보내려면 터미널에서 Return을 누르세요". Otherwise nothing is
+  written and the toast says why (not running: restart first; no bracketed paste yet: try once its prompt shows).
+- **Tours.** The screenshot build's README and layout tours set `newChatKind = chat` in their own defaults domain;
+  `SHOTS_LAYOUT=terminal` removes it and checks that the project's first chat and ⌘T's are terminal chats.
 
 ### 57.8 The guard in a terminal chat: git and edits the review does not see
 
