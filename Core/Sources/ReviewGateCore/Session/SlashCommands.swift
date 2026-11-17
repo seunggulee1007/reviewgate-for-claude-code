@@ -127,8 +127,9 @@ public enum SlashCommandCatalog {
     public static let recentMemory = 20
 
     /// Every command the session knows, once each: `commands` (with descriptions and source) first, then the bare names of
-    /// `skills` / `slashCommands` the list did not have (an engine before §36 sends names only). Sorted by name.
-    public static func entries(_ caps: SessionCapabilities?) -> [SlashCommandEntry] {
+    /// `skills` / `slashCommands` the list did not have (an engine before §36 sends names only). Sorted by name. `offersMcp`:
+    /// the app's own /mcp (§56.4) is listed too.
+    public static func entries(_ caps: SessionCapabilities?, offersMcp: Bool = false) -> [SlashCommandEntry] {
         guard let caps else { return [] }
         let skills = Set(caps.skills)
         let plugins = Set(caps.plugins)
@@ -138,7 +139,8 @@ public enum SlashCommandCatalog {
             // wave4c w4c-commit (§41.1): /clear is the app's new chat — the palette says so.
             out.append(SlashCommandEntry(name: command.name,
                                          description: command.name == "clear" ? TeamFormat.clearDescription
-                                             : command.name == BtwCommand.name ? BtwCommand.description : firstLine(command.description),
+                                             : command.name == BtwCommand.name ? BtwCommand.description
+                                             : offersMcp && command.name == McpCommand.name ? McpCommand.description : firstLine(command.description),
                                          argumentHint: command.argumentHint.trimmingCharacters(in: .whitespacesAndNewlines),
                                          isSkill: skills.contains(command.name), aliases: command.aliases,
                                          group: group(for: command)))
@@ -149,6 +151,11 @@ public enum SlashCommandCatalog {
         // §56.1: /btw is the app's own (the CLI lists it to the terminal only).
         if seen.insert(BtwCommand.name).inserted {
             out.append(SlashCommandEntry(name: BtwCommand.name, description: BtwCommand.description, argumentHint: "<question>", group: .builtin))
+        }
+        // §56.4: /mcp is the app's in a regular chat (the CLI's is the terminal's dialog).
+        if offersMcp, seen.insert(McpCommand.name).inserted {
+            out.append(SlashCommandEntry(name: McpCommand.name, description: McpCommand.description, argumentHint: McpCommand.argumentHint,
+                                         group: .builtin))
         }
         return out.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
@@ -282,7 +289,7 @@ public extension AppSettings {
 
 public extension AppState {
     /// The palette's commands (`capabilities`, the cache until this session's arrive).
-    var slashEntries: [SlashCommandEntry] { SlashCommandCatalog.entries(capabilities) }
+    var slashEntries: [SlashCommandEntry] { SlashCommandCatalog.entries(capabilities, offersMcp: offersMcpCommand) }
 
     /// This project's recently used commands, most recent first.
     var slashRecents: [String] {

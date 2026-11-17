@@ -257,6 +257,22 @@
         }
       }
     },
+    "%@ — %lld MCP servers done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — %lld MCP servers done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — MCP 서버 %2$lld개 완료"
+          }
+        }
+      }
+    },
     "%@ → %@ tokens": {
       "localizations": {
         "en": {
@@ -6359,6 +6375,70 @@
         }
       }
     },
+    "Log in…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log in…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인…"
+          }
+        }
+      }
+    },
+    "Manage MCP servers — reconnect, log in, turn on or off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage MCP servers — reconnect, log in, turn on or off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 서버를 관리해요 — 재연결, 로그인, 켜기·끄기"
+          }
+        }
+      }
+    },
+    "No MCP server is called “%@” — type /mcp to see the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No MCP server is called “%@” — type /mcp to see the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”라는 MCP 서버가 없어요 — /mcp로 목록을 봐요"
+          }
+        }
+      }
+    },
+    "No MCP server to act on — type /mcp to see the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No MCP server to act on — type /mcp to see the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대상 MCP 서버가 없어요 — /mcp로 목록을 봐요"
+          }
+        }
+      }
+    },
     "No side answer yet — type /btw and your question": {
       "localizations": {
         "en": {
@@ -9079,6 +9159,22 @@
         }
       }
     },
+    "Opening Terminal to log in to “%@”…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening Terminal to log in to “%@”…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”에 로그인하도록 터미널을 여는 중…"
+          }
+        }
+      }
+    },
     "Opens a new chat in the app — this chat stays in the list": {
       "localizations": {
         "en": {
@@ -10003,6 +10099,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "최근 사용"
+          }
+        }
+      }
+    },
+    "Reconnect": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "재연결"
+          }
+        }
+      }
+    },
+    "Reconnecting %lld MCP servers…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting %lld MCP servers…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 서버 %lld개 재연결 중…"
+          }
+        }
+      }
+    },
+    "Reconnecting “%@”…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting “%@”…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” 재연결 중…"
           }
         }
       }
@@ -13395,6 +13539,22 @@
         }
       }
     },
+    "The session is not running — MCP servers can be managed once it is": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The session is not running — MCP servers can be managed once it is"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션이 실행 중이 아니에요 — 세션이 시작되면 MCP 서버를 관리할 수 있어요"
+          }
+        }
+      }
+    },
     "The side question failed: %@": {
       "localizations": {
         "en": {
@@ -13823,6 +13983,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 Claude 세션은 MCP 서버를 관리할 수 없습니다 — Claude Code를 업데이트하세요"
+          }
+        }
+      }
+    },
+    "This engine cannot manage MCP servers — reopen the project after updating ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot manage MCP servers — reopen the project after updating ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 MCP 서버를 관리하지 못해요 — ReviewGate를 업데이트한 뒤 프로젝트를 다시 열어요"
           }
         }
       }
@@ -14707,6 +14883,38 @@
         }
       }
     },
+    "Turn Off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn Off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끄기"
+          }
+        }
+      }
+    },
+    "Turn On": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn On"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "켜기"
+          }
+        }
+      }
+    },
     "Turn them on in System Settings › Notifications › ReviewGate to hear about permission requests and finished work while you are away.": {
       "localizations": {
         "en": {
@@ -14719,6 +14927,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "자리를 비운 동안에도 허용 요청과 끝난 작업을 알 수 있게 시스템 설정 › 알림 › ReviewGate에서 켜 주세요."
+          }
+        }
+      }
+    },
+    "Turning off %lld MCP servers…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning off %lld MCP servers…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 서버 %lld개 끄는 중…"
+          }
+        }
+      }
+    },
+    "Turning off “%@”…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning off “%@”…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” 끄는 중…"
+          }
+        }
+      }
+    },
+    "Turning on %lld MCP servers…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning on %lld MCP servers…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 서버 %lld개 켜는 중…"
+          }
+        }
+      }
+    },
+    "Turning on “%@”…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning on “%@”…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” 켜는 중…"
           }
         }
       }
@@ -15443,6 +15715,22 @@
         }
       }
     },
+    "Working on “%@” — wait for it to finish": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working on “%@” — wait for it to finish"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” 작업 중이에요 — 끝날 때까지 기다려요"
+          }
+        }
+      }
+    },
     "Working tree has uncommitted changes": {
       "localizations": {
         "en": {
@@ -15455,6 +15743,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "작업 트리에 커밋하지 않은 변경이 있어요"
+          }
+        }
+      }
+    },
+    "Working…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 중…"
           }
         }
       }
@@ -16591,6 +16895,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "×%1$lld · 마지막 %2$@"
+          }
+        }
+      }
+    },
+    "“%@” is already off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” is already off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”은(는) 이미 꺼져 있어요"
+          }
+        }
+      }
+    },
+    "“%@” is already on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” is already on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”은(는) 이미 켜져 있어요"
+          }
+        }
+      }
+    },
+    "“%@” is off — turn it on first (⌥↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” is off — turn it on first (⌥↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”은(는) 꺼져 있어요 — 먼저 켜요 (⌥↩)"
           }
         }
       }
