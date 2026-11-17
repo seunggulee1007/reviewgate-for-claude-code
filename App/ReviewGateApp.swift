@@ -494,8 +494,9 @@ private struct WorkbenchWindow: View {
                     }
                 }
                 entry.model.terminals.installShellToggle(window: { [weak entry] in entry?.window }) { [weak entry] in
-                    guard let entry, entry.store.projectURL != nil, entry.model.tab != .prs else { return }
+                    guard let entry, entry.store.projectURL != nil, entry.model.tab != .prs else { return false }
                     entry.model.shell.toggle()
+                    return true
                 }
                 entry.store.confirmSideSwitch = SideSwitchAlert.confirm   // wave4b w4b-side (§40.3)
                 // wave3 mac-session: hand-offs wait while this window opens its first project.

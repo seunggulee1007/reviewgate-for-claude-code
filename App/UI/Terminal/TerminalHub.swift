@@ -30,8 +30,10 @@ final class TerminalHub {
         guard self.store !== store else { return }
         self.store = store
         store.onTerminalInterrupt = { [weak self, weak store] in
-            guard let self, let id = store?.currentSessionId else { return }
-            self.chatHosts[id]?.sendEscape()
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id] else { return }
+            // With a shell of the bottom panel at the keyboard, ⌘. is not meant for Claude: nothing gets the Esc.
+            if let window = host.view.window, let terminal = window.firstResponder as? ReviewTerminalView, terminal !== host.view { return }
+            host.sendEscape()
         }
         // Settings' "Restart now" (MCP servers, extensions, instructions, a new CLI) in a terminal chat: its claude reads
         // them at start, so the PTY restarts and resumes the conversation.
@@ -86,17 +88,18 @@ final class TerminalHub {
     }
 
     /// §57.6: ⌃` in `window()` toggles the terminal panel whatever has the keyboard. SwiftTerm hands only ⌘ keys to the
-    /// menu, so inside a terminal ⌃` would reach the program as NUL; this monitor takes it first (keyCode 50, the key left
-    /// of 1 on any layout, with exactly ⌃).
-    func installShellToggle(window: @escaping @MainActor () -> NSWindow?, toggle: @escaping @MainActor () -> Void) {
+    /// menu, so inside a terminal ⌃` would reach the program as NUL; this monitor takes it first (with exactly ⌃, keyCode
+    /// 50 = kVK_ANSI_Grave: a key position, whatever the layout — left of 1 on ANSI keyboards, next to the left Shift on
+    /// ISO ones, where the key left of 1 is kVK_ISO_Section). `toggle` returns false when the window has no panel to
+    /// toggle (no project, the PRs tab): the key then goes on to whatever has the keyboard.
+    func installShellToggle(window: @escaping @MainActor () -> NSWindow?, toggle: @escaping @MainActor () -> Bool) {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
                 guard event.keyCode == 50,
                       event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .function, .numericPad]) == .control,
                       let mine = window(), event.window === mine else { return false }
-                toggle()
-                return true
+                return toggle()
             }
             return handled ? nil : event
         }

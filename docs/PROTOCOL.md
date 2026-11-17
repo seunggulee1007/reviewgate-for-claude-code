@@ -8830,7 +8830,8 @@ chat's id);
   restarting. Nothing types into the TUI for the user.
 - **Engine restart.** A running terminal is never killed: the strip turns orange ("ReviewGate가 다시 시작됐어요 …") and
   Restart takes a new spec (its hooks fail closed meanwhile).
-- **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt`. Commands…, Attach
+- **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt` — not while a shell of
+  the terminal panel has the keyboard (then it does nothing). Commands…, Attach
   Images…, the permission mode, Find in Chat and Review › Request Changes are off for a terminal chat (the TUI has its
   own). Continue in Terminal is not offered for a terminal chat.
 - **Attention.** `waiting` turning on is a permission / question attention event once per wait (`term:<chat>:<since>`):
@@ -8853,7 +8854,9 @@ chat's id);
 - **⌃` / View › Toggle Terminal Panel.** Hidden → shown with the keyboard in its shell (a first tab when there is none);
   shown with the keyboard in it → hidden, the keyboard back to the chat (its terminal, else the message box); shown
   without the keyboard → the keyboard to it. The menu item carries the key for discoverability; a local key monitor
-  (keyCode 50, exactly ⌃, in this window) takes it first, because a terminal would send ⌃` to its program as NUL.
+  (keyCode 50 — a key position: left of 1 on ANSI keyboards, next to the left Shift on ISO ones —, exactly ⌃, in this
+  window) takes it first, because a terminal would send ⌃` to its program as NUL. With no project or on the PRs tab
+  there is no panel: the monitor lets the key through.
 - **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s, to its process group). A shell that exits 0 (`exit`, ⌃D) closes its
   tab; any other end stays as "exited (n)" with Restart / Close. The last tab closing hides the panel. Hiding the panel or
   switching tabs never ends a shell; closing the window or quitting does. Its top edge drags to resize it (the
