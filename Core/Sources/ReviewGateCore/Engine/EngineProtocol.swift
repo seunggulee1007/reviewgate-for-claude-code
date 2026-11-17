@@ -554,6 +554,8 @@ public enum EngineCommand: Sendable, Equatable {
     case terminalExited(sessionId: String, exitCode: Int32?)
     /// §57.1: "Review now" — ends the open turn; refused `no_turn` when none is open.
     case terminalEndTurn(sessionId: String)
+    /// MARK: terminal-continue — §57.9: chat `sessionId`'s conversation goes on in a new terminal chat (the chat a record).
+    case sessionContinueTerminal(sessionId: String)
     case sessionOpen(id: String)
     case sessionRename(id: String, title: String)
     case sessionArchive(id: String, archived: Bool)
@@ -772,6 +774,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .sessionList: "session_list"
         case .sessionNew: "session_new"
         case .sessionNewTerminal: "session_new"   // MARK: terminal-chat (§57)
+        case .sessionContinueTerminal: "session_continue_terminal"   // §57.9
         case .terminalSpec: "terminal_spec"
         case .terminalStarted: "terminal_started"
         case .terminalExited: "terminal_exited"
@@ -919,7 +922,7 @@ extension EngineCommand: Encodable {
             try encodeSteerTakeBackFields(to: encoder)
         case .btwAsk:   // §56.1
             try encodeBtwFields(to: encoder)
-        case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn:   // §57
+        case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal:   // §57
             try encodeTerminalChatFields(to: encoder)
         case .interruptTakeBack:   // §56.2
             try encodeInterruptTakeBackFields(to: encoder)
@@ -2348,6 +2351,10 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
     public var kind: SessionKind = .chat
     /// §57.1: the CLI conversation the terminal last ran when it differs from `id` (`/clear` or `/resume` in the TUI).
     public var cliSessionId: String?
+    /// MARK: terminal-continue — §57.9: a terminal chat carrying on chat `continuedFrom`'s conversation; a chat whose
+    /// conversation goes on in terminal chat `continuedIn` (a record here).
+    public var continuedFrom: String?
+    public var continuedIn: String?
 
     public init(id: String, title: String, createdAt: String = "", updatedAt: String = "", turns: Int = 0, costUSD: Double = 0,
                 lastUserText: String = "", archived: Bool = false, resumeFailed: Bool = false) {
@@ -2394,6 +2401,7 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
         movedTo = (try? c.decodeIfPresent(ChatMoveRef.self, forKey: .movedTo)) ?? nil   // wave4b w4b-follow
         movedFrom = (try? c.decodeIfPresent(ChatMoveRef.self, forKey: .movedFrom)) ?? nil
         (kind, cliSessionId) = TerminalChatWire.meta(from: decoder)   // MARK: terminal-chat (§57)
+        (continuedFrom, continuedIn) = TerminalChatWire.continuation(from: decoder)   // §57.9
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -2412,6 +2420,7 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
         try c.encodeIfPresent(movedTo, forKey: .movedTo)   // wave4b w4b-follow
         try c.encodeIfPresent(movedFrom, forKey: .movedFrom)
         try TerminalChatWire.encode(kind: kind, cliSessionId: cliSessionId, to: encoder)   // MARK: terminal-chat (§57)
+        try TerminalChatWire.encode(continuedFrom: continuedFrom, continuedIn: continuedIn, to: encoder)   // §57.9
     }
 }
 

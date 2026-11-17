@@ -98,7 +98,7 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
 }
 
 enum TerminalChatWire {
-    private enum MetaKeys: String, CodingKey { case kind, cliSessionId }
+    private enum MetaKeys: String, CodingKey { case kind, cliSessionId, continuedFrom, continuedIn }
     private enum SessionKeys: String, CodingKey { case terminal }
 
     /// `kind` / `cliSessionId` of a `SessionMeta` (lenient: missing or unknown kind → `.chat`, an empty id → nil).
@@ -114,6 +114,19 @@ enum TerminalChatWire {
         var c = encoder.container(keyedBy: MetaKeys.self)
         if kind == .terminal { try c.encode(kind, forKey: .kind) }
         try c.encodeIfPresent(cliSessionId, forKey: .cliSessionId)
+    }
+
+    /// §57.9: `continuedFrom` / `continuedIn` of a `SessionMeta` (an empty or malformed id → nil).
+    static func continuation(from decoder: Decoder) -> (from: String?, into: String?) {
+        guard let c = try? decoder.container(keyedBy: MetaKeys.self) else { return (nil, nil) }
+        let id = { (k: MetaKeys) in lenientValue(String.self, c, k).flatMap { $0.isEmpty ? nil : $0 } }
+        return (id(.continuedFrom), id(.continuedIn))
+    }
+
+    static func encode(continuedFrom: String?, continuedIn: String?, to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: MetaKeys.self)
+        try c.encodeIfPresent(continuedFrom, forKey: .continuedFrom)
+        try c.encodeIfPresent(continuedIn, forKey: .continuedIn)
     }
 
     /// `state.session.terminal` (nil when absent, null or malformed).
@@ -132,7 +145,7 @@ extension EngineCommand {
         switch self {
         case .sessionNewTerminal:
             try c.encode(SessionKind.terminal, forKey: .kind)
-        case let .terminalSpec(sessionId), let .terminalEndTurn(sessionId):
+        case let .terminalSpec(sessionId), let .terminalEndTurn(sessionId), let .sessionContinueTerminal(sessionId):
             try c.encode(sessionId, forKey: .sessionId)
         case let .terminalStarted(sessionId, pid):
             try c.encode(sessionId, forKey: .sessionId)

@@ -83,6 +83,10 @@ public struct MenuState: Equatable, Sendable {
     /// The chat on screen is a terminal chat: no message box — Commands…, Attach Images…, Find in Chat and the
     /// permission mode are the TUI's own.
     public var shownChatIsTerminal = false
+    /// MARK: terminal-continue (§57.9): Chat › "Continue as Terminal Chat" acts on the chat on screen (nil: a terminal chat
+    /// or none — not offered) and why it is off.
+    public var continueTerminalChatId: String?
+    public var continueTerminalBlocker: String?
 
     public init() {}
 
@@ -121,5 +125,9 @@ public struct MenuState: Equatable, Sendable {
         isTerminalChat = store.isTerminalChat
         shownChatIsTerminal = store.shownChatIsTerminal
         canPickPermissionMode = store.canPickPermissionMode && !isTerminalChat && !shownChatIsTerminal
+        if let shown = store.shownChatId, let meta = store.sessions.first(where: { $0.id == shown }), meta.kind != .terminal {
+            continueTerminalChatId = shown
+            continueTerminalBlocker = store.continueAsTerminalBlocker(meta)
+        }
     }
 }
