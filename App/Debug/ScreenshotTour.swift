@@ -2619,11 +2619,14 @@ private final class Tour {
     private func terminalOnly() async throws {
         try await wait("project open", timeout: 180) { $0.projectURL != nil && !$0.isStarting }
         guard let window = entry.window else { throw TourError("no window") }
-        // No `place()`: a quiet run never activates the app or orders its window in front.
-        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1280, height: 800)), display: true)
+        // No `place()`: a quiet run never activates the app or orders its window in front. §57.5: the user's laptop window.
+        let laptop = NSSize(width: 1000, height: 637)
+        window.setFrame(NSRect(origin: window.frame.origin, size: laptop), display: true)
         AppSettings.setAppearance(.dark)
+        UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")   // the split's default (this build's own domain)
         let hub = entry.model.terminals
         let demo = store.projectURL?.path ?? ""
+        let size = { (h: TerminalHost) in "\(Int(h.view.frame.width))×\(Int(h.view.frame.height)) pt, \(h.view.terminalDimensions.cols)×\(h.view.terminalDimensions.rows) cells" }
 
         // 1. A new terminal chat shows the fake's banner.
         guard await store.newTerminalChat() else { return log("terminal: New Terminal Chat refused — SILENT") }
@@ -2637,15 +2640,64 @@ private final class Tour {
         let firstBanner = Self.banner(host)
         log("terminal: banner shown — \(firstBanner ?? "?")")
 
-        // 2. A prompt typed into the PTY becomes a review turn with notes.txt.
+        // 1b. §57.5: nothing to review — the terminal takes the window beside the sidebar, 80 columns or more at the laptop
+        // size, and the PTY's winsize is the view's.
+        _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols >= 80 }
+        let wide = host.view.terminalDimensions.cols
+        log("terminal: layout without a review — chat view \(size(host)) " + (wide >= 80 ? "(80 columns or more)" : "— CUT (under 80 columns)"))
+        await ptyFollows(host, "without a review")
+        try write(try render(window), "terminal-chat-wide-dark")
+
+        // 2. A prompt typed into the PTY becomes a review turn with notes.txt; the review panel opens on the terminal's right
+        // and the terminal (which keeps the keyboard) shrinks.
+        host.focus()
+        let focusedBefore = host.isFocused
+        let signalsBefore = Self.reports(host, "winsize").count
         host.send(text: "add a note\r")
         let reviewed = await waitFor(seconds: 30) { [store] in
             store.gatePhase == .reviewing && store.changedFiles.contains { $0.path == "notes.txt" }
         }
         log("terminal: first prompt → " + (reviewed ? "review with notes.txt" : "— SILENT (phase \(store.gatePhase), files \(store.changedFiles.map(\.path)))"))
         log("terminal: hooks seen \(store.terminalInfo?.hooksSeen == true), running \(store.terminalInfo?.running == true)")
+        let opened = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
         try await Task.sleep(for: .milliseconds(1200))
+        let narrow = host.view.terminalDimensions.cols
+        log("terminal: layout review — " + (opened ? "the review panel opened, chat view \(size(host)) (was \(wide) columns)" : "— LOST (the review panel did not open: \(size(host)))")
+            + (narrow >= 38 ? "" : " — CUT (under 38 columns)"))
+        // One resize for one open (an animated panel resized the TUI at every frame on the way).
+        let signals = Self.reports(host, "winsize").count - signalsBefore
+        log("terminal: layout review — SIGWINCH ×\(signals) for the panel opening " + (signals <= 2 ? "(one redraw)" : "— JUMP (the TUI redrew at each width on the way)"))
+        log("terminal: layout review — the terminal " + (!focusedBefore ? "INFO had no keyboard before (\(String(describing: window.firstResponder)))"
+                                                          : host.isFocused ? "kept the keyboard" : "— LOST (the keyboard went to \(String(describing: window.firstResponder)))"))
+        await ptyFollows(host, "review panel open")
         try write(try render(window), "terminal-chat-review-dark")
+
+        // 2b. ⌘⇧D closes the panel: the terminal takes the width again; the split moved (the stored share) resizes it.
+        entry.model.toggleDiffTick += 1   // ⌘⇧D
+        let closed = await waitFor(seconds: 5) { host.view.terminalDimensions.cols >= wide }
+        try await Task.sleep(for: .milliseconds(600))
+        log("terminal: layout panel closed — " + (closed ? "chat view \(size(host))" : "— LOST (still \(size(host)))"))
+        await ptyFollows(host, "panel closed")
+        try write(try render(window), "terminal-chat-panel-closed-dark")
+        entry.model.toggleDiffTick += 1
+        _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
+        // The divider moves the terminal where there is room to move it (the laptop window keeps the review at its floor).
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1280, height: 800)), display: true)
+        try await Task.sleep(for: .milliseconds(800))
+        var splitCols: [Int] = []
+        for share in [0.3, 0.7] {
+            UserDefaults.standard.set(share, forKey: "terminalReviewSplit")
+            try await Task.sleep(for: .milliseconds(800))
+            splitCols.append(host.view.terminalDimensions.cols)
+            await ptyFollows(host, "split at \(share)")
+        }
+        UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")
+        log("terminal: layout split dragged at 1280 × 800 — \(splitCols.map(String.init).joined(separator: " → ")) columns "
+            + (splitCols.count == 2 && splitCols[0] < splitCols[1] && splitCols[0] >= 38 ? "(the terminal moved with it)" : "— LOST (the split did not move the terminal)"))
+        window.setFrame(NSRect(origin: window.frame.origin, size: laptop), display: true)
+        try await Task.sleep(for: .milliseconds(800))
+        entry.model.toggleDiffTick += 1   // closed again: the next review must open it by itself
+        _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols >= wide }
 
         // 3. Reject it; the next prompt's context says so.
         if reviewed, let file = store.changedFiles.first(where: { $0.path == "notes.txt" }) {
@@ -2659,6 +2711,9 @@ private final class Tour {
             }
             log("terminal: second prompt's context " + (told ? "names the rejected file" : "— LOST (\(Self.lastLines(host, 6)))"))
             _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing }
+            let reopened = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
+            try await Task.sleep(for: .milliseconds(600))
+            log("terminal: layout next review — " + (reopened ? "the panel the user closed opened again, chat view \(size(host))" : "— LOST (it stayed closed: \(size(host)))"))
         } else {
             log("terminal: reject step skipped — LOST (no review to reject)")
         }
@@ -2678,9 +2733,20 @@ private final class Tour {
         let pwdOK = await waitFor(seconds: 10) { shell.screenLines().contains { $0.trimmingCharacters(in: .whitespaces) == demo } }
         log("terminal: shell pwd " + (pwdOK ? "is the project folder" : "— LOST (\(Self.lastLines(shell, 4)))"))
         try await Task.sleep(for: .milliseconds(800))
-        let size = { (h: TerminalHost) in "\(Int(h.view.frame.width))×\(Int(h.view.frame.height)) pt, \(h.view.terminalDimensions.cols)×\(h.view.terminalDimensions.rows) cells" }
         log("terminal: INFO shell view \(size(shell)), chat view \(size(host))")
+        // The panel took the chat terminal's height: both PTYs have their views' size; so after the window resizes.
+        await ptyFollows(host, "shell panel open")
+        await sttyFollows(shell, "shell panel open")
         try write(try render(window), "shell-panel-dark")
+        for (name, frame) in [("window 1280 × 800", NSSize(width: 1280, height: 800)), ("window back to 1000 × 637", laptop)] {
+            let before = host.view.terminalDimensions
+            window.setFrame(NSRect(origin: window.frame.origin, size: frame), display: true)
+            _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols != before.cols && host.view.terminalDimensions.rows != before.rows }
+            try await Task.sleep(for: .milliseconds(600))
+            log("terminal: layout \(name) — chat view \(size(host)), shell view \(size(shell))")
+            await ptyFollows(host, name)
+            await sttyFollows(shell, name)
+        }
 
         // 5. The input method in the shell's `cat` (cooked mode: what the kernel's line editing makes of it).
         shell.send(text: "exec cat\r")
@@ -2759,6 +2825,40 @@ private final class Tour {
         try await Task.sleep(for: .seconds(3))
         let respawned = hub.host(for: chatId).map { "\($0.state)" } ?? (hub.spawning.isEmpty ? nil : "spawning")
         log("terminal: window close → " + (respawned == nil ? "no claude started again" : "— LOST (\(respawned!))"))
+    }
+
+    /// §57.5: the fake claude's own winsize (TIOCGWINSZ through Node's `stdout.columns`, asked with a `size` line) is the
+    /// view's cells, and its last `winsize` line (SIGWINCH) says the same. `terminal: winsize` lines; LOST when they differ.
+    private func ptyFollows(_ host: TerminalHost, _ step: String) async {
+        let asked = Self.reports(host, "size").count
+        host.send(text: "size\r")
+        _ = await waitFor(seconds: 5) { Self.reports(host, "size").count > asked }
+        let cells = host.view.terminalDimensions
+        let view = "\(cells.cols)x\(cells.rows)"
+        let pty = Self.reports(host, "size").last ?? "nothing"
+        let signal = Self.reports(host, "winsize").last
+        let ok = pty == view && (signal == nil || signal == view)
+        log("terminal: winsize \(step) — view \(view), claude's PTY \(pty), last SIGWINCH \(signal ?? "none") " + (ok ? "(follows)" : "— LOST"))
+    }
+
+    /// `stty size` in a shell tab (rows cols) is its view's cells.
+    private func sttyFollows(_ shell: TerminalHost, _ step: String) async {
+        let rowsCols = { shell.screenLines().filter { $0.trimmingCharacters(in: .whitespaces).range(of: #"^\d+ \d+$"#, options: .regularExpression) != nil } }
+        let before = rowsCols().count
+        shell.send(text: "stty size\r")
+        _ = await waitFor(seconds: 5) { rowsCols().count > before }
+        let cells = shell.view.terminalDimensions
+        let said = rowsCols().last?.trimmingCharacters(in: .whitespaces) ?? "nothing"
+        log("terminal: stty size \(step) — view \(cells.rows) \(cells.cols), stty \(said) " + (said == "\(cells.rows) \(cells.cols)" ? "(follows)" : "— LOST"))
+    }
+
+    /// The `CxR` of each line the fake printed as `<prefix> CxR…`, oldest first.
+    private static func reports(_ host: TerminalHost, _ prefix: String) -> [String] {
+        host.screenLines().compactMap { line in
+            let words = line.trimmingCharacters(in: .whitespaces).split(separator: " ")
+            guard words.count >= 2, words[0] == prefix, words[1].contains("x") else { return nil }
+            return String(words[1])
+        }
     }
 
     private var imeOutcome: [(String, Bool)] = []

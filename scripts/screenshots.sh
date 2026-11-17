@@ -51,7 +51,10 @@
 #                  (REVIEWGATE_TERMINAL_SHELL: no login or interactive shell, no dotfiles): the banner, a prompt typed into
 #                  the PTY becoming a review, a reject named in the next prompt's context, the shell tab's folder, the
 #                  input method in `cat` (한글, a commit on focus loss, Hanja, the #825 mask), copy without the pasteboard,
-#                  ⌃`, /exit and Restart resuming the same conversation, Settings' Restart now restarting the PTY (a new
+#                  ⌃`, /exit and Restart resuming the same conversation, the layout at the laptop's 1000 × 637 (the terminal
+#                  80 columns or more without a review, the review panel opening beside it for each review and closing, the
+#                  split moved, the window resized) with the PTY's winsize following each time (the fake's `size` /
+#                  `winsize` lines, `stty size` in the shell), Settings' Restart now restarting the PTY (a new
 #                  pid, the same conversation, its hooks still reviewed), and no claude starting again once the window's
 #                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
@@ -298,8 +301,9 @@ CLAUDE_BIN=claude
 if [ "${SHOTS_LAYOUT:-}" = terminal ]; then
   # §57 terminal tour: a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
   # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
-  # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It never reads or writes ~/.claude. Run as the
-  # app's chat CLI (stream-json) it fails at once: this tour has no chat-kind turn.
+  # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It prints its terminal's size (the PTY's winsize)
+  # on each SIGWINCH (`winsize CxR`) and when a line is `size` (`size CxR COLUMNS=…`, no turn). It never reads or writes
+  # ~/.claude. Run as the app's chat CLI (stream-json) it fails at once: this tour has no chat-kind turn.
   mkdir -p "$SHOTS_DIR/fakebin"
   CLAUDE_BIN="$SHOTS_DIR/fakebin/claude"
   cat > "$CLAUDE_BIN" <<'EOF'
@@ -326,10 +330,13 @@ const post = async (body) => {
   return res.json().catch(() => ({}));
 };
 let n = 0;
+const winsize = () => `${process.stdout.columns}x${process.stdout.rows}`;
+process.stdout.on("resize", () => console.log(`winsize ${winsize()}`));
 const rl = readline.createInterface({ input: process.stdin, terminal: false });
 rl.on("line", async (line) => {
   rl.pause();
   if (line.trim() === "/exit") process.exit(0);
+  if (line.trim() === "size") { console.log(`size ${winsize()} COLUMNS=${process.env.COLUMNS ?? "-"}`); rl.resume(); return; }
   const promptId = randomUUID();
   const answer = await post({ hook_event_name: "UserPromptSubmit", prompt: line, prompt_id: promptId });
   if (answer.decision === "block") { console.log(`blocked: ${answer.reason}`); rl.resume(); return; }
