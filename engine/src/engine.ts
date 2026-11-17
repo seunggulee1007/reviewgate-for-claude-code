@@ -8425,14 +8425,17 @@ export class ReviewEngine {
 
   private async adoptAutoTurn(source: ClaudeSessionLike, ev: Extract<SessionEvent, { type: "auto_turn_start" }>): Promise<void> {
     let ok = false;
+    let busy = false;
     let tree: string | undefined;
-    const deadline = Date.now() + this.autoTurnWaitMs;
+    // §57.4: a terminal chat's write tool waits 55 s in its session (the hook gives up at 60 s): the engine answers first.
+    const deadline = Date.now() + (source instanceof TerminalSession ? Math.min(this.autoTurnWaitMs, TERMINAL_AUTO_TURN_WAIT_MS) : this.autoTurnWaitMs);
     try {
       if (this.collection) await this.collection.catch(() => undefined);
       // MARK: r2-peers — §52.1: a collection that failed holds the turn too (its calls wait) while its automatic retry is
       // still to run (M30, §3), within the same bound. With no retry left the turn takes the failed one in (`prepareAnswer`).
       while ((this.gate.collecting || this.gate.reverting || this.collectRetryPending()) && this.session === source && Date.now() < deadline) await pause(50);
       if (this.session !== source || this.closed) return;
+      busy = this.gate.collecting || this.gate.reverting || this.collectRetryPending();
       if (this.gate.running) {
         // A send slipped in before the input closed: the CLI's turn joins it — and the session waits for that message too.
         const joinBy = Math.min(deadline, Date.now() + AUTO_TURN_JOIN_MS);
@@ -8492,7 +8495,7 @@ export class ReviewEngine {
       }
     } finally {
       if (!ok) this.externalTurn = null;
-      if (this.session === source) source.autoTurnReady?.(ok, ok && tree !== undefined ? this.turnHookTree(tree) : undefined);
+      if (this.session === source) source.autoTurnReady?.(ok, ok && tree !== undefined ? this.turnHookTree(tree) : undefined, !ok && busy);
       this.drainAdoptQueue();
       this.touch();
     }
@@ -9055,6 +9058,8 @@ type PlannedCommit = { message: string; whole: string[]; blobs: SeriesBlob[]; fi
 /** §56.2: how long Esc's take-back one by one (a CLI without `cancel_queued`) waits for the CLI before it interrupts. */
 const TAKE_BACK_BEFORE_INTERRUPT_MS = 1500;
 const AUTO_TURN_WAIT_MS = 60_000;
+/** §57.4: the same wait for a terminal chat — under its session's 55 s (and the PreToolUse hook's 60 s). */
+const TERMINAL_AUTO_TURN_WAIT_MS = 45_000;
 /** §52.1: how long it waits for a message sent meanwhile to go out (its turn is the one it joins). */
 const AUTO_TURN_JOIN_MS = 5_000;
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

@@ -60,6 +60,13 @@ export type TerminalSessionOptions = {
 
 /** A prompt the engine did not answer in time is blocked with this (the user sends it again). */
 export const PROMPT_TIMEOUT_REASON = "ReviewGate could not start the review of this prompt in time (it is still busy). Send it again.";
+/**
+ * A write tool whose review turn could not start in time — the engine was still collecting the last turn, or did not
+ * answer within the session's wait — is denied with this (not the unprompted-turn reason: the user may well have asked).
+ */
+export const ADOPT_BUSY_REASON =
+  "ReviewGate was still busy with the last turn's changes and could not start reviewing this one in time, so this call " +
+  "was blocked. Wait a moment, then try it again.";
 /** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
 const PROMPT_CANCELLED_REASON = "Claude Code stopped waiting for ReviewGate's answer to this prompt.";
 
@@ -70,6 +77,8 @@ const PERMISSION_MODES: ReadonlySet<string> = new Set(["default", "acceptEdits",
 type Touched = { path: string; tools: Set<string>; count: number; toolUseIds: string[] };
 type OpenTurn = { promptId: string | null; hookPromptId: string | null; openedAt: number };
 type Waiter<T> = { resolve: (v: T) => void; timer: NodeJS.Timeout };
+/** How a write tool's wait for its review turn ended (`busy`: it ran out, or the engine was still busy). */
+type Adopted = { ok: boolean; busy?: boolean };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
 
@@ -94,7 +103,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   /** The prompt waiting for the engine's answer; `seq` is its `terminal_prompt`'s, so an answer reaches only its own. */
   private prompt: (Waiter<PromptAnswer> & { seq: number }) | null = null;
   private promptSeq = 0;
-  private adoption: { promise: Promise<boolean>; waiter: Waiter<{ ok: boolean; tree?: string }> } | null = null;
+  private adoption: { promise: Promise<Adopted>; waiter: Waiter<Adopted & { tree?: string }> } | null = null;
   private lastBgTasks = 0;
   private ctx: HookContext;
   private touched = new Map<string, Touched>();
@@ -154,8 +163,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.settleAdoption({ ok: false });
   }
 
-  /** §52 path: the engine took (true, with A's tree) or refused (false) the turn a write tool started. */
-  autoTurnReady(ok: boolean, checkpointTree?: string): void {
+  /** §52 path: the engine took (true, with A's tree) or refused (false; `busy`: its wait ran out) the turn a write tool started. */
+  autoTurnReady(ok: boolean, checkpointTree?: string, busy = false): void {
     if (!this.adoption) {
       // The calls stopped waiting (denied) before the engine took the turn: it ends at once, so the gate opens again.
       if (ok && !this.disposed && !this.open) {
@@ -165,7 +174,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       }
       return;
     }
-    this.settleAdoption(ok ? { ok, ...(checkpointTree !== undefined ? { tree: checkpointTree } : {}) } : { ok });
+    this.settleAdoption(ok ? { ok, ...(checkpointTree !== undefined ? { tree: checkpointTree } : {}) } : { ok, busy });
   }
 
   // ---- what the engine calls
@@ -305,7 +314,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     if (!this.open) {
       const ready = await this.adopt(str(input.prompt_id));
       if (!ready.ok) {
-        return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: UNPROMPTED_REASON } };
+        const reason = ready.busy ? ADOPT_BUSY_REASON : UNPROMPTED_REASON;
+        return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } };
       }
     }
     if (input.tool_name === "Bash") await this.beforeBash(input);
@@ -313,22 +323,24 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   }
 
   /** A write tool with no turn open: the engine takes it as a turn Claude started (§52.1) — one wait for every call. */
-  private async adopt(hookPromptId: string | null): Promise<{ ok: boolean }> {
+  private async adopt(hookPromptId: string | null): Promise<Adopted> {
     let pending = this.adoption;
     if (!pending) {
-      let waiter!: Waiter<{ ok: boolean; tree?: string }>;
-      const promise = new Promise<{ ok: boolean; tree?: string }>((resolve) => {
-        const timer = setTimeout(() => this.settleAdoption({ ok: false }), this.opts.adoptWaitMs ?? 55_000);
+      let waiter!: Waiter<Adopted & { tree?: string }>;
+      // The PreToolUse hook gives up at 60 s; the engine's own wait for a terminal chat is shorter (45 s), so its answer
+      // normally comes first.
+      const promise = new Promise<Adopted & { tree?: string }>((resolve) => {
+        const timer = setTimeout(() => this.settleAdoption({ ok: false, busy: true }), this.opts.adoptWaitMs ?? 55_000);
         timer.unref?.();
         waiter = { resolve, timer };
       }).then((r) => {
         if (r.ok && !this.open && !this.disposed) this.openTurn({ promptId: null, hookPromptId, openedAt: this.now() }, r.tree);
-        return r.ok;
+        return { ok: r.ok, ...(r.busy ? { busy: true } : {}) };
       });
       pending = this.adoption = { promise, waiter };
       this.opts.emit({ type: "auto_turn_start", trigger: "continue", ...(hookPromptId ? { commandUuid: hookPromptId } : {}) });
     }
-    return { ok: await pending.promise };
+    return await pending.promise;
   }
 
   private async onPostTool(input: Record<string, unknown>): Promise<void> {
@@ -522,7 +534,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     w.resolve(a);
   }
 
-  private settleAdoption(r: { ok: boolean; tree?: string }): void {
+  private settleAdoption(r: Adopted & { tree?: string }): void {
     const a = this.adoption;
     if (!a) return;
     this.adoption = null;

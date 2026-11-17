@@ -5,7 +5,7 @@ import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -32,7 +32,7 @@ function makeRepo(): string {
 type Rig = { ts: TerminalSession; events: SessionEvent[]; dir: string; of: <T extends SessionEvent["type"]>(t: T) => Extract<SessionEvent, { type: T }>[]; hook: (input: Record<string, unknown>) => Promise<Record<string, unknown>>; tree: () => Promise<string> };
 
 /** `answer`: how the fake engine answers `terminal_prompt` (null: it does not — the test answers). */
-function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number } = {}): Rig {
+function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number } = {}): Rig {
   const dir = makeRepo();
   const events: SessionEvent[] = [];
   let ts!: TerminalSession;
@@ -44,7 +44,7 @@ function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prom
     cwd: dir,
     ignorePatterns: [],
     promptWaitMs: opts.promptWaitMs ?? 5000,
-    adoptWaitMs: 5000,
+    adoptWaitMs: opts.adoptWaitMs ?? 5000,
     plansDir: join(dir, ".no-plans"),
     windowMarginMs: 60_000,
     emit: (ev) => {
@@ -149,6 +149,18 @@ describe("TerminalSession", () => {
     expect(await again).toEqual({});
     expect(r.ts.isTurnActive).toBe(true);
     expect(r.ts.state.promptId).toBeNull(); // a turn Claude started itself
+  });
+
+  it("a write tool whose turn could not start in time (the wait ran out, the engine still busy) is denied as busy, not unprompted", async () => {
+    const busy = (reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
+    const slow = rig({ adoptWaitMs: 50 });
+    expect(await slow.hook(pre("Write", { file_path: "x.txt", content: "x" }, "t1"))).toEqual(busy(ADOPT_BUSY_REASON));
+    const r = rig();
+    const pending = r.hook(pre("Write", { file_path: "x.txt", content: "x" }, "t2"));
+    await new Promise((res) => setTimeout(res, 10));
+    r.ts.autoTurnReady(false, undefined, true);
+    expect(await pending).toEqual(busy(ADOPT_BUSY_REASON));
+    expect(r.ts.isTurnActive).toBe(false);
   });
 
   it("the engine taking the turn after the calls were denied (their wait ran out) ends it at once", async () => {

@@ -268,9 +268,10 @@ export interface ClaudeSessionLike {
   readonly backgroundWorkOn?: boolean;
   /**
    * §52: the engine's answer to `auto_turn_start` — true: the turn is a review turn (snapshot A taken; the calls waiting
-   * go on); false: §18 applies (its changes are denied).
+   * go on); false: §18 applies (its changes are denied). `busy`: false because the gate was still collecting / reverting
+   * when the engine's wait ran out (a terminal chat says so instead of the unprompted-turn reason).
    */
-  autoTurnReady?(ok: boolean, checkpointTree?: string): void;
+  autoTurnReady?(ok: boolean, checkpointTree?: string, busy?: boolean): void;
   /** MARK: wave6 w6-statusline — §44.2: what the status line's stdin takes from the live session (optional: test doubles). */
   readonly statusUsage?: SessionStatusUsage;
 }
