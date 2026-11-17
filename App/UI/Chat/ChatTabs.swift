@@ -138,7 +138,10 @@ struct ChatTabStrip: View {
                     Divider()
                     Text(verbatim: current.title)
                     // §57.5: a terminal chat runs in a terminal already.
-                    if current.kind != .terminal { continueInTerminalItem(current) }   // wave3 mac-session (§36.9); polish PX-03: why not, as its subtitle
+                    if current.kind != .terminal {
+                        ContinueAsTerminalChatMenuItem(meta: current)   // MARK: terminal-continue (§57.9)
+                        continueInTerminalItem(current)
+                    }   // wave3 mac-session (§36.9); polish PX-03: why not, as its subtitle
                 }
                 if store.sessionTools.sessionsSupported {   // wave3 mac-session (§36.9)
                     Divider()
@@ -272,6 +275,7 @@ struct ChatTabStrip: View {
         Button(tab.archived ? "Unarchive" : "Archive") { store.archiveChat(id: tab.id, archived: !tab.archived) }
         if tab.kind != .terminal {   // §57.5: a terminal chat runs in a terminal already
             Divider()
+            ContinueAsTerminalChatMenuItem(meta: tab)   // MARK: terminal-continue (§57.9)
             ContinueInTerminalMenuItem(meta: tab) { continueRequest = $0 }   // wave3 mac-session (§36.9)
         }
     }

@@ -498,3 +498,23 @@ struct ImportedChatNote: View {
         }
     }
 }
+
+/// MARK: terminal-continue (§57.9): "Continue as Terminal Chat" — the chat's Claude conversation goes on in a new terminal
+/// chat (the real TUI); the chat stays as a record. Off with its reason as the item's second line (and tooltip).
+struct ContinueAsTerminalChatMenuItem: View {
+    @Environment(AppState.self) private var store
+    let meta: SessionMeta
+
+    var body: some View {
+        let blocker = store.continueAsTerminalBlocker(meta)
+        Button {
+            Task { await store.continueAsTerminalChat(id: meta.id) }
+        } label: {
+            Label("Continue as Terminal Chat", systemImage: "terminal")
+            Text(verbatim: blocker ?? String(localized: "Claude Code resumes this conversation in a new terminal chat; this chat is kept as a record"))
+        }
+        .disabled(blocker != nil)
+        .help(blocker ?? String(localized: "Claude Code resumes this conversation in a new terminal chat; this chat is kept as a record"))
+        .accessibilityIdentifier("Continue as terminal chat")
+    }
+}

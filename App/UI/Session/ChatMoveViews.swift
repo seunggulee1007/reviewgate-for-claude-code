@@ -72,6 +72,15 @@ struct ChatMoveBar: View {
                 .accessibilityIdentifier("Open moved chat window")
             }
             .accessibilityIdentifier("Moved chat bar")
+        } else if let target = store.shownChatContinuedIn {   // MARK: terminal-continue (§57.9)
+            bar(tint: .teal, icon: "terminal", text: ContinueTerminalText.continuedBanner(title: target.title)) {
+                Button("Open") { Task { await store.openChat(id: target.id) } }
+                    .controlSize(.small)
+                    .disabled(store.chatSwitchBlocker != nil || store.currentSessionId == target.id)
+                    .help(store.chatSwitchBlocker ?? String(localized: "Open the terminal chat this conversation continues in"))
+                    .accessibilityIdentifier("Open continued terminal chat")
+            }
+            .accessibilityIdentifier("Continued chat bar")
         } else if let notice = store.chatMoveNotice {
             bar(tint: .orange, icon: "exclamationmark.triangle.fill", text: notice) {
                 Button("Dismiss") { store.dismissChatMoveNotice() }

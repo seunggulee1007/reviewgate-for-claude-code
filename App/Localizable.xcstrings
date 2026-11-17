@@ -33971,6 +33971,54 @@
           }
         }
       }
+    },
+    "Continue as Terminal Chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue as Terminal Chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅으로 이어가기"
+          }
+        }
+      }
+    },
+    "Claude Code resumes this conversation in a new terminal chat; this chat is kept as a record": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code resumes this conversation in a new terminal chat; this chat is kept as a record"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널 채팅에서 Claude Code가 이 대화를 이어가요. 이 채팅은 기록으로 남아요"
+          }
+        }
+      }
+    },
+    "Open the terminal chat this conversation continues in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the terminal chat this conversation continues in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 대화가 이어지는 터미널 채팅 열기"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

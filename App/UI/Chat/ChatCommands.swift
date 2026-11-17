@@ -31,6 +31,12 @@ struct ChatCommands: Commands {
                 .keyboardShortcut("t", modifiers: [.control, .option, .command])
                 .disabled(!menu.hasProject || menu.newChatBlocked)
                 .accessibilityIdentifier("Chat menu New classic chat")
+            // MARK: terminal-continue (§57.9): the chat on screen's conversation goes on in a terminal chat.
+            if let id = menu.continueTerminalChatId {
+                Button("Continue as Terminal Chat") { if let store { Task { await store.continueAsTerminalChat(id: id) } } }
+                    .disabled(menu.continueTerminalBlocker != nil)
+                    .accessibilityIdentifier("Chat menu Continue as terminal chat")
+            }
             // As the tab's ×: a chat shown read-only hands back to the live one; the live chat's tab waits for a switch.
             Button("Close Chat Tab") {
                 if let store, let model, let id = store.shownChatId {
