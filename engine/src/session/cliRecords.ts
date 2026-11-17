@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { claudeConfigDir } from "./extensions.js";
 
 /**
@@ -55,6 +55,30 @@ export function cliSessionExists(cwd: string, sessionId: string, env: Record<str
   for (const c of cwds) {
     try {
       if (existsSync(cliSessionFile(c, sessionId, env))) return true;
+    } catch {
+      // unreadable config dir: unknown
+    }
+  }
+  return false;
+}
+
+/**
+ * §57.2: the CLI no longer has `sessionId` for `cwd` — its projects folder for the cwd (as given or symlink-resolved)
+ * exists, so this is where it keeps that cwd's conversations, and holds no record of it (cleaned up after
+ * `cleanupPeriodDays`, deleted). False whenever that is not certain (no such folder: another config dir, a cwd the CLI
+ * never ran in), so a conversation is never given up on a guess.
+ */
+export function cliSessionGone(cwd: string, sessionId: string, env: Record<string, string | undefined>): boolean {
+  if (!SESSION_ID_RE.test(sessionId) || cliSessionExists(cwd, sessionId, env)) return false;
+  const cwds = new Set([cwd]);
+  try {
+    cwds.add(realpathSync(cwd));
+  } catch {
+    // a cwd that does not resolve is checked as given
+  }
+  for (const c of cwds) {
+    try {
+      if (existsSync(dirname(cliSessionFile(c, sessionId, env)))) return true;
     } catch {
       // unreadable config dir: unknown
     }

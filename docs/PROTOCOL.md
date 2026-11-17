@@ -8678,7 +8678,10 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   SessionEnd hook becomes the chat's `cliSessionId` (persisted; removed again when it is the chat's own id), and the spec
   resumes that one. Only a UUID is taken — from a hook and when `sessions/index.json` is read — and no other event's
   `session_id` is: any process holding the token can post a hook, and the id goes into the next spawn's argv. The
-  chat keeps its id (it is never renamed after the CLI's id, as a chat is). After an app restart the engine reopens the
+  chat keeps its id (it is never renamed after the CLI's id, as a chat is). When the CLI no longer has the conversation
+  to resume — its projects folder for the project exists and holds no record of it (cleaned up, deleted) — the spec starts
+  a fresh one instead (`--session-id=<a new UUID>`, which becomes the chat's `cliSessionId`), so Restart never loops on
+  "No conversation found"; no such folder (another config dir) is no proof, and the spec resumes as before. After an app restart the engine reopens the
   current chat; the app sees `kind: "terminal"` and asks for a spec.
 - **Restart in a tab.** The app ends the PTY, sends `terminal_exited`, asks for a new spec (the old token is retired: a
   stale terminal's prompts are blocked and its write tools denied) and spawns again.

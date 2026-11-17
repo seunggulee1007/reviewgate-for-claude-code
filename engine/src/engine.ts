@@ -131,7 +131,7 @@ import { TRANSCRIPT_RESTORE_ROWS, type TranscriptStore } from "./review/transcri
 import { historyWhy, readTranscriptRows, readTranscriptWindow, searchTranscriptFile, summaryRow, TRANSCRIPT_PAGE_MAX, TRANSCRIPT_PAGE_ROWS, TRANSCRIPT_SEARCH_HITS, TRANSCRIPT_SEARCH_MAX_QUERY } from "./review/transcriptHistory.js";
 import { ClaudeSession, claudeLaunchProblem, USER_SKIPPED_MESSAGE, type ClaudeSessionLike, type ClaudeSessionOptions } from "./session/claude.js";
 import { codeOfErrorText } from "./session/apiErrors.js";
-import { cliSessionExists, cliSessionFile, codeOfStartFailure, START_FAILURE_MESSAGES, type StartFailureCode } from "./session/cliRecords.js";
+import { cliSessionExists, cliSessionFile, cliSessionGone, codeOfStartFailure, START_FAILURE_MESSAGES, type StartFailureCode } from "./session/cliRecords.js";
 import { rememberKeys, type ReadOnlyContext } from "./session/bashClass.js";
 import { isExploreCall, markExplore } from "./session/explore.js"; // MARK: wave4b w4b-tabs (§39.2)
 import { autoAllowReason, EDIT_TOOLS_MATCHER } from "./session/hooks.js";
@@ -2604,8 +2604,18 @@ export class ReviewEngine {
     const token = server.issue(ts);
     ts.setToken(token, (t) => server.retire(t));
     const meta = this.requireSession(sessionId);
-    const resume = meta.cliSessionId !== undefined || this.isResumable(meta);
-    const argv = terminalArgv({ claude: tc.claude, id: meta.cliSessionId ?? meta.id, resume, settingsJson: JSON.stringify(hookSettings(server.url)) });
+    let cliId = meta.cliSessionId ?? meta.id;
+    let resume = meta.cliSessionId !== undefined || this.isResumable(meta);
+    if (resume && cliSessionGone(project.path, cliId, this.childEnv())) {
+      // The CLI no longer has that conversation (purged): `--resume` would only end in "No conversation found", and every
+      // Restart again. A fresh conversation under a new id — the chat keeps its own and resumes this one from now on.
+      this.log("warn", `terminal chat ${sessionId}: Claude Code no longer has conversation ${cliId}; starting a new one`);
+      cliId = randomUUID();
+      resume = false;
+      meta.cliSessionId = cliId;
+      this.persistSessions();
+    }
+    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(hookSettings(server.url)) });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };

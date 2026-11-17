@@ -1,7 +1,8 @@
 import { chmodSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TerminalSpecEvent } from "../src/protocol.js";
+import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
@@ -249,6 +250,29 @@ describe("terminal chats (§57)", () => {
     expect(s2.resume).toBe(true);
     expect(s2.argv[1]).toBe(`--resume=${cleared}`);
     expect(s2.argv).not.toContain("--dangerously-skip-permissions");
+  });
+
+  it("a conversation the CLI no longer has (purged) starts fresh under a new id instead of --resume failing again", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await turn(r, s, "p1");
+    // The CLI keeps this project's conversations here; it has none of this chat's (unknown folder: resume as before).
+    expect((await spec(r, id)).argv[1]).toBe(`--resume=${id}`);
+    const projects = dirname(cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: r.config }));
+    mkdirSync(projects, { recursive: true });
+    writeFileSync(join(projects, "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl"), "");
+    const fresh = await spec(r, id);
+    expect(fresh.resume).toBe(false);
+    const cliId = /^--session-id=(.+)$/.exec(fresh.argv[1]!)?.[1];
+    expect(cliId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(cliId).not.toBe(id);
+    const meta = r.h.engine.state.sessions.list.find((m) => m.id === id);
+    expect(meta?.cliSessionId).toBe(cliId); // the chat keeps its id
+    expect(r.h.engine.state.sessions.currentId).toBe(id);
+    // Once the CLI has the new conversation, it is resumed.
+    writeFileSync(join(projects, `${cliId}.jsonl`), "");
+    expect((await spec(r, id)).argv[1]).toBe(`--resume=${cliId}`);
   });
 
   it("Notification: waiting is set (permission / question) and cleared by the next hook", async () => {
