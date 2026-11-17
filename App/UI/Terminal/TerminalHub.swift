@@ -20,6 +20,10 @@ final class TerminalHub {
     @ObservationIgnored private weak var store: AppState?
     @ObservationIgnored private var enginePIDAtSpawn: [String: Int32] = [:]
     @ObservationIgnored private var keyMonitor: Any?
+    /// The window is closing or the app quits: nothing starts again. Set before the PTYs end — claude's SessionEnd hook
+    /// changes the engine's state, and `sync()` would otherwise see no host for the live chat and spawn a new one while the
+    /// engine still runs.
+    @ObservationIgnored private var closing = false
 
     /// Wires the window's store: Stop (⌘.) on a terminal chat becomes Esc in its PTY; the hub follows the live chat.
     func attach(store: AppState) {
@@ -45,7 +49,7 @@ final class TerminalHub {
     /// Restart in the chat's terminal (an exit, a disconnect, the strip's button): the PTY ends, the engine hears it, a
     /// fresh spec (a new hook token, `--resume` once the conversation exists) starts it again.
     func restart(chatId: String) async {
-        guard let store, chatId == store.currentSessionId, store.isTerminalChat else { return }
+        guard let store, !closing, chatId == store.currentSessionId, store.isTerminalChat else { return }
         specErrors[chatId] = nil
         if let host = chatHosts[chatId], host.state.isRunning {
             await host.stop()
@@ -54,8 +58,9 @@ final class TerminalHub {
         await spawn(chatId)
     }
 
-    /// Every PTY of the window ends (the window closes).
+    /// Every PTY of the window ends (the window closes); none starts again.
     func stopAll() async {
+        closing = true
         let hosts = Array(chatHosts.values)
         chatHosts = [:]
         for host in hosts { await host.stop() }
@@ -63,6 +68,7 @@ final class TerminalHub {
 
     /// Quit: SIGTERM to every PTY without waiting (the app is going away).
     func terminateAll() {
+        closing = true
         for host in chatHosts.values where host.view.process.running { host.view.terminate() }
     }
 
@@ -113,7 +119,7 @@ final class TerminalHub {
     }
 
     private func sync() {
-        guard let store else { return }
+        guard let store, !closing else { return }
         lastActivity = Date()
         // The engine stopped (its window offers to reopen the project): the PTYs stay — their hooks now fail closed, so
         // they are disconnected and offer Restart once the project is open again.
@@ -158,7 +164,7 @@ final class TerminalHub {
             if chatId == store.currentSessionId { specErrors[chatId] = FlowText.refusal(error) }
             return
         }
-        guard chatId == store.currentSessionId, store.isTerminalChat else { return }
+        guard !closing, chatId == store.currentSessionId, store.isTerminalChat else { return }
         let host = chatHosts[chatId] ?? TerminalHost()
         chatHosts[chatId] = host
         host.hooksSeen = { [weak store] in store?.sessionInfo.terminal?.hooksSeen == true }

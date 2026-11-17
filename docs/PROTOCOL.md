@@ -8796,7 +8796,8 @@ session events a chat's CLI session gives, so snapshot A / B, the turn diff, acc
   SIGKILL after 3 s; text typed and not sent is lost), then sends `terminal_exited` (accepted for a chat the engine left);
   showing another chat read-only does not. A terminal chat shown
   read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
-  PTYs. A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
+  PTYs, and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
+  shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing

@@ -2730,8 +2730,15 @@ private final class Tour {
         log("terminal: restart → " + (resumed && sameId ? "resumed \(second ?? "")" : "— LOST (\(second ?? "no banner"))"))
         try await Task.sleep(for: .milliseconds(800))
         try write(try render(window), "terminal-chat-restarted-dark")
+
+        // 8. The window closes: every PTY ends and none starts again, whatever the engine reports meanwhile (claude's
+        // SessionEnd hook, the exit report — here the exit report, as the fake sends no SessionEnd).
         await entry.model.shell.stopAll()
         await hub.stopAll()
+        store.terminalExited(sessionId: chatId, exitCode: nil)
+        try await Task.sleep(for: .seconds(3))
+        let respawned = hub.host(for: chatId).map { "\($0.state)" } ?? (hub.spawning.isEmpty ? nil : "spawning")
+        log("terminal: window close → " + (respawned == nil ? "no claude started again" : "— LOST (\(respawned!))"))
     }
 
     private var imeOutcome: [(String, Bool)] = []
