@@ -8768,6 +8768,12 @@ chat's id);
   and unsent notes as `additionalContext` (a prompt starting with "/" keeps them for the next one), the `user_message`
   row and the title. The PreToolUse hook gets the turn's tree for Bash attribution. Any failure blocks the prompt with
   the reason.
+- **One prompt at a time.** A UserPromptSubmit that comes while the previous one is still waiting (the CLI gave up on it,
+  a forged hook) blocks the earlier one at once (the session's timeout reason). The engine adopts prompts one after the
+  other: the later one waits for the adoption in flight within its own budget (100 s), else it is blocked ("ReviewGate is
+  still starting the review of your previous prompt. Send this one again in a moment."). Each `terminal_prompt` carries a
+  sequence number and the engine answers that number: an answer reaches only its own prompt; one whose prompt no longer
+  waits takes the late path (an ok ends the turn it opened at once, `prompt_timeout`).
 - **Esc gives no Stop** (Claude Code does not run Stop on a user interrupt). An interrupted turn stays running —
   accept / reject stay locked, the diff shows live changes — until the first of: the next prompt with a new `prompt_id`,
   Notification `idle_prompt`, SessionEnd, the PTY's exit (`terminal_exited`), or "Review now" (`terminal_end_turn`).

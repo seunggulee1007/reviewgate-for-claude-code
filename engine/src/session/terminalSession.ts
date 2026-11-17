@@ -89,7 +89,9 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private disposed = false;
   private token: string | null = null;
   private retireToken: ((token: string) => void) | null = null;
-  private prompt: Waiter<PromptAnswer> | null = null;
+  /** The prompt waiting for the engine's answer; `seq` is its `terminal_prompt`'s, so an answer reaches only its own. */
+  private prompt: (Waiter<PromptAnswer> & { seq: number }) | null = null;
+  private promptSeq = 0;
   private adoption: { promise: Promise<boolean>; waiter: Waiter<{ ok: boolean; tree?: string }> } | null = null;
   private lastBgTasks = 0;
   private ctx: HookContext;
@@ -183,17 +185,21 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.touch();
   }
 
-  /** The engine's answer to `terminal_prompt`. A late ok (the prompt was blocked meanwhile) ends the turn it opened. */
-  answerPrompt(a: PromptAnswer): void {
-    if (this.prompt) {
+  /**
+   * The engine's answer to `terminal_prompt` #`seq`; true when that prompt still waited for it. A late ok (the prompt was
+   * blocked meanwhile, or another prompt waits now) ends the turn it opened.
+   */
+  answerPrompt(seq: number, a: PromptAnswer): boolean {
+    if (this.prompt?.seq === seq) {
       this.settlePrompt(a);
-      return;
+      return true;
     }
     if (a.ok) {
       this.opts.log("warn", "terminal: the review turn started after its prompt was blocked; ending it");
       this.open = { promptId: null, hookPromptId: null, openedAt: this.now() };
       this.closeTurn("prompt_timeout");
     }
+    return false;
   }
 
   /** `terminal_exited`: the PTY ended — an open turn ends. */
@@ -273,13 +279,14 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       // The Esc rule (§57.4): a turn left open by an interrupt ends at the next prompt.
       this.closeTurn("interrupted");
     }
-    this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }); // a stale wait (never: the CLI waits for each prompt)
+    this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }); // a stale wait (the CLI gave up on it, a forged hook)
+    const seq = ++this.promptSeq;
     const answer = new Promise<PromptAnswer>((resolve) => {
       const timer = setTimeout(() => this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }), this.opts.promptWaitMs);
       timer.unref?.();
-      this.prompt = { resolve, timer };
+      this.prompt = { resolve, timer, seq };
     });
-    this.opts.emit({ type: "terminal_prompt", prompt: typeof input.prompt === "string" ? input.prompt : "", promptId });
+    this.opts.emit({ type: "terminal_prompt", prompt: typeof input.prompt === "string" ? input.prompt : "", promptId, seq });
     const a = await answer;
     if (!a.ok) return { decision: "block", reason: a.reason };
     this.openTurn({ promptId, hookPromptId: promptId, openedAt: this.now() }, a.checkpointTree);

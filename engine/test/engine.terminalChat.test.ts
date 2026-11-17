@@ -303,6 +303,28 @@ describe("terminal chats (§57)", () => {
     expect(st.changedFiles.map((f) => f.path)).toContain("two.txt"); // p2's review stands while p3 answers it
   });
 
+  it("two prompts at once are adopted one after the other; each answer reaches its own prompt", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    // A turn ends: its collection runs while p1 comes, so p1's adoption waits for it — and p2 comes meanwhile (the CLI
+    // gave up on p1, or a forged hook): p1 is blocked by the session, the turn its adoption opens ends at once, then p2
+    // is adopted on its own — never with p1's answer.
+    await hook(s, ups("p0", "zero prompt"));
+    write(r.dir, "zero.txt", "0\n");
+    await hook(s, { hook_event_name: "Stop" });
+    const first = hook(s, ups("p1", "first prompt"));
+    const second = await hook(s, ups("p2", "second prompt"));
+    expect(await first).toMatchObject({ decision: "block" });
+    expect(second.decision).toBeUndefined();
+    const st = await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p2", "p2 running");
+    expect(st.sessions.list.find((m) => m.id === id)?.lastUserText).toBe("second prompt");
+    // p1's turn was opened and closed (prompt_timeout) before p2's started — never two turns over each other.
+    expect(r.h.ofType("user_message").map((e) => [e.text, e.turn])).toEqual([["zero prompt", 1], ["first prompt", 2], ["second prompt", 3]]);
+    expect(r.h.ofType("turn_end").map((e) => e.stopReason)).toEqual(["end_turn", "prompt_timeout"]);
+    expect(r.h.ofType("user_message").at(-1)).toMatchObject({ text: "second prompt" });
+  });
+
   it("a write tool with no prompt (Claude went on by itself) is taken as a turn of its own", async () => {
     const r = await rig();
     const id = await newTerminal(r);

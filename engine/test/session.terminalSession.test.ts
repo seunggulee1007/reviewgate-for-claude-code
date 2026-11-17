@@ -49,7 +49,7 @@ function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prom
     windowMarginMs: 60_000,
     emit: (ev) => {
       events.push(ev);
-      if (ev.type === "terminal_prompt" && answer) void tree().then((t) => ts.answerPrompt(answer(ev, t)));
+      if (ev.type === "terminal_prompt" && answer) void tree().then((t) => ts.answerPrompt(ev.seq, answer(ev, t)));
     },
     log: () => undefined,
   });
@@ -79,7 +79,7 @@ describe("TerminalSession", () => {
   it("UserPromptSubmit waits for the engine's answer: context, block, timeout", async () => {
     const r = rig({ answer: (ev, t) => (ev.prompt === "no" ? { ok: false, reason: "busy" } : { ok: true, additionalContext: ev.prompt === "ctx" ? "[Review gate] Accepted: a." : null, checkpointTree: t }) });
     expect(await r.hook(ups("p1", "ctx"))).toEqual({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: "[Review gate] Accepted: a." } });
-    expect(r.of("terminal_prompt")).toEqual([{ type: "terminal_prompt", prompt: "ctx", promptId: "p1" }]);
+    expect(r.of("terminal_prompt")).toEqual([{ type: "terminal_prompt", prompt: "ctx", promptId: "p1", seq: 1 }]);
     expect(r.ts.state).toMatchObject({ hooksSeen: true, promptId: "p1" });
     expect(r.ts.isTurnActive).toBe(true);
     await r.hook({ hook_event_name: "Stop" });
@@ -93,8 +93,26 @@ describe("TerminalSession", () => {
     expect(await slow.hook(ups("p1"))).toEqual({ decision: "block", reason: PROMPT_TIMEOUT_REASON });
     expect(slow.ts.isTurnActive).toBe(false);
     // The engine opened the turn after all: it ends at once (the prompt never ran).
-    slow.ts.answerPrompt({ ok: true, additionalContext: null, checkpointTree: await slow.tree() });
+    expect(slow.ts.answerPrompt(1, { ok: true, additionalContext: null, checkpointTree: await slow.tree() })).toBe(false);
     expect(slow.of("turn_end").map((e) => e.stopReason)).toEqual(["prompt_timeout"]);
+  });
+
+  it("an answer reaches only its own prompt: a stale one (an earlier seq) never settles the prompt waiting now", async () => {
+    const r = rig({ answer: null });
+    const first = r.hook(ups("p1", "first"));
+    await new Promise((res) => setTimeout(res, 10));
+    // The CLI gave up on p1 and sent p2 (or a forged hook did): p1 is blocked, p2 waits for its own answer.
+    const second = r.hook(ups("p2", "second"));
+    await new Promise((res) => setTimeout(res, 10));
+    expect(await first).toEqual({ decision: "block", reason: PROMPT_TIMEOUT_REASON });
+    const [e1, e2] = r.of("terminal_prompt");
+    expect([e1!.seq, e2!.seq]).toEqual([1, 2]);
+    // p1's late answer: not p2's — the turn it opened ends at once.
+    expect(r.ts.answerPrompt(e1!.seq, { ok: true, additionalContext: "for p1", checkpointTree: await r.tree() })).toBe(false);
+    expect(r.of("turn_end").map((e) => e.stopReason)).toEqual(["prompt_timeout"]);
+    expect(r.ts.answerPrompt(e2!.seq, { ok: true, additionalContext: "for p2", checkpointTree: await r.tree() })).toBe(true);
+    expect(await second).toEqual({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: "for p2" } });
+    expect(r.ts.state.promptId).toBe("p2");
   });
 
   it("a write tool with no turn open starts one through auto_turn_start; refused → deny", async () => {

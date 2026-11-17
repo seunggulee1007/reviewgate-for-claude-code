@@ -170,7 +170,7 @@ export type SessionEvent =
   | { type: "rate_limit_info"; window: RateLimitWindow }
   // §57 terminal chat (TerminalSession only):
   /** The user submitted a prompt in the TUI (UserPromptSubmit): the engine adopts it as a review turn and answers it (`answerPrompt`). */
-  | { type: "terminal_prompt"; prompt: string; promptId: string | null }
+  | { type: "terminal_prompt"; prompt: string; promptId: string | null; seq: number }
   /** Claude Code waits for the user in the TUI (Notification: `permission_prompt`, `elicitation_dialog`, …). */
   | { type: "terminal_attention"; notificationType: string; message: string; title?: string }
   /** The TUI runs another CLI conversation (`/clear`, `/resume`): the chat's `cliSessionId`. */

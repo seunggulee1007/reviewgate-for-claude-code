@@ -338,6 +338,9 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
 ]);
 
+/** §57.4: a terminal prompt that came while the previous one was still being adopted, and waited past its budget. */
+const TERMINAL_PROMPT_QUEUED_REASON = "ReviewGate is still starting the review of your previous prompt. Send this one again in a moment.";
+
 /** §57.4: what a terminal prompt the gate cannot take is blocked with (the TUI shows it; the user sends it again). */
 function terminalBlockedReason(code: string): string {
   if (code === "collecting" || code === "reverting") return "ReviewGate is still collecting the last turn's changes. Send the prompt again in a moment.";
@@ -480,6 +483,8 @@ export class ReviewEngine {
   /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
   private hookServer: HookServer | null = null;
   private readonly terminalPromptWaitMs: number;
+  /** §57.4: the terminal prompts being adopted, one after another (settles once every one queued so far is done). */
+  private terminalAdopting: Promise<void> | null = null;
   /** `permission_response { remember: true }` keys (docs/M16-FRICTION.md §2); shared live with the Claude session's hooks. */
   private readonly rememberedAllows = new Set<string>();
   /** Release-2 review (§33.7): when each remembered key joined the set, and the newest clear of the repository's file applied. */
@@ -2626,29 +2631,50 @@ export class ReviewEngine {
   }
 
   /**
+   * §57.4: terminal prompts are adopted one at a time — a second one (the CLI gave up on the first, a forged hook) waits
+   * for the one in flight within its own wait budget, or is blocked with TERMINAL_PROMPT_QUEUED_REASON.
+   */
+  private queueTerminalPrompt(ts: TerminalSession, ev: Extract<SessionEvent, { type: "terminal_prompt" }>): void {
+    const deadline = Date.now() + this.terminalPromptWaitMs;
+    const prior = this.terminalAdopting;
+    const run = (async (): Promise<void> => {
+      if (prior && !(await settlesWithin(prior, deadline - Date.now()))) {
+        this.log("warn", "terminal prompt blocked: the previous prompt is still being adopted");
+        if (this.session === ts) ts.answerPrompt(ev.seq, { ok: false, reason: TERMINAL_PROMPT_QUEUED_REASON });
+        return;
+      }
+      await this.adoptTerminalPrompt(ts, ev, deadline);
+    })();
+    // The queue's tail settles only when this one and every one before it did (a prompt refused early leaves the earlier
+    // one in flight).
+    const tail = prior ? Promise.all([prior, run]).then(() => undefined) : run;
+    this.terminalAdopting = tail;
+    void tail.finally(() => {
+      if (this.terminalAdopting === tail) this.terminalAdopting = null;
+    });
+  }
+
+  /**
    * §57.4: the user submitted a prompt in the TUI — taken as `send` takes a message, minus sending it: the collection in
    * flight first, the gate's checks, snapshot A (kept while a review stands), the review summary and unsent notes as the
    * hook's `additionalContext`, the turn's start. The hook waits for the answer; any failure blocks the prompt with why.
    */
-  private async adoptTerminalPrompt(ts: TerminalSession, ev: Extract<SessionEvent, { type: "terminal_prompt" }>): Promise<void> {
-    const answer = (a: PromptAnswer): void => {
-      if (this.session === ts) ts.answerPrompt(a);
-    };
+  private async adoptTerminalPrompt(ts: TerminalSession, ev: Extract<SessionEvent, { type: "terminal_prompt" }>, deadline: number): Promise<void> {
+    const answer = (a: PromptAnswer): boolean => this.session === ts && ts.answerPrompt(ev.seq, a);
     const trimmed = ev.prompt.trim();
     let started = false;
     try {
-      const deadline = Date.now() + this.terminalPromptWaitMs;
       await this.terminalGateSettled(ts, deadline);
-      if (this.session !== ts || this.closed) return answer({ ok: false, reason: RETIRED_REASON });
+      if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
       if (this.gate.running && !ts.isTurnActive) {
         // The session has no turn open but the gate still runs one (it was never closed): it ends now, then the prompt.
         this.log("warn", "terminal: a review turn without an open terminal turn ends before the next prompt");
         this.endTurnAbnormally("interrupted");
         await this.terminalGateSettled(ts, deadline);
-        if (this.session !== ts || this.closed) return answer({ ok: false, reason: RETIRED_REASON });
+        if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
       }
       const slices = this.slices();
-      if (!this.gate.checkpoint || !canSend(slices)) return answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
+      if (!this.gate.checkpoint || !canSend(slices)) return void answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
       await this.followHeadMove();
       await this.gate.prepareAnswer(this.takeBgCarry());
       const keptA = this.gate.keepsTurnStart;
@@ -2660,7 +2686,7 @@ export class ReviewEngine {
         this.gate.abortTurn();
         this.touch();
         this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
-        return answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+        return void answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
       }
       const skippedAtStart = this.gate.snapshotSkipped;
       this.sessionState.pendingPlan = null;
@@ -7242,7 +7268,7 @@ export class ReviewEngine {
         return;
       // MARK: terminal-chat (§57)
       case "terminal_prompt":
-        if (source instanceof TerminalSession) void this.adoptTerminalPrompt(source, ev);
+        if (source instanceof TerminalSession) this.queueTerminalPrompt(source, ev);
         return;
       case "terminal_session_id":
         this.onTerminalSessionId(ev.sessionId);
@@ -9024,6 +9050,19 @@ const AUTO_TURN_WAIT_MS = 60_000;
 /** §52.1: how long it waits for a message sent meanwhile to go out (its turn is the one it joins). */
 const AUTO_TURN_JOIN_MS = 5_000;
 const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** `p` settled (either way) within `ms`; the timer never outlives the wait. */
+async function settlesWithin(p: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<false>((r) => {
+    timer = setTimeout(() => r(false), Math.max(0, ms));
+  });
+  try {
+    return await Promise.race([p.then(() => true, () => true), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** MARK: wave4c w4c-trust — §41.2: a file rejected in one of the last this-many review rounds is never auto-accepted. */
 const HISTORY_REJECT_ROUNDS = 20;
