@@ -211,6 +211,9 @@ final class WindowModel {
     /// §56.4: the `/mcp` list over the box (`.zero` while it is closed) and its rows' server names.
     @ObservationIgnored var debugMcpFrame: CGRect = .zero
     @ObservationIgnored var debugMcpRows: [String] = []
+    /// The review diff's header and its Accept button as shown — the layout check says when Accept is past the pane's edge.
+    @ObservationIgnored var debugDiffHeaderFrame: CGRect = .zero
+    @ObservationIgnored var debugAcceptFrame: CGRect = .zero
     #endif
 
     func reveal(toolUseId: String) {

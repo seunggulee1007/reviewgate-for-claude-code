@@ -12,19 +12,28 @@ struct DiffRangePicker: View {
     var body: some View {
         let ranges = store.availableRanges(for: file)
         if ranges.count > 1 {
-            Picker("Diff range", selection: Binding(get: { store.diffSince(for: file) }, set: { store.setDiffRange($0, for: file) })) {
-                ForEach(ranges, id: \.self) { since in
-                    Text(verbatim: since.label).tag(since)
-                }
+            // A narrow diff pane (a laptop window's chat beside it) gets the same choice as a pop-up menu: four segments
+            // would run past the pane's edge.
+            FullOrCompact { _ in
+                picker(ranges).pickerStyle(.segmented)
+            } compact: {
+                picker(ranges).pickerStyle(.menu)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
-            .fixedSize()
-            .help("Which part of the change the diff shows: the whole review, this turn, since your change request, or since you accepted the file")
-            .accessibilityIdentifier("Diff range")
             DiffRangeHints(file: file)   // wave3 check-clients: what this range leaves to 전체, said (as Electron)
         }
+    }
+
+    private func picker(_ ranges: [DiffSince]) -> some View {
+        Picker("Diff range", selection: Binding(get: { store.diffSince(for: file) }, set: { store.setDiffRange($0, for: file) })) {
+            ForEach(ranges, id: \.self) { since in
+                Text(verbatim: since.label).tag(since)
+            }
+        }
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+        .help("Which part of the change the diff shows: the whole review, this turn, since your change request, or since you accepted the file")
+        .accessibilityIdentifier("Diff range")
     }
 }
 

@@ -694,6 +694,7 @@ struct DiffViewHeader: View {
     @Binding var ignoreWhitespace: Bool
     @Binding var confirmRevertSelected: Bool
     let onAddNote: () -> Void
+    @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
 
     var body: some View {
         // The file's unsent notes — what Request changes sends (wave2 mac-flow, §34.4: sent ones are "요청함" cards).
@@ -737,15 +738,67 @@ struct DiffViewHeader: View {
             }
             DiffProvenanceHeader(file: file)   // wave1 mac-review — §31–32
             DiffRangePicker(file: file)   // wave2 mac-flow (§34.1): 전체 / 이번 턴 / 요청 이후 / 수락 이후
-            // Narrow diff panes (agent panel open, small window) fall back to icon-only controls instead of overflowing.
+            // Narrow diff panes (agent panel open, small window) fall back to icon-only controls instead of overflowing, and
+            // narrower still (a laptop window's chat beside it, ~300 pt) fold everything but Reject / Accept into "⋯" — Accept
+            // is never pushed past the pane's edge.
             // FullOrCompact, not ViewThatFits: the buttons, toggles and editor menu are AppKit views it rebuilt every pass.
             FullOrCompact { measuring in
                 controls(measuring: measuring)
             } compact: {
-                controls(measuring: false).labelStyle(.iconOnly)
+                FullOrCompact { measuring in
+                    controls(measuring: measuring).labelStyle(.iconOnly)
+                } compact: {
+                    foldedControls
+                }
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        #if DEBUG
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugDiffHeaderFrame = $0 }   // the layout check
+        #endif
+    }
+
+    private var addNoteDisabled: Bool {
+        diff == nil || diff?.isBinary == true || (diff?.hunks.isEmpty ?? true) || showFullFile || store.isNoteLocked
+            || (ignoreWhitespace && !showFullFile)   // wave4c w4c-review
+    }
+
+    /// The narrowest header: Revert selected and the file's verdict buttons, the rest in "⋯" (a menu keeps its items whole).
+    private var foldedControls: some View {
+        HStack(spacing: 6) {
+            Spacer(minLength: 0)
+            if showsHunkControls, selectedHunks > 0 {
+                Button("Revert selected (\(selectedHunks))", systemImage: "scissors") { confirmRevertSelected = true }
+                    .labelStyle(.iconOnly)
+                    .fixedSize()
+                    .disabled(!canRejectHunks)
+                    .help(Text("Revert the ticked parts to the start of the turn; the rest stays under review") + Text(verbatim: " (\(selectedHunks))"))
+                    .accessibilityLabel("Revert selected")
+                    .accessibilityIdentifier("Revert selected hunks")
+            }
+            Menu {
+                Button("Add note", systemImage: "text.bubble") { onAddNote() }
+                    .disabled(addNoteDisabled)
+                if !showFullFile, !file.isBinary {
+                    Toggle("Ignore whitespace", systemImage: "space", isOn: $ignoreWhitespace)
+                }
+                Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                Button("Find in diff", systemImage: "magnifyingglass") { model.diffFindTick += 1 }
+                Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
+                    .disabled(file.status == .deleted)
+                Divider()
+                DiffEditorMenuItems(file: file, line: editorLine)
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
+            .accessibilityLabel("More diff options")
+            .accessibilityIdentifier("Diff header more")
+            verdictControls(measuring: false).labelStyle(.iconOnly)
+        }
     }
 
     /// `measuring`: the hidden copy FullOrCompact sizes — it registers no shortcut (the one on screen is the only ⌥⌘N).
@@ -762,8 +815,7 @@ struct DiffViewHeader: View {
             }
             Button("Add note", systemImage: "text.bubble") { onAddNote() }
                 .fixedSize()
-                .disabled(diff == nil || diff?.isBinary == true || (diff?.hunks.isEmpty ?? true) || showFullFile || store.isNoteLocked
-                          || (ignoreWhitespace && !showFullFile))   // wave4c w4c-review
+                .disabled(addNoteDisabled)
                 .keyboardShortcut(measuring ? nil : KeyboardShortcut("n", modifiers: [.command, .option]))   // wave4 w4-input (polish-06), Electron's Ctrl+Alt+N
                 .help(store.isNoteLocked ? AppState.sessionRefusalText("session_running")
                       : ignoreWhitespace && !showFullFile ? ReviewLeftovers.whitespaceViewNote   // wave4c w4c-review
@@ -781,38 +833,47 @@ struct DiffViewHeader: View {
                 .accessibilityLabel("Full file")
                 .accessibilityIdentifier("Full file")
             DiffEditorButton(file: file, line: editorLine)
-            switch file.state {
-            case .pending:
-                // wave2 mac-flow (§34.2): while a turn runs accept still applies; reject waits and says why.
-                // polish P2-review-23 (r2-review-flow): Edit › Undo (⌘Z) takes the accept / the reject back.
-                Button("Reject", systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
-                    .controlSize(.regular)
-                    .fixedSize()
-                    .disabled(store.isRejectLocked || file.uncaptured)
-                    .help(store.rejectLockReason ?? rejectHelp)
-                    .accessibilityLabel("Reject")
-                    .accessibilityIdentifier("Reject")
-                Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
-                    .fixedSize()
-                    .disabled(store.isAcceptLocked)
-                    .help(store.acceptLockReason ?? String(localized: "Accept and move to the next pending file (⌘⇧A) · next/previous pending: ⌘] / ⌘["))
-                    .accessibilityLabel("Accept")
-                    .accessibilityIdentifier("Accept")
-            case .accepted:
-                Label("Accepted", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
-                Button("Undo Accept", systemImage: "arrow.uturn.left") { store.unaccept(file) }
-                    .controlSize(.regular)
-                    .fixedSize()
-                    .disabled(store.isReviewLocked)
-                    .help(Text("Make this file pending again (the file on disk is not changed)") + Text(verbatim: " (⌘⇧U)"))
-                    .accessibilityIdentifier("Undo Accept")
-            case .rejected:
-                Label("Rejected", systemImage: "arrow.uturn.backward.circle.fill").font(.callout).foregroundStyle(.orange)
-            case .changesRequested:
-                Label("Changes requested", systemImage: "exclamationmark.bubble.fill").font(.callout).foregroundStyle(.orange)
-            }
+            verdictControls(measuring: measuring)
+        }
+    }
+
+    /// Reject / Accept (Undo Accept, the verdict) — in every width of the header.
+    @ViewBuilder
+    private func verdictControls(measuring: Bool) -> some View {
+        switch file.state {
+        case .pending:
+            // wave2 mac-flow (§34.2): while a turn runs accept still applies; reject waits and says why.
+            // polish P2-review-23 (r2-review-flow): Edit › Undo (⌘Z) takes the accept / the reject back.
+            Button("Reject", systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
+                .controlSize(.regular)
+                .fixedSize()
+                .disabled(store.isRejectLocked || file.uncaptured)
+                .help(store.rejectLockReason ?? rejectHelp)
+                .accessibilityLabel("Reject")
+                .accessibilityIdentifier("Reject")
+            Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .fixedSize()
+                .disabled(store.isAcceptLocked)
+                .help(store.acceptLockReason ?? String(localized: "Accept and move to the next pending file (⌘⇧A) · next/previous pending: ⌘] / ⌘["))
+                .accessibilityLabel("Accept")
+                .accessibilityIdentifier("Accept")
+                #if DEBUG
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { if !measuring { model.debugAcceptFrame = $0 } }
+                #endif
+        case .accepted:
+            Label("Accepted", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
+            Button("Undo Accept", systemImage: "arrow.uturn.left") { store.unaccept(file) }
+                .controlSize(.regular)
+                .fixedSize()
+                .disabled(store.isReviewLocked)
+                .help(Text("Make this file pending again (the file on disk is not changed)") + Text(verbatim: " (⌘⇧U)"))
+                .accessibilityIdentifier("Undo Accept")
+        case .rejected:
+            Label("Rejected", systemImage: "arrow.uturn.backward.circle.fill").font(.callout).foregroundStyle(.orange)
+        case .changesRequested:
+            Label("Changes requested", systemImage: "exclamationmark.bubble.fill").font(.callout).foregroundStyle(.orange)
         }
     }
 
@@ -863,10 +924,31 @@ struct DiffEditorButton: View {
         .accessibilityIdentifier("Open in Editor")
     }
 
-    private func open(in editor: ExternalEditor) {
+    private func open(in editor: ExternalEditor) { Self.open(file, line: line(), in: editor, store: store) }
+
+    static func open(_ file: ChangedFile, line: Int, in editor: ExternalEditor, store: AppState) {
         guard let root = store.projectInfo?.root ?? store.projectURL?.path else { return }
         let absolute = (root as NSString).appendingPathComponent(file.path)
-        editor.open(absolute, line: line())
+        editor.open(absolute, line: line)
+    }
+}
+
+/// "Open in Editor" as a submenu (the folded diff header's "⋯"): the remembered editor first, then the other installed ones.
+struct DiffEditorMenuItems: View {
+    @Environment(AppState.self) private var store
+    let file: ChangedFile
+    let line: () -> Int
+
+    var body: some View {
+        let installed = ExternalEditor.installed
+        let preferred = ExternalEditor.preferred ?? installed.first ?? .finder
+        let editors = [preferred] + installed.filter { $0 != preferred }
+        Menu("Open in Editor", systemImage: "arrow.up.forward.app") {
+            ForEach(editors) { editor in
+                Button(editor.title, systemImage: editor.systemImage) { DiffEditorButton.open(file, line: line(), in: editor, store: store) }
+            }
+        }
+        .disabled(file.status == .deleted)
     }
 }
 

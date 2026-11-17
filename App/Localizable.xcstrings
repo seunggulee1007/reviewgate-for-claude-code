@@ -15600,6 +15600,22 @@
         }
       }
     },
+    "More diff options": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More diff options"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diff 옵션 더 보기"
+          }
+        }
+      }
+    },
     "More lines are not available: the file is too large or binary": {
       "localizations": {
         "en": {
@@ -15644,6 +15660,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld줄 넘게 변경됨"
+          }
+        }
+      }
+    },
+    "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 메모 추가 (⌥⌘N), 공백 무시, 줄바꿈, diff에서 찾기 (⌥⌘F), 전체 파일, 에디터에서 열기 (⇧⌘E)"
           }
         }
       }

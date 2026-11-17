@@ -76,28 +76,41 @@ struct LiveDiffView: View {
         HStack(spacing: 8) {
             Image(systemName: "hammer.fill").foregroundStyle(.orange)
             Text("In progress (can't accept yet)").font(.callout.weight(.semibold)).fixedSize()
-            Spacer(minLength: 4)
-            Button("Refresh", systemImage: "arrow.clockwise") {
-                guard let path = store.liveSelection else { return }
-                Task {
-                    await store.refreshLiveChanges()
-                    await store.openLiveDiff(path)
-                }
+            // A narrow pane keeps the way back as its icon (the title stays whole).
+            FullOrCompact { _ in
+                HStack { Spacer(minLength: 4); refreshButton; backButton }
+            } compact: {
+                HStack { Spacer(minLength: 4); refreshButton; backButton.labelStyle(.iconOnly) }
             }
-            .labelStyle(.iconOnly)
-            .controlSize(.small)
-            .disabled(store.isLoadingLiveChanges || !(store.isRunning || store.isSnapshotting))
-            .help("Refresh")
-            .accessibilityIdentifier("Refresh live diff")
-            Button("Back to current review", systemImage: "arrow.uturn.left") { store.closeLiveDiff() }
-                .controlSize(.small)
-                .fixedSize()
-                .accessibilityIdentifier("Back from live diff")
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
         .background(Color.orange.wash(colorScheme, light: 0.10, dark: 0.18))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Live diff banner")
+    }
+
+    private var refreshButton: some View {
+        Button("Refresh", systemImage: "arrow.clockwise") {
+            guard let path = store.liveSelection else { return }
+            Task {
+                await store.refreshLiveChanges()
+                await store.openLiveDiff(path)
+            }
+        }
+        .labelStyle(.iconOnly)
+        .controlSize(.small)
+        .fixedSize()
+        .disabled(store.isLoadingLiveChanges || !(store.isRunning || store.isSnapshotting))
+        .help("Refresh")
+        .accessibilityIdentifier("Refresh live diff")
+    }
+
+    private var backButton: some View {
+        Button("Back to current review", systemImage: "arrow.uturn.left") { store.closeLiveDiff() }
+            .controlSize(.small)
+            .fixedSize()
+            .help("Back to current review")
+            .accessibilityIdentifier("Back from live diff")
     }
 
     private func header(_ path: String) -> some View {

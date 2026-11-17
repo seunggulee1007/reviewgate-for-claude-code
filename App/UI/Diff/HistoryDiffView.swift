@@ -87,19 +87,28 @@ struct HistoryDiffView: View {
                 Text("Nothing here changes the current review.").font(.caption).foregroundStyle(.secondary).fixedSize()
                 Color.clear.frame(width: 0, height: 0)
             }
-            Spacer(minLength: 4)
-            Button("Back to current review", systemImage: "arrow.uturn.left") {
-                store.closeHistoryDiff()
-                onBack()
+            // A narrow pane keeps the way back as its icon (the title stays whole).
+            FullOrCompact { _ in
+                HStack { Spacer(minLength: 4); backButton }
+            } compact: {
+                HStack { Spacer(minLength: 4); backButton.labelStyle(.iconOnly) }
             }
-            .controlSize(.small)
-            .fixedSize()
-            .accessibilityIdentifier("Back to current review")
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
         .background(Color.purple.wash(colorScheme, light: 0.10, dark: 0.20))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("History banner")
+    }
+
+    private var backButton: some View {
+        Button("Back to current review", systemImage: "arrow.uturn.left") {
+            store.closeHistoryDiff()
+            onBack()
+        }
+        .controlSize(.small)
+        .fixedSize()
+        .help("Back to current review")
+        .accessibilityIdentifier("Back to current review")
     }
 
     private func header(entry: ReviewHistoryEntry, file: ReviewHistoryFile) -> some View {
