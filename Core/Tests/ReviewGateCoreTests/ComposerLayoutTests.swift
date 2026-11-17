@@ -35,7 +35,8 @@ import Testing
         #expect(PaneSplit.leadingWidth(100, total: 1117, minLeading: 420, minTrailing: 380, leadingFloor: 240) == 420)
     }
 
-    /// terminal-chat (§57.5): a terminal chat's terminal never goes below 80 columns (627 pt). Side by side only where 80
+    /// terminal-chat (§57.5): a terminal chat's terminal never goes below 80 columns (627 pt). Side by side (the review
+    /// panel next to the file list, the terminal on its right) only where 80
     /// columns and the review's 360 pt fit (987 pt); there the divider moves between the two; below it the review is a drawer
     /// over the terminal — 45 % of the area, at least 360 pt, a strip of the terminal left — and the terminal keeps its width.
     @Test func theTerminalNeverGoesBelowEightyColumns() {
@@ -59,6 +60,18 @@ import Testing
         #expect(PaneSplit.reviewDrawerWidth(total: 450, reviewFloor: 360) == 360)   // the floor wins over the strip
         #expect(PaneSplit.reviewDrawerWidth(total: 300, reviewFloor: 360) == 300)
         #expect(width(300, 200) == 200)
+        // The review panel leads (sidebar | diff | terminal): its width is what the terminal leaves, so the divider moves it
+        // between the review's floor and 80 columns of terminal.
+        func panel(_ want: Double, _ total: Double) -> Double {
+            PaneSplit.reviewPanelWidth(want, total: total, minTerminal: 627, reviewFloor: 360)
+        }
+        #expect(panel(400, 1094) == 400)
+        #expect(panel(100, 1094) == 360)
+        #expect(panel(900, 1094) == 467)
+        #expect(panel(0.45 * 1094, 1094) + width(0.55 * 1094, 1094) == 1094)
+        for total in stride(from: 987.0, through: 2000, by: 7) {
+            for want in [0, 0.3 * total, 0.7 * total, total] { #expect(total - panel(want, total) >= 627 && panel(want, total) >= 360) }
+        }
     }
 
     @Test func requestChangesShowsOnlyWithNotesToSend() {
