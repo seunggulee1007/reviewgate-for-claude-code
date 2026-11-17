@@ -45,7 +45,8 @@ public enum ShortcutTable {
         ShortcutSection("View", rows: [
             ShortcutRow("Refresh", mac: "⌘R", windows: "Ctrl+R"),
             ShortcutRow("Toggle Sidebar", mac: "⌃⌘S", windows: "Ctrl+B"),
-            ShortcutRow("Toggle Diff Pane", mac: "⌘⇧D", windows: "Ctrl+Shift+D"),
+            ShortcutRow("Toggle Diff Pane", mac: "⌘⇧D", windows: "Ctrl+Shift+D",
+                        note: "In a terminal chat: the review panel beside the terminal"),   // MARK: terminal-chat (§57.5)
             ShortcutRow("Toggle Agent Panel", mac: "⌥⌘A", windows: "Ctrl+Alt+A"),
             ShortcutRow("Toggle Side Questions", mac: "⌥⌘S", windows: "Ctrl+Alt+S"),
             ShortcutRow("Agent Board", mac: "⌥⌘B", windows: "Ctrl+Alt+B"),   // MARK: wave5 w5-board (§43.1)

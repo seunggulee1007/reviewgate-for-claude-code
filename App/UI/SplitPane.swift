@@ -14,6 +14,11 @@ struct SplitPane<Leading: View, Trailing: View>: View {
     /// The leading pane is gone and the trailing one takes the width — the trailing view stays the same view (its state,
     /// scroll position and focus survive opening and closing the leading pane).
     var collapsed = false
+    /// MARK: terminal-chat (§57.5): `collapsed` hides the trailing pane instead, and the leading one (the terminal) stays
+    /// the same view.
+    var collapsesTrailing = false
+    /// The leading pane's width for a wanted width and the total, instead of the minimums above (the terminal chat's split).
+    var clamp: ((CGFloat, CGFloat) -> CGFloat)? = nil
     /// Called when a drag ends with the settled fraction.
     var onCommit: (Double) -> Void = { _ in }
     @ViewBuilder let leading: () -> Leading
@@ -26,14 +31,16 @@ struct SplitPane<Leading: View, Trailing: View>: View {
             let total = geo.size.width
             let width = clampedWidth(fraction * total, total: total)
             HStack(spacing: 0) {
-                if !collapsed {
+                if !collapsed || collapsesTrailing {
                     leading()
-                        .frame(width: width)
+                        .frame(width: collapsed ? total : width)
                         .clipped()
                 }
-                trailing()
-                    .frame(width: collapsed ? total : max(total - width, 0))
-                    .clipped()
+                if !collapsed || !collapsesTrailing {
+                    trailing()
+                        .frame(width: collapsed ? total : max(total - width, 0))
+                        .clipped()
+                }
             }
             .overlay(alignment: .leading) {
                 if !collapsed {
@@ -75,7 +82,8 @@ struct SplitPane<Leading: View, Trailing: View>: View {
     /// window) the trailing one keeps its minimum while the leading one keeps `leadingFloor`, else the panes share it in
     /// proportion to their minimums instead of the trailing one being pushed out (Core `PaneSplit`).
     private func clampedWidth(_ width: CGFloat, total: CGFloat) -> CGFloat {
-        CGFloat(PaneSplit.leadingWidth(Double(width), total: Double(total), minLeading: Double(minLeading),
+        if let clamp { return clamp(width, total) }
+        return CGFloat(PaneSplit.leadingWidth(Double(width), total: Double(total), minLeading: Double(minLeading),
                                        minTrailing: Double(minTrailing), leadingFloor: leadingFloor.map(Double.init)))
     }
 }

@@ -163,9 +163,24 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
     /// The screen's rows joined without breaks, so a line the terminal wrapped reads whole (the tour's checks).
     func screenText() -> String { screenLines().joined() }
 
+    /// Every terminal's font (the chat's and the shell panel's).
+    static let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+
+    /// §57.5: the width in points a terminal needs for `columns` cells of `font` — SwiftTerm's cell is the advance of "W"
+    /// snapped to the pixel grid, plus a legacy scroller's width when scroll bars always show.
+    static func width(columns: Int) -> CGFloat {
+        var unit: UniChar = 0x57
+        var glyph: CGGlyph = 0
+        let advance = CTFontGetGlyphsForCharacters(font, &unit, &glyph, 1) ? font.advancement(forGlyph: NSGlyph(glyph)).width : 8
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let cell = (advance * scale).rounded() / scale
+        let scroller = NSScroller.preferredScrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        return ceil(cell * CGFloat(columns) + scroller)
+    }
+
     private func configure(_ v: ReviewTerminalView) {
         v.processDelegate = self
-        v.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        v.font = Self.font
         v.nativeBackgroundColor = NSColor(calibratedRed: 0.08, green: 0.08, blue: 0.09, alpha: 1)
         v.nativeForegroundColor = NSColor(calibratedWhite: 0.9, alpha: 1)
         v.caretColor = NSColor.systemTeal

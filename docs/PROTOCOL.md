@@ -8804,9 +8804,39 @@ chat's id);
   while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중"). The existing chat UI
   stays the default.
 - **The column.** When the chat on screen is a terminal chat, the chat column keeps its tab strip and shows the terminal
-  (SwiftTerm) instead of the transcript, the HUD, the cards and the composer: Claude Code draws its own. The diff, the
-  changed files and accept / reject around it are unchanged. A terminal chat's tab has a terminal symbol, and an orange
-  dot while its Claude Code is not running (exited, or disconnected from the engine).
+  (SwiftTerm) instead of the transcript, the HUD, the cards and the composer: Claude Code draws its own. The changed files
+  and accept / reject are unchanged. A terminal chat's tab has a terminal symbol, and an orange dot while its Claude Code
+  is not running (exited, or disconnected from the engine).
+- **The layout: the terminal large, the diff only to review.** Claude Code's TUI wants 80 columns or more; in the chat
+  column beside the diff (~55 columns at 1000 pt) its boxes and status lines were cut. So a terminal chat lays the window
+  out as sidebar | terminal | review panel, where the review panel is the diff pane (the diff and accept / reject) on the
+  terminal's right, with its edge tab at the window's right edge. Chat-kind chats keep the diff | chat layout.
+  - *When it shows.* The panel is the diff pane's open / closed state (`diffCollapsed`, M16): closed while there is nothing
+    to show (no changed file, nothing selected), so the terminal takes the whole width; it opens when files arrive, when a
+    file is picked in the sidebar or a link, for a past round's file, the running turn's live diff (§34.6) and a project
+    file (§47); and, for a terminal chat, again each time the gate enters `reviewing` with files pending — so a panel the
+    user closed during one review is back for the next. It closes when the review empties (all accepted / rejected).
+  - *Closing it.* The edge tab (tooltip "리뷰 패널 숨기기 — 터미널이 너비를 모두 써요 (⌘⇧D)") or View › Toggle Diff Pane
+    (⌘⇧D — the same key and the same pane as in a chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the
+    terminal). VoiceOver: "리뷰 패널 표시 / 숨기기" on the tab, the panel itself is "리뷰 패널".
+  - *Widths* (Core `PaneSplit.terminalWidth`; a column is SwiftTerm's cell, the advance of "W" in the 13 pt monospaced
+    system font, ≈ 7.8 pt, and the terminal adds a legacy scroller's 15 pt when scroll bars always show). The divider is
+    draggable; the terminal's share is remembered for all windows (`terminalReviewSplit`, default 0.55 — the panel
+    ~45 %). When both fit (80 columns + 400 pt), the terminal keeps 80 columns and the panel can be dragged down to 360 pt
+    — the width at which the diff header's icon-only controls still show Accept. In a tighter window the diff wins while
+    reviewing: the panel keeps 400 pt and the terminal shrinks, then the panel goes down to its 360 pt, never the
+    terminal below 38 columns (the TUI's prompt box and status line still fit); below that the terminal keeps its 38 and
+    the panel gets what is left. At the laptop's 1000 × 637 (676 pt beside the sidebar) that is 39 columns beside the
+    360 pt panel while reviewing and 84 columns with the panel closed (measured by the terminal tour); with the sidebar
+    hidden (⌃⌘S) ~71 columns beside a 400 pt panel. The rule is continuous in the width, so nothing jumps while the
+    window resizes.
+  - *The keyboard.* The terminal is the split's leading pane open or closed — one view: opening or closing the panel
+    never moves the first responder; only the terminal's size changes. Beside a terminal the panel opens and closes
+    without an animation: each animation frame resized the terminal and the TUI redrew at every width on the way (nine
+    SIGWINCHs for one open); now one resize, one redraw.
+  - *The PTY follows.* Any size change — the window, the shell panel's height (§57.6), the split, the panel — resizes
+    the terminal view; SwiftTerm recomputes its cells and sets the PTY's winsize (TIOCSWINSZ → SIGWINCH), so the TUI
+    redraws at the new size (`stty size` in a shell tab says the same; the terminal tour checks both).
 - **The PTY** (`TerminalLaunch`, Core). The user's login shell (`getpwuid`) runs `-l -i -c 'exec <argv…>'` (each word
   POSIX-quoted, so `${RG_HOOK_TOKEN}` in the settings stays literal for the CLI) in `spec.cwd`, with an environment built
   from scratch: `HOME USER LOGNAME SHELL TMPDIR PATH` of the app (every parent `CLAUDE*` dropped), `TERM=xterm-256color`,
@@ -8821,7 +8851,8 @@ chat's id);
   read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
   PTYs (all at once, not one after another), and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
   shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
-- **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),
+- **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요 — 변경은 오른쪽에 나와요"
+  (hooks arrive),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
   changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).

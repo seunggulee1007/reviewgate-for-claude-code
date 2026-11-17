@@ -25,7 +25,7 @@ Mac·Windows 열과 비교해요.
 |---|---|---|---|
 | 새로고침 | ⌘R | Ctrl+R | |
 | 사이드바 보기/숨기기 | ⌃⌘S | Ctrl+B | 두 OS 의 관례를 따라요 |
-| Diff 패널 보기/숨기기 | ⌘⇧D | Ctrl+Shift+D | |
+| Diff 패널 보기/숨기기 | ⌘⇧D | Ctrl+Shift+D | 터미널 채팅(Mac)에서는 터미널 오른쪽의 리뷰 패널 |
 | 에이전트 패널 보기/숨기기 | ⌥⌘A | Ctrl+Alt+A | |
 | 곁질문 패널 보기/숨기기 | ⌥⌘S | Ctrl+Alt+S | |
 | 관제판 열기·닫기 | ⌥⌘B | Ctrl+Alt+B | Mac 은 창 메뉴, Windows 는 보기 메뉴에 있어요 |

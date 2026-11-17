@@ -46,13 +46,19 @@ private struct TerminalStatusStrip: View {
         let info = store.terminalInfo
         HStack(spacing: 8) {
             let (text, symbol, tint, help) = status(info)
-            Label(text, systemImage: symbol)
-                .font(.caption)
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .help(help)
-                .accessibilityIdentifier("Terminal chat status")
+            // §57.5: beside the review panel the strip is the terminal's width — the words that fit, the shortest cut.
+            ViewThatFits(in: .horizontal) {
+                Label(text, systemImage: symbol)
+                if text == Self.reviewedText {
+                    Label(String(localized: "Reviewed by ReviewGate"), systemImage: symbol)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(help)
+            .accessibilityIdentifier("Terminal chat status")
             Spacer(minLength: 4)
             TimelineView(.periodic(from: .now, by: 5)) { context in
                 if showsReviewNow(info, now: context.date) {
@@ -86,6 +92,8 @@ private struct TerminalStatusStrip: View {
         return info.interruptSuspected || now.timeIntervalSince(model.terminals.lastActivity) >= 60
     }
 
+    private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the right") }
+
     private func status(_ info: TerminalSessionInfo?) -> (String, String, Color, String) {
         if host.disconnected {
             return (String(localized: "ReviewGate restarted — this terminal is no longer reviewed. Restart it"), "bolt.horizontal.circle",
@@ -101,7 +109,7 @@ private struct TerminalStatusStrip: View {
                     String(localized: "ReviewGate takes a snapshot when you send a prompt and shows the turn's changes once Claude stops"))
         }
         if info?.hooksSeen == true {
-            return (String(localized: "Reviewed by ReviewGate — each turn's changes show on the left"), "checkmark.shield", .secondary,
+            return (Self.reviewedText, "checkmark.shield", .secondary,
                     String(localized: "Claude Code reports each prompt and edit to ReviewGate; accept or reject the changes as in a chat"))
         }
         return (String(localized: "Waiting for the first prompt"), "hourglass", .secondary,

@@ -34,6 +34,18 @@ public enum PaneSplit {
         }
         return min(max(want, minLeading), total - minTrailing)
     }
+
+    /// MARK: terminal-chat (§57.5): a terminal chat's split — the terminal leading, the review panel trailing — so the
+    /// terminal's width in points. Roomy (`total` holds both minimums): the terminal keeps `minTerminal` (80 columns) and
+    /// the review can be dragged down to `reviewFloor`. Tight: the review keeps `minReview` while the terminal shrinks, down
+    /// to `terminalFloor` (the TUI stays usable); the user can still drag the review down to its floor; below that the
+    /// terminal keeps its floor and the review gets what is left. Continuous in `total`, so no jump while the window resizes.
+    public static func terminalWidth(_ want: Double, total: Double, minTerminal: Double, terminalFloor: Double,
+                                     minReview: Double, reviewFloor: Double) -> Double {
+        let low = total >= minTerminal + minReview ? minTerminal : max(terminalFloor, total - minReview)
+        let high = max(low, total - reviewFloor)
+        return min(min(max(want, low), high), max(total, 0))
+    }
 }
 
 extension AppState {

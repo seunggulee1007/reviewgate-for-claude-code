@@ -12717,6 +12717,22 @@
         }
       }
     },
+    "Hide review panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide review panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 숨기기"
+          }
+        }
+      }
+    },
     "Hide the engine log": {
       "localizations": {
         "en": {
@@ -12745,6 +12761,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "엔진 로그 숨기기 — 오류 배너의 ‘로그 보기’나 도움말 › ‘엔진 로그 보기’로 다시 열어요"
+          }
+        }
+      }
+    },
+    "Hide the review panel — the terminal takes the width (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the review panel — the terminal takes the width (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 숨기기 — 터미널이 너비를 모두 써요 (⌘⇧D)"
           }
         }
       }
@@ -13484,6 +13516,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "가져오면 %@"
+          }
+        }
+      }
+    },
+    "In a terminal chat: the review panel beside the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a terminal chat: the review panel beside the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서는 터미널 옆의 리뷰 패널"
           }
         }
       }
@@ -22320,6 +22368,22 @@
         }
       }
     },
+    "Review panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널"
+          }
+        }
+      }
+    },
     "Review requested": {
       "localizations": {
         "en": {
@@ -22422,18 +22486,34 @@
         }
       }
     },
-    "Reviewed by ReviewGate — each turn's changes show on the left": {
+    "Reviewed by ReviewGate": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reviewed by ReviewGate — each turn's changes show on the left"
+            "value": "Reviewed by ReviewGate"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ReviewGate가 리뷰해요 — 턴마다 변경이 왼쪽에 나와요"
+            "value": "ReviewGate가 리뷰해요"
+          }
+        }
+      }
+    },
+    "Reviewed by ReviewGate — changes show on the right": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewed by ReviewGate — changes show on the right"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 리뷰해요 — 변경은 오른쪽에 나와요"
           }
         }
       }
@@ -23462,6 +23542,22 @@
         }
       }
     },
+    "Show review panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show review panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 표시"
+          }
+        }
+      }
+    },
     "Show the change": {
       "localizations": {
         "en": {
@@ -23474,6 +23570,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "변경 내용 보기"
+          }
+        }
+      }
+    },
+    "Show the review panel beside the terminal (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the review panel beside the terminal (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 옆에 리뷰 패널 표시 (⌘⇧D)"
           }
         }
       }

@@ -50,6 +50,8 @@ struct MainWindow: View {
     @State private var diffFraction = 0.5
     /// M16: the diff pane is collapsed to an edge tab (chat takes the width); auto-collapses when nothing is changed.
     @State private var diffCollapsed = false
+    /// §57.5: the terminal's share of a terminal chat's split (the review panel the rest), remembered across launches.
+    @AppStorage("terminalReviewSplit") private var terminalFraction = 0.55
     /// The agent activity inspector (remembered across launches; ⌥⌘A, the toolbar button, the HUD agents chip).
     @AppStorage(AgentPanel.storageKey) private var showAgentPanel = false
     /// §21 the side-question inspector (remembered; shares the inspector column with the agent panel).
@@ -180,32 +182,22 @@ struct MainWindow: View {
                         // transcript's scroll position and the focus survive the diff pane opening (a review begins) or closing.
                         // MARK: terminal-chat (§57.6): the bottom terminal panel (⌃`) under the diff and the chat.
                         VStack(spacing: 0) {
-                            HStack(spacing: 0) {
-                                diffEdgeTab
-                                Divider()
-                                // r1-composer M11: in a laptop window the chat keeps 380 pt beside the diff (the diff the rest, down
-                                // to 240) — squeezed to ~311 pt its composer lost the send button past the window's edge.
-                                SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 380, leadingFloor: 240, collapsed: diffCollapsed,
-                                          onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
-                                    if store.codeBrowser.isOpen {
-                                        // MARK: code-browser (§47): a project file, read-only, until "Back to review".
-                                        ProjectFileView()
-                                    } else if tab == .history || store.historySelection != nil {
-                                        // §14: a past round's file, read-only, until "Back to current review".
-                                        HistoryDiffView { tab = .changes }
-                                    } else if store.liveSelection != nil {
-                                        // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
-                                        LiveDiffView()
-                                    } else {
-                                        // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
-                                        DiffView(
-                                            file: store.selectedFile,
-                                            diff: store.selectedDiff,
-                                            truncated: store.selectedDiffTruncated,
-                                            isReviewLocked: store.isReviewLocked)
+                            Group {
+                                if store.shownChatIsTerminal {
+                                    terminalSplit
+                                } else {
+                                    HStack(spacing: 0) {
+                                        diffEdgeTab
+                                        Divider()
+                                        // r1-composer M11: in a laptop window the chat keeps 380 pt beside the diff (the diff the rest, down
+                                        // to 240) — squeezed to ~311 pt its composer lost the send button past the window's edge.
+                                        SplitPane(fraction: $diffFraction, minLeading: 420, minTrailing: 380, leadingFloor: 240, collapsed: diffCollapsed,
+                                                  onCommit: { fraction in updateUIState { $0.diffFraction = fraction } }) {
+                                            reviewPane
+                                        } trailing: {
+                                            ChatView()
+                                        }
                                     }
-                                } trailing: {
-                                    ChatView()
                                 }
                             }
                             .frame(minHeight: 200, maxHeight: .infinity)
@@ -311,6 +303,10 @@ struct MainWindow: View {
             setDiffCollapsed(empty && store.selectedFile == nil && !store.codeBrowser.isOpen, remember: false)
         }
         .onChange(of: model.toggleDiffTick) { _, _ in setDiffCollapsed(!diffCollapsed) }
+        .onChange(of: store.gatePhase) { _, phase in
+            // §57.5: a terminal chat's review panel opens for each review, also after the user closed it during the last one.
+            if phase == .reviewing, store.shownChatIsTerminal, store.hasPendingReview { setDiffCollapsed(false, remember: false) }
+        }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
             windowWidth = width
             fitAgentPanel()
@@ -388,15 +384,77 @@ struct MainWindow: View {
         Task { await store.refresh(scope: scope) }
     }
 
+    // MARK: The review pane
+
+    /// What the diff pane shows: a project file (§47), a past round's file (§14), the running turn's change (§34.6) or the
+    /// current review's file.
+    @ViewBuilder
+    private var reviewPane: some View {
+        if store.codeBrowser.isOpen {
+            // MARK: code-browser (§47): a project file, read-only, until "Back to review".
+            ProjectFileView()
+        } else if tab == .history || store.historySelection != nil {
+            // §14: a past round's file, read-only, until "Back to current review".
+            HistoryDiffView { tab = .changes }
+        } else if store.liveSelection != nil {
+            // wave2 mac-flow (§34.6): the running turn's change so far, read-only.
+            LiveDiffView()
+        } else {
+            // wave7 w7-state (§45.2): equal inputs (no closures) — a window re-render skips it.
+            DiffView(
+                file: store.selectedFile,
+                diff: store.selectedDiff,
+                truncated: store.selectedDiffTruncated,
+                isReviewLocked: store.isReviewLocked)
+        }
+    }
+
+    // MARK: The terminal chat's split (§57.5)
+
+    /// A terminal chat: the terminal takes the window and the review panel (the diff pane) opens on its right while there
+    /// is something to review. The terminal is the split's leading pane open or closed — one view, so the TUI keeps the
+    /// keyboard while the panel opens and closes; only its size (and the PTY's winsize) changes.
+    private var terminalSplit: some View {
+        let minTerminal = TerminalHost.width(columns: Self.terminalColumns)
+        let terminalFloor = TerminalHost.width(columns: Self.terminalFloorColumns)
+        return HStack(spacing: 0) {
+            SplitPane(fraction: $terminalFraction, collapsed: diffCollapsed, collapsesTrailing: true,
+                      clamp: { want, total in
+                          CGFloat(PaneSplit.terminalWidth(Double(want), total: Double(total), minTerminal: Double(minTerminal),
+                                                          terminalFloor: Double(terminalFloor), minReview: Self.minReviewWidth,
+                                                          reviewFloor: Self.reviewFloorWidth))
+                      }) {
+                ChatView()
+            } trailing: {
+                reviewPane
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(Text("Review panel"))
+            }
+            Divider()
+            diffEdgeTab
+        }
+    }
+
+    /// The terminal's width when the review panel fits beside it, and the least it keeps while the panel is open.
+    private static let terminalColumns = 80
+    private static let terminalFloorColumns = 38
+    /// The review panel keeps this much while the terminal can shrink (a tight window), and can be dragged down to the
+    /// floor — where the diff header's icon-only controls still show Accept (~350 pt with Reject, the editor menu…).
+    private static let minReviewWidth: Double = 400
+    private static let reviewFloorWidth: Double = 360
+
     // MARK: Diff pane collapse (M16)
 
-    /// The thin edge tab left of the diff pane; click (or ⌘⇧D) collapses or expands it.
+    /// The thin edge tab left of the diff pane; click (or ⌘⇧D) collapses or expands it. §57.5: a terminal chat has it at the
+    /// window's right edge, beside the review panel it opens and closes.
     private var diffEdgeTab: some View {
-        Button {
+        let terminal = store.shownChatIsTerminal
+        let opens = diffCollapsed != terminal   // the chevron points where the pane goes
+        return Button {
             setDiffCollapsed(!diffCollapsed)
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: diffCollapsed ? "chevron.right" : "chevron.left").font(.caption2.weight(.semibold))
+                Image(systemName: opens ? "chevron.right" : "chevron.left").font(.caption2.weight(.semibold))
                 Text("Diff")
                     .font(.caption.weight(.medium))
                     .fixedSize()
@@ -418,8 +476,10 @@ struct MainWindow: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .background(Color(nsColor: .windowBackgroundColor))
-        .help(diffCollapsed ? Text("Show the diff pane (⌘⇧D)") : Text("Hide the diff pane (⌘⇧D)"))
-        .accessibilityLabel(diffCollapsed ? Text("Show diff pane") : Text("Hide diff pane"))
+        .help(terminal ? (diffCollapsed ? Text("Show the review panel beside the terminal (⌘⇧D)") : Text("Hide the review panel — the terminal takes the width (⌘⇧D)"))
+                       : (diffCollapsed ? Text("Show the diff pane (⌘⇧D)") : Text("Hide the diff pane (⌘⇧D)")))
+        .accessibilityLabel(terminal ? (diffCollapsed ? Text("Show review panel") : Text("Hide review panel"))
+                                     : (diffCollapsed ? Text("Show diff pane") : Text("Hide diff pane")))
         .accessibilityIdentifier("Diff edge tab")
     }
 
@@ -427,7 +487,13 @@ struct MainWindow: View {
     /// collapse/expand never does, so the remembered value stays what the user last asked for.
     private func setDiffCollapsed(_ collapsed: Bool, remember: Bool = true) {
         guard collapsed != diffCollapsed else { return }
-        withAnimation(.easeInOut(duration: 0.15)) { diffCollapsed = collapsed }
+        if store.shownChatIsTerminal {
+            // §57.5: no animation beside a terminal — each of its frames resized the terminal, and the TUI redrew at every
+            // width on the way (nine SIGWINCHs for one open); now one resize, one redraw.
+            diffCollapsed = collapsed
+        } else {
+            withAnimation(.easeInOut(duration: 0.15)) { diffCollapsed = collapsed }
+        }
         if remember { updateUIState { $0.diffCollapsed = collapsed } }
     }
 
