@@ -51,6 +51,8 @@ export type TurnChanges = { files: ChangedFile[]; added: number; deleted: number
 
 export type PendingCollect = { toolFiles: ToolFileEntry[]; stopReason: string; usage: TurnUsage | null; windows?: ToolWindow[] };
 
+/** §57: what a review summary was made of (`beginSendParts`), to put back with `restoreSummary`. */
+export type SummaryPaths = { accepted: string[]; rejected: string[]; partial: string[] };
 export type PreparedRequestChanges = { message: string; checkpointTree: string; endTree: string };
 
 // MARK: wave2 engine-why
@@ -946,11 +948,12 @@ export class ReviewGate {
    * when there is none — for a terminal chat, where the user typed the prompt and both go out as `additionalContext`.
    * The same side effects as `beginSend`.
    */
-  beginSendParts(keepSummary = false): { summary: string | null; notes: string | null } {
+  beginSendParts(keepSummary = false): { summary: string | null; notes: string | null; taken: SummaryPaths | null } {
     // A fresh snapshot A follows: the previous review round is over (accepted files stay on disk).
     if (!this.isAnsweringReview && !this.isRequestingChanges) this.completeRound();
     // `keepSummary`: a slash command (`/compact`, §27) must start with "/" — the summary waits for the next real message.
     const summary = keepSummary ? null : this.lastReviewSummary;
+    const taken = summary === null ? null : { accepted: this.acceptedPaths, rejected: this.rejectedPaths, partial: this.partiallyRejectedPaths };
     if (summary !== null) {
       this.acceptedPaths = [];
       this.rejectedPaths = [];
@@ -962,7 +965,19 @@ export class ReviewGate {
     this.lastReject = null; // MARK: wave4c w4c-trust — §41.2: sending ends the reject undo
     if (!this.isAnsweringReview) this.reviewNotes = [];
     this.running = true;
-    return { summary, notes };
+    return { summary, notes, taken };
+  }
+
+  /**
+   * §57: the review summary `beginSendParts` consumed (`taken`) never reached Claude — the terminal prompt it was for was
+   * blocked meanwhile or the CLI gave up on it — so it goes out with the next prompt instead.
+   */
+  restoreSummary(taken: SummaryPaths): void {
+    const merge = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
+    this.acceptedPaths = merge(taken.accepted, this.acceptedPaths);
+    this.rejectedPaths = merge(taken.rejected, this.rejectedPaths);
+    this.partiallyRejectedPaths = merge(taken.partial, this.partiallyRejectedPaths);
+    this.onChange();
   }
 
   /** `snapshotStart()` will keep the current A (a change request / an answer to a standing review). */

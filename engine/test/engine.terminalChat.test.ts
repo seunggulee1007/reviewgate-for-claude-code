@@ -325,6 +325,24 @@ describe("terminal chats (§57)", () => {
     expect(r.h.ofType("user_message").at(-1)).toMatchObject({ text: "second prompt" });
   });
 
+  it("a review summary the CLI never got (its prompt was blocked meanwhile) goes with the next prompt", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await turn(r, s, "p0");
+    await r.h.engine.handle({ type: "reject", paths: ["notes.txt"] });
+    // A turn Claude starts itself keeps the summary; its collection is in flight while p1 and p2 come.
+    expect(await hook(s, { hook_event_name: "PreToolUse", ...write_("auto.txt", "w1", "pa") })).toEqual({});
+    write(r.dir, "auto.txt", "auto\n");
+    await hook(s, { hook_event_name: "PostToolUse", ...write_("auto.txt", "w1", "pa"), tool_response: {} });
+    await hook(s, { hook_event_name: "Stop" });
+    // p1's adoption takes the summary, but p1 is blocked by p2 before its answer: p2 carries it.
+    const first = hook(s, ups("p1", "first prompt"));
+    const second = await hook(s, ups("p2", "second prompt"));
+    expect(await first).toMatchObject({ decision: "block" });
+    expect(String((second.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext)).toContain("Rejected (reverted on disk");
+  });
+
   it("a write tool with no prompt (Claude went on by itself) is taken as a turn of its own", async () => {
     const r = await rig();
     const id = await newTerminal(r);

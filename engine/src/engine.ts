@@ -167,7 +167,7 @@ import { ENGINE_VERSION } from "./version.js";
 // MARK: wave2 engine-why
 import type { FileWhy, LiveChangesEvent } from "./protocol.js";
 import type { ChangedFile } from "./git/checkpoint.js";
-import type { AnnotateArgs, ScheduledRejectOutcome } from "./review/gate.js";
+import type { AnnotateArgs, ScheduledRejectOutcome, SummaryPaths } from "./review/gate.js";
 import type { TurnDelta } from "./review/turnDelta.js"; // MARK: wave3 check-engine (§37.3)
 import { annotateDetail } from "./review/detail.js";
 // MARK: wave4c w4c-review — §41.3 review leftovers
@@ -2663,6 +2663,7 @@ export class ReviewEngine {
     const answer = (a: PromptAnswer): boolean => this.session === ts && ts.answerPrompt(ev.seq, a);
     const trimmed = ev.prompt.trim();
     let started = false;
+    let taken: SummaryPaths | null = null;
     try {
       await this.terminalGateSettled(ts, deadline);
       if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
@@ -2693,7 +2694,9 @@ export class ReviewEngine {
       this.proposedPlanKeys.clear();
       // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
       const command = trimmed.startsWith("/");
-      const { summary, notes } = this.gate.beginSendParts(command);
+      const sendParts = this.gate.beginSendParts(command);
+      const { summary, notes } = sendParts;
+      taken = sendParts.taken;
       const parts = [summary, notes].filter((p): p is string => p !== null);
       const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
       if (!command) {
@@ -2715,11 +2718,16 @@ export class ReviewEngine {
       this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
       if (this.session !== ts) throw new Error("the terminal chat was left");
       started = true;
-      answer({ ok: true, additionalContext: parts.length > 0 ? parts.join("\n\n") : null, checkpointTree: this.turnHookTree(tree) });
+      if (!answer({ ok: true, additionalContext: parts.length > 0 ? parts.join("\n\n") : null, checkpointTree: this.turnHookTree(tree) }) && taken) {
+        // The prompt no longer waited (blocked meanwhile, the CLI gave up): Claude never got the summary — the next one does.
+        this.gate.restoreSummary(taken);
+        this.log("info", "terminal prompt: its review summary never reached Claude; it goes with the next prompt");
+      }
       this.touch();
       await this.checkConcurrent("send");
     } catch (e) {
       this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
+      if (!started && taken) this.gate.restoreSummary(taken);
       if (!started && this.gate.running) {
         this.gate.abortTurn();
         this.dropRecord();
