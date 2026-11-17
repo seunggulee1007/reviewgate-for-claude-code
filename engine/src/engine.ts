@@ -2659,9 +2659,11 @@ export class ReviewEngine {
     // one in flight).
     const tail = prior ? Promise.all([prior, run]).then(() => undefined) : run;
     this.terminalAdopting = tail;
-    void tail.finally(() => {
+    // Both handlers: a rejected adoption must not become an unhandled rejection (it would end the engine process).
+    const clear = (): void => {
       if (this.terminalAdopting === tail) this.terminalAdopting = null;
-    });
+    };
+    void tail.then(clear, clear);
   }
 
   /**
