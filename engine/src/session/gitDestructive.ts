@@ -367,7 +367,7 @@ const KEYWORDS: ReadonlySet<string> = new Set(["if", "then", "else", "elif", "do
 const SHELLS: ReadonlySet<string> = new Set(["bash", "sh", "zsh", "dash", "ksh"]);
 
 /** The words of the program that really runs: leading assignments, keywords and wrappers (`sudo`, `env`, `xargs`, …) dropped. */
-function programWords(words: readonly string[]): string[] {
+export function programWords(words: readonly string[]): string[] {
   return program(words).words;
 }
 

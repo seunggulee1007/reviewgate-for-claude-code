@@ -2582,6 +2582,7 @@ export class ReviewEngine {
       promptWaitMs: this.terminalPromptWaitMs + 10_000,
       plansDir: join(claudeConfigDir(this.childEnv()), "plans"),
       scratchDirs: defaultScratchDirs(),
+      reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
       emit: (ev) => this.onSessionEvent(ts, ev),
       log: (level, msg) => this.log(level, msg),
     });

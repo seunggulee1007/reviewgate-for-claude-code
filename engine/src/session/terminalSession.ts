@@ -30,6 +30,7 @@ import {
 } from "./hooks.js";
 import { changedWithin, WINDOW_MARGIN_MS } from "./provenance.js";
 import { editScopeReason } from "./reviewScope.js";
+import { terminalBashDecision, terminalEditDecision, type GuardDecision } from "./terminalGuard.js";
 import { isCliSessionId } from "./terminalSpec.js";
 
 /** The engine's answer to a `terminal_prompt`. */
@@ -51,6 +52,8 @@ export type TerminalSessionOptions = {
   /** Override of the plans folder (plan files are no outside edits). */
   plansDir?: string;
   scratchDirs?: readonly string[];
+  /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
+  reviewPaths?: () => ReadonlySet<string>;
   emit: (ev: SessionEvent) => void;
   log: SessionLog;
   /** Test seams. */
@@ -81,6 +84,14 @@ type Waiter<T> = { resolve: (v: T) => void; timer: NodeJS.Timeout };
 type Adopted = { ok: boolean; busy?: boolean };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
+
+/** §57.8: a PreToolUse answer from the guard's decision. */
+const preToolAnswer = (g: GuardDecision): HookOutput => ({
+  hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: g.decision, permissionDecisionReason: g.reason },
+});
+
+/** §57.8: the guard itself failed — the call asks (fail closed, but not a deny the user cannot get past). */
+export const TERMINAL_GUARD_FAILED_REASON = "ReviewGate could not check this call against the review — confirm it.";
 
 function preview(v: unknown): string {
   if (v === undefined || v === null) return "";
@@ -311,6 +322,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   }
 
   private async onPreTool(input: Record<string, unknown>): Promise<HookOutput> {
+    // MARK: terminal-guard — §57.8: git that throws away work is blocked before any turn starts; git that changes the
+    // repository and edits the review does not see make the TUI ask, in every mode.
+    const guard = await this.guard(input);
+    if (this.disposed) return retiredAnswer("PreToolUse"); // retired while the guard read the call
+    if (guard?.decision === "deny") return preToolAnswer(guard);
     if (!this.open) {
       const ready = await this.adopt(str(input.prompt_id));
       if (!ready.ok) {
@@ -319,7 +335,26 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       }
     }
     if (input.tool_name === "Bash") await this.beforeBash(input);
-    return {};
+    return guard ? preToolAnswer(guard) : {};
+  }
+
+  /** §57.8: the guard's word on this call (null: the TUI's own permission flow decides). A failure asks. */
+  private async guard(input: Record<string, unknown>): Promise<GuardDecision | null> {
+    const ti = input.tool_input && typeof input.tool_input === "object" ? (input.tool_input as Record<string, unknown>) : {};
+    const cwd = str(input.cwd) ?? this.opts.cwd;
+    const mode = str(input.permission_mode) ?? undefined;
+    try {
+      const root = await containmentRoot(this.ctx);
+      if (input.tool_name === "Bash") {
+        return await terminalBashDecision(String(ti.command ?? ""), { cwd, root, reviewPaths: this.opts.reviewPaths?.() ?? new Set(), mode });
+      }
+      const file = toolFile(ti, cwd);
+      if (!file || !EDIT_TOOLS_RE.test(str(input.tool_name) ?? "")) return null;
+      return terminalEditDecision(file, { root, scratchDirs: this.opts.scratchDirs, mode, isPlanFile: (f) => isPlanFile(f, this.ctx) });
+    } catch (e) {
+      this.opts.log("warn", `terminal: the guard could not read this call (${String(e)}); asking`);
+      return { decision: "ask", reason: TERMINAL_GUARD_FAILED_REASON };
+    }
   }
 
   /** A write tool with no turn open: the engine takes it as a turn Claude started (§52.1) — one wait for every call. */

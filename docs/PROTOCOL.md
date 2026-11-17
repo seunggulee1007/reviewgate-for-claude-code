@@ -8740,7 +8740,7 @@ never be an option of its own)`, "--settings", <json>, "--append-system-prompt",
 `--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
 ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
 "already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
-reverted on disk. `env` is `{ RG_HOOK_TOKEN: <32 random bytes, hex> }`. The settings are an argv string, never a file,
+reverted on disk, then the git rule of §57.8 (`TERMINAL_GIT_INSTRUCTION`). `env` is `{ RG_HOOK_TOKEN: <32 random bytes, hex> }`. The settings are an argv string, never a file,
 and hold no token:
 
 ```json
@@ -8803,7 +8803,7 @@ chat's id);
 | Hook | What happens | Answer |
 |---|---|---|
 | UserPromptSubmit | A turn still open with another `prompt_id` ends first (`interrupted`, the Esc rule). The engine adopts the prompt as a review turn (below) | `additionalContext` when there is a review summary / unsent notes; `{decision:"block", reason}` when the review cannot start |
-| PreToolUse (Edit, Write, MultiEdit, NotebookEdit, Bash) | No turn open (Claude goes on by itself: a user's Stop hook that blocked, a background task's result): taken as a turn Claude started (§52.1, `auto_turn_start {trigger:"continue"}`), A first. Bash: the base snapshot (not for a read-only command) and the call's window (§31) | `{}` (the TUI's own permission flow runs); refused: `permissionDecision:"deny"` (the unprompted-turn reason; when the turn could not start in time — the engine waits ≤ 45 s for the collection in flight, the session ≤ 55 s, the hook 60 s — a "still busy, try it again" reason) |
+| PreToolUse (Edit, Write, MultiEdit, NotebookEdit, Bash) | First the guard (§57.8): a git command that throws work away is denied before anything else. Then, no turn open (Claude goes on by itself: a user's Stop hook that blocked, a background task's result): taken as a turn Claude started (§52.1, `auto_turn_start {trigger:"continue"}`), A first. Bash: the base snapshot (not for a read-only command) and the call's window (§31) | `{}` (the TUI's own permission flow runs), or the guard's `ask` / `deny` (§57.8); refused: `permissionDecision:"deny"` (the unprompted-turn reason; when the turn could not start in time — the engine waits ≤ 45 s for the collection in flight, the session ≤ 55 s, the hook 60 s — a "still busy, try it again" reason) |
 | PostToolUse (edit tools) | The file is the turn's (`tool_use` with `file`, `tool_result`); an edit the review does not see (outside the project, a nested repository, Claude's memory) goes to `changedOutside` | `{}` |
 | PostToolUse / PostToolUseFailure (Bash) | The post-Bash snapshot: `tool_files` (what changed inside the call's window), `bash_snapshot`, the rows. `is_interrupt` sets `interruptSuspected` | `{}` |
 | Stop | The open turn ends: `turn_end {stopReason:"end_turn"}` (no usage, no budget) → snapshot B, the review. `background_tasks` it names go first, so the next turn keeps A (§52) | `{}` at once — the next prompt waits for the collection |
@@ -8837,8 +8837,9 @@ chat's id);
   `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
   any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
   notification); Stop needs nothing new (the running → reviewing change already notifies).
-- **Not in Stage 1:** the change budget (§54) and the PreToolUse guard (asks, cards, git and scope checks) do not apply to
-  a terminal chat — the TUI's own permission flow decides. A TUI `/rewind` restores files from the CLI's own history,
+- **Not in Stage 1:** the change budget (§54) and the chat's permission cards (allow patterns, remembered allows, the
+  plan-mode and unprompted rules) do not apply to a terminal chat — the TUI's own permission flow decides, with the guard
+  of §57.8 on top (git and edits the review does not see). A TUI `/rewind` restores files from the CLI's own history,
   outside ReviewGate's snapshots: what it restores shows as the next turn's changes.
 
 ### 57.5 The Mac app: the terminal chat
@@ -8916,8 +8917,9 @@ chat's id);
   Esc / Tab / Backspace and arrows, so ⌥Return during 한 reaches the input method (Hanja), and the input method's reads and
   replacements before the caret work on the cursor row. The marked-text overlay neither blanks the rest of the line
   (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
-- **Not in Stage 1.** The change budget (§54), the guard's ask cards and the per-turn model are not applied to a terminal
-  chat; the TUI's `/rewind` restores files outside ReviewGate's snapshots (the next turn shows them as changed).
+- **Not in Stage 1.** The change budget (§54), the chat's permission cards and the per-turn model are not applied to a
+  terminal chat (the TUI asks itself; the guard of §57.8 makes it ask for git and unseen edits); the TUI's `/rewind`
+  restores files outside ReviewGate's snapshots (the next turn shows them as changed).
 
 ### 57.6 The Mac app: the terminal panel
 
@@ -8937,6 +8939,29 @@ chat's id);
   window keeps 200 pt above); the height is remembered.
 - **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
   with no `-l` / `-i`, so no dotfiles run in a tour.
+
+### 57.8 The guard in a terminal chat: git and edits the review does not see
+
+A terminal chat runs the user's own Claude Code, with its own permission modes and rules — in auto mode it committed on
+its own before the review was accepted. The PreToolUse hook (`Edit|Write|MultiEdit|NotebookEdit|Bash`, `onFailure:
+"block"`, so an engine that is gone blocks) answers with the guard (`session/terminalGuard.ts`) before the turn logic:
+
+| Call | Answer |
+|---|---|
+| Bash whose git throws away uncommitted work or rewrites the remote — §46 `destructiveGitReason`: `reset --hard/--merge`, `clean` (not `-n`), `checkout -f`, `checkout`/`restore` over files under review or uncommitted (`checkout -- .`), `switch -f/--discard-changes`, `branch -D/-M/-C/-f`, `stash drop/clear`, `push --force/-f/--force-with-lease/--mirror/--delete/+ref/:ref`, `worktree remove -f`, `merge/rebase/cherry-pick/revert/am --abort/--skip` over work | `deny`, "ReviewGate blocked this git command: … ask the user in the chat …" — before a turn is opened for it |
+| Bash with any other git command that changes the repository (`commit`, `add`, `push`, `pull`, `merge`, `rebase`, `checkout`/`switch`, `stash`, `tag`, `branch <new>`, `cherry-pick`, `revert`, `am`, `reflog expire/delete`, `fetch --prune`, `git -c …` / `--git-dir` / `--work-tree` before any verb, `gh pr checkout/merge`) | `ask`, "ReviewGate: this git command changes the repository — confirm it (the review of this turn is not accepted yet)" — the TUI's own dialog, in every mode it asks in (auto included: a hook's `ask` shows the dialog there, measured in the M0 spike) |
+| Edit / Write / MultiEdit / NotebookEdit of a file the review does not see — §33.3 `editScopeReason`: outside the project (not a scratch file in the temp folders), in `.git`, in a nested repository, Claude Code's settings files | `ask`, "ReviewGate: <the scope message> Confirm this edit." |
+| In `bypassPermissions` / `dontAsk` (the hook's `permission_mode`) | what would `ask` is `deny` instead ("… in this permission mode Claude Code cannot ask the user …") |
+| Read-only git (`status`, `diff`, `log`, `show`, `branch [--list]`, `rev-parse`, `blame`, `stash list/show`, `remote -v`, `config` reads, … — §19.3's list), `--version`, `help`, `fetch`, `ls-remote`, `reflog [show]`; a plan file; Claude's memory; anything else | nothing (`{}`): the TUI decides |
+
+- The line is read as §46 reads it: `&&` `||` `;` `|` chains, subshells, `bash -c` / `sh -c` / `eval` scripts, a script
+  piped into a shell, `$( … )`, `xargs`, `find -exec`, `env` / `sudo` wrappers, `git -C <dir>`. Text inside `echo`,
+  `grep` or a here-document is not a command.
+- The guard's own failure asks ("ReviewGate could not check this call against the review — confirm it.").
+- `TERMINAL_SYSTEM_APPEND` ends with `TERMINAL_GIT_INSTRUCTION`: run git commands that change the repository only when the
+  user (or a skill they ran) asks — never on your own initiative or to finish a task; the user reviews first; ReviewGate
+  asks to confirm each and blocks what throws work away; if one is declined or blocked, stop and ask.
+- Classic chats are unchanged (§46: git runs as in the terminal once asked; only destructive git gets the card).
 
 ## 58. Accept N & Continue
 

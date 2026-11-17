@@ -16,9 +16,22 @@ export const HOOK_TOKEN_ENV = "RG_HOOK_TOKEN";
 export const HOOK_TOKEN_HEADER = "X-ReviewGate-Token";
 
 /** Appended to Claude's system prompt in a terminal chat. */
+/**
+ * MARK: terminal-guard — §57.8: the git rule of a terminal chat (§46's GIT_INSTRUCTION in this chat's terms: the TUI's own
+ * dialog asks, ReviewGate blocks what throws work away).
+ */
+export const TERMINAL_GIT_INSTRUCTION =
+  "Git: run git commands that change the repository — commit, push, merge, pull, rebase, reset, checkout / switch, stash, " +
+  "cherry-pick, revert, tag, branch changes — only when the user (or a skill they ran) asks you to, never on your own " +
+  "initiative and never just to finish a task: the user reviews and accepts your changes in ReviewGate first. ReviewGate " +
+  "asks the user to confirm each such command here, and blocks those that throw away uncommitted work or rewrite the remote " +
+  "(reset --hard, clean -f, checkout / restore over uncommitted files, branch -D, stash drop / clear, force pushes). If the " +
+  "user declines or ReviewGate blocks one, do not try another way: stop and ask the user.";
+
 export const TERMINAL_SYSTEM_APPEND =
   "Changes you make are reviewed in ReviewGate after each turn. A '[Review gate] …' note in your context lists files the " +
-  "user accepted or rejected; rejected files were reverted on disk — do not redo them unless asked.";
+  "user accepted or rejected; rejected files were reverted on disk — do not redo them unless asked.\n\n" +
+  TERMINAL_GIT_INSTRUCTION;
 
 /** The write tools whose calls start / attribute a review turn. */
 export const TERMINAL_WRITE_TOOLS_MATCHER = "Edit|Write|MultiEdit|NotebookEdit|Bash";

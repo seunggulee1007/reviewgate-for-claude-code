@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TerminalSpecEvent } from "../src/protocol.js";
 import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
+import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { fileExists, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -227,6 +228,37 @@ describe("terminal chats (§57)", () => {
     const managed = await rig({ managed: { settings: { allowManagedHooksOnly: true }, sources: [{ kind: "file", path: "/etc/example/managed-settings.json" }], failed: null } });
     const mId = await newTerminal(managed);
     expect(await refusal(managed.h, { type: "terminal_spec", sessionId: mId })).toMatchObject({ ok: false, code: "terminal_hooks_disabled", error: "terminal_hooks_disabled:allowManagedHooksOnly" });
+  });
+
+  it("§57.8 the guard: git that changes the repository asks, git that throws work away is denied, an outside edit asks", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await r.h.engine.handle({ type: "terminal_started", sessionId: id, pid: 4343 });
+    await hook(s, ups("p1", "fix the README"));
+    const pre = (tool_name: string, tool_input: Record<string, unknown>, permission_mode = "auto") =>
+      hook(s, { hook_event_name: "PreToolUse", tool_name, tool_input, tool_use_id: `t${Math.random()}`, prompt_id: "p1", permission_mode });
+    const answer = (decision: string, reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: decision, permissionDecisionReason: reason } });
+    // The incident: auto mode, `git commit` before the review was accepted — the TUI must ask.
+    expect(await pre("Bash", { command: "git add -A && git commit -m 'feat: done'" })).toEqual(answer("ask", TERMINAL_GIT_ASK_REASON));
+    expect(await pre("Bash", { command: "git push origin main" }, "bypassPermissions")).toEqual(answer("deny", TERMINAL_GIT_NO_ASK_REASON));
+    write(r.dir, "README.md", "edited\n");
+    expect(await pre("Bash", { command: "git reset --hard" })).toEqual(answer("deny", TERMINAL_GIT_DENY_REASON));
+    expect(await pre("Bash", { command: "git status && git diff" })).toEqual({});
+    // Another repository (a clone in the temp folder is real work, not a scratch file).
+    const other = temp("rg-term-outside");
+    sh(other, "init", "-q");
+    const outside = join(other, "notes.md");
+    expect((await pre("Write", { file_path: outside, content: "x" })).hookSpecificOutput).toMatchObject({ permissionDecision: "ask" });
+    expect(await pre("Write", { file_path: join(r.dir, "inside.md"), content: "x" })).toEqual({});
+    // A denied git command before any prompt starts no turn.
+    await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
+    await r.h.waitFor((st) => st.gate.phase !== "running", "turn over");
+    const phase = r.h.engine.state.gate.phase;
+    expect(await pre("Bash", { command: "git clean -fdx" })).toEqual(answer("deny", TERMINAL_GIT_DENY_REASON));
+    await new Promise((res) => setTimeout(res, 200));
+    expect(r.h.engine.state.gate.phase).toBe(phase);
+    expect(phase).not.toBe("running");
   });
 
   it("terminal_exited ends the open turn and collects it", async () => {

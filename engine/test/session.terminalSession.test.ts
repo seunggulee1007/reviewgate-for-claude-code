@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
@@ -131,7 +131,8 @@ describe("TerminalSession", () => {
   it("a write tool with no turn open starts one through auto_turn_start; refused → deny", async () => {
     const r = rig();
     const pending = r.hook(pre("Write", { file_path: "x.txt", content: "x" }, "t1"));
-    await new Promise((res) => setTimeout(res, 10));
+    // §57.8: the guard reads the repository's root once before the turn is asked for.
+    await vi.waitFor(() => expect(r.of("auto_turn_start")).toHaveLength(1));
     expect(r.of("auto_turn_start")).toEqual([{ type: "auto_turn_start", trigger: "continue", commandUuid: "p1" }]);
     // A second call meanwhile waits on the same answer.
     const second = r.hook(pre("Edit", { file_path: "y.txt" }, "t2"));
@@ -316,7 +317,7 @@ describe("TerminalSession", () => {
     r.ts.setToken("tok-1", (t) => retired.push(t));
     const prompt = r.hook(ups("p1"));
     const adopt = r.hook(pre("Write", { file_path: "a" }, "t1"));
-    await new Promise((res) => setTimeout(res, 10));
+    await vi.waitFor(() => expect(r.of("auto_turn_start")).toHaveLength(1)); // §57.8: past the guard
     const n = r.events.length;
     await r.ts.dispose();
     expect(await prompt).toEqual({ decision: "block", reason: RETIRED_REASON });

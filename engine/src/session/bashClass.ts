@@ -608,6 +608,22 @@ function inRepository(dir: string, ctx: ReadOnlyContext): boolean {
   return !ctx.foreignDir?.(dir);
 }
 
+/**
+ * MARK: terminal-guard — §57.8: a git command already split by `gitInvocations` (`-C` applied, `globals` = the options
+ * before the verb with their values) changes nothing: safe global options only (`-C` aside: its folder is the caller's
+ * concern) and a read-only verb with read-only options — the same verbs and options `isReadOnlyCommand` takes.
+ */
+export function gitWordsAreReadOnly(globals: readonly string[], verb: string, args: readonly string[]): boolean {
+  for (let k = 0; k < globals.length; k++) {
+    if (globals[k] === "-C") {
+      k++;
+      continue;
+    }
+    if (!GIT_SAFE_GLOBALS.has(globals[k]!)) return false;
+  }
+  return GIT_READ_ONLY_VERBS.has(verb) && gitVerbIsReadOnly(verb, [...args]);
+}
+
 /** `git [global options] verb …` with read-only options and verb; `-C <dir>` only with a context, into the repository. */
 function gitIsReadOnly(args: Word[], run: RunEnv | undefined): boolean {
   let i = 0;
