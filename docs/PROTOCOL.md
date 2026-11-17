@@ -9021,6 +9021,40 @@ its own before the review was accepted. The PreToolUse hook (`Edit|Write|MultiEd
   asks to confirm each and blocks what throws work away; if one is declined or blocked, stop and ask.
 - Classic chats are unchanged (§46: git runs as in the terminal once asked; only destructive git gets the card).
 
+### 57.9 Continue a chat as a terminal chat
+
+Now that a new chat is a terminal chat, a chat's Claude conversation must not be stranded in the chat UI: "Continue as
+Terminal Chat" carries it into a new terminal chat (the real TUI resumes it). Mac only.
+
+```ts
+session_continue_terminal { sessionId }   // reply: result; the new terminal chat is the current one (state, transcript_restore)
+// SessionMeta gains:
+  continuedFrom?: string;   // a terminal chat made by it: the chat whose conversation it carries on
+  continuedIn?: string;     // that chat: the terminal chat its conversation goes on in — it is a record from now on
+```
+
+- **Refused** (`CommandRefused("<code>:<detail>", {code})`): `terminal_unsupported` (a client other than mac / test — the
+  desktop client's IPC guard does not list it either), `session_busy` / `collect_failed` (as a switch, §9), `not_a_chat`
+  (a terminal chat), `chat_is_record` (`resumeFailed`, `movedTo` or already `continuedIn`), `nothing_to_continue` (the CLI
+  has no conversation of it yet: not `cliKnown`, not confirmed, no record file), `review_pending` (files wait in the
+  review — accepted or rejected first, so nothing pending is dropped and the terminal chat's review starts from its own
+  first prompt's snapshot A), `unknown_session`.
+- **What happens.** The chat's CLI stops first — a parked one (§9.1) is disposed, the live one stopped, never parked: two
+  processes on one conversation conflict ("already in use"). A new terminal chat is made with `cliSessionId` = the chat's
+  id (a UUID — the id `terminal_spec` puts into `--resume=<id>`), `cliKnown`, `continuedFrom`, and the chat's title +
+  " (터미널)"; the chat gets `continuedIn`. The engine switches to the new chat as `session_new` does (its turns and
+  rows start empty: the earlier turns and their review history stay the chat's) and the app's PTY resumes the
+  conversation in the TUI.
+- **The record.** A chat with `continuedIn` opens like a moved chat (§39.4): its rows show, its CLI starts fresh under a
+  record id (never `--resume` of the conversation the terminal chat now runs), and it cannot be continued or moved
+  again. Its review history is untouched.
+- **The Mac app.** "Continue as Terminal Chat" (터미널 채팅으로 이어가기) in a chat tab's right-click menu and the tabs' ⋯
+  menu (next to "Continue in terminal", which copies a command for Terminal.app and stays), and Chat › Continue as Terminal
+  Chat for the chat on screen; none for a terminal chat. Off with the reason as the item's second line / tooltip
+  (`continueAsTerminalBlocker`): a record, no conversation yet, files waiting in the review, Claude working. Over the
+  record a teal bar: "이 대화는 터미널 채팅 '<title>'에서 이어져요 — 이 채팅은 기록으로 남아요" with [열기] (opens the terminal
+  chat). A refusal is a non-fatal row in those words.
+
 ## 58. Accept N & Continue
 
 After a turn its changes wait in the review, and accepting them tells Claude nothing until the next message (the engine

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TerminalSpecEvent } from "../src/protocol.js";
 import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
+import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
 import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
@@ -259,6 +260,59 @@ describe("terminal chats (§57)", () => {
     await new Promise((res) => setTimeout(res, 200));
     expect(r.h.engine.state.gate.phase).toBe(phase);
     expect(phase).not.toBe("running");
+  });
+
+  it("§57.9 session_continue_terminal: a chat's conversation goes on in a new terminal chat; the chat stays a record", async () => {
+    const r = await rig();
+    const chatId = r.h.engine.state.sessions.currentId!;
+    // Refused before the chat has a conversation of the CLI's.
+    expect(await refusal(r.h, { type: "session_continue_terminal", sessionId: chatId })).toMatchObject({ ok: false, code: "nothing_to_continue" });
+    // One turn: the CLI reports the chat's id.
+    const classic = r.h.session();
+    await r.h.engine.handle({ type: "send", text: "hello" });
+    classic.emitTurnEnd({ sessionId: chatId });
+    await r.h.waitFor((st) => st.gate.phase !== "running" && st.gate.phase !== "collecting", "turn over");
+    // A file waiting in the review: refused (accept or reject it first).
+    const turn2 = r.h.session();
+    await r.h.engine.handle({ type: "send", text: "write a note" });
+    write(r.dir, "pending.txt", "x\n");
+    turn2.emitTurnEnd({ sessionId: chatId, toolFiles: [{ path: "pending.txt", tools: ["Write"], count: 1 }] });
+    await r.h.waitFor((st) => st.changedFiles.some((f) => f.path === "pending.txt"), "a pending file");
+    expect(await refusal(r.h, { type: "session_continue_terminal", sessionId: chatId })).toMatchObject({ ok: false, code: "review_pending" });
+    await r.h.engine.handle({ type: "accept", paths: ["pending.txt"] });
+    await r.h.waitFor((st) => !st.changedFiles.some((f) => f.path === "pending.txt" && f.state === "pending"), "accepted");
+
+    expect(await refusal(r.h, { type: "session_continue_terminal", sessionId: chatId })).toMatchObject({ ok: true });
+    const st = await r.h.waitFor((x) => x.session.terminal !== undefined && x.sessions.currentId !== chatId, "the terminal chat");
+    const id = st.sessions.currentId!;
+    const meta = st.sessions.list.find((m) => m.id === id)!;
+    const src = st.sessions.list.find((m) => m.id === chatId)!;
+    expect(meta).toMatchObject({ kind: "terminal", cliSessionId: chatId, continuedFrom: chatId, cliKnown: true });
+    expect(meta.title.endsWith(CONTINUED_TITLE_SUFFIX)).toBe(true);
+    expect(src.continuedIn).toBe(id);
+    expect(classic.disposed && turn2.disposed).toBe(true); // its CLI stopped first (two processes on one conversation conflict)
+    // The terminal resumes the chat's conversation; its first review turn starts at its own first prompt.
+    const s = await spec(r, id);
+    expect(s.resume).toBe(true);
+    expect(s.argv[1]).toBe(`--resume=${chatId}`);
+    expect(r.h.engine.state.gate.phase === "idle" || r.h.engine.state.changedFiles.every((f) => f.state !== "pending")).toBe(true);
+
+    // The chat is a record now: opening it never resumes its conversation; continuing it again is refused.
+    expect(await refusal(r.h, { type: "session_continue_terminal", sessionId: chatId })).toMatchObject({ ok: false, code: "chat_is_record" });
+    expect(await refusal(r.h, { type: "session_continue_terminal", sessionId: id })).toMatchObject({ ok: false, code: "not_a_chat" });
+    await r.h.engine.handle({ type: "session_open", sessionId: chatId });
+    await r.h.waitFor((x) => x.sessions.currentId === chatId && x.session.open, "the record");
+    expect(r.h.session().opts.settings.resumeSessionId).toBeUndefined();
+    // Reloaded from disk, the link stays.
+    await r.h.engine.dispose();
+    const again = await rig({ dir: r.dir, config: r.config });
+    const list = again.h.engine.state.sessions.list;
+    expect(list.find((m) => m.id === chatId)?.continuedIn).toBe(id);
+    expect(list.find((m) => m.id === id)?.continuedFrom).toBe(chatId);
+
+    // Windows has no terminal chat.
+    const win = await rig({ client: "windows" });
+    expect(await refusal(win.h, { type: "session_continue_terminal", sessionId: win.h.engine.state.sessions.currentId! })).toMatchObject({ ok: false, code: "terminal_unsupported" });
   });
 
   it("terminal_exited ends the open turn and collects it", async () => {

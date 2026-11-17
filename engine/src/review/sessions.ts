@@ -75,6 +75,8 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...(typeof o.planFile === "string" && o.planFile ? { planFile: o.planFile } : {}), // MARK: wave4d w4d-plan (§42.1)
     ...(o.kind === "terminal" ? { kind: "terminal" as const } : {}), // §57: "chat" (the default) is never written
     ...(isCliSessionId(o.cliSessionId) ? { cliSessionId: o.cliSessionId } : {}), // §57.2: a UUID or nothing (it goes into argv)
+    ...(typeof o.continuedFrom === "string" && o.continuedFrom ? { continuedFrom: o.continuedFrom } : {}), // §57.9
+    ...(typeof o.continuedIn === "string" && o.continuedIn ? { continuedIn: o.continuedIn } : {}),
   };
 }
 

@@ -692,6 +692,11 @@ export type EngineCommand =
   | Cmd<"refresh", { scope?: RefreshScope[] }>
   | Cmd<"session_list">
   | Cmd<"session_new", { kind?: SessionKind }>
+  /**
+   * MARK: terminal-continue — §57.9: carries chat `sessionId`'s Claude conversation into a new terminal chat (Mac only): its
+   * CLI stops, the new chat resumes that conversation in the TUI and becomes the current one; the chat stays as a record.
+   */
+  | Cmd<"session_continue_terminal", { sessionId: string }>
   // `sessionId`, not `id`: `id` is the reply-correlation field of every command.
   | Cmd<"session_open", { sessionId: string }>
   | Cmd<"session_rename", { sessionId: string; title: string }>
@@ -1419,6 +1424,11 @@ export type SessionMeta = {
   kind?: SessionKind;
   /** §57: the CLI conversation the terminal last ran when it differs from `id` (`/clear` or `/resume` inside the TUI); `terminal_spec` resumes this one. */
   cliSessionId?: string;
+  // MARK: terminal-continue — §57.9
+  /** A terminal chat made by `session_continue_terminal`: the chat whose conversation it carries on. */
+  continuedFrom?: string;
+  /** A chat whose conversation goes on in that terminal chat (`session_continue_terminal`): it stays as a record. */
+  continuedIn?: string;
 };
 
 export type SessionsState = {

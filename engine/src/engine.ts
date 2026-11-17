@@ -262,7 +262,7 @@ import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffor
 // MARK: terminal-chat (§57)
 import { HookServer, RETIRED_REASON } from "./session/hookServer.js";
 import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js";
-import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
+import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
 import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
@@ -365,6 +365,8 @@ export const MAX_MENTIONS = 20;
 export const MAX_COMPACT_FOCUS = 2000;
 /** Suffix of the chat a conversation rewind left behind (§26). */
 export const REWOUND_TITLE_SUFFIX = " (되돌리기 전)";
+/** MARK: terminal-continue — §57.9: the title of a terminal chat that carries a chat's conversation on. */
+export const CONTINUED_TITLE_SUFFIX = " (터미널)";
 
 /** What `send` takes besides the text (§23, §24, §27). */
 type SendOptions = { mentions?: { path: string; kind: "file" | "dir" }[]; images?: PreparedImage[]; command?: boolean; /** MARK: wave5 w5-model — §43.4: this message's own model (null = the CLI's default). */ model?: string | null };
@@ -1380,6 +1382,9 @@ export class ReviewEngine {
       case "session_new":
         await this.sessionNew(cmd.kind);
         return;
+      case "session_continue_terminal": // MARK: terminal-continue (§57.9)
+        await this.sessionContinueTerminal(cmd.sessionId);
+        return;
       // MARK: terminal-chat (§57)
       case "terminal_spec":
         return this.terminalSpec(cmd.sessionId);
@@ -2243,7 +2248,7 @@ export class ReviewEngine {
     await this.checkConcurrent("open");
     // MARK: wave2 check-engine — §35.4: a record is never resumed again (the CLI has no conversation for it).
     // MARK: wave4b w4b-follow — §39.4: a chat handed to another worktree is a record here (its conversation goes on there).
-    if (current?.resumeFailed === true || current?.movedTo !== undefined) await this.startSession(path, null, this.recordOnlyId());
+    if (current?.resumeFailed === true || current?.movedTo !== undefined || current?.continuedIn !== undefined) await this.startSession(path, null, this.recordOnlyId());
     else if (current && this.isResumable(current)) await this.startSession(path, current.id);
     else await this.startSession(path, null, current?.id ?? null);
     this.afterReceived(); // MARK: wave4b w4b-follow — §39.4 (nothing awaited after the start)
@@ -2403,6 +2408,43 @@ export class ReviewEngine {
     await this.switchSession(this.sessions!.create(undefined, undefined, terminal ? "terminal" : undefined), false);
   }
 
+  /**
+   * MARK: terminal-continue — §57.9: chat `sessionId`'s conversation goes on in a new terminal chat. Refused like a switch
+   * (`session_busy`, `collect_failed`), for a client without terminal chats (`terminal_unsupported`), a terminal chat
+   * (`not_a_chat`), a record (`chat_is_record`), a chat the CLI has no conversation of yet (`nothing_to_continue`) and while
+   * files wait in the review (`review_pending` — accept or reject them first: the new chat's review starts from its own
+   * first prompt). The chat's CLI — live or parked — stops first (two processes on one conversation conflict), the new chat
+   * resumes it (`cliSessionId`), and the chat stays as a record that names it (`continuedIn`).
+   */
+  private async sessionContinueTerminal(sessionId: unknown): Promise<void> {
+    if (!this.terminalClient()) throw new CommandRefused(`terminal_unsupported:${this.lockOwner.client}`, { code: "terminal_unsupported" });
+    this.guardSessionSwitch();
+    if (typeof sessionId !== "string" || !sessionId) throw new CommandRefused("unknown_session");
+    const src = this.requireSession(sessionId);
+    if (src.kind === "terminal") throw new CommandRefused(`not_a_chat:${src.id}`, { code: "not_a_chat" });
+    if (src.resumeFailed === true || src.movedTo !== undefined || src.continuedIn !== undefined) {
+      throw new CommandRefused(`chat_is_record:${src.id}`, { code: "chat_is_record" });
+    }
+    const known = src.cliKnown === true || this.confirmedSessionIds.has(src.id) || this.cliHasRecord(src.id);
+    if (!isCliSessionId(src.id) || !known) throw new CommandRefused(`nothing_to_continue:${src.id}`, { code: "nothing_to_continue" });
+    if (this.pathsUnderReview().size > 0) throw new CommandRefused("review_pending");
+    const idx = this.sessions!;
+    // Its CLI goes first: a parked one, or the live one (a switch would park it).
+    const parked = this.takeParked(src.id);
+    if (parked) await this.disposeParked(parked, "its conversation continues in a terminal chat");
+    if (this.currentSessionId === src.id) await this.stopSession();
+    await this.parkedGoing.get(src.id);
+    const meta = idx.create(undefined, undefined, "terminal");
+    meta.title = `${src.title}${CONTINUED_TITLE_SUFFIX}`;
+    meta.cliSessionId = src.id;
+    meta.cliKnown = true;
+    meta.continuedFrom = src.id;
+    src.continuedIn = meta.id;
+    this.log("info", `continuing chat ${src.id} in terminal chat ${meta.id}`);
+    await this.switchSession(meta, true);
+    this.persistSessions();
+  }
+
   private async sessionOpen(id: string): Promise<void> {
     this.guardSessionSwitch();
     const meta = this.requireSession(id);
@@ -2440,12 +2482,13 @@ export class ReviewEngine {
     this.touch();
     this.emit(this.restoreEvent()); // MARK: wave4 w4-history — §38.3 (+ start / sessionId)
     // r2-chats-cards M33 (§9.1): the chat's own idle CLI, started the way a new one would be — no restart.
-    if (back && meta.resumeFailed !== true && meta.movedTo === undefined && back.key === this.launchKey()) return this.unpark(back);
+    if (back && meta.resumeFailed !== true && meta.movedTo === undefined && meta.continuedIn === undefined && back.key === this.launchKey()) return this.unpark(back);
     if (back) void this.disposeParked(back, "its start changed");
     await this.parkedGoing.get(meta.id); // its parked CLI is gone before a new one resumes the same conversation
     // MARK: wave2 check-engine — §35.4: a record shows its rows; the CLI starts fresh for whatever comes next.
     // MARK: wave4b w4b-follow — §39.4: a chat handed to another worktree opens as a record here.
-    if (meta.resumeFailed === true || meta.movedTo !== undefined) await this.startSession(project.path, null, this.recordOnlyId());
+    // MARK: terminal-continue — §57.9: a chat continued in a terminal chat is a record too.
+    if (meta.resumeFailed === true || meta.movedTo !== undefined || meta.continuedIn !== undefined) await this.startSession(project.path, null, this.recordOnlyId());
     else if (resume) await this.startSession(project.path, meta.id);
     else await this.startSession(project.path, null, meta.id);
   }
@@ -2768,7 +2811,7 @@ export class ReviewEngine {
   /** MARK: wave3 check-engine — §37.4: the open chat is a record (`resumeFailed`): the CLI no longer has its conversation. */
   private openChatIsRecord(): boolean {
     const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
-    return meta?.resumeFailed === true || meta?.movedTo !== undefined; // MARK: wave4b w4b-follow (§39.4)
+    return meta?.resumeFailed === true || meta?.movedTo !== undefined || meta?.continuedIn !== undefined; // MARK: wave4b w4b-follow (§39.4), §57.9
   }
 
   /** The id the fresh CLI of the open record starts with — the same across restarts until a turn makes it a chat. */
@@ -8802,6 +8845,7 @@ function peerFlag(mode: PeerInboundMode): "hold" | "refuse" {
 const STATUS_LINE_COMMANDS: ReadonlySet<EngineCommand["type"]> = new Set<EngineCommand["type"]>([
   "open_project", "switch_project", "close_project", "restart_session", "session_new", "session_open", "send", "set_model",
   "set_permission_mode", "plan_response", "rewind", "compact", "chat_move", "chat_receive", "cli_session_import",
+  "session_continue_terminal",
 ]);
 
 /** MARK: wave7 w7-state — §45.2: two HUD activity lines say the same. */
@@ -8990,6 +9034,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "plan_follow": // MARK: wave4d w4d-plan (§42.1)
     case "restart_session":
     case "session_new":
+    case "session_continue_terminal": // §57.9
     case "session_open":
     case "peer_accept":
     case "peer_dismiss":
