@@ -424,6 +424,22 @@ public final class SideThreadStore {
         return queued
     }
 
+    /// MARK: terminal-default — §57.7: [메인 대화로 보내기] in a terminal chat (nothing sends into its TUI): the request is
+    /// pasted into its Claude Code's prompt, without Enter. Returns why it could not (nil: pasted, or nothing to paste).
+    @discardableResult
+    public func pasteToTerminal(_ key: String) -> String? {
+        guard let app, let request = mainOnlyRequest(key) else { return nil }
+        if let why = app.pasteIntoTerminal(request.text) { return why }
+        mainOnly[key] = nil
+        errors[key] = nil
+        if key.isEmpty {
+            composeDraft = ""
+            isComposing = false
+            composeAnchor = nil
+        }
+        return nil
+    }
+
     public func cancel(_ threadId: String) async {
         guard let app else { return }
         do { _ = try await app.reply(.sideCancel(threadId: threadId)) } catch { errors[threadId] = refusalText(error) }

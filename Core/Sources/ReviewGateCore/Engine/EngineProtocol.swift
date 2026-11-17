@@ -370,6 +370,9 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     /// repository) the user allowed for this project: it runs only while its command hashes to this ("" none; per
     /// project, sent before each `open_project` as `loadLocalSettings`; live).
     public var allowedProjectStatusLine: String?
+    // MARK: terminal-default
+    /// §57.7: the kind of the chat the engine makes by itself when a project has none (its first open); live.
+    public var newChatKind: SessionKind?
 
     public init(budget: Budget? = nil, ignorePatterns: [String]? = nil, autoAllowTools: [String]? = nil,
                 loadUserSettings: Bool? = nil, systemPromptAppend: String? = nil, claudePath: String? = nil,

@@ -289,6 +289,7 @@ public enum AppSettings {
         settings.showStatusLine = showStatusLine(defaults: defaults)
         // Per project: the project's own command is allowed with its settings before each open_project (projectSessionSettings).
         settings.allowedProjectStatusLine = ""
+        settings.newChatKind = newChatKind(defaults: defaults)   // MARK: terminal-default (§57.7, NewChatKind.swift)
         return settings
     }
 

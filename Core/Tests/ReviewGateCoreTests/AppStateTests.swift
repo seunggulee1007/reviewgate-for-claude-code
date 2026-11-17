@@ -178,7 +178,7 @@ import Testing
         app.handle(.transcriptRestore(items: [TranscriptItem(at: "t", turn: 0, kind: .userMessage(text: "earlier"))]))
         #expect(app.transcript.count == 3)
         // `session_new` → empty restore clears everything.
-        #expect(await app.newChat())
+        #expect(await app.newClassicChat())
         #expect(sent.last == .sessionNew)
         app.handle(.transcriptRestore(items: []))
         #expect(app.transcript.isEmpty && app.restoredTranscriptIDs.isEmpty)

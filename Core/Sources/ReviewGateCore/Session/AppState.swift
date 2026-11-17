@@ -186,6 +186,9 @@ public final class AppState {
     @ObservationIgnored public var onTerminalRestart: (@MainActor () -> Void)?
     /// The terminal wait last raised as attention (`terminalSnapshotApplied`), so each wait is raised once.
     @ObservationIgnored var lastTerminalWaitingKey: String?
+    /// MARK: terminal-default — §57.7 "Paste into the terminal": the App pastes the text into the live terminal chat's
+    /// PTY (bracketed, never followed by Enter) and gives it the keyboard; returns why it could not (nil: pasted).
+    @ObservationIgnored public var onTerminalPaste: (@MainActor (String) -> String?)?
     // MARK: wave1 mac-session
     /// M7: the message the last `send` carried and when — back to the front of the queue when the engine fails it.
     @ObservationIgnored var recentSend: (message: QueuedMessage, at: Date)?
@@ -1644,10 +1647,23 @@ public final class AppState {
 
     // MARK: - Chat sessions
 
-    /// `session_new`: stops the current Claude session and starts a fresh one; the transcript is cleared by the
-    /// engine's `transcript_restore {items: []}`. Returns false on refusal (`chatSwitchBlocker` / `lastError`).
+    /// ⌘T / [+] / 새 채팅: a fresh chat of the kind Settings › "새 채팅 종류" names (`defaultChatKind`; §57.7).
     @discardableResult
     public func newChat() async -> Bool {
+        await newChat(kind: defaultChatKind)
+    }
+
+    /// A fresh chat of `kind`: a terminal chat (`newTerminalChat`), or a chat (`newClassicChat`).
+    @discardableResult
+    public func newChat(kind: SessionKind) async -> Bool {
+        kind == .terminal ? await newTerminalChat() : await newClassicChat()
+    }
+
+    /// `session_new`: stops the current Claude session and starts a fresh one; the transcript is cleared by the
+    /// engine's `transcript_restore {items: []}`. Returns false on refusal (`chatSwitchBlocker` / `lastError`).
+    /// §57.7: always the app's chat UI, whatever the default kind ("새 채팅 (채팅 UI)").
+    @discardableResult
+    public func newClassicChat() async -> Bool {
         guard projectInfo != nil else { return false }
         // r2-chats-cards M31 (§9): while Claude works the new chat waits for the turn (and the queue) instead of a refusal.
         if newChatBlocker == nil, chatSwitchWaits {

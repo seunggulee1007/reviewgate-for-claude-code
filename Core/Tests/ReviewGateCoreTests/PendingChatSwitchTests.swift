@@ -53,7 +53,7 @@ import Testing
         app.commandSink = { fired.append($0) }
         app.handle(.state(snapshot(seq: 1, phase: .running)))
         #expect(app.newChatBlocker == nil && app.chatSwitchWaits)
-        #expect(await app.newChat())
+        #expect(await app.newClassicChat())
         #expect(app.pendingChatSwitch == .newChat)
         #expect(app.pendingChatSwitchText == String(localized: "A new chat opens once Claude is done in '\("Mapper fix")'", bundle: .module))
         #expect(opens(fired) == 0)
@@ -73,7 +73,7 @@ import Testing
         app.commandSink = { fired.append($0) }
         app.handle(.state(snapshot(seq: 1, phase: .running)))
         app.enqueue("then run the tests")
-        #expect(await app.newChat())
+        #expect(await app.newClassicChat())
         app.handle(.state(snapshot(seq: 2, phase: .idle)))
         await eventually { sent(fired, "then run the tests") }
         await settle()
@@ -161,7 +161,7 @@ import Testing
         await app.viewChat(id: "s2")
         #expect(await app.sendInViewedChat("first", mentions: ["src/cart.ts"]))
         #expect(await app.sendInViewedChat("then this", mentions: ["src/pricing.ts"]))
-        #expect(await app.newChat())   // the last one wins — what was held for 'Yesterday' goes back to the composer
+        #expect(await app.newClassicChat())   // the last one wins — what was held for 'Yesterday' goes back to the composer
         #expect(app.pendingChatSwitch == .newChat)
         #expect(app.taskForComposer?.text == "first\n\nthen this")
         #expect(app.taskForComposer?.mentions == ["src/cart.ts", "src/pricing.ts"])
@@ -172,14 +172,14 @@ import Testing
         var fired: [EngineCommand] = []
         app.commandSink = { fired.append($0) }
         app.handle(.state(snapshot(seq: 1, phase: .running)))
-        #expect(await app.newChat())
+        #expect(await app.newClassicChat())
         app.handle(.state(snapshot(seq: 2, phase: .collectFailed, collectError: "git add -A failed")))
         await eventually { app.pendingChatSwitch == nil }
         await settle()
         #expect(app.pendingChatSwitch == nil && opens(fired) == 0)
         #expect(app.newChatBlocker == AppState.sessionRefusalText("collect_failed"))
         // ⌘T now is never held: the engine answers it (collect_failed) and the button says why beforehand.
-        _ = await app.newChat()
+        _ = await app.newClassicChat()
         #expect(app.pendingChatSwitch == nil)
     }
 }

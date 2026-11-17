@@ -17746,6 +17746,70 @@
           }
         }
       }
+    },
+    "The chat on screen is not a live terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The chat on screen is not a live terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "화면의 채팅이 지금 실행 중인 터미널 채팅이 아니에요"
+          }
+        }
+      }
+    },
+    "Claude Code is not running in this terminal — restart it first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code is not running in this terminal — restart it first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 터미널에서 Claude Code가 실행 중이 아니에요 — 먼저 다시 시작하세요"
+          }
+        }
+      }
+    },
+    "Claude Code is not ready for a paste yet — try again once its prompt shows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code is not ready for a paste yet — try again once its prompt shows"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 아직 붙여넣기를 받을 준비가 안 됐어요 — 입력란이 보이면 다시 해 보세요"
+          }
+        }
+      }
+    },
+    "Pasted into the terminal — press Return there to send it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pasted into the terminal — press Return there to send it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널에 붙여넣었어요 — 보내려면 터미널에서 Return을 누르세요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
