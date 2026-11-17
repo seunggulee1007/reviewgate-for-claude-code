@@ -72,6 +72,19 @@ describe("§49 workbench_create {task}", () => {
     expect(again.ofType("task_started")).toHaveLength(0);
   });
 
+  it("§57.7: with new chats opening as terminals, the task's fresh chat is still a chat — ReviewGate sends the task", async () => {
+    const { h } = await opened();
+    await h.engine.request({ type: "workbench_create", branch: "task/57", task: { text: TASK } });
+    const wt = h.engine.state.workbenches.list.find((w) => w.branch === "task/57")!.path;
+    const t = harness();
+    await t.hello({ newChatKind: "terminal" });
+    await t.open(wt);
+    await t.waitFor(() => t.session().sends.length === 1, "the task's first message");
+    const st = t.engine.state;
+    expect(st.sessions.list.find((m) => m.id === st.sessions.currentId)?.kind).toBeUndefined();
+    expect(st.session.terminal).toBeUndefined();
+  });
+
   it("without a mode the fresh chat starts in the worktree's default", async () => {
     const { h } = await opened();
     await h.engine.request({ type: "workbench_create", branch: "task/plain", task: { text: "Fix the typo in README" } });
