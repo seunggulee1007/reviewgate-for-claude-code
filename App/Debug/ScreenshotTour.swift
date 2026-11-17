@@ -2818,6 +2818,16 @@ private final class Tour {
         let hub = entry.model.terminals
         let demo = store.projectURL?.path ?? ""
         let size = { (h: TerminalHost) in "\(Int(h.view.frame.width))×\(Int(h.view.frame.height)) pt, \(h.view.terminalDimensions.cols)×\(h.view.terminalDimensions.rows) cells" }
+        // §57.5: where the review panel is — the drawer on the terminal's left, under the chat tabs; side by side, the order
+        // file list | diff | terminal (the terminal's x in the window, the panel's and the tabs' in SwiftUI's global space).
+        let placement = { [model = entry.model] (h: TerminalHost) -> (left: Bool, belowTabs: Bool, order: Bool, text: String) in
+            let review = model.debugReviewFrame, tabs = model.debugTerminalHeaderFrame
+            let terminalX = h.view.convert(h.view.bounds, to: nil).minX
+            let left = review.width > 0 && abs(review.minX - tabs.minX) < 2 && review.maxX < tabs.maxX
+            let belowTabs = review.height > 0 && review.minY >= tabs.maxY - 0.5
+            let order = review.width > 0 && review.minX > 100 && review.maxX <= terminalX + 2 && abs(tabs.minX - terminalX) < 2
+            return (left, belowTabs, order, "panel x \(Int(review.minX))–\(Int(review.maxX)) y \(Int(review.minY)), tabs x \(Int(tabs.minX)) bottom \(Int(tabs.maxY)), terminal x \(Int(terminalX))")
+        }
 
         // 0. §57.7: with no choice saved, a fresh project's first chat is a terminal chat, and so is ⌘T's.
         let firstKind = store.currentChatKind
@@ -2869,6 +2879,9 @@ private final class Tour {
         log("terminal: layout review — SIGWINCH ×\(signals) for the drawer opening " + (signals == 0 ? "(no reflow)" : "— JUMP (the TUI redrew)"))
         log("terminal: layout review — the terminal " + (!focusedBefore ? "INFO had no keyboard before (\(String(describing: window.firstResponder)))"
                                                           : host.isFocused ? "kept the keyboard" : "— LOST (the keyboard went to \(String(describing: window.firstResponder)))"))
+        let drawerAt = placement(host)
+        log("terminal: layout drawer place — " + (drawerAt.left && drawerAt.belowTabs
+            ? "on the terminal's left, under the chat tabs (\(drawerAt.text))" : "— LOST (left \(drawerAt.left), under the tabs \(drawerAt.belowTabs): \(drawerAt.text))"))
         await ptyFollows(host, "review drawer open")
         try write(try render(window), "terminal-chat-review-dark")
 
@@ -2891,6 +2904,9 @@ private final class Tour {
         let sideCols = host.view.terminalDimensions.cols
         log("terminal: layout 1440 × 900 — " + (model.terminalReviewLayout == .sideBySide && sideCols >= 80
             ? "side by side, chat view \(size(host))" : "— CUT (layout \(model.terminalReviewLayout), \(size(host)))"))
+        let sideAt = placement(host)
+        log("terminal: layout side-by-side order — " + (sideAt.order
+            ? "file list | diff | terminal (\(sideAt.text))" : "— LOST (\(sideAt.text))"))
         await ptyFollows(host, "side by side at 1440 × 900")
         try write(try render(window), "terminal-chat-side-by-side-dark")
         var splitCols: [Int] = []
