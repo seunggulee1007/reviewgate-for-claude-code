@@ -67,7 +67,7 @@ export function WorkbenchSetupSection(props: {
       {preview && files.length === 0 && (
         <div className="flow-help">
           {setup.copy.length === 0 && setup.useWorktreeInclude
-            ? t("Untracked or ignored files (mvnw, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.")
+            ? t("Untracked or ignored files (.env, local config…) are copied when they match the patterns of Workbench setup or .worktreeinclude.")
             : t("Nothing in this worktree matches the patterns of Workbench setup.")}
         </div>
       )}
@@ -174,13 +174,13 @@ export function WorkbenchSetupEditor() {
         className="mono"
         value={patterns}
         disabled={off}
-        placeholder={"mvnw\n.mvn/**"}
+        placeholder={".env\nconfig/local/*.yml"}
         aria-label={t("Files to copy")}
         onChange={(e) => setPatterns(e.target.value)}
         onBlur={commitText}
         data-testid="Workbench copy patterns"
       />
-      <div className="flow-help">{t("One pattern per line (mvnw, .mvn/**, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.")}</div>
+      <div className="flow-help">{t("One pattern per line (.env, .env.*, config/local/*.yml). Only untracked or ignored files of this worktree are copied — never a tracked file or .git.")}</div>
       <label className="check">
         <input type="checkbox" checked={setup.useWorktreeInclude} disabled={off} onChange={(e) => save({ useWorktreeInclude: e.target.checked })} data-testid="Workbench use worktreeinclude" />
         {t("Also copy what .worktreeinclude lists")}
@@ -191,7 +191,7 @@ export function WorkbenchSetupEditor() {
         className="mono"
         value={command}
         disabled={off}
-        placeholder="./mvnw -q -o compile"
+        placeholder="npm ci"
         aria-label={t("Setup command")}
         onChange={(e) => setCommand(e.target.value)}
         onBlur={commitText}
