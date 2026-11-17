@@ -55,13 +55,21 @@ final class ReviewTerminalView: LocalProcessTerminalView {
         return text
     }
 
-    /// Deletes the end of the line before the cursor when `range` is its tail. False when the range is not something we
-    /// can replace (then the caller does what SwiftTerm does).
+    /// What the input method last read before the cursor (`attributedSubstring`): a replacement deletes only that text.
+    private var lastRead: (range: NSRange, text: String)?
+
+    /// Deletes the end of the line before the cursor when `range` is its tail and still holds what the input method read
+    /// there — the row may have changed since (the program redrew it), and other text of the same length must not go.
+    /// False when the range is not something we can replace (then the caller does what SwiftTerm does).
     private func deleteBeforeCursor(_ range: NSRange) -> Bool {
         guard !hasMarkedText(), range.location != NSNotFound, range.length > 0 else { return false }
         let before = textBeforeCursor() as NSString
-        guard range.location + range.length == before.length else { return false }
+        guard range.location + range.length == before.length,
+              let read = lastRead, range.location >= read.range.location, NSMaxRange(range) <= NSMaxRange(read.range) else { return false }
         let doomed = before.substring(with: range)
+        let wasRead = (read.text as NSString).substring(with: NSRange(location: range.location - read.range.location, length: range.length))
+        guard doomed == wasRead else { return false }
+        lastRead = nil
         send(data: ArraySlice(Array(repeating: UInt8(0x7f), count: doomed.count)))
         return true
     }
@@ -80,7 +88,9 @@ final class ReviewTerminalView: LocalProcessTerminalView {
         guard hi > lo else { return nil }
         let clamped = NSRange(location: lo, length: hi - lo)
         actualRange?.pointee = clamped
-        return NSAttributedString(string: before.substring(with: clamped))
+        let text = before.substring(with: clamped)
+        lastRead = (clamped, text)
+        return NSAttributedString(string: text)
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
