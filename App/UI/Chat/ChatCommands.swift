@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// wave4 w4-input (polish-06): the Chat menu — ⌘T a new chat, ⌘⇧W closes the tab on screen, ⌘1…⌘9 the chat tab at that
+/// wave4 w4-input (polish-06): the Chat menu — ⌘T a new chat (§57.7: of the default kind; ⌃⌘T terminal, ⌃⌥⌘T classic), ⌘⇧W closes the tab on screen, ⌘1…⌘9 the chat tab at that
 /// place. A blocked switch is a disabled item, as the tab strip's `+` and tabs are. Electron has the same keys
 /// (src/renderer/keymap.ts). ⌘W stays the window's (File › Close).
 /// MARK: wave7 w7-state — §45.2: it reads the window's `menuState` alone (the tabs' titles, the live chat, the blocker).
@@ -16,6 +16,8 @@ struct ChatCommands: Commands {
             let store = focused?.store
             let model = focused?.model
             let menu = store?.menuState ?? MenuState()
+            // MARK: terminal-default (§57.7): ⌘T opens the kind Settings › "New chats open as" names (a terminal chat unless
+            // changed); both kinds keep their own item.
             Button("New chat") { if let store { Task { await store.newChat() } } }
                 .keyboardShortcut("t", modifiers: .command)
                 .disabled(!menu.hasProject || menu.newChatBlocked)   // r2-chats-cards M31: while Claude works it waits for the turn
@@ -25,6 +27,10 @@ struct ChatCommands: Commands {
                 .keyboardShortcut("t", modifiers: [.control, .command])
                 .disabled(!menu.hasProject || menu.newChatBlocked)
                 .accessibilityIdentifier("Chat menu New terminal chat")
+            Button("New Chat (Classic)") { if let store { Task { await store.newClassicChat() } } }
+                .keyboardShortcut("t", modifiers: [.control, .option, .command])
+                .disabled(!menu.hasProject || menu.newChatBlocked)
+                .accessibilityIdentifier("Chat menu New classic chat")
             // As the tab's ×: a chat shown read-only hands back to the live one; the live chat's tab waits for a switch.
             Button("Close Chat Tab") {
                 if let store, let model, let id = store.shownChatId {

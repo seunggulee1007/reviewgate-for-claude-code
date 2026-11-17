@@ -262,7 +262,8 @@ struct AgentDetailSections: View {
         copyButton(detail.report, id: "report")
         Button("Send to main chat", systemImage: "arrowshape.turn.up.left") { sendToMain() }
             .disabled(detail.report == nil)
-            .help("Puts the report into the composer — add what Claude should do with it, then send")
+            .help(store.isTerminalChat ? String(localized: "Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Return there")
+                                       : String(localized: "Puts the report into the composer — add what Claude should do with it, then send"))
             .accessibilityIdentifier("Agent report send to main")
         Button("Ask in a side thread", systemImage: "bubble.left.and.text.bubble.right") { askInSideThread() }
             .disabled(!store.side.isSupported)
@@ -423,7 +424,14 @@ struct AgentDetailSections: View {
     /// Puts the report into the composer (nothing is sent): the user adds what Claude should do with it.
     private func sendToMain() {
         guard let text = detail.report else { return }
-        model.insertIntoComposer(String(localized: "\(detail.type) report:") + "\n\n" + text + "\n\n")
+        let draft = String(localized: "\(detail.type) report:") + "\n\n" + text + "\n\n"
+        // MARK: terminal-default (§57.7): a terminal chat has no message box — the report is pasted into its Claude Code.
+        if store.isTerminalChat {
+            if let why = store.pasteIntoTerminal(draft) { Toast.show(why, systemImage: "exclamationmark.triangle") }
+            else { Toast.show(NewChatKindText.pasted, systemImage: "terminal") }
+        } else {
+            model.insertIntoComposer(draft)
+        }
         dismiss()
     }
 

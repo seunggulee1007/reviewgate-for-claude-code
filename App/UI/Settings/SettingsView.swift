@@ -52,6 +52,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(AppSettings.Key.commitPushByDefault) private var commitPushByDefault = false
     @AppStorage(AppSettings.Key.commitTrailer) private var commitTrailer = ""
     @AppStorage(AppSettings.Key.autoRestartSession) private var autoRestartSession = true
+    @AppStorage(AppSettings.Key.newChatKind) private var newChatKind = SessionKind.terminal.rawValue   // MARK: terminal-default (§57.7)
     @AppStorage(AppSettings.backgroundWorkKey) private var backgroundWork = true   // §52
     @AppStorage(AppSettings.subagentsInTurnKey) private var subagentsInTurn = false   // §52.2
     // M16 permissions
@@ -169,6 +170,16 @@ private struct GeneralSettingsView: View {
             }
             PeerInboundSettingsSection()   // wave1 mac-session (§29)
             Section("Session") {
+                // MARK: terminal-default (§57.7): what ⌘T, + and a project's first chat open as; existing chats keep theirs.
+                Picker("New chats open as", selection: $newChatKind) {
+                    Text("Terminal").tag(SessionKind.terminal.rawValue)
+                    Text("Chat").tag(SessionKind.chat.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .help("Terminal: Claude Code itself runs in the chat column — every command, key and dialog of the terminal works, and ReviewGate reviews each turn. Chat: ReviewGate's own chat UI with cards, the queue and flows that send for you.")
+                .accessibilityIdentifier("New chats open as")
+                Text("For ⌘T, the + of the chat tabs and a project's first chat. Both kinds stay in the Chat menu: New Terminal Chat (⌃⌘T) and New Chat (Classic) (⌃⌥⌘T). Chats you already have keep their kind.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Auto-restart session", isOn: $autoRestartSession)
                     .accessibilityIdentifier("Auto-restart session")
                 Text("Starts a new Claude session once when the current one dies unexpectedly. The review list is kept either way; off, the chat shows \"Session ended — Restart\".")
@@ -281,6 +292,7 @@ private struct GeneralSettingsView: View {
         .onChange(of: autoRestartSession) { _, enabled in
             for store in WorkbenchRegistry.shared.allStores { store.updateAutoRestartSession(enabled) }
         }
+        .onChange(of: newChatKind) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushNewChatKind() } }   // §57.7
         .onChange(of: autoAllowReadOnlyBash) { _, _ in pushPermissionSettings() }
         .onChange(of: bashAllowPatterns) { _, _ in pushPermissionSettings() }
         .task(id: store.toolchain) { await loadVersions() }

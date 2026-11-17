@@ -135,6 +135,14 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.send(data: ArraySlice(Array(text.utf8)))
     }
 
+    /// §57.7: `text` as one bracketed paste (`TerminalPaste`) — only when the program turned bracketed paste on, so a line
+    /// break never acts as Enter. False: nothing was written.
+    func paste(_ text: String) -> Bool {
+        guard let bytes = TerminalPaste.bytes(text, bracketed: view.terminalStateSnapshot().bracketedPasteMode) else { return false }
+        view.send(data: ArraySlice(bytes))
+        return true
+    }
+
     /// Esc into the PTY: Stop (⌘.) on a terminal chat — the TUI stops Claude as in any terminal.
     func sendEscape() {
         view.send(data: [0x1b])

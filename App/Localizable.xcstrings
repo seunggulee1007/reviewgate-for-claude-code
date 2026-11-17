@@ -26214,22 +26214,6 @@
         }
       }
     },
-    "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "업무를 전용 워크벤치(새 브랜치와 폴더, 자기 창과 새 채팅)에서 시작해요. 지금 채팅은 그대로 남아요."
-          }
-        }
-      }
-    },
     "Status": {
       "localizations": {
         "en": {
@@ -33568,6 +33552,358 @@
           "stringUnit": {
             "state": "translated",
             "value": "클릭하면 파일을 엽니다"
+          }
+        }
+      }
+    },
+    "New Chat (Classic)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Chat (Classic)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 채팅 (클래식)"
+          }
+        }
+      }
+    },
+    "Opens once Claude is done (⌃⌥⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens once Claude is done (⌃⌥⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 작업이 끝나면 열려요 (⌃⌥⌘T)"
+          }
+        }
+      }
+    },
+    "ReviewGate's chat UI in this column (⌃⌥⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate's chat UI in this column (⌃⌥⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 칸에서 ReviewGate의 채팅 UI로 대화 (⌃⌥⌘T)"
+          }
+        }
+      }
+    },
+    "New terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널 채팅"
+          }
+        }
+      }
+    },
+    "New terminal chat — Claude Code itself in this column (⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New terminal chat — Claude Code itself in this column (⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널 채팅 — 이 칸에서 Claude Code를 그대로 실행 (⌘T)"
+          }
+        }
+      }
+    },
+    "New chat — ReviewGate's chat UI (⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chat — ReviewGate's chat UI (⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 채팅 — ReviewGate의 채팅 UI (⌘T)"
+          }
+        }
+      }
+    },
+    "Right-click for the other kind; Settings › New chats open as changes the default": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right-click for the other kind; Settings › New chats open as changes the default"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 종류는 오른쪽 클릭으로 열어요. 기본값은 설정 › 새 채팅 종류에서 바꿔요"
+          }
+        }
+      }
+    },
+    "It opens once Claude is done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It opens once Claude is done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업을 마치면 열려요"
+          }
+        }
+      }
+    },
+    "New chats open as": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New chats open as"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 채팅 종류"
+          }
+        }
+      }
+    },
+    "Terminal: Claude Code itself runs in the chat column — every command, key and dialog of the terminal works, and ReviewGate reviews each turn. Chat: ReviewGate's own chat UI with cards, the queue and flows that send for you.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal: Claude Code itself runs in the chat column — every command, key and dialog of the terminal works, and ReviewGate reviews each turn. Chat: ReviewGate's own chat UI with cards, the queue and flows that send for you."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널: 채팅 칸에서 Claude Code 자체가 실행돼요 — 터미널의 모든 명령·키·대화상자가 그대로 되고, ReviewGate가 턴마다 리뷰해요. 채팅: 카드·대기열과 대신 보내 주는 기능이 있는 ReviewGate의 채팅 UI예요."
+          }
+        }
+      }
+    },
+    "For ⌘T, the + of the chat tabs and a project's first chat. Both kinds stay in the Chat menu: New Terminal Chat (⌃⌘T) and New Chat (Classic) (⌃⌥⌘T). Chats you already have keep their kind.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For ⌘T, the + of the chat tabs and a project's first chat. Both kinds stay in the Chat menu: New Terminal Chat (⌃⌘T) and New Chat (Classic) (⌃⌥⌘T). Chats you already have keep their kind."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘T, 채팅 탭의 +, 프로젝트의 첫 채팅에 쓰여요. 두 종류 모두 채팅 메뉴에 있어요: 새 터미널 채팅(⌃⌘T), 새 채팅 (클래식)(⌃⌥⌘T). 이미 있는 채팅은 종류가 그대로예요."
+          }
+        }
+      }
+    },
+    "Trust this folder? Choose Yes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trust this folder? Choose Yes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더를 신뢰할지 물으면 Yes"
+          }
+        }
+      }
+    },
+    "If Claude Code asks whether to trust this folder, choose Yes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If Claude Code asks whether to trust this folder, choose Yes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 폴더를 신뢰할지 물으면 Yes를 고르세요"
+          }
+        }
+      }
+    },
+    "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 Claude Code에서 받은 소식이 없어요 — 첫 프롬프트부터 리뷰해요. Claude Code는 폴더에서 처음 실행될 때 이 폴더를 신뢰할지 묻고, \"No, exit\"가 선택돼 있어요: \"Yes, I trust this folder\"를 고르세요 — No를 고르면 Claude Code가 종료되고 아무것도 리뷰할 수 없어요."
+          }
+        }
+      }
+    },
+    "Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat of %@ — you read it and press Return there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat of %@ — you read it and press Return there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 답하지 않은 스레드를 %@ 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Return을 누르세요"
+          }
+        }
+      }
+    },
+    "Pastes this thread into Claude Code's prompt in the terminal chat of %@ — you read it and press Return there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastes this thread into Claude Code's prompt in the terminal chat of %@ — you read it and press Return there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 스레드를 %@ 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Return을 누르세요"
+          }
+        }
+      }
+    },
+    "Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Return there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Return there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보고서를 터미널의 Claude Code 입력란에 붙여넣어요 — Claude에게 시킬 일을 덧붙이고 터미널에서 Return을 누르세요"
+          }
+        }
+      }
+    },
+    "Paste the question into the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste the question into the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문을 터미널에 붙여넣기"
+          }
+        }
+      }
+    },
+    "Pastes it into Claude Code's prompt in the terminal chat as typed — press Return there to send it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastes it into Claude Code's prompt in the terminal chat as typed — press Return there to send it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력한 그대로 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 보내려면 터미널에서 Return을 누르세요"
+          }
+        }
+      }
+    },
+    "Paste into the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste into the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널에 붙여넣기"
+          }
+        }
+      }
+    },
+    "Paste into Claude Code's prompt in the terminal — press Return there to send it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste into Claude Code's prompt in the terminal — press Return there to send it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 Claude Code 입력란에 붙여넣어요 — 보내려면 터미널에서 Return을 누르세요"
+          }
+        }
+      }
+    },
+    "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat in ReviewGate's chat UI, which sends the task for you — so this chat is left as it is.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat in ReviewGate's chat UI, which sends the task for you — so this chat is left as it is."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무를 전용 워크벤치(새 브랜치와 폴더, 자기 창, 그리고 업무를 대신 보내 주는 ReviewGate 채팅 UI의 새 채팅)에서 시작해요. 지금 채팅은 그대로 남아요."
           }
         }
       }

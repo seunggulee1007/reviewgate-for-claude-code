@@ -34,14 +34,22 @@ enum PRClaudeRouting {
         return nil
     }
 
-    /// Puts `threads` into the target window's composer (the chat comes forward) and returns where it went.
+    /// Puts `threads` into the target window's composer (the chat comes forward) and returns where it went. MARK:
+    /// terminal-default (§57.7): when that window's live chat is a terminal chat the draft is pasted into its Claude Code
+    /// (bracketed, no Enter — this click is the explicit one) instead; a terminal that is not running says why.
     @discardableResult
     static func send(threads: [PRCommentThread], pr: PRDetail, store: AppState) -> WorkbenchWindowEntry? {
         guard !threads.isEmpty, let entry = target(headRef: pr.headRefName, store: store), entry.store.projectURL != nil else { return nil }
         let command = PRClaude.respondCommand(entry.store.prRespondCommand, number: pr.number)
-        entry.model.insertIntoComposer(PRClaude.draft(prNumber: pr.number, prTitle: pr.title, threads: threads, command: command))
+        let draft = PRClaude.draft(prNumber: pr.number, prTitle: pr.title, threads: threads, command: command)
         entry.model.tab = .changes
         if entry.store !== store { entry.focus() }
+        if entry.store.isTerminalChat {
+            if let why = entry.store.pasteIntoTerminal(draft) { Toast.show(why, systemImage: "exclamationmark.triangle") }
+            else { Toast.show(NewChatKindText.pasted, systemImage: "terminal") }
+            return entry
+        }
+        entry.model.insertIntoComposer(draft)
         return entry
     }
 
@@ -50,6 +58,17 @@ enum PRClaudeRouting {
         guard let entry = target(headRef: headRef, store: store) else { return String(localized: "this window") }
         if entry.store === store { return String(localized: "this window") }
         return String(localized: "the \(headRef) workbench window")
+    }
+
+    /// The buttons' help: the message box, or — the live chat there is a terminal chat — its Claude Code (§57.7).
+    static func help(all: Bool, headRef: String, store: AppState) -> String {
+        let place = destination(headRef: headRef, store: store)
+        if target(headRef: headRef, store: store)?.store.isTerminalChat == true {
+            return all ? String(localized: "Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat of \(place) — you read it and press Return there")
+                       : String(localized: "Pastes this thread into Claude Code's prompt in the terminal chat of \(place) — you read it and press Return there")
+        }
+        return all ? String(localized: "Puts the threads you have not answered yet into Claude's message box in \(place) — you read it and send it")
+                   : String(localized: "Puts this thread into Claude's message box in \(place) — you read it and send it")
     }
 }
 
@@ -115,7 +134,7 @@ struct PRClaudeHeaderButtons: View {
         }
         .controlSize(.small)
         .disabled(blocker != nil)
-        .help(blocker ?? String(localized: "Puts the threads you have not answered yet into Claude's message box in \(PRClaudeRouting.destination(headRef: pr.headRefName, store: app)) — you read it and send it"))
+        .help(blocker ?? PRClaudeRouting.help(all: true, headRef: pr.headRefName, store: app))
         .accessibilityIdentifier("Send all unresolved")
     }
 
@@ -153,7 +172,7 @@ struct PRSendCommentButton: View {
             .buttonStyle(.borderless)
             .controlSize(.small)
             .disabled(blocker != nil)
-            .help(blocker ?? String(localized: "Puts this thread into Claude's message box in \(PRClaudeRouting.destination(headRef: pr.headRefName, store: app)) — you read it and send it"))
+            .help(blocker ?? PRClaudeRouting.help(all: false, headRef: pr.headRefName, store: app))
             .accessibilityIdentifier("Send comment to Claude")
         }
     }

@@ -271,7 +271,8 @@ struct NewWorkbenchSheet: View {
     private var header: some View {
         if runsTask {
             Text("Run as Task").font(.headline)
-            Text("Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat — so this chat is left as it is.")
+            // MARK: terminal-default (§57.7): ReviewGate sends the task, so its chat is a chat even when new chats open as terminals.
+            Text("Starts the task in a workbench of its own — a new branch and folder, its own window and a fresh chat in ReviewGate's chat UI, which sends the task for you — so this chat is left as it is.")
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else if let fromPr {

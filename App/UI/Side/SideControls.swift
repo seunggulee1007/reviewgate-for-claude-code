@@ -101,21 +101,38 @@ struct SideSendToMainButton: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button {
-                guard let queued = store.side.sendToMain(key) else { return }
-                Toast.show(queued ? String(localized: "Queued for the main conversation — sent when Claude is free")
-                                  : String(localized: "Sent to the main conversation"),
-                           systemImage: "arrowshape.turn.up.left.fill")
-            } label: {
-                // Not "Send to main": that one turns the answer into an instruction first; this sends the question itself.
-                Label("Send the question to the main conversation as typed", systemImage: "arrowshape.turn.up.left.fill")
-                    .lineLimit(1)   // a panel dragged narrow cuts the words ("…"), never the button; the tooltip says it all
+            // MARK: terminal-default (§57.7): a terminal chat's Claude Code takes only what is typed — the question is pasted
+            // into its prompt (no Enter) instead of sent.
+            if store.isTerminalChat {
+                Button {
+                    if let why = store.side.pasteToTerminal(key) { Toast.show(why, systemImage: "exclamationmark.triangle") }
+                    else { Toast.show(NewChatKindText.pasted, systemImage: "terminal") }
+                } label: {
+                    Label("Paste the question into the terminal", systemImage: "terminal")
+                        .lineLimit(1)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.teal)
+                .controlSize(.small)
+                .help("Pastes it into Claude Code's prompt in the terminal chat as typed — press Return there to send it")
+                .accessibilityIdentifier("Side send to main conversation")
+            } else {
+                Button {
+                    guard let queued = store.side.sendToMain(key) else { return }
+                    Toast.show(queued ? String(localized: "Queued for the main conversation — sent when Claude is free")
+                                      : String(localized: "Sent to the main conversation"),
+                               systemImage: "arrowshape.turn.up.left.fill")
+                } label: {
+                    // Not "Send to main": that one turns the answer into an instruction first; this sends the question itself.
+                    Label("Send the question to the main conversation as typed", systemImage: "arrowshape.turn.up.left.fill")
+                        .lineLimit(1)   // a panel dragged narrow cuts the words ("…"), never the button; the tooltip says it all
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.teal)
+                .controlSize(.small)
+                .help("Sends it to the main conversation as typed; while Claude works it waits in the queue")
+                .accessibilityIdentifier("Side send to main conversation")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.teal)
-            .controlSize(.small)
-            .help("Sends it to the main conversation as typed; while Claude works it waits in the queue")
-            .accessibilityIdentifier("Side send to main conversation")
         }
     }
 }

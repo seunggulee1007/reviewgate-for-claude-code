@@ -41,6 +41,18 @@ final class TerminalHub {
             guard let self, let id = store?.currentSessionId else { return }
             Task { await self.restart(chatId: id) }
         }
+        // MARK: terminal-default — §57.7 "Paste into the terminal" (an explicit click only): the text goes into the TUI's
+        // prompt as one bracketed paste and the terminal takes the keyboard; never an Enter — the user sends it.
+        store.onTerminalPaste = { [weak self, weak store] text in
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id], host.state.isRunning, !host.disconnected else {
+                return NewChatKindText.terminalNotRunning
+            }
+            guard host.paste(text) else { return NewChatKindText.terminalNotReady }
+            host.focus()
+            // From the PRs tab the terminal is not in the window yet: the keyboard goes to it once it is.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { host.focus() }
+            return nil
+        }
         observe()
     }
 

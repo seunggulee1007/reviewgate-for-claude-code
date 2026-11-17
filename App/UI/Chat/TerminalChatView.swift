@@ -52,6 +52,9 @@ private struct TerminalStatusStrip: View {
                 if text == Self.reviewedText {
                     Label(String(localized: "Reviewed by ReviewGate"), systemImage: symbol)
                 }
+                if text == Self.trustText {
+                    Label(String(localized: "Trust this folder? Choose Yes"), systemImage: symbol)
+                }
             }
             .font(.caption)
             .foregroundStyle(tint)
@@ -93,6 +96,9 @@ private struct TerminalStatusStrip: View {
     }
 
     private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the right") }
+    /// MARK: terminal-default (§57.7): before the first hook — Claude Code's trust question defaults to "No, exit", and a
+    /// folder it does not trust cannot be reviewed, so the strip says what to pick before the user presses Return.
+    private static var trustText: String { String(localized: "If Claude Code asks whether to trust this folder, choose Yes") }
 
     private func status(_ info: TerminalSessionInfo?) -> (String, String, Color, String) {
         if host.disconnected {
@@ -112,8 +118,8 @@ private struct TerminalStatusStrip: View {
             return (Self.reviewedText, "checkmark.shield", .secondary,
                     String(localized: "Claude Code reports each prompt and edit to ReviewGate; accept or reject the changes as in a chat"))
         }
-        return (String(localized: "Waiting for the first prompt"), "hourglass", .secondary,
-                String(localized: "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt"))
+        return (Self.trustText, "questionmark.folder", .accentColor,
+                String(localized: "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed."))
     }
 }
 

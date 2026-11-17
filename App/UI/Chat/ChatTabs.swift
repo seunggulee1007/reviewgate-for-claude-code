@@ -26,6 +26,8 @@ struct ChatTabStrip: View {
     @State private var roomWidth: CGFloat = 0
     /// "탭을 닫았어요 · 다시 열기" for a few seconds after a tab closed.
     @State private var justClosed: String?
+    /// MARK: terminal-default (§57.7): what `+` / ⌘T opens (Settings › "New chats open as").
+    @AppStorage(AppSettings.Key.newChatKind) private var newChatKind = SessionKind.terminal.rawValue
 
     var body: some View {
         let blocker = store.chatSwitchBlocker
@@ -90,13 +92,14 @@ struct ChatTabStrip: View {
                 .buttonStyle(.icon)
                 .controlSize(.small)
                 .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
-                .help(store.newChatBlocker ?? (store.chatSwitchWaits ? String(localized: "New chat (⌘T) — it opens once Claude is done")
-                                                                     : String(localized: "New chat") + " (⌘T)"))   // wave4 w4-input: Chat → New chat
-                .accessibilityLabel("New chat")
+                .help(store.newChatBlocker ?? newChatHelp)   // wave4 w4-input: Chat → New chat
+                .accessibilityLabel(newChatKind == SessionKind.chat.rawValue ? Text("New chat") : Text("New terminal chat"))
                 .accessibilityIdentifier("New chat")
-                // MARK: terminal-chat (§57.5): the other kind of chat from the same button.
+                // MARK: terminal-chat (§57.5) / terminal-default (§57.7): either kind from the same button.
                 .contextMenu {
                     Button("New Terminal Chat", systemImage: "terminal") { Task { await store.newTerminalChat() } }
+                        .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
+                    Button("New Chat (Classic)", systemImage: "bubble.left.and.bubble.right") { Task { await store.newClassicChat() } }
                         .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
                 }
             if store.pendingChatSwitch != nil { PendingChatSwitchChip() }   // r2-chats-cards M31 / M33 (§9)
@@ -120,6 +123,15 @@ struct ChatTabStrip: View {
                 }
                 .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
                 .accessibilityIdentifier("Chat menu new terminal chat")
+                // MARK: terminal-default (§57.7): the app's chat UI — what flows that send for you (Run as Task, a plan) use.
+                Button {
+                    Task { await store.newClassicChat() }
+                } label: {
+                    Label("New Chat (Classic)", systemImage: "bubble.left.and.bubble.right")
+                    Text(store.chatSwitchWaits ? String(localized: "Opens once Claude is done (⌃⌥⌘T)") : String(localized: "ReviewGate's chat UI in this column (⌃⌥⌘T)"))
+                }
+                .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
+                .accessibilityIdentifier("Chat menu new classic chat")
                 Button("History…") { showHistory = true }
                     .accessibilityIdentifier("Chat history")
                 if let current = store.sessions.first(where: { $0.id == store.currentSessionId }) {
@@ -262,6 +274,16 @@ struct ChatTabStrip: View {
             Divider()
             ContinueInTerminalMenuItem(meta: tab) { continueRequest = $0 }   // wave3 mac-session (§36.9)
         }
+    }
+
+    /// MARK: terminal-default (§57.7) — `+`'s tooltip names the kind it opens and where the other one is.
+    private var newChatHelp: String {
+        let terminal = newChatKind != SessionKind.chat.rawValue
+        let what = terminal ? String(localized: "New terminal chat — Claude Code itself in this column (⌘T)")
+                            : String(localized: "New chat — ReviewGate's chat UI (⌘T)")
+        let other = String(localized: "Right-click for the other kind; Settings › New chats open as changes the default")
+        let wait = store.chatSwitchWaits ? "\n" + String(localized: "It opens once Claude is done") : ""
+        return what + "\n" + other + wait
     }
 
     /// MARK: terminal-chat (§57.5) — a terminal chat's tab: the terminal symbol, and whether its Claude Code has exited.

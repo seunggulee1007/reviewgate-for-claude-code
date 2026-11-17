@@ -14,6 +14,8 @@ struct SidePromoteSheet: View {
 
     private var live: SidePromoteDraft { store.side.draft ?? draft }
     private var isMessage: Bool { draft.target == .message }
+    /// §57.7: a message for a terminal chat is pasted into its terminal (nothing sends into its TUI).
+    private var pastesIntoTerminal: Bool { isMessage && store.isTerminalChat }
     private var chatTitle: String? { store.openTabs.first { $0.id == store.currentSessionId }?.title }
 
     var body: some View {
@@ -53,7 +55,7 @@ struct SidePromoteSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if isMessage, store.pendingFiles.count > 0 {
+                if isMessage, !pastesIntoTerminal, store.pendingFiles.count > 0 {
                     Toggle(isOn: $acceptPending) {
                         Text("Accept the \(store.pendingFiles.count) pending files first")
                     }
@@ -90,13 +92,21 @@ struct SidePromoteSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button {
                     let edited = text
+                    // MARK: terminal-default (§57.7): the engine refuses `side_promote {as: "message"}` in a terminal chat —
+                    // the instruction is pasted into its Claude Code's prompt (no Enter) and the sheet closes.
+                    if pastesIntoTerminal {
+                        if let why = store.pasteIntoTerminal(edited) { Toast.show(why, systemImage: "exclamationmark.triangle"); return }
+                        Toast.show(NewChatKindText.pasted, systemImage: "terminal")
+                        store.side.dismissDraft()
+                        return
+                    }
                     let accept = acceptPending
                     Task { _ = await store.side.sendDraft(text: edited, acceptPending: accept) }
                 } label: {
                     if live.isSending {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text(isMessage ? "Send" : "Add note")
+                        Text(pastesIntoTerminal ? "Paste into the terminal" : isMessage ? "Send" : "Add note")
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -104,7 +114,8 @@ struct SidePromoteSheet: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || live.isSending)
                 // MARK: r2-skills-side — P3-transcript-15: what it does, then its key.
-                .help(String.withKey(isMessage ? String(localized: "Send to the main conversation") : String(localized: "Add as a review note"), key: "⌘↩"))
+                .help(String.withKey(pastesIntoTerminal ? String(localized: "Paste into Claude Code's prompt in the terminal — press Return there to send it")
+                                     : isMessage ? String(localized: "Send to the main conversation") : String(localized: "Add as a review note"), key: "⌘↩"))
                 .accessibilityIdentifier("Promote send")
             }
             .padding(16)

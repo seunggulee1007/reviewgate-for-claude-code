@@ -67,6 +67,14 @@ enum ScreenshotTour {
             tour.finish(TourError("bundle id \(Bundle.main.bundleIdentifier ?? "?") does not end in .screenshots"))
             return
         }
+        // MARK: terminal-default (§57.7): the README and layout tours run in chats; `SHOTS_LAYOUT=terminal` checks the default
+        // (no choice saved → a terminal chat). Only this build's own defaults domain.
+        if env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
+            UserDefaults.standard.removeObject(forKey: AppSettings.Key.newChatKind)
+        } else {
+            AppSettings.setNewChatKind(.chat)
+        }
+        entry.store.pushNewChatKind()
         logFile = EngineLogFile(directory: out.appendingPathComponent("logs"))
         entry.store.fileLog = logFile   // not ~/Library/Logs/ReviewGate — nor for the windows the tour opens
         Task { await tour.run() }
@@ -1407,7 +1415,7 @@ private final class Tour {
         // A new chat (the engine's), turns in it, and back to the chat before it (shown read-only from its saved rows).
         window.setFrame(NSRect(origin: NSPoint(x: visible.minX, y: visible.maxY - sizes[0].height), size: sizes[0]), display: true)
         let before = store.currentSessionId
-        if await store.newChat() {
+        if await store.newClassicChat() {
             try await wait("new chat", timeout: 30) { $0.currentSessionId != before && $0.currentSessionId != nil }
             try await Task.sleep(for: .milliseconds(1200))
             try await capture("new-chat", "new-chat")
@@ -1769,7 +1777,7 @@ private final class Tour {
         let longHeight = chat?.documentView?.frame.height ?? 0
         let before = store.currentSessionId
         let t0 = ContinuousClock.now
-        guard await store.newChat() else { return log("cpu: no new chat (\(store.newChatBlocker ?? "refused"))") }
+        guard await store.newClassicChat() else { return log("cpu: no new chat (\(store.newChatBlocker ?? "refused"))") }
         while store.currentSessionId == before, ContinuousClock.now - t0 < .seconds(20) { try await Task.sleep(for: .milliseconds(1)) }
         let switched = ContinuousClock.now
         while (chat?.documentView?.frame.height ?? 0) >= longHeight / 2, ContinuousClock.now - switched < .seconds(10) {
@@ -2811,8 +2819,14 @@ private final class Tour {
         let demo = store.projectURL?.path ?? ""
         let size = { (h: TerminalHost) in "\(Int(h.view.frame.width))×\(Int(h.view.frame.height)) pt, \(h.view.terminalDimensions.cols)×\(h.view.terminalDimensions.rows) cells" }
 
-        // 1. A new terminal chat shows the fake's banner.
-        guard await store.newTerminalChat() else { return log("terminal: New Terminal Chat refused — SILENT") }
+        // 0. §57.7: with no choice saved, a fresh project's first chat is a terminal chat, and so is ⌘T's.
+        let firstKind = store.currentChatKind
+        log("terminal: default kind — the project's first chat is " + (firstKind == .terminal ? "a terminal chat" : "— LOST (a \(firstKind.rawValue))")
+            + ", ⌘T opens " + (store.defaultChatKind == .terminal ? "a terminal chat" : "— LOST (a chat)"))
+        // 1. ⌘T: a new terminal chat shows the fake's banner.
+        let firstChat = store.currentSessionId
+        guard await store.newChat() else { return log("terminal: New Chat (⌘T) refused — SILENT") }
+        try await wait("a new chat", timeout: 30) { $0.currentSessionId != firstChat }
         try await wait("terminal chat is the live chat", timeout: 30) { $0.isTerminalChat && $0.shownChatIsTerminal }
         guard let chatId = store.currentSessionId else { return log("terminal: no chat id — SILENT") }
         let bannerShown = await waitFor(seconds: 10) { hub.host(for: chatId)?.screenText().contains("fake-claude session=") == true }
