@@ -8651,7 +8651,7 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
   `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
-  (`send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
+  (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
   `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
   {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
@@ -8664,7 +8664,7 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
 ### 57.2 Lifecycle and resume
 
 - **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
-  chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project`, `restart_session` —
+  chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project` —
   the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
   state). Such a session is never parked (§9.1): switching away stops it and retires its token.
 - **Spawn.** The app asks `terminal_spec {sessionId}` for the current chat (refused `terminal_not_current` otherwise),
@@ -8682,6 +8682,10 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   current chat; the app sees `kind: "terminal"` and asks for a spec.
 - **Restart in a tab.** The app ends the PTY, sends `terminal_exited`, asks for a new spec (the old token is retired: a
   stale terminal's prompts are blocked and its write tools denied) and spawns again.
+- **No `restart_session`.** It is refused `terminal_chat`: stopping the session would retire the live terminal's token
+  and leave its TUI silently disconnected. The Mac app's "Restart now" (Settings: MCP servers, extensions, instructions,
+  a new CLI) and "Restart session" restart the chat's PTY instead (`AppState.onTerminalRestart` → the restart above):
+  the user's claude reads those settings when it starts, and the conversation is resumed.
 - **The engine restarts** (its sidecar died): the port changes, so a running terminal's hooks fail — closed where it
   matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
 

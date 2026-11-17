@@ -33,6 +33,12 @@ final class TerminalHub {
             guard let self, let id = store?.currentSessionId else { return }
             self.chatHosts[id]?.sendEscape()
         }
+        // Settings' "Restart now" (MCP servers, extensions, instructions, a new CLI) in a terminal chat: its claude reads
+        // them at start, so the PTY restarts and resumes the conversation.
+        store.onTerminalRestart = { [weak self, weak store] in
+            guard let self, let id = store?.currentSessionId else { return }
+            Task { await self.restart(chatId: id) }
+        }
         observe()
     }
 

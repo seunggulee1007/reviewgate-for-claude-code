@@ -154,6 +154,26 @@ import Testing
         #expect(fired.contains(.interrupt))
     }
 
+    @Test func restartOnATerminalChatRestartsItsPty() {
+        let app = makeState()
+        var fired: [EngineCommand] = []
+        var restarts = 0
+        app.commandSink = { fired.append($0) }
+        app.onTerminalRestart = { restarts += 1 }
+        app.handle(.state(snapshot(seq: 1, phase: .idle)))
+        // Settings' "Restart now", the reconnect and the banner's "Restart session": the PTY, never `restart_session`.
+        app.restartSession()
+        app.reconnectSession()
+        app.restartSessionFromBanner()
+        #expect(restarts == 3)
+        #expect(!fired.contains(.restartSession))
+        // A chat-kind chat still restarts through the engine.
+        app.handle(.state(snapshot(seq: 2, phase: .idle, current: "c1")))
+        app.restartSession()
+        #expect(restarts == 3)
+        #expect(fired.contains(.restartSession))
+    }
+
     @Test func refusalsInTheUsersWords() {
         for code in ["terminal_chat", "terminal_unsupported", "terminal_not_current", "terminal_cli_too_old", "terminal_hooks_disabled", "no_turn"] {
             let text = TerminalChatText.refusal(code: code)

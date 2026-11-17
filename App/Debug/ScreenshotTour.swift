@@ -2731,7 +2731,27 @@ private final class Tour {
         try await Task.sleep(for: .milliseconds(800))
         try write(try render(window), "terminal-chat-restarted-dark")
 
-        // 8. The window closes: every PTY ends and none starts again, whatever the engine reports meanwhile (claude's
+        // 8. Settings' "Restart now" (`restartSession()`) in a terminal chat: never the engine's restart_session (that
+        // would retire the live terminal's token) — the PTY restarts, resumes the same conversation, and its hooks still
+        // reach the review.
+        let pidBefore = hub.host(for: chatId).flatMap { Self.pid($0) }
+        store.restartSession()
+        let restartedNow = await waitFor(seconds: 15) {
+            guard let h = hub.host(for: chatId), let pid = Self.pid(h), pid != pidBefore else { return false }
+            return h.screenText().contains("resume=true")
+        }
+        let third = hub.host(for: chatId).flatMap { Self.banner($0) }
+        let sameAgain = third.map { Self.sessionId($0) } == firstBanner.map { Self.sessionId($0) }
+        log("terminal: Restart now → " + (restartedNow && sameAgain ? "the terminal restarted, \(third ?? "")" : "— LOST (\(third ?? "no banner"), pid \(pidBefore.map(String.init) ?? "-") → \(hub.host(for: chatId).flatMap { Self.pid($0) }.map(String.init) ?? "-"))"))
+        if restartedNow, let h = hub.host(for: chatId) {
+            h.send(text: "after the restart\r")
+            let answered = await waitFor(seconds: 30) { h.screenText().contains("done") || h.screenText().contains("blocked:") }
+            let ok = answered && !h.screenText().contains("blocked:")
+            log("terminal: a prompt after Restart now " + (ok ? "is reviewed" : "— LOST (\(Self.lastLines(h, 4)))"))
+            _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing }
+        }
+
+        // 9. The window closes: every PTY ends and none starts again, whatever the engine reports meanwhile (claude's
         // SessionEnd hook, the exit report — here the exit report, as the fake sends no SessionEnd).
         await entry.model.shell.stopAll()
         await hub.stopAll()
@@ -2799,6 +2819,11 @@ private final class Tour {
         guard let start = text.range(of: "fake-claude session="), let flag = text[start.upperBound...].range(of: " resume=") else { return nil }
         let value = text[flag.upperBound...].hasPrefix("true") ? "true" : "false"
         return String(text[start.lowerBound..<flag.upperBound]) + value
+    }
+
+    /// The running PTY's pid (nil when it does not run).
+    private static func pid(_ host: TerminalHost) -> Int32? {
+        if case let .running(pid) = host.state { pid } else { nil }
     }
 
     private static func sessionId(_ banner: String) -> String {

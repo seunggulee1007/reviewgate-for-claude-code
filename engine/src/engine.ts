@@ -327,9 +327,13 @@ export type EngineOptions = {
 
 /** MARK: terminal-chat — §57: default of `EngineOptions.terminalPromptWaitMs` (the UserPromptSubmit hook gives up at 120 s). */
 export const TERMINAL_PROMPT_WAIT_MS = 100_000;
-/** §57.1: what the TUI does itself in a terminal chat — refused `terminal_chat` (and `side_promote {as: "message"}`). */
+/**
+ * §57.1: what the TUI does itself in a terminal chat — refused `terminal_chat` (and `side_promote {as: "message"}`).
+ * `restart_session` too: stopping the session would retire the live terminal's token and leave it silently disconnected;
+ * the app restarts the chat's PTY instead (a new spec, the conversation resumed).
+ */
 const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
-  "send", "steer", "steer_take_back", "btw_ask", "interrupt", "request_changes", "permission_response", "set_permission_mode",
+  "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "request_changes", "permission_response", "set_permission_mode",
   "set_model", "plan_response", "plan_follow", "rewind", "compact", "peer_accept", "task_stop", "task_background", "stop_agent",
   "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
 ]);

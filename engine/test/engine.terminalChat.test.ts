@@ -170,7 +170,7 @@ describe("terminal chats (§57)", () => {
   it("refusals: chat-only commands (terminal_chat), another chat (terminal_not_current)", async () => {
     const r = await rig();
     const id = await newTerminal(r);
-    for (const cmd of [{ type: "send", text: "hi" }, { type: "interrupt" }, { type: "set_model", model: "haiku" }, { type: "btw_ask", question: "q" }, { type: "side_promote", threadId: "t", as: "message" }] as const) {
+    for (const cmd of [{ type: "restart_session" }, { type: "send", text: "hi" }, { type: "interrupt" }, { type: "set_model", model: "haiku" }, { type: "btw_ask", question: "q" }, { type: "side_promote", threadId: "t", as: "message" }] as const) {
       expect(await refusal(r.h, cmd), cmd.type).toMatchObject({ ok: false, code: "terminal_chat" });
     }
     expect(await refusal(r.h, { type: "terminal_spec", sessionId: "other" })).toMatchObject({ ok: false, code: "terminal_not_current" });

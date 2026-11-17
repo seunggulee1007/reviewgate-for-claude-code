@@ -181,6 +181,9 @@ public final class AppState {
     // MARK: terminal-chat (§57)
     /// Stop (⌘.) on a terminal chat: the App writes Esc to its PTY (the TUI stops Claude as in any terminal).
     @ObservationIgnored public var onTerminalInterrupt: (@MainActor () -> Void)?
+    /// "Restart now" (Settings, a new CLI) / "Restart session" on a terminal chat: the App restarts its PTY — a new spec,
+    /// the conversation resumed. The engine refuses `restart_session` there (`terminal_chat`).
+    @ObservationIgnored public var onTerminalRestart: (@MainActor () -> Void)?
     /// The terminal wait last raised as attention (`terminalSnapshotApplied`), so each wait is raised once.
     @ObservationIgnored var lastTerminalWaitingKey: String?
     // MARK: wave1 mac-session
@@ -801,8 +804,10 @@ public final class AppState {
         fire(.cancelGitInit)
     }
 
-    /// `restart_session` (audit 1.4): a fresh Claude session for the open project; the review list is kept.
+    /// `restart_session` (audit 1.4): a fresh Claude session for the open project; the review list is kept. A terminal
+    /// chat's claude runs in the App's PTY: that one restarts instead (§57.5).
     public func restartSession() {
+        if isTerminalChat { onTerminalRestart?(); return }
         guard canRestartSession else { return }
         fire(.restartSession)
     }
@@ -1270,6 +1275,7 @@ public final class AppState {
     /// The banner's "Restart session" (`session_crashed`, `cli_not_found`).
     public func restartSessionFromBanner() {
         errorBanner = nil
+        if isTerminalChat { onTerminalRestart?(); return }
         if canRestartSession { fire(.restartSession) }
     }
 
