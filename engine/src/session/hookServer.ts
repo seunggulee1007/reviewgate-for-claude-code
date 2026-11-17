@@ -13,8 +13,8 @@ import { HOOK_TOKEN_HEADER } from "./terminalSpec.js";
 export type HookOutput = Record<string, unknown>;
 
 export interface TerminalHookHandler {
-  /** One hook's input (the CLI's JSON); resolves with the answer. */
-  handleHook(input: Record<string, unknown>): Promise<HookOutput>;
+  /** One hook's input (the CLI's JSON); resolves with the answer. `signal` aborts when the CLI gave up on the request. */
+  handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput>;
 }
 
 /** The body cap (enforced while streaming). */
@@ -137,6 +137,11 @@ export class HookServer {
       req.resume();
       return reply(413);
     }
+    // The CLI cancels a hook it stopped waiting for (its timeout, Esc): the connection closes before the answer went out.
+    const cancelled = new AbortController();
+    res.on("close", () => {
+      if (!res.writableFinished) cancelled.abort();
+    });
     const chunks: Buffer[] = [];
     let size = 0;
     let tooBig = false;
@@ -165,7 +170,7 @@ export class HookServer {
         this.log(`terminal hook ${String(body.hook_event_name)} of a retired token: blocked`);
         return reply(200, retiredAnswer(body.hook_event_name));
       }
-      route.handler.handleHook(body).then(
+      route.handler.handleHook(body, cancelled.signal).then(
         (out) => reply(200, out),
         (e) => {
           this.log(`terminal hook ${String(body.hook_event_name)} failed: ${String(e)}`);

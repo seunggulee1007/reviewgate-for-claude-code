@@ -8734,6 +8734,9 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
 
 - **One token per spawn.** Each `terminal_spec` issues a fresh token (32 random bytes, hex) routed to the current
   terminal chat and retires the chat's previous one; switching chats or closing the project retires it too.
+- **A request the CLI gives up on** (its timeout, the connection closed before the answer went out) aborts the
+  handler's `AbortSignal`: a UserPromptSubmit still waiting for the engine stops waiting, and a review turn the engine
+  opens for it afterwards ends at once (`prompt_timeout`), so no turn is left open for a prompt that never ran.
 - **Retired token** (an earlier spawn, a chat switched away from): 200 with a blocking answer — UserPromptSubmit
   `{decision: "block", reason}`, PreToolUse `permissionDecision: "deny"` with the same reason ("This terminal is no longer
   connected to ReviewGate's review. Restart it from its tab."), every other event `{}`. The last 64 retired tokens are

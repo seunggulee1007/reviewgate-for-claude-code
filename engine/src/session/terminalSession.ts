@@ -60,6 +60,8 @@ export type TerminalSessionOptions = {
 
 /** A prompt the engine did not answer in time is blocked with this (the user sends it again). */
 export const PROMPT_TIMEOUT_REASON = "ReviewGate could not start the review of this prompt in time (it is still busy). Send it again.";
+/** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
+const PROMPT_CANCELLED_REASON = "Claude Code stopped waiting for ReviewGate's answer to this prompt.";
 
 const PREVIEW_CHARS = 400;
 const EDIT_TOOLS_RE = /^(Edit|Write|MultiEdit|NotebookEdit)$/;
@@ -221,7 +223,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   // ---- hooks
 
-  async handleHook(input: Record<string, unknown>): Promise<HookOutput> {
+  async handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput> {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
     this.hooksSeen = true;
@@ -238,7 +240,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     try {
       switch (event) {
         case "UserPromptSubmit":
-          return await this.onPrompt(input);
+          return await this.onPrompt(input, signal);
         case "PreToolUse":
           return await this.onPreTool(input);
         case "PostToolUse":
@@ -269,7 +271,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     }
   }
 
-  private async onPrompt(input: Record<string, unknown>): Promise<HookOutput> {
+  private async onPrompt(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput> {
     const promptId = str(input.prompt_id);
     if (this.open) {
       if (promptId !== null && this.open.hookPromptId === promptId) {
@@ -280,12 +282,18 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       this.closeTurn("interrupted");
     }
     this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }); // a stale wait (the CLI gave up on it, a forged hook)
+    if (signal?.aborted) return { decision: "block", reason: PROMPT_CANCELLED_REASON };
     const seq = ++this.promptSeq;
     const answer = new Promise<PromptAnswer>((resolve) => {
       const timer = setTimeout(() => this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }), this.opts.promptWaitMs);
       timer.unref?.();
       this.prompt = { resolve, timer, seq };
     });
+    // The CLI gave up on this hook: the wait ends now, so the engine's answer takes the late path (a turn it opened ends).
+    const cancel = (): void => {
+      if (this.prompt?.seq === seq) this.settlePrompt({ ok: false, reason: PROMPT_CANCELLED_REASON });
+    };
+    signal?.addEventListener("abort", cancel, { once: true });
     this.opts.emit({ type: "terminal_prompt", prompt: typeof input.prompt === "string" ? input.prompt : "", promptId, seq });
     const a = await answer;
     if (!a.ok) return { decision: "block", reason: a.reason };

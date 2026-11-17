@@ -30,6 +30,30 @@ async function post(port: number, opts: { token?: string; body?: string | Blob; 
 }
 
 describe("HookServer", () => {
+  it("a request the CLI gives up on (the connection closes before the answer) aborts the handler's signal", async () => {
+    const { server, port } = await started();
+    let signal: AbortSignal | undefined;
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    const token = server.issue({ handleHook: async (_input, s) => ((signal = s), await held, {}) });
+    const req = request({ host: "127.0.0.1", port, path: "/hook", method: "POST", headers: { "Content-Type": "application/json", "X-ReviewGate-Token": token } });
+    req.on("error", () => undefined);
+    req.end(JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "hi" }));
+    for (let i = 0; i < 100 && !signal; i++) await new Promise((r) => setTimeout(r, 10));
+    expect(signal?.aborted).toBe(false);
+    const aborted = new Promise<void>((r) => signal!.addEventListener("abort", () => r(), { once: true }));
+    req.destroy();
+    await aborted;
+    expect(signal!.aborted).toBe(true);
+    release();
+    // An answered request never aborts.
+    let answered: AbortSignal | undefined;
+    const t2 = server.issue({ handleHook: async (_input, s) => ((answered = s), {}) });
+    expect((await post(port, { token: t2 })).status).toBe(200);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(answered?.aborted).toBe(false);
+  });
+
   it("listens on 127.0.0.1 on a random port; a valid request reaches its handler", async () => {
     const { server, port } = await started();
     expect(port).toBeGreaterThan(0);

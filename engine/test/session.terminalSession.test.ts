@@ -97,6 +97,19 @@ describe("TerminalSession", () => {
     expect(slow.of("turn_end").map((e) => e.stopReason)).toEqual(["prompt_timeout"]);
   });
 
+  it("the CLI giving up on a prompt's hook (abort) blocks its wait at once; the engine's late answer ends the turn it opened", async () => {
+    const r = rig({ answer: null });
+    const cancelled = new AbortController();
+    const pending = r.ts.handleHook({ session_id: "chat-1", cwd: r.dir, ...ups("p1") }, cancelled.signal);
+    await new Promise((res) => setTimeout(res, 10));
+    cancelled.abort();
+    // At once, not after the 5 s wait.
+    expect(await Promise.race([pending, new Promise((res) => setTimeout(() => res("still waiting"), 1000))])).toMatchObject({ decision: "block" });
+    expect(r.ts.answerPrompt(r.of("terminal_prompt")[0]!.seq, { ok: true, additionalContext: null, checkpointTree: await r.tree() })).toBe(false);
+    expect(r.of("turn_end").map((e) => e.stopReason)).toEqual(["prompt_timeout"]);
+    expect(r.ts.isTurnActive).toBe(false);
+  });
+
   it("an answer reaches only its own prompt: a stale one (an earlier seq) never settles the prompt waiting now", async () => {
     const r = rig({ answer: null });
     const first = r.hook(ups("p1", "first"));
