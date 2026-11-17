@@ -61,7 +61,9 @@ export function DiffHeader(props: DiffHeaderProps) {
           <span className="caption orange" style={{ whiteSpace: "nowrap" }} data-testid="Note count">💬 {t("{0} notes", props.noteCount)}</span>
         )}
       </div>
-      <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+      {/* A narrow diff pane (a laptop window's chat beside it) wraps the controls onto a second line instead of pushing
+          Accept, the last, past the pane's edge (the Mac's header folds them into "⋯"). */}
+      <div className="row wrap" style={{ gap: 8, justifyContent: "flex-end" }} data-testid="Diff header controls">
         <button
           type="button"
           className={`small ${props.showFullFile ? "active" : ""}`}
