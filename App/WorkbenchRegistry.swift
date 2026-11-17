@@ -142,6 +142,10 @@ final class WindowModel {
     // MARK: terminal-chat (§57.5)
     /// The window's terminal chats: their PTYs live here, so the PRs tab or a re-render never ends one.
     let terminals = TerminalHub()
+    /// §57.5: how the window shows a terminal chat's review panel now (side by side, or a drawer over the terminal) and
+    /// whether it is open — set by the window (the tour reads them).
+    var terminalReviewLayout: TerminalReviewLayout = .sideBySide
+    var reviewPanelOpen = false
     /// §57.6: the bottom terminal panel's shells (⌃`).
     let shell = ShellPanelModel()
     // MARK: polish p-foundation — seeds the polish lanes fill in (types and helpers: App/UI/Common/WindowSeeds.swift)

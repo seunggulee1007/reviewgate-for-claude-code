@@ -52,6 +52,8 @@ struct MainWindow: View {
     @State private var diffCollapsed = false
     /// §57.5: the terminal's share of a terminal chat's split (the review panel the rest), remembered across launches.
     @AppStorage("terminalReviewSplit") private var terminalFraction = 0.55
+    /// §57.5: the width of a terminal chat's terminal + review area (the edge tab aside) — side by side or a drawer.
+    @State private var terminalAreaWidth: CGFloat = 0
     /// The agent activity inspector (remembered across launches; ⌥⌘A, the toolbar button, the HUD agents chip).
     @AppStorage(AgentPanel.storageKey) private var showAgentPanel = false
     /// §21 the side-question inspector (remembered; shares the inspector column with the agent panel).
@@ -412,35 +414,65 @@ struct MainWindow: View {
     // MARK: The terminal chat's split (§57.5)
 
     /// A terminal chat: the terminal takes the window and the review panel (the diff pane) opens on its right while there
-    /// is something to review. The terminal is the split's leading pane open or closed — one view, so the TUI keeps the
-    /// keyboard while the panel opens and closes; only its size (and the PTY's winsize) changes.
+    /// is something to review. The terminal never goes below 80 columns: where 80 columns and the panel's floor fit side by
+    /// side the panel is the split's trailing pane; in a narrower window it is a drawer over the terminal, which keeps its
+    /// whole width (no resize, no reflow) while the drawer opens and closes. Either way the terminal is the split's leading
+    /// pane — one view, so the TUI keeps the keyboard; only its size (and the PTY's winsize) changes, and only side by side.
     private var terminalSplit: some View {
-        let minTerminal = TerminalHost.width(columns: Self.terminalColumns)
-        let terminalFloor = TerminalHost.width(columns: Self.terminalFloorColumns)
+        let minTerminal = Double(TerminalHost.width(columns: Self.terminalColumns))
+        let overlay = terminalLayout == .overlay
         return HStack(spacing: 0) {
-            SplitPane(fraction: $terminalFraction, collapsed: diffCollapsed, collapsesTrailing: true,
-                      clamp: { want, total in
-                          CGFloat(PaneSplit.terminalWidth(Double(want), total: Double(total), minTerminal: Double(minTerminal),
-                                                          terminalFloor: Double(terminalFloor), minReview: Self.minReviewWidth,
-                                                          reviewFloor: Self.reviewFloorWidth))
-                      }) {
-                ChatView()
-            } trailing: {
-                reviewPane
-                    .accessibilityElement(children: .contain)
-                    .accessibilityLabel(Text("Review panel"))
+            ZStack(alignment: .trailing) {
+                SplitPane(fraction: $terminalFraction, collapsed: diffCollapsed || overlay, collapsesTrailing: true,
+                          clamp: { want, total in
+                              CGFloat(PaneSplit.terminalWidth(Double(want), total: Double(total), minTerminal: minTerminal,
+                                                              reviewFloor: Self.reviewFloorWidth))
+                          }) {
+                    ChatView()
+                } trailing: {
+                    if !overlay {
+                        reviewPane
+                            .accessibilityElement(children: .contain)
+                            .accessibilityLabel(Text("Review panel"))
+                    }
+                }
+                if overlay && !diffCollapsed { reviewDrawer }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { terminalAreaWidth = $0 }
             Divider()
             diffEdgeTab
         }
+        .onChange(of: terminalLayout, initial: true) { _, layout in model.terminalReviewLayout = layout }
+        .onChange(of: diffCollapsed, initial: true) { _, collapsed in model.reviewPanelOpen = !collapsed }
     }
 
-    /// The terminal's width when the review panel fits beside it, and the least it keeps while the panel is open.
+    /// §57.5: side by side or a drawer, for the area's width now.
+    private var terminalLayout: TerminalReviewLayout {
+        PaneSplit.terminalReviewLayout(total: Double(terminalAreaWidth), minTerminal: Double(TerminalHost.width(columns: Self.terminalColumns)),
+                                       reviewFloor: Self.reviewFloorWidth)
+    }
+
+    /// §57.5: the review panel over the terminal in a narrow window — full height on the right, a shadow on its edge, a strip
+    /// of the terminal left visible. It takes no keyboard by itself (the terminal keeps it); a click in it does, and then
+    /// Esc closes it (Esc in the terminal stays the TUI's).
+    private var reviewDrawer: some View {
+        reviewPane
+            .frame(width: CGFloat(PaneSplit.reviewDrawerWidth(total: Double(terminalAreaWidth), reviewFloor: Self.reviewFloorWidth)))
+            .frame(maxHeight: .infinity)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .overlay(alignment: .leading) { Divider() }
+            .compositingGroup()
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.55 : 0.22), radius: 14, x: -4)
+            .onExitCommand { setDiffCollapsed(true) }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Text("Review panel over the terminal"))
+            .accessibilityHint(Text("Esc or ⌘⇧D closes it; the terminal behind it keeps its width"))
+            .accessibilityIdentifier("Review drawer")
+    }
+
+    /// The terminal's width when the review panel fits beside it (it never goes below), and the panel's floor — where the
+    /// diff header's icon-only controls still show Accept (~350 pt with Reject, the editor menu…).
     private static let terminalColumns = 80
-    private static let terminalFloorColumns = 38
-    /// The review panel keeps this much while the terminal can shrink (a tight window), and can be dragged down to the
-    /// floor — where the diff header's icon-only controls still show Accept (~350 pt with Reject, the editor menu…).
-    private static let minReviewWidth: Double = 400
     private static let reviewFloorWidth: Double = 360
 
     // MARK: Diff pane collapse (M16)
@@ -476,7 +508,10 @@ struct MainWindow: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .background(Color(nsColor: .windowBackgroundColor))
-        .help(terminal ? (diffCollapsed ? Text("Show the review panel beside the terminal (⌘⇧D)") : Text("Hide the review panel — the terminal takes the width (⌘⇧D)"))
+        .help(terminal ? (terminalLayout == .overlay
+                            ? (diffCollapsed ? Text("Show the review panel over the terminal — the window is too narrow for both side by side (⌘⇧D)")
+                                             : Text("Hide the review panel (⌘⇧D, or Esc in the panel)"))
+                            : (diffCollapsed ? Text("Show the review panel beside the terminal (⌘⇧D)") : Text("Hide the review panel — the terminal takes the width (⌘⇧D)")))
                        : (diffCollapsed ? Text("Show the diff pane (⌘⇧D)") : Text("Hide the diff pane (⌘⇧D)")))
         .accessibilityLabel(terminal ? (diffCollapsed ? Text("Show review panel") : Text("Hide review panel"))
                                      : (diffCollapsed ? Text("Show diff pane") : Text("Hide diff pane")))

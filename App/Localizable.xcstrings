@@ -33907,6 +33907,70 @@
           }
         }
       }
+    },
+    "Review panel over the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review panel over the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 위 리뷰 패널"
+          }
+        }
+      }
+    },
+    "Esc or ⌘⇧D closes it; the terminal behind it keeps its width": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esc or ⌘⇧D closes it; the terminal behind it keeps its width"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esc나 ⌘⇧D로 닫아요. 뒤의 터미널은 너비가 그대로예요"
+          }
+        }
+      }
+    },
+    "Show the review panel over the terminal — the window is too narrow for both side by side (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the review panel over the terminal — the window is too narrow for both side by side (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널을 터미널 위에 띄워요 — 창이 좁아 나란히 둘 수 없어요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "Hide the review panel (⌘⇧D, or Esc in the panel)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the review panel (⌘⇧D, or Esc in the panel)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 숨기기 (⌘⇧D, 패널 안에서는 Esc)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
