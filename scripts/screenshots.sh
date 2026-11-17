@@ -310,8 +310,9 @@ const readline = require("node:readline");
 const argv = process.argv.slice(2);
 if (argv.includes("--version")) { console.log("2.1.325 (Claude Code)"); process.exit(0); }
 if (argv.some((a) => a.includes("stream-json"))) { console.error("fake-claude: only the terminal chat is faked"); process.exit(1); }
-const value = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined; };
-const resume = argv.includes("--resume");
+// `--flag value` or `--flag=value` (the engine joins the session id to its flag).
+const value = (flag) => { const i = argv.indexOf(flag); if (i >= 0) return argv[i + 1]; return argv.find((a) => a.startsWith(`${flag}=`))?.slice(flag.length + 1); };
+const resume = argv.some((a) => a === "--resume" || a.startsWith("--resume="));
 const session = value(resume ? "--resume" : "--session-id");
 let url;
 try { url = JSON.parse(value("--settings") ?? "{}").hooks.Stop[0].hooks[0].url; } catch { url = undefined; }

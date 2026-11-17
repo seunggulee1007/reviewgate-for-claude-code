@@ -1854,7 +1854,7 @@ export type TerminalSpecEvent = {
   /** Added to the PTY env; only keys starting RG_ or CLAUDE_CODE_. Holds RG_HOOK_TOKEN. */
   env: Record<string, string>;
   cwd: string;
-  /** true: argv has `--resume <id>`; false: `--session-id <id>`. */
+  /** true: argv has `--resume=<id>`; false: `--session-id=<id>`. */
   resume: boolean;
 };
 export type SidePromoteDraftEvent = { type: "side_promote_draft"; id?: string; threadId: string; text: string };

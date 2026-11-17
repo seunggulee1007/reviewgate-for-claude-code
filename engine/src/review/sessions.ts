@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { SessionKind, SessionMeta, TranscriptItem } from "../protocol.js";
+import { isCliSessionId } from "../session/terminalSpec.js";
 import { readJSON, writeAtomicJSON } from "./persist.js";
 import { TRANSCRIPT_FILE, TranscriptStore } from "./transcript.js";
 
@@ -73,7 +74,7 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...normalizeMove("movedFrom", o.movedFrom),
     ...(typeof o.planFile === "string" && o.planFile ? { planFile: o.planFile } : {}), // MARK: wave4d w4d-plan (§42.1)
     ...(o.kind === "terminal" ? { kind: "terminal" as const } : {}), // §57: "chat" (the default) is never written
-    ...(typeof o.cliSessionId === "string" && o.cliSessionId ? { cliSessionId: o.cliSessionId } : {}),
+    ...(isCliSessionId(o.cliSessionId) ? { cliSessionId: o.cliSessionId } : {}), // §57.2: a UUID or nothing (it goes into argv)
   };
 }
 

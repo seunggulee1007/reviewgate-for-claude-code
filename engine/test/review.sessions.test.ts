@@ -63,19 +63,19 @@ describe("SessionIndex (index.json)", () => {
     const chat = idx.create("chat", "2026-10-01T00:00:00.000Z");
     const term = idx.create("term", "2026-10-02T00:00:00.000Z", "terminal");
     const plain = idx.create("plain", "2026-10-03T00:00:00.000Z", "chat");
-    term.cliSessionId = "other-cli-id";
+    term.cliSessionId = "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a";
     expect(chat.kind).toBeUndefined();
     expect(plain.kind).toBeUndefined();
     expect(term.kind).toBe("terminal");
     await idx.save();
 
     const again = await SessionIndex.open(gitDir, null);
-    expect(again.get("term")).toMatchObject({ kind: "terminal", cliSessionId: "other-cli-id" });
+    expect(again.get("term")).toMatchObject({ kind: "terminal", cliSessionId: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" });
     expect("kind" in again.get("chat")!).toBe(false);
     expect("cliSessionId" in again.get("chat")!).toBe(false);
   });
 
-  it("§57: a malformed kind or cliSessionId is dropped, the chat itself still loads", async () => {
+  it("§57: a malformed kind or cliSessionId (not a UUID: it would go into argv) is dropped, the chat itself still loads", async () => {
     const gitDir = track(makeTempDir("rg-sessions"));
     mkdirSync(sessionsDir(gitDir), { recursive: true });
     const meta = (id: string, extra: Record<string, unknown>) => ({ id, title: id, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z", turns: 0, costUSD: 0, lastUserText: null, ...extra });
@@ -84,18 +84,24 @@ describe("SessionIndex (index.json)", () => {
       JSON.stringify({
         version: 1,
         sessions: [
-          meta("ok", { kind: "terminal", cliSessionId: "x" }),
+          meta("ok", { kind: "terminal", cliSessionId: "0B7E3C1A-5D2F-4E8B-9A6C-1F2E3D4C5B6A" }),
           meta("chat-kind", { kind: "chat" }),
+          meta("flag", { kind: "terminal", cliSessionId: "--dangerously-skip-permissions" }),
+          meta("not-uuid", { kind: "terminal", cliSessionId: "x" }),
           meta("odd-kind", { kind: "tmux", cliSessionId: "" }),
           meta("num-kind", { kind: 1, cliSessionId: 42 }),
         ],
       }),
     );
     const idx = await SessionIndex.open(gitDir, null);
-    expect(idx.list()).toHaveLength(4);
-    expect(idx.get("ok")).toMatchObject({ kind: "terminal", cliSessionId: "x" });
+    expect(idx.list()).toHaveLength(6);
+    expect(idx.get("ok")).toMatchObject({ kind: "terminal", cliSessionId: "0B7E3C1A-5D2F-4E8B-9A6C-1F2E3D4C5B6A" });
     for (const id of ["chat-kind", "odd-kind", "num-kind"]) {
       expect(idx.get(id)!.kind, id).toBeUndefined();
+      expect(idx.get(id)!.cliSessionId, id).toBeUndefined();
+    }
+    for (const id of ["flag", "not-uuid"]) {
+      expect(idx.get(id)!.kind, id).toBe("terminal");
       expect(idx.get(id)!.cliSessionId, id).toBeUndefined();
     }
   });

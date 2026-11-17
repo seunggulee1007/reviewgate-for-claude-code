@@ -30,6 +30,7 @@ import {
 } from "./hooks.js";
 import { changedWithin, WINDOW_MARGIN_MS } from "./provenance.js";
 import { editScopeReason } from "./reviewScope.js";
+import { isCliSessionId } from "./terminalSpec.js";
 
 /** The engine's answer to a `terminal_prompt`. */
 export type PromptAnswer = { ok: true; additionalContext: string | null; checkpointTree: string } | { ok: false; reason: string };
@@ -218,8 +219,10 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
     this.hooksSeen = true;
-    const sid = str(input.session_id);
-    if (sid && sid !== this.cliSessionId) {
+    // `/clear` or `/resume` in the TUI: the conversation the next prompt runs in (or the one that ended) is the chat's from
+    // now on — only from those two events, and only a UUID (the id goes into the next spawn's argv).
+    const sid = event === "UserPromptSubmit" || event === "SessionEnd" ? input.session_id : undefined;
+    if (isCliSessionId(sid) && sid !== this.cliSessionId) {
       this.cliSessionId = sid;
       this.opts.emit({ type: "terminal_session_id", sessionId: sid });
     }

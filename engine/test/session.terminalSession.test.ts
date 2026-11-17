@@ -240,14 +240,31 @@ describe("TerminalSession", () => {
     expect(r.of("terminal_state").length).toBeGreaterThan(0);
   });
 
-  it("a session_id change (/clear, /resume in the TUI) emits terminal_session_id once; turn_end keeps the chat id", async () => {
+  it("a session_id change (/clear, /resume in the TUI) on a prompt emits terminal_session_id once; turn_end keeps the chat id", async () => {
     const r = rig();
+    const cli2 = "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a";
     await r.hook(ups("p1"));
-    await r.ts.handleHook({ hook_event_name: "Stop", session_id: "cli-2" });
-    await r.ts.handleHook({ hook_event_name: "Notification", notification_type: "other", session_id: "cli-2" });
-    expect(r.of("terminal_session_id")).toEqual([{ type: "terminal_session_id", sessionId: "cli-2" }]);
-    expect(r.ts.cliSession).toBe("cli-2");
+    await r.hook({ hook_event_name: "Stop" });
+    await r.hook({ ...ups("p2"), session_id: cli2 });
+    await r.hook({ hook_event_name: "SessionEnd", reason: "clear", session_id: cli2 });
+    expect(r.of("terminal_session_id")).toEqual([{ type: "terminal_session_id", sessionId: cli2 }]);
+    expect(r.ts.cliSession).toBe(cli2);
     expect(r.of("turn_end")[0]!.sessionId).toBe("chat-1");
+    const cli3 = "1c8f4d2b-6e3a-4f9c-8b7d-2a3b4c5d6e7f";
+    await r.hook({ hook_event_name: "SessionEnd", reason: "resume", session_id: cli3 });
+    expect(r.ts.cliSession).toBe(cli3);
+  });
+
+  it("a forged session_id never becomes the chat's: not a UUID, or on another event than UserPromptSubmit / SessionEnd", async () => {
+    const r = rig();
+    await r.hook({ ...ups("p1"), session_id: "--dangerously-skip-permissions" });
+    await r.hook({ hook_event_name: "Stop", session_id: "--dangerously-skip-permissions" });
+    await r.hook({ hook_event_name: "SessionEnd", session_id: "cli-2 --x" });
+    for (const event of ["Stop", "Notification", "PostToolUse", "StopFailure"]) {
+      await r.hook({ hook_event_name: event, session_id: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" });
+    }
+    expect(r.of("terminal_session_id")).toEqual([]);
+    expect(r.ts.cliSession).toBe("chat-1");
   });
 
   it("dispose answers every pending wait with block / deny, retires the token and emits nothing", async () => {

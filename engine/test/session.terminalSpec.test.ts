@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { hookSettings, hooksDisabled, MIN_TERMINAL_CLI, TERMINAL_SYSTEM_APPEND, terminalArgv, terminalEnv } from "../src/session/terminalSpec.js";
+import { hookSettings, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, TERMINAL_SYSTEM_APPEND, terminalArgv, terminalEnv } from "../src/session/terminalSpec.js";
 import { makeTempDir, removeDir } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.3: the terminal's --settings, argv and the hooks-disabled preflight.
@@ -50,12 +50,16 @@ describe("hookSettings", () => {
 
 describe("terminalArgv / terminalEnv", () => {
   const settingsJson = JSON.stringify(hookSettings(URL));
-  it("a fresh chat starts with --session-id, a known one resumes; the token is never in argv", () => {
+  it("a fresh chat starts with --session-id=<id>, a known one resumes (--resume=<id>); the token is never in argv", () => {
     const token = "ab".repeat(32);
     const fresh = terminalArgv({ claude: "/usr/local/bin/claude", id: "chat-1", resume: false, settingsJson });
-    expect(fresh).toEqual(["/usr/local/bin/claude", "--session-id", "chat-1", "--settings", settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]);
+    expect(fresh).toEqual(["/usr/local/bin/claude", "--session-id=chat-1", "--settings", settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]);
     const resumed = terminalArgv({ claude: "claude", id: "cli-2", resume: true, settingsJson });
-    expect(resumed.slice(0, 3)).toEqual(["claude", "--resume", "cli-2"]);
+    expect(resumed.slice(0, 2)).toEqual(["claude", "--resume=cli-2"]);
+    // An id that looks like a flag stays the flag's value: no argv element of its own.
+    const odd = terminalArgv({ claude: "claude", id: "--dangerously-skip-permissions", resume: true, settingsJson });
+    expect(odd).not.toContain("--dangerously-skip-permissions");
+    expect(odd[1]).toBe("--resume=--dangerously-skip-permissions");
     for (const argv of [fresh, resumed]) {
       expect(argv.join(" ")).not.toContain(token);
       expect(argv).not.toContain("--model");
@@ -63,6 +67,14 @@ describe("terminalArgv / terminalEnv", () => {
       expect(argv).not.toContain("--setting-sources");
     }
     expect(TERMINAL_SYSTEM_APPEND).toContain("[Review gate]");
+  });
+
+  it("isCliSessionId: a UUID only", () => {
+    expect(isCliSessionId("0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a")).toBe(true);
+    expect(isCliSessionId("0B7E3C1A-5D2F-4E8B-9A6C-1F2E3D4C5B6A")).toBe(true);
+    for (const v of ["--dangerously-skip-permissions", "cli-2", "", " 0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a\n--x", 42, null, undefined]) {
+      expect(isCliSessionId(v), String(v)).toBe(false);
+    }
   });
 
   it("only RG_ and CLAUDE_CODE_ keys reach the PTY env", () => {

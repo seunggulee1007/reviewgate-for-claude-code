@@ -127,8 +127,8 @@ describe("terminal chats (§57)", () => {
     const r = await rig();
     const id = await newTerminal(r);
     const s = await spec(r, id);
-    expect(s.argv.slice(0, 4)).toEqual([r.claude, "--session-id", id, "--settings"]);
-    expect(s.argv[5]).toBe("--append-system-prompt");
+    expect(s.argv.slice(0, 3)).toEqual([r.claude, `--session-id=${id}`, "--settings"]);
+    expect(s.argv[4]).toBe("--append-system-prompt");
     expect(s.resume).toBe(false);
     expect(s.cwd).toBe(r.dir);
     expect(Object.keys(s.env)).toEqual(["RG_HOOK_TOKEN"]);
@@ -236,16 +236,19 @@ describe("terminal chats (§57)", () => {
     const s = await spec(r, id);
     await turn(r, s, "p1");
     await r.h.engine.handle({ type: "accept_all" });
-    // The TUI's /clear: the next hooks carry another session id.
-    await hook(s, { hook_event_name: "Notification", notification_type: "other", message: "", session_id: "cli-after-clear" });
-    await r.h.waitFor((st) => st.sessions.list.find((m) => m.id === id)?.cliSessionId === "cli-after-clear", "cliSessionId");
+    // The TUI's /clear: the next prompt carries another session id (a forged, non-UUID one before it is ignored).
+    const cleared = "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a";
+    await hook(s, { hook_event_name: "SessionEnd", reason: "clear", session_id: "--dangerously-skip-permissions" });
+    await hook(s, { ...ups("p2", "/help"), session_id: cleared });
+    await r.h.waitFor((st) => st.sessions.list.find((m) => m.id === id)?.cliSessionId === cleared, "cliSessionId");
     expect(r.h.engine.state.sessions.currentId).toBe(id); // the chat keeps its id
     await r.h.engine.dispose();
     const again = await rig({ dir: r.dir, config: r.config });
     expect(again.h.engine.state.sessions.currentId).toBe(id);
     const s2 = await spec(again, id);
     expect(s2.resume).toBe(true);
-    expect(s2.argv.slice(1, 3)).toEqual(["--resume", "cli-after-clear"]);
+    expect(s2.argv[1]).toBe(`--resume=${cleared}`);
+    expect(s2.argv).not.toContain("--dangerously-skip-permissions");
   });
 
   it("Notification: waiting is set (permission / question) and cleared by the next hook", async () => {

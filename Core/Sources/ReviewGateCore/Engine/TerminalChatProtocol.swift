@@ -24,7 +24,7 @@ public struct TerminalSpec: Decodable, Sendable, Equatable {
     /// Added to the PTY env; only keys starting `RG_` or `CLAUDE_CODE_` are used. Holds `RG_HOOK_TOKEN`.
     public let env: [String: String]
     public let cwd: String
-    /// true: argv has `--resume <id>`; false: `--session-id <id>`.
+    /// true: argv has `--resume=<id>`; false: `--session-id=<id>`.
     public let resume: Bool
 
     public init(id: String? = nil, sessionId: String, argv: [String], env: [String: String], cwd: String, resume: Bool) {

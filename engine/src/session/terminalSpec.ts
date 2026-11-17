@@ -60,9 +60,22 @@ export function hookSettings(url: string): { hooks: Record<string, { matcher?: s
   };
 }
 
-/** `claude --session-id|--resume <id> --settings <json> --append-system-prompt <…>` — the user's own claude otherwise. */
+/**
+ * A CLI conversation id a terminal chat may run: a UUID, as the CLI makes them. A hook's `session_id` (any process holding
+ * the token can post one) or a stored `cliSessionId` that is anything else is ignored, so it never reaches the argv.
+ */
+export const CLI_SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isCliSessionId(v: unknown): v is string {
+  return typeof v === "string" && CLI_SESSION_ID_RE.test(v);
+}
+
+/**
+ * `claude --session-id=<id>|--resume=<id> --settings <json> --append-system-prompt <…>` — the user's own claude otherwise.
+ * The id is joined to its flag, so whatever it holds it is that flag's value, never an option of its own.
+ */
 export function terminalArgv(a: { claude: string; id: string; resume: boolean; settingsJson: string }): string[] {
-  return [a.claude, a.resume ? "--resume" : "--session-id", a.id, "--settings", a.settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND];
+  return [a.claude, `${a.resume ? "--resume" : "--session-id"}=${a.id}`, "--settings", a.settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND];
 }
 
 /** The env the PTY adds: only `RG_*` / `CLAUDE_CODE_*` keys pass. */

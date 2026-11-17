@@ -74,7 +74,7 @@ import Testing
     @Test func theSpecAndThePtysLife() async throws {
         let app = makeState()
         var asked: [EngineCommand] = []
-        let spec = TerminalSpec(sessionId: "t1", argv: ["/usr/local/bin/claude", "--session-id", "t1"], env: ["RG_HOOK_TOKEN": "x"],
+        let spec = TerminalSpec(sessionId: "t1", argv: ["/usr/local/bin/claude", "--session-id=t1"], env: ["RG_HOOK_TOKEN": "x"],
                                 cwd: "/work/acme", resume: false)
         app.replySink = { command in
             asked.append(command)

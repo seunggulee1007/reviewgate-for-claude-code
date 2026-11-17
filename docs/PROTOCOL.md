@@ -8636,7 +8636,7 @@ type TerminalSpecEvent = { type: "terminal_spec"; id?: string; sessionId: string
   argv: string[];                  // argv[0] = the claude executable (absolute when found); never holds the token
   env: Record<string, string>;     // added to the PTY env; only RG_* / CLAUDE_CODE_* keys; holds RG_HOOK_TOKEN
   cwd: string;
-  resume: boolean };               // true: argv has --resume <id>; false: --session-id <id>
+  resume: boolean };               // true: argv has --resume=<id>; false: --session-id=<id>
 type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
 type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
   waiting: TerminalWaiting | null; interruptSuspected: boolean };
@@ -8674,8 +8674,10 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   longer the current terminal chat is accepted and does nothing (switching away already ended it).
 - **Resume.** `terminal_spec` resumes (`--resume`) once the chat is resumable — it ran a prompt (`lastUserText`,
   `cliKnown`: set when a prompt is adopted), or the CLI has its record — else it starts the chat's id
-  (`--session-id`). A `/clear` or `/resume` inside the TUI changes the conversation: the next hook's `session_id` becomes
-  the chat's `cliSessionId` (persisted; removed again when it is the chat's own id), and the spec resumes that one. The
+  (`--session-id`). A `/clear` or `/resume` inside the TUI changes the conversation: the `session_id` of the next UserPromptSubmit or
+  SessionEnd hook becomes the chat's `cliSessionId` (persisted; removed again when it is the chat's own id), and the spec
+  resumes that one. Only a UUID is taken — from a hook and when `sessions/index.json` is read — and no other event's
+  `session_id` is: any process holding the token can post a hook, and the id goes into the next spawn's argv. The
   chat keeps its id (it is never renamed after the CLI's id, as a chat is). After an app restart the engine reopens the
   current chat; the app sees `kind: "terminal"` and asks for a spec.
 - **Restart in a tab.** The app ends the PTY, sends `terminal_exited`, asks for a new spec (the old token is retired: a
@@ -8683,8 +8685,8 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
 - **The engine restarts** (its sidecar died): the port changes, so a running terminal's hooks fail — closed where it
   matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
 
-**What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id" | "--resume", <cliSessionId ?? id>,
-"--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
+**What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id=<id>" | "--resume=<id>"` (`<id>` = `cliSessionId ?? id`, joined to its flag so it can
+never be an option of its own)`, "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
 `--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
 ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
 "already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
@@ -8733,14 +8735,16 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
   connected to ReviewGate's review. Restart it from its tab."), every other event `{}`. The last 64 retired tokens are
   remembered; older ones get 401 (non-blocking for the CLI except where `onFailure: "block"` makes it block).
 - **The token sits in claude's env**, so a command Claude runs could post a hook. Accepted for Stage 1: B is tree-based, so
-  a forged hook cannot hide a change; the server is 127.0.0.1 only and the token changes per spawn.
+  a forged hook cannot hide a change; the server is 127.0.0.1 only and the token changes per spawn. A forged `session_id`
+  cannot reach the next launch's argv as an option (UUID only, `--resume=<id>`).
 
 ### 57.4 Turns: how the hooks map onto the review
 
 `session/terminalSession.ts` is the terminal chat's session object: it never starts the CLI, it turns hooks into the
 session events a chat's CLI session gives, so snapshot A / B, the turn diff, accept / reject, `state`, `turn_end` and
-`turn_summary` are the chat's. On every hook: `hooksSeen`; a `session_id` other than the one expected (`/clear`,
-`/resume` inside the TUI) becomes the chat's `cliSessionId` (the chat keeps its id; `turn_end` carries the chat's id);
+`turn_summary` are the chat's. On every hook: `hooksSeen`; on UserPromptSubmit and SessionEnd, a `session_id` (a UUID) other than the one expected
+(`/clear`, `/resume` inside the TUI) becomes the chat's `cliSessionId` (the chat keeps its id; `turn_end` carries the
+chat's id);
 `waiting` is cleared (but by a Notification).
 
 | Hook | What happens | Answer |
