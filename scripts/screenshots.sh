@@ -56,8 +56,9 @@
 #                  the PTY becoming a review, a reject named in the next prompt's context, the shell tab's folder, the
 #                  input method in `cat` (한글, a commit on focus loss, Hanja, the #825 mask), copy without the pasteboard,
 #                  ⌃`, /exit and Restart resuming the same conversation, the layout at the laptop's 1000 × 637 (the terminal
-#                  80 columns or more without a review, the review panel opening beside it for each review and closing, the
-#                  split moved, the window resized) with the PTY's winsize following each time (the fake's `size` /
+#                  80 columns or more without a review, the review panel opening as a drawer over it — no SIGWINCH, the
+#                  keyboard kept — for each review and closing, side by side at 1440 × 900 with the split moved and never
+#                  under 80 columns, the window resized), the first chat and ⌘T's being terminal chats by default (§57.7) with the PTY's winsize following each time (the fake's `size` /
 #                  `winsize` lines, `stty size` in the shell), Settings' Restart now restarting the PTY (a new
 #                  pid, the same conversation, its hooks still reviewed), and no claude starting again once the window's
 #                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).

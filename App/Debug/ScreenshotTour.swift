@@ -2845,8 +2845,9 @@ private final class Tour {
         await ptyFollows(host, "without a review")
         try write(try render(window), "terminal-chat-wide-dark")
 
-        // 2. A prompt typed into the PTY becomes a review turn with notes.txt; the review panel opens on the terminal's right
-        // and the terminal (which keeps the keyboard) shrinks.
+        // 2. A prompt typed into the PTY becomes a review turn with notes.txt. §57.5: at the laptop size 80 columns and the
+        // review's floor do not fit side by side, so the review panel opens as a drawer over the terminal — which keeps its
+        // width (no SIGWINCH) and the keyboard.
         host.focus()
         let focusedBefore = host.isFocused
         let signalsBefore = Self.reports(host, "winsize").count
@@ -2856,31 +2857,42 @@ private final class Tour {
         }
         log("terminal: first prompt → " + (reviewed ? "review with notes.txt" : "— SILENT (phase \(store.gatePhase), files \(store.changedFiles.map(\.path)))"))
         log("terminal: hooks seen \(store.terminalInfo?.hooksSeen == true), running \(store.terminalInfo?.running == true)")
-        let opened = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
+        let model = entry.model
+        let opened = await waitFor(seconds: 5) { model.reviewPanelOpen }
         try await Task.sleep(for: .milliseconds(1200))
-        let narrow = host.view.terminalDimensions.cols
-        log("terminal: layout review — " + (opened ? "the review panel opened, chat view \(size(host)) (was \(wide) columns)" : "— LOST (the review panel did not open: \(size(host)))")
-            + (narrow >= 38 ? "" : " — CUT (under 38 columns)"))
-        // One resize for one open (an animated panel resized the TUI at every frame on the way).
+        let overCols = host.view.terminalDimensions.cols
+        log("terminal: layout review at 1000 × 637 — " + (opened && model.terminalReviewLayout == .overlay
+            ? "the review panel opened as a drawer over the terminal, chat view \(size(host))"
+            : "— LOST (open \(model.reviewPanelOpen), layout \(model.terminalReviewLayout), \(size(host)))")
+            + (overCols >= 80 && overCols == wide ? " — the terminal kept its \(overCols) columns" : " — CUT (\(overCols) columns, was \(wide))"))
         let signals = Self.reports(host, "winsize").count - signalsBefore
-        log("terminal: layout review — SIGWINCH ×\(signals) for the panel opening " + (signals <= 2 ? "(one redraw)" : "— JUMP (the TUI redrew at each width on the way)"))
+        log("terminal: layout review — SIGWINCH ×\(signals) for the drawer opening " + (signals == 0 ? "(no reflow)" : "— JUMP (the TUI redrew)"))
         log("terminal: layout review — the terminal " + (!focusedBefore ? "INFO had no keyboard before (\(String(describing: window.firstResponder)))"
                                                           : host.isFocused ? "kept the keyboard" : "— LOST (the keyboard went to \(String(describing: window.firstResponder)))"))
-        await ptyFollows(host, "review panel open")
+        await ptyFollows(host, "review drawer open")
         try write(try render(window), "terminal-chat-review-dark")
 
-        // 2b. ⌘⇧D closes the panel: the terminal takes the width again; the split moved (the stored share) resizes it.
+        // 2b. ⌘⇧D closes the drawer: nothing under it moved, so no SIGWINCH either.
+        let signalsOpen = Self.reports(host, "winsize").count
         entry.model.toggleDiffTick += 1   // ⌘⇧D
-        let closed = await waitFor(seconds: 5) { host.view.terminalDimensions.cols >= wide }
+        let closed = await waitFor(seconds: 5) { !model.reviewPanelOpen }
         try await Task.sleep(for: .milliseconds(600))
-        log("terminal: layout panel closed — " + (closed ? "chat view \(size(host))" : "— LOST (still \(size(host)))"))
-        await ptyFollows(host, "panel closed")
+        let closeSignals = Self.reports(host, "winsize").count - signalsOpen
+        log("terminal: layout drawer closed — " + (closed && host.view.terminalDimensions.cols == wide && closeSignals == 0
+            ? "chat view \(size(host)), no SIGWINCH" : "— LOST (open \(model.reviewPanelOpen), \(size(host)), SIGWINCH ×\(closeSignals))"))
+        await ptyFollows(host, "drawer closed")
         try write(try render(window), "terminal-chat-panel-closed-dark")
         entry.model.toggleDiffTick += 1
-        _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
-        // The divider moves the terminal where there is room to move it (the laptop window keeps the review at its floor).
-        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1280, height: 800)), display: true)
+        _ = await waitFor(seconds: 5) { model.reviewPanelOpen }
+        // A wide window: side by side, the terminal at 80 columns or more, the divider moving it within that.
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1440, height: 900)), display: true)
+        _ = await waitFor(seconds: 5) { model.terminalReviewLayout == .sideBySide }
         try await Task.sleep(for: .milliseconds(800))
+        let sideCols = host.view.terminalDimensions.cols
+        log("terminal: layout 1440 × 900 — " + (model.terminalReviewLayout == .sideBySide && sideCols >= 80
+            ? "side by side, chat view \(size(host))" : "— CUT (layout \(model.terminalReviewLayout), \(size(host)))"))
+        await ptyFollows(host, "side by side at 1440 × 900")
+        try write(try render(window), "terminal-chat-side-by-side-dark")
         var splitCols: [Int] = []
         for share in [0.3, 0.7] {
             UserDefaults.standard.set(share, forKey: "terminalReviewSplit")
@@ -2889,12 +2901,16 @@ private final class Tour {
             await ptyFollows(host, "split at \(share)")
         }
         UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")
-        log("terminal: layout split dragged at 1280 × 800 — \(splitCols.map(String.init).joined(separator: " → ")) columns "
-            + (splitCols.count == 2 && splitCols[0] < splitCols[1] && splitCols[0] >= 38 ? "(the terminal moved with it)" : "— LOST (the split did not move the terminal)"))
+        log("terminal: layout split dragged at 1440 × 900 — \(splitCols.map(String.init).joined(separator: " → ")) columns "
+            + (splitCols.count == 2 && splitCols[0] < splitCols[1] && splitCols[0] >= 80 ? "(the terminal moved with it, never under 80)" : "— LOST (the split did not move the terminal, or cut it)"))
+        // Back to the laptop: one resize into the drawer layout (the terminal takes the width again).
+        let backSignals = Self.reports(host, "winsize").count
         window.setFrame(NSRect(origin: window.frame.origin, size: laptop), display: true)
+        _ = await waitFor(seconds: 5) { model.terminalReviewLayout == .overlay }
         try await Task.sleep(for: .milliseconds(800))
+        log("terminal: layout back to 1000 × 637 — \(model.terminalReviewLayout == .overlay ? "a drawer again" : "— LOST (\(model.terminalReviewLayout))"), chat view \(size(host)), SIGWINCH ×\(Self.reports(host, "winsize").count - backSignals)")
         entry.model.toggleDiffTick += 1   // closed again: the next review must open it by itself
-        _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols >= wide }
+        _ = await waitFor(seconds: 5) { !model.reviewPanelOpen }
 
         // 3. Reject it; the next prompt's context says so.
         if reviewed, let file = store.changedFiles.first(where: { $0.path == "notes.txt" }) {
@@ -2908,9 +2924,9 @@ private final class Tour {
             }
             log("terminal: second prompt's context " + (told ? "names the rejected file" : "— LOST (\(Self.lastLines(host, 6)))"))
             _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing }
-            let reopened = await waitFor(seconds: 5) { host.view.terminalDimensions.cols < wide }
+            let reopened = await waitFor(seconds: 5) { model.reviewPanelOpen }
             try await Task.sleep(for: .milliseconds(600))
-            log("terminal: layout next review — " + (reopened ? "the panel the user closed opened again, chat view \(size(host))" : "— LOST (it stayed closed: \(size(host)))"))
+            log("terminal: layout next review — " + (reopened ? "the drawer the user closed opened again, chat view \(size(host))" : "— LOST (it stayed closed: \(size(host)))"))
         } else {
             log("terminal: reject step skipped — LOST (no review to reject)")
         }
