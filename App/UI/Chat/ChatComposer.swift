@@ -30,6 +30,8 @@ final class ComposerModel {
     var paletteForced = false
     var paletteDismissed = false
     var paletteIndex = 0
+    /// §56.4: the selected row of the `/mcp` list (`ComposerMcpPalette`).
+    var mcpIndex = 0
     /// A refused paste / drop / attachment, shown above the composer for a few seconds.
     var notice: String?
     var dropHover = false
@@ -221,6 +223,8 @@ struct ComposerPalettes: View {
                            onPick: { composer.pickMention($0, store: store) },
                            onHover: { composer.mentionIndex = $0 },
                            onRetry: { composer.mentionRetry &+= 1 })
+        } else if let command = composer.mcpCommand(store) {
+            ComposerMcpPalette(composer: composer, command: command)   // §56.4: `/mcp`, as in the terminal
         } else if composer.paletteVisible(available: store.canUseSlashPalette) {   // r1-composer M14: while Claude works too
             // wave3 mac-session (§36.5): descriptions, hints, groups, recently used first, "Starting session…".
             let sections = composer.paletteSections(store)
@@ -439,6 +443,7 @@ struct ChatComposer: View {
             composer.paletteDismissed = false
             composer.paletteForced = false   // ⌘/ over a typed draft: typing on is a message, not a filter — ↩ stays a newline
             composer.paletteIndex = 0
+            composer.mcpIndex = 0   // §56.4
         }
         .onChange(of: model.requestChangesTick) { _, _ in
             // ⌘⇧C (audit 1.11): with notes, send them; otherwise just land in the composer.
@@ -827,7 +832,7 @@ struct ChatComposer: View {
     /// r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as the instruction (no interrupt: Claude
     /// follows it in the same turn); the text leaves the box like a sent message.
     private func denyWithDraft(_ card: PermissionRequest) {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         let text = trimmedDraft
         guard !text.isEmpty else { return }
         store.denyPermission(requestId: card.requestId, .instruction(text))
@@ -861,7 +866,7 @@ struct ChatComposer: View {
 
     /// Plain Send: the message goes out and the review list stays exactly as it is.
     private func send() {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         let text = composer.draft
         if store.viewingChat != nil { sendInViewedChat(text); return }   // wave4b w4b-tabs (§39.2)
         guard store.canSend, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -891,7 +896,7 @@ struct ChatComposer: View {
 
     /// §50 "바로 보내기": the draft goes into the running turn (refused by the engine, it waits in the queue).
     private func steerDraft() {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         guard !trimmedDraft.isEmpty else { return }
         let text = composer.draft
         let (mentions, _) = composer.takeInputs(history: store.promptHistory)
@@ -906,7 +911,7 @@ struct ChatComposer: View {
     /// card goes out once every question has an answer), or with an empty box the card goes as it is. Never steered: a
     /// message in the turn would only wait behind the open question. Mentions and images stay for the next message.
     private func answerQuestion(_ open: OpenQuestion) {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         let id = open.requestId
         var draft = transcript.questionDrafts[id] ?? QuestionDraft()
         guard !trimmedDraft.isEmpty else {
@@ -936,7 +941,7 @@ struct ChatComposer: View {
     }
 
     private func queueDraft() {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         guard !trimmedDraft.isEmpty else { return }
         let (queuedMentions, queuedImages) = composer.takeInputs(history: store.promptHistory)
         store.enqueue(composer.draft, mentions: queuedMentions, images: queuedImages)
@@ -947,7 +952,7 @@ struct ChatComposer: View {
 
     /// "중단하고 보내기" (§28): interrupt, then this message right behind it.
     private func stopAndSend() {
-        if takeBtw() { return }   // §56.1
+        if takeBtw() || takeMcp() { return }   // §56.1 / §56.4
         guard store.isRunning, !trimmedDraft.isEmpty else { return }
         let (sentMentions, sentImages) = composer.takeInputs(history: store.promptHistory)
         store.interruptAndSend(composer.draft, mentions: sentMentions, images: sentImages)
@@ -1006,7 +1011,7 @@ struct ChatComposer: View {
     /// queued while it restarts). It never answers a permission card — a stray Return must not allow a command — and an empty
     /// draft stays as it is. r2-review-flow M30: false when nothing could take the text (the caller says why).
     private func sendFromReturn() -> Bool {
-        if takeBtw() { return true }   // §56.1: before a question or a card takes the text
+        if takeBtw() || takeMcp() { return true }   // §56.1 / §56.4: before a question or a card takes the text
         // r1-composer M08: ↩ answers Claude's open question (with an empty box: sends its card as it is).
         if let question {
             answerQuestion(question)
@@ -1038,6 +1043,24 @@ struct ChatComposer: View {
         } else {
             Task { await store.askBtw(question) }
         }
+        return true
+    }
+
+    /// §56.4: `/mcp …` is the app's command too — never sent, queued or put into the turn: `/mcp` opens the list (a space
+    /// after it), `/mcp reconnect|enable|disable <name>` runs. False for any other text.
+    private func takeMcp() -> Bool {
+        guard store.canUseSlashPalette, store.offersMcpCommand, let command = McpCommand.parse(composer.draft) else { return false }
+        composer.closePalette()
+        composer.paletteForced = false
+        if case .run = command {
+            composer.runMcpEnter(store, command)
+        } else if composer.mcpCommand(store) == nil {
+            composer.draft = "/mcp "   // `/mcp` typed out: the list opens
+            composer.caretRequest = (composer.draft as NSString).length
+        } else {
+            composer.runMcpEnter(store, command)
+        }
+        composer.inputFocused = true
         return true
     }
 
@@ -1287,6 +1310,10 @@ struct ChatComposer: View {
                 break
             }
         }
+        // §56.4: the `/mcp` list's keys (↑ ↓ ↩ ⌥↩ ⌘↩ ⇥ esc) before the slash palette's and the box's own.
+        if let command = composer.mcpCommand(store), let handled = composer.handleMcpKey(key, store: store, command: command) {
+            return handled
+        }
         switch key {
         case .optionEnter:
             // r1-composer M08: ⌥↩ while Claude's question is open — the text goes to Claude apart from the question (into
@@ -1338,6 +1365,8 @@ struct ChatComposer: View {
             // §56.1: ↩ in an empty box closes the /btw answer; `/btw` typed out runs at once instead of the palette's pick.
             if key == .enter, closesBtwAnswer { store.dismissBtw(); return true }
             if key == .enter, paletteVisible, composer.slashToken?.lowercased() == BtwCommand.name { return takeBtw() }
+            // §56.4: `/mcp` typed out opens the list whatever row the palette has selected.
+            if key == .enter, paletteVisible, composer.slashToken?.lowercased() == McpCommand.name, takeMcp() { return true }
             guard paletteVisible else { return key == .enter && returnSends ? (sendFromReturn() || explainUnsent()) : false }
             let entries = composer.paletteEntries(store)
             guard !entries.isEmpty else { composer.closePalette(); return true }

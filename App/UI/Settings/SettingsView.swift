@@ -2,16 +2,25 @@ import SwiftUI
 import ReviewGateCore
 
 struct SettingsView: View {
+    /// §56.4: the tab shown — `/mcp`'s "Add in Settings…" opens Extensions (where MCP servers are added).
+    enum Tab: String { case general, extensions, project, accounts }
+    static let tabKey = "settingsTab"
+    @AppStorage(SettingsView.tabKey) private var tab = Tab.general.rawValue
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(Tab.general.rawValue)
             ExtensionsSettingsView()
                 .tabItem { Label("Extensions", systemImage: "puzzlepiece.extension") }
+                .tag(Tab.extensions.rawValue)
             ProjectFlowSettingsView()   // wave3 mac-flow: commit template, workbench setup, PR command of this repository
                 .tabItem { Label("Project", systemImage: "folder.badge.gearshape") }
+                .tag(Tab.project.rawValue)
             AccountsSettingsView()
                 .tabItem { Label("Accounts", systemImage: "person.crop.circle") }
+                .tag(Tab.accounts.rawValue)
         }
         .frame(width: 560, height: 760)
     }

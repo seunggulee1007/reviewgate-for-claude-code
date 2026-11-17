@@ -208,6 +208,9 @@ final class WindowModel {
     @ObservationIgnored var debugQueueTools: [String: CGRect] = [:]
     /// §56.1: the /btw answer over the box (`.zero` while it is not shown).
     @ObservationIgnored var debugBtwFrame: CGRect = .zero
+    /// §56.4: the `/mcp` list over the box (`.zero` while it is closed) and its rows' server names.
+    @ObservationIgnored var debugMcpFrame: CGRect = .zero
+    @ObservationIgnored var debugMcpRows: [String] = []
     #endif
 
     func reveal(toolUseId: String) {

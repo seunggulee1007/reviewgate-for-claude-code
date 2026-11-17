@@ -8487,7 +8487,7 @@ styles. A screen that uses them gets these without a change of its own.
 
 ## 56. The message box as the terminal's
 
-Three things a terminal user reaches for in Claude Code's input that the message box lacked.
+What a terminal user reaches for in Claude Code's input that the message box lacked.
 
 ### 56.1 `/btw` — a side question while Claude works
 
@@ -8611,6 +8611,45 @@ editor closes. A long instruction is easier to write there. This is the clients'
   (`externalEdit.ts`, `ExternalEditBar.tsx`) keeps the draft from before Ctrl+G for Cancel and ignores a save of a draft
   it finished. Ctrl+G with no Shift / Alt / Meta on every platform (⌘G stays find-next on the Mac); the button and bar as
   on the Mac.
+
+### 56.4 `/mcp` — the MCP servers from the message box
+
+In the terminal `/mcp` lists the session's MCP servers and ↑ / ↓ + Enter reconnect, log in to or turn one on / off;
+`/mcp reconnect|enable|disable <name>` does it at once. In the app this lived in the capabilities popover / Settings ›
+Extensions › MCP servers only (§22). No engine command is new: the list is `mcp_status`, the actions `mcp_reconnect`,
+`mcp_toggle`, `mcp_auth`, as there.
+
+- **Where.** A regular (chat-kind) chat's message box, with a project open and an engine with §22 (`McpStore.isSupported`;
+  an engine that answered `unknown_command` hides it). A terminal chat has the real TUI's `/mcp`. The slash palette lists
+  `/mcp` (Built-in: "Manage MCP servers — reconnect, log in, turn on or off", hint `[reconnect|enable|disable] <server|all>`)
+  over a `/mcp` the CLI may list. `/mcp …` is the app's command, like `/btw`: never sent, queued or put into the turn.
+- **The list.** ↩ (or ⇥) on `/mcp` in the palette, or `/mcp ` with a space, opens the list over the box: one row per server
+  — its status dot (a spinner while an action runs), name, where it comes from (User / Project / Local / Plugin / …), the
+  tool count once connected, the status (Connected / Failed / Needs login / Connecting… / Off / Working…) and its own
+  buttons: the ↩ action, an on / off switch and Open Config File (the file that defines it, §42.3; disabled with the reason
+  when unknown). The list asks `mcp_status` when it opens (until the first answer: the names and states the session
+  reported) and has ↻. What follows `/mcp ` filters by name (names starting with it first). A failed action's words show
+  in a line at its top. No servers: "No MCP servers" with **Add in Settings…** (Settings › Extensions).
+- **Keys.** ↑ / ↓ select; ↩ = Reconnect — **Log in…** for a server that needs a login (Terminal with `claude /mcp`, as in
+  Settings), **Turn On** for one that is off; ⌥↩ turns it on / off; ⌘↩ opens its config file; ⇥ completes the selected
+  name into the command; Esc closes the list and empties the box (the command goes, as the terminal's dialog). Hover
+  selects; each button has a tooltip with its key and VoiceOver reads a row as "name, origin, status, N MCP tools" with
+  the three actions as named actions. The box stays usable: actions run in the background, the row shows the spinner,
+  then its new status.
+- **Typed out.** `/mcp reconnect <name>`, `/mcp enable <name>`, `/mcp disable <name>` + ↩ run on the server with that name
+  (any case), else on the selected row of the list it filters (the list is the name completion; ⇥ completes). The box
+  empties and the notice line says "Reconnecting “x”…", then "x — Connected" or the engine's refusal. A name that matches
+  none: "No MCP server is called “x” — type /mcp to see the list". `all` (as the terminal's) acts on every server it can,
+  one after the other ("Turning off 3 MCP servers…", then "Turn Off — 3 MCP servers done" or the first refusal).
+- **When it cannot.** The session not running, a row busy, Reconnect on a server that is off, Turn On on one that is on:
+  the button is disabled with the reason as its tooltip, and its key beeps and says the reason in the notice line.
+- **Verified** (`SHOTS_LAYOUT=composer`, quiet, 1000 × 637, against the live session): two servers added for this session
+  (`mcp_add {scope: "session"}`, nothing written to disk) — a tiny node stdio server with two tools and one that
+  exits at once (Failed); `/mcp` first in the palette and ↩ opening the list with both (and the account's own servers —
+  the checks filter to "acme" and never act on those); ↩ reconnecting (the spinner, then Connected); ⌥↩ off and on;
+  `/mcp disable|enable acme-docs` typed out (the box empties, the notice line follows); an unknown name refused in words;
+  the filter, ⇥ and Esc; "No server matches" once both were removed ("No MCP servers" when the account has none)
+  (`composer /mcp` lines, `composer-mcp-*.png`). Core: `McpPaletteTests`.
 
 ## 57. Terminal chat
 
