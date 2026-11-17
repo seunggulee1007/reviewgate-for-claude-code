@@ -35,32 +35,30 @@ import Testing
         #expect(PaneSplit.leadingWidth(100, total: 1117, minLeading: 420, minTrailing: 380, leadingFloor: 240) == 420)
     }
 
-    /// terminal-chat (§57.5): the terminal keeps 80 columns (627 pt) when the review panel fits beside it; in the laptop
-    /// window the review keeps the 360 pt its Accept button needs and the terminal shrinks, never below 38 columns (298 pt);
-    /// no jump on the way.
-    @Test func theTerminalKeepsEightyColumnsWhenTheReviewFits() {
+    /// terminal-chat (§57.5): a terminal chat's terminal never goes below 80 columns (627 pt). Side by side only where 80
+    /// columns and the review's 360 pt fit (987 pt); there the divider moves between the two; below it the review is a drawer
+    /// over the terminal — 45 % of the area, at least 360 pt, a strip of the terminal left — and the terminal keeps its width.
+    @Test func theTerminalNeverGoesBelowEightyColumns() {
         func width(_ want: Double, _ total: Double) -> Double {
-            PaneSplit.terminalWidth(want, total: total, minTerminal: 627, terminalFloor: 298, minReview: 400, reviewFloor: 360)
+            PaneSplit.terminalWidth(want, total: total, minTerminal: 627, reviewFloor: 360)
         }
-        // A wide window: where the user put the divider, the terminal at least 80 columns, the review at least its floor.
-        #expect(width(770, 1400) == 770)
-        #expect(width(601, 1093) == 627)
-        #expect(width(1300, 1400) == 1040)
-        // Without the sidebar in the laptop window (976 pt): the review keeps 400, the terminal 576 — the drag moves it to 616.
-        #expect(width(537, 976) == 576)
-        #expect(width(900, 976) == 616)
-        // The laptop window (676 pt beside the sidebar): the review keeps its floor, the terminal what is left.
-        #expect(width(372, 676) == 316)
-        #expect(width(100, 676) == 298)
-        // The smallest window: the terminal keeps its floor, the review the rest.
-        #expect(width(300, 577) == 298)
-        #expect(width(500, 577) == 298)
+        func layout(_ total: Double) -> TerminalReviewLayout {
+            PaneSplit.terminalReviewLayout(total: total, minTerminal: 627, reviewFloor: 360)
+        }
+        // A wide window (1440 × 900 beside the sidebar: ~1094 pt): where the user put the divider, within both minimums.
+        #expect(layout(1094) == .sideBySide)
+        #expect(width(600, 1094) == 627)
+        #expect(width(700, 1094) == 700)
+        #expect(width(1000, 1094) == 734)
+        #expect(layout(987) == .sideBySide && width(0, 987) == 627 && width(900, 987) == 627)
+        // Narrower: a drawer; the laptop window (676 pt beside the sidebar), 1280 × 800 (~934 pt), no sidebar (~954 pt).
+        for total in [986.9, 954, 934, 676, 400] { #expect(layout(total) == .overlay) }
+        for total in stride(from: 987.0, through: 2000, by: 7) { #expect(width(0.55 * total, total) >= 627) }
+        #expect(PaneSplit.reviewDrawerWidth(total: 676, reviewFloor: 360) == 360)
+        #expect(PaneSplit.reviewDrawerWidth(total: 934, reviewFloor: 360) == 420)
+        #expect(PaneSplit.reviewDrawerWidth(total: 450, reviewFloor: 360) == 360)   // the floor wins over the strip
+        #expect(PaneSplit.reviewDrawerWidth(total: 300, reviewFloor: 360) == 300)
         #expect(width(300, 200) == 200)
-        // Continuous where the two rules meet.
-        #expect(width(0, 1027) == 627 && width(0, 1026.9) > 626.8)
-        for total in stride(from: 560.0, through: 1200, by: 1) {
-            #expect(abs(width(0.55 * total, total) - width(0.55 * (total + 1), total + 1)) <= 1.0)
-        }
     }
 
     @Test func requestChangesShowsOnlyWithNotesToSend() {

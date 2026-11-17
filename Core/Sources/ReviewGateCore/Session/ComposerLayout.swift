@@ -36,16 +36,33 @@ public enum PaneSplit {
     }
 
     /// MARK: terminal-chat (§57.5): a terminal chat's split — the terminal leading, the review panel trailing — so the
-    /// terminal's width in points. Roomy (`total` holds both minimums): the terminal keeps `minTerminal` (80 columns) and
-    /// the review can be dragged down to `reviewFloor`. Tight: the review keeps `minReview` while the terminal shrinks, down
-    /// to `terminalFloor` (the TUI stays usable); the user can still drag the review down to its floor; below that the
-    /// terminal keeps its floor and the review gets what is left. Continuous in `total`, so no jump while the window resizes.
-    public static func terminalWidth(_ want: Double, total: Double, minTerminal: Double, terminalFloor: Double,
-                                     minReview: Double, reviewFloor: Double) -> Double {
-        let low = total >= minTerminal + minReview ? minTerminal : max(terminalFloor, total - minReview)
+    /// terminal's width in points while both are side by side (`terminalReviewLayout` is `.sideBySide`): at least
+    /// `minTerminal` (80 columns — the TUI never shrinks below it) and at most what leaves the review its `reviewFloor`,
+    /// where the user put the divider in between. Below that width the panel is a drawer over the terminal instead.
+    public static func terminalWidth(_ want: Double, total: Double, minTerminal: Double, reviewFloor: Double) -> Double {
+        let low = min(minTerminal, max(total, 0))
         let high = max(low, total - reviewFloor)
-        return min(min(max(want, low), high), max(total, 0))
+        return min(max(want, low), high)
     }
+
+    /// §57.5: how a terminal chat shows its review panel in `total` points (the terminal and the panel, the edge tab aside):
+    /// side by side when the terminal keeps 80 columns beside the panel's floor, else as a drawer over the terminal, which
+    /// keeps its whole width (no resize, no reflow of the TUI) while the drawer opens and closes.
+    public static func terminalReviewLayout(total: Double, minTerminal: Double, reviewFloor: Double) -> TerminalReviewLayout {
+        total >= minTerminal + reviewFloor ? .sideBySide : .overlay
+    }
+
+    /// §57.5: the drawer's width — 45 % of the area, at least the panel's floor (its Accept still shows), never so wide that
+    /// less than `terminalStrip` of the terminal stays visible beside it (in a tiny window: what is there).
+    public static func reviewDrawerWidth(total: Double, reviewFloor: Double, share: Double = 0.45, terminalStrip: Double = 120) -> Double {
+        let want = max(reviewFloor, (total * share).rounded())
+        return max(min(want, total - terminalStrip), min(reviewFloor, max(total, 0)))
+    }
+}
+
+/// §57.5: a terminal chat's review panel beside the terminal, or as a drawer over it.
+public enum TerminalReviewLayout: Equatable, Sendable {
+    case sideBySide, overlay
 }
 
 extension AppState {
