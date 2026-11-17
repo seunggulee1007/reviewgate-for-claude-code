@@ -98,12 +98,12 @@ final class ShellPanelModel {
         tabs = []
         selectedId = nil
         visible = false
-        for host in hosts { await host.stop() }
+        await TerminalHub.stop(hosts)
     }
 
     /// Quit: SIGTERM to every shell without waiting.
     func terminateAll() {
-        for tab in tabs where tab.host.view.process.running { tab.host.view.terminate() }
+        for tab in tabs where tab.host.view.process.running { tab.host.terminate() }
     }
 
     private func focusSelected() {

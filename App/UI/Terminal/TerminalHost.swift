@@ -59,7 +59,7 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         configure(fresh)
         view.processDelegate = nil
         view.stopCaretObservation()
-        if view.process.running { view.terminate() }
+        if view.process.running { terminate() }
         view = fresh
         generation += 1
         disconnected = false
@@ -90,18 +90,37 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         return pid
     }
 
-    /// Ends the PTY: SIGTERM, then SIGKILL after 3 s. Returns once it is reaped (or at once when nothing runs).
+    /// Ends the PTY: SIGTERM, then SIGKILL after 3 s — to its whole process group (what claude or the shell started in it:
+    /// tools, MCP servers). Returns once it is reaped (or at once when nothing runs).
     func stop() async {
         guard view.process.running else { return }
         stopping = true
         defer { stopping = false }
-        let pid = view.process.shellPid
-        view.terminate()
+        let group = processGroup()
+        terminate()
         let ended = await waitForExit(seconds: 3)
-        if !ended, pid > 0 {
-            kill(pid, SIGKILL)
+        if !ended, let group {
+            kill(-group, SIGKILL)
+            _ = await waitForExit(seconds: 2)
+        } else if !ended, view.process.shellPid > 0 {
+            kill(view.process.shellPid, SIGKILL)
             _ = await waitForExit(seconds: 2)
         }
+    }
+
+    /// SIGTERM to the PTY's process group (and its child, through SwiftTerm) without waiting.
+    func terminate() {
+        let group = processGroup()
+        view.terminate()
+        if let group { kill(-group, SIGTERM) }
+    }
+
+    /// The PTY child's process group — its own (forkpty makes it a session leader), never the app's; nil when it is gone.
+    private func processGroup() -> pid_t? {
+        let pid = view.process.shellPid
+        guard pid > 0 else { return nil }
+        let group = getpgid(pid)
+        return group > 1 && group != getpgrp() ? group : nil
     }
 
     /// `stop()` and `start(launch:)`.

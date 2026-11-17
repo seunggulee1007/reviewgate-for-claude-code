@@ -8815,10 +8815,11 @@ chat's id);
   `CLAUDE_CODE_*` keys. After the start: IUTF8 on the PTY, then `terminal_started {pid}`.
 - **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
   shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
-  SIGKILL after 3 s; text typed and not sent is lost), then sends `terminal_exited` (accepted for a chat the engine left);
+  SIGKILL after 3 s, to the PTY's whole process group — what claude started there goes too; text typed and not sent is
+  lost), then sends `terminal_exited` (accepted for a chat the engine left);
   showing another chat read-only does not. A terminal chat shown
   read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
-  PTYs, and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
+  PTYs (all at once, not one after another), and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
   shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요" (hooks arrive),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
@@ -8853,7 +8854,7 @@ chat's id);
   shown with the keyboard in it → hidden, the keyboard back to the chat (its terminal, else the message box); shown
   without the keyboard → the keyboard to it. The menu item carries the key for discoverability; a local key monitor
   (keyCode 50, exactly ⌃, in this window) takes it first, because a terminal would send ⌃` to its program as NUL.
-- **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s). A shell that exits 0 (`exit`, ⌃D) closes its
+- **Tabs.** `+` opens another shell; × ends one (SIGTERM, SIGKILL after 3 s, to its process group). A shell that exits 0 (`exit`, ⌃D) closes its
   tab; any other end stays as "exited (n)" with Restart / Close. The last tab closing hides the panel. Hiding the panel or
   switching tabs never ends a shell; closing the window or quitting does. Its top edge drags to resize it (the
   window keeps 200 pt above); the height is remembered.

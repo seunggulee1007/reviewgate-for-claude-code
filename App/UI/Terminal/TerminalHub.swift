@@ -64,18 +64,25 @@ final class TerminalHub {
         await spawn(chatId)
     }
 
-    /// Every PTY of the window ends (the window closes); none starts again.
+    /// Every PTY of the window ends (the window closes), all at once; none starts again.
     func stopAll() async {
         closing = true
         let hosts = Array(chatHosts.values)
         chatHosts = [:]
-        for host in hosts { await host.stop() }
+        await Self.stop(hosts)
     }
 
     /// Quit: SIGTERM to every PTY without waiting (the app is going away).
     func terminateAll() {
         closing = true
-        for host in chatHosts.values where host.view.process.running { host.view.terminate() }
+        for host in chatHosts.values where host.view.process.running { host.terminate() }
+    }
+
+    /// Ends `hosts` side by side, so closing a window with many terminals takes one stop's time, not one each.
+    static func stop(_ hosts: [TerminalHost]) async {
+        // Each stop waits on the main actor without holding it, so the tasks run side by side.
+        let stops = hosts.map { host in Task { @MainActor in await host.stop() } }
+        for stop in stops { await stop.value }
     }
 
     /// §57.6: ⌃` in `window()` toggles the terminal panel whatever has the keyboard. SwiftTerm hands only ⌘ keys to the
