@@ -8643,6 +8643,10 @@ Extensions › MCP servers only (§22). No engine command is new: the list is `m
   one after the other ("Turning off 3 MCP servers…", then "Turn Off — 3 MCP servers done" or the first refusal).
 - **When it cannot.** The session not running, a row busy, Reconnect on a server that is off, Turn On on one that is on:
   the button is disabled with the reason as its tooltip, and its key beeps and says the reason in the notice line.
+- **Electron.** The same list over the composer (`renderer/mcpPalette.ts`, `McpPalette.tsx`): Enter, Alt+Enter, Ctrl+Enter
+  for ⌥↩ / ⌘↩, Tab, Esc; the store's `mcpRefresh` / `mcpReconnect` / `mcpToggle` / `mcpAuth` / `mcpOpenConfig`; a
+  refusal and the typed command's progress in the composer's error line; no servers: **Add server…** opens the
+  Extensions dialog. The palette lists `/mcp` always (no terminal chat there).
 - **Verified** (`SHOTS_LAYOUT=composer`, quiet, 1000 × 637, against the live session): two servers added for this session
   (`mcp_add {scope: "session"}`, nothing written to disk) — a tiny node stdio server with two tools and one that
   exits at once (Failed); `/mcp` first in the palette and ↩ opening the list with both (and the account's own servers —

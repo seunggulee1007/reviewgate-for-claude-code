@@ -79,6 +79,6 @@ describe("/clear in the palette", () => {
     const of = (name: string) => out.find((e) => e.name === name)!.description;
     expect(of("clear")).toBe("Opens a new chat in the app — this chat stays in the list");
     expect(of("compact")).toBe("Clear conversation history but keep a summary");
-    expect(out.map((e) => e.name)).toEqual(["btw", "clear", "compact"]); // §56.1: /btw is the app's, always listed
+    expect(out.map((e) => e.name)).toEqual(["btw", "clear", "compact", "mcp"]); // §56.1 /btw, §56.4 /mcp: the app's, always listed
   });
 });

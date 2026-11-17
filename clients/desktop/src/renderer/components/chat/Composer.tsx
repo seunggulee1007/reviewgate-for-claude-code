@@ -52,6 +52,9 @@ import { btwNothingYet, btwQuestion, useBtw } from "../../btw";
 import { ExternalEditBar } from "./ExternalEditBar"; // §56.3
 import { isExternalEditKey, useExternalEdit } from "../../externalEdit";
 import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
+import { McpPalette } from "./McpPalette"; // §56.4
+import { actionDoneAll, actionProgress, actionProgressAll, commandFilter, completing, disabledReason, isAll, mcpRows, mcpTarget, noServerText, parseMcpCommand, primaryAction, rowStatus, toggleAction, unavailableReason, type McpAction, type McpCommand } from "../../mcpPalette";
+import type { McpServerInfo } from "@reviewgate/engine";
 import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
 import { WaitingLine } from "../agents/AgentBits";
@@ -122,6 +125,7 @@ export function Composer() {
   const [paletteForced, setPaletteForced] = useState(false);
   const [paletteDismissed, setPaletteDismissed] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(0);
+  const [mcpIndex, setMcpIndex] = useState(0); // §56.4: the `/mcp` list's selected row
   /** "Accept N & Send" asks first when it would accept more than three files. */
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // polish P4-composer-16: the box grows with what is typed (up to 40% of the window) from the height the user last dragged
@@ -360,6 +364,19 @@ export function Composer() {
   useEffect(() => dismissBtw(), [liveChatId, dismissBtw]);
   // MARK: r1-composer M14 — the palette works while Claude works or the session starts too (a pick goes into the draft).
   const paletteVisible = slashPaletteShows({ projectOpen: state.project !== null, dismissed: paletteDismissed, forced: paletteForced, token });
+  // §56.4: `/mcp ` (a space after it) — the session's MCP servers over the box, as in the terminal; `/mcp` alone is still
+  // the palette's (↩ opens the list).
+  const mcpCmd: McpCommand | null = state.project !== null && token === null && !paletteForced ? parseMcpCommand(draft) : null;
+  const mcp = useStore((s) => s.mcp);
+  const mcpNotice = useStore((s) => s.mcpNotice);
+  const mcpCtx = { sessionOpen: state.session.open };
+  const mcpPaletteRows = mcpCmd ? mcpRows(mcp.servers, commandFilter(mcpCmd)) : [];
+  const mcpSelected = mcpPaletteRows.length > 0 ? mcpPaletteRows[Math.min(mcpIndex, mcpPaletteRows.length - 1)]! : null;
+  const mcpOpen = mcpCmd !== null;
+  useEffect(() => {
+    // The live list (status, tools, where each is defined) each time the list opens, as the terminal's /mcp shows it.
+    if (mcpOpen && useStore.getState().state.session.open) void useStore.getState().mcpRefresh();
+  }, [mcpOpen]);
 
   // §23: the `@query` at the caret (not while the slash palette is open).
   const mention = paletteVisible || state.project === null ? null : mentionToken(draft, caret);
@@ -547,9 +564,90 @@ export function Composer() {
     return true;
   };
 
+  /** §56.4: runs `a` on `server` unless it cannot (then why in the error line); `typed`: the box empties and says how it went. */
+  const runMcp = (a: McpAction, server: McpServerInfo, typed: boolean) => {
+    const why = disabledReason(a, server, useStore.getState().mcp.busy[server.name] !== undefined, mcpCtx);
+    if (why) {
+      setAttachErrors([why]);
+      return;
+    }
+    const st = useStore.getState();
+    const done =
+      a === "reconnect" ? st.mcpReconnect(server.name) : a === "login" ? st.mcpAuth(server.name) : st.mcpToggle(server.name, a === "enable");
+    if (typed) {
+      setDraft("");
+      setAttachErrors([actionProgress(a, server.name)]);
+      void done.then(() => {
+        const now = useStore.getState();
+        const after = now.mcp.servers.find((x) => x.name === server.name);
+        setAttachErrors([now.mcpNotice ?? (after ? `${server.name} — ${rowStatus(after, false)}` : "")].filter((x) => x.length > 0));
+      });
+    }
+    inputRef.current?.focus();
+  };
+  /** §56.4: `/mcp <verb> all` — every server it can act on, one after the other. */
+  const runMcpOnEvery = (a: McpAction) => {
+    const busy = useStore.getState().mcp.busy;
+    const targets = mcp.servers.filter((x) => disabledReason(a, x, busy[x.name] !== undefined, mcpCtx) === null);
+    if (targets.length === 0) {
+      setAttachErrors([unavailableReason(mcpCtx) ?? noServerText("")]);
+      return;
+    }
+    setDraft("");
+    setAttachErrors([actionProgressAll(a, targets.length)]);
+    void (async () => {
+      let failure: string | null = null;
+      for (const x of targets) {
+        const st = useStore.getState();
+        await (a === "reconnect" ? st.mcpReconnect(x.name) : st.mcpToggle(x.name, a === "enable"));
+        failure ??= useStore.getState().mcpNotice;
+      }
+      setAttachErrors([failure ?? actionDoneAll(a, targets.length)]);
+    })();
+    inputRef.current?.focus();
+  };
+  /** §56.4 ↩: the row's own action (`/mcp`), or the typed one (`/mcp reconnect <name>`). */
+  const mcpEnter = (cmd: McpCommand) => {
+    if (cmd.kind === "list") {
+      if (mcpSelected) runMcp(primaryAction(mcpSelected), mcpSelected, false);
+      return;
+    }
+    const action: McpAction = cmd.verb;
+    if (isAll(cmd)) return runMcpOnEvery(action);
+    const target = mcpTarget(cmd.name, mcpPaletteRows, mcpIndex);
+    if (!target) {
+      setAttachErrors([noServerText(cmd.name)]);
+      return;
+    }
+    runMcp(action, target, true);
+  };
+  const mcpOpenConfig = (server: McpServerInfo) => {
+    const file = server.origin?.file;
+    if (!file) {
+      setAttachErrors([t("ReviewGate does not know which file defines this server")]);
+      return;
+    }
+    void useStore.getState().mcpOpenConfig(file);
+  };
+  /**
+   * §56.4: `/mcp …` is the app's command too — never sent, queued or put into the turn: `/mcp` opens the list (a space
+   * after it), `/mcp reconnect|enable|disable <name>` runs. False for any other text.
+   */
+  const takeMcp = (): boolean => {
+    const cmd = state.project !== null ? parseMcpCommand(draft) : null;
+    if (!cmd) return false;
+    setSplitOpen(false);
+    closePalette();
+    setPaletteForced(false);
+    if (cmd.kind === "list" && mcpCmd === null) setDraft("/mcp ");
+    else mcpEnter(cmd);
+    inputRef.current?.focus();
+    return true;
+  };
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!canSend || draft.trim().length === 0) return;
     if (viewing) {
       // wave4b w4b-tabs (§39.2): move the session to this chat first; a refused switch gives the text back.
@@ -580,7 +678,7 @@ export function Composer() {
 
   /** "Add to queue": sent in order once a plain Send is allowed again. */
   const doQueue = () => {
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!queueMode || !hasText) return;
     setDraft("");
     closePalette();
@@ -596,7 +694,7 @@ export function Composer() {
    */
   const doSteer = () => {
     setSplitOpen(false);
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!canSteer || !hasText) return;
     const text = draft;
     const sentMentions = mentions;
@@ -617,7 +715,7 @@ export function Composer() {
    */
   const doAnswer = () => {
     setSplitOpen(false);
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!question) return;
     if (!hasText) {
       if (!questionReady) return;
@@ -644,7 +742,7 @@ export function Composer() {
   /** r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as its instruction; the text leaves the box. */
   const doDenyWithText = () => {
     setSplitOpen(false);
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     const text = draft.trim();
     if (!cardForText || text.length === 0) return;
     useStore.getState().respondPermission(cardForText, false, text);
@@ -664,7 +762,7 @@ export function Composer() {
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!running || !hasText) return;
     setDraft("");
     closePalette();
@@ -681,7 +779,7 @@ export function Composer() {
   };
 
   const sendAccepting = () => {
-    if (takeBtw()) return; // §56.1
+    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
     if (!acceptAndSend || draft.trim().length === 0) return;
     const count = pending;
     setDraft("");
@@ -771,6 +869,42 @@ export function Composer() {
           e.preventDefault();
           setMentionDismissedAt(mention.start);
           return;
+      }
+    }
+    // §56.4: the `/mcp` list's keys — ↑ ↓, Enter (its action), Alt+Enter (on / off), Ctrl+Enter (the config file), Tab
+    // (the name), Esc (closes it with the command) — before the box's own.
+    if (mcpCmd) {
+      const plain = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && plain) {
+        e.preventDefault();
+        const n = mcpPaletteRows.length;
+        if (n > 0) setMcpIndex((i) => (Math.min(i, n - 1) + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+        return;
+      }
+      if (isEnter(e) && plain) {
+        e.preventDefault();
+        mcpEnter(mcpCmd);
+        return;
+      }
+      if (isEnter(e) && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        if (mcpSelected) runMcp(toggleAction(mcpSelected), mcpSelected, false);
+        return;
+      }
+      if (isEnter(e) && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        if (mcpSelected) mcpOpenConfig(mcpSelected);
+        return;
+      }
+      if (e.key === "Tab" && plain) {
+        e.preventDefault();
+        if (mcpSelected) setDraft(completing(mcpCmd, mcpSelected.name));
+        return;
+      }
+      if (e.key === "Escape" && plain) {
+        e.preventDefault();
+        setDraft(""); // as the terminal's dialog: the command goes with it
+        return;
       }
     }
     // MARK: r1-composer M08 — ⌥↩ while Claude's question is open: the text goes to Claude apart from it (else a new line).
@@ -874,6 +1008,7 @@ export function Composer() {
       case "Tab":
         e.preventDefault();
         if (isEnter(e) && token?.toLowerCase() === "btw" && takeBtw()) break; // §56.1: `/btw` typed out runs at once
+        if (isEnter(e) && token?.toLowerCase() === "mcp" && takeMcp()) break; // §56.4: `/mcp` typed out opens the list
         if (entries.length === 0) closePalette();
         else pick(entries[Math.min(paletteIndex, entries.length - 1)]!);
         break;
@@ -922,6 +1057,24 @@ export function Composer() {
       onDrop={onDrop}
       data-testid="Composer"
     >
+      {mcpCmd && (
+        <McpPalette
+          command={mcpCmd}
+          rows={mcpPaletteRows}
+          total={mcp.servers.length}
+          loaded={mcp.loaded}
+          selection={Math.min(mcpIndex, Math.max(mcpPaletteRows.length - 1, 0))}
+          busy={mcp.busy}
+          ctx={mcpCtx}
+          error={mcpNotice}
+          onSelect={setMcpIndex}
+          onAction={(a, server) => runMcp(a, server, false)}
+          onOpenConfig={mcpOpenConfig}
+          onRefresh={() => void useStore.getState().mcpRefresh()}
+          onDismissError={() => useStore.getState().dismissMcpNotice()}
+          onAddServer={() => openDialog({ kind: "extensions" })}
+        />
+      )}
       {paletteVisible && <SlashPalette sections={palette.sections} selection={Math.min(paletteIndex, Math.max(entries.length - 1, 0))} emptyState={palette.emptyState} cached={cached} starting={palette.starting} onPick={pick} onHover={setPaletteIndex} />}
       {mentionVisible && (
         <MentionPopover
@@ -979,6 +1132,7 @@ export function Composer() {
           setCaret(e.target.selectionStart ?? e.target.value.length);
           setPaletteDismissed(false);
           setPaletteIndex(0);
+          setMcpIndex(0); // §56.4
         }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
         onPaste={onPaste}

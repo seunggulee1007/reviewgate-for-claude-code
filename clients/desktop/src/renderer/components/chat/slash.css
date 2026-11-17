@@ -12,3 +12,15 @@
 .slash-line .badge { flex: none; margin-left: auto; }
 .slash-desc { font-size: 11.5px; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette .item.slash-item.selected .slash-desc { color: var(--fg); }
+
+/* §56.4 `/mcp`: the session's MCP servers over the composer — a head with the count and ↻, one row per server. */
+.palette.mcp-palette { width: 520px; }
+.mcp-palette-head { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.mcp-palette-head .badge { font-size: 10px; font-weight: 600; padding: 0 5px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); }
+.mcp-palette-error { display: flex; align-items: flex-start; gap: 6px; padding: 4px 10px; }
+.palette .item.mcp-palette-row { gap: 6px; font-family: var(--font); min-width: 0; }
+.mcp-palette-row .slash-name { flex: 0 1 auto; }
+.mcp-palette-row .nowrap { flex: none; white-space: nowrap; }
+.mcp-palette-row .spinner { width: 8px; height: 8px; flex: none; }
+.mcp-palette-row.off .slash-name, .mcp-palette-row.off .mcp-source { opacity: 0.7; }
+.palette.mcp-palette .note { display: flex; align-items: center; gap: 8px; }

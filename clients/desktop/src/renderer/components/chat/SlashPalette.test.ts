@@ -8,6 +8,7 @@ import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SessionCapabilities } from "@reviewgate/engine";
 import { initI18n } from "../../i18n";
+import { mcpDescription } from "../../mcpPalette";
 import { slashEntries, slashSections, type PaletteEmptyState, type SlashEntry, type SlashSection } from "../../slashCommands";
 
 type PaletteProps = { sections: SlashSection[]; selection: number; emptyState: PaletteEmptyState | null; cached: boolean; starting: boolean; onPick: (e: SlashEntry) => void };
@@ -48,7 +49,7 @@ describe("SlashPalette (§36.5)", () => {
     const html = render({ sections: slashSections(slashEntries(caps), "", []), selection: 1 });
     expect(html).toContain(">기본<");
     expect(html).toContain(">writer-kit<");
-    expect(html).toContain("Manage MCP servers");
+    expect(html).toContain(mcpDescription()); // §56.4: the app's words over the CLI's /mcp
     expect(html).toContain("&lt;주제&gt;");
     expect(html).toContain("슬라이드 초안 작성");
     expect(html).toContain(">스킬<");

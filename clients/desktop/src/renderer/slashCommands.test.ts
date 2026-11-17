@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionCapabilities } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
+import { mcpDescription } from "./mcpPalette";
 import {
   capabilitiesCaption,
   flattenSections,
@@ -50,7 +51,8 @@ describe("slash palette entries (§36.5)", () => {
     const all = slashEntries(caps());
     const dev = all.find((e) => e.name === "writer-kit:writer-deck")!;
     expect(dev).toMatchObject({ description: "슬라이드 초안 작성", argumentHint: "<주제>", isSkill: true, group: { kind: "plugin", name: "writer-kit" } });
-    expect(all.find((e) => e.name === "mcp")).toMatchObject({ description: "Manage MCP servers", argumentHint: "[reconnect|enable|disable [<server>|all]]", group: { kind: "builtin" } });
+    // §56.4: /mcp is the app's — its words over the CLI's, the CLI's argument hint kept.
+    expect(all.find((e) => e.name === "mcp")).toMatchObject({ description: mcpDescription(), argumentHint: "[reconnect|enable|disable [<server>|all]]", group: { kind: "builtin" } });
     expect(all.find((e) => e.name === "deploy")).toMatchObject({ argumentHint: "<env>", isSkill: true, group: { kind: "project" } });
     expect(all.find((e) => e.name === "review")).toMatchObject({ aliases: ["rv"], group: { kind: "mine" } });
     expect(all.find((e) => e.name === "github:pr")?.group).toEqual({ kind: "mcp", server: "github" });
@@ -64,7 +66,7 @@ describe("slash palette entries (§36.5)", () => {
   it("an engine before §36 sends names only: skills flagged, a <plugin>: prefix of a known plugin groups it", () => {
     const old: SessionCapabilities = { slashCommands: ["compact", "writer-kit:writer-notes"], skills: ["writer-kit:writer-notes", "my-skill"], plugins: ["writer-kit"], mcpServers: [] };
     const all = slashEntries(old);
-    expect(names(all)).toEqual(["btw", "compact", "my-skill", "writer-kit:writer-notes"]); // §56.1: /btw is the app's
+    expect(names(all)).toEqual(["btw", "compact", "mcp", "my-skill", "writer-kit:writer-notes"]); // §56.1 /btw, §56.4 /mcp: the app's
     expect(all.find((e) => e.name === "writer-kit:writer-notes")).toMatchObject({ isSkill: true, group: { kind: "plugin", name: "writer-kit" } });
     expect(all.find((e) => e.name === "compact")?.group).toEqual({ kind: "other" });
     expect(slashEntries(null)).toEqual([]);
