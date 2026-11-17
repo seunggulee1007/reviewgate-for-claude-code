@@ -51,8 +51,9 @@
 #                  (REVIEWGATE_TERMINAL_SHELL: no login or interactive shell, no dotfiles): the banner, a prompt typed into
 #                  the PTY becoming a review, a reject named in the next prompt's context, the shell tab's folder, the
 #                  input method in `cat` (한글, a commit on focus loss, Hanja, the #825 mask), copy without the pasteboard,
-#                  ⌃`, /exit and Restart resuming the same conversation (`terminal:` lines; terminal-chat-*.png,
-#                  shell-panel-*.png).
+#                  ⌃`, /exit and Restart resuming the same conversation, Settings' Restart now restarting the PTY (a new
+#                  pid, the same conversation, its hooks still reviewed), and no claude starting again once the window's
+#                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
