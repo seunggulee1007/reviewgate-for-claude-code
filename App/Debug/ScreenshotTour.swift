@@ -1084,7 +1084,169 @@ private final class Tour {
         log("composer /btw keys: Esc " + (escClosed ? "closed it" : "LOST (still open)") + ", /btw alone " + (again ? "showed it again" : "LOST")
             + ", ↩ in the empty box " + (enterClosed ? "closed it" : "LOST (still open)"))
         store.dismissBtw()
+        try await composerMcpChecks(window, box: box)
     }
+
+    /// §56.4 `/mcp` against the live session: two made-up servers added for this session only (nothing written to disk) —
+    /// "acme-docs", a tiny stdio server this tour writes (node, two tools), and "acme-tickets", which exits at once (failed).
+    /// The list is filtered to "acme" (the account may bring servers of its own, e.g. claude.ai's — never touched here).
+    /// `/mcp` in the palette, ↩ opening the list, ↩ reconnecting (the row's spinner, then Connected), ⌥↩ off and on, `/mcp
+    /// disable|enable <name>` typed out, a name that matches none, the filter, ⇥ completing, Esc, and the empty states once
+    /// both are removed (`composer /mcp` lines; composer-mcp-*.png). LOST when a step did not end as it should.
+    private func composerMcpChecks(_ window: NSWindow, box: NSTextView) async throws {
+        let composer = entry.model.chatComposer
+        let mcp = store.mcp
+        let room = window.contentView?.bounds.size ?? .zero
+        let path = (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map { "\($0)/node" }
+        guard let node = path.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+            return log("composer /mcp: no node on PATH — LOST")
+        }
+        let server = out.appendingPathComponent("acme-docs-mcp.cjs")
+        try Self.tinyMcpServer.write(to: server, atomically: true, encoding: .utf8)
+        func settle(_ name: String, seconds: Int = 30, until done: (McpServerInfo) -> Bool) async throws -> McpServerInfo? {
+            for _ in 0..<(seconds * 10) {
+                if !mcp.busy.contains(name), let s = mcp.server(name), done(s) { return s }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            return mcp.server(name)
+        }
+        func press(_ selector: Selector) async throws {
+            box.doCommand(by: selector)
+            try await Task.sleep(for: .milliseconds(150))
+        }
+        func shown() -> (CGRect, [String], Bool) {
+            let frame = entry.model.debugMcpFrame
+            return (frame, entry.model.debugMcpRows, frame.height > 0 && frame.maxX <= room.width + 0.5 && frame.minY >= -0.5)
+        }
+        if let error = await mcp.add(name: "acme-docs", scope: .session, config: .stdio(command: node, args: [server.path])) {
+            return log("composer /mcp: adding acme-docs refused (\(error)) — LOST")
+        }
+        _ = await mcp.add(name: "acme-tickets", scope: .session, config: .stdio(command: node, args: ["-e", "process.exit(3)"]))
+        mcp.dismissError()
+        let docs = try await settle("acme-docs") { $0.status == .connected }
+        let tickets = try await settle("acme-tickets", seconds: 10) { $0.status != .pending }
+        let others = mcp.servers.filter { !$0.name.hasPrefix("acme-") }.count
+        log("composer /mcp servers: acme-docs \(docs.map { "\($0.status.rawValue), \($0.toolCount ?? -1) tools" } ?? "missing")"
+            + ", acme-tickets \(tickets?.status.rawValue ?? "missing"), \(others) of the account's own" + (docs?.status == .connected ? "" : " — LOST (acme-docs not connected)"))
+
+        // `/mcp` in the slash palette; ↩ opens the list (the account's servers too), then "acme" filters it.
+        setComposerText("/mcp", in: window)
+        try await Task.sleep(for: .milliseconds(500))
+        let paletteFirst = entry.model.debugPaletteRows.first
+        try await press(#selector(NSResponder.insertNewline(_:)))
+        try await Task.sleep(for: .milliseconds(1200))
+        let (allFrame, allRows, allInside) = shown()
+        log("composer /mcp: the palette lists /mcp " + (paletteFirst == "mcp" ? "first" : "LOST (first \(paletteFirst ?? "none"))")
+            + ", ↩ → box \"\(box.string)\", list \(NSStringFromRect(allFrame)) rows \(allRows.count)"
+            + (allRows.starts(with: ["acme-docs", "acme-tickets"]) && allRows.count == 2 + others && allInside ? " — shown" : " — LOST (\(allRows))"))
+        setComposerText("/mcp acme", in: window)
+        try await Task.sleep(for: .milliseconds(800))
+        let (listFrame, rows, listInside) = shown()
+        log("composer /mcp acme: list \(NSStringFromRect(listFrame)) rows \(rows)" + (rows == ["acme-docs", "acme-tickets"] && listInside ? " — shown" : " — LOST"))
+        try write(try render(window), "composer-mcp-list")
+
+        // ↩ reconnects the selected row: its spinner, then its status.
+        composer.mcpIndex = 0
+        box.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        var spun = false
+        for _ in 0..<100 where !spun {
+            spun = mcp.busy.contains("acme-docs")
+            if !spun { try await Task.sleep(for: .milliseconds(5)) }
+        }
+        if spun { try write(try render(window), "composer-mcp-busy") }
+        let reconnected = try await settle("acme-docs") { $0.status == .connected }
+        log("composer /mcp ↩: " + (spun ? "spinner on acme-docs" : "no spinner seen (it answered at once)") + ", then \(reconnected?.status.rawValue ?? "missing")"
+            + ", box \"\(box.string)\"" + (reconnected?.status == .connected && box.string == "/mcp acme" && mcp.errorText == nil ? " — reconnected" : " — LOST (\(mcp.errorText ?? "-"))"))
+
+        // ⌥↩ (the list's key) turns it off, then on again.
+        guard let command = composer.mcpCommand(store) else { return log("composer /mcp: the list closed — LOST") }
+        _ = composer.handleMcpKey(.optionEnter, store: store, command: command)
+        let off = try await settle("acme-docs") { $0.isOff }
+        try await Task.sleep(for: .milliseconds(400))
+        try write(try render(window), "composer-mcp-off")
+        _ = composer.handleMcpKey(.optionEnter, store: store, command: command)
+        let on = try await settle("acme-docs") { !$0.isOff && $0.status == .connected }
+        log("composer /mcp ⌥↩: " + (off?.isOff == true ? "turned off" : "LOST (not off)") + ", again " + (on?.status == .connected ? "on and connected" : "LOST (\(on?.status.rawValue ?? "missing"))"))
+
+        // Typed out: `/mcp disable <name>` / `/mcp enable <name>` run at once; an unknown name says so.
+        setComposerText("/mcp disable acme-docs", in: window)
+        box.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        let typedNotice = composer.notice
+        try await Task.sleep(for: .milliseconds(150))
+        let emptied = box.string.isEmpty
+        let disabled = try await settle("acme-docs") { $0.isOff }
+        try await Task.sleep(for: .milliseconds(300))
+        let doneNotice = composer.notice
+        try write(try render(window), "composer-mcp-typed")
+        setComposerText("/mcp enable acme-docs", in: window)
+        try await press(#selector(NSResponder.insertNewline(_:)))
+        let enabled = try await settle("acme-docs") { !$0.isOff && $0.status == .connected }
+        setComposerText("/mcp reconnect nothing-here", in: window)
+        try await press(#selector(NSResponder.insertNewline(_:)))
+        let unknown = composer.notice ?? ""
+        log("composer /mcp typed: disable → \(disabled?.isOff == true && emptied ? "off, box emptied" : "LOST") (notice \"\(typedNotice ?? "-")\" then \"\(doneNotice ?? "-")\")"
+            + ", enable → \(enabled?.status == .connected ? "connected" : "LOST")"
+            + ", unknown name → " + (unknown.contains("nothing-here") ? "\"\(unknown)\"" : "LOST (\(unknown))"))
+        composer.notice = nil
+
+        // The filter, ⇥ completing the name, Esc closing.
+        setComposerText("/mcp tick", in: window)
+        try await Task.sleep(for: .milliseconds(500))
+        let filtered = entry.model.debugMcpRows
+        try await press(#selector(NSResponder.insertTab(_:)))
+        let completed = box.string
+        try await press(#selector(NSResponder.cancelOperation(_:)))
+        try await Task.sleep(for: .milliseconds(300))
+        let closed = box.string.isEmpty && entry.model.debugMcpFrame.height <= 0
+        log("composer /mcp keys: \"tick\" → \(filtered)" + (filtered == ["acme-tickets"] ? "" : " LOST")
+            + ", ⇥ → \"\(completed)\"" + (completed == "/mcp acme-tickets" ? "" : " LOST")
+            + ", esc " + (closed ? "closed it" : "LOST (box \"\(box.string)\")"))
+
+        // Both removed: nothing matches "acme"; with no server at all, "No MCP servers" and its way to Settings.
+        for name in ["acme-docs", "acme-tickets"] { if let s = mcp.server(name) { await mcp.remove(s) } }
+        let gone = !mcp.servers.contains { $0.name.hasPrefix("acme-") }
+        setComposerText("/mcp acme", in: window)
+        try await Task.sleep(for: .milliseconds(1000))
+        let (noMatchFrame, noMatchRows, _) = shown()
+        log("composer /mcp after removing both: \(gone ? "gone" : "LOST (still listed)"), \"acme\" → list \(NSStringFromRect(noMatchFrame))"
+            + (noMatchFrame.height > 0 && noMatchRows.isEmpty ? " — “No server matches” shown" : " — LOST (\(noMatchRows))"))
+        if mcp.servers.isEmpty {
+            setComposerText("/mcp ", in: window)
+            try await Task.sleep(for: .milliseconds(1000))
+            let (emptyFrame, emptyRows, _) = shown()
+            log("composer /mcp empty: list \(NSStringFromRect(emptyFrame))" + (emptyFrame.height > 0 && emptyRows.isEmpty ? " — “No MCP servers” shown" : " — LOST"))
+            try write(try render(window), "composer-mcp-empty")
+        } else {
+            try write(try render(window), "composer-mcp-nomatch")
+            log("composer /mcp empty: not checked — the account has \(mcp.servers.count) servers of its own")
+        }
+        setComposerText("", in: window)
+    }
+
+    /// The tour's own MCP server: newline-delimited JSON-RPC on stdio, two tools, nothing else.
+    private static let tinyMcpServer = #"""
+    const readline = require("node:readline");
+    const send = (m) => process.stdout.write(JSON.stringify(m) + "\n");
+    const tools = [
+      { name: "search", description: "Search the docs", inputSchema: { type: "object", properties: { q: { type: "string" } } } },
+      { name: "page", description: "Read a page", inputSchema: { type: "object", properties: { path: { type: "string" } } } },
+    ];
+    readline.createInterface({ input: process.stdin }).on("line", (line) => {
+      let msg;
+      try { msg = JSON.parse(line); } catch { return; }
+      if (msg.id === undefined) return;
+      if (msg.method === "initialize") {
+        send({ jsonrpc: "2.0", id: msg.id, result: { protocolVersion: (msg.params && msg.params.protocolVersion) || "2025-06-18",
+          capabilities: { tools: {} }, serverInfo: { name: "acme-docs", version: "1.0.0" } } });
+      } else if (msg.method === "tools/list") {
+        send({ jsonrpc: "2.0", id: msg.id, result: { tools } });
+      } else if (msg.method === "ping") {
+        send({ jsonrpc: "2.0", id: msg.id, result: {} });
+      } else {
+        send({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+      }
+    });
+    """#
 
     /// What a session with the user's settings lists (made-up names): built-in, mine, the project's, a plugin's skill with its
     /// short alias, a plugin command, a command in a subfolder, an MCP prompt.
