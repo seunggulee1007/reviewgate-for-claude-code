@@ -19,8 +19,16 @@ struct ChatView: View {
         // HUD, the cards and the composer are the TUI's own.
         if store.shownChatIsTerminal {
             VStack(spacing: 0) {
-                ChatHeader()
-                Divider()
+                VStack(spacing: 0) {
+                    ChatHeader()
+                    Divider()
+                }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                    model.terminalHeaderHeight = frame.height   // §57.5: the review drawer starts under the tabs
+                    #if DEBUG
+                    model.debugTerminalHeaderFrame = frame
+                    #endif
+                }
                 TerminalChatView()
             }
             .clipped()

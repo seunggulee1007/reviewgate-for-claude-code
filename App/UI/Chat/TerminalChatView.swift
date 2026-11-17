@@ -95,7 +95,7 @@ private struct TerminalStatusStrip: View {
         return info.interruptSuspected || now.timeIntervalSince(model.terminals.lastActivity) >= 60
     }
 
-    private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the right") }
+    private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the left") }
     /// MARK: terminal-default (§57.7): before the first hook — Claude Code's trust question defaults to "No, exit", and a
     /// folder it does not trust cannot be reviewed, so the strip says what to pick before the user presses Return.
     private static var trustText: String { String(localized: "If Claude Code asks whether to trust this folder, choose Yes") }

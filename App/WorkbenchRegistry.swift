@@ -146,6 +146,9 @@ final class WindowModel {
     /// whether it is open — set by the window (the tour reads them).
     var terminalReviewLayout: TerminalReviewLayout = .sideBySide
     var reviewPanelOpen = false
+    /// §57.5: the chat tabs' height over a terminal chat (with their divider) — the review drawer starts under them, so the
+    /// tabs' + and ⋯ stay visible and clickable while it is open.
+    var terminalHeaderHeight: CGFloat = 0
     /// §57.6: the bottom terminal panel's shells (⌃`).
     let shell = ShellPanelModel()
     // MARK: polish p-foundation — seeds the polish lanes fill in (types and helpers: App/UI/Common/WindowSeeds.swift)
@@ -208,6 +211,10 @@ final class WindowModel {
     @ObservationIgnored var debugPaletteRows: [String] = []
     /// composer: the queue bar above the box (`.zero` while it is not shown).
     @ObservationIgnored var debugQueueBarFrame: CGRect = .zero
+    /// §57.5: a terminal chat's review panel — beside the terminal or the drawer over it (`.zero` before it showed) — and
+    /// the chat tabs over the terminal, in SwiftUI's global space: the terminal tour checks the order and the drawer's top.
+    @ObservationIgnored var debugReviewFrame: CGRect = .zero
+    @ObservationIgnored var debugTerminalHeaderFrame: CGRect = .zero
     /// §50.3: the queue bar's tools by name (`steer.edit`, `steer.takeBack`, `queued.edit`, `queued.remove`; `.zero` when gone).
     @ObservationIgnored var debugQueueTools: [String: CGRect] = [:]
     /// §56.1: the /btw answer over the box (`.zero` while it is not shown).

@@ -11335,6 +11335,54 @@
         }
       }
     },
+    "Show the review panel between the file list and the terminal (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the review panel between the file list and the terminal (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일 목록과 터미널 사이에 리뷰 패널 표시 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널을 파일 목록 옆, 터미널 위에 띄워요 — 창이 좁아 나란히 둘 수 없어요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "The review panel opens left of the terminal, next to the file list (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The review panel opens left of the terminal, next to the file list (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널은 터미널 왼쪽, 파일 목록 옆에 열려요 (⌘⇧D)"
+          }
+        }
+      }
+    },
     "exited (%lld)": {
       "localizations": {
         "en": {
@@ -22662,18 +22710,18 @@
         }
       }
     },
-    "Reviewed by ReviewGate — changes show on the right": {
+    "Reviewed by ReviewGate — changes show on the left": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reviewed by ReviewGate — changes show on the right"
+            "value": "Reviewed by ReviewGate — changes show on the left"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ReviewGate가 리뷰해요 — 변경은 오른쪽에 나와요"
+            "value": "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요"
           }
         }
       }
@@ -23730,22 +23778,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "변경 내용 보기"
-          }
-        }
-      }
-    },
-    "Show the review panel beside the terminal (⌘⇧D)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show the review panel beside the terminal (⌘⇧D)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "터미널 옆에 리뷰 패널 표시 (⌘⇧D)"
           }
         }
       }
@@ -33936,22 +33968,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esc나 ⌘⇧D로 닫아요. 뒤의 터미널은 너비가 그대로예요"
-          }
-        }
-      }
-    },
-    "Show the review panel over the terminal — the window is too narrow for both side by side (⌘⇧D)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show the review panel over the terminal — the window is too narrow for both side by side (⌘⇧D)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "리뷰 패널을 터미널 위에 띄워요 — 창이 좁아 나란히 둘 수 없어요 (⌘⇧D)"
           }
         }
       }
