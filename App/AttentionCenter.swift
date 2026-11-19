@@ -11,6 +11,10 @@ import ReviewGateCore
 /// switch turned on) and its answer is re-read on every activation: Settings and the window say when it is off
 /// (`NotificationStatusModel`). Clicking a notification brings its window forward (restored from the Dock), opens its
 /// chat and scrolls to the card or summary it was about (`AttentionTarget`).
+///
+/// §39.7: each kind sounds its own (`NotificationSoundCategory`). The app plays the sound itself (`NotificationSoundPlayer`)
+/// at the moment it posts — the notification carries none — so a macOS alert sound picked by name always resolves and the
+/// sound plays also when macOS shows no banner.
 @MainActor
 final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = AttentionCenter()
@@ -27,6 +31,11 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     /// The windows (`scope`) that waited for the user at the last look: one that stops waiting has its cards' notifications
     /// removed.
     private var waitingScopes: Set<String> = []
+    // MARK: notification-sounds (§39.7)
+    /// One sound per category every 2 s over every window.
+    private var soundGate = NotificationSoundGate()
+    /// "Play sound for notifications" is off for ReviewGate in System Settings › Notifications: the app plays none either.
+    private var systemSoundsOff = false
 
     /// Called once at launch (the delegate must be set before a click is delivered).
     func start() {
@@ -76,12 +85,14 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    private func apply(_ status: (raw: UNAuthorizationStatus, system: SystemNotificationStatus)) {
+    private func apply(_ status: (raw: UNAuthorizationStatus, system: SystemNotificationStatus, soundsOff: Bool)) {
         authorization = status.raw
+        systemSoundsOff = status.soundsOff
         if NotificationStatusModel.shared.system != status.system { NotificationStatusModel.shared.system = status.system }
     }
 
-    private static func read(_ center: UNUserNotificationCenter) async -> (raw: UNAuthorizationStatus, system: SystemNotificationStatus) {
+    private static func read(_ center: UNUserNotificationCenter) async
+        -> (raw: UNAuthorizationStatus, system: SystemNotificationStatus, soundsOff: Bool) {
         let settings = await center.notificationSettings()
         let raw = settings.authorizationStatus
         let system: SystemNotificationStatus
@@ -91,7 +102,9 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         case .authorized, .provisional, .ephemeral: system = settings.alertStyle == .none ? .noBanners : .allowed
         @unknown default: system = .unknown
         }
-        return (raw, system)
+        // §39.7: only an allowed app's sound switch says anything (denied or never asked: the app's own switch decides).
+        let allowed = raw == .authorized || raw == .provisional
+        return (raw, system, allowed && settings.soundSetting == .disabled)
     }
 
     private func flushWaiting() {
@@ -113,6 +126,7 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         guard coalescer.shouldPost(event, scope: scope) else { return }
         let target = AttentionTarget(kind: event.kind, chatId: entry.store.currentSessionId, requestId: event.requestId)
         post(event, scope: scope, project: entry.store.windowTitle, target: target)
+        playSound(NotificationSoundCategory(event: event))   // §39.7: also when macOS shows nothing (off, not asked yet)
         // MARK: polish p-lifecycle (P1-chrome-11): Claude waits for the user while the app is behind — the Dock icon bounces
         // once too (a notification turned off in macOS left only the badge's number).
         if event.kind.blocksClaude, !NSApp.isActive { NSApp.requestUserAttention(.informationalRequest) }
@@ -147,7 +161,7 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         var info: [String: String] = ["projectPath": scope]
         info.merge(target.userInfo) { old, _ in old }
         content.userInfo = info
-        if AppSettings.notificationSound() { content.sound = .default }
+        // §39.7: no sound here — `handle` played this kind's own (a sound by name only resolves from Library/Sounds).
         // One live notification per window and kind: a newer "turn finished" replaces the older one.
         let request = UNNotificationRequest(identifier: DeliveredNotifications.identifier(scope: scope, kind: event.kind),
                                             content: content, trigger: nil)
@@ -168,16 +182,35 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         switch authorization {
         case .authorized, .provisional, .ephemeral:
             UNUserNotificationCenter.current().add(request)
+            playUpdateSound()
         case nil:
             // At launch macOS's answer may not have been read yet.
             Task {
                 let status = await Self.read(UNUserNotificationCenter.current())
                 guard status.raw == .authorized || status.raw == .provisional else { return }
+                apply(status)
                 try? await UNUserNotificationCenter.current().add(request)
+                playUpdateSound()
             }
         default:
             break
         }
+    }
+
+    // MARK: notification-sounds (§39.7)
+
+    /// `category`'s sound, as Settings › Notifications picked it — none while "Play a sound" is off, "None" is picked,
+    /// macOS turned ReviewGate's sounds off, or the same category sounded under 2 s ago (another window, a burst).
+    private func playSound(_ category: NotificationSoundCategory) {
+        guard !systemSoundsOff, let sound = AppSettings.notificationSoundToPlay(for: category),
+              soundGate.admits(category) else { return }
+        NotificationSoundPlayer.play(sound)
+    }
+
+    /// The update's notice sounds only while the app is behind: in front, the window's own banner says it.
+    private func playUpdateSound() {
+        guard !NSApp.isActive else { return }
+        playSound(.appUpdate)
     }
 
     // MARK: UNUserNotificationCenterDelegate
@@ -232,6 +265,27 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         if !answered.isEmpty {
             UNUserNotificationCenter.current().removeDeliveredNotifications(
                 withIdentifiers: answered.flatMap { DeliveredNotifications.waiting(scope: $0) })
+        }
+    }
+}
+
+// MARK: notification-sounds (§39.7)
+
+/// Plays a notification's sound with `NSSound`: by name it finds the macOS alert sounds (/System/Library/Sounds), which
+/// `UNNotificationSound(named:)` does not (it looks only in Library/Sounds of the app and its container). "Default" is the
+/// alert sound of System Settings › Sound; a sound that is gone plays that too.
+@MainActor
+enum NotificationSoundPlayer {
+    static func play(_ sound: NotificationSound) {
+        switch sound {
+        case .none:
+            return
+        case .systemDefault:
+            NSSound.beep()
+        case .named(let name):
+            guard let nsSound = NSSound(named: NSSound.Name(name)) else { NSSound.beep(); return }
+            nsSound.stop()   // a shared instance: played again while it sounds, it would stay silent
+            nsSound.play()
         }
     }
 }

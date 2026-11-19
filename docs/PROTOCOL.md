@@ -4816,6 +4816,48 @@ An older engine works as before.
 - Tests: `Core/Tests/ReviewGateCoreTests/NotificationRoutingTests.swift`, `clients/desktop/src/main/notifyRouting.test.ts`,
   `clients/desktop/src/renderer/notifyClick.test.ts`.
 
+### 39.7 A sound per kind of notification
+
+Every notification sounded the same, so the user could not tell by ear whether Claude waits or is done. Mac client only;
+the engine and the wire do not change.
+
+- **Categories and their defaults** — distinct out of the box, so nothing needs setting up:
+
+  | Category (`NotificationSoundCategory`) | Events | Default |
+  |---|---|---|
+  | `permission` — 허용 요청·계획 | `permission`, `plan`, a terminal chat's permission wait (§57.5) | Glass |
+  | `question` — 질문 | `question`, a terminal chat's question, `peerMessage` (it waits for the user) | Purr |
+  | `turnFinished` — 작업이 끝났을 때 | `turnFinished` without a stop reason, `sideAnswer`, `agentsFinished` | Hero |
+  | `error` — 오류·사용량 한도·로그인으로 멈췄을 때 | `actionNeeded`, `turnFinished` with a §38.1 stop reason (`AttentionEvent.stopReason`) | Basso |
+  | `appUpdate` — 앱 업데이트 | §48's update notices (`postAppUpdate`) | Pop |
+
+  A bright chime for what blocks Claude, a soft one for a question, a fanfare for finished work, the low buzz macOS uses
+  for errors, a light pop for the update.
+- **Settings › Notifications** under "Play a sound" (kept: off silences every category): one picker per category —
+  "Default" (the alert sound of System Settings › Sound), "None", then the alert sounds macOS ships, read from
+  /System/Library/Sounds (Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
+  on macOS 26) — and ▶ to hear it. UserDefaults `notificationSound.<category>` = `default` / `none` / the sound's name;
+  unset → the default. A pick no longer on the Mac stays listed and plays the alert sound.
+- **How it plays — the app, not the notification.** `UNNotificationSound(named:)` looks only in Library/Sounds of the
+  app bundle and of its container (for this unsandboxed app, the user's ~/Library/Sounds); a system sound by name does not
+  resolve there and macOS would fall back to its default — the very sameness this fixes. Copying the system sounds into
+  ~/Library/Sounds would put them in every app's sound list, and bundling them is not ours to redistribute. So a
+  notification is posted **without a sound** and `AttentionCenter` plays the category's sound with `NSSound(named:)`
+  (which finds /System/Library/Sounds) at the moment it posts — once per event. The same call covers the attention the
+  user gets without a banner (macOS notifications off or not asked yet: the sound comes with the Dock bounce and badge).
+- **When it stays silent.** Everything that holds the notification back holds the sound: ReviewGate's switch, the
+  category's group switch (§39.6), the window in front (not while the app is active and that window key), the
+  coalescer's once-per-key. Then: "Play a sound" off, "None" picked, or "Play sound for notifications" off for ReviewGate
+  in System Settings (`UNNotificationSettings.soundSetting`, read while macOS allows the notifications). No storms: one
+  sound per category every 2 s over every window (`NotificationSoundGate`) — five windows finishing together sound once.
+  The update's sound plays only while the app is behind (in front, the window's banner says it).
+- **Focus (Do Not Disturb)** is not readable without another permission (`INFocusStatusCenter`), and an app's own sound
+  is not silenced by it: Settings says so under the pickers (pick None, or turn off Play a sound).
+- **Windows client: not in this pass.** Its toast sound is Windows' (`silent` follows "Play a sound"); a per-category
+  choice needs either a custom `toastXml` with `ms-winsoundevent:` audio (the toast's text, click and AUMID handling move
+  into that XML) or bundled sound files played by the renderer — a follow-up.
+- Tests: `Core/Tests/ReviewGateCoreTests/NotificationSoundsTests.swift`.
+
 ## 40. Wave 4 (third batch): follow-ups, the review list, side questions
 
 0.2.7: what an adversarial pass over §38 and §39 found, a review list that reads like a Java / Spring repository, and
