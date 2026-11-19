@@ -7122,12 +7122,19 @@ download whose identifier differs from the running app's, so a build with an old
   GitHub's own asset digest when the API reports one; `hdiutil attach -readonly -nobrowse -noautoopen -mountpoint …`; the
   new app passes `codesign --verify --deep --strict`, has the running app's TeamIdentifier (`codesign -dv`; a running app
   with none — ad-hoc — refuses) and bundle id, and says the tag's version. Any failure detaches the image, removes the
-  folder and says why on the banner ([Try Again]); nothing of the installed app has been touched.
+  folder and says why on the banner ([Try Again]); nothing of the installed app has been touched. From the click to the
+  quit the banner's title is "Installing ReviewGate X" (up to 0.5.16 it said "… is available" all along, and the user
+  could not tell anything was under way) and its line names the step: "Downloading 12.4 / 24.0 MB" beside a bar (the
+  bytes in the download folder every half second against the DMG's size from the release; VoiceOver reads it as
+  "Download progress" with that line), then "Checking the download's checksum…", "Opening the disk image…", "Checking the
+  new app's signature and version…" beside a spinner. Settings › General › Updates shows the same title, line and bar
+  while an install runs or after one failed.
 - **Restarting.** Never while a window has a turn running or a card waiting for the user (`closeGuardReason`, whatever
   "Ask before closing" says): the banner says "ReviewGate 0.5.5 is ready. Claude is working in 2 windows — ReviewGate
   restarts when they finish." with [Cancel] (detaches, removes the download) and restarts by itself once they are idle.
-  Then a helper script written into the work folder starts detached (`/bin/sh <script> <pid> <new app> <bundle> <mount>
-  <work> <log>`) and the app quits the usual way (the window list written, every engine stopped). The helper waits for
+  Before it does, "Ready — ReviewGate closes and reopens as X" shows for 2 s, so the windows closing is no surprise (a
+  turn started meanwhile is waited for after all); [Restart Now] goes straight on. Then a helper script written into the
+  work folder starts detached (`/bin/sh <script> <pid> <new app> <bundle> <mount> <work> <log>`) and the app quits the usual way (the window list written, every engine stopped). The helper waits for
   that one pid to exit (at most 10 minutes — then it detaches and replaces nothing), `ditto`s the image's app to a sibling
   of `Bundle.main.bundleURL`, renames the old bundle aside and the copy into place (and back should the rename fail),
   removes the old one, detaches the image, reopens the bundle with `open` — the new version, or the previous one when

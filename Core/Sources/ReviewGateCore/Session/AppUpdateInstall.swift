@@ -429,10 +429,6 @@ public extension AppUpdateText {
         return "\(mb(Double(min(Int64(total), bytes)))) / \(mb(Double(total))) MB"
     }
 
-    static func restarting(_ version: String) -> String {
-        String(localized: "Restarting into ReviewGate \(version)…", bundle: .module)
-    }
-
     /// The banner's title from [Install and Restart] to the quit (it said "… is available" all along — the user could not
     /// tell an install was under way).
     static func installingTitle(_ version: String) -> String {

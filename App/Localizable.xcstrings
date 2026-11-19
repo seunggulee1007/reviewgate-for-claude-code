@@ -34035,6 +34035,38 @@
           }
         }
       }
+    },
+    "Download progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download progress"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내려받기 진행률"
+          }
+        }
+      }
+    },
+    "How much of the update has been downloaded": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How much of the update has been downloaded"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업데이트를 얼마나 받았는지 보여줘요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
