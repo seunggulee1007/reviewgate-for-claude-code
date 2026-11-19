@@ -89,7 +89,10 @@ extension AttentionEvent {
     /// A finished turn: with a stop reason its headline says why it stopped; the body keeps the files line.
     public static func turnFinished(pending: Int, key: String, stopped: TurnStopReason?) -> AttentionEvent {
         var event = turnFinished(pending: pending, key: key)
-        if let stopped { event.title = stopped.text }
+        if let stopped {
+            event.title = stopped.text
+            event.stopReason = stopped.kind   // §39.7: sounds as an error
+        }
         return event
     }
 }

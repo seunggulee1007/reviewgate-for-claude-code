@@ -25,6 +25,10 @@ public struct AttentionEvent: Sendable, Equatable {
     // MARK: wave4b w4-notify
     /// The permission / question card it is about — a click scrolls there (`AttentionTarget`).
     public var requestId: String?
+    // MARK: notification-sounds (§39.7)
+    /// A finished turn that stopped on a problem (usage limit, login, an API error…): it sounds as an error
+    /// (`NotificationSoundCategory`). nil for every other event.
+    public var stopReason: TurnStopReason.Kind?
 
     public init(kind: Kind, title: String, body: String, key: String) {
         self.kind = kind
