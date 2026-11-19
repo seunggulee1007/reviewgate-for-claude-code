@@ -936,6 +936,79 @@ private final class Tour {
         }
     }
 
+    /// Korean typed into the focused message box, as the input method sends it: "ㅎ", "하", "한" as marked text, half a second
+    /// for SwiftUI's updates and any focus logic to run, then "한" committed and "ㄱ", "그", "글" composed and committed — in an
+    /// idle chat, with a review waiting (Accept & Continue beside the box) and while Claude works; each once as the input
+    /// method's calls come (AppKit posts no text change for marked text) and once with a change notice after each. Then a
+    /// draft SwiftUI sets mid-composition (a send) replaces the syllable, and a syllable left as text when the composition
+    /// ends without a change notice (the keyboard leaving mid-syllable) reaches the draft. `composer ime` lines; LOST when
+    /// the marked syllable was wiped, the box lost the keyboard, or the draft and the box disagree.
+    private func composerImeChecks(_ window: NSWindow, box: ComposerNSTextView) async throws {
+        let composer = entry.model.chatComposer
+        let files = [ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        defer { store.debugShowGate(.idle) }
+        let nowhere = NSRange(location: NSNotFound, length: 0)
+        func compose(_ steps: [String], notices: Bool = false) async throws {
+            for text in steps {
+                box.setMarkedText(text, selectedRange: NSRange(location: (text as NSString).length, length: 0), replacementRange: nowhere)
+                if notices { box.didChangeText() }
+                try await Task.sleep(for: .milliseconds(40))
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
+        func focusBox() async throws {
+            setComposerText("", in: window)
+            composer.inputFocused = true
+            window.makeFirstResponder(box)
+            try await Task.sleep(for: .milliseconds(400))
+        }
+        for state in ["idle", "review", "working"] {
+            switch state {
+            case "review": store.debugShowComposerState(working: false, files: files)
+            case "working": store.debugShowComposerState(working: true, files: [])
+            default: store.debugShowGate(.idle)
+            }
+            for notices in [false, true] {
+                let step = "\(state)\(notices ? ", change notices" : "")"
+                try await focusBox()
+                func composing(_ marked: String, shown: String) {
+                    let has = box.hasMarkedText(), focused = window.firstResponder === box
+                    let now = has ? (box.string as NSString).substring(with: box.markedRange()) : ""
+                    log("composer ime \(step) \"\(shown)\": box \"\(box.string)\", marked \"\(now)\", keyboard " + (focused ? "in the box" : "moved")
+                        + (has && now == marked && box.string == shown && focused ? " — composing" : " — LOST"))
+                }
+                try await compose(["ㅎ", "하", "한"], notices: notices)
+                composing("한", shown: "한")
+                box.insertText("한", replacementRange: nowhere)
+                try await compose(["ㄱ", "그", "글"], notices: notices)
+                composing("글", shown: "한글")
+                box.insertText("글", replacementRange: nowhere)
+                try await Task.sleep(for: .milliseconds(500))
+                let kept = composer.draft == "한글" && box.string == "한글" && !box.hasMarkedText() && window.firstResponder === box
+                log("composer ime \(step) committed: draft \"\(composer.draft)\", box \"\(box.string)\"" + (kept ? " — kept" : " — LOST"))
+            }
+        }
+        store.debugShowGate(.idle)
+        // SwiftUI's own change mid-composition (the draft sent or replaced): it wins, the syllable goes.
+        try await focusBox()
+        box.insertText("한", replacementRange: nowhere)
+        try await compose(["ㄱ", "그"])
+        composer.draft = "보냄"
+        try await Task.sleep(for: .milliseconds(500))
+        let replaced = box.string == "보냄" && !box.hasMarkedText() && composer.draft == "보냄"
+        log("composer ime draft set mid-composition: box \"\(box.string)\", draft \"\(composer.draft)\"" + (replaced ? " — replaced" : " — LOST"))
+        // The composition ended without a change notice (unmarkText: AppKit when the keyboard leaves mid-syllable): the
+        // syllable stays as text, and the draft has it too.
+        try await focusBox()
+        box.insertText("한", replacementRange: nowhere)
+        try await compose(["ㄱ", "그", "글"])
+        box.unmarkText()
+        try await Task.sleep(for: .milliseconds(500))
+        let agreed = !box.hasMarkedText() && composer.draft == "한글" && box.string == "한글"
+        log("composer ime syllable left unmarked: box \"\(box.string)\", draft \"\(composer.draft)\"" + (agreed ? " — kept" : " — LOST"))
+        try await focusBox()
+    }
+
     /// What the terminal's input does, checked in the message box at the laptop size. `composer paste <source>`: ⌘V through
     /// the app's Edit menu, as the key goes, of what a screenshot, a browser's Copy Image, Preview and a Finder copy of an
     /// image file put on the pasteboard — a private pasteboard handed to the box, never the user's clipboard; LOST when no
@@ -947,6 +1020,7 @@ private final class Tour {
         guard let box = composerView(window) as? ComposerNSTextView else { return log("composer: no message box — LOST") }
         let composer = entry.model.chatComposer
         setComposerText("", in: window)
+        try await composerImeChecks(window, box: box)
 
         // ⌘V of an image.
         let board = NSPasteboard(name: NSPasteboard.Name("rg-tour-paste-\(ProcessInfo.processInfo.processIdentifier)"))
