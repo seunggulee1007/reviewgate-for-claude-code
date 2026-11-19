@@ -254,7 +254,8 @@ describe("terminal chats (§57)", () => {
     expect(await pre("Write", { file_path: join(r.dir, "inside.md"), content: "x" })).toEqual({});
     // A denied git command before any prompt starts no turn.
     await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
-    await r.h.waitFor((st) => st.gate.phase !== "running", "turn over");
+    // Collected, not merely over: a phase read while the collection runs (`collecting`) is gone by the check below.
+    await r.h.waitFor((st) => st.gate.phase === "reviewing" || st.gate.phase === "idle", "turn collected");
     const phase = r.h.engine.state.gate.phase;
     expect(await pre("Bash", { command: "git clean -fdx" })).toEqual(answer("deny", TERMINAL_GIT_DENY_REASON));
     await new Promise((res) => setTimeout(res, 200));
