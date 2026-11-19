@@ -79,6 +79,11 @@ public enum AppUpdateSource {
         ["api", "--hostname", host, "repos/\(repository)/releases/latest"]
     }
 
+    /// `gh api … releases/tags/vX.Y.Z` — one release (the notes of the version just installed).
+    public static func releaseArguments(tag: String) -> [String] {
+        ["api", "--hostname", host, "repos/\(repository)/releases/tags/\(tag)"]
+    }
+
     public static func downloadArguments(tag: String, into directory: String) -> [String] {
         ["release", "download", tag, "--repo", "\(host)/\(repository)", "-p", assetPattern, "-D", directory]
     }
@@ -231,6 +236,15 @@ public enum AppUpdateChecker {
             return .unavailable(.classify(status: output.status, stderr: output.stderrText + "\n" + output.stdoutText))
         }
         return outcome(of: output.stdout, currentVersion: currentVersion)
+    }
+
+    /// The release of `version` (`vX.Y.Z`), for its notes after the restart; nil offline, without `gh` or for any reply
+    /// that is not that release.
+    public static func release(_ version: String, ghPath: String?, run: UpdateRun) async -> AppRelease? {
+        guard let ghPath, let wanted = SemanticVersion(version) else { return nil }
+        guard let output = try? await run(ghPath, AppUpdateSource.releaseArguments(tag: "v\(wanted)"), checkTimeout),
+              output.status == 0, let found = try? AppRelease.parse(output.stdout), found.version == wanted else { return nil }
+        return found
     }
 
     /// The reply against the running version.

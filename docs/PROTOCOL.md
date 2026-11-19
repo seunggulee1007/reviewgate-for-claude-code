@@ -7122,13 +7122,22 @@ download whose identifier differs from the running app's, so a build with an old
   GitHub's own asset digest when the API reports one; `hdiutil attach -readonly -nobrowse -noautoopen -mountpoint …`; the
   new app passes `codesign --verify --deep --strict`, has the running app's TeamIdentifier (`codesign -dv`; a running app
   with none — ad-hoc — refuses) and bundle id, and says the tag's version. Any failure detaches the image, removes the
-  folder and says why on the banner ([Try Again]); nothing of the installed app has been touched.
+  folder and says why on the banner ([Try Again]); nothing of the installed app has been touched. From the click to the
+  quit the banner's title is "Installing ReviewGate X" (up to 0.5.16 it said "… is available" all along, and the user
+  could not tell anything was under way) and its line names the step: "Downloading 12.4 / 24.0 MB" beside a bar (the
+  bytes in the download folder every half second against the DMG's size from the release; VoiceOver reads it as
+  "Download progress" with that line), then "Checking the download's checksum…", "Opening the disk image…", "Checking the
+  new app's signature and version…" beside a spinner. Settings › General › Updates shows the same title, line and bar
+  while an install runs or after one failed.
 - **Restarting.** Never while a window has a turn running or a card waiting for the user (`closeGuardReason`, whatever
   "Ask before closing" says): the banner says "ReviewGate 0.5.5 is ready. Claude is working in 2 windows — ReviewGate
   restarts when they finish." with [Cancel] (detaches, removes the download) and restarts by itself once they are idle.
-  Then a helper script written into the work folder starts detached (`/bin/sh <script> <pid> <new app> <bundle> <mount>
-  <work> <log>`) and the app quits the usual way (the window list written, every engine stopped). The helper waits for
-  that one pid to exit (at most 10 minutes — then it detaches and replaces nothing), `ditto`s the image's app to a sibling
+  Before it does, "Ready — ReviewGate closes and reopens as X" shows for 2 s, so the windows closing is no surprise (a
+  turn started meanwhile is waited for after all); [Restart Now] goes straight on. Then a helper script written into the
+  work folder starts detached (`/bin/sh <script> <pid> <new app> <bundle> <mount> <work> <log>`), the app records the
+  install (below) and posts "Installing ReviewGate X — It reopens in a few seconds." (a notification, not waited for;
+  with ReviewGate's notifications off or denied by macOS the banner's "Ready" line was all) and quits the usual way (the
+  window list written, every engine stopped). The helper waits for that one pid to exit (at most 10 minutes — then it detaches and replaces nothing), `ditto`s the image's app to a sibling
   of `Bundle.main.bundleURL`, renames the old bundle aside and the copy into place (and back should the rename fail),
   removes the old one, detaches the image, reopens the bundle with `open` — the new version, or the previous one when
   anything failed — and removes the work folder; it logs to `~/Library/Logs/ReviewGate/update.log`. Nothing is killed by
@@ -7140,6 +7149,18 @@ download whose identifier differs from the running app's, so a build with an old
   in Quit (⌘Q did nothing either) until the helper gave up. To update from them: close every project window before
   **Install and Restart**, or force-quit the app (⌥⌘Esc) within the 10 minutes, and the helper finishes. "Move to
   Applications" (`AppMoveBanner`) had the same hang and quits from the run loop too.
+- **After the restart.** Before quitting the app writes `{from, to}` (the running version, the one to install) to its
+  own defaults (`pendingUpdateInstall`, the app's domain — nothing under `~/.reviewgate`); a cancelled quit removes it.
+  The next launch takes it once (`UpdateRelaunch`): the running version is `to` or newer → a notification "Updated to
+  ReviewGate X" ("Previously Y.") and, in every window's banner stack, "Updated to ReviewGate X" with [What's New] — the
+  notes of `vX` (`gh api … releases/tags/vX`, the same `gh` as the check; offline: no button) in the What's New sheet —
+  and [×]. Still older (the helper reopened the previous version, or gave up waiting) → "Could not install ReviewGate X" /
+  "The update to X did not install — <why>" with [Try Again] and [×]; why is the helper's last line of its last run in
+  `update.log` (after its last "waiting for ReviewGate"), without the date, with the last line a tool wrote there in
+  parentheses (`mv: … Permission denied`); no log → "… — the previous version was reopened." When the launch's check
+  finds that release, the notice becomes the update banner's failure (one banner, [Try Again] / [What's New] / [×]).
+  [Try Again] looks the release up when no check has and installs it, or says why it could not. No window opens for
+  any of it; the notice stays until closed, for this launch only.
 - **Compatibility.** No wire change; the Electron client does not check for updates. Teammates' ad-hoc builds never
   install an update from the app (no team to compare); they install by hand as before.
 - **Verified.** Core `AppUpdateTests`: semver parsing and order, the `releases/latest` reply (assets, digest, drafts,
@@ -7148,7 +7169,10 @@ download whose identifier differs from the running app's, so a build with an old
   version gate, the location check, the "Claude working → wait" decision, the pipeline with fake gh / hdiutil / codesign
   (a bad checksum never mounts; a refused app is detached and its folder removed), and the helper run for real against
   temporary folders with stub `hdiutil` / `open` (the bundle replaced, not merged; a failed copy keeps the old one; both
-  reopen). `make release VERSION=0.5.5 DRY_RUN=1` end to end (Release build, a 25 MB DMG, both apps checked, notes, the
+  reopen), the install's words ("Downloading 12.4 / 24.0 MB", the download's share), the record of the install the app
+  quit for (taken once; none → nothing said) and what the reopened app says from it (the version installed or newer →
+  "Updated to …"; still older → "did not install" with the helper's last lines of its last run in `update.log`), and the
+  notes looked up by tag through a fake `gh`. `make release VERSION=0.5.5 DRY_RUN=1` end to end (Release build, a 25 MB DMG, both apps checked, notes, the
   version files put back), then the opt-in `AppUpdateTests.realImagePassesTheGatesAndTheHelperInstallsIt`
   (`RG_UPDATE_DMG` / `RG_UPDATE_RUNNING_APP`) on that DMG with the real hdiutil, codesign and ditto: checksum, mount,
   signature, team and version pass, the helper swaps a scratch bundle that still passes `codesign --verify --deep --strict`

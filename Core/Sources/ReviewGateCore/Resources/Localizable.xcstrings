@@ -17443,22 +17443,6 @@
         }
       }
     },
-    "Restarting into ReviewGate %@…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restarting into ReviewGate %@…"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ReviewGate %@(으)로 다시 시작하는 중…"
-          }
-        }
-      }
-    },
     "Could not install ReviewGate %@": {
       "localizations": {
         "en": {
@@ -17903,6 +17887,134 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 대화는 터미널 채팅 '%@'에서 이어져요 — 이 채팅은 기록으로 남아요"
+          }
+        }
+      }
+    },
+    "Installing ReviewGate %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installing ReviewGate %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate %@ 설치 중"
+          }
+        }
+      }
+    },
+    "Downloading %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "받는 중 %@"
+          }
+        }
+      }
+    },
+    "Ready — ReviewGate closes and reopens as %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready — ReviewGate closes and reopens as %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "준비됐어요 — ReviewGate가 닫혔다가 %@(으)로 다시 열려요"
+          }
+        }
+      }
+    },
+    "It reopens in a few seconds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It reopens in a few seconds."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "몇 초 뒤에 다시 열려요."
+          }
+        }
+      }
+    },
+    "Updated to ReviewGate %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated to ReviewGate %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate %@(으)로 업데이트했어요"
+          }
+        }
+      }
+    },
+    "Previously %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previously %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 버전: %@"
+          }
+        }
+      }
+    },
+    "The update to %@ did not install — the previous version was reopened.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The update to %@ did not install — the previous version was reopened."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 업데이트가 설치되지 않아 이전 버전을 다시 열었어요."
+          }
+        }
+      }
+    },
+    "The update to %@ did not install — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The update to %1$@ did not install — %2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 업데이트가 설치되지 않았어요 — %2$@"
           }
         }
       }
