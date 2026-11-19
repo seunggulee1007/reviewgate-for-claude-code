@@ -109,6 +109,7 @@ private struct GeneralSettingsView: View {
                 Toggle("Play a sound", isOn: $notificationSound)
                     .disabled(!notificationsEnabled)
                     .accessibilityIdentifier("Notification sound")
+                NotificationSoundRows()   // §39.7: a sound per kind of notification
                 Text("Turn finished (with the files waiting for review), permission requests, questions, plans and errors that need you. The dock badge counts files pending review across windows, or shows ! while Claude waits for an answer.")
                     .font(.caption).foregroundStyle(.secondary)
                 NotificationSettingsRows()   // MARK: wave4b w4-notify — macOS turned them off? one switch per group

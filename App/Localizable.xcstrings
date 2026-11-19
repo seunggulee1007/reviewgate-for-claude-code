@@ -3873,6 +3873,22 @@
         }
       }
     },
+    "App updates": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App updates"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱 업데이트"
+          }
+        }
+      }
+    },
     "Appearance": {
       "localizations": {
         "en": {
@@ -10791,6 +10807,22 @@
         }
       }
     },
+    "Each kind of notification plays its own sound, out of the box too. ReviewGate plays them itself, so a Focus (Do Not Disturb) does not silence them — pick None, or turn off Play a sound.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each kind of notification plays its own sound, out of the box too. ReviewGate plays them itself, so a Focus (Do Not Disturb) does not silence them — pick None, or turn off Play a sound."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "알림 종류마다 처음부터 다른 소리가 나요. 소리는 ReviewGate가 직접 내서 집중 모드(방해 금지)로는 꺼지지 않아요 — 없음을 고르거나 ‘소리 재생’을 끄세요."
+          }
+        }
+      }
+    },
     "Each reply is limited to %lld files / %lld lines; you'll review the diff before continuing.": {
       "localizations": {
         "en": {
@@ -11335,6 +11367,70 @@
         }
       }
     },
+    "None is picked — nothing to play": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None is picked — nothing to play"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "없음을 골랐어요 — 들려줄 소리가 없어요"
+          }
+        }
+      }
+    },
+    "Permission requests and plans": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission requests and plans"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "허용 요청·계획"
+          }
+        }
+      }
+    },
+    "Plays this sound": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays this sound"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 소리를 들려줘요"
+          }
+        }
+      }
+    },
+    "Questions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questions"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문"
+          }
+        }
+      }
+    },
     "Show the review panel between the file list and the terminal (⌘⇧D)": {
       "localizations": {
         "en": {
@@ -11363,6 +11459,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 패널을 파일 목록 옆, 터미널 위에 띄워요 — 창이 좁아 나란히 둘 수 없어요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "Sounds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sounds"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "소리"
+          }
+        }
+      }
+    },
+    "Stopped by an error, usage limit or login": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped by an error, usage limit or login"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오류·사용량 한도·로그인으로 멈췄을 때"
           }
         }
       }
@@ -28150,6 +28278,22 @@
         }
       }
     },
+    "The sound this kind of notification plays": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The sound this kind of notification plays"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 종류의 알림이 내는 소리"
+          }
+        }
+      }
+    },
     "The status line command failed: %@. Showing its last output.": {
       "localizations": {
         "en": {
@@ -29554,6 +29698,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 저장소의 모든 워크벤치에서 켜거나 꺼요"
+          }
+        }
+      }
+    },
+    "Turn on Play a sound to choose": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Play a sound to choose"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "고르려면 ‘소리 재생’을 켜세요"
           }
         }
       }

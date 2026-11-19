@@ -105,6 +105,88 @@ struct NotificationSettingsRows: View {
     }
 }
 
+// MARK: notification-sounds (§39.7)
+
+/// Settings › Notifications under "Play a sound": the sound of each kind of notification — a macOS alert sound, "Default"
+/// (System Settings › Sound) or "None" — with ▶ to hear it. Distinct out of the box (`NotificationSoundCategory.defaultSound`).
+struct NotificationSoundRows: View {
+    @AppStorage(AppSettings.Key.notificationsEnabled) private var notificationsEnabled = true
+    @AppStorage(AppSettings.Key.notificationSound) private var notificationSound = true
+    /// What macOS ships, read once when Settings opens.
+    @State private var names = NotificationSound.systemSoundNames()
+
+    var body: some View {
+        let enabled = notificationsEnabled && notificationSound
+        Text("Sounds").font(.subheadline.weight(.semibold))
+        ForEach(NotificationSoundCategory.allCases) { category in
+            NotificationSoundRow(category: category, names: names, enabled: enabled)
+        }
+        Text("Each kind of notification plays its own sound, out of the box too. ReviewGate plays them itself, so a Focus (Do Not Disturb) does not silence them — pick None, or turn off Play a sound.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+private struct NotificationSoundRow: View {
+    let category: NotificationSoundCategory
+    let names: [String]
+    let enabled: Bool
+    @AppStorage private var choice: String
+
+    init(category: NotificationSoundCategory, names: [String], enabled: Bool) {
+        self.category = category
+        self.names = names
+        self.enabled = enabled
+        _choice = AppStorage(wrappedValue: category.defaultSound.stored, category.defaultsKey)
+    }
+
+    private var sound: NotificationSound { NotificationSound(stored: choice) ?? category.defaultSound }
+
+    private var listed: [String] {
+        if case .named(let name) = sound, !names.contains(name) { return names + [name] }
+        return names
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Picker(selection: $choice) {
+                Text("Default").tag(NotificationSound.systemDefault.stored)
+                Text("None").tag(NotificationSound.none.stored)
+                Divider()
+                // A pick that is not on this Mac any more stays listed (it plays the alert sound until changed).
+                ForEach(listed, id: \.self) { name in
+                    Text(verbatim: name).tag(name)
+                }
+            } label: {
+                Text(title)
+            }
+            .help(enabled ? Text("The sound this kind of notification plays") : Text("Turn on Play a sound to choose"))
+            .accessibilityIdentifier("Notification sound \(category.rawValue)")
+            Button {
+                NotificationSoundPlayer.play(sound)
+            } label: {
+                Image(systemName: "play.fill")
+            }
+            .buttonStyle(.borderless)
+            .disabled(sound == .none)
+            .help(sound == .none ? Text("None is picked — nothing to play") : Text("Plays this sound"))
+            .accessibilityLabel(Text("Preview"))
+            .accessibilityHint(Text("Plays this sound"))
+            .accessibilityIdentifier("Notification sound preview \(category.rawValue)")
+        }
+        .disabled(!enabled)
+    }
+
+    private var title: LocalizedStringKey {
+        switch category {
+        case .permission: "Permission requests and plans"
+        case .question: "Questions"
+        case .turnFinished: "When work finishes"
+        case .error: "Stopped by an error, usage limit or login"
+        case .appUpdate: "App updates"
+        }
+    }
+}
+
 extension WindowModel {
     /// A clicked notification (the window is already in front): the review tab, its chat and the card / summary the chat
     /// scrolls to (`notificationReveal`). wave4b integration (§39.2 × §39.6): a click never switches the Claude session —
