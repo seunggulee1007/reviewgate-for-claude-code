@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TerminalSpecEvent } from "../src/protocol.js";
@@ -7,7 +7,8 @@ import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
 import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
-import { makeHarness, type Harness } from "./helpers/engine.js";
+import { fakePlatform, makeHarness, type Harness } from "./helpers/engine.js";
+import { makeFakeClaude } from "./helpers/fakeClaude.js";
 import { fileExists, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 /**
@@ -40,22 +41,20 @@ function makeRepo(): string {
   return dir;
 }
 
-/** A `claude` that only answers `--version`. */
-function fakeClaude(version = "2.1.325"): string {
-  const bin = temp("rg-term-bin");
-  const path = join(bin, "claude");
-  writeFileSync(path, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo "${version} (Claude Code)"; exit 0; fi\nexit 1\n`);
-  chmodSync(path, 0o755);
-  return path;
-}
+/**
+ * The engine sees the platform it runs on: on Windows the fake `claude` is npm's `claude.cmd` shim, which only an engine
+ * that knows it is on Windows looks through (helpers/fakeClaude.ts). Terminal chats are Mac-only for the clients, but the
+ * engine side tested here is the same everywhere.
+ */
+const platform = { ...fakePlatform, isWindows: process.platform === "win32" };
 
 type Rig = { h: Harness; dir: string; config: string; claude: string };
 
 async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal" } = {}): Promise<Rig> {
   const dir = o.dir ?? makeRepo();
   const config = o.config ?? temp("rg-term-config");
-  const claude = fakeClaude(o.version);
-  const h = makeHarness({ env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY });
+  const claude = makeFakeClaude(temp("rg-term-bin"), o.version);
+  const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY });
   harnesses.push(h);
   await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
   await h.settle();
@@ -254,7 +253,8 @@ describe("terminal chats (§57)", () => {
     expect(await pre("Write", { file_path: join(r.dir, "inside.md"), content: "x" })).toEqual({});
     // A denied git command before any prompt starts no turn.
     await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
-    await r.h.waitFor((st) => st.gate.phase !== "running", "turn over");
+    // Collected, not merely over: a phase read while the collection runs (`collecting`) is gone by the check below.
+    await r.h.waitFor((st) => st.gate.phase === "reviewing" || st.gate.phase === "idle", "turn collected");
     const phase = r.h.engine.state.gate.phase;
     expect(await pre("Bash", { command: "git clean -fdx" })).toEqual(answer("deny", TERMINAL_GIT_DENY_REASON));
     await new Promise((res) => setTimeout(res, 200));
