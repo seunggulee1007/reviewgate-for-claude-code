@@ -124,9 +124,24 @@ struct ComposerTextView: NSViewRepresentable {
             view.font = NSFont.systemFont(ofSize: size)
             coordinator.reportHeight()
         }
-        if view.string != text {
+        // Korean / Japanese input: the syllable an input method composes (marked text) is in the view, not in `text` — AppKit
+        // posts no text change for it — so a SwiftUI update mid-composition (the caret, the palettes, anything) must leave the
+        // view alone, or each syllable is wiped as it is typed. Only a change SwiftUI made itself (`text` moved off what the
+        // two last agreed on: a send, a picked mention) replaces it, the composition dropped first. A view that is ahead
+        // (a composition that ended without a change notice) hands its text to SwiftUI instead of being overwritten.
+        if view.string == text {
+            coordinator.synced = text
+        }
+        if view.string != text, text == coordinator.synced {
+            if !view.hasMarkedText() { DispatchQueue.main.async { coordinator.pushText() } }
+        } else if view.string != text {
             coordinator.isApplying = true
+            if view.hasMarkedText() {
+                view.inputContext?.discardMarkedText()
+                view.unmarkText()
+            }
             view.string = text
+            coordinator.synced = text
             let target = min(caretRequest ?? (text as NSString).length, (text as NSString).length)
             view.setSelectedRange(NSRange(location: target, length: 0))
             coordinator.isApplying = false
@@ -148,18 +163,32 @@ struct ComposerTextView: NSViewRepresentable {
         var parent: ComposerTextView
         weak var textView: ComposerNSTextView?
         var isApplying = false
+        /// The text the view and SwiftUI last agreed on (the view reported it, or SwiftUI set it): `text` off it is SwiftUI's
+        /// own change; the view off it while `text` is still on it is typing SwiftUI has not heard of yet (marked text).
+        var synced: String
 
-        init(_ parent: ComposerTextView) { self.parent = parent }
+        init(_ parent: ComposerTextView) {
+            self.parent = parent
+            synced = parent.text
+        }
 
         func textDidChange(_ notification: Notification) {
             guard !isApplying, let view = textView else { return }
+            synced = view.string
             parent.text = view.string
             parent.caret = view.selectedRange().location
             reportHeight()
         }
 
+        /// The view's text to SwiftUI (a composition that ended without a change notice) — unless SwiftUI changed it meanwhile.
+        func pushText() {
+            guard !isApplying, let view = textView, !view.hasMarkedText(), view.string != synced, parent.text == synced else { return }
+            textDidChange(Notification(name: NSText.didChangeNotification, object: view))
+        }
+
         func textViewDidChangeSelection(_ notification: Notification) {
-            guard !isApplying, let view = textView else { return }
+            // Mid-composition the caret is the input method's: no SwiftUI update per syllable (the commit reports it).
+            guard !isApplying, let view = textView, !view.hasMarkedText() else { return }
             let location = view.selectedRange().location
             if parent.caret != location { parent.caret = location }
         }
@@ -251,8 +280,18 @@ final class ComposerNSTextView: NSTextView {
 
     override func resignFirstResponder() -> Bool {
         let ok = super.resignFirstResponder()
-        if ok { coordinator?.focusChanged(false) }
+        if ok {
+            coordinator?.focusChanged(false)
+            // The keyboard left mid-syllable: AppKit keeps the syllable as text, without a change notice — SwiftUI hears of it.
+            DispatchQueue.main.async { [weak self] in self?.coordinator?.pushText() }
+        }
         return ok
+    }
+
+    /// A composition the input method ends without a change notice keeps the syllable as text: SwiftUI hears of it.
+    override func unmarkText() {
+        super.unmarkText()
+        DispatchQueue.main.async { [weak self] in self?.coordinator?.pushText() }
     }
 
     /// r1-composer M08: 1…9 typed into an empty box go to the chat first (an option of Claude's open question); a digit it
