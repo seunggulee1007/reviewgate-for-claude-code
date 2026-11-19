@@ -7155,7 +7155,10 @@ download whose identifier differs from the running app's, so a build with an old
   version gate, the location check, the "Claude working → wait" decision, the pipeline with fake gh / hdiutil / codesign
   (a bad checksum never mounts; a refused app is detached and its folder removed), and the helper run for real against
   temporary folders with stub `hdiutil` / `open` (the bundle replaced, not merged; a failed copy keeps the old one; both
-  reopen). `make release VERSION=0.5.5 DRY_RUN=1` end to end (Release build, a 25 MB DMG, both apps checked, notes, the
+  reopen), the install's words ("Downloading 12.4 / 24.0 MB", the download's share), the record of the install the app
+  quit for (taken once; none → nothing said) and what the reopened app says from it (the version installed or newer →
+  "Updated to …"; still older → "did not install" with the helper's last lines of its last run in `update.log`), and the
+  notes looked up by tag through a fake `gh`. `make release VERSION=0.5.5 DRY_RUN=1` end to end (Release build, a 25 MB DMG, both apps checked, notes, the
   version files put back), then the opt-in `AppUpdateTests.realImagePassesTheGatesAndTheHelperInstallsIt`
   (`RG_UPDATE_DMG` / `RG_UPDATE_RUNNING_APP`) on that DMG with the real hdiutil, codesign and ditto: checksum, mount,
   signature, team and version pass, the helper swaps a scratch bundle that still passes `codesign --verify --deep --strict`

@@ -403,6 +403,92 @@ public enum AppUpdateHelper {
     }
 }
 
+// MARK: - After the restart
+
+/// What the app was about to install when it quit for the restart — kept in the app's own defaults, so the reopened app
+/// can say how it went (once).
+public struct UpdateInstallRecord: Codable, Equatable, Sendable {
+    /// The version that quit.
+    public var from: String
+    /// The version the helper was to install.
+    public var to: String
+
+    public init(from: String, to: String) {
+        self.from = from
+        self.to = to
+    }
+}
+
+public enum UpdateRelaunch {
+    public enum Notice: Equatable, Sendable {
+        /// The running app is the version installed (or newer).
+        case updated(from: String, to: String)
+        /// The previous version runs again; `reason` is the helper's last word in its log.
+        case failed(to: String, reason: String?)
+    }
+
+    /// nil without a record (no update quit the app) or with a version that cannot be read.
+    public static func notice(_ record: UpdateInstallRecord?, runningVersion: String, log: String?) -> Notice? {
+        guard let record, let running = SemanticVersion(runningVersion), let target = SemanticVersion(record.to) else { return nil }
+        if running >= target { return .updated(from: record.from, to: runningVersion) }
+        return .failed(to: record.to, reason: log.flatMap(failureReason(inLog:)))
+    }
+
+    /// The last run of the helper in `update.log` (from its last "waiting for ReviewGate"): its last line, without the
+    /// date ("could not replace … — reopening the previous version"), and the last line a tool wrote there (`mv: …`).
+    public static func failureReason(inLog log: String) -> String? {
+        let lines = log.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let start = lines.lastIndex { $0.contains(marker + "waiting for ReviewGate") } ?? -1
+        let run = lines[(start + 1)...]
+        let said = run.last { $0.contains(marker) }.flatMap { line in line.range(of: marker).map { String(line[$0.upperBound...]) } }
+        let tool = run.last { !$0.contains(marker) }
+        let reason = switch (said, tool) {
+        case let (said?, tool?): "\(said) (\(tool))"
+        case let (said?, nil): said
+        case let (nil, tool?): tool
+        case (nil, nil): ""
+        }
+        guard !reason.isEmpty else { return nil }
+        return reason.count > 240 ? String(reason.prefix(239)) + "…" : reason
+    }
+
+    /// The helper's own lines: `2026-11-19 10:00:00 update: …`.
+    private static let marker = " update: "
+
+    /// The end of the log file (it is appended to by every update).
+    public static func readLog(_ url: URL, lastBytes: Int = 16 * 1024) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        try? handle.seek(toOffset: size > UInt64(lastBytes) ? size - UInt64(lastBytes) : 0)
+        return (try? handle.readToEnd()).map { String(decoding: $0, as: UTF8.self) }
+    }
+}
+
+public extension AppSettings.Key {
+    /// The update the app quit to install (`UpdateInstallRecord` as JSON); read and removed at the next launch.
+    static let pendingUpdateInstall = "pendingUpdateInstall"
+}
+
+public extension AppSettings {
+    static func recordUpdateInstall(_ record: UpdateInstallRecord, defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(record) else { return }
+        defaults.set(data, forKey: Key.pendingUpdateInstall)
+    }
+
+    /// The restart was cancelled: nothing to say at the next launch.
+    static func clearUpdateInstall(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: Key.pendingUpdateInstall)
+    }
+
+    /// The record once (it is removed).
+    static func takeUpdateInstall(defaults: UserDefaults = .standard) -> UpdateInstallRecord? {
+        guard let data = defaults.data(forKey: Key.pendingUpdateInstall) else { return nil }
+        defaults.removeObject(forKey: Key.pendingUpdateInstall)
+        return try? JSONDecoder().decode(UpdateInstallRecord.self, from: data)
+    }
+}
+
 // MARK: - Words
 
 public extension AppUpdateText {
@@ -443,6 +529,26 @@ public extension AppUpdateText {
     /// Every check passed and no window holds the restart: said for a moment before the windows close.
     static func ready(_ version: String) -> String {
         String(localized: "Ready — ReviewGate closes and reopens as \(version)", bundle: .module)
+    }
+
+    /// The notification posted as the app quits for the restart (under `installingTitle`).
+    static var reopensSoon: String { String(localized: "It reopens in a few seconds.", bundle: .module) }
+
+    /// After the restart: the notification's and the window's title.
+    static func updatedTitle(_ version: String) -> String {
+        String(localized: "Updated to ReviewGate \(version)", bundle: .module)
+    }
+
+    static func updatedFrom(_ version: String) -> String {
+        String(localized: "Previously \(version).", bundle: .module)
+    }
+
+    /// After the restart, the previous version again: why, from the helper's log when it said.
+    static func notInstalled(_ version: String, reason: String?) -> String {
+        guard let reason else {
+            return String(localized: "The update to \(version) did not install — the previous version was reopened.", bundle: .module)
+        }
+        return String(localized: "The update to \(version) did not install — \(reason)", bundle: .module)
     }
 
     /// How much of the DMG has come, 0…1; nil without a size to compare with.

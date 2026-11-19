@@ -291,6 +291,70 @@ import Testing
                 == "ReviewGate 0.5.5 is ready. Claude is working — ReviewGate restarts when the turn finishes.")
     }
 
+    // MARK: - After the restart
+
+    @Test func theReopenedAppSaysOnceThatItWasUpdated() {
+        let d = defaults()
+        #expect(AppSettings.takeUpdateInstall(defaults: d) == nil)   // no record → nothing to say
+        #expect(UpdateRelaunch.notice(nil, runningVersion: "0.5.16", log: nil) == nil)
+        AppSettings.recordUpdateInstall(UpdateInstallRecord(from: "0.5.15", to: "0.5.16"), defaults: d)
+        let record = AppSettings.takeUpdateInstall(defaults: d)
+        #expect(record == UpdateInstallRecord(from: "0.5.15", to: "0.5.16"))
+        #expect(AppSettings.takeUpdateInstall(defaults: d) == nil)   // once
+        #expect(UpdateRelaunch.notice(record, runningVersion: "0.5.16", log: nil) == .updated(from: "0.5.15", to: "0.5.16"))
+        #expect(UpdateRelaunch.notice(record, runningVersion: "0.5.17", log: nil) == .updated(from: "0.5.15", to: "0.5.17"))
+        #expect(UpdateRelaunch.notice(record, runningVersion: "dev", log: nil) == nil)
+        #expect(AppUpdateText.updatedTitle("0.5.16") == "Updated to ReviewGate 0.5.16")
+    }
+
+    @Test func thePreviousVersionReopenedSaysWhyTheUpdateDidNotInstall() {
+        let record = UpdateInstallRecord(from: "0.5.15", to: "0.5.16")
+        let log = """
+        2026-11-18 09:00:00 update: waiting for ReviewGate (pid 100) to quit
+        2026-11-18 09:00:05 update: installed /Applications/ReviewGate.app
+        2026-11-19 10:00:00 update: waiting for ReviewGate (pid 200) to quit
+        mv: rename /Applications/ReviewGate.app to /Applications/.ReviewGate.app.old-7: Permission denied
+        2026-11-19 10:00:05 update: could not replace /Applications/ReviewGate.app — reopening the previous version
+
+        """
+        let reason = "could not replace /Applications/ReviewGate.app — reopening the previous version"
+            + " (mv: rename /Applications/ReviewGate.app to /Applications/.ReviewGate.app.old-7: Permission denied)"
+        #expect(UpdateRelaunch.notice(record, runningVersion: "0.5.15", log: log) == .failed(to: "0.5.16", reason: reason))
+        // the helper gave up waiting: its own line alone
+        let gaveUp = "2026-11-19 10:00:00 update: waiting for ReviewGate (pid 200) to quit\n"
+            + "2026-11-19 10:10:00 update: pid 200 still running after 600 s — nothing replaced\n"
+        #expect(UpdateRelaunch.failureReason(inLog: gaveUp) == "pid 200 still running after 600 s — nothing replaced")
+        // no log, or nothing after the last start: the previous version reopened, no reason
+        #expect(UpdateRelaunch.notice(record, runningVersion: "0.5.15", log: nil) == .failed(to: "0.5.16", reason: nil))
+        #expect(UpdateRelaunch.failureReason(inLog: "2026-11-19 10:00:00 update: waiting for ReviewGate (pid 200) to quit\n") == nil)
+        #expect(AppUpdateText.notInstalled("0.5.16", reason: nil)
+                == "The update to 0.5.16 did not install — the previous version was reopened.")
+        #expect(AppUpdateText.notInstalled("0.5.16", reason: "nothing replaced") == "The update to 0.5.16 did not install — nothing replaced")
+    }
+
+    @Test func readsTheEndOfTheLog() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("AppUpdateTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("update.log")
+        try (String(repeating: "x", count: 100) + "\nlast line\n").write(to: file, atomically: true, encoding: .utf8)
+        #expect(UpdateRelaunch.readLog(file, lastBytes: 10) == "last line\n")
+        #expect(UpdateRelaunch.readLog(file)?.hasPrefix("xxx") == true)
+        #expect(UpdateRelaunch.readLog(dir.appendingPathComponent("none.log")) == nil)
+    }
+
+    @Test func fetchesTheNotesOfTheInstalledVersion() async {
+        let calls = Calls()
+        let reply = output(Self.releaseJSON)
+        let run: UpdateRun = { exe, args, _ in calls.add(exe, args); return reply }
+        #expect(await AppUpdateChecker.release("0.5.5", ghPath: "/gh", run: run)?.tag == "v0.5.5")
+        #expect(calls.all.first == ["/gh", "api", "--hostname", "github.com", "repos/seunggulee1007/reviewgate-for-claude-code/releases/tags/v0.5.5"])
+        #expect(await AppUpdateChecker.release("0.5.6", ghPath: "/gh", run: run) == nil)   // another release's reply
+        #expect(await AppUpdateChecker.release("0.5.5", ghPath: nil, run: run) == nil)
+        let offline: UpdateRun = { _, _, _ in self.output("", stderr: "error connecting to api.github.com", status: 1) }
+        #expect(await AppUpdateChecker.release("0.5.5", ghPath: "/gh", run: offline) == nil)
+    }
+
     @Test func theInstallSaysHowFarItIs() {
         #expect(AppUpdateText.downloading(AppUpdateText.received(12_400_000, of: 24_000_000)) == "Downloading 12.4 / 24.0 MB")
         #expect(AppUpdateText.downloadFraction(12_000_000, of: 24_000_000) == 0.5)

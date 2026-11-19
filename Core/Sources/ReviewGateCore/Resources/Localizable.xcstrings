@@ -17938,6 +17938,86 @@
           }
         }
       }
+    },
+    "It reopens in a few seconds.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It reopens in a few seconds."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "몇 초 뒤에 다시 열려요."
+          }
+        }
+      }
+    },
+    "Updated to ReviewGate %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated to ReviewGate %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate %@(으)로 업데이트했어요"
+          }
+        }
+      }
+    },
+    "Previously %@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previously %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 버전: %@"
+          }
+        }
+      }
+    },
+    "The update to %@ did not install — the previous version was reopened.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The update to %@ did not install — the previous version was reopened."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 업데이트가 설치되지 않아 이전 버전을 다시 열었어요."
+          }
+        }
+      }
+    },
+    "The update to %@ did not install — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The update to %1$@ did not install — %2$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 업데이트가 설치되지 않았어요 — %2$@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
