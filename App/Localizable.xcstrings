@@ -34067,6 +34067,54 @@
           }
         }
       }
+    },
+    "Hide this notice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide this notice"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 알림을 닫아요"
+          }
+        }
+      }
+    },
+    "Looks the release up again and installs it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looks the release up again and installs it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "릴리스를 다시 찾아 설치해요"
+          }
+        }
+      }
+    },
+    "What changed in the version you now have": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What changed in the version you now have"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 쓰는 버전에서 바뀐 점을 보여줘요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

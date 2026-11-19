@@ -27,7 +27,7 @@ struct WindowNoticesStack: View {
                                                      dismissed: notificationsNoticeDismissed)
                     && NotificationHealth.problem(appEnabled: notificationsEnabled, system: NotificationStatusModel.shared.system) != nil
             case .cliVersion: store.cliVersionBanner != nil
-            case .appUpdate: AppUpdateController.shared.bannerRelease != nil
+            case .appUpdate: AppUpdateController.shared.bannerRelease != nil || AppUpdateController.shared.relaunch != nil
             case .setupReport: WorkbenchSetupReports.shared.report(for: store.projectURL) != nil
             case .transient: store.projectURL.map { RecentProjects.isTransient($0.path) } ?? false
             }

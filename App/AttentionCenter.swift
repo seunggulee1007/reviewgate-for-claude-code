@@ -154,6 +154,32 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(request)
     }
 
+    // MARK: app-update (§48)
+
+    /// The update's own notices — "Installing ReviewGate X" as the app quits for the restart, "Updated to ReviewGate X"
+    /// after it. Only while ReviewGate's notifications are on and macOS allows them (else the window's banner alone says
+    /// it); nothing waits for it. One at a time: the newer replaces the older.
+    func postAppUpdate(title: String, body: String) {
+        guard AppSettings.notificationsEnabled() else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        let request = UNNotificationRequest(identifier: "app-update", content: content, trigger: nil)
+        switch authorization {
+        case .authorized, .provisional, .ephemeral:
+            UNUserNotificationCenter.current().add(request)
+        case nil:
+            // At launch macOS's answer may not have been read yet.
+            Task {
+                let status = await Self.read(UNUserNotificationCenter.current())
+                guard status.raw == .authorized || status.raw == .provisional else { return }
+                try? await UNUserNotificationCenter.current().add(request)
+            }
+        default:
+            break
+        }
+    }
+
     // MARK: UNUserNotificationCenterDelegate
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {

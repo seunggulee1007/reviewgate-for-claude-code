@@ -44,6 +44,11 @@ final class AppUpdateController {
     private(set) var receivedBytes: Int64?
     /// How long "Ready — ReviewGate closes and reopens as X" shows before the quit.
     private static let readyPause: Duration = .seconds(2)
+    /// After an update's restart: "Updated to X", or why it did not install — said once, until closed.
+    private(set) var relaunch: UpdateRelaunch.Notice?
+    /// The installed version's release, for [What's New] after the restart (nil offline).
+    private(set) var relaunchRelease: AppRelease?
+    private static var logFile: URL { EngineLogFile.shared.directory.appendingPathComponent("update.log") }
 
     /// A download, a check or the wait is under way: no second install, no dismiss.
     var isInstalling: Bool {
@@ -66,11 +71,47 @@ final class AppUpdateController {
     /// `gh` meanwhile), then every 6 hours while automatic checks are on.
     func start() {
         guard loop == nil else { return }
+        noticeRelaunch()
         loop = Task { [weak self] in
             try? await Task.sleep(for: .seconds(8))
             while !Task.isCancelled {
                 if AppSettings.checkForUpdatesAutomatically() { await self?.runCheck(userInitiated: false) }
                 try? await Task.sleep(for: AppUpdateChecker.interval)
+            }
+        }
+    }
+
+    /// The update this app quit for (`AppSettings.takeUpdateInstall`, once): updated — a notification and the windows'
+    /// "Updated to X" with [What's New] once its notes come; the previous version again — why, with [Try Again].
+    private func noticeRelaunch() {
+        guard let notice = UpdateRelaunch.notice(AppSettings.takeUpdateInstall(), runningVersion: currentVersion,
+                                                 log: UpdateRelaunch.readLog(Self.logFile)) else { return }
+        relaunch = notice
+        guard case let .updated(from, to) = notice else { return }
+        AttentionCenter.shared.postAppUpdate(title: AppUpdateText.updatedTitle(to), body: AppUpdateText.updatedFrom(from))
+        Task {
+            let (gh, run) = await Self.ghRunner()
+            let found = await AppUpdateChecker.release(to, ghPath: gh, run: run)
+            if relaunch == notice { relaunchRelease = found }
+        }
+    }
+
+    /// [×] on "Updated to X" / "did not install".
+    func dismissRelaunch() {
+        relaunch = nil
+        relaunchRelease = nil
+    }
+
+    /// [Try Again] on "The update to X did not install": the release is looked up (unless a check found it) and installed.
+    func retryFailedUpdate() {
+        relaunch = nil
+        Task {
+            while checking { try? await Task.sleep(for: .milliseconds(300)) }
+            if release == nil { await runCheck(userInitiated: false) }
+            if release != nil {
+                startInstall()
+            } else if let lastOutcome {
+                AppUpdateAlerts.report(lastOutcome, controller: self)
             }
         }
     }
@@ -111,6 +152,12 @@ final class AppUpdateController {
                 dismissed = nil
             }
             if case .failed = install, report { install = nil }
+            // The reopened previous version's "did not install" becomes the banner's failure for that release (one banner,
+            // with [Try Again] and [What's New]).
+            if case let .failed(to, reason) = relaunch, to == found.version.description, install == nil {
+                install = .failed(AppUpdateText.notInstalled(to, reason: reason))
+                relaunch = nil
+            }
         case .upToDate:
             if !isInstalling { release = nil; install = nil }
         case .unavailable:
@@ -258,13 +305,17 @@ final class AppUpdateController {
         install = .restarting
         do {
             helper = try AppUpdateHelper.launch(prepared, bundlePath: Bundle.main.bundlePath,
-                                                log: EngineLogFile.shared.directory.appendingPathComponent("update.log"))
+                                                log: Self.logFile)
         } catch {
             install = .failed(AppUpdateText.refusal(.helperFailed(error.localizedDescription)))
             discardPrepared()
             return
         }
         restartRequested = true
+        // The reopened app compares itself with this (`noticeRelaunch`); macOS says it too while the windows are gone.
+        AppSettings.recordUpdateInstall(UpdateInstallRecord(from: currentVersion, to: prepared.version.description))
+        AttentionCenter.shared.postAppUpdate(title: AppUpdateText.installingTitle(prepared.version.description),
+                                             body: AppUpdateText.reopensSoon)
         // polish P5-sheets-48: not the user's quit — the next launch reopens these windows whatever "Reopen last projects"
         // says.
         AppSettings.setRestoreOnceAfterRelaunch()
@@ -329,6 +380,7 @@ final class AppUpdateController {
         restartRequested = false
         helper?.terminate()
         helper = nil
+        AppSettings.clearUpdateInstall()
         install = .failed(AppUpdateText.restartCancelled)
         discardPrepared()
     }
@@ -425,9 +477,11 @@ enum AppUpdateAlerts {
 struct AppUpdateBannerView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showingNotes = false
+    @State private var showingInstalledNotes = false
     private var updater: AppUpdateController { AppUpdateController.shared }
 
     var body: some View {
+        if let notice = updater.relaunch { relaunchBanner(notice) }
         if let release = updater.bannerRelease {
             HStack(spacing: 8) {
                 Image(systemName: failure == nil ? "arrow.down.circle.fill" : "exclamationmark.triangle.fill")
@@ -463,6 +517,68 @@ struct AppUpdateBannerView: View {
     private var failure: String? {
         if case .failed(let message) = updater.install { return message }
         return nil
+    }
+
+    /// After an update's restart, once: "Updated to ReviewGate X" — [What's New] (once its notes came) [×]; or the previous
+    /// version again: "Could not install ReviewGate X" with why — [Try Again] [×].
+    @ViewBuilder
+    private func relaunchBanner(_ notice: UpdateRelaunch.Notice) -> some View {
+        let failed = if case .failed = notice { true } else { false }
+        HStack(spacing: 8) {
+            Image(systemName: failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(failed ? Color.orange : Color.green)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: Self.relaunchTitle(notice))
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .accessibilityIdentifier("Update result text")
+                Text(verbatim: Self.relaunchDetail(notice))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("Update result detail")
+            }
+            Spacer(minLength: 4)
+            if failed {
+                Button("Try Again") { updater.retryFailedUpdate() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .help("Looks the release up again and installs it")
+                    .accessibilityIdentifier("Retry update")
+            } else if let installed = updater.relaunchRelease {
+                Button(AppUpdateText.whatsNewButton) { showingInstalledNotes = true }
+                    .controlSize(.small)
+                    .help("What changed in the version you now have")
+                    .accessibilityIdentifier("Installed update notes")
+                    .sheet(isPresented: $showingInstalledNotes) { AppUpdateNotesSheet(release: installed) }
+            }
+            Button { updater.dismissRelaunch() } label: { Image(systemName: "xmark") }
+                .buttonStyle(IconButtonStyle(padding: 2))
+                .controlSize(.small)
+                .help("Hide this notice")
+                .accessibilityLabel("Hide this notice")
+                .accessibilityIdentifier("Dismiss update result")
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background((failed ? Color.orange : Color.green).wash(colorScheme, light: 0.10, dark: 0.18))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Update result")
+        Divider()
+    }
+
+    private static func relaunchTitle(_ notice: UpdateRelaunch.Notice) -> String {
+        switch notice {
+        case .updated(_, let to): AppUpdateText.updatedTitle(to)
+        case .failed(let to, _): AppUpdateText.installFailedTitle(to)
+        }
+    }
+
+    private static func relaunchDetail(_ notice: UpdateRelaunch.Notice) -> String {
+        switch notice {
+        case .updated(let from, _): AppUpdateText.updatedFrom(from)
+        case let .failed(to, reason): AppUpdateText.notInstalled(to, reason: reason)
+        }
     }
 
     @ViewBuilder
