@@ -291,6 +291,16 @@ import Testing
                 == "ReviewGate 0.5.5 is ready. Claude is working — ReviewGate restarts when the turn finishes.")
     }
 
+    @Test func theInstallSaysHowFarItIs() {
+        #expect(AppUpdateText.downloading(AppUpdateText.received(12_400_000, of: 24_000_000)) == "Downloading 12.4 / 24.0 MB")
+        #expect(AppUpdateText.downloadFraction(12_000_000, of: 24_000_000) == 0.5)
+        #expect(AppUpdateText.downloadFraction(30_000_000, of: 24_000_000) == 1)   // the .sha256 beside it
+        #expect(AppUpdateText.downloadFraction(12_000_000, of: nil) == nil)
+        #expect(AppUpdateText.downloadFraction(12_000_000, of: 0) == nil)
+        #expect(AppUpdateText.installingTitle("0.5.16") == "Installing ReviewGate 0.5.16")
+        #expect(AppUpdateText.ready("0.5.16") == "Ready — ReviewGate closes and reopens as 0.5.16")
+    }
+
     // MARK: - The pipeline (fake gh / hdiutil / codesign)
 
     /// Plays gh (writes the assets), hdiutil (makes the mounted app) and codesign (the answers given) in a temporary folder.

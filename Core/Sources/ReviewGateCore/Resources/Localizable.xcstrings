@@ -17906,6 +17906,54 @@
           }
         }
       }
+    },
+    "Installing ReviewGate %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installing ReviewGate %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate %@ 설치 중"
+          }
+        }
+      }
+    },
+    "Downloading %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloading %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "받는 중 %@"
+          }
+        }
+      }
+    },
+    "Ready — ReviewGate closes and reopens as %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready — ReviewGate closes and reopens as %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "준비됐어요 — ReviewGate가 닫혔다가 %@(으)로 다시 열려요"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

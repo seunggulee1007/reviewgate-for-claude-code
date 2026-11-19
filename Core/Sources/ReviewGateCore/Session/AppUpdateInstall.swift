@@ -433,6 +433,28 @@ public extension AppUpdateText {
         String(localized: "Restarting into ReviewGate \(version)…", bundle: .module)
     }
 
+    /// The banner's title from [Install and Restart] to the quit (it said "… is available" all along — the user could not
+    /// tell an install was under way).
+    static func installingTitle(_ version: String) -> String {
+        String(localized: "Installing ReviewGate \(version)", bundle: .module)
+    }
+
+    /// "Downloading 12.4 / 24.0 MB" (`received`).
+    static func downloading(_ amount: String) -> String {
+        String(localized: "Downloading \(amount)", bundle: .module)
+    }
+
+    /// Every check passed and no window holds the restart: said for a moment before the windows close.
+    static func ready(_ version: String) -> String {
+        String(localized: "Ready — ReviewGate closes and reopens as \(version)", bundle: .module)
+    }
+
+    /// How much of the DMG has come, 0…1; nil without a size to compare with.
+    static func downloadFraction(_ bytes: Int64, of total: Int?) -> Double? {
+        guard let total, total > 0 else { return nil }
+        return min(1, max(0, Double(bytes) / Double(total)))
+    }
+
     static func installFailedTitle(_ version: String) -> String {
         String(localized: "Could not install ReviewGate \(version)", bundle: .module)
     }
