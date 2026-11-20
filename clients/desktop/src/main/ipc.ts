@@ -29,6 +29,7 @@ import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows (polish-07): d
 import { projectOpenPath } from "./sessionSettings.js";
 import { pinnedVersionPath } from "./cliPin.js";
 import { isDirectory, isTransientProjectPath, recentEntries, withoutRecent } from "./recentProjects.js"; // MARK: wave4 w4-install
+import { ptyInfo } from "./pty/nodePty.js"; // MARK: terminal-win (§57.10)
 
 type Deps = {
   engineFor: (sender: WebContents) => ReviewEngine | undefined;
@@ -274,7 +275,9 @@ export function installIPC(deps: Deps): void {
     if (r.canceled) return [];
     return Promise.all(r.filePaths.slice(0, MAX_ATTACHMENTS).map((path) => readPickedImage(path)));
   });
-  ipcMain.handle("rg:toolchainInfo", (): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
+  // MARK: terminal-win — PROTOCOL §57.10: whether this process can run PTYs (node-pty loaded; ConPTY on Windows ≥ 1903).
+  ipcMain.handle("rg:pty:info", () => ptyInfo());
+  ipcMain.handle("rg:toolchainInfo",(): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
   // MARK: wave3 desktop-flow (src/main/flowWindows.ts)
   /** §36.12: the new workbench's window takes its failed setup's report once its project is open. */
   ipcMain.handle("rg:takeWorkbenchSetupReport", (_e, paths: unknown) => setupReports.take(paths));

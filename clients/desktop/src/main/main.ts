@@ -4,8 +4,11 @@
  * Windows and their engines live in src/main/windows.ts, the `rg:*` handlers in src/main/ipc.ts.
  */
 import { app, BrowserWindow, clipboard, shell } from "electron";
-import { statSync } from "node:fs";
+import { statSync, writeFileSync } from "node:fs";
+import { release, tmpdir } from "node:os";
 import { join, sep } from "node:path";
+import { configureNodePty, nodePty } from "./pty/nodePty.js"; // MARK: terminal-win (§57.10)
+import { runPtySelftest, selftestArg } from "./pty/selftest.js";
 import { buildMenu, type MenuHandlers } from "./menu.js";
 import { secondInstanceAction, type SecondInstanceData } from "./singleInstance.js";
 import { applyAppearance, detectWindowsClaude, loadSettings, saveSettings } from "./settings.js";
@@ -49,11 +52,25 @@ app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId(appUserModelId(app.isPackaged, process.execPath));
 installNavigationGuards(APP_ORIGIN);
 const E2E: E2EMode | null = process.argv.includes("--e2e") ? { project: process.env.REVIEWGATE_PROJECT ?? "" } : null;
+// MARK: terminal-win — PROTOCOL §57.10: node-pty loads from app.asar.unpacked when packaged (src/main/pty/nodePty.ts).
+configureNodePty({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
+// `--rg-pty-selftest[=<out.json>]`: node-pty + ConPTY under this Electron, then exit — no lock, no window, no settings.
+const PTY_SELFTEST = selftestArg(process.argv);
+if (PTY_SELFTEST) {
+  void runPtySelftest({ load: nodePty(), platform: process.platform, arch: process.arch, osRelease: release(), env: process.env, cwd: tmpdir(), electron: process.versions.electron ?? null })
+    .then((r) => {
+      const json = JSON.stringify(r);
+      if (PTY_SELFTEST.out) writeFileSync(PTY_SELFTEST.out, json);
+      else process.stdout.write(`${json}\n`);
+      app.exit(r.ok ? 0 : 1);
+    })
+    .catch(() => app.exit(1));
+}
 
 // Audit daily-19: one ReviewGate process per user — a second launch hands its project to this one and quits instead of
 // opening the same worktrees with a second set of engines (src/main/singleInstance.ts). The --e2e harness skips the lock.
 const secondLaunchData: SecondInstanceData = { project: process.env.REVIEWGATE_PROJECT ?? "" };
-const primaryInstance = E2E !== null || app.requestSingleInstanceLock(secondLaunchData);
+const primaryInstance = E2E !== null || PTY_SELFTEST !== null || app.requestSingleInstanceLock(secondLaunchData);
 if (!primaryInstance) app.exit(0);
 const isDirectory = (p: string): boolean => {
   try {
@@ -166,13 +183,14 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin" || E2E) app.quit();
 });
 app.on("activate", () => {
+  if (PTY_SELFTEST) return;
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 // MARK: polish p-lifecycle (P1-chrome-09): another window in front — its project, its items, its chat tabs.
 app.on("browser-window-focus", () => rebuildMenu());
 
 void app.whenReady().then(async () => {
-  if (!primaryInstance) return;
+  if (!primaryInstance || PTY_SELFTEST) return;
   logLine("main", "main", `ReviewGate ${app.getVersion()} electron ${process.versions.electron} ${process.platform} ${sep}`);
   initI18n(app.getLocale(), process.platform); // MARK: wave4 w4-safety
   applyAppearance();
