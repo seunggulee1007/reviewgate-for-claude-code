@@ -9273,7 +9273,8 @@ makes the same object current again: no `terminal_spec`, no new token, no respaw
   chat goes to the background when all hold: the client runs background terminals (`terminalFeature("background")`: the
   Mac app; a capability can open it to others later), `terminal.running`, no review turn open, the gate neither running,
   collecting nor reverting, no prompt being adopted, no turn of another CLI being taken, the chat not a record. Otherwise
-  the switch stops it and retires its token as before.
+  the switch stops it and retires its token as before. The engine keeps at most 8 per window (the app's own cap is 4):
+  one more ends the one in the background longest (its token retired).
 - **Fail-closed hooks.** In the background a hook gets: UserPromptSubmit → `{decision:"block", reason}` ("This terminal
   chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in ReviewGate and send
   it again."); PreToolUse (the write tools, and MCP / EnterWorktree / ExitWorktree calls: a second fail-closed entry,

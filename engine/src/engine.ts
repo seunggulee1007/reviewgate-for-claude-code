@@ -323,7 +323,12 @@ export type EngineOptions = {
   autoTurnWaitMs?: number;
   /** §57: how long a terminal chat's prompt waits for the gate (the collection in flight; default 100 000 ms, under the hook's 120 s). */
   terminalPromptWaitMs?: number;
+  /** §57.10: how many background terminals a window keeps (default `MAX_BACKGROUND_TERMINALS`; test seam). */
+  maxBackgroundTerminals?: number;
 };
+
+/** §57.10: the engine's own cap of background terminals per window (the Mac app ends the least recently shown past 4). */
+export const MAX_BACKGROUND_TERMINALS = 8;
 
 /** MARK: terminal-chat — §57: default of `EngineOptions.terminalPromptWaitMs` (the UserPromptSubmit hook gives up at 120 s). */
 export const TERMINAL_PROMPT_WAIT_MS = 100_000;
@@ -496,6 +501,7 @@ export class ReviewEngine {
   /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
   private hookServer: HookServer | null = null;
   private readonly terminalPromptWaitMs: number;
+  private readonly maxBackgroundTerminals: number;
   /** §57.15: "Allow and follow" on a bridged EnterWorktree — the chat's next main-agent EnterWorktree before `until` is followed. */
   private terminalFollowArm: { chatId: string; until: number } | null = null;
   /** §57.10: terminal chats of this window whose Claude Code keeps running while another chat is current (by chat id). */
@@ -892,6 +898,7 @@ export class ReviewEngine {
     this.interruptWaitMs = opts.interruptWaitMs ?? INTERRUPT_WAIT_MS;
     this.autoTurnWaitMs = opts.autoTurnWaitMs ?? AUTO_TURN_WAIT_MS; // MARK: r2-peers (§52.1)
     this.terminalPromptWaitMs = opts.terminalPromptWaitMs ?? TERMINAL_PROMPT_WAIT_MS; // MARK: terminal-chat (§57)
+    this.maxBackgroundTerminals = opts.maxBackgroundTerminals ?? MAX_BACKGROUND_TERMINALS; // §57.10
     this.parkIdleMs = opts.parkIdleMs ?? PARK_IDLE_MS;
     // MARK: wave3 engine-session (§36.7, §36.8)
     this.extensionsAutoRetryMs = opts.extensionsAutoRetryMs ?? EXTENSIONS_AUTO_RETRY_MS;
@@ -2610,6 +2617,10 @@ export class ReviewEngine {
   private parkTerminal(ts: TerminalSession): void {
     ts.setBackground(true);
     this.backgroundTerminals.set(ts.chatId, ts);
+    // Past the cap the one in the background longest ends (its token retired: the app ends its PTY).
+    for (const id of [...this.backgroundTerminals.keys()].slice(0, Math.max(0, this.backgroundTerminals.size - this.maxBackgroundTerminals))) {
+      void this.disposeBackgroundTerminals("too many background terminals", id);
+    }
     this.stopMcpPolling();
     this.session = null;
     this.sessionStartedAt = null;

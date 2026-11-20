@@ -53,11 +53,11 @@ const platform = { ...fakePlatform, isWindows: process.platform === "win32" };
 
 type Rig = { h: Harness; dir: string; config: string; claude: string };
 
-async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal"; promptWaitMs?: number; capabilities?: ClientCapabilities } = {}): Promise<Rig> {
+async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal"; promptWaitMs?: number; capabilities?: ClientCapabilities; maxBackground?: number } = {}): Promise<Rig> {
   const dir = o.dir ?? makeRepo();
   const config = o.config ?? temp("rg-term-config");
   const claude = makeFakeClaude(temp("rg-term-bin"), o.version);
-  const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY, dataDir: temp("rg-term-data"), ...(o.promptWaitMs ? { terminalPromptWaitMs: o.promptWaitMs } : {}) });
+  const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY, dataDir: temp("rg-term-data"), ...(o.promptWaitMs ? { terminalPromptWaitMs: o.promptWaitMs } : {}), ...(o.maxBackground ? { maxBackgroundTerminals: o.maxBackground } : {}) });
   harnesses.push(h);
   await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", ...(o.capabilities ? { capabilities: o.capabilities } : {}), settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
   await h.settle();
@@ -623,6 +623,21 @@ describe("terminal chats (§57)", () => {
       expect(st.session.terminal?.running).toBe(true);
       expect(st.sessions.backgroundTerminals).toBeUndefined();
       await turn(r, s, "p3", "again.txt");
+    });
+
+    it("past the engine's cap the terminal in the background longest ends (its token retired)", async () => {
+      const r = await rig({ maxBackground: 1 });
+      const first = await newTerminal(r);
+      await spec(r, first);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: first, pid: 6161 });
+      const second = await newTerminal(r); // the first goes to the background
+      expect(r.h.engine.state.sessions.backgroundTerminals?.map((b) => b.chatId)).toEqual([first]);
+      await spec(r, second);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: second, pid: 6262 });
+      await toChat(r, second); // the second goes too: one past the cap
+      const st = await r.h.waitFor((x) => x.sessions.backgroundTerminals?.length === 1, "cap");
+      expect(st.sessions.backgroundTerminals?.map((b) => b.chatId)).toEqual([second]);
+      expect(pids(r)).not.toContain(6161);
     });
 
     it("parking is refused while a turn is open: the switch ends the terminal (its token retired)", async () => {
