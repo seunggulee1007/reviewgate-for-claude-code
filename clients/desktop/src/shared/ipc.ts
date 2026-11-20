@@ -172,6 +172,8 @@ export type AppSettings = {
   dismissedUpdateVersion?: string;
   /** §48 Windows: written as the app quits to install an update, taken once by the next launch (main only). */
   pendingUpdateInstall?: { from: string; to: string; why?: string };
+  /** §48 Windows (the Mac's P5-sheets-48): the launch after an update's restart reopens the windows once, whatever `reopenLastProjects` says. */
+  restoreOnceAfterRelaunch?: boolean;
   // MARK: terminal-win — PROTOCOL §57.17 (terminal-stage3 plan §2.3)
   /** Settings › Session › "Terminal chat (preview)": shows the terminal-chat entry points (absent = off). */
   terminalChatPreview?: boolean;

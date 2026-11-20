@@ -164,7 +164,7 @@ const installer = new UpdateInstaller({
     const o: Electron.MessageBoxOptions = { type: "warning", message: t("Restart now?"), detail: [t("The turns that run are stopped."), ...blockers.map(blockerLine)].join("\n"), buttons: [t("Restart Now"), t("Cancel")], defaultId: 1, cancelId: 1, noLink: true };
     return (await (owner ? dialog.showMessageBox(owner, o) : dialog.showMessageBox(o))).response === 0;
   },
-  saveRecord: (record) => saveSettings({ pendingUpdateInstall: record ?? undefined }),
+  saveRecord: (record) => saveSettings({ pendingUpdateInstall: record ?? undefined, restoreOnceAfterRelaunch: record ? true : undefined }),
   quit: (prepared) => {
     pendingInstaller = prepared;
     logLine("main", "main", `update: quitting to install ${installer.target?.version ?? "?"}`);

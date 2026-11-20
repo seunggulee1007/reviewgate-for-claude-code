@@ -59,7 +59,10 @@ export function openWindowsToWrite(windows: { projectPath: string | null; destro
 /** Launch: at most 5 windows, in the saved order, existing folders only — missing ones are pruned. */
 export function restorableWindows(): OpenWindow[] {
   const s = loadSettings();
-  if (s.reopenLastProjects === false) return [];
+  // §48 Windows: the restart of an update reopens what was open, once, whatever the switch says.
+  const once = s.restoreOnceAfterRelaunch === true;
+  if (once) saveSettings({ restoreOnceAfterRelaunch: undefined });
+  if (s.reopenLastProjects === false && !once) return [];
   const saved = (s.openWindows ?? []).filter((w): w is OpenWindow => typeof w?.path === "string" && w.path.length > 0);
   const alive = saved.filter((w) => existsSync(resolve(w.path)));
   if (alive.length !== saved.length) {
