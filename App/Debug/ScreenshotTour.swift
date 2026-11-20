@@ -924,7 +924,7 @@ private final class Tour {
         store.debugShowComposerState(working: false, files: files)
         store.selectedPath = "src/cart.ts"
         defer { store.debugShowGate(.idle) }
-        for size in [NSSize(width: 1000, height: 637), NSSize(width: 900, height: 512)] {
+        for size in [NSSize(width: 1440, height: 900), NSSize(width: 1000, height: 637), NSSize(width: 900, height: 512)] {
             entry.model.debugAcceptFrame = .zero
             window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
             try await Task.sleep(for: .milliseconds(1500))
