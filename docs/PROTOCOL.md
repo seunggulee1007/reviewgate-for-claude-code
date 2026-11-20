@@ -9689,3 +9689,12 @@ repository (git never adds a `.git` folder to a tree, so it never shows in the r
 **Claude in the folder.** The CLI runs in the folder as in a terminal: its own `git` commands fail there ("not a git
 repository"). The hooks' snapshots (post-Bash, terminal chats) go through `runGit` and use the hidden repository; an edit
 into the hidden repository is git's own data for the M23 guard (§33.3), as an edit into `.git` would be.
+
+**Windows client.** The git-init dialog (`GitInitDialog.tsx`) puts **Track without git** first (recommended, with one line:
+a hidden copy outside the folder shows what Claude changed, the folder is not touched, commit / branches / workbenches /
+PRs are off), then Initialize git here, the candidate subfolders, Choose another folder… and Cancel. It sends
+`track_without_git` without `confirm`; `folder_unsafe` turns the dialog into an in-app confirm ("Track this folder without
+git?") whose answer resends it with `confirm: true`. `folder_too_large` names the limit (more than 20,000 files / more than
+1 GB / the listing took too long) and suggests git init or a smaller folder; any other refusal shows its words in the dialog;
+`locked_by_other_session` opens the take-over dialog on the folder. The reopen errors (`error{code:"folder_too_large" |
+"track_failed"}`) use the same words on the banner.

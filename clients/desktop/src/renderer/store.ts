@@ -37,6 +37,7 @@ import type {
 } from "@reviewgate/engine";
 import type { AppSettings } from "../shared/ipc";
 import { engineRequest, refusalOf } from "./engineRequest";
+import { type TrackOutcome } from "./noGit"; // §59
 import { errorEventText, presentationOf, refusalMessage } from "./errorCodes";
 import { canAcceptAndSend, isDiffCollapsed } from "./friction";
 import { t } from "./i18n";
@@ -498,6 +499,11 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   cancelTakeover(): void;
   closeProject(): Promise<void>;
   initRepository(): Promise<void>;
+  /**
+   * §59 `track_without_git` (`confirm` once the user agreed to a `looksUnsafe` folder): `confirm` — ask, then call again
+   * with `true`; `failed` — the refusal's words (the prompt stays). Another session's lock opens the take-over dialog.
+   */
+  trackWithoutGit(confirm?: boolean): Promise<TrackOutcome>;
   cancelGitInit(): void;
   /** `restart_session` (docs/PROTOCOL.md §8): new Claude session for the open project, gate untouched. */
   restartSession(): Promise<void>;
@@ -1527,6 +1533,28 @@ export const useStore = create<Store>((set, get, api) => {
     async initRepository() {
       if (!get().state.gitInit) return;
       await get().run({ type: "init_repo" }, { fatal: true });
+    },
+
+    async trackWithoutGit(confirm = false) {
+      const path = get().state.gitInit?.path;
+      if (!path) return { kind: "ok" };
+      try {
+        await engineRequest({ type: "track_without_git", ...(confirm ? { confirm: true } : {}) });
+        await get().settle();
+        return { kind: "ok" };
+      } catch (e) {
+        const r = refusalOf(e);
+        if (r.code === "folder_unsafe") return { kind: "confirm" };
+        if (r.code === "locked_by_other_session") {
+          // §59: the prompt is gone (gitInit cleared) and the folder remembered — Take over reopens it with `takeover`.
+          await get().settle();
+          if (await rg().focusProjectWindow(path)) return { kind: "ok" };
+          set({ lockedProjectPath: path, refusedLockPid: Number(r.detail) || 0, dialog: { kind: "lockConflict" } });
+          return { kind: "ok" };
+        }
+        appendLog(`[warn] track_without_git: ${r.error}`);
+        return { kind: "failed", text: refusalMessage(r) };
+      }
     },
 
     cancelGitInit() {

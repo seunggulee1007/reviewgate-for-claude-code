@@ -13,6 +13,7 @@ import { scopeRowText } from "./scopeNotices"; // MARK: r1-scope
 import { gitNoticeText } from "./gitNotices"; // MARK: r1-git
 import { reviewFlowNoticeText } from "./rejectSchedule"; // MARK: r2-review-flow (M32)
 import { terminalStartRefusal } from "./terminalStrip"; // MARK: terminal-win (§57.17)
+import { folderTooLargeText, notGitRepoReason, trackFailedText } from "./noGit"; // §59
 
 /** `error` event codes (§19.6 "Claude CLI / API failures" + "Other engine error codes"). */
 export const ERROR_EVENT_CODES = [
@@ -32,6 +33,9 @@ export const ERROR_EVENT_CODES = [
   "unprompted_blocked",
   "project_open_failed",
   "git_init_failed",
+  // §59: a folder tracked without git could not be reopened on its hidden repository (the git-init prompt is back)
+  "folder_too_large",
+  "track_failed",
   "collect_failed",
   "refresh_failed",
   "revert_failed",
@@ -94,6 +98,11 @@ export const REFUSAL_CODES = [
   "gate_closed",
   "git_identity_missing",
   "git_init_not_needed",
+  // §59 track_without_git / a command that needs a real repository
+  "folder_unsafe",
+  "folder_too_large",
+  "track_failed",
+  "not_a_git_repo",
   "history_trees_gone",
   "invalid_branch_name",
   "invalid_mode",
@@ -440,6 +449,10 @@ export function errorEventText(ev: ErrorInfo, opts: { now?: Date; timeZone?: str
       return withDetail(t("The project could not be opened"));
     case "git_init_failed":
       return withDetail(t("The git repository could not be initialized"));
+    case "folder_too_large": // §59: "folder_too_large:files — …"
+      return folderTooLargeText(/^folder_too_large:(\w+)/.exec(ev.message ?? "")?.[1] ?? "");
+    case "track_failed":
+      return trackFailedText(ev.message ?? "");
     case "collect_failed":
       return withDetail(t("The changes could not be collected"));
     case "refresh_failed":
@@ -547,6 +560,14 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("Git identity is not configured (user.name / user.email).{0}", d ? ` ${d}` : "");
     case "git_init_not_needed":
       return t("This folder is already a git repository.");
+    case "folder_unsafe":
+      return t("This looks like a large or personal folder — confirm before tracking it without git.");
+    case "folder_too_large":
+      return folderTooLargeText(d);
+    case "track_failed":
+      return trackFailedText(d);
+    case "not_a_git_repo":
+      return notGitRepoReason();
     case "history_trees_gone":
       return t("The snapshots of this round were cleaned up; its diff can no longer be shown.");
     case "invalid_branch_name":
