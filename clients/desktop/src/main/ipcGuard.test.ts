@@ -79,6 +79,11 @@ describe("isSafeExternalURL / validateCommand", () => {
     }
   });
 
+  it("allows the git-init prompt's answers (§59: track_without_git, with or without confirm)", () => {
+    for (const type of ["init_repo", "track_without_git", "cancel_git_init"]) expect(validateCommand({ type }).ok, type).toBe(true);
+    expect(validateCommand({ type: "track_without_git", confirm: true }).ok).toBe(true);
+  });
+
   it("allows the composer commands (§23–27)", () => {
     for (const type of ["list_files", "attachment_get", "set_model", "rewind", "compact", "interrupt"]) {
       expect(validateCommand({ type }).ok).toBe(true);
