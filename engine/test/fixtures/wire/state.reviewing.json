@@ -6,7 +6,8 @@
     "name": "repo",
     "branch": "main",
     "remoteURL": null,
-    "commonDir": "/repo/.git"
+    "commonDir": "/repo/.git",
+    "vcs": "git"
   },
   "gitInit": null,
   "session": {

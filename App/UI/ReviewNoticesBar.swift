@@ -231,8 +231,9 @@ struct ReviewNoticesBar: View {
         case .concurrent:
             Button("Create workbench") { model.showNewWorkbench = true }
                 .controlSize(.small)
-                .disabled(store.projectInfo == nil)
-                .help("A git worktree on a new branch with its own window and Claude session — its changes stay out of this review")
+                .disabled(store.projectInfo == nil || store.isShadowProject)
+                .help(store.notGitRepositoryReason.map { Text(verbatim: $0) }   // §59
+                      ?? Text("A git worktree on a new branch with its own window and Claude session — its changes stay out of this review"))
                 .accessibilityIdentifier("Concurrent create workbench")
         case let .skipped(files):
             Button("Add to ignore patterns") { ignore(files.map(\.path), notice: notice) }

@@ -35299,6 +35299,214 @@
           }
         }
       }
+    },
+    "Track without git: ReviewGate keeps a hidden copy outside this folder to show what Claude changed. The folder itself is not touched; commit, branches, workbenches and PRs are off.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Track without git: ReviewGate keeps a hidden copy outside this folder to show what Claude changed. The folder itself is not touched; commit, branches, workbenches and PRs are off."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git 없이 추적: ReviewGate가 이 폴더 밖에 숨은 사본을 두고 Claude가 바꾼 내용을 보여줘요. 폴더 자체는 건드리지 않아요. 대신 commit, 브랜치, 워크벤치, PR은 쓸 수 없어요."
+          }
+        }
+      }
+    },
+    "Taking a snapshot of the folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taking a snapshot of the folder…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 스냅샷을 만드는 중…"
+          }
+        }
+      }
+    },
+    "Wait for the snapshot to finish": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the snapshot to finish"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "스냅샷이 끝날 때까지 기다리세요"
+          }
+        }
+      }
+    },
+    "Makes this folder a git repository (git init) — commit, branches, workbenches and PRs work as usual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes this folder a git repository (git init) — commit, branches, workbenches and PRs work as usual"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 git 저장소로 만들어요 (git init) — commit, 브랜치, 워크벤치, PR을 평소처럼 쓸 수 있어요"
+          }
+        }
+      }
+    },
+    "Open another folder instead": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open another folder instead"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대신 다른 폴더를 열어요"
+          }
+        }
+      }
+    },
+    "Close this folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 닫아요"
+          }
+        }
+      }
+    },
+    "Track without git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Track without git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git 없이 추적"
+          }
+        }
+      }
+    },
+    "Recommended: review this folder as it is — ReviewGate keeps a hidden copy outside it; the folder gets no .git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommended: review this folder as it is — ReviewGate keeps a hidden copy outside it; the folder gets no .git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추천: 이 폴더를 그대로 리뷰해요 — ReviewGate가 폴더 밖에 숨은 사본을 두고, 폴더에는 .git이 생기지 않아요"
+          }
+        }
+      }
+    },
+    "Track this folder without git?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Track this folder without git?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 git 없이 추적할까요?"
+          }
+        }
+      }
+    },
+    "Track anyway": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Track anyway"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그래도 추적"
+          }
+        }
+      }
+    },
+    "This looks like a large or personal folder (%@). ReviewGate would keep a hidden copy of everything in it, which can take a while and use a lot of disk space.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like a large or personal folder (%@). ReviewGate would keep a hidden copy of everything in it, which can take a while and use a lot of disk space."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "큰 폴더나 개인 폴더로 보여요 (%@). ReviewGate가 그 안의 모든 것을 숨은 사본으로 두게 되어 시간이 걸리고 디스크 공간을 많이 쓸 수 있어요."
+          }
+        }
+      }
+    },
+    "Not a git repository — changes tracked by ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not a git repository — changes tracked by ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git 저장소 아님 — ReviewGate가 변경을 추적해요"
+          }
+        }
+      }
+    },
+    "ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 이 폴더의 숨은 사본을 폴더 밖에 두고 Claude가 바꾼 내용을 보여 주고 되돌려요. 폴더 자체에는 .git이 없어요. commit, 브랜치, 워크벤치, PR은 쓸 수 없어요 — 쓰려면 이 폴더에 git을 초기화하세요."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

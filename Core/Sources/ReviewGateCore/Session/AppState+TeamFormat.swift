@@ -12,7 +12,7 @@ public extension AppState {
     /// `commit_format`; nil without a project, on an older engine (`unknown_command`) or a failure — the sheet then shows
     /// what it showed before.
     func loadCommitFormat() async -> CommitFormatReply? {
-        guard projectInfo != nil else { return nil }
+        guard projectInfo != nil, !isShadowProject else { return nil }
         do {
             let reply = try await client.request(.commitFormat)
             guard case let .commitFormat(format) = reply else { return nil }
@@ -25,7 +25,7 @@ public extension AppState {
 
     /// `pr_draft {base}`; nil as `loadCommitFormat`.
     func loadPRDraft(base: String) async -> PRDraftReply? {
-        guard projectInfo != nil, !base.isEmpty else { return nil }
+        guard projectInfo != nil, !isShadowProject, !base.isEmpty else { return nil }
         do {
             let reply = try await client.request(.prDraft(base: base))
             guard case let .prDraft(draft) = reply else { return nil }

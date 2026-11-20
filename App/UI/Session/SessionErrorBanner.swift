@@ -177,12 +177,13 @@ struct SessionErrorBanner: View {
                 .help(LogActions.folderHelp)
                 .accessibilityIdentifier("Open log folder from banner")
         case .openWorkbench:
+            // §59: creating one needs a repository; opening one that exists does not.
+            let creates = banner.code == "worktree_blocked" || banner.path == nil
             Button("Open as Workbench") { openAsWorkbench() }
                 .controlSize(.small)
-                .disabled(store.projectInfo == nil)
-                .help(banner.code == "worktree_blocked"
-                      ? String(localized: "Creates a workbench on that branch — its own window, its own review")
-                      : String(localized: "Opens that workbench in its own window, where its changes are reviewed"))
+                .disabled(store.projectInfo == nil || (creates && store.isShadowProject))
+                .help(!creates ? String(localized: "Opens that workbench in its own window, where its changes are reviewed")
+                      : store.notGitRepositoryReason ?? String(localized: "Creates a workbench on that branch — its own window, its own review"))
                 .accessibilityIdentifier("Open as workbench from banner")
         case .openFolder:
             Button("Open Folder") { openFolder() }

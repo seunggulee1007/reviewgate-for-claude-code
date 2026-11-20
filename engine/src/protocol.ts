@@ -607,6 +607,11 @@ export type EngineCommand =
   | Cmd<"switch_project", { path: string; takeover?: boolean }>
   | Cmd<"close_project">
   | Cmd<"init_repo">
+  /**
+   * §59: while `state.gitInit` is set — review the folder through a hidden repository kept outside it (no `.git` in the
+   * folder), then start the session. `confirm` is required when `gitInit.looksUnsafe` (else refused `folder_unsafe`).
+   */
+  | Cmd<"track_without_git", { confirm?: boolean }>
   | Cmd<"cancel_git_init">
   | Cmd<"restart_session">
   /** `mentions`: repo-relative paths (§23); `attachments`: images (§24). */
@@ -970,7 +975,16 @@ export type ProjectState = {
    * the clients keep "이 저장소에서 항상 허용" by it. Absent outside a repository's common dir lookup (and from older engines).
    */
   commonDir?: string;
+  /**
+   * §59: how the folder is reviewed — `git`: its own repository; `shadow`: tracked without git (a hidden repository
+   * ReviewGate keeps outside the folder; branches, worktrees, commits, push and PRs are refused `not_a_git_repo`). Absent
+   * from older engines (= `git`).
+   */
+  vcs?: ProjectVcs;
 };
+
+/** §59: `state.project.vcs`. */
+export type ProjectVcs = "git" | "shadow";
 
 export type GitInitState = { path: string; candidates: string[]; looksUnsafe: boolean };
 

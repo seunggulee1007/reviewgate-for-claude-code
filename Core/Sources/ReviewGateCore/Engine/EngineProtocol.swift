@@ -419,6 +419,9 @@ public enum EngineCommand: Sendable, Equatable {
     case switchProject(path: String)
     case closeProject
     case initRepo
+    /// §59: reviews the `gitInit` folder through a hidden repository outside it (no `.git` in it); `confirm` after the user
+    /// agreed to a folder that `looksUnsafe`.
+    case trackWithoutGit(confirm: Bool = false)
     case cancelGitInit
     /// M13 (audit 1.4): a fresh Claude session for the open project without resetting the gate.
     case restartSession
@@ -711,6 +714,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .switchProject: "switch_project"
         case .closeProject: "close_project"
         case .initRepo: "init_repo"
+        case .trackWithoutGit: "track_without_git"
         case .cancelGitInit: "cancel_git_init"
         case .restartSession: "restart_session"
         case .peerAccept: "peer_accept"
@@ -897,6 +901,7 @@ extension EngineCommand: Encodable {
         case watch   // wave5 w5-brain
         case columns, visible   // wave6 w6-statusline
         case caseSensitive, wholeWord   // code-browser
+        case confirm   // §59
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -918,6 +923,8 @@ extension EngineCommand: Encodable {
         case let .openProject(path, takeover):
             try c.encode(path, forKey: .path)
             if takeover { try c.encode(true, forKey: .takeover) }
+        case let .trackWithoutGit(confirm):   // §59
+            if confirm { try c.encode(true, forKey: .confirm) }
         case let .switchProject(path), let .liveDiff(path):
             try c.encode(path, forKey: .path)
         case let .selectFile(path, since), let .fullFile(path, since):
@@ -1281,15 +1288,38 @@ public struct ProjectInfo: Codable, Sendable, Hashable {
     /// MARK: r2-skills-side — §33.6 (M21): `git rev-parse --git-common-dir` (absolute), the same for every worktree of the
     /// repository: "이 프로젝트에서 항상 허용" is kept by it. Nil from an older engine.
     public var commonDir: String?
+    /// §59: `git`, or `shadow` — a folder that is no repository, reviewed through a hidden repository outside it (no branch,
+    /// remote, commit, workbench or PR). Absent (an older engine) or unknown → `git`.
+    public var vcs: ProjectVcs
 
-    public init(path: String, root: String, name: String, branch: String?, remoteURL: String?, commonDir: String? = nil) {
+    public init(path: String, root: String, name: String, branch: String?, remoteURL: String?, commonDir: String? = nil,
+                vcs: ProjectVcs = .git) {
         self.path = path
         self.root = root
         self.name = name
         self.branch = branch
         self.remoteURL = remoteURL
         self.commonDir = commonDir
+        self.vcs = vcs
     }
+
+    private enum CodingKeys: String, CodingKey { case path, root, name, branch, remoteURL, commonDir, vcs }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(path: try c.decode(String.self, forKey: .path), root: try c.decode(String.self, forKey: .root),
+                  name: try c.decode(String.self, forKey: .name), branch: try c.decodeIfPresent(String.self, forKey: .branch),
+                  remoteURL: try c.decodeIfPresent(String.self, forKey: .remoteURL),
+                  commonDir: try c.decodeIfPresent(String.self, forKey: .commonDir),
+                  vcs: lenientValue(ProjectVcs.self, c, .vcs) ?? .git)
+    }
+}
+
+/// §59 `state.project.vcs`.
+public enum ProjectVcs: String, Codable, Sendable, Hashable {
+    case git
+    /// Tracked without git: the folder has no `.git`; ReviewGate keeps a hidden repository outside it.
+    case shadow
 }
 
 /// `state.gitInit`: the opened folder is not a repository; the UI offers `init_repo`.

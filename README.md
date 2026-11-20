@@ -126,6 +126,9 @@ update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
    open -a ReviewGate ~/work/my-app
    ```
 
+   A folder that is not a git repository can be made one, or tracked without git: ReviewGate then keeps a hidden
+   repository outside the folder (no `.git` is added); commits, branches, workbenches and PRs need a real repository.
+
 2. **Tell Claude what to do** in the chat at the bottom. Return sends; Shift-Return starts a new line.
 3. **Review the turn.** Go through the changed files and accept or revert each one. Your next instruction goes out once
    the turn is reviewed.

@@ -44,6 +44,7 @@ extension AppState {
     /// Why "Commit accepted" waits — the engine's `canCommit` is false while a collection failed, a revert, a turn or its
     /// collection runs; nil otherwise (with no accepted file the button's count says so).
     public var commitLockReason: String? {
+        if let reason = notGitRepositoryReason { return reason }   // §59: a folder tracked without git has nothing to commit to
         if let reason = collectFailedLockReason { return reason }
         if isReverting { return Self.sessionRefusalText("reverting") }
         if isRunning || isSnapshotting { return Self.sessionRefusalText("session_running") }

@@ -195,7 +195,8 @@ export function acceptedPaths(g: ReviewGate): string[] {
  */
 export function canCommit(s: EngineSlices): boolean {
   const g = s.gate;
-  return s.project !== null && !g.running && !g.collecting && !g.reverting && g.collectError === null && acceptedPaths(g).length > 0;
+  // §59: a folder tracked without git has nothing to commit to.
+  return s.project !== null && s.project.vcs !== "shadow" && !g.running && !g.collecting && !g.reverting && g.collectError === null && acceptedPaths(g).length > 0;
 }
 
 export function commitState(s: EngineSlices): CommitState {

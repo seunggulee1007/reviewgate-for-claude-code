@@ -25,7 +25,6 @@ struct MainWindow: View {
     @Binding var tab: MainTab
     @Environment(WindowModel.self) private var model
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var confirmUnsafeInit = false
     /// Mirrors `store.needsGitInit` so the sheet is driven by plain view state.
     @State private var showGitInit = false
     @State private var showNewBranch = false
@@ -96,10 +95,16 @@ struct MainWindow: View {
             // wave1 mac-review — §31–32: reverting changes from outside the app, the stale-review sheet, Finish review.
             .modifier(ReviewProvenanceModals())
             .modifier(SessionToolsModals())   // wave3 mac-session (§36.9): CLI 세션 가져오기
-            .sheet(isPresented: $model.showNewWorkbench, onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil }) {
+            // §59: every way in is off in a folder tracked without git; this keeps a stray one from opening the sheet.
+            .sheet(isPresented: Binding(get: { model.showNewWorkbench && !store.isShadowProject }, set: { model.showNewWorkbench = $0 }), onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil }) {
                 NewWorkbenchSheet(initialBranch: model.newWorkbenchBranch ?? "") { url in workbenchCreated(url) }   // wave4d w4d-plan
             }
-            .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil { showCreatePR = true } }   // polish P5-sheets-46
+            .onChange(of: model.showNewWorkbench) { _, show in
+                guard show, store.isShadowProject else { return }
+                model.showNewWorkbench = false
+                model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil
+            }
+            .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil, !store.isShadowProject { showCreatePR = true } }   // polish P5-sheets-46
             .sheet(isPresented: $showCreatePR) {
                 CreatePRSheet()
             }
@@ -123,7 +128,7 @@ struct MainWindow: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
                 Picker("Sidebar", selection: $tab) {
-                    ForEach(MainTab.allCases) { Text($0.title).tag($0) }
+                    ForEach(MainTab.allCases.filter { $0 != .prs || !store.isShadowProject }) { Text($0.title).tag($0) }   // §59: no PRs
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -276,6 +281,7 @@ struct MainWindow: View {
         .onChange(of: store.needsGitInit, initial: true) { _, needs in showGitInit = needs }
         .onChange(of: store.projectInfo?.root, initial: true) { _, root in restoreUIState(root: root) }
         .onChange(of: tab) { _, new in updateUIState { $0.sidebarTab = new.rawValue } }
+        .onChange(of: tab == .prs && store.isShadowProject, initial: true) { _, hidden in if hidden { tab = .changes } }   // §59
         .onChange(of: store.selectedPath) { _, path in
             if let path {
                 updateUIState { $0.selectedPath = path }
@@ -321,7 +327,7 @@ struct MainWindow: View {
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
         }
         .sheet(isPresented: $showGitInit, onDismiss: { if store.needsGitInit { store.cancelGitInit() } }) {
-            gitInitSheet
+            GitInitSheet()
         }
     }
 
@@ -735,7 +741,9 @@ struct MainWindow: View {
                 }
             }
             // Branch / remote only make sense once the folder is an opened git repository.
-            if let info = store.projectInfo {
+            if store.isShadowProject {
+                noGitLine   // §59
+            } else if let info = store.projectInfo {
                 HStack(spacing: 6) {
                     branchSwitcher(info)
                     if let remote = info.remoteURL {
@@ -769,6 +777,16 @@ struct MainWindow: View {
             Task { await store.refreshWorkbenches() }
         }
         .sheet(isPresented: $showNewBranch) { newBranchSheet }
+    }
+
+    /// §59: in place of the branch line — the folder is tracked without git, calmly, with what that means on hover.
+    private var noGitLine: some View {
+        Label("Not a git repository — changes tracked by ReviewGate", systemImage: "eye")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1).truncationMode(.tail)
+            .help("ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them.")
+            .accessibilityIdentifier("Not a git repository")
     }
 
     /// `state.pr.lastCreatedPR` after "Create PR from this branch…": the URL plus Open / dismiss.
@@ -1079,8 +1097,10 @@ struct MainWindow: View {
                 }
             }
             Divider()
-            workbenchSection
-            Divider()
+            if !store.isShadowProject {   // §59: no worktrees without a repository
+                workbenchSection
+                Divider()
+            }
             PeerInboundProjectMenu()   // wave1 mac-session (§29)
             Divider()
             Button("Open Project…") { ProjectOpener.choose(store: store) }
@@ -1109,66 +1129,6 @@ struct MainWindow: View {
         .help(Text("Switch project (⌘⇧O)") + Text(verbatim: "\n" + (store.projectInfo?.root ?? store.projectURL?.path ?? "")))
         .accessibilityLabel("Project switcher")
         .accessibilityIdentifier("Project switcher")
-    }
-
-    // MARK: Not a git repository
-
-    private var gitInitSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("This folder is not a git repository", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-            Text(store.projectURL?.path ?? "")
-                .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-            Text("ReviewGate uses git snapshots to show and revert each turn's changes, so it needs a repository to work in.")
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !store.gitCandidates.isEmpty {
-                Text("Git repositories inside this folder:").font(.subheadline.weight(.medium))
-                List(store.gitCandidates, id: \.self) { url in
-                    Button {
-                        ProjectOpener.open(url, store: store)
-                    } label: {
-                        Label(url.lastPathComponent, systemImage: "folder.badge.gearshape")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(url.path)
-                    .accessibilityIdentifier("Git candidate \(url.lastPathComponent)")
-                }
-                .listStyle(.bordered)
-                .frame(minHeight: 120, maxHeight: 240)
-                .accessibilityIdentifier("Git candidates")
-            }
-
-            HStack {
-                Button("Initialize git here", role: .destructive) {
-                    if store.gitInitLooksUnsafe {
-                        confirmUnsafeInit = true
-                    } else {
-                        Task { await store.initRepository() }
-                    }
-                }
-                .accessibilityIdentifier("Initialize git")
-                Spacer()
-                Button("Choose another folder…") {
-                    store.cancelGitInit()
-                    ProjectOpener.choose(store: store)
-                }
-                .accessibilityIdentifier("Choose another folder")
-                Button("Cancel", role: .cancel) { store.cancelGitInit() }
-                    .keyboardShortcut(.cancelAction)
-            }
-        }
-        .padding(20)
-        .frame(width: 480)
-        .alert("Initialize git in this folder?", isPresented: $confirmUnsafeInit) {
-            Button("Initialize anyway", role: .destructive) { Task { await store.initRepository() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This looks like a large or personal folder (\(store.projectURL?.path ?? "")). Initializing git here is probably a mistake.")
-        }
     }
 }
 

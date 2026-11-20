@@ -14,6 +14,9 @@ extension AppState {
         return nil
     }
 
+    /// §59: why "Implement in a new workbench…" cannot be used — a folder tracked without git, else the handoff's reason.
+    public var planWorkbenchBlocker: String? { notGitRepositoryReason ?? planHandoffBlocker }
+
     /// [계속 계획] with per-step notes: one message ("단계 N (…): …" lines, then the general note), else the engine's own text.
     public func keepPlanning(steps: [PlanStepBrief], notes: [Int: String], general: String) {
         keepPlanning(message: PlanReviewNotes.message(steps: steps, notes: notes, general: general))

@@ -119,7 +119,7 @@ struct PlanCard: View {
                     .help("Stay in plan mode and send your note back for a revision (esc while this card is focused)")
                     .accessibilityLabel("Keep planning")
                     .accessibilityIdentifier("Keep planning")
-                PlanApproveMenu(isLocked: isLocked, handoffBlocker: handoffBlocker,
+                PlanApproveMenu(isLocked: isLocked, handoffBlocker: handoffBlocker, workbenchBlocker: store.planWorkbenchBlocker,
                                 runMode: store.planApproveMode,   // wave6 w6-terminal (§44.1): back to auto from an auto chat
                                 onApprove: { mode in answer { onApprove(mode) } },
                                 onApproveNewChat: { mode in answer { onApproveNewChat(mode) } },
@@ -128,6 +128,7 @@ struct PlanCard: View {
         }
         .sheet(isPresented: $showReview) {
             PlanReviewSheet(plan: plan, isLocked: isLocked, refusal: refusal, handoffBlocker: handoffBlocker,
+                            workbenchBlocker: store.planWorkbenchBlocker,
                             notes: $stepNotes, general: $note,
                             onApprove: { onApprove($0) },
                             onApproveNewChat: { onApproveNewChat($0) },

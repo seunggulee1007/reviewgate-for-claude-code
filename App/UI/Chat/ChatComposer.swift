@@ -1270,10 +1270,10 @@ struct ChatComposer: View {
                 } label: {
                     Image(systemName: "arrow.triangle.branch")
                 }
-                .disabled(store.projectInfo == nil || store.viewingChat != nil)
+                .disabled(store.projectInfo == nil || store.viewingChat != nil || store.isShadowProject)
                 .help(store.projectInfo == nil ? String(localized: "Open a project first (⌘O)")
-                      : store.viewingChat != nil ? String(localized: "Go back to the running chat to run this as a task")
-                      : String(localized: "Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is"))
+                      : store.notGitRepositoryReason ?? (store.viewingChat != nil ? String(localized: "Go back to the running chat to run this as a task")
+                      : String(localized: "Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is")))
                 .accessibilityLabel("Run as Task")
                 .accessibilityIdentifier("Run as Task")
             }
