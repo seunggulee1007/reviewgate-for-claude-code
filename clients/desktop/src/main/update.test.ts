@@ -67,6 +67,18 @@ describe("the update check (P5-sheets-49)", () => {
     expect(updateStatus().lastCheck?.text).toBe("GitHub could not be reached. Check the network connection and try again.");
   });
 
+  it("Settings sees a check under way (Check Now off, the spinner) until it ends", async () => {
+    let answer!: (v: { ok: true; json: unknown }) => void;
+    const p = checkOnce(() => new Promise((r) => (answer = r)));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(updateStatus().checking).toBe(true);
+    expect((sent.at(-1) as UpdateStatus).checking).toBe(true);
+    answer({ ok: true, json: release("v0.6.2") });
+    await p;
+    expect(updateStatus().checking).toBe(false);
+    expect((sent.at(-1) as UpdateStatus).checking).toBe(false);
+  });
+
   it("a copy that cannot install (here: not the packaged Windows app) says why and installs nothing", async () => {
     await checkOnce(async () => ({ ok: true, json: release("v0.6.2") }));
     expect(updateStatus().release?.why).toBeTruthy();

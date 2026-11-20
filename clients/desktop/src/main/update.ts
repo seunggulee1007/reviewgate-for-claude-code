@@ -205,7 +205,9 @@ function broadcast(): void {
 
 /** One check (a second while one runs joins it). */
 export function checkOnce(fetch: FetchLatest = fetchLatest): Promise<UpdateOutcome> {
-  checking ??= (async () => {
+  if (checking) return checking;
+  checking = (async () => {
+    await Promise.resolve(); // `checking` is set before the windows are told
     broadcast();
     const r = await fetch();
     const outcome = r.ok ? outcomeOf(r.json, app.getVersion()) : ({ kind: "unavailable", why: r.why } as const);
