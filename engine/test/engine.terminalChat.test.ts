@@ -843,4 +843,40 @@ describe("terminal chats (§57)", () => {
       expect(r.h.ofType("chat_moved").at(-1)).toMatchObject({ sessionId: id, path: wt });
     });
   });
+
+  it("§57.15 the permission bridge end to end: the app's answer reaches the hook; follow arms the next EnterWorktree; refusals; setting off", async () => {
+    const dir = makeRepo();
+    const wt = join(temp("rg-term-wt"), "feat");
+    sh(dir, "worktree", "add", "-q", "-b", "feat", wt);
+    const r = await rig({ dir });
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    const settings = JSON.parse(s.argv[s.argv.indexOf("--settings") + 1]!) as { hooks: Record<string, unknown> };
+    expect(settings.hooks.PermissionRequest).toBeDefined();
+    const pending = hook(s, { hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "echo hi" } });
+    const st = await r.h.waitFor((x) => (x.session.terminal?.permissions?.length ?? 0) > 0, "bridged");
+    const p = st.session.terminal!.permissions![0]!;
+    expect(p).toMatchObject({ toolName: "Bash", summary: "Bash: echo hi" });
+    expect(await refusal(r.h, { type: "terminal_permission_response", sessionId: id, requestId: p.requestId, allow: true, follow: true })).toMatchObject({ ok: false, code: "follow_not_allowed" });
+    expect(await refusal(r.h, { type: "terminal_permission_response", sessionId: id, requestId: p.requestId, allow: false, message: "not now" })).toMatchObject({ ok: true });
+    expect(await pending).toEqual({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "deny", message: "not now" } } });
+    expect(await refusal(r.h, { type: "terminal_permission_response", sessionId: id, requestId: p.requestId, allow: true })).toMatchObject({ ok: false, code: "permission_gone" });
+    // Allow and follow: the EnterWorktree it allowed moves the chat (default mode: it would only be offered otherwise).
+    const enter = hook(s, { hook_event_name: "PermissionRequest", tool_name: "EnterWorktree", tool_input: { name: "feat" } });
+    const st2 = await r.h.waitFor((x) => x.session.terminal?.permissions?.some((q) => q.toolName === "EnterWorktree") === true, "EnterWorktree bridged");
+    const q = st2.session.terminal!.permissions!.find((x) => x.toolName === "EnterWorktree")!;
+    expect(q.canFollow).toBe(true);
+    expect(await refusal(r.h, { type: "terminal_permission_response", sessionId: id, requestId: q.requestId, allow: true, follow: true })).toMatchObject({ ok: true });
+    expect(await enter).toMatchObject({ hookSpecificOutput: { decision: { behavior: "allow" } } });
+    await hook(s, { hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: { name: "feat" }, tool_use_id: "e1", tool_response: { worktreePath: realpathSync(wt) } });
+    await r.h.waitFor((x) => x.sessions.list.find((m) => m.id === id)?.movedTo !== undefined, "followed");
+
+    // The setting off: answered {} at once, nothing bridged.
+    const off = await rig();
+    await off.h.engine.handle({ type: "set_settings", settings: { terminalPermissionBridge: false } });
+    const oid = await newTerminal(off);
+    const os = await spec(off, oid);
+    expect(await hook(os, { hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
+    expect(off.h.engine.state.session.terminal?.permissions).toBeUndefined();
+  });
 });

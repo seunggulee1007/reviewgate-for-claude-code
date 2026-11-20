@@ -338,6 +338,9 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "retry_extensions", "mcp_reconnect", "mcp_toggle",
 ]);
 
+/** §57.15: how long "Allow and follow" waits for the EnterWorktree it allowed. */
+const TERMINAL_FOLLOW_ARM_MS = 120_000;
+
 /** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
 type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
 
@@ -491,6 +494,8 @@ export class ReviewEngine {
   /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
   private hookServer: HookServer | null = null;
   private readonly terminalPromptWaitMs: number;
+  /** §57.15: "Allow and follow" on a bridged EnterWorktree — the chat's next main-agent EnterWorktree before `until` is followed. */
+  private terminalFollowArm: { chatId: string; until: number } | null = null;
   /** §57.10: terminal chats of this window whose Claude Code keeps running while another chat is current (by chat id). */
   private readonly backgroundTerminals = new Map<string, TerminalSession>();
   /** §57.4: the terminal prompts being adopted, one after another (settles once every one queued so far is done). */
@@ -2721,6 +2726,8 @@ export class ReviewEngine {
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
       // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
       stopFeedback: (q) => (this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null),
+      // §57.15: the setting (default on) and a client that answers the dialogs.
+      permissionBridge: () => this.settings.terminalPermissionBridge !== false && this.terminalFeature("permissionBridge"),
       stopFeedbackLost: (ids) => {
         this.gate.untakeNotesForStop(ids);
         this.touch();
@@ -2814,10 +2821,23 @@ export class ReviewEngine {
     this.touch();
   }
 
-  /** §57.15 `terminal_permission_response`: answers one bridged dialog; refused `permission_gone` when it is no longer open. */
-  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
-    this.requireTerminal(cmd.sessionId);
-    throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+  /**
+   * §57.15 `terminal_permission_response`: answers one bridged dialog (allow once / deny); refused `permission_gone` when it
+   * is no longer open (the TUI answered first, the CLI gave up), `follow_not_allowed` for `follow` on anything but
+   * EnterWorktree. `follow` with an allow: the main agent's next EnterWorktree of this chat within 120 s moves the chat there.
+   */
+  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string; allow: boolean; message?: string; follow?: boolean }): void {
+    const ts = this.requireTerminal(cmd.sessionId);
+    const entry = typeof cmd.requestId === "string" ? ts.permission(cmd.requestId) : undefined;
+    if (!entry) throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+    const follow = cmd.follow === true && cmd.allow === true;
+    if (follow && entry.toolName !== "EnterWorktree") throw new CommandRefused(`follow_not_allowed:${entry.toolName}`, { code: "follow_not_allowed" });
+    if (!ts.answerPermission(cmd.requestId, cmd.allow === true, typeof cmd.message === "string" ? cmd.message : undefined)) {
+      throw new CommandRefused(`permission_gone:${cmd.requestId}`, { code: "permission_gone" });
+    }
+    if (follow) this.terminalFollowArm = { chatId: ts.chatId, until: Date.now() + TERMINAL_FOLLOW_ARM_MS };
+    this.log("info", `terminal chat ${ts.chatId}: ${entry.toolName} ${cmd.allow ? "allowed" : "denied"} from the app${follow ? " (and followed)" : ""}`);
+    this.touch();
   }
 
   /**
@@ -7501,6 +7521,12 @@ export class ReviewEngine {
         if (ev.code === "worktree_outside_review" && ev.reasonCode === "worktree_command") {
           // M05b: EnterWorktree moved the CLI into that worktree — in auto mode the chat follows at once, as "허용하고 따라가기".
           const entered = ev.toolName === "EnterWorktree";
+          // §57.15: "Allow and follow" answered in the app for this chat's EnterWorktree.
+          const arm = this.terminalFollowArm;
+          if (entered && ev.toolUseId && arm && this.terminal?.chatId === arm.chatId && Date.now() <= arm.until && this.canMoveChat()) {
+            this.terminalFollowArm = null;
+            this.followAfterTool.set(ev.toolUseId, { path: ev.path ?? null, followUp: this.chatMoveFollowUp(ev.path ?? null) });
+          }
           // §57.12: a terminal chat follows by the TUI's own mode, and only for a client that moves terminal chats.
           if (entered && ev.toolUseId && !this.followAfterTool.has(ev.toolUseId) && this.chatPermissionMode() === "auto" && this.canMoveChat()) {
             this.followAfterTool.set(ev.toolUseId, { path: ev.path ?? null, followUp: this.chatMoveFollowUp(ev.path ?? null) });

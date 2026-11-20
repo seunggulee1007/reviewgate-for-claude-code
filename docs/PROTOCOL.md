@@ -9284,6 +9284,29 @@ the TUI (no auto-Enter): the engine stages the request — `state.session.termin
   (`undoRequestChanges`) and stages it again.
 - **`terminal_request_cancel {sessionId}`** unstages it; refused `no_request_queued` when nothing is staged.
 
+### 57.15 Answering Claude Code's permission dialogs
+
+A `PermissionRequest` http hook (no matcher, `H(600)`, no `onFailure`: a failure leaves the TUI's dialog in charge) is
+registered for a client that answers dialogs (`terminalFeature("permissionBridge")`: the Mac app). The engine decides at
+hook time: with `settings.terminalPermissionBridge === false` (default true), in the background (§57.10), or when the
+request is already aborted, it answers `{}` at once (the TUI's dialog) after raising `waiting`.
+
+- **Bridged.** Otherwise `state.session.terminal.permissions` gains `{requestId, toolName, summary, reason, since,
+  canFollow?}` and `waiting {kind:"permission"}` is set at once (not after the Notification's 6 s). `summary`: `Bash:
+  <command>`, the edit's path, or the tool with its input (≤ 300 characters). `reason`: the §57.8 guard's reason when the
+  guard asked for the same call (`tool_name` + stable JSON of `tool_input`) within 60 s. `canFollow`: EnterWorktree.
+- **First answer wins.** The hook request stays open until one of: the app's `terminal_permission_response`, the CLI gave
+  up (abort), any later PreToolUse / PostToolUse / PostToolUseFailure / Stop / UserPromptSubmit of the session (the TUI
+  answered), the PTY's end, the chat going to the background. All but the first answer `{}`. The input has no
+  `tool_use_id`: the open HTTP request is the correlation, and `requestId` is the only handle the app gets.
+- **`terminal_permission_response {sessionId, requestId, allow, message?, follow?}`.** allow →
+  `{hookSpecificOutput:{hookEventName:"PermissionRequest", decision:{behavior:"allow"}}}`; deny → `decision:{behavior:"deny",
+  message: message ?? "The user denied this in ReviewGate."}`. Never `updatedInput`, `updatedPermissions` ("always allow"
+  stays in the TUI) or `interrupt`. Refused `permission_gone` (no longer open), `follow_not_allowed` (`follow` on anything
+  but EnterWorktree), `terminal_not_current`.
+- **Allow and follow** (`follow: true` with `allow`): the chat's next main-agent EnterWorktree PostToolUse within 120 s is
+  followed whatever the TUI's mode (§57.12; the follow-up is the `chatMoveFollowUp` text).
+
 ### 57.16 Hook coverage, proxy and config dir
 
 - **Every tool's PostToolUse.** PostToolUse and PostToolUseFailure carry no matcher: after a WebFetch or MCP dialog the

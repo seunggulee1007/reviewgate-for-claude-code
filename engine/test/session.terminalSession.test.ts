@@ -5,7 +5,7 @@ import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, movingReason, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, BRIDGE_DENY_MESSAGE, permissionSummary, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, movingReason, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -32,7 +32,7 @@ function makeRepo(): string {
 type Rig = { ts: TerminalSession; events: SessionEvent[]; dir: string; of: <T extends SessionEvent["type"]>(t: T) => Extract<SessionEvent, { type: T }>[]; hook: (input: Record<string, unknown>) => Promise<Record<string, unknown>>; tree: () => Promise<string> };
 
 /** `answer`: how the fake engine answers `terminal_prompt` (null: it does not — the test answers). */
-function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number } = {}): Rig {
+function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number; bridge?: boolean } = {}): Rig {
   const dir = makeRepo();
   const events: SessionEvent[] = [];
   let ts!: TerminalSession;
@@ -47,6 +47,7 @@ function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prom
     adoptWaitMs: opts.adoptWaitMs ?? 5000,
     plansDir: join(dir, ".no-plans"),
     windowMarginMs: 60_000,
+    ...(opts.bridge ? { permissionBridge: () => true } : {}),
     emit: (ev) => {
       events.push(ev);
       if (ev.type === "terminal_prompt" && answer) void tree().then((t) => ts.answerPrompt(ev.seq, answer(ev, t)));
@@ -481,5 +482,65 @@ describe("TerminalSession", () => {
     expect(await waiting).toBe(true);
     r.ts.endMove();
     expect(r.ts.state.moving).toBeUndefined();
+  });
+
+  it("§57.15 the permission bridge: first answer wins — the app, an abort, or a later hook; guard reasons; never in the background", async () => {
+    const r = rig({ bridge: true });
+    const permReq = (command: string, signal?: AbortSignal) =>
+      r.ts.handleHook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command }, session_id: "chat-1", cwd: r.dir }, signal);
+    // The app allows.
+    const a = permReq("echo hi");
+    await new Promise((res) => setTimeout(res, 10));
+    const [entry] = r.ts.state.permissions ?? [];
+    expect(entry).toMatchObject({ toolName: "Bash", summary: "Bash: echo hi", reason: null });
+    expect(entry?.canFollow).toBeUndefined();
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    expect(r.ts.answerPermission(entry!.requestId, true)).toBe(true);
+    expect(await a).toEqual({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } } });
+    expect(r.ts.state.permissions).toBeUndefined();
+    expect(r.ts.answerPermission(entry!.requestId, true)).toBe(false); // permission_gone
+    // Denied, with and without a message.
+    const d = permReq("rm -rf build");
+    await new Promise((res) => setTimeout(res, 10));
+    r.ts.answerPermission(r.ts.state.permissions![0]!.requestId, false);
+    expect(await d).toEqual({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "deny", message: BRIDGE_DENY_MESSAGE } } });
+    // The CLI gave up (abort) → {}.
+    const ac = new AbortController();
+    const g = permReq("make", ac.signal);
+    await new Promise((res) => setTimeout(res, 10));
+    ac.abort();
+    expect(await g).toEqual({});
+    // A later hook of the session: the TUI answered → {}.
+    const t = permReq("ls");
+    await new Promise((res) => setTimeout(res, 10));
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_use_id: "b1", tool_response: "" });
+    expect(await t).toEqual({});
+    // The guard's ask names the dialog that follows for the same call.
+    await r.hook(ups("p1"));
+    const ask = await r.hook(pre("Bash", { command: "git commit -m x" }, "g1"));
+    expect(ask).toMatchObject({ hookSpecificOutput: { permissionDecision: "ask" } });
+    const c = permReq("git commit -m x");
+    await new Promise((res) => setTimeout(res, 10));
+    expect(r.ts.state.permissions![0]!.reason).toBe((ask.hookSpecificOutput as { permissionDecisionReason: string }).permissionDecisionReason);
+    // Going to the background leaves open dialogs to the TUI, and none is bridged there.
+    r.ts.setBackground(true);
+    expect(await c).toEqual({});
+    expect(await permReq("echo bg")).toEqual({});
+    expect(r.ts.state.permissions).toBeUndefined();
+    // EnterWorktree offers "Allow and follow".
+    r.ts.setBackground(false);
+    const w = r.ts.handleHook({ hook_event_name: "PermissionRequest", tool_name: "EnterWorktree", tool_input: { name: "feat" }, session_id: "chat-1", cwd: r.dir });
+    await new Promise((res) => setTimeout(res, 10));
+    expect(r.ts.state.permissions![0]).toMatchObject({ toolName: "EnterWorktree", canFollow: true });
+    await r.ts.dispose();
+    expect(await w).toEqual({});
+    expect(permissionSummary("Write", { file_path: "notes.txt" }, "/work/acme")).toBe(join("/work/acme", "notes.txt"));
+    expect(permissionSummary("mcp__acme__q", { q: "x".repeat(400) }, "/").length).toBe(300);
+  });
+
+  it("§57.15 bridge off: PermissionRequest is answered {} at once (the TUI's dialog)", async () => {
+    const r = rig();
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
+    expect(r.ts.state.permissions).toBeUndefined();
   });
 });
