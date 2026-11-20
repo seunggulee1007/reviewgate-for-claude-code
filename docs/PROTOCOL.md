@@ -9165,6 +9165,12 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
 - **PermissionRequest** is registered (no matcher, `H(600)`, no `onFailure`) only for a client that answers bridged
   dialogs (`terminalFeature("permissionBridge")`: the Mac app); it sets `waiting` at once (§57.15).
 - **CwdChanged** (`H(10)`) reports a `cd` of the TUI's shell (`terminal_cwd`, §57.12). It has no decision.
+- **Config dir.** The PTY's login shell can export its own `CLAUDE_CONFIG_DIR`. Every hook carries `transcript_path` =
+  `<configDir>/projects/<key>/<uuid>.jsonl`; the session takes `<configDir>` from it when it has exactly that shape, is
+  absolute and `<configDir>/projects` is a directory, and when it changed emits it — persisted as `SessionMeta.cliConfigDir`.
+  `terminal_spec` then reads both dirs: refused `terminal_hooks_disabled` when either says hooks are off; the conversation
+  is "gone" (§57.2) only when no dir has the record and each says gone; plan files are under the learned dir's `plans`.
+  A forged path only feeds read-only checks, and only makes them stricter.
 
 ## 58. Accept N & Continue
 

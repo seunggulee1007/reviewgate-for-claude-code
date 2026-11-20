@@ -2645,6 +2645,7 @@ export class ReviewEngine {
       // A little longer than the engine's own bound, so the prompt gets the engine's reason, not the session's.
       promptWaitMs: this.terminalPromptWaitMs + 10_000,
       plansDir: join(claudeConfigDir(this.childEnv()), "plans"),
+      ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
       emit: (ev) => this.onSessionEvent(ts, ev),
@@ -2672,7 +2673,10 @@ export class ReviewEngine {
     }
     const configDir = claudeConfigDir(this.childEnv());
     const managed = (this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir })).settings;
-    const off = hooksDisabled({ configDir, projectDir: project.path, managed });
+    const known = this.requireSession(sessionId);
+    // §57.16: the engine's config dir and the one the terminal was seen using — refused when either says hooks are off.
+    let off: ReturnType<typeof hooksDisabled> = null;
+    for (const dir of this.terminalConfigDirs(known)) off ??= hooksDisabled({ configDir: dir, projectDir: project.path, managed });
     if (off) throw new CommandRefused(`terminal_hooks_disabled:${off}`, { code: "terminal_hooks_disabled" });
     const server = (this.hookServer ??= new HookServer((msg) => this.log("debug", msg)));
     await server.start();
@@ -2682,7 +2686,7 @@ export class ReviewEngine {
     const meta = this.requireSession(sessionId);
     let cliId = meta.cliSessionId ?? meta.id;
     let resume = meta.cliSessionId !== undefined || this.isResumable(meta);
-    if (resume && cliSessionGone(project.path, cliId, this.childEnv())) {
+    if (resume && this.terminalCliGone(meta, cliId)) {
       // The CLI no longer has that conversation (purged): `--resume` would only end in "No conversation found", and every
       // Restart again. A fresh conversation under a new id — the chat keeps its own and resumes this one from now on.
       this.log("warn", `terminal chat ${sessionId}: Claude Code no longer has conversation ${cliId}; starting a new one`);
@@ -2708,6 +2712,33 @@ export class ReviewEngine {
   private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
     this.requireTerminal(cmd.sessionId);
     throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+  }
+
+  /** §57.16: the config dirs a terminal chat's CLI may use — the engine's, then the one its hooks showed (when another). */
+  private terminalConfigDirs(meta: SessionMeta): string[] {
+    const own = claudeConfigDir(this.childEnv());
+    return meta.cliConfigDir && meta.cliConfigDir !== own ? [own, meta.cliConfigDir] : [own];
+  }
+
+  /**
+   * §57.2 / §57.16: the CLI no longer has conversation `cliId` — it is in none of the config dirs the terminal may use, and
+   * each of them says gone (its projects folder for the project exists without the record). Unknown is never gone.
+   */
+  private terminalCliGone(meta: SessionMeta, cliId: string): boolean {
+    const cwd = this.project!.path;
+    const envs = this.terminalConfigDirs(meta).map((dir) => ({ ...this.childEnv(), CLAUDE_CONFIG_DIR: dir }));
+    if (envs.some((env) => cliSessionExists(cwd, cliId, env))) return false;
+    return envs.every((env) => cliSessionGone(cwd, cliId, env));
+  }
+
+  /** §57.16: the terminal's hooks show the config dir its CLI really uses: kept on the chat for the next spec's checks. */
+  private onTerminalConfigDir(chatId: string, dir: string): void {
+    const meta = this.sessions?.get(chatId);
+    if (!meta || meta.cliConfigDir === dir) return;
+    meta.cliConfigDir = dir;
+    this.log("info", `terminal chat ${chatId}: its Claude Code uses the config dir ${dir}`);
+    this.persistSessions();
+    this.touch();
   }
 
   /** §57: the TUI runs another CLI conversation (`/clear`, `/resume`): the chat resumes that one from now on. */
@@ -7394,6 +7425,9 @@ export class ReviewEngine {
         return;
       case "terminal_state":
         this.touch();
+        return;
+      case "terminal_config_dir": // §57.16
+        if (source instanceof TerminalSession) this.onTerminalConfigDir(source.chatId, ev.dir);
         return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);

@@ -504,4 +504,28 @@ describe("terminal chats (§57)", () => {
     expect(next.decision).toBeUndefined();
     await r.h.waitFor((st) => st.gate.phase === "running" && st.session.terminal?.promptId === "p2", "p2 running");
   });
+
+  it("§57.16 the config dir the terminal really uses is learned from transcript_path and used by the gone and hooks checks", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await turn(r, s, "p1");
+    const other = temp("rg-term-config-b"); // the PTY's login shell exported another CLAUDE_CONFIG_DIR
+    const record = cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: other });
+    mkdirSync(dirname(record), { recursive: true });
+    writeFileSync(record, "");
+    await hook(s, { hook_event_name: "Notification", notification_type: "idle_prompt", message: "", transcript_path: record });
+    await r.h.waitFor((st) => st.sessions.list.find((m) => m.id === id)?.cliConfigDir === other, "cliConfigDir");
+    // The engine's own dir has the project's folder without the record: not gone, it is in the learned one.
+    const ownProjects = dirname(cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: r.config }));
+    mkdirSync(ownProjects, { recursive: true });
+    expect((await spec(r, id)).argv[1]).toBe(`--resume=${id}`);
+    // Hooks off in the learned dir refuse the spec too.
+    writeFileSync(join(other, "settings.json"), JSON.stringify({ disableAllHooks: true }));
+    expect(await refusal(r.h, { type: "terminal_spec", sessionId: id })).toMatchObject({ ok: false, code: "terminal_hooks_disabled" });
+    // Reloaded from disk, the learned dir stays.
+    await r.h.engine.dispose();
+    const again = await rig({ dir: r.dir, config: r.config });
+    expect(again.h.engine.state.sessions.list.find((m) => m.id === id)?.cliConfigDir).toBe(other);
+  });
 });

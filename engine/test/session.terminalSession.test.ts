@@ -1,11 +1,11 @@
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, configDirOfTranscript, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -354,5 +354,21 @@ describe("TerminalSession", () => {
     expect(await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "/work/acme/feature" })).toEqual({});
     await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "relative/dir" });
     expect(r.of("terminal_cwd")).toEqual([{ type: "terminal_cwd", cwd: "/work/acme/feature" }]);
+  });
+
+  it("§57.16 transcript_path → terminal_config_dir (once per dir); a malformed path is ignored", async () => {
+    const r = rig();
+    const config = realpathSync(makeTempDir("rg-term-cfg"));
+    dirs.push(config);
+    mkdirSync(join(config, "projects", "-work-acme"), { recursive: true });
+    const file = join(config, "projects", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl");
+    for (const bad of ["/dev/null", "relative/projects/x/0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl", join(config, "other", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl"), join(config, "projects", "-work-acme", "notes.jsonl"), join("/nonexistent", "projects", "k", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl")]) {
+      expect(configDirOfTranscript(bad), bad).toBeNull();
+      await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: bad });
+    }
+    expect(r.of("terminal_config_dir")).toHaveLength(0);
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    expect(r.of("terminal_config_dir")).toEqual([{ type: "terminal_config_dir", dir: config }]);
   });
 });
