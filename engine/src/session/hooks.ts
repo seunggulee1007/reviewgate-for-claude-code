@@ -1015,6 +1015,123 @@ export async function changedBetween(cp: GitCheckpoint, a: string, b: string, ig
 }
 
 /**
+ * M05b — §39.4 / §57.12: what a main-agent EnterWorktree / ExitWorktree PostToolUse reports — EnterWorktree: where it went
+ * (its result's `worktreePath` / `worktreeBranch`, else the path its PreToolUse saw) with the worktrees before it;
+ * ExitWorktree: the folder the CLI went back to (`originalCwd`). Null for a subagent's call or any other tool.
+ */
+export function worktreeToolNotice(input: Record<string, unknown>, watch?: { path?: string; before?: GitWorktree[] | null }): ScopeNotice | null {
+  if (input.hook_event_name !== "PostToolUse" || agentIdOf(input as unknown as HookInput) !== undefined) return null;
+  const toolUseId = toolUseIdOf(input as unknown as HookInput);
+  const response = input.tool_response;
+  if (input.tool_name === "EnterWorktree") {
+    const result = isolatedResult(response);
+    const path = result.path ?? watch?.path;
+    const before = watch?.before;
+    return { code: "worktree_outside_review", toolName: "EnterWorktree", ...(toolUseId ? { toolUseId } : {}), ...(path ? { path } : {}), ...(result.branch ? { branch: result.branch } : {}), reasonCode: "worktree_command", ...(before ? { worktreesBefore: before } : {}) };
+  }
+  if (input.tool_name === "ExitWorktree") {
+    const back = response && typeof response === "object" ? (response as { originalCwd?: unknown }).originalCwd : undefined;
+    if (typeof back === "string" && back) return { code: "worktree_exited", toolName: "ExitWorktree", ...(toolUseId ? { toolUseId } : {}), path: back };
+  }
+  return null;
+}
+
+/**
+ * §54 before an edit tool: with a budget on, the edit is counted (`file` and the estimated lines); over the hard limit — or
+ * after an earlier deny — it is denied (`budget_event deny`), past the soft one a `budget_event warn` goes out once. Null:
+ * it may run. Without a budget (the default) nothing is counted.
+ */
+export function budgetPreEdit(ctx: Pick<HookContext, "budget" | "cwd" | "emit">, toolName: string, ti: Record<string, unknown>, file: string | undefined): HookJSONOutput | null {
+  const b = ctx.budget;
+  if (!b.active) return null;
+  const est = estimateEditLines(toolName, ti, ctx.cwd);
+
+  const projectedFiles = new Set(b.files);
+  if (file) projectedFiles.add(file);
+  const projectedLines = b.lines + est;
+
+  if (b.denied || b.wouldExceedHard(projectedFiles.size, projectedLines)) {
+    b.denied = true;
+    ctx.emit({
+      type: "budget_event",
+      kind: "deny",
+      toolName,
+      file,
+      files: projectedFiles.size,
+      lines: projectedLines,
+      budget: b.budget,
+    });
+    return denyPre(
+      reviewGateReason(projectedFiles.size, b.budget.maxFiles, projectedLines, b.budget.maxLines),
+    );
+  }
+
+  if (file) b.files.add(file);
+  b.lines = projectedLines;
+
+  if (!b.warned && b.exceedsSoft()) {
+    b.warned = true;
+    ctx.emit({
+      type: "budget_event",
+      kind: "warn",
+      toolName,
+      file,
+      files: b.files.size,
+      lines: b.lines,
+      budget: b.budget,
+    });
+  }
+  return null;
+}
+
+/**
+ * §54 before a Bash call: after a budget deny only change attempts are refused — never a command that just reads or tests,
+ * and the turn goes on (it is never interrupted): Claude reports what it did and what remains. Null: it may run.
+ */
+export function budgetPreBash(ctx: Pick<HookContext, "budget">, command: string): HookJSONOutput | null {
+  const b = ctx.budget;
+  if (b.active && b.denied && writesFiles(command)) {
+    return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
+  }
+  return null;
+}
+
+/** §54 after an edit tool: past the soft limit, the note for Claude (PostToolUse `additionalContext`); null otherwise. */
+export function budgetSoftNote(ctx: Pick<HookContext, "budget">): string | null {
+  const b = ctx.budget;
+  if (!b.active || !b.exceedsSoft()) return null;
+  return budgetNote(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines, b.hardMultiplier);
+}
+
+/**
+ * §54 after a Bash call's snapshot (`tree`): its `attributed` files count, and the turn's lines (numstat A → `tree`, only
+ * Claude's files, §31) when larger than the estimate; past the soft limit a `budget_event warn` goes out once. Without a
+ * budget (the default) nothing is counted — and the turn's numstat is not even taken.
+ */
+export async function budgetAfterBash(ctx: Pick<HookContext, "budget" | "checkpointTree" | "ignorePatterns" | "emit">, cp: GitCheckpoint, tree: string, attributed: readonly string[]): Promise<void> {
+  const b = ctx.budget;
+  if (!b.active || !ctx.checkpointTree) return;
+  for (const f of attributed) b.files.add(f);
+  // numstat is cumulative for the whole turn; take the larger of the two measures so edits already
+  // counted by the pre-edit estimate are not double-counted. Only Claude's files count (§31).
+  const entries = await treeNumstat(cp, ctx.checkpointTree, tree, ctx.ignorePatterns);
+  const mine = new Set([...b.files].map((f) => normalizeForCompare(f)));
+  const lines = entries.reduce((n, e) => (mine.has(normalizeForCompare(e.file)) ? n + e.lines : n), 0);
+  if (lines > b.lines) b.lines = lines;
+  if (!b.warned && b.exceedsSoft()) {
+    b.warned = true;
+    ctx.emit({
+      type: "budget_event",
+      kind: "warn",
+      toolName: "Bash",
+      files: b.files.size,
+      lines: b.lines,
+      budget: b.budget,
+    });
+  }
+}
+
+/**
  * Before the turn's first Bash call that may write (§31: a read-only one takes none): the tree its post-Bash snapshot is
  * diffed against, so Bash file attribution never picks up what earlier turns left on disk (a request-changes turn keeps
  * the old A).
@@ -1033,7 +1150,6 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   const preEdit: HookCallback = async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allow();
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
-    const b = ctx.budget;
     const ti = toolInput(input);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, undefined, input);
     if (unprompted) return unprompted;
@@ -1072,45 +1188,8 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       return cliDecides ? allow() : askPre(OUTSIDE_REASON);
     }
     // §54: the change budget is opt-in — without one (the default) an edit is neither counted nor denied.
-    if (b.active) {
-      const est = estimateEditLines(input.tool_name, ti, ctx.cwd);
-
-      const projectedFiles = new Set(b.files);
-      if (file) projectedFiles.add(file);
-      const projectedLines = b.lines + est;
-
-      if (b.denied || b.wouldExceedHard(projectedFiles.size, projectedLines)) {
-        b.denied = true;
-        ctx.emit({
-          type: "budget_event",
-          kind: "deny",
-          toolName: input.tool_name,
-          file,
-          files: projectedFiles.size,
-          lines: projectedLines,
-          budget: b.budget,
-        });
-        return denyPre(
-          reviewGateReason(projectedFiles.size, b.budget.maxFiles, projectedLines, b.budget.maxLines),
-        );
-      }
-
-      if (file) b.files.add(file);
-      b.lines = projectedLines;
-
-      if (!b.warned && b.exceedsSoft()) {
-        b.warned = true;
-        ctx.emit({
-          type: "budget_event",
-          kind: "warn",
-          toolName: input.tool_name,
-          file,
-          files: b.files.size,
-          lines: b.lines,
-          budget: b.budget,
-        });
-      }
-    }
+    const overBudget = budgetPreEdit(ctx, input.tool_name, ti, file);
+    if (overBudget) return overBudget;
     // Path containment: an edit outside the checkpoint root (or through a symlink escaping it) is
     // never auto-allowed; `ask` reaches canUseTool, which puts it on the permission card. §39.5: in auto mode it is the
     // CLI's call — unless it is one of Claude Code's own settings files (`~/.claude/settings.json`), checked first. M23: so is
@@ -1136,7 +1215,6 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   const preBash: HookCallback = async (input) => {
     if (input.hook_event_name !== "PreToolUse") return allow();
     noteCliMode(input, ctx); // MARK: wave6 w6-terminal (§44.1)
-    const b = ctx.budget;
     const ti = toolInput(input);
     // §19.3: a command is judged where it runs — a `cd` / `git -C` into the repository's own worktrees stays read-only.
     const cwd = hookCwd(input, ctx);
@@ -1149,9 +1227,8 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (planDeny) return denyPre(planDeny);
     // §54: after a budget deny only change attempts are refused — never a command that just reads or tests, and the turn
     // goes on (it is never interrupted): Claude reports what it did and what remains.
-    if (b.active && b.denied && writesFiles(command)) {
-      return denyPre(reviewGateReason(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines));
-    }
+    const overBudget = budgetPreBash(ctx, command);
+    if (overBudget) return overBudget;
     const readOnly = isReadOnlyCommand(command, ro);
     // §31: a read-only command (not one run in the background) changes nothing — no baseline before it, no snapshot after.
     const toolUseId = toolUseIdOf(input);
@@ -1267,39 +1344,27 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
   const postWorktreeTool: HookCallback = async (input) => {
     if (input.hook_event_name !== "PostToolUse") return allow();
     const toolUseId = toolUseIdOf(input);
-    const response = (input as { tool_response?: unknown }).tool_response;
     ctx.worktrees = undefined; // a worktree may have been added
     if (input.tool_name === "EnterWorktree" && agentIdOf(input) !== undefined) {
       // A subagent went into a worktree (only it moved): the row of an isolated agent says where it works.
       noticeAfterTool("Agent", input, ctx);
-    } else if (input.tool_name === "EnterWorktree") {
-      const watch = toolUseId ? ctx.scopeWatches?.get(toolUseId) : undefined;
-      if (toolUseId) {
-        ctx.scopeWatches?.delete(toolUseId);
-        ctx.scopeReasons?.delete(toolUseId);
-      }
-      const result = isolatedResult(response);
-      const path = result.path ?? watch?.worktree?.path;
-      const before = watch?.worktree?.before;
-      ctx.onScopeNotice?.({ code: "worktree_outside_review", toolName: "EnterWorktree", ...(toolUseId ? { toolUseId } : {}), ...(path ? { path } : {}), ...(result.branch ? { branch: result.branch } : {}), reasonCode: "worktree_command", ...(before ? { worktreesBefore: before } : {}) });
-    } else if (input.tool_name === "ExitWorktree" && agentIdOf(input) === undefined) {
-      if (toolUseId) ctx.scopeReasons?.delete(toolUseId);
-      const back = response && typeof response === "object" ? (response as { originalCwd?: unknown }).originalCwd : undefined;
-      if (typeof back === "string" && back) ctx.onScopeNotice?.({ code: "worktree_exited", toolName: "ExitWorktree", ...(toolUseId ? { toolUseId } : {}), path: back });
+      return allow();
     }
+    if (agentIdOf(input) !== undefined) return allow();
+    const watch = toolUseId && input.tool_name === "EnterWorktree" ? ctx.scopeWatches?.get(toolUseId) : undefined;
+    if (toolUseId) {
+      if (input.tool_name === "EnterWorktree") ctx.scopeWatches?.delete(toolUseId);
+      ctx.scopeReasons?.delete(toolUseId);
+    }
+    const notice = worktreeToolNotice(input as unknown as Record<string, unknown>, watch?.worktree);
+    if (notice) ctx.onScopeNotice?.(notice);
     return allow();
   };
 
   const postEdit: HookCallback = async (input) => {
     if (input.hook_event_name !== "PostToolUse") return allow();
-    const b = ctx.budget;
-    if (!b.active || !b.exceedsSoft()) return allow();
-    return {
-      hookSpecificOutput: {
-        hookEventName: "PostToolUse",
-        additionalContext: budgetNote(b.files.size, b.budget.maxFiles, b.lines, b.budget.maxLines, b.hardMultiplier),
-      },
-    };
+    const note = budgetSoftNote(ctx);
+    return note ? { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: note } } : allow();
   };
 
   /**
@@ -1335,7 +1400,6 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const toolUseId = toolUseIdOf(input);
     if (toolUseId && ctx.readOnlyBash?.delete(toolUseId)) return allow();
     if (!ctx.checkpointTree) return allow();
-    const b = ctx.budget;
     try {
       if (!ctx.checkpoint) ctx.checkpoint = await openCheckpoint(ctx.cwd);
       const cp = ctx.checkpoint;
@@ -1348,27 +1412,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
       const attributed = window ? await changedWithin(changed, window, cp.root, ctx.windowMarginMs ?? WINDOW_MARGIN_MS) : changed;
       if (attributed.length > 0) ctx.onBashFiles?.(input.tool_use_id, attributed);
       ctx.onBashSnapshot?.(input.tool_use_id, tree, cp.root);
-      // §54: without a budget (the default) nothing is counted — and the turn's numstat is not even taken.
-      if (b.active) {
-        for (const f of attributed) b.files.add(f);
-        // numstat is cumulative for the whole turn; take the larger of the two measures so edits already
-        // counted by the pre-edit estimate are not double-counted. Only Claude's files count (§31).
-        const entries = await treeNumstat(cp, ctx.checkpointTree, tree, ctx.ignorePatterns);
-        const mine = new Set([...b.files].map((f) => normalizeForCompare(f)));
-        const lines = entries.reduce((n, e) => (mine.has(normalizeForCompare(e.file)) ? n + e.lines : n), 0);
-        if (lines > b.lines) b.lines = lines;
-        if (!b.warned && b.exceedsSoft()) {
-          b.warned = true;
-          ctx.emit({
-            type: "budget_event",
-            kind: "warn",
-            toolName: "Bash",
-            files: b.files.size,
-            lines: b.lines,
-            budget: b.budget,
-          });
-        }
-      }
+      await budgetAfterBash(ctx, cp, tree, attributed);
     } catch (e) {
       ctx.log("debug", `snapshot after Bash failed: ${String(e)}`);
     }

@@ -1,11 +1,11 @@
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -337,5 +337,71 @@ describe("TerminalSession", () => {
     r.ts.setToken("b");
     expect(retired).toEqual(["a"]);
     expect(r.ts.state).toMatchObject({ running: false, hooksSeen: false });
+  });
+
+  it("§57.16 any tool's PostToolUse clears waiting (a WebFetch dialog); PermissionRequest waits at once; CwdChanged → terminal_cwd", async () => {
+    const r = rig();
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "WebFetch", tool_input: { url: "https://example.com" } })).toEqual({});
+    expect(r.ts.state.waiting).toMatchObject({ kind: "permission", message: "Claude needs your permission to use WebFetch" });
+    expect(r.of("terminal_attention").at(-1)).toMatchObject({ notificationType: "permission_request" });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "WebFetch", tool_input: { url: "https://example.com" }, tool_use_id: "f1", tool_response: "ok" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(r.of("tool_use")).toHaveLength(0); // neither an edit tool nor Bash: nothing of the turn
+    await r.hook({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use mcp__acme__fetch" });
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    await r.hook({ hook_event_name: "PostToolUseFailure", tool_name: "mcp__acme__fetch", tool_input: {}, tool_use_id: "m1", error: "denied" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "/work/acme/feature" })).toEqual({});
+    await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "relative/dir" });
+    expect(r.of("terminal_cwd")).toEqual([{ type: "terminal_cwd", cwd: "/work/acme/feature" }]);
+  });
+
+  it("§57.16 transcript_path → terminal_config_dir (once per dir); a malformed path is ignored", async () => {
+    const r = rig();
+    const config = realpathSync(makeTempDir("rg-term-cfg"));
+    dirs.push(config);
+    mkdirSync(join(config, "projects", "-work-acme"), { recursive: true });
+    const file = join(config, "projects", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl");
+    for (const bad of ["/dev/null", "relative/projects/x/0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl", join(config, "other", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl"), join(config, "projects", "-work-acme", "notes.jsonl"), join("/nonexistent", "projects", "k", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl")]) {
+      expect(configDirOfTranscript(bad), bad).toBeNull();
+      await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: bad });
+    }
+    expect(r.of("terminal_config_dir")).toHaveLength(0);
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    expect(r.of("terminal_config_dir")).toEqual([{ type: "terminal_config_dir", dir: config }]);
+  });
+
+  it("§57.10 background: prompts blocked, write tools denied (the guard's deny first), waits still raised; back again keeps the token", async () => {
+    const r = rig();
+    const retired: string[] = [];
+    r.ts.setToken("tok-1", (t) => retired.push(t));
+    r.ts.started(77);
+    r.ts.setBackground(true);
+    expect(r.ts.isBackground).toBe(true);
+    expect(await r.hook(ups("p1"))).toEqual({ decision: "block", reason: BACKGROUND_PROMPT_REASON });
+    expect(r.of("terminal_prompt")).toHaveLength(0);
+    const deny = (reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "a.txt"), content: "x" }, "w1"))).toEqual(deny(BACKGROUND_TOOL_REASON));
+    write(r.dir, "README.md", "dirty\n");
+    const reset = await r.hook(pre("Bash", { command: "git reset --hard" }, "b1"));
+    expect((reset.hookSpecificOutput as { permissionDecisionReason: string }).permissionDecisionReason).not.toBe(BACKGROUND_TOOL_REASON);
+    expect(reset).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect(r.of("auto_turn_start")).toHaveLength(0);
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    await r.hook({ hook_event_name: "Notification", notification_type: "elicitation_dialog", message: "Which one?" });
+    expect(r.ts.state.waiting?.kind).toBe("question");
+    expect(r.of("terminal_attention").length).toBeGreaterThanOrEqual(2);
+    await r.hook({ ...ups("p2"), session_id: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" });
+    expect(r.of("terminal_session_id")).toEqual([{ type: "terminal_session_id", sessionId: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" }]);
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: false })).toEqual({});
+    expect(r.of("turn_end")).toHaveLength(0);
+    // Foreground again: the same token (never retired), prompts reviewed as before.
+    r.ts.setBackground(false);
+    expect(retired).toEqual([]);
+    expect(r.ts.state.running).toBe(true);
+    expect(await r.hook(ups("p3"))).toEqual({});
+    expect(r.ts.state.promptId).toBe("p3");
   });
 });

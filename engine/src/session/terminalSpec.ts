@@ -45,12 +45,18 @@ type HttpHook = {
   onFailure?: "block";
 };
 
+/** What a spawn's `--settings` carries besides the review hooks (§57.15). */
+export type HookSettingsOptions = {
+  /** §57.15: a PermissionRequest hook — only for a client that answers bridged dialogs (else nobody would). */
+  permissionRequest?: boolean;
+};
+
 /**
  * The `--settings` object: every hook posts to `url` with the token header (interpolated by the CLI from the env).
  * `onFailure: "block"` only where blocking is fail-closed (UserPromptSubmit, PreToolUse) — never on Stop, where "block"
- * means "keep Claude going".
+ * means "keep Claude going". PostToolUse / PostToolUseFailure match every tool (§57.16: any later hook clears `waiting`).
  */
-export function hookSettings(url: string): { hooks: Record<string, { matcher?: string; hooks: HttpHook[] }[]> } {
+export function hookSettings(url: string, opts: HookSettingsOptions = {}): { hooks: Record<string, { matcher?: string; hooks: HttpHook[] }[]> } {
   const h = (timeout: number, block = false): HttpHook => ({
     type: "http",
     url,
@@ -63,8 +69,11 @@ export function hookSettings(url: string): { hooks: Record<string, { matcher?: s
     hooks: {
       UserPromptSubmit: [{ hooks: [h(120, true)] }],
       PreToolUse: [{ matcher: TERMINAL_WRITE_TOOLS_MATCHER, hooks: [h(60, true)] }],
-      PostToolUse: [{ matcher: TERMINAL_WRITE_TOOLS_MATCHER, hooks: [h(120)] }],
-      PostToolUseFailure: [{ matcher: "Bash", hooks: [h(120)] }],
+      // §57.15: no onFailure — a failure leaves the TUI's own dialog in charge.
+      ...(opts.permissionRequest ? { PermissionRequest: [{ hooks: [h(600)] }] } : {}),
+      PostToolUse: [{ hooks: [h(120)] }],
+      PostToolUseFailure: [{ hooks: [h(120)] }],
+      CwdChanged: [{ hooks: [h(10)] }],
       Stop: [{ hooks: [h(30)] }],
       StopFailure: [{ hooks: [h(30)] }],
       Notification: [{ hooks: [h(10)] }],

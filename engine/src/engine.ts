@@ -338,6 +338,12 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
 ]);
 
+/** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
+type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
+
+/** §57.4: how long past its own deadline a terminal prompt's adoption may hold the queue (it never settled: logged, dropped). */
+const TERMINAL_ADOPT_GRACE_MS = 10_000;
+
 /** §57.4: a terminal prompt that came while the previous one was still being adopted, and waited past its budget. */
 const TERMINAL_PROMPT_QUEUED_REASON = "ReviewGate is still starting the review of your previous prompt. Send this one again in a moment.";
 
@@ -485,6 +491,8 @@ export class ReviewEngine {
   /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
   private hookServer: HookServer | null = null;
   private readonly terminalPromptWaitMs: number;
+  /** §57.10: terminal chats of this window whose Claude Code keeps running while another chat is current (by chat id). */
+  private readonly backgroundTerminals = new Map<string, TerminalSession>();
   /** §57.4: the terminal prompts being adopted, one after another (settles once every one queued so far is done). */
   private terminalAdopting: Promise<void> | null = null;
   /** `permission_response { remember: true }` keys (docs/M16-FRICTION.md §2); shared live with the Claude session's hooks. */
@@ -1016,6 +1024,7 @@ export class ReviewEngine {
       const done = this.gate.checkpoint !== null && !this.gate.running && !this.gate.collecting && this.gate.turnEndTree !== null
         && !this.gate.hasPendingReview && this.gate.unsentNoteCount === 0 && !this.gate.isRequestingChanges && this.gate.changedFiles.length > 0;
       if (this.parked) await this.disposeParked(this.parked, "the engine stops"); // r2-chats-cards M33 (§9.1)
+      await this.disposeBackgroundTerminals("the engine stops"); // §57.10
       await this.stopSession();
       await this.hookServer?.close(); // MARK: terminal-chat (§57)
       this.hookServer = null;
@@ -1395,6 +1404,13 @@ export class ReviewEngine {
         return;
       }
       case "terminal_exited": {
+        // §57.10: a background terminal's PTY ended (its tab closed, the app's cap): it is gone.
+        const bg = this.backgroundTerminals.get(cmd.sessionId);
+        if (bg) {
+          bg.ptyExited();
+          await this.disposeBackgroundTerminals("its terminal exited", cmd.sessionId);
+          return;
+        }
         // A chat already switched away from has no terminal any more: nothing to end.
         const ts = this.terminal;
         if (ts && ts.chatId === cmd.sessionId && this.currentSessionId === cmd.sessionId) ts.ptyExited();
@@ -1403,6 +1419,12 @@ export class ReviewEngine {
       }
       case "terminal_end_turn": // §57.4 "Review now": a turn Esc left open ends here
         if (!this.requireTerminal(cmd.sessionId).endTurnByUser()) throw new CommandRefused("no_turn", { code: "no_turn" });
+        return;
+      case "terminal_request_cancel": // §57.14
+        this.terminalRequestCancel(cmd.sessionId);
+        return;
+      case "terminal_permission_response": // §57.15
+        this.terminalPermissionResponse(cmd);
         return;
       case "session_open":
         await this.sessionOpen(cmd.sessionId);
@@ -1428,6 +1450,7 @@ export class ReviewEngine {
         const meta = this.requireSession(cmd.sessionId);
         if (meta.id === this.currentSessionId) throw new CommandRefused("session_current");
         if (this.parked?.chatId === meta.id) void this.disposeParked(this.parked, "its chat was deleted"); // r2-chats-cards M33 (§9.1)
+        if (this.backgroundTerminals.has(meta.id)) await this.disposeBackgroundTerminals("its chat was deleted", meta.id); // §57.10
         this.sessions!.remove(meta.id);
         void this.side.removeFor(meta.id);
         if (this.projectGitDir) removeCheckpoints(this.projectGitDir, meta.id);
@@ -2116,6 +2139,7 @@ export class ReviewEngine {
     await this.side.stopAll();
     await this.side.load(null);
     if (this.parked) await this.disposeParked(this.parked, "another project opened"); // r2-chats-cards M33 (§9.1)
+    await this.disposeBackgroundTerminals("another project opened"); // §57.10
     await this.stopSession();
     await this.releaseProjectLock();
     this.resetProjectState();
@@ -2398,6 +2422,15 @@ export class ReviewEngine {
     return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
   }
 
+  /**
+   * §57.10–57.15: the Stage 2 terminal features a client runs itself — background terminals, the permission bridge, the
+   * status line tee, following / moving between worktrees. The mac app (and tests) today; the one place a client
+   * capability (`hello`) can open one to another client later.
+   */
+  private terminalFeature(_feature: TerminalFeature): boolean {
+    return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
+  }
+
   private async sessionNew(kind?: SessionKind): Promise<void> {
     // MARK: terminal-chat — §57.1: a terminal chat needs the app's PTY (Mac only in Stage 1).
     const terminal = kind === "terminal";
@@ -2481,6 +2514,13 @@ export class ReviewEngine {
     this.restoreAgentHistory(); // MARK: wave4d w4d-agents2 (§42.4)
     this.touch();
     this.emit(this.restoreEvent()); // MARK: wave4 w4-history — §38.3 (+ start / sessionId)
+    // MARK: terminal-chat — §57.10: the chat's own background terminal is current again (a record's ends).
+    const bg = this.backgroundTerminals.get(meta.id);
+    if (bg) {
+      this.backgroundTerminals.delete(meta.id);
+      if (meta.resumeFailed !== true && meta.movedTo === undefined && meta.continuedIn === undefined) return this.resumeBackgroundTerminal(bg, meta);
+      await bg.dispose().catch(() => undefined);
+    }
     // r2-chats-cards M33 (§9.1): the chat's own idle CLI, started the way a new one would be — no restart.
     if (back && meta.resumeFailed !== true && meta.movedTo === undefined && meta.continuedIn === undefined && back.key === this.launchKey()) return this.unpark(back);
     if (back) void this.disposeParked(back, "its start changed");
@@ -2518,6 +2558,9 @@ export class ReviewEngine {
 
   /** The chat switched away from: its CLI parked, idle (the one parked before goes), else stopped as before. */
   private async parkOrStopSession(): Promise<void> {
+    // MARK: terminal-chat — §57.10: an idle terminal chat keeps running in the background (its token stays live).
+    const ts = this.terminal;
+    if (ts && this.canParkTerminal(ts)) return this.parkTerminal(ts);
     const s = this.session;
     const chatId = this.currentSessionId;
     if (!s || !chatId || !this.canPark()) return this.stopSession();
@@ -2540,6 +2583,55 @@ export class ReviewEngine {
     this.endPeerState(); // as a stop: nothing of that chat's peers or tasks shows in the next one (none runs: canPark)
     this.parked = parked;
     this.log("info", `chat ${chatId}: its Claude Code process waits, idle, for ${Math.round(this.parkIdleMs / 1000)} s`);
+  }
+
+  /**
+   * §57.10: the current terminal chat may run on in the background — the client runs background terminals, its PTY runs,
+   * no review turn is open or being collected / reverted, no prompt is being adopted, no turn of another CLI is taken.
+   */
+  private canParkTerminal(ts: TerminalSession): boolean {
+    return this.terminalFeature("background") && !this.closed && this.currentSessionId === ts.chatId && ts.state.running && !ts.isTurnActive
+      && !this.gate.running && !this.gate.collecting && !this.gate.reverting && this.terminalAdopting === null && this.externalTurn === null
+      && !this.openChatIsRecord();
+  }
+
+  /** §57.10: the current terminal chat goes to the background — detached like a stop, but its token and PTY stay. */
+  private parkTerminal(ts: TerminalSession): void {
+    ts.setBackground(true);
+    this.backgroundTerminals.set(ts.chatId, ts);
+    this.stopMcpPolling();
+    this.session = null;
+    this.sessionStartedAt = null;
+    this.sessionStartName = null;
+    this.sessionState.open = false;
+    this.startClock = null;
+    this.endCapabilitiesStart();
+    this.setPendingPermissions([]);
+    this.endPeerState();
+    this.log("info", `terminal chat ${ts.chatId}: its Claude Code keeps running in the background`);
+  }
+
+  /** §57.10: the chat's background terminal is current again — the same session and token; nothing is respawned. */
+  private resumeBackgroundTerminal(ts: TerminalSession, meta: SessionMeta): void {
+    ts.setBackground(false);
+    this.session = ts;
+    this.sessionStart = { resume: null, gotInfo: false, ready: true };
+    this.sessionState.open = true;
+    this.sessionState.starting = false;
+    this.sessionState.sessionId = meta.id;
+    this.log("info", `terminal chat ${meta.id}: back from the background (no restart)`);
+    this.touch();
+  }
+
+  /** §57.10: ends a background terminal (its token retired: the app ends its PTY); every one when `chatId` is absent. */
+  private async disposeBackgroundTerminals(why: string, chatId?: string): Promise<void> {
+    for (const [id, ts] of [...this.backgroundTerminals]) {
+      if (chatId !== undefined && id !== chatId) continue;
+      this.backgroundTerminals.delete(id);
+      this.log("info", `terminal chat ${id}: its background terminal ends (${why})`);
+      await ts.dispose().catch(() => undefined);
+    }
+    this.touch();
   }
 
   /** The parked CLI of `chatId`, out of the parking (the caller takes it back or ends it); null when there is none. */
@@ -2592,8 +2684,8 @@ export class ReviewEngine {
 
   /** Every CLI of this engine (the live one and a parked one): never "another Claude in this worktree" (§31.4, §36.9). */
   private ownCliPids(): Set<number> | null {
-    // §57: a terminal chat's session carries its PTY's claude pid (`terminal_started`).
-    const pids = [this.session?.pid, this.parked?.session.pid].filter((p): p is number => p !== undefined);
+    // §57: a terminal chat's session carries its PTY's claude pid (`terminal_started`); §57.10: so do the background ones.
+    const pids = [this.session?.pid, this.parked?.session.pid, ...[...this.backgroundTerminals.values()].map((t) => t.pid)].filter((p): p is number => p !== undefined);
     return pids.length > 0 ? new Set(pids) : null;
   }
 
@@ -2624,6 +2716,7 @@ export class ReviewEngine {
       // A little longer than the engine's own bound, so the prompt gets the engine's reason, not the session's.
       promptWaitMs: this.terminalPromptWaitMs + 10_000,
       plansDir: join(claudeConfigDir(this.childEnv()), "plans"),
+      ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
       emit: (ev) => this.onSessionEvent(ts, ev),
@@ -2651,7 +2744,10 @@ export class ReviewEngine {
     }
     const configDir = claudeConfigDir(this.childEnv());
     const managed = (this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir })).settings;
-    const off = hooksDisabled({ configDir, projectDir: project.path, managed });
+    const known = this.requireSession(sessionId);
+    // §57.16: the engine's config dir and the one the terminal was seen using — refused when either says hooks are off.
+    let off: ReturnType<typeof hooksDisabled> = null;
+    for (const dir of this.terminalConfigDirs(known)) off ??= hooksDisabled({ configDir: dir, projectDir: project.path, managed });
     if (off) throw new CommandRefused(`terminal_hooks_disabled:${off}`, { code: "terminal_hooks_disabled" });
     const server = (this.hookServer ??= new HookServer((msg) => this.log("debug", msg)));
     await server.start();
@@ -2661,7 +2757,7 @@ export class ReviewEngine {
     const meta = this.requireSession(sessionId);
     let cliId = meta.cliSessionId ?? meta.id;
     let resume = meta.cliSessionId !== undefined || this.isResumable(meta);
-    if (resume && cliSessionGone(project.path, cliId, this.childEnv())) {
+    if (resume && this.terminalCliGone(meta, cliId)) {
       // The CLI no longer has that conversation (purged): `--resume` would only end in "No conversation found", and every
       // Restart again. A fresh conversation under a new id — the chat keeps its own and resumes this one from now on.
       this.log("warn", `terminal chat ${sessionId}: Claude Code no longer has conversation ${cliId}; starting a new one`);
@@ -2670,15 +2766,76 @@ export class ReviewEngine {
       meta.cliSessionId = cliId;
       this.persistSessions();
     }
-    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(hookSettings(server.url)) });
+    const settings = hookSettings(server.url, { permissionRequest: this.terminalFeature("permissionBridge") });
+    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings) });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
   }
 
+  /** §57.14 `terminal_request_cancel`: unstages the chat's Request changes; refused `no_request_queued` when none is staged. */
+  private terminalRequestCancel(sessionId: string): void {
+    this.requireTerminal(sessionId);
+    throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+  }
+
+  /** §57.15 `terminal_permission_response`: answers one bridged dialog; refused `permission_gone` when it is no longer open. */
+  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
+    this.requireTerminal(cmd.sessionId);
+    throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+  }
+
+  /** §57.16: the config dirs a terminal chat's CLI may use — the engine's, then the one its hooks showed (when another). */
+  private terminalConfigDirs(meta: SessionMeta): string[] {
+    const own = claudeConfigDir(this.childEnv());
+    return meta.cliConfigDir && meta.cliConfigDir !== own ? [own, meta.cliConfigDir] : [own];
+  }
+
+  /**
+   * §57.2 / §57.16: the CLI no longer has conversation `cliId` — it is in none of the config dirs the terminal may use, and
+   * each of them says gone (its projects folder for the project exists without the record). Unknown is never gone.
+   */
+  private terminalCliGone(meta: SessionMeta, cliId: string): boolean {
+    const cwd = this.project!.path;
+    const envs = this.terminalConfigDirs(meta).map((dir) => ({ ...this.childEnv(), CLAUDE_CONFIG_DIR: dir }));
+    if (envs.some((env) => cliSessionExists(cwd, cliId, env))) return false;
+    return envs.every((env) => cliSessionGone(cwd, cliId, env));
+  }
+
+  /** §57.10: what a background terminal reports — ids and config dir go to its own chat; waits and state touch; nothing else. */
+  private onBackgroundTerminalEvent(ts: TerminalSession, ev: SessionEvent): void {
+    switch (ev.type) {
+      case "terminal_session_id":
+        this.onTerminalSessionId(ts.chatId, ev.sessionId);
+        return;
+      case "terminal_config_dir":
+        this.onTerminalConfigDir(ts.chatId, ev.dir);
+        return;
+      case "terminal_attention":
+        this.log("info", `background terminal chat ${ts.chatId} waits for the user (${ev.notificationType}): ${ev.message}`);
+        this.touch();
+        return;
+      case "terminal_state":
+        this.touch();
+        return;
+      default:
+        this.log("debug", `background terminal chat ${ts.chatId}: ${ev.type} dropped`);
+    }
+  }
+
+  /** §57.16: the terminal's hooks show the config dir its CLI really uses: kept on the chat for the next spec's checks. */
+  private onTerminalConfigDir(chatId: string, dir: string): void {
+    const meta = this.sessions?.get(chatId);
+    if (!meta || meta.cliConfigDir === dir) return;
+    meta.cliConfigDir = dir;
+    this.log("info", `terminal chat ${chatId}: its Claude Code uses the config dir ${dir}`);
+    this.persistSessions();
+    this.touch();
+  }
+
   /** §57: the TUI runs another CLI conversation (`/clear`, `/resume`): the chat resumes that one from now on. */
-  private onTerminalSessionId(cliId: string): void {
-    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+  private onTerminalSessionId(chatId: string, cliId: string): void {
+    const meta = this.sessions?.get(chatId);
     if (!meta) return;
     if (cliId === meta.id) delete meta.cliSessionId;
     else meta.cliSessionId = cliId;
@@ -2710,9 +2867,13 @@ export class ReviewEngine {
       }
       await this.adoptTerminalPrompt(ts, ev, deadline);
     })();
-    // The queue's tail settles only when this one and every one before it did (a prompt refused early leaves the earlier
-    // one in flight).
-    const tail = prior ? Promise.all([prior, run]).then(() => undefined) : run;
+    // The queue's tail settles when this one and every one before it did (a prompt refused early leaves the earlier one in
+    // flight) — or at the latest TERMINAL_ADOPT_GRACE_MS after this prompt's own deadline: an adoption that never settles
+    // (its prompt was blocked by its own timer long before) must not block every later prompt.
+    const all = prior ? Promise.all([prior, run]).then(() => undefined) : run;
+    const tail = settlesWithin(all, deadline + TERMINAL_ADOPT_GRACE_MS - Date.now()).then((settled) => {
+      if (!settled) this.log("warn", "terminal: a prompt adoption never settled; the queue moves on");
+    });
     this.terminalAdopting = tail;
     // Both handlers: a rejected adoption must not become an unhandled rejection (it would end the engine process).
     const clear = (): void => {
@@ -2791,7 +2952,8 @@ export class ReviewEngine {
         this.log("info", "terminal prompt: its review summary never reached Claude; it goes with the next prompt");
       }
       this.touch();
-      await this.checkConcurrent("send");
+      // §57.4: not awaited — the adoption (and the queue behind it) is done once the prompt has its answer.
+      void this.checkConcurrent("send").catch((e: unknown) => this.log("debug", `terminal: the concurrent-CLI check failed: ${errorMessage(e)}`));
     } catch (e) {
       this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
       if (!started && taken) this.gate.restoreSummary(taken);
@@ -2943,6 +3105,7 @@ export class ReviewEngine {
     await this.side.stopAll();
     await this.side.load(null);
     if (this.parked) await this.disposeParked(this.parked, "the project closed"); // r2-chats-cards M33 (§9.1)
+    await this.disposeBackgroundTerminals("the project closed"); // §57.10
     await this.stopSession();
     // Nothing pending: the persisted review has served its purpose (accepted files stay on disk).
     // Chained behind the in-flight writes so a late save cannot resurrect the file. (§34.4: sent notes do not count.)
@@ -6982,6 +7145,10 @@ export class ReviewEngine {
   // ------------------------------------------------------------------ session events
 
   private onSessionEvent(source: ClaudeSessionLike, ev: SessionEvent): void {
+    // MARK: terminal-chat — §57.10: a background terminal only reports its ids, its waits and its state.
+    if (source instanceof TerminalSession && source.isBackground && this.backgroundTerminals.get(source.chatId) === source) {
+      return this.onBackgroundTerminalEvent(source, ev);
+    }
     // r2-chats-cards M33 (§9.1): a parked CLI that starts to work (a task's result, a message, a turn of its own) or dies
     // is not taken back — nothing it would do may escape the review.
     if (this.parked?.session === source && !this.closed) {
@@ -7346,7 +7513,7 @@ export class ReviewEngine {
         if (source instanceof TerminalSession) this.queueTerminalPrompt(source, ev);
         return;
       case "terminal_session_id":
-        this.onTerminalSessionId(ev.sessionId);
+        if (source instanceof TerminalSession) this.onTerminalSessionId(source.chatId, ev.sessionId);
         return;
       case "terminal_attention":
         // §57.1: `state.session.terminal.waiting` (the session's) — the app badges the Dock and notifies from it.
@@ -7355,6 +7522,9 @@ export class ReviewEngine {
         return;
       case "terminal_state":
         this.touch();
+        return;
+      case "terminal_config_dir": // §57.16
+        if (source instanceof TerminalSession) this.onTerminalConfigDir(source.chatId, ev.dir);
         return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
@@ -8660,7 +8830,14 @@ export class ReviewEngine {
       workbenches: this.workbenches,
       lockConflict: this.lockConflict,
       commit: this.commitSlice,
-      sessions: { list: this.sessions?.list() ?? [], currentId: this.currentSessionId, openTabIds: this.openTabIds },
+      sessions: {
+        list: this.sessions?.list() ?? [], currentId: this.currentSessionId, openTabIds: this.openTabIds,
+        // §57.10: absent when none.
+        ...(this.backgroundTerminals.size > 0 ? { backgroundTerminals: [...this.backgroundTerminals.values()].map((t) => {
+          const st = t.state;
+          return { chatId: t.chatId, running: st.running, hooksSeen: st.hooksSeen, waiting: st.waiting };
+        }) } : {}),
+      },
       storage: { saveFailed: this.saveHealth.view, disk: this.disk ? { ...this.disk } : null }, // MARK: wave4b w4b-bigturn (§39.1)
       autoAcceptRules: this.autoAcceptRules, // MARK: wave4c w4c-trust (§41.2)
     };
@@ -9059,6 +9236,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_started":
     case "terminal_exited":
     case "terminal_end_turn":
+    case "terminal_request_cancel": // §57.14
+    case "terminal_permission_response": // §57.15
       return "session";
     case "side_ask":
     case "side_list":

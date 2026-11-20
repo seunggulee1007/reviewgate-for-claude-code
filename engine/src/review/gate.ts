@@ -970,10 +970,12 @@ export class ReviewGate {
 
   /**
    * §57: the review summary `beginSendParts` consumed (`taken`) never reached Claude — the terminal prompt it was for was
-   * blocked meanwhile or the CLI gave up on it — so it goes out with the next prompt instead.
+   * blocked meanwhile or the CLI gave up on it — so it goes out with the next prompt instead. The newer decision wins: a
+   * path decided again since (in any current list) drops out of `taken`, so it is never both Accepted and Rejected.
    */
   restoreSummary(taken: SummaryPaths): void {
-    const merge = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
+    const newer = new Set([...this.acceptedPaths, ...this.rejectedPaths, ...this.partiallyRejectedPaths]);
+    const merge = (a: string[], b: string[]): string[] => [...new Set([...a.filter((p) => !newer.has(p)), ...b])];
     this.acceptedPaths = merge(taken.accepted, this.acceptedPaths);
     this.rejectedPaths = merge(taken.rejected, this.rejectedPaths);
     this.partiallyRejectedPaths = merge(taken.partial, this.partiallyRejectedPaths);

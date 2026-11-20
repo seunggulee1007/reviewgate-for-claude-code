@@ -7,6 +7,8 @@
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { BackgroundTask, PermissionMode, TerminalSessionState, TerminalWaiting } from "../protocol.js";
+import { statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
 import { normalizeForCompare } from "../platform/paths.js";
 import { isReadOnlyCommand } from "./bashClass.js";
@@ -51,6 +53,8 @@ export type TerminalSessionOptions = {
   adoptWaitMs?: number;
   /** Override of the plans folder (plan files are no outside edits). */
   plansDir?: string;
+  /** §57.16: the CLI config dir the terminal was last seen using (`SessionMeta.cliConfigDir`); a hook that shows another emits `terminal_config_dir`. */
+  configDir?: string;
   scratchDirs?: readonly string[];
   /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
   reviewPaths?: () => ReadonlySet<string>;
@@ -70,6 +74,14 @@ export const PROMPT_TIMEOUT_REASON = "ReviewGate could not start the review of t
 export const ADOPT_BUSY_REASON =
   "ReviewGate was still busy with the last turn's changes and could not start reviewing this one in time, so this call " +
   "was blocked. Wait a moment, then try it again.";
+/** §57.10: a prompt typed into a terminal chat that runs in the background (another chat is current). */
+export const BACKGROUND_PROMPT_REASON =
+  "This terminal chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in " +
+  "ReviewGate and send it again.";
+/** §57.10: a write tool of a terminal chat that runs in the background. */
+export const BACKGROUND_TOOL_REASON =
+  "ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the user " +
+  "switches back to this chat.";
 /** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
 const PROMPT_CANCELLED_REASON = "Claude Code stopped waiting for ReviewGate's answer to this prompt.";
 
@@ -93,6 +105,18 @@ const preToolAnswer = (g: GuardDecision): HookOutput => ({
 /** §57.8: the guard itself failed — the call asks (fail closed, but not a deny the user cannot get past). */
 export const TERMINAL_GUARD_FAILED_REASON = "ReviewGate could not check this call against the review — confirm it.";
 
+/** §57.16: `<configDir>` of `<configDir>/projects/<key>/<uuid>.jsonl` when it is that and `<configDir>/projects` is a directory; else null. */
+export function configDirOfTranscript(path: string): string | null {
+  if (!isAbsolute(path) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/i.test(basename(path))) return null;
+  const projects = dirname(dirname(path));
+  if (basename(projects) !== "projects" || !basename(dirname(path))) return null;
+  try {
+    return statSync(projects).isDirectory() ? dirname(projects) : null;
+  } catch {
+    return null;
+  }
+}
+
 function preview(v: unknown): string {
   if (v === undefined || v === null) return "";
   const text = typeof v === "string" ? v : JSON.stringify(v);
@@ -109,6 +133,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private interruptSuspected = false;
   private open: OpenTurn | null = null;
   private disposed = false;
+  /** §57.10: another chat is current — the hooks answer fail-closed (prompts blocked, write tools denied). */
+  private background = false;
   private token: string | null = null;
   private retireToken: ((token: string) => void) | null = null;
   /** The prompt waiting for the engine's answer; `seq` is its `terminal_prompt`'s, so an answer reaches only its own. */
@@ -120,9 +146,15 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private touched = new Map<string, Touched>();
   private changedOutside = new Set<string>();
   private editsSinceBash = new Set<string>();
+  /** §57.16: the config dir learned from `transcript_path` (and the last path read, so each is checked once). */
+  private configDir: string | null;
+  private lastTranscript: string | null = null;
+  private plansDir: string | undefined;
 
   constructor(private readonly opts: TerminalSessionOptions) {
     this.cliSessionId = opts.cliSessionId;
+    this.configDir = opts.configDir ?? null;
+    this.plansDir = opts.configDir ? join(opts.configDir, "plans") : opts.plansDir;
     this.ctx = this.freshContext();
   }
 
@@ -147,6 +179,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   get isTurnActive(): boolean {
     return this.open !== null;
+  }
+
+  /** §57.10: the chat runs in the background (`setBackground`). */
+  get isBackground(): boolean {
+    return this.background;
   }
 
   // ---- ClaudeSessionLike: the TUI does all of this itself
@@ -200,6 +237,16 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.waiting = null;
   }
 
+  /**
+   * §57.10: another chat became current (true) — the token stays live, the PTY keeps running, its hooks answer fail-closed —
+   * or this chat is current again (false): the same object, the same token, nothing respawned.
+   */
+  setBackground(on: boolean): void {
+    if (this.background === on) return;
+    this.background = on;
+    this.touch();
+  }
+
   /** `terminal_started`: the PTY runs claude. */
   started(pid: number): void {
     this.pid = pid;
@@ -246,6 +293,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   async handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput> {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
+    if (this.background) return this.backgroundHook(input);
     this.hooksSeen = true;
     // `/clear` or `/resume` in the TUI: the conversation the next prompt runs in (or the one that ended) is the chat's from
     // now on — only from those two events, and only a UUID (the id goes into the next spawn's argv).
@@ -255,6 +303,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       this.opts.emit({ type: "terminal_session_id", sessionId: sid });
     }
     if (event !== "Notification") this.waiting = null;
+    this.noteTranscript(input.transcript_path);
     const mode = input.permission_mode;
     if (typeof mode === "string" && PERMISSION_MODES.has(mode)) this.ctx.permissionMode = mode as PermissionMode;
     try {
@@ -280,10 +329,56 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         case "Notification":
           this.onNotification(input);
           return {};
+        case "PermissionRequest":
+          return this.onPermissionRequest(input);
+        case "CwdChanged": {
+          // §57.12: the TUI's shell changed folder (a `cd`) — the engine tells whether that is another worktree.
+          const cwd = str(input.new_cwd);
+          if (cwd && isAbsolute(cwd)) this.opts.emit({ type: "terminal_cwd", cwd });
+          return {};
+        }
         case "SessionEnd":
           if (this.open) this.closeTurn("session_end");
           return {};
         default:
+          return {};
+      }
+    } finally {
+      this.touch();
+    }
+  }
+
+  /**
+   * §57.10: a hook while another chat is current — nothing of it may escape the review: prompts are blocked, write tools
+   * denied (the guard's deny first, so its reason wins), waits still raise attention; the session id and config dir are
+   * still followed. Everything else is answered `{}`.
+   */
+  private async backgroundHook(input: Record<string, unknown>): Promise<HookOutput> {
+    const event = input.hook_event_name;
+    this.hooksSeen = true;
+    const sid = event === "UserPromptSubmit" || event === "SessionEnd" ? input.session_id : undefined;
+    if (isCliSessionId(sid) && sid !== this.cliSessionId) {
+      this.cliSessionId = sid;
+      this.opts.emit({ type: "terminal_session_id", sessionId: sid });
+    }
+    if (event !== "Notification") this.waiting = null;
+    this.noteTranscript(input.transcript_path);
+    try {
+      switch (event) {
+        case "UserPromptSubmit":
+          return { decision: "block", reason: BACKGROUND_PROMPT_REASON };
+        case "PreToolUse": {
+          const guard = await this.guard(input);
+          if (guard?.decision === "deny") return preToolAnswer(guard);
+          return preToolAnswer({ decision: "deny", reason: BACKGROUND_TOOL_REASON });
+        }
+        case "PermissionRequest":
+          return this.onPermissionRequest(input);
+        case "Notification":
+          this.onNotification(input);
+          return {};
+        default:
+          this.opts.log("debug", `terminal (background): ${String(event)} answered {}`);
           return {};
       }
     } finally {
@@ -454,6 +549,35 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     if (this.waiting) this.opts.emit({ type: "terminal_attention", notificationType: type, message, ...(title ? { title } : {}) });
   }
 
+  /**
+   * §57.15 / §57.16: Claude Code shows a permission dialog — `waiting` at once (not after the Notification's 6 s). The TUI
+   * answers it; any later hook of the session clears the wait.
+   */
+  private onPermissionRequest(input: Record<string, unknown>): HookOutput {
+    const tool = str(input.tool_name) ?? "a tool";
+    const message = `Claude needs your permission to use ${tool}`;
+    this.waiting = { kind: "permission", message, since: new Date(this.now()).toISOString() };
+    this.opts.emit({ type: "terminal_attention", notificationType: "permission_request", message });
+    return {};
+  }
+
+  /**
+   * §57.16: every hook names its conversation's file, `<configDir>/projects/<key>/<id>.jsonl` — so the config dir the CLI
+   * really uses (the PTY's login shell may export its own CLAUDE_CONFIG_DIR). Taken only in that shape, absolute, with a
+   * `projects` directory there; a change emits `terminal_config_dir`. Read-only checks only ever use it.
+   */
+  private noteTranscript(raw: unknown): void {
+    if (typeof raw !== "string" || raw === this.lastTranscript) return;
+    this.lastTranscript = raw;
+    const dir = configDirOfTranscript(raw);
+    if (!dir || dir === this.configDir) return;
+    this.configDir = dir;
+    this.plansDir = join(dir, "plans");
+    this.ctx.plansDir = this.plansDir;
+    this.opts.log("info", `terminal: Claude Code's config dir is ${dir}`);
+    this.opts.emit({ type: "terminal_config_dir", dir });
+  }
+
   // ---- the turn
 
   private freshContext(): HookContext {
@@ -462,7 +586,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       cwd: this.opts.cwd,
       ignorePatterns: this.opts.ignorePatterns,
       autoAllowTools: new Set(),
-      ...(this.opts.plansDir ? { plansDir: this.opts.plansDir } : {}),
+      ...(this.plansDir ? { plansDir: this.plansDir } : {}),
       ...(this.opts.scratchDirs ? { scratchDirs: this.opts.scratchDirs } : {}),
       ...(this.opts.now ? { now: this.opts.now } : {}),
       readOnlyBash: new Set(),

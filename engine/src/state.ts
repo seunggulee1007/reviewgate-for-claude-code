@@ -310,7 +310,10 @@ export function buildState(s: EngineSlices): ReviewState {
     workbenches: { list: s.workbenches.list.map((w) => ({ ...w, locked: w.locked ? { ...w.locked } : null })), current: s.workbenches.current, managedRoot: s.workbenches.managedRoot },
     lockConflict: s.lockConflict ? { ...s.lockConflict } : null,
     commit: commitState(s),
-    sessions: { list: s.sessions.list.map((m) => ({ ...m })), currentId: s.sessions.currentId, openTabIds: [...s.sessions.openTabIds] },
+    sessions: {
+      list: s.sessions.list.map((m) => ({ ...m })), currentId: s.sessions.currentId, openTabIds: [...s.sessions.openTabIds],
+      ...(s.sessions.backgroundTerminals ? { backgroundTerminals: s.sessions.backgroundTerminals.map((b) => ({ ...b, waiting: b.waiting ? { ...b.waiting } : null })) } : {}), // §57.10
+    },
     ...(s.storage ? { storage: structuredClone(s.storage) } : {}), // MARK: wave4b w4b-bigturn (§39.1)
     ...(s.project && s.autoAcceptRules && anyAutoAcceptRule(s.autoAcceptRules) ? { autoAcceptRules: normalizeAutoAcceptRules(s.autoAcceptRules) } : {}), // MARK: wave4c w4c-trust (§41.2)
   };

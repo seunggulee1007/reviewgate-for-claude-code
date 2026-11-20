@@ -8748,8 +8748,28 @@ type TerminalSpecEvent = { type: "terminal_spec"; id?: string; sessionId: string
   resume: boolean };               // true: argv has --resume=<id>; false: --session-id=<id>
 type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
 type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
-  waiting: TerminalWaiting | null; interruptSuspected: boolean };
+  waiting: TerminalWaiting | null; interruptSuspected: boolean;
+  // Stage 2 — all optional, absent = none:
+  status?: TerminalStatus | null;              // §57.13: the TUI's last status line input (the statusLine tee)
+  requestQueued?: TerminalRequestQueued | null; // §57.14: a Request changes waiting to reach Claude
+  permissions?: TerminalPermission[];          // §57.15: dialogs the app may answer, oldest first
+  moving?: TerminalPlace | null;               // §57.12: the chat moves to another worktree — the app ends its PTY now
+  elsewhere?: TerminalElsewhere | null };      // §57.12: Claude Code works in another worktree — the strip offers the move
+type TerminalStatus = { costUsd: number | null; model: string | null; modelName: string | null;
+  contextTokens: number | null; contextWindow: number | null; at: string };
+type TerminalRequestQueued = { via: "stop" | "next_prompt"; noteIds: string[] | null; extra: string | null; at: string };
+type TerminalPermission = { requestId: string; toolName: string; summary: string; reason: string | null; since: string;
+  canFollow?: boolean };                       // EnterWorktree only: "Allow and follow" is offered
+type TerminalPlace = { path: string; name: string };
+type TerminalElsewhere = TerminalPlace & { toolName: "EnterWorktree" | "CwdChanged"; canMove: boolean };
+type BackgroundTerminalState = { chatId: string; running: boolean; hooksSeen: boolean; waiting: TerminalWaiting | null };
 // SessionState gains:  terminal?: TerminalSessionState | null   (null / absent for a chat-kind session)
+// SessionsState gains: backgroundTerminals?: BackgroundTerminalState[]   (§57.10; absent = none)
+// SessionMeta gains:   cliConfigDir?: string    (§57.16: the CLI config dir the terminal really uses; absolute)
+// Settings gains:      terminalPermissionBridge?: boolean   (§57.15; default true, live)
+terminal_request_cancel { sessionId }            // §57.14: unstages a Request changes; refused `no_request_queued`
+terminal_permission_response { sessionId; requestId; allow: boolean; message?: string; follow?: boolean }
+                                                 // §57.15: refused `permission_gone`, `follow_not_allowed`
 ```
 
 - **No new broadcast event.** `terminal_spec` is a reply only; everything else rides on `state.session.terminal` and the
@@ -8768,14 +8788,18 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
   turn; `cli_not_found` as elsewhere.
-- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
+- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands (nor `terminal_request_cancel` /
+  `terminal_permission_response`), so its renderer cannot send them.
+- **Stage 2 commands** reply `result`. `terminal_request_cancel` and `terminal_permission_response` are refused
+  `terminal_not_current` like the other `terminal_*` commands; their own refusals are in §57.14 and §57.15.
 
 ### 57.2 Lifecycle and resume
 
 - **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
   chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project` —
   the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
-  state). Such a session is never parked (§9.1): switching away stops it and retires its token.
+  state). Such a session is never parked (§9.1). Switching away keeps an idle, running one in the background (§57.10);
+  otherwise it stops and its token is retired.
 - **Spawn.** The app asks `terminal_spec {sessionId}` for the current chat (refused `terminal_not_current` otherwise),
   runs `argv` in its PTY with `env` and `cwd`, then sends `terminal_started {sessionId, pid}` (`running`; the pid is
   never reported as another Claude in the worktree, §31). `terminal_exited {sessionId, exitCode}` when the PTY ends: an
@@ -8813,8 +8837,10 @@ and hold no token:
 {"hooks":{
  "UserPromptSubmit":[{"hooks":[H(120,"block")]}],
  "PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(60,"block")]}],
- "PostToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(120)]}],
- "PostToolUseFailure":[{"matcher":"Bash","hooks":[H(120)]}],
+ "PermissionRequest":[{"hooks":[H(600)]}],          // §57.15: only for a client that answers it (the Mac app)
+ "PostToolUse":[{"hooks":[H(120)]}],
+ "PostToolUseFailure":[{"hooks":[H(120)]}],
+ "CwdChanged":[{"hooks":[H(10)]}],
  "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
  "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
 H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
@@ -8875,6 +8901,9 @@ chat's id);
 | Stop | The open turn ends: `turn_end {stopReason:"end_turn"}` (no usage, no budget) → snapshot B, the review. `background_tasks` it names go first, so the next turn keeps A (§52) | `{}` at once — the next prompt waits for the collection |
 | StopFailure | As Stop with `stopReason:"stop_failure:<error>"`, and a non-fatal `error {code:"api_error"}` | `{}` |
 | Notification | `permission_prompt` / `agent_needs_input` → `waiting {kind:"permission"}`; `elicitation_dialog` → `{kind:"question"}`; `idle_prompt` ends an open turn (`interrupted`) | `{}` |
+| PermissionRequest (every tool; §57.15) | `waiting {kind:"permission"}` at once, `terminal_attention`; the bridge (§57.15) offers it to the app | `{}` (the TUI's dialog), or the app's allow / deny |
+| PostToolUse / PostToolUseFailure (any other tool) | Nothing of the turn; like every hook it clears `waiting` (§57.16) | `{}` |
+| CwdChanged (§57.12) | `new_cwd` (absolute) → the engine's `elsewhere` offer | `{}` |
 | SessionEnd | An open turn ends (`session_end`) | `{}` |
 
 - **Adopting a prompt** mirrors `send` without sending: the collection in flight first (bounded by 100 s, under the
@@ -8882,13 +8911,15 @@ chat's id);
   (kept while a review stands — the prompt answers it, as a question during a review does in a chat), the review summary
   and unsent notes as `additionalContext` (a prompt starting with "/" keeps them for the next one; a summary whose prompt
   no longer waited for the answer — blocked meanwhile, the CLI gave up — or whose turn could not start is put back, so
-  the next prompt carries it), the `user_message`
+  the next prompt carries it; a path decided again since — accepted, rejected or partly rejected — keeps only the newer
+  decision, so it is never listed both Accepted and Rejected), the `user_message`
   row and the title. The PreToolUse hook gets the turn's tree for Bash attribution. Any failure blocks the prompt with
   the reason.
 - **One prompt at a time.** A UserPromptSubmit that comes while the previous one is still waiting (the CLI gave up on it,
   a forged hook) blocks the earlier one at once (the session's timeout reason). The engine adopts prompts one after the
   other: the later one waits for the adoption in flight within its own budget (100 s), else it is blocked ("ReviewGate is
-  still starting the review of your previous prompt. Send this one again in a moment."). Each `terminal_prompt` carries a
+  still starting the review of your previous prompt. Send this one again in a moment."). An adoption that never settles
+  holds the queue at most 10 s past its own deadline (logged warn; that prompt was already blocked by its own timer). Each `terminal_prompt` carries a
   sequence number and the engine answers that number: an answer reaches only its own prompt; one whose prompt no longer
   waits takes the late path (an ok ends the turn it opened at once, `prompt_timeout`).
 - **Esc gives no Stop** (Claude Code does not run Stop on a user interrupt). An interrupted turn stays running —
@@ -9145,6 +9176,49 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   (`continueAsTerminalBlocker`): a record, no conversation yet, files waiting in the review, Claude working. Over the
   record a teal bar: "이 대화는 터미널 채팅 '<title>'에서 이어져요 — 이 채팅은 기록으로 남아요" with [열기] (opens the terminal
   chat). A refusal is a non-fatal row in those words.
+
+### 57.10 Background terminals
+
+A switch away from a terminal chat no longer ends its Claude Code. The engine keeps the chat's `TerminalSession` and its
+live token in a per-window map; the PTY keeps running, so the TUI's unsent input and scrollback stay. Switching back
+makes the same object current again: no `terminal_spec`, no new token, no respawn.
+
+- **When.** On a switch (`session_new`, `session_open`, `session_continue_terminal`, a record opened), the current terminal
+  chat goes to the background when all hold: the client runs background terminals (`terminalFeature("background")`: the
+  Mac app; a capability can open it to others later), `terminal.running`, no review turn open, the gate neither running,
+  collecting nor reverting, no prompt being adopted, no turn of another CLI being taken, the chat not a record. Otherwise
+  the switch stops it and retires its token as before.
+- **Fail-closed hooks.** In the background a hook gets: UserPromptSubmit → `{decision:"block", reason}` ("This terminal
+  chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in ReviewGate and send
+  it again."); PreToolUse (the write tools) → the guard's deny when it denies (§57.8), else `permissionDecision:"deny"`
+  ("ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the
+  user switches back to this chat."); PermissionRequest → `{}` (the TUI answers) and `waiting`; Notification → `waiting`
+  as in §57.4; every other event `{}`. `/clear` / `/resume` (`session_id`) and the config dir (§57.16) are still
+  followed, for that chat. Nothing reaches the review; no turn opens.
+- **State.** `state.sessions.backgroundTerminals: [{chatId, running, hooksSeen, waiting}]` (absent when none). The app
+  raises attention from a background `waiting` as from the current chat's.
+- **Ends** (the token retired; the app ends the PTY when the entry disappears): `terminal_exited {sessionId}` for that
+  chat (its tab closed, the app's cap), `session_delete`, `open_project` / `switch_project`, `close_project`, the engine's
+  disposal, and a switch to that chat when it became a record. The engine has no cap; the app keeps at most four.
+- **pids.** A background terminal's claude pid is never "another Claude in this worktree" (§31).
+- **Risk.** A background task or an MCP tool of the background terminal can still write files: those are tree changes,
+  shown in the current window's review as external changes (§31) — not hidden, but not reviewed under that chat.
+
+### 57.16 Hook coverage, proxy and config dir
+
+- **Every tool's PostToolUse.** PostToolUse and PostToolUseFailure carry no matcher: after a WebFetch or MCP dialog the
+  next hook clears `waiting` at once (it stayed set until the next write tool or Stop before). Tools that are neither edit
+  tools nor Bash add nothing to the turn. A user's "No" in the TUI's dialog sends no hook until Stop, which clears it.
+  Cost: one local round trip per tool call (about 1 ms).
+- **PermissionRequest** is registered (no matcher, `H(600)`, no `onFailure`) only for a client that answers bridged
+  dialogs (`terminalFeature("permissionBridge")`: the Mac app); it sets `waiting` at once (§57.15).
+- **CwdChanged** (`H(10)`) reports a `cd` of the TUI's shell (`terminal_cwd`, §57.12). It has no decision.
+- **Config dir.** The PTY's login shell can export its own `CLAUDE_CONFIG_DIR`. Every hook carries `transcript_path` =
+  `<configDir>/projects/<key>/<uuid>.jsonl`; the session takes `<configDir>` from it when it has exactly that shape, is
+  absolute and `<configDir>/projects` is a directory, and when it changed emits it — persisted as `SessionMeta.cliConfigDir`.
+  `terminal_spec` then reads both dirs: refused `terminal_hooks_disabled` when either says hooks are off; the conversation
+  is "gone" (§57.2) only when no dir has the record and each says gone; plan files are under the learned dir's `plans`.
+  A forged path only feeds read-only checks, and only makes them stricter.
 
 ## 58. Accept N & Continue
 
