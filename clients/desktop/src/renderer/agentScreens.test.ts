@@ -362,7 +362,7 @@ describe("§36 agents (wave3 desktop-agents)", () => {
     expect(html).toContain('data-testid="Agent sheet report"');
     expect(html).toContain("쿠폰 코드 사용처 14곳");
     expect(html).toContain("메인으로 보내기");
-    expect(html).toContain("곁질문으로 묻기");
+    expect(html).toContain("Side question으로 묻기");
     expect(html).toContain("rg couponCode");
     expect(html).toContain("14.8k 토큰");
     expect(html).toContain("8분 11초");

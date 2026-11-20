@@ -2,7 +2,7 @@
  * "Why did this change": under the diff header, the tool calls that touched the file this turn
  * (`ChangedFile.toolUseIds` → transcript rows) with their short input, the assistant text that preceded
  * each call (`rationale`) and the subagent that made it; clicking one scrolls the conversation to it.
- * Without any recorded call the section stays: "원인 기록 없음 — 곁질문으로 물어보기", or for a change made outside the
+ * Without any recorded call the section stays: "원인 기록 없음 — side question으로 물어보기", or for a change made outside the
  * app (§31 `origin: "external"`) "앱 밖 변경 — Claude가 바꾸지 않았을 수 있음".
  * MARK: wave2 desktop-diff — §34.8 `changedFiles[].why` on top (the header line while folded): the engine's best
  * explanation with its source (Claude 보고 / the call's own sentence / dimmed "앞선 설명" / 원인 기록 없음), the subagent

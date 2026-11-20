@@ -4,7 +4,7 @@ import ReviewGateCore
 // MARK: wave3 mac-flow
 // docs/PROTOCOL.md §36.13 on the Mac: "AI pre-review" in the Changes head (a read-only side session runs /code-review on this
 // round; "사전 리뷰 중… / 지적 N개 / 실패: 이유", cancel), a badge per file, a mark on the diff line and an inline card with
-// "노트로 추가 / 곁질문 / 무시". The main chat's own ReportFindings show the same way. Nothing here changes a file: "Add as
+// "노트로 추가 / side question / 무시". The main chat's own ReportFindings show the same way. Nothing here changes a file: "Add as
 // note" is an ordinary review note (sent with Request changes), "Ask in a side thread" an ordinary side question.
 
 /// The Changes head's row: the button (with the effort and "this file only") and the status of the latest run.

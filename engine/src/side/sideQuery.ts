@@ -40,7 +40,7 @@ export const SIDE_WEB_TOOLS: ReadonlySet<string> = new Set(["WebFetch", "WebSear
 export const SIDE_REPORT_TOOLS: ReadonlySet<string> = new Set(["ReportFindings"]);
 
 export const SIDE_READ_ONLY_REASON =
-  "ReviewGate: this is a side question (곁질문) — a read-only Q&A next to the main conversation. Files may not be changed and " +
+  "ReviewGate: this is a side question — a read-only Q&A next to the main conversation. Files may not be changed and " +
   "no mutating commands, writing MCP tools or agents other than Explore may run here. Answer with read-only tools, and propose " +
   "any change in text (file, line, what to change); the user can send it to the main conversation.";
 
@@ -49,7 +49,7 @@ export const SIDE_READ_ONLY_REASON =
  * thread marks the call `denied`); the clients offer [메인 대화로 보내기] for a thread whose answer has a denied Skill call.
  */
 export const SIDE_SKILL_REASON =
-  "ReviewGate: this is a side question (곁질문) — skills and slash commands run in the main conversation, never here. Do not " +
+  "ReviewGate: this is a side question — skills and slash commands run in the main conversation, never here. Do not " +
   "imitate the skill: tell the user in one sentence that it runs in the main conversation (the side panel offers to send " +
   "the request there), and answer only what can be answered by reading.";
 
@@ -58,7 +58,7 @@ export const SIDE_SKILL_REASON =
  * allow rules. Starts like `SIDE_READ_ONLY_REASON` (the thread marks the call `denied` by that prefix).
  */
 export const SIDE_WEB_OFF_REASON =
-  "ReviewGate: this is a side question (곁질문) — the web is off here (ReviewGate Settings › Side questions), or this site is not " +
+  "ReviewGate: this is a side question — the web is off here (ReviewGate Settings › Side questions), or this site is not " +
   "in the user's Claude Code allow rules. Answer from the code and the conversation; name the page instead of opening it.";
 
 /** §40.3: a web call the side session may make without "any site" (`SideQueryOptions.webAllowed`). */
@@ -98,7 +98,7 @@ function sideMcpReads(toolName: string, input: Record<string, unknown>, opts: { 
 }
 
 export const SIDE_SYSTEM_PROMPT =
-  "You are answering a side question (곁질문) about the coding session above, in a separate read-only thread. " +
+  "You are answering a side question about the coding session above, in a separate read-only thread. " +
   "The main conversation continues independently and does not see this thread. Do not modify files, run mutating " +
   "commands or start agents — those calls are refused. Read code with read-only tools if needed and answer concisely. " +
   "If a change would help, describe it precisely in text (file, line, what to change) instead of making it.";

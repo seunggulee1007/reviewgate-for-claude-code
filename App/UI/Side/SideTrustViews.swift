@@ -75,7 +75,7 @@ struct SideQuoteHeader: View {
     }
 }
 
-/// Right-click on Claude's answer → "곁질문으로 묻기" about the whole answer (SwiftUI text gives no selection to a menu; the
+/// Right-click on Claude's answer → "side question으로 묻기" about the whole answer (SwiftUI text gives no selection to a menu; the
 /// thread quotes the answer). Disabled while another chat is shown read-only: its question would go to the running chat.
 struct AskQuoteMenuItem: View {
     @Environment(AppState.self) private var store

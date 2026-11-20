@@ -12,7 +12,7 @@ import type { ToolCallInfo } from "../review/summary.js";
 export const MAX_CONTEXT_HUNK_LINES = 200;
 export const MAX_CONTEXT_DIFF_LINES = 160;
 export const MAX_CONTEXT_CALLS = 3;
-export const SIDE_PROMPT_HEADER = "[Side question (곁질문) — read-only thread next to the main conversation]";
+export const SIDE_PROMPT_HEADER = "[Side question — read-only thread next to the main conversation]";
 
 export type AnchorData = {
   anchor: SideAnchor | null;
@@ -106,7 +106,7 @@ export const QUOTE_MAX = 2000;
 /** §40.3: the thread's earlier Q&A a new fork gets is cut to this many chars (oldest dropped first). */
 export const EARLIER_MAX = 8000;
 /** §40.3: what a side session is called in the CLI's session list (`claude --resume`). */
-export const SIDE_SESSION_TITLE_PREFIX = "[곁질문] ";
+export const SIDE_SESSION_TITLE_PREFIX = "[side question] ";
 
 /** §40.3: a well-formed `SideAnchor.quote` (text trimmed, cut at `QUOTE_MAX`; a bad `turn` becomes null), else null. */
 export function normalizeQuoteAnchor(raw: unknown): SideQuoteAnchor | null {
@@ -118,7 +118,7 @@ export function normalizeQuoteAnchor(raw: unknown): SideQuoteAnchor | null {
   return { text: text.length > QUOTE_MAX ? text.slice(0, QUOTE_MAX - 1) + "…" : text, turn };
 }
 
-/** §40.3: `[곁질문] <the question's first line>` (the thread title, ≤ 60 chars). */
+/** §40.3: `[side question] <the question's first line>` (the thread title, ≤ 60 chars). */
 export function sideSessionTitle(threadTitle: string): string {
   return SIDE_SESSION_TITLE_PREFIX + (threadTitle.trim() || "…");
 }
@@ -219,7 +219,7 @@ export const PROMOTE_DRAFT_PROMPT =
   "lines. Write only the instruction (a few sentences or a short list), no preamble, no greeting; in the language the " +
   "user used in this thread. If nothing should change, say so in one sentence.";
 
-export const PROMOTE_PROVENANCE = "(곁질문에서 정리됨)";
+export const PROMOTE_PROVENANCE = "(side question에서 정리됨)";
 
 /** A compact preview of a tool call's input (edit tools: the strings cut) for the anchor context, ≤ 600 chars. */
 export function summarizeInput(input: Record<string, unknown>): string | undefined {

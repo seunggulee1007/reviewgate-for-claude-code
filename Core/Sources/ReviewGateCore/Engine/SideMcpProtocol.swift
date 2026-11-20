@@ -1,6 +1,6 @@
 import Foundation
 
-// Wire types of docs/PROTOCOL.md §21 (side questions, "곁질문") and §22 (MCP servers), engine/src/protocol.ts.
+// Wire types of docs/PROTOCOL.md §21 (side questions, "side question") and §22 (MCP servers), engine/src/protocol.ts.
 // Every decoder is lenient — missing fields default, unknown enum values fall back — so a newer engine never makes
 // an event undecodable.
 

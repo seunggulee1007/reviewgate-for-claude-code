@@ -160,7 +160,7 @@ describe("the agent board (§43.1)", () => {
     expect(html).toContain('data-testid="Agent board tab agents"');
     expect(html).toContain('data-testid="Agent board tab brain"');
     expect(html).toContain('data-testid="Agent board tab graph"');
-    expect(html).toContain("관제판");
+    expect(html).toContain("Agent Board");
     expect(html).toContain("열기/닫기 Ctrl+Alt+B");
     const brain = await render("./components/board/SubBrainBoard");
     expect(brain).toContain('data-testid="sub-brain"');

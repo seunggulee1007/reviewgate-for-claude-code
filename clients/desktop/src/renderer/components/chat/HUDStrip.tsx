@@ -107,7 +107,7 @@ function AgentsChip() {
   );
 }
 
-/** §21: "곁질문 $0.03" — side questions cost apart from the session; toggles the side panel (⌥⌘/ asks about the selection). */
+/** §21: "side question $0.03" — side questions cost apart from the session; toggles the side panel (⌥⌘/ asks about the selection). */
 function SideChip() {
   const open = useStore((s) => s.sidePanelOpen);
   const toggle = useStore((s) => s.toggleSidePanel);

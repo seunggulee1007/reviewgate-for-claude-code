@@ -73,7 +73,7 @@ describe("web tools in side questions (audit SME-08)", () => {
     expect(sideToolDenyReason("WebFetch", { url: "https://docs.spring.io/x" }, { allowWeb: false, webAllowed: (t, i) => t === "WebFetch" && String(i.url).includes("spring.io") })).toBeUndefined();
     expect(sideToolDenyReason("WebFetch", { url: "https://evil.example/?q=code" }, { allowWeb: false, webAllowed: (t, i) => t === "WebFetch" && String(i.url).includes("spring.io") })).toBe(SIDE_WEB_OFF_REASON);
     // The thread marks a refusal `denied` by the read-only reason's opening words.
-    expect(SIDE_WEB_OFF_REASON.startsWith(SIDE_READ_ONLY_REASON.slice(0, 40))).toBe(true);
+    expect(SIDE_WEB_OFF_REASON.startsWith(SIDE_READ_ONLY_REASON.slice(0, 38))).toBe(true);
     // Nothing else widens.
     expect(sideToolDenyReason("Edit", { file_path: "/x" }, { allowWeb: true, webAllowed: () => true })).toBe(SIDE_READ_ONLY_REASON);
   });
@@ -155,14 +155,14 @@ describe("web tools in side questions (audit SME-08)", () => {
 });
 
 describe("side session files (audit SME-06)", () => {
-  it("names a new fork '[곁질문] …'; closing the thread deletes its session file — never the main one", async () => {
+  it("names a new fork '[side question] …'; closing the thread deletes its session file — never the main one", async () => {
     const { h, deleted, renamed } = host(() => ({ text: "answer" }));
     const side = new SideThreads(h);
     await side.load("main-1");
     const t = await side.ask(undefined, null, "왜 이 매퍼를 바꿨어?");
     const done = await answered(side, t.id);
     expect(done.sessionId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(renamed).toEqual([[done.sessionId!, "[곁질문] 왜 이 매퍼를 바꿨어?"]]);
+    expect(renamed).toEqual([[done.sessionId!, "[side question] 왜 이 매퍼를 바꿨어?"]]);
     // A follow-up resumes: no second rename.
     await side.ask(t.id, null, "그럼 테스트는?");
     await answered(side, t.id);
@@ -349,6 +349,6 @@ describe("quote anchors and earlier Q&A (audit SME-12, SME-07)", () => {
     expect(b).toContain("Q: q1");
     expect(b).toContain("A: a1");
     expect(b).toMatch(/out of date/);
-    expect(sideSessionTitle("  ")).toBe("[곁질문] …");
+    expect(sideSessionTitle("  ")).toBe("[side question] …");
   });
 });

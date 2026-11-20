@@ -161,7 +161,7 @@ export function PRDiffPane() {
             path={file.filename} /* MARK: wave2 desktop-diff — 경로:줄 복사 */
             context={context} /* MARK: wave4c w4c-review — 20줄 더 보기 (its lines are outside the PR's diff: no comment / side question) */
             revealedActions={false}
-            // MARK: wave3 desktop-flow — §36.14: "곁질문으로 묻기" on a PR line (the "?" gutter and the right-click menu)
+            // MARK: wave3 desktop-flow — §36.14: "side question으로 묻기" on a PR line (the "?" gutter and the right-click menu)
             onAsk={askLine ? (line) => askLine(line) : undefined}
             lineMenuItems={(line) => line.id < 0 ? [] /* MARK: wave4c w4c-review — a revealed line is outside the PR's diff */ : [
               askLine

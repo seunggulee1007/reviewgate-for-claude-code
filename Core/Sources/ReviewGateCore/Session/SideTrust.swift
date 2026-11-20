@@ -115,7 +115,7 @@ public enum SideTrust {
             .text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// "곁질문으로 묻기" on Claude's answer: `SideAnchor(quote:)`, trimmed and cut; nil for blank text.
+    /// "side question으로 묻기" on Claude's answer: `SideAnchor(quote:)`, trimmed and cut; nil for blank text.
     public static func quoteAnchor(_ text: String, turn: Int?) -> SideAnchor? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// §21 entry points shared by the review surfaces: the small "왜?" capsule, the "곁질문 N" badge and the context-menu
+/// §21 entry points shared by the review surfaces: the small "왜?" capsule, the "side question N" badge and the context-menu
 /// items. All of them hide on an engine without side questions.
 
 /// One click: asks the default "why" question about `anchor` in the side panel (the main conversation is untouched).
@@ -38,7 +38,7 @@ struct AskWhyButton: View {
     }
 }
 
-/// "곁질문 2": threads anchored here; a click opens the newest one.
+/// "side question 2": threads anchored here; a click opens the newest one.
 struct SideBadge: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store

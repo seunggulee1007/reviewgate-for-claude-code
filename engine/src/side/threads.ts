@@ -10,7 +10,7 @@ import { earlierBlock, PROMOTE_DRAFT_PROMPT, sideSessionTitle, summarizeInput } 
 import { SIDE_READ_ONLY_REASON, SideQuery, type SideQueryEvent, type SideQueryOptions, type SideQueryResult } from "./sideQuery.js";
 
 /**
- * Side threads ("곁질문", docs/PROTOCOL.md §21): per main chat, persisted in
+ * Side threads ("side question", docs/PROTOCOL.md §21): per main chat, persisted in
  * `<gitdir>/reviewgate/side/<mainSessionId>.json`, each question run by its own `SideQuery`.
  */
 

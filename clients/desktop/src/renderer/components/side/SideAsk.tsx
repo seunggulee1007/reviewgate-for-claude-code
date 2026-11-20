@@ -1,6 +1,6 @@
 /**
  * Entry points of the side questions (docs/PROTOCOL.md §21): the small "왜?" button that opens the side panel on a
- * new question about an anchor, and the "곁질문 N" badge on a file / hunk / tool row that already has threads.
+ * new question about an anchor, and the "side question N" badge on a file / hunk / tool row that already has threads.
  */
 import { useCallback, useMemo, type MouseEvent, type ReactNode } from "react";
 import type { DiffHunk, DiffLine, SideAnchor, SideThread } from "@reviewgate/engine";
@@ -94,7 +94,7 @@ export function AskButton(props: {
   );
 }
 
-/** "곁질문 2" — opens the newest thread (or the list when there are several on the same anchor). */
+/** "side question 2" — opens the newest thread (or the list when there are several on the same anchor). */
 export function SideBadge({ threads, testId }: { threads: SideThread[]; testId?: string }) {
   const open = useStore((s) => s.openSideThread);
   const showList = useStore((s) => s.showSideList);

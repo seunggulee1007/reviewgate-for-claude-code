@@ -2,7 +2,7 @@ import SwiftUI
 import ReviewGateCore
 
 // MARK: wave5 w5-board
-// docs/PROTOCOL.md §43.1 — the agent board ("관제판"): one window per project window (Window › Agent Board, ⌥⌘B) with three
+// docs/PROTOCOL.md §43.1 — the agent board ("Agent Board"): one window per project window (Window › Agent Board, ⌥⌘B) with three
 // tabs — agents (`AgentBoardView`), sub-brain (`SubBrainBoardView`, w5-brain) and code graph (`CodeGraphBoardView`, w5-graph).
 // Each tab view takes no arguments and reads the project's state from the environment. The tab is remembered per project.
 

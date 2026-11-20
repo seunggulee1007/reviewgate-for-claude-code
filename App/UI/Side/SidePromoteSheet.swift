@@ -50,8 +50,8 @@ struct SidePromoteSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(focused ? Color.teal.opacity(0.6) : Color.secondary.opacity(0.2)))
                     .focused($focused)
                     .accessibilityIdentifier("Promote text")
-                Text(isMessage ? "Written by the side session as an instruction for Claude — edit it freely. “(곁질문에서 정리됨)” is added at the end."
-                               : "Becomes a note for “Request changes”. “(곁질문에서 정리됨)” is added at the end.")
+                Text(isMessage ? "Written by the side session as an instruction for Claude — edit it freely. “(side question에서 정리됨)” is added at the end."
+                               : "Becomes a note for “Request changes”. “(side question에서 정리됨)” is added at the end.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

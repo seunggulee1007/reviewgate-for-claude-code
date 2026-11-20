@@ -1,4 +1,4 @@
-/* MARK: wave5 w5-board — §43.1 the agent board ("관제판") and the avatars. The tones are the Mac's Core `AgentAvatarTone`
+/* MARK: wave5 w5-board — §43.1 the agent board ("Agent Board") and the avatars. The tones are the Mac's Core `AgentAvatarTone`
    (engine/test/fixtures/agentAvatars.json; agentAvatar.test.ts checks these three blocks against it). */
 :root {
   --av-coral: #D2603F;

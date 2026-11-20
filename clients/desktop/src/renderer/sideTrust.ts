@@ -59,7 +59,7 @@ export function reforkQuestion(th: Pick<SideThread, "messages"> | undefined, typ
 /** §40.3: a quoted passage is cut here (the engine cuts at the same length). */
 export const QUOTE_MAX = 2000;
 
-/** "곁질문으로 묻기" on selected text of Claude's answer: `{quote: {text, turn}}`, or null for an empty selection. */
+/** "side question으로 묻기" on selected text of Claude's answer: `{quote: {text, turn}}`, or null for an empty selection. */
 export function quoteAnchor(selection: string, turn: number | null | undefined): SideAnchor | null {
   const text = selection.replace(/\s+$/g, "").replace(/^\s+/g, "");
   if (!text) return null;

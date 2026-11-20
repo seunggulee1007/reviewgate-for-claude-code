@@ -219,7 +219,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item: shown }: 
     return (
       <div className={`msg assistant md${cls}`} data-testid="Assistant message">
         {badge}
-        <QuotableMarkdown itemId={item.id} text={item.text} />{/* MARK: wave4b w4b-side — §40.3 right-click → 곁질문으로 묻기 */}
+        <QuotableMarkdown itemId={item.id} text={item.text} />{/* MARK: wave4b w4b-side — §40.3 right-click → side question으로 묻기 */}
       </div>
     );
   }

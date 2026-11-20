@@ -111,7 +111,7 @@ struct WhyChangedSection: View {
                 .font(.caption)
                 .lineLimit(2)
             Spacer(minLength: 4)
-            // wave4b w4b-files (comp-13): an outside change can be asked about too, as on Electron ("원인 기록 없음 — 곁질문").
+            // wave4b w4b-files (comp-13): an outside change can be asked about too, as on Electron ("원인 기록 없음 — side question").
             AskWhyButton(anchor: SideAnchor(path: file.path))
         }
         .foregroundStyle(.secondary)

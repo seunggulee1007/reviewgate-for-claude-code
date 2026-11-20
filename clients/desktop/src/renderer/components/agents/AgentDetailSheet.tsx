@@ -2,7 +2,7 @@
  * MARK: wave3 desktop-agents — the agent details sheet (docs/PROTOCOL.md §36.1, audit agents-02 / agents-06), opened from the
  * agent card, the chat's group head and the HUD's agent list: what the subagent was told (지시, markdown folded to 3 lines,
  * "전체 보기"), what it reported (보고서: the whole cleaned report from `agent_report` — also after the next turn and a
- * restart —, copy / 메인으로 보내기 / 곁질문으로 묻기), its tool calls (click → the call in the conversation), the files it
+ * restart —, copy / 메인으로 보내기 / side question으로 묻기), its tool calls (click → the call in the conversation), the files it
  * changed (click → the diff) and its usage and model. While it runs: ■ 이 에이전트 중지. An engine before §36 has no
  * `agent_report`: the sheet shows what the transcript has (the Agent call's prompt, the result's preview) without saying more.
  */
@@ -180,7 +180,7 @@ function Instructions({ text }: { text: string }) {
   );
 }
 
-/** 보고서: the whole cleaned report (or what the transcript has), copy / 메인으로 보내기 / 곁질문으로 묻기. */
+/** 보고서: the whole cleaned report (or what the transcript has), copy / 메인으로 보내기 / side question으로 묻기. */
 function ReportSection({ view, text, load, onClose }: { view: AgentView; text: string; load: ReportLoad; onClose: () => void }) {
   const askAbout = useStore((s) => s.askAbout);
   const terminal = useStore((s) => liveTerminalChatId(s.state) !== null); // §57.7

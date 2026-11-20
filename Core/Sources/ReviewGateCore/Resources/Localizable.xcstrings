@@ -892,7 +892,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 %lld개가 멈춰요"
+            "value": "Side question %lld개가 멈춰요"
           }
         }
       }
@@ -1452,7 +1452,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 답이 아직 오는 중이에요(%lld개). 채팅을 바꾸면 답이 끊겨요. 그래도 바꿀까요?"
+            "value": "Side question 답이 아직 오는 중이에요(%lld개). 채팅을 바꾸면 답이 끊겨요. 그래도 바꿀까요?"
           }
         }
       }
@@ -2284,7 +2284,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문을 빠르게 해요 — Claude는 하던 일을 계속하고, 답은 대화에 남지 않아요"
+            "value": "Side question을 빠르게 해요 — Claude는 하던 일을 계속하고, 답은 대화에 남지 않아요"
           }
         }
       }
@@ -3148,7 +3148,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 곁질문에 답하지 못했어요"
+            "value": "Claude가 side question에 답하지 못했어요"
           }
         }
       }
@@ -3164,7 +3164,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 곁질문에 답하지 못했어요: %@"
+            "value": "Claude가 side question에 답하지 못했어요: %@"
           }
         }
       }
@@ -4754,7 +4754,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "읽은 코드가 밖으로 나갈 수 있어요. 곁질문이 여는 페이지 주소에 코드가 실릴 수 있어요."
+            "value": "읽은 코드가 밖으로 나갈 수 있어요. side question이 여는 페이지 주소에 코드가 실릴 수 있어요."
           }
         }
       }
@@ -6498,7 +6498,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아직 곁질문 답이 없어요 — /btw 뒤에 질문을 적어요"
+            "value": "아직 side question 답이 없어요 — /btw 뒤에 질문을 적어요"
           }
         }
       }
@@ -6770,7 +6770,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "공백 무시 보기예요 — 부분 되돌리기·메모·줄 곁질문은 일반 보기에서 할 수 있어요"
+            "value": "공백 무시 보기예요 — 부분 되돌리기·메모·줄 side question은 일반 보기에서 할 수 있어요"
           }
         }
       }
@@ -7298,7 +7298,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "줄 곁질문은 ‘전체’ 보기에서 할 수 있어요"
+            "value": "줄 side question은 ‘전체’ 보기에서 할 수 있어요"
           }
         }
       }
@@ -7874,7 +7874,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "앱에서는 mod 화면이 보이지 않아요 — 같은 정보는 관제판에 있어요"
+            "value": "앱에서는 mod 화면이 보이지 않아요 — 같은 정보는 Agent Board에 있어요"
           }
         }
       }
@@ -8450,7 +8450,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "원인 기록 없음 — 곁질문으로 물어보기"
+            "value": "원인 기록 없음 — side question으로 물어보기"
           }
         }
       }
@@ -11582,7 +11582,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 답변 완료"
+            "value": "Side question 답변 완료"
           }
         }
       }
@@ -11598,7 +11598,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 실패"
+            "value": "Side question 실패"
           }
         }
       }
@@ -11614,7 +11614,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문은 코드와 대화만 보고 답해요."
+            "value": "Side question은 코드와 대화만 보고 답해요."
           }
         }
       }
@@ -13646,7 +13646,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문이 실패했습니다: %@"
+            "value": "Side question이 실패했습니다: %@"
           }
         }
       }
@@ -14686,7 +14686,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "메인 대화에서만 실행돼요 — 곁질문은 스킬과 명령을 실행하지 못해요 (%@)"
+            "value": "메인 대화에서만 실행돼요 — side question은 스킬과 명령을 실행하지 못해요 (%@)"
           }
         }
       }
@@ -14750,7 +14750,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 곁질문은 파일에 대한 것이 아니라 리뷰 메모로 추가할 수 없습니다"
+            "value": "이 side question은 파일에 대한 것이 아니라 리뷰 메모로 추가할 수 없습니다"
           }
         }
       }
@@ -14766,7 +14766,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 곁질문은 아직 답변 중입니다 — 기다리거나 먼저 중지하세요"
+            "value": "이 side question은 아직 답변 중입니다 — 기다리거나 먼저 중지하세요"
           }
         }
       }
@@ -14782,7 +14782,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 곁질문은 더 이상 없습니다"
+            "value": "이 side question은 더 이상 없습니다"
           }
         }
       }
@@ -14910,7 +14910,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 3개가 이미 답변 중입니다 — 하나가 끝날 때까지 기다리세요"
+            "value": "Side question 3개가 이미 답변 중입니다 — 하나가 끝날 때까지 기다리세요"
           }
         }
       }
@@ -14926,7 +14926,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "곁질문 세션이 너무 많이 실행 중입니다 — 하나가 끝나면 다시 시도하세요"
+            "value": "Side question 세션이 너무 많이 실행 중입니다 — 하나가 끝나면 다시 시도하세요"
           }
         }
       }

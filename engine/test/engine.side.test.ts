@@ -143,7 +143,7 @@ describe("side read-only policy (§21)", () => {
     expect(sideToolDenyReason("Agent", { subagent_type: "general-purpose" }, mcp)).toBe(SIDE_READ_ONLY_REASON);
     expect(sideToolDenyReason("Skill", { skill: "acme-verify" }, mcp)).toBe(SIDE_SKILL_REASON);
     // Both refusals start alike: the thread marks the call denied by that prefix.
-    expect(SIDE_SKILL_REASON.slice(0, 40)).toBe(SIDE_READ_ONLY_REASON.slice(0, 40));
+    expect(SIDE_SKILL_REASON.slice(0, 38)).toBe(SIDE_READ_ONLY_REASON.slice(0, 38));
     // The reads the plan saw refused (r2 M18): a PR lookup, a log with its errors dropped, a `cd` into the project first —
     // judged where they run, as the main session's read-only commands (§19.3).
     const root = makeRepo();

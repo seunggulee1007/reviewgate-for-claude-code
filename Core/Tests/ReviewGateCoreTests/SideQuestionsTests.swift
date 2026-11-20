@@ -266,7 +266,7 @@ import Testing
         app.side.queueDraft(text: "편집한 지시")
         #expect(app.side.draft == nil)
         #expect(app.side.queuedThreadIds == ["t1"])
-        #expect(app.queuedMessages.map(\.text) == ["편집한 지시\n\n(곁질문에서 정리됨)"])
+        #expect(app.queuedMessages.map(\.text) == ["편집한 지시\n\n(side question에서 정리됨)"])
     }
 
     @Test func noteRefusalIsShownAndSuccessClosesTheSheet() async throws {

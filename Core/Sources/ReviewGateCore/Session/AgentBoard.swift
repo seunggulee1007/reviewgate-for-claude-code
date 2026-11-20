@@ -1,7 +1,7 @@
 import Foundation
 
 // MARK: wave5 w5-board
-// docs/PROTOCOL.md §43.1 — the agent board ("관제판"): a window per project window with three tabs (agents, sub-brain, code
+// docs/PROTOCOL.md §43.1 — the agent board ("Agent Board"): a window per project window with three tabs (agents, sub-brain, code
 // graph) that remembers its place and tab, and the agents tab's one-line summary ("지금 3명 일하는 중 · 1명 권한 대기 ·
 // 오늘 12명 다녀감"). Electron's `renderer/agentAvatar.ts` (`boardSummary`) counts the same way.
 

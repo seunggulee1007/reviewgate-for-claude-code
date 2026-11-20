@@ -1,5 +1,5 @@
 /**
- * Side questions ("곁질문", docs/PROTOCOL.md §21) — the pure part of the client state, unit-tested: the current
+ * Side questions ("side question", docs/PROTOCOL.md §21) — the pure part of the client state, unit-tested: the current
  * chat's threads keyed by id, the answer that is still streaming (`side_text_delta` / `side_tool_use` /
  * `side_tool_result` until the thread's next `side_thread` snapshot), anchors in words, badge counts per file /
  * hunk, the matching tool row of a permission card, promote refusals and the background notification.
@@ -212,7 +212,7 @@ export function promoteRecovery(as: PromoteAs, code: string): PromoteRecovery {
 }
 
 /** The suffix the engine appends; the queued fallback adds the same so the main agent sees where it came from. */
-export const PROMOTE_SUFFIX = "\n\n(곁질문에서 정리됨)";
+export const PROMOTE_SUFFIX = "\n\n(side question에서 정리됨)";
 
 /**
  * MARK: r2-skills-side — P3-transcript-29: what closing the window (or quitting) loses while the promote dialog is up — its
@@ -236,7 +236,7 @@ const firstLine = (s: string, max = 160): string => {
   return line.length > max ? line.slice(0, max - 1) + "…" : line;
 };
 
-/** `side_turn_end` while the window is in the background → "곁질문 답변 도착: <title>". */
+/** `side_turn_end` while the window is in the background → "side question 답변 도착: <title>". */
 export function sideNotification(th: SideThread | undefined, answer: string, stopReason: string, ctx: { project: string | null }): NotifyRequest | null {
   if (!th || stopReason === "interrupted") return null;
   const title = ctx.project ? `ReviewGate — ${ctx.project}` : "ReviewGate";

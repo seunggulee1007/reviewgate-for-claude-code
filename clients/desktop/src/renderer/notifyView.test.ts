@@ -35,7 +35,7 @@ describe("Settings › 알림 (Windows)", () => {
     const out = renderToStaticMarkup(createElement(Section, { settings: { notifications: true } as AppSettings, patch: () => undefined }));
     expect(out).toContain("허용 요청·질문·계획");
     expect(out).toContain("작업이 끝났을 때");
-    expect(out).toContain("그 밖의 알림 (오류·곁질문·다른 세션·서브에이전트)");
+    expect(out).toContain("그 밖의 알림 (오류·side question·다른 세션·서브에이전트)");
     expect(out.match(/ checked=""/g)?.length).toBe(3);
     expect(out).toContain("알림이 안 보이면: Windows 설정 › 시스템 › 알림에서 ReviewGate와 방해 금지(집중 지원)를 확인하세요.");
     expect(out).toContain('data-testid="Open notification settings"');

@@ -1,5 +1,5 @@
 /**
- * §40.3 (wave4b w4b-side, audit SME-12): right-click on Claude's answer → "곁질문으로 묻기" about the selected text (or the
+ * §40.3 (wave4b w4b-side, audit SME-12): right-click on Claude's answer → "side question으로 묻기" about the selected text (or the
  * whole answer when nothing is selected). The anchor is the quote and the turn it is from. Not on a chat shown read-only
  * (§39.2): its side questions would go to the running chat's conversation — the item is there, disabled, with why.
  * MARK: r2-skills-side — P3-transcript-09: "복사" (the selection) and "메시지 복사" (the answer's markdown) come first.
@@ -13,7 +13,7 @@ import { PointerMenu } from "../agents/AgentBits";
 import { Markdown } from "../chat/Markdown";
 import { copyWithToast } from "../common/CopyButton"; // MARK: r2-skills-side (P3-transcript-09)
 
-/** Claude's finished answer with the right-click "곁질문으로 묻기". */
+/** Claude's finished answer with the right-click "side question으로 묻기". */
 export function QuotableMarkdown({ itemId, text }: { itemId: number; text: string }) {
   const { onContextMenu, menu } = useQuoteMenu(itemId, text);
   return (

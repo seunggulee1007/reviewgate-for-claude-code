@@ -1503,7 +1503,7 @@ skipped file; `reject_all` only when nothing else is revertible, it skips them o
   `cli-versions.json`. Per-repository records stay in the git dir (`<gitdir>/reviewgate/…`, and the repository-wide
   `<git common dir>/reviewgate/capabilities.json` / `extensions-start.json` of §36.5 / §36.7).
 
-## 21. Side questions ("곁질문")
+## 21. Side questions ("side question")
 
 The user asks about a change in a **side thread** without affecting the main conversation, then optionally sends a
 conclusion to it. Additive: six commands, eight events, two optional settings, `hud.sideCostUSD`, `error.threadId`.
@@ -1551,7 +1551,7 @@ type SideThread = {
   starts the side session `fresh` (no history; the anchor context still says what changed). The main session's own CLI
   transcript is never written (a fork copies into a new session file), the engine transcript, `hud.turnCount`,
   `hud.sessionCostUSD` and `SessionMeta` are untouched.
-- **Anchor context.** The first question is prefixed (`buildSidePrompt`) with `[Side question (곁질문) — read-only …]`, the
+- **Anchor context.** The first question is prefixed (`buildSidePrompt`) with `[Side question — read-only …]`, the
   anchored file (`path`, status, +/−, review state), `line`/`side`, the hunk (`hunkId`, else the hunk containing `line`,
   else the whole diff ≤ 160 lines; ≤ 200 lines per hunk) of the current `select_file` diff — or, with `entryId`, of the
   history entry's proposal and its round prompt — and up to 3 tool calls that produced it (`toolUseId`, else the file's
@@ -1570,10 +1570,10 @@ type SideThread = {
   **agents that only read**
   (`Agent` / `Task` with `subagent_type: "Explore"`, no `isolation`; each of its own calls goes through this same hook and
   `canUseTool`, so it stays read-only). Everything else — `Edit Write MultiEdit NotebookEdit`, mutating Bash, other agents,
-  MCP tools that write, `ExitPlanMode`, `KillShell` — is denied with *"ReviewGate: this is a side question (곁질문) — a
+  MCP tools that write, `ExitPlanMode`, `KillShell` — is denied with *"ReviewGate: this is a side question — a
   read-only Q&A next to the main conversation. … propose any change in text …"* (the `side_tool_result` carries `denied:
   true`). **`Skill`** is denied too (r2 M18; it was allowed: a skill typed there loaded but could not run, and its
-  `!`command`` lines would run without a hook) with *"ReviewGate: this is a side question (곁질문) — skills and slash commands
+  `!`command`` lines would run without a hook) with *"ReviewGate: this is a side question — skills and slash commands
   run in the main conversation, never here. …"* — it starts like the read-only reason, so the call is `denied`; the clients
   offer [메인 대화로 보내기] (the thread's question as typed, as for `side_command`) on an answer with a denied `Skill` call.
   Also: `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` (as §13), **the user's MCP servers** (r2 M18; before, `strictMcpConfig` +
@@ -1604,12 +1604,12 @@ type SideThread = {
   instruction to the coding agent … referencing files and lines …"* and replies `side_promote_draft {threadId, text}`
   (nothing streams, not added to `messages`; cost counted like a question). Refused `side_busy`, `side_no_answer` (no
   answer yet), `side_draft_failed:<why>`. `side_promote {threadId, as, text}` then sends the (user-edited) text:
-  - `as: "message"` → the normal `send` of the main session with `text + "\n\n(곁질문에서 정리됨)"` (and
+  - `as: "message"` → the normal `send` of the main session with `text + "\n\n(side question에서 정리됨)"` (and
     `acceptPending` passed through): every §3 / §10 rule applies — while files await review it is a question turn, while a
     turn runs it is refused `gate_closed:running` (likewise every other `gate_closed:<reason>`), `send_failed` when
     snapshot A / the session refused it.
   - `as: "note"` → a review note on the anchor (`path`, `line` or null, `side` default `new`, `excerpt` = the anchored line
-    of the current diff) with body `text + "\n(곁질문에서 정리됨)"`, for the request-changes flow. Refused `side_no_anchor`
+    of the current diff) with body `text + "\n(side question에서 정리됨)"`, for the request-changes flow. Refused `side_no_anchor`
     (no `anchor.path`), `not_a_changed_file:<path>`, `session_running` (as `add_note`), `empty_note`.
   - Without `text` the command answers with a draft (`side_promote_draft`) and promotes nothing. Each promotion is
     recorded in `thread.promotions`.
@@ -4905,7 +4905,7 @@ notice source, one setting; nothing an existing client relies on changes meaning
 - §40.2 **A review list that reads like the code** — one risk rule in the engine (settings, SQL, schema, CI and
   permission badges; a test below the code it tests), a diff without lines says what changed, the list grouped by folder
   or by layer.
-- §40.3 **Side questions you can trust** — the web off unless chosen, forks named `[곁질문] …` in `claude --resume` and
+- §40.3 **Side questions you can trust** — the web off unless chosen, forks named `[side question] …` in `claude --resume` and
   deleted with their thread, "턴 N 시점" and [최신 대화로 다시 묻기], a quote of Claude's answer as the anchor, a queued
   conclusion on record.
 
@@ -4924,7 +4924,7 @@ one rule (client-only, no wire change):
 
 - The §40.2 grouping splits what the §39.3 author filter kept, and a §39.1 bulk list (over 300 files) still folds by
   folder with the grouping menu disabled and its reason.
-- While another chat is shown read-only (§39.2), the §40.3 quote anchor ("곁질문으로 묻기" on Claude's answer) is disabled
+- While another chat is shown read-only (§39.2), the §40.3 quote anchor ("side question으로 묻기" on Claude's answer) is disabled
   with its reason and a turn summary file whose review is done offers no '왜?' (its question would go to the running
   chat; a file still in the review keeps it); showing a chat read-only is not a switch, so a side answer coming in goes
   on. A real switch while a side answer is coming asks first (§40.3), and turns "풀리면 이어서 하기" off (§40.1).
@@ -5062,7 +5062,7 @@ type FileRiskKind = "sensitive" | "deleted" | "permission" | "schema" | "bash" |
   the row's tooltip.
 - **Already there (comp-13).** A file nothing of Claude's explains is origin `external` with its own badge ("앱 밖 변경"), never
   "Bash"; a post-Bash file is that call's only when its ctime falls in the call's execution window (§31.1); a file without
-  a recorded cause says so in the diff header with a side question ("원인 기록 없음 — 곁질문으로 물어보기"; Mac
+  a recorded cause says so in the diff header with a side question ("원인 기록 없음 — side question으로 물어보기"; Mac
   `WhyChangedSection`, Electron `ChangeCause`).
 - **Not in this pass.** Grouping by cause (subagent · Bash command · turn — the §39.3 author filter covers the subagents),
   a whitespace-ignoring diff (`select_file {ignoreWhitespace}`; §34.7's `whitespaceOnly` badge stays), image previews of
@@ -5097,7 +5097,7 @@ SideThread.promotions[].queued?: true
 ```
 
 - **The web is off by default** (SME-08). `settings.sideWeb`: `off` (absent or unknown, too) — `WebFetch` / `WebSearch`
-  are refused in the side session's PreToolUse hook and `canUseTool` with *"ReviewGate: this is a side question (곁질문) — the
+  are refused in the side session's PreToolUse hook and `canUseTool` with *"ReviewGate: this is a side question — the
   web is off here (ReviewGate Settings › Side questions), or this site is not in the user's Claude Code allow rules. …"*
   (it starts like the read-only reason, so the call is marked `denied`); `rules` — only a call the user already allows
   without a card: their `permissions.allow` rules `WebFetch(domain:…)` / `WebFetch` / `WebSearch` (the rules the main
@@ -5107,7 +5107,7 @@ SideThread.promotions[].queued?: true
   never get the web, not even the allowed sites. The clients send `sideAllowWeb: sideWeb === "on"` next to it.
 - **Peer messages** (peer-06): every side CLI — questions, commit drafts, pre-reviews — runs with the flag setting
   `crossSessionInbound: "refuse"` (already since §29; tests `engine.peer.test.ts`, `side.trust.test.ts`).
-- **The side sessions' own files** (SME-06). A new fork is renamed `[곁질문] <thread title>` (SDK `renameSession`, after its
+- **The side sessions' own files** (SME-06). A new fork is renamed `[side question] <thread title>` (SDK `renameSession`, after its
   first answer; the CLI keeps the main chat's title for a fork otherwise). Its session file is deleted (SDK
   `deleteSession {dir: <project path>}`) when the thread is closed (`side_close`), dropped by the 30-thread limit, when its
   chat is deleted (`session_delete`) and when the side file of a chat that is gone is pruned on open; never an id that is
@@ -5125,12 +5125,12 @@ SideThread.promotions[].queued?: true
   record keeps none). A chat moved to another worktree (§39.4) takes its threads along: `chat_receive` copies the chat's
   side file from the source worktree's git dir once the chat is in the target's index (unless the target has one; the
   source's record keeps its copy); a follow-up there forks again (its side session lives under the source's project dir). A chat switch still stops running
-  side questions: both clients ask first while one is answering ("곁질문 답이 아직 오는 중이에요(N개). 채팅을 바꾸면 답이 끊겨요.
+  side questions: both clients ask first while one is answering ("side question 답이 아직 오는 중이에요(N개). 채팅을 바꾸면 답이 끊겨요.
   그래도 바꿀까요?"; Mac `AppState.confirmSideSwitch`, Electron `storeSessions` `swap`). Reading another chat (§39.2) does not
   switch and cuts nothing.
 - **Entry points** (SME-12). `anchor.quote`: a passage of Claude's answer and its turn (the nearest user message before it);
   well-formed (non-empty text, cut at 2000 chars, a bad `turn` → null) it wins over the review fields (a `pr` wins over it);
-  the prompt quotes it fenced as data. Right-click on Claude's answer → "곁질문으로 묻기": Electron the selected text (else
+  the prompt quotes it fenced as data. Right-click on Claude's answer → "side question으로 묻기": Electron the selected text (else
   the whole answer), Mac the whole answer (SwiftUI gives a menu no selection); disabled while another chat is shown
   read-only. A turn summary card's file keeps its '왜?' after the review is done (anchor: the path and the call that made
   the change; not on a chat shown read-only). PR diff lines / hunks have had theirs since §36.14.
@@ -5140,7 +5140,7 @@ SideThread.promotions[].queued?: true
   cache, fastest". A conclusion put in the composer queue sends `side_promote {queued: true}`: the thread records
   `{as: "message", queued: true}` and shows "⏳ 메인 대화 대기열에 넣음" — also after a chat switch.
 - Verified with CLI 2.1.309 / SDK 0.3.270 (haiku): a fork (`resume` + `forkSession` + `sessionId`) is a new session with the
-  main chat's title in `listSessions`; `renameSession` gives it `customTitle: "[곁질문] …"` and leaves the main one alone;
+  main chat's title in `listSessions`; `renameSession` gives it `customTitle: "[side question] …"` and leaves the main one alone;
   `deleteSession {dir}` removes the fork's file and keeps the main one, a second call throws "not found"; resuming a session
   that is gone yields `result/error_during_execution` with nothing before it, then "No conversation found with session ID".
 - Unchanged: the side policy (§21) — edits, `Agent` / `Task` (but an Explore agent in a side question, r2 M18), MCP tools
@@ -5984,7 +5984,7 @@ both clients follow one rule:
   agent, the subagent type's face (the sparkle robot for a type the table does not know), none from outside (Core
   `SubBrainText.writerAvatar`, renderer `writerAvatar`) — small and still, without a mood badge (Mac
   `AgentAvatarView(showsMood: false)`, Electron `<Avatar showsMood={false}>`).
-- §43.3's [관제판 열기] (Settings › Extensions › the mods) opens this project window's board — Mac `BoardWindows.show`,
+- §43.3's [Agent Board 열기] (Settings › Extensions › the mods) opens this project window's board — Mac `BoardWindows.show`,
   Electron `toggleBoard(true)` after the dialog closes — and never closes a board already open, as the board's own key would.
 - A tile's menu is the agent card's (§42.4), so §43.5's "왜 시작했는지 묻기" is on the board too. The side question opens
   beside the chat, so the board gets out of its way: the Mac brings the project window forward (as for "대화에서 보기"),
@@ -6005,7 +6005,7 @@ message whatever its model; the to-do list tools write no file (stopping a task 
 
 ### 43.1 The agent board
 
-What every subagent is doing, as faces — the agent board ("관제판"), the kind of view a Claude Code mod can draw in the
+What every subagent is doing, as faces — the agent board ("Agent Board"), the kind of view a Claude Code mod can draw in the
 terminal, now in both apps (its "1 에이전트" tab; "2 서브브레인" and "3 코드 그래프" are §43.2 and §43.3). No wire change: the
 board reads what §13, §36.1, §39.3 and §42.4 already send (`hud.agents`, `hud.agentHistory`, the permission queue, the HUD)
 and acts only through the existing commands (`stop_agent`, `agent_report`). Rules in Core `AgentAvatar.swift` /
@@ -6201,7 +6201,7 @@ SessionExtensions.mods?: UserMod[]   // { name, description, version?, path, sou
   with `.claude-plugin/plugin.json`; one per real folder, ≤ 50, re-read at most every 10 s, absent when there are none;
   `loaded` = the session reported a plugin at that folder. Settings › Extensions › "Claude Code mod": name, version,
   description, folder (Finder / Explorer), "이 세션에 로드됐어요" / "만든 Claude Code 세션에서만 로드돼요" / "이 세션에는 로드되지
-  않았어요", and "앱에서는 mod 화면이 보이지 않아요 — 같은 정보는 관제판에 있어요" with [관제판 열기] (this project window's board, opened
+  않았어요", and "앱에서는 mod 화면이 보이지 않아요 — 같은 정보는 Agent Board에 있어요" with [Agent Board 열기] (this project window's board, opened
   or brought forward — never closed: Mac `BoardWindows.show`, Electron `toggleBoard(true)` after the dialog closes).
 - **Verified with the real CLI** 2.1.310 (haiku, a scratch repository, `sidecar/test/driver-board.mjs`, a board mod
   copied — never moved): with `CLAUDE_CODE_PLUGIN_DIRS` naming the copy's folder, the SDK session loads the mod beside the
@@ -6324,7 +6324,7 @@ are reused; the engine's permission sets and its verified CLI range move.
 - **'왜?' on plan steps and agent cards.** A side question about a plan step quotes it (`quote: {text: "3. <step>", turn:
   null}`, §40.3): from each step of a proposed plan's sheet / dialog (it closes first; the notes stay on the card) and of
   "plan vs actual" (the live chat's summaries). One about an agent anchors at its Agent call (`toolUseId`: the call and
-  Claude's words before it, §21): the agent card's menu "왜 시작했는지 묻기 (곁질문)" (the Mac's is off with its reason when
+  Claude's words before it, §21): the agent card's menu "왜 시작했는지 묻기 (side question)" (the Mac's is off with its reason when
   the engine has no side questions). The question names the step itself — "계획의 3단계 「…」 — 이 단계는 왜 필요하고, 지금까지
   어떤 변경이 이 단계에 해당해?" — so an engine that ignores the anchor still knows what is asked. Core `WhyQuestions`,
   Electron `whyQuestions.ts`. The Mac summary numbers its steps from 1 (it showed the 0-based wire index).
@@ -8210,7 +8210,7 @@ The side panel (§21, §40.3) on both clients — no wire change.
   nothing before). A chat switch brings the chat's own back, a restart too; asking empties that one (on the Mac also when
   the anchor was removed with × before asking). Since nothing is lost on close, the quit / close question (§55.1,
   P3-transcript-29) lists no line for them; it lists the send sheet while it is up (Mac, `registersUnsavedWork("sidePromote")`;
-  the Windows client's promote dialog once its drafted text is there, `useUnsavedWork("sidePromote")`): "곁질문에서 정리한
+  the Windows client's promote dialog once its drafted text is there, `useUnsavedWork("sidePromote")`): "side question에서 정리한
   지시문이나 메모를 아직 보내지 않았어요. 닫으면 사라져요."
 - **A skill goes to the main chat** (§21, r2 M18): the refusal `side_command` or an answer whose `Skill` call was denied
   shows "메인 대화에서만 실행돼요 …" with [질문을 메인 대화로 그대로 보내기] — named apart from the footer's [메인 대화로 보내기],
@@ -8218,7 +8218,7 @@ The side panel (§21, §40.3) on both clients — no wire change.
   running turn, a card, a session that is starting, a paused queue), the toast saying which as the queue itself decides;
   a denied `Skill` call's "read-only" mark says "스킬은 메인 대화에서만 실행돼요".
 - **Keys and closing** (Mac, P3-transcript-15): Esc goes back from a thread or a new question to the list, then closes
-  the panel; ↑ / ↓ pick a thread in the list (an accent outline) and ↩ opens it; the head has ✕ "곁질문 닫기 (⌥⌘S)"; the
+  the panel; ↑ / ↓ pick a thread in the list (an accent outline) and ↩ opens it; the head has ✕ "side question 닫기 (⌥⌘S)"; the
   new-question buttons say "선택 항목에 대해 묻기 (⌥⌘/)" — the menu's name for that key (P3-transcript-31); the follow-up's
   send button is "묻기" to VoiceOver as in its tooltip; the send sheet's Send says what it does with its key ("메인 대화로
   보내기 (⌘↩)" / "리뷰 메모로 추가 (⌘↩)"). The Windows client already closed on Esc.
@@ -8227,7 +8227,7 @@ The side panel (§21, §40.3) on both clients — no wire change.
   Windows client the right-click on Claude's answer in the main chat starts with "복사" (the selection) and "메시지 복사".
 - **Words for what a row is** (P3-transcript-07, PX-04, 31): a side answer's tool call says what it did in the tooltip on its
   name and detail (`ToolRowTooltip` / `toolRowTooltip`, "명령 실행: …", "파일 읽기: …" — the input as JSON before; the row-wide
-  tooltip that hid the status mark's is gone), ✓ / ✕ are "도구 결과" / "도구 오류"; the Windows client's delete reads "이 곁질문
+  tooltip that hid the status mark's is gone), ✓ / ✕ are "도구 결과" / "도구 오류"; the Windows client's delete reads "이 side question
   삭제" with the trash glyph (it was "이 스레드 닫기" and 🗑).
 - **Full values and times** (P3-transcript-22, 23, 24, 26, PX-21): an anchor chip, a tool call's rationale, a preview line and
   the send sheet's destination show in full on hover; "3분 전" keeps up and shows the exact time on hover (`RelativeTimeText` /

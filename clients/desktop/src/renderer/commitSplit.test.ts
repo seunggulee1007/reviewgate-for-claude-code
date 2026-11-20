@@ -120,7 +120,7 @@ describe("§53 words", () => {
   it("refusals in the user's words", () => {
     expect(splitRefusalText("commit_split_failed:the fork answered nothing")).toBe("Claude가 변경을 나누지 못했어요: the fork answered nothing");
     expect(splitRefusalText("nothing_to_commit")).toContain("수락");
-    expect(splitRefusalText("side_limit")).toContain("곁질문");
+    expect(splitRefusalText("side_limit")).toContain("Side question");
     expect(splitRefusalText("invalid_part:src/a.ts")).toContain("src/a.ts");
     expect(splitRefusalText("hunk_twice:src/a.ts#1")).toContain("src/a.ts#1");
     expect(splitRefusalText("empty_message")).toBe("메시지가 비어 있는 커밋이 있어요");

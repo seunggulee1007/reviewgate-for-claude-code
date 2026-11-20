@@ -388,7 +388,7 @@ private struct AssistantMessageRow: View {
             .overlay(alignment: .topTrailing) {
                 if copyable, hovering || copied { copyButton.offset(x: 30) }
             }
-            // MARK: wave4b w4b-side — §40.3 (SME-12): right-click → 곁질문으로 묻기 (the answer quoted, with its turn)
+            // MARK: wave4b w4b-side — §40.3 (SME-12): right-click → side question으로 묻기 (the answer quoted, with its turn)
             .contextMenu {
                 if copyable {
                     Button("Copy message", systemImage: "doc.on.doc") { copy() }

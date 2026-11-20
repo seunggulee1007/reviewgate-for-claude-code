@@ -6260,7 +6260,7 @@ export class ReviewEngine {
   /**
    * `side_promote {as, text}`: `message` sends the text to the main session through the normal `send` (same gate
    * rules: a question while files await review, refused `gate_closed:<reason>` while a turn runs); `note` adds a
-   * review note on the thread's anchor (path + line) for the request-changes flow. Both carry `(곁질문에서 정리됨)`.
+   * review note on the thread's anchor (path + line) for the request-changes flow. Both carry `(side question에서 정리됨)`.
    */
   private async sidePromote(threadId: string, as: "message" | "note", rawText: string, acceptPending: boolean): Promise<void> {
     const thread = this.side.get(threadId);

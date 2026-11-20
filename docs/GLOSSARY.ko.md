@@ -23,9 +23,9 @@ Mac(App/·Core 의 Localizable.xcstrings)과 Electron(ko.extra.json → gen-i18n
 | Effort | effort | Claude Code 화면과 같은 영어 그대로. "추론 강도"·"노력"으로 옮기지 않는다. 단계는 낮음·보통·높음·매우 높음·최대 |
 | Refresh | 새로고침 | 붙여 쓴다 |
 | sidecar | 엔진 | 내부 이름은 사용자 문구에 드러내지 않는다 |
-| Side question | 곁질문 | |
+| Side question | side question | |
 | Auto (model) | 자동 (모델) | 메시지마다 모델을 고른다(§43.4). 칩은 "자동 · sonnet". 권한 모드의 "자동"과 섞이지 않게 모델 이름을 같이 쓴다. 정책은 비용 우선 · 균형 · 품질 우선 |
-| Agent Board | 관제판 | 에이전트 · 서브브레인 · 코드 그래프 탭이 있는 창(§43). Mac 창 › 관제판(⌥⌘B), Windows 보기 › 관제판(Ctrl+Alt+B). "대시보드"는 쓰지 않는다 |
+| Agent Board | Agent Board | 에이전트 · 서브브레인 · 코드 그래프 탭이 있는 창(§43). Mac 창 › Agent Board(⌥⌘B), Windows 보기 › Agent Board(Ctrl+Alt+B). "대시보드"는 쓰지 않는다 |
 | Sub-brain | 서브브레인 | Claude Code 의 자동 메모리(저장소마다 하나, 워크벤치가 같이 쓴다, §43.2). 폴더를 말할 때만 "자동 메모리 폴더" |
 | Code graph | 코드 그래프 | graphify 가 만든 리포트(§43.3). 다시 만드는 것은 "다시 빌드" |
 | Terminal chat | 터미널 채팅 | 채팅 칸이 앱의 채팅 UI 대신 진짜 Claude Code(TUI)인 채팅(§57). 리뷰·수락·거절은 채팅과 같다. "터미널 세션"은 쓰지 않는다 |

@@ -86,7 +86,7 @@ export function PromoteDialog() {
           rows={9}
           data-testid="Promote text"
         />
-        <div className="tiny faint">{pastes ? t("Pastes it into Claude Code's prompt in the terminal chat as typed — press Enter there to send it") : d.as === "message" ? t("“(곁질문에서 정리됨)” is added at the end so Claude knows where it came from.") : t("The note is kept with the review and goes to Claude with Request changes.")}</div>
+        <div className="tiny faint">{pastes ? t("Pastes it into Claude Code's prompt in the terminal chat as typed — press Enter there to send it") : d.as === "message" ? t("“(side question에서 정리됨)” is added at the end so Claude knows where it came from.") : t("The note is kept with the review and goes to Claude with Request changes.")}</div>
       </div>
       {d.error && (
         <div className={`banner ${d.recovery ? "orange" : "red"} promote-error`} data-testid="Promote error">

@@ -42,7 +42,7 @@ extension LiveChipSummary {
     }
 }
 
-/// Under the range picker of a range other than "전체": "줄 곁질문은 / 부분 되돌리기는 ‘전체’ 보기에서 할 수 있어요" instead of
+/// Under the range picker of a range other than "전체": "줄 side question은 / 부분 되돌리기는 ‘전체’ 보기에서 할 수 있어요" instead of
 /// those controls just going away (§34.1; Electron's range row and hunk bar say the same).
 struct DiffRangeHints: View {
     @Environment(AppState.self) private var store

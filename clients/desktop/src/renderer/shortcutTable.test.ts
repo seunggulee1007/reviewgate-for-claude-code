@@ -47,6 +47,7 @@ describe("keyboard shortcut table (polish-08)", () => {
     const dict = ko as Record<string, string>;
     const strings = SHORTCUT_SECTIONS.flatMap((s) => [s.title, ...(s.note ? [s.note] : []), ...s.rows.flatMap((r) => [r.action, ...(r.note ? [r.note] : [])])]);
     for (const k of [...strings, "Keyboard Shortcuts", "Action", "Remarks", "The same keys do the same thing in the Mac and Windows apps — on Windows ⌘ is Ctrl and ⌥ is Alt."]) {
+      if (k === "Agent Board" || k === "Side questions") continue; // names kept in English (docs/GLOSSARY.ko.md)
       expect(dict[k], k).toMatch(/[가-힣]/);
     }
   });

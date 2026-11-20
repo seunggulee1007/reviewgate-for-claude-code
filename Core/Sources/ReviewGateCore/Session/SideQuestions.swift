@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-// docs/PROTOCOL.md §21: side questions ("곁질문") — a read-only Q&A next to the main conversation, about a change,
+// docs/PROTOCOL.md §21: side questions ("side question") — a read-only Q&A next to the main conversation, about a change,
 // whose conclusion can be sent to the main conversation or added as a review note.
 
 /// The answer of a running question as it streams (`side_text_delta` / `side_tool_use` / `side_tool_result`); dropped once
@@ -51,7 +51,7 @@ public struct SidePromoteDraft: Sendable, Equatable, Identifiable {
 /// Words for anchors and the one-click questions.
 public enum SideQuestionText {
     /// What every promoted message ends with (the engine appends the same marker).
-    public static let promotedMarker = "(곁질문에서 정리됨)"
+    public static let promotedMarker = "(side question에서 정리됨)"
 
     /// The one-click "왜?" question for an anchor.
     public static func defaultQuestion(for anchor: SideAnchor?) -> String {

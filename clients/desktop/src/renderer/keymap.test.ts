@@ -29,10 +29,10 @@ describe("side question: ⌥⌘/ (Ctrl+Alt+/), not ⌘⇧/ (macOS's Help menu se
     initI18n("en", "darwin");
     expect(t("New side question (⌥⌘/)")).toBe("New side question (⌥⌘/)");
     initI18n("ko", "darwin");
-    expect(t("New side question (⌥⌘/)")).toBe("새 곁질문 (⌥⌘/)");
+    expect(t("New side question (⌥⌘/)")).toBe("새 side question (⌥⌘/)");
     expect(t("Ask a side question about this — the main conversation is not affected (⌥⌘/)")).toContain("(⌥⌘/)");
     initI18n("ko", "win32");
-    expect(t("New side question (⌥⌘/)")).toBe("새 곁질문 (Ctrl+Alt+/)");
+    expect(t("New side question (⌥⌘/)")).toBe("새 side question (Ctrl+Alt+/)");
   });
 });
 

@@ -1,5 +1,5 @@
 /**
- * MARK: wave5 w5-board — §43.1: the agent board ("관제판") on Windows: a large panel over the window (View › Agent Board,
+ * MARK: wave5 w5-board — §43.1: the agent board ("Agent Board") on Windows: a large panel over the window (View › Agent Board,
  * Ctrl+Alt+B; the agent panel's board button) with three tabs — agents (`AgentBoard`), sub-brain (`SubBrainBoard`, w5-brain)
  * and code graph (`CodeGraphBoard`, w5-graph), each a default export without props that reads the store. The tab is
  * remembered per project; Esc, the ✕ or a click outside closes it, and showing an agent in the chat closes it too.

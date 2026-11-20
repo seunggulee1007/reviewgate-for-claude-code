@@ -287,7 +287,7 @@ async function main() {
     await request({ type: "side_promote", threadId: q1.thread.id, as: "note", text: draft.text });
     s = await waitState((x) => x.reviewNotes.length === 1, "the promoted note");
     const note = s.reviewNotes[0];
-    assert(note.path === "README.md" && note.body.includes("(곁질문에서 정리됨)"), `5: note on README.md with provenance: ${JSON.stringify(note)}`);
+    assert(note.path === "README.md" && note.body.includes("(side question에서 정리됨)"), `5: note on README.md with provenance: ${JSON.stringify(note)}`);
     assert(s.gate.canRequestChanges, "5: request_changes becomes available");
     observed.promote = { draft: draft.text.trim().slice(0, 200), note: { path: note.path, line: note.line, side: note.side } };
     log(`5 promote OK: ${JSON.stringify(observed.promote)}`);

@@ -6,7 +6,7 @@ import ReviewGateCore
 // docs/PROTOCOL.md §36.14 on the Mac: PR comments to Claude ("Claude에게 보내기" per comment, "미해결 전체 보내기") as a composer
 // draft — in the window of the PR head branch's workbench when one is open, else this window; starting with the repository's
 // PR command (e.g. /acme-tools:review-reply {pr}) when one is set. Nothing goes out without the user's send. Also
-// "워크벤치로 열기" for the PR's head and the PR diff line's "곁질문".
+// "워크벤치로 열기" for the PR's head and the PR diff line's "side question".
 
 @MainActor
 enum PRClaudeRouting {

@@ -6,7 +6,7 @@ enum SidePanel {
     static let storageKey = "sidePanelVisible"
 }
 
-/// §21 "곁질문" inspector: the current chat's side threads (list), one thread (anchor header, streaming answer, tool calls,
+/// §21 "side question" inspector: the current chat's side threads (list), one thread (anchor header, streaming answer, tool calls,
 /// follow-up, promote) or a new question on an anchor. Nothing here changes the main conversation until "Send to main".
 struct SidePanelView: View {
     @Environment(\.colorScheme) private var colorScheme

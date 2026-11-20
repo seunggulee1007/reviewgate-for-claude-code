@@ -52,6 +52,7 @@ describe("main process in Korean (polish-07)", () => {
       const label = item.label!;
       if (label.startsWith("ReviewGate ")) continue; // the version line
       if (label === "PR") continue; // View › the PRs tab: Korean says it the same way
+      if (label === "Agent Board") continue; // a name kept in English (docs/GLOSSARY.ko.md)
       expect(label, `${item.role ?? ""} ${label}`).toMatch(/[가-힣]/);
     }
     const labels = walk(template).map((i) => i.label);
@@ -64,7 +65,7 @@ describe("main process in Korean (polish-07)", () => {
 
   it("shows the Mac's View keys without taking them from the renderer, and Help › Keyboard Shortcuts (polish-08)", async () => {
     const items = walk(await windowsMenu());
-    for (const [label, accelerator] of [["Diff 패널 보기/숨기기", "CmdOrCtrl+Shift+D"], ["에이전트 패널 보기/숨기기", "CmdOrCtrl+Alt+A"], ["곁질문 패널 보기/숨기기", "CmdOrCtrl+Alt+S"]] as const) {
+    for (const [label, accelerator] of [["Diff 패널 보기/숨기기", "CmdOrCtrl+Shift+D"], ["에이전트 패널 보기/숨기기", "CmdOrCtrl+Alt+A"], ["Side question 패널 보기/숨기기", "CmdOrCtrl+Alt+S"]] as const) {
       const item = items.find((i) => i.label === label);
       expect(item?.accelerator, label).toBe(accelerator);
       expect(item?.registerAccelerator, label).toBe(false);

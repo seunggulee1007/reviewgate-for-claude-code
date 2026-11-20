@@ -330,7 +330,7 @@ describe("side + MCP store flows", () => {
     useStore.setState({ state: { ...useStore.getState().state, project: { path: "/p", root: "/p", name: "p" } as never } });
     useStore.getState().queuePromote();
     expect(useStore.getState().promoteDraft).toBeNull();
-    expect(useStore.getState().queue.items.at(-1)!.text).toBe("검증을 되돌려 주세요.\n\n(곁질문에서 정리됨)");
+    expect(useStore.getState().queue.items.at(-1)!.text).toBe("검증을 되돌려 주세요.\n\n(side question에서 정리됨)");
     expect(useStore.getState().sideQueued["p1"]).toBe(true);
   });
 

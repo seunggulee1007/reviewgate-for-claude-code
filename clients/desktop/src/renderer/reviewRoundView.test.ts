@@ -179,7 +179,7 @@ describe("review round 2 on screen (wave2 desktop-flow)", () => {
     expect(html).not.toContain("요청 이후");
     expect(html).toContain("수락 뒤 바뀜");
     expect(html).not.toContain("Claude가 작업 중이에요");
-    expect(html).toContain('data-testid="Range ask hint">줄 곁질문은 ‘전체’ 보기에서 할 수 있어요');
+    expect(html).toContain('data-testid="Range ask hint">줄 side question은 ‘전체’ 보기에서 할 수 있어요');
     useStore.setState({ diffSince: "review" });
     expect(render(DiffRound, { file: a })).not.toContain("Range ask hint");
     useStore.setState({ diffSince: "accepted" });

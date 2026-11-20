@@ -78,7 +78,7 @@ export function UnifiedDiff(props: {
   selectedHunks?: ReadonlySet<number>;
   /** §21: the hover "?" in the gutter — ask a side question about this line. */
   onAsk?: (line: DiffLine, key: LineKey, hunk: DiffHunk) => void;
-  /** §21: always-shown controls on each hunk header, left of `hunkActions` ("왜?" + the "곁질문 N" badge). */
+  /** §21: always-shown controls on each hunk header, left of `hunkActions` ("왜?" + the "side question N" badge). */
   hunkAside?: (hunk: DiffHunk) => ReactNode;
   /** Lines (`keyId`) a side thread is anchored on (accent bar). */
   anchoredLines?: ReadonlySet<string>;
