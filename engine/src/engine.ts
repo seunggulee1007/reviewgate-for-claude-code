@@ -22,10 +22,11 @@ import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { branches as listBranches, createBranch, isWorktreeDirty, switchBranch } from "./git/branches.js";
-import { initRepository, LfsMissingError, openCheckpoint, OpenSupersededError, type GitCheckpoint } from "./git/checkpoint.js";
+import { GitCheckpoint, initRepository, LfsMissingError, openCheckpoint, OpenSupersededError } from "./git/checkpoint.js";
 import { commit as gitCommit, gitIdentity, push as gitPush, stagePaths } from "./git/commit.js";
 import { CommandRefused, refusalFields } from "./errors.js";
-import { NotARepositoryError, setGitPath } from "./git/exec.js";
+import { NotARepositoryError, registerShadowRepo, setGitPath } from "./git/exec.js";
+import { FolderTooLargeError, hasShadowRepo, markShadowRepo, prepareShadowRepo, scanShadowFolder, shadowBaseline } from "./git/shadow.js";
 import { findGitCandidates, looksUnsafeForGitInit } from "./git/repo.js";
 import {
   addWorktree,
@@ -145,7 +146,7 @@ import type { GitCommandResult } from "./session/events.js"; // MARK: r1-git (§
 import { originOf, type ToolWindow } from "./session/provenance.js";
 import { ToolOutputStore } from "./session/toolOutput.js";
 import { AgentTracker, STOP_AGENT_TIMEOUT_MS } from "./session/agents.js";
-import { repoRelativeInside, samePath, toRepoRelative } from "./platform/paths.js";
+import { realpathLenient, repoRelativeInside, samePath, toNativeAbs, toRepoRelative } from "./platform/paths.js";
 import { exec } from "./util/exec.js";
 import { anchorLineText, buildSidePrompt, PROMOTE_PROVENANCE, summarizeInput, type AnchorData } from "./side/context.js";
 import type { SideQueryOptions } from "./side/sideQuery.js";
@@ -343,6 +344,18 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "retry_extensions", "mcp_reconnect", "mcp_toggle",
 ]);
 
+/**
+ * §59: what needs a real git repository — refused `not_a_git_repo` while the open folder is tracked without git
+ * (`state.project.vcs == "shadow"`); `plan_response {into: "workbench"}` too.
+ */
+const SHADOW_REFUSED: ReadonlySet<string> = new Set([
+  "branches", "switch_branch", "create_branch",
+  "workbench_list", "workbench_create", "workbench_preview", "workbench_remove", "workbench_prune", "chat_move",
+  "commit", "commit_hunks", "commit_series", "commit_draft", "commit_split_draft", "commit_format", "push",
+  "pr_list", "pr_open", "pr_select_file", "pr_add_draft", "pr_remove_draft", "pr_submit", "pr_reply", "pr_reload_comments",
+  "pr_file_lines", "pr_create", "pr_draft", "pr_ai_draft",
+]);
+
 /** §57.15: how long "Allow and follow" waits for the EnterWorktree it allowed. */
 const TERMINAL_FOLLOW_ARM_MS = 120_000;
 
@@ -495,6 +508,8 @@ export class ReviewEngine {
   // MARK: wave5 w5-brain — §43.2: the repository's auto memory (read only); a watched folder's changes go out as `brain`.
   private readonly subBrain = new SubBrain({ now: () => this.now(), onChange: (ev) => this.emit(ev) });
   private gitInit: EngineSlices["gitInit"] = null;
+  /** §59: the open folder is tracked without git — its hidden repository, registered for every git call of the folder. */
+  private shadow: { gitDir: string; release: () => void } | null = null;
   private session: ClaudeSessionLike | null = null;
   private sessionState: EngineSlices["session"] = emptySession();
   // MARK: terminal-chat (§57)
@@ -1061,6 +1076,7 @@ export class ReviewEngine {
       if (this.churnTimer) clearTimeout(this.churnTimer); // MARK: wave7 w7-state (§45.2): the last snapshot below carries it
       this.churnTimer = null;
       this.stopDiskWatch(); // MARK: wave4b w4b-bigturn (§39.1)
+      this.releaseShadow(); // §59
       this.emitState();
       this.closed = true;
       for (const [id, p] of this.pending) p.reject(new Error(`engine disposed (${id})`));
@@ -1076,6 +1092,9 @@ export class ReviewEngine {
     // MARK: terminal-chat — §57.1: the TUI does these itself in a terminal chat.
     if (this.terminal && (TERMINAL_REFUSED.has(cmd.type) || (cmd.type === "side_promote" && cmd.as === "message"))) {
       throw new CommandRefused(`terminal_chat:${cmd.type}`, { code: "terminal_chat" });
+    }
+    if (this.shadow && (SHADOW_REFUSED.has(cmd.type) || (cmd.type === "plan_response" && cmd.into === "workbench"))) {
+      throw new CommandRefused(`not_a_git_repo:${cmd.type}`, { code: "not_a_git_repo" });
     }
     switch (cmd.type) {
       case "hello": {
@@ -1109,6 +1128,9 @@ export class ReviewEngine {
         return;
       case "init_repo":
         await this.initRepo();
+        return;
+      case "track_without_git": // §59
+        await this.trackWithoutGit(cmd.confirm === true);
         return;
       case "cancel_git_init":
         if (this.gitInit) {
@@ -2164,13 +2186,18 @@ export class ReviewEngine {
     const abort = new AbortController();
     this.openAbort = abort;
     try {
-      cp = await openCheckpoint(path, abort.signal);
+      cp = await openCheckpoint(path, abort.signal, { discover: true });
     } catch (e) {
       if (e instanceof OpenSupersededError) {
         this.log("info", "an open superseded by a newer one while its git did not answer");
         return;
       }
       if (e instanceof NotARepositoryError) {
+        // §59: a folder tracked without git before goes straight to its hidden repository.
+        if (hasShadowRepo(this.dataDir, shadowFolder(path))) {
+          await this.openShadow(path, takeover, false);
+          return;
+        }
         this.gitInit = { path, candidates: findGitCandidates(path), looksUnsafe: looksUnsafeForGitInit(path) };
         this.touch();
         return;
@@ -2227,13 +2254,73 @@ export class ReviewEngine {
     let cp: GitCheckpoint;
     try {
       await initRepository(pending.path);
-      cp = await openCheckpoint(pending.path);
+      cp = await openCheckpoint(pending.path, undefined, { discover: true });
     } catch (e) {
       this.fail(errorMessage(e), true, "git", { code: "git_init_failed" });
       return;
     }
     await this.lockProject(cp, false);
     await this.adoptCheckpoint(cp, pending.path);
+  }
+
+  /** §59 `track_without_git`: the folder of `state.gitInit` is reviewed through a hidden repository (never a `.git` in it). */
+  private async trackWithoutGit(confirm: boolean): Promise<void> {
+    const pending = this.gitInit;
+    if (!pending) throw new CommandRefused("git_init_not_needed");
+    if (pending.looksUnsafe && !confirm) throw new CommandRefused("folder_unsafe");
+    await this.openShadow(pending.path, false, true);
+  }
+
+  /**
+   * §59: opens `path` on its hidden repository: created when missing, the size guard, a baseline of the folder as it is now
+   * (kept as it was while a review of it waits — `restoreReview` brings that back), the choice remembered, then the open
+   * goes on as for a repository. `fromPrompt` (`track_without_git`): a refusal keeps `state.gitInit`; a reopen that fails
+   * shows the prompt again with the error.
+   */
+  private async openShadow(path: string, takeover: boolean, fromPrompt: boolean): Promise<void> {
+    const folder = shadowFolder(path);
+    let release: (() => void) | null = null;
+    let gitDir: string;
+    try {
+      gitDir = await prepareShadowRepo(this.dataDir, folder);
+      release = registerShadowRepo(folder, gitDir);
+      const cp = new GitCheckpoint(folder);
+      const head = await cp.head();
+      if (head.sha !== null && (await loadReview(gitDir).catch(() => null)) !== null) await scanShadowFolder(folder);
+      else {
+        const b = await shadowBaseline(folder);
+        this.log("info", `tracking ${folder} without git (${b.files} files, ${b.bytes} bytes${b.committed ? ", new baseline" : ""}; hidden repository ${gitDir})`);
+      }
+      await markShadowRepo(this.dataDir, folder);
+    } catch (e) {
+      release?.();
+      const tooLarge = e instanceof FolderTooLargeError;
+      const code = tooLarge ? "folder_too_large" : "track_failed";
+      if (!fromPrompt) {
+        this.gitInit = { path, candidates: findGitCandidates(path), looksUnsafe: looksUnsafeForGitInit(path) };
+        this.fail(errorMessage(e), false, "git", { code });
+        return;
+      }
+      this.log("warn", `track without git: ${errorMessage(e)}`);
+      throw new CommandRefused(tooLarge ? `folder_too_large:${e.limit}` : `track_failed: ${errorMessage(e)}`, { code });
+    }
+    this.gitInit = null;
+    this.shadow = { gitDir, release };
+    this.touch();
+    const cp = new GitCheckpoint(folder);
+    try {
+      await this.lockProject(cp, takeover);
+    } catch (e) {
+      this.releaseShadow();
+      throw e;
+    }
+    await this.adoptCheckpoint(cp, path);
+  }
+
+  /** §59: the folder's git calls stop going to its hidden repository (the project closed or another one opens). */
+  private releaseShadow(): void {
+    this.shadow?.release();
+    this.shadow = null;
   }
 
   private async adoptCheckpoint(cp: GitCheckpoint, path: string): Promise<void> {
@@ -2259,15 +2346,16 @@ export class ReviewEngine {
     // §36.7: the repository's start history sets the init watchdog's adaptive limit.
     this.startHistory = this.projectCommonDir ? await loadStartHistory(this.projectCommonDir) : [];
     this.applyCachedCapabilities();
-    const [branch, remoteURL] = await Promise.all([cp.branchName(), cp.remoteURL()]);
+    // §59: a hidden repository's branch and identity are ReviewGate's own, never shown as the folder's.
+    const [branch, remoteURL] = this.shadow ? [null, null] : await Promise.all([cp.branchName(), cp.remoteURL()]);
     this.codeGraph.reset(); // MARK: wave5 w5-graph — §43.3: another project's report, freshness and build are not this one's
     // MARK: r2-skills-side — §33.6 (M21): the repository every worktree of it shares (the clients' per-repository allow list).
-    this.project = { path, root: cp.root, name: basename(path), branch, remoteURL, ...(this.projectCommonDir ? { commonDir: this.projectCommonDir } : {}) };
+    this.project = { path, root: cp.root, name: basename(path), branch, remoteURL, ...(this.projectCommonDir ? { commonDir: this.projectCommonDir } : {}), vcs: this.shadow ? "shadow" : "git" };
     this.statusLine.projectChanged(); // MARK: wave6 w6-statusline — §44.2: the last project's lines go now, a run of it stops
     // MARK: wave5 w5-brain — §43.2: the session's baseline of the memory folder (read in the background).
     this.refreshBrainDir();
     void this.subBrain.scan().catch(() => undefined);
-    this.commitSlice.identity = await gitIdentity(cp.root);
+    this.commitSlice.identity = this.shadow ? { name: null, email: null } : await gitIdentity(cp.root);
     this.startDiskWatch(); // MARK: wave4b w4b-bigturn (§39.1)
     this.touch();
     await this.restoreReview();
@@ -3277,12 +3365,12 @@ export class ReviewEngine {
     if (cp && wants("review") && (await this.gate.recheckRejectUndo())) this.touch();
     if (cp && wants("branches")) await this.refreshBranches();
     if (cp && wants("workbenches")) await this.refreshWorkbenches(true, true); // wave4 w4-install: an explicit refresh re-checks all
-    if (cp && (wants("branches") || wants("workbenches"))) {
+    if (cp && !this.shadow && (wants("branches") || wants("workbenches"))) {
       this.commitSlice.identity = await gitIdentity(cp.root);
       this.touch();
     }
     const prUsed = this.pr.mine.length > 0 || this.pr.reviewRequested.length > 0 || this.pr.selected !== null;
-    if (scope?.includes("pr") || (scope === null && prUsed)) {
+    if (!this.shadow && (scope?.includes("pr") || (scope === null && prUsed))) {
       void this.handle({ type: "pr_list" });
       if (this.pr.selected) void this.handle({ type: "pr_reload_comments" });
     }
@@ -3782,6 +3870,7 @@ export class ReviewEngine {
     this.disk = null;
     this.saveHealth.clear();
     this.gitInit = null;
+    this.releaseShadow(); // §59
     this.sessionState = emptySession(this.settings.permissionMode ?? "default");
     this.planByClaude = false; // MARK: wave6 w6-terminal (§44.1)
     this.rememberedAllows.clear();
@@ -4831,7 +4920,7 @@ export class ReviewEngine {
   /** Reloads `branches`, `isWorktreeDirty` and `project.branch`. Failures only go to the log. */
   private async refreshBranches(): Promise<void> {
     const cp = this.gate.checkpoint;
-    if (!cp) return;
+    if (!cp || this.shadow) return; // §59: a folder tracked without git has no branches
     try {
       // MARK: wave3 engine-flow — §36.12: the remote-tracking branches ride along (bases for workbench_create).
       const [list, dirty, name, remotes] = await Promise.all([listBranches(cp), isWorktreeDirty(cp), cp.branchName(), remoteBranches(cp).catch(() => [])]);
@@ -4875,7 +4964,7 @@ export class ReviewEngine {
    */
   private async refreshWorkbenches(withDirty: boolean, forceDirty = false): Promise<void> {
     const cp = this.gate.checkpoint;
-    if (!cp) return;
+    if (!cp || this.shadow) return; // §59: nor worktrees
     try {
       const [common, worktrees] = await Promise.all([commonDir(cp.root), listWorktrees(cp.root)]);
       if (this.gate.checkpoint !== cp) return;
@@ -9353,6 +9442,11 @@ async function listRepoFiles(cp: GitCheckpoint): Promise<string[]> {
   return out.stdout.toString("utf8").split("\0").filter(Boolean);
 }
 
+/** §59: the folder a hidden repository is kept for — its real path, native form (as git's toplevel would name it). */
+function shadowFolder(path: string): string {
+  return toNativeAbs(realpathLenient(path));
+}
+
 function emptyWorkbenches(): EngineSlices["workbenches"] {
   return { list: [], current: "", managedRoot: "" };
 }
@@ -9610,6 +9704,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "open_project":
     case "switch_project":
     case "init_repo":
+    case "track_without_git": // §59
     case "reject":
     case "reject_all":
     case "reject_hunks":

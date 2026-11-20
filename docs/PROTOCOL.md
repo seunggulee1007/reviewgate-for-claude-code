@@ -69,6 +69,7 @@ type EngineCommand =
   | Cmd<"switch_project", { path: string; takeover?: boolean }> // alias of open_project (the client confirmed a pending review)
   | Cmd<"close_project">
   | Cmd<"init_repo">                                       // when state.gitInit != null: git init, then start the session
+  | Cmd<"track_without_git", { confirm?: boolean }>       // when state.gitInit != null: review the folder through a hidden repository outside it (no .git in it), then start the session; confirm required when gitInit.looksUnsafe (§59)
   | Cmd<"cancel_git_init">
   | Cmd<"restart_session">                                 // new Claude session for the open project WITHOUT resetting the gate; resumes the stored session id (§8)
   | Cmd<"send", { text: string; acceptPending?: boolean; mentions?: string[]; attachments?: SendAttachment[] }>  // guarded by gate.canSend; engine prefixes gate.lastReviewSummary; acceptPending accepts every pending file first (§10); mentions §23, attachments §24
@@ -164,8 +165,8 @@ One **snapshot** message (`state`) plus streaming events.
 ```ts
 type ReviewState = {
   seq: number;                                   // monotonic; clients drop out-of-order snapshots
-  project: null | { path: string; root: string; name: string; branch: string | null; remoteURL: string | null };
-  gitInit: null | { path: string; candidates: string[]; looksUnsafe: boolean };
+  project: null | { path: string; root: string; name: string; branch: string | null; remoteURL: string | null; commonDir?: string; vcs?: "git" | "shadow" };  // vcs §59 (absent = git)
+  gitInit: null | { path: string; candidates: string[]; looksUnsafe: boolean };  // the opened folder is no repository: init_repo / track_without_git (§59) / cancel_git_init
   session: {
     open: boolean; starting: boolean;
     sessionId: string | null; model: string | null;
@@ -408,7 +409,7 @@ Golden samples of `state`, `file_diff` and `full_file_content` live in `engine/t
 - Permission `ask`-hook semantics, auto-allowed edit tools, the read-only set, `stopReason: "interrupted"`, `loadUserSettings` — carried over verbatim from v1 (§4). `permission_request` blocks the tool until `permission_response` with the same `requestId`. Several can be open at once (parallel subagents): `state.session.pendingPermissions` lists them oldest first, `state.session.pendingPermission` is the oldest, and `blockedReason` is `awaiting_permission` while any is open (§33). Read-only Bash commands, `bashAllowPatterns` matches and session-remembered allows never produce a `permission_request` (§10).
 - Activity folding (`state.hud.activity`): `tool_start` → `{kind:"tool", toolName, detail?}`; `tool_end` → `subagent` if `subagentDepth > 0` else `working`; `subagent_start` → `{kind:"subagent", toolName?, detail?}`; `subagent_end` → `subagent`/`working` (`subagentDepth` itself is the number of running foreground `hud.agents`, §13); `thinking` → `{kind:"thinking", detail?}` (also emitted for the CLI's `status` system messages — `detail` = `"compacting"` during `/compact` / auto-compaction, `"requesting"` while waiting for the model — and `"compacted"` at a compact boundary); `idle` → `{kind:"idle"}`. The raw `activity` events are still emitted for finer HUD use.
 - Branches: `state.branches` is refreshed after `open_project`/`init_repo`, after every collection (success or failure), after `switch_branch`/`create_branch`, and on `branches`. `switch_branch`/`create_branch` are refused with `result{ok:false, error:"switch_blocked:<kind>"}` while `switchBlocker` is set (`running` while starting/running/collecting/reverting; `pendingReview{count}` while files are pending or changes-requested; `dirtyWorktree` when `git status --porcelain` is non-empty — ignore patterns are not applied there). A git failure emits `error{scope:"git"}` ("Failed to switch to branch X: …" / "Failed to create branch X: …") and `result{ok:false}`.
-- Projects: `open_project` stops the current session, clears all project-bound state, opens the checkpoint; a non-repository yields `state.gitInit = {path, candidates, looksUnsafe}` (`candidates`: immediate subfolders containing `.git`, sorted; `looksUnsafe`: `/`, `$HOME`, ~/Desktop/Documents/Downloads or > 200 entries) and `blockedReason = "git_init_needed"` until `init_repo` / `cancel_git_init` / another `open_project`. The session starts once the toolchain is located (`state.toolchain`); a missing `claude` yields `error{fatal:true, scope:"engine"}` with the project open and `session.open = false`.
+- Projects: `open_project` stops the current session, clears all project-bound state, opens the checkpoint; a non-repository yields `state.gitInit = {path, candidates, looksUnsafe}` (`candidates`: immediate subfolders containing `.git`, sorted; `looksUnsafe`: `/`, `$HOME`, ~/Desktop/Documents/Downloads or > 200 entries) and `blockedReason = "git_init_needed"` until `init_repo` / `track_without_git` (§59) / `cancel_git_init` / another `open_project`. A folder tracked without git before (§59) opens straight on its hidden repository instead (`project.vcs = "shadow"`, no `gitInit`). The session starts once the toolchain is located (`state.toolchain`); a missing `claude` yields `error{fatal:true, scope:"engine"}` with the project open and `session.open = false`.
 - `error{fatal:true, scope:"session"}` = the Claude session died; the engine keeps running, `session.open = false`, a running turn is closed (`stopReason: "error"` / `"session closed"`) and collected so the review list (if any) is preserved. The engine restarts the session by itself once per turn (§8 auto-restart) — not when it died before initialize, and a refused start is recovered without an error (§30) — `restart_session` restarts it on demand, and `open_project` of the same path restores the persisted review (§8) — none of them loses the pending list. Non-fatal `error`s only set `lastError` (transcript row). Every `error` of scope session / git / engine is also kept as a `kind: "error"` row of the chat's transcript (§30).
 - `set_settings`: `budget`, `autoAllowReadOnlyBash`, `bashAllowPatterns`, `applyUserAllowRules` and `applyUserBashRules` (§33.5) reach the running session immediately (queued permission requests they now cover are answered, §33.1); `persistSessionAllows` saves / removes the repository's remembered allows at once (§33.7); `ignorePatterns` apply at the next collection; `ghHost` switches the PR store host; `claudePath`/`ghPath`/`gitPath` re-locate the toolchain lazily; `autoAllowTools`/`loadUserSettings`/`systemPromptAppend`/`model`/`allowWorktreeIsolation` apply on the next `open_project` (session start); `chatMoveFollowUp` (§39.4) is read when the engine moves a chat. Fields a client omits (or sends as `undefined`) keep the engine defaults — a `hello` without `budget` runs with `{maxFiles: 0, maxLines: 0, hardMultiplier: 2.0}`: no change budget (§54).
 - `pr_create` (PR lane): refused with `empty base` / `detached_head` / `no_remote` / `unsupported_remote:<url>` / `no_project`. The repository is derived from the `origin` fetch URL (`git@host:o/r.git`, `ssh://…`, `https://host/o/r`) → `--repo host/o/r`. When the current branch has no upstream the engine first runs `git push -u origin <branch>` (no confirmation; a push failure is `result{ok:false}` with git's message). Then `gh pr create --repo … --head <branch> --base <base> [--title T --body B | --fill] [--draft]`; the reply is `pr_created{url, branch}` and `state.pr.lastCreatedPR` mirrors it. A `gh` failure is `result{ok:false, error:<gh stderr>}` + `error{scope:"pr"}`.
@@ -1406,7 +1407,8 @@ parentheses. The turn itself still ends as usual (`turn_end`, collection).
 resolves to a `.cmd` / `.bat` shim with no `claude.exe` / `cli.js` behind it, which cannot be spawned without a shell), `session_start_failed` (fatal; or one of the API codes
 above when the start error text matches), `send_failed` (the session refused a send, request-changes or the
 init-timeout resend; a `send` whose snapshot A fails is refused instead, §35.1), `plan_followup_failed` (§19.5), `extensions_init_timeout` (§16 fallback), `unprompted_blocked` (§18),
-`project_open_failed`, `git_init_failed`, `collect_failed`, `refresh_failed`, `revert_failed` (reject / reject_hunks git
+`project_open_failed`, `git_init_failed`, `folder_too_large` / `track_failed` (§59: reopening a folder tracked without git
+failed; `state.gitInit` is set again), `collect_failed`, `refresh_failed`, `revert_failed` (reject / reject_hunks git
 failure), `branch_failed`, `workbench_failed`, `commit_failed`, `command_failed` (any other unexpected failure of a command),
 `side_failed` (+ `threadId`, §21), `mcp_auth_required` / `mcp_failed` (+ `server`, §22), `peer_release_failed` (non-fatal, §29:
 the CLI did not let the held messages through; they are still held), `lfs_missing` (§32: instead of
@@ -1424,7 +1426,8 @@ turn changed again after the user rejected it, so it was not reverted; M32, §34
 English): `binary_file`, `branch_in_use`, `cannot_remove_current`, `cannot_remove_main`, `collect_failed`, `commit_failed`,
 `detached_head`, `diff_mismatch`, `empty_base` ("empty base"), `empty_message` ("empty message" / `empty_message`),
 `empty_note` ("empty note"), `empty_title`, `engine_disposed` ("engine disposed"), `file_changed_since_review` (+ `paths`,
-§19.1), `gate_closed`, `git_identity_missing`, `git_init_not_needed`, `history_trees_gone`, `invalid_branch_name`,
+§19.1), `gate_closed`, `git_identity_missing`, `git_init_not_needed`, `not_a_git_repo` / `folder_unsafe` / `folder_too_large` /
+`track_failed` (§59), `history_trees_gone`, `invalid_branch_name`,
 `invalid_mode`, `locked_by_other_session`, `no_hunks`, `no_plan`, `no_project`, `no_remote`, `no_review`, `no_session`,
 `not_a_changed_file`, `not_in_history_entry`, `not_pending`, `notes_pending`, `nothing_to_commit`, `nothing_to_push`,
 `nothing_to_retry`, `partial_reject_unsupported`, `path_exists`, `plan_followup_failed`, `push_failed`,
@@ -9599,3 +9602,90 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
 - **Not in a terminal chat** (§57): its column has no message box (the TUI is the composer) and `canAcceptAndContinue` is
   false there, so neither the button nor ⌘⇧↩ can send — the engine would refuse `send` with `terminal_chat` anyway.
 - **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.
+
+## 59. Folders that are not git repositories (track without git)
+
+ReviewGate reviews through git snapshots, so a folder that is no repository used to offer two ways out: `init_repo` (a
+`.git` in the user's folder) or `cancel_git_init`. A third one keeps the folder as it is: ReviewGate keeps a **hidden
+repository outside the folder** and reviews as usual; the folder never gets a `.git`.
+
+**Command.** `track_without_git {confirm?: boolean}` — valid while `state.gitInit != null` (else refused
+`git_init_not_needed`). On success `gitInit` becomes null, `state.project` is set with **`vcs: "shadow"`** and the session
+starts as after `init_repo` (lock, persisted review, chats, …). Refusals keep `state.gitInit` as it was (the prompt stays):
+
+| code (`result.code`; `error`) | when |
+| --- | --- |
+| `git_init_not_needed` | no `gitInit` pending |
+| `folder_unsafe` | `gitInit.looksUnsafe` (`/`, `$HOME`, ~/Desktop, ~/Documents, ~/Downloads, > 200 entries) and no `confirm: true` — the client asks first, then resends with `confirm` |
+| `folder_too_large` (`folder_too_large:files` / `:bytes` / `:scan`) | the size guard below |
+| `track_failed` (`track_failed: <git's message>`) | anything else (git missing, the data folder not writable, …) |
+
+Like every refusal these come only as the command's `result` (no `error` event); `locked_by_other_session` (§6) can follow
+the same way, with `gitInit` cleared — resend `open_project {takeover: true}`, which opens the now-remembered folder.
+
+**State.** `project.vcs: "git" | "shadow"` (`ProjectVcs`; additive — older engines omit it, read absent as `git`). With
+`shadow`: `project.root` is the folder's real path, `project.branch` and `project.remoteURL` are null, `project.commonDir`
+is the hidden repository (the per-repository allow list keys on it, §33.6, as for any repository), `commit.identity` is
+`{name: null, email: null}`, `commit.canCommit` is always false, `branches.list` and `workbenches.list` stay empty (never
+refreshed). Clients hide or disable what needs a repository from `vcs` alone.
+
+**What works.** Everything the review is made of: send / steer / interrupt, the turn's snapshots and collection, the
+review list, diffs (`select_file`, `full_file`, `live_changes`), accept / unaccept / reject / `reject_all` / `reject_hunks`
+/ `reject_undo`, notes and `request_changes`, auto-accept rules, external-change detection (§31: files changed outside the
+app, a stale review), the large-file stubs (§39.1) and mods paths (§32), `rewind`, review history (§14: rounds are pinned
+trees of the hidden repository — `review_history`, `history_diff`, `history_cleanup`), chats and their persistence, side
+questions, pre-review, MCP, `list_files`, `project_file`, `project_search` (git grep on the hidden repository, `--untracked`),
+terminal chats and their hooks. The §46 git-command card still asks before a destructive-looking `git` command of Claude's
+in the folder — that command fails there anyway ("not a git repository"), as in a terminal; a nested repository inside the
+folder (a clone in a subfolder) is its own repository and is guarded as before.
+
+**What is refused** (`result{ok:false, code:"not_a_git_repo", error:"not_a_git_repo:<command type>"}`, before anything
+runs): `branches`, `switch_branch`, `create_branch`; `workbench_list`, `workbench_create`, `workbench_preview`,
+`workbench_remove`, `workbench_prune`, `chat_move`, `plan_response {into: "workbench"}`; `commit`, `commit_hunks`,
+`commit_series`, `commit_draft`, `commit_split_draft`, `commit_format`, `push`; every PR command (`pr_list`, `pr_open`,
+`pr_select_file`, `pr_add_draft`, `pr_remove_draft`, `pr_submit`, `pr_reply`, `pr_reload_comments`, `pr_file_lines`,
+`pr_create`, `pr_draft`, `pr_ai_draft`). `pr_close`, `accounts` and `login_in_terminal` are not about the repository and
+stay. `refresh` skips its `branches` / `workbenches` / `pr` parts.
+
+**The hidden repository.** `<dataDir>/shadow-repos/<folder name>-<16 hex of sha256 of the folder's real path>/`
+(`dataDir`: `REVIEWGATE_DATA_DIR`, else `~/.reviewgate`), a bare repository (`git init --bare`) whose work tree is given on
+every call: `runGit` keeps a registry of such folders and runs their git as `git -C <folder> --git-dir=<hidden>
+--work-tree=<folder> …` (the registry is exact: a subfolder — a nested repository — still discovers its own). The lock
+(§6), the persisted review, chats, checkpoints and refs live in it as they would in `.git`. Its local config only:
+`user.name ReviewGate`, `user.email reviewgate@localhost` (its baseline commits never need the user's identity),
+`commit.gpgsign false`, `core.autocrlf false`; the user's global git config is never written. `info/exclude` is written
+once, then left to the user: `node_modules/`, `bower_components/`, `.DS_Store`, `Thumbs.db`, `desktop.ini`, `build/`,
+`dist/`, `out/`, `target/`, `.gradle/`, `.next/`, `.nuxt/`, `.cache/`, `.parcel-cache/`, `.turbo/`, `coverage/`, `.venv/`,
+`venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.mypy_cache/`, `.tox/`, `.terraform/`, `DerivedData/`, `*.log`,
+`*.tmp`, `*.swp` — the folder's own `.gitignore` files apply too, and the mods paths (§32) are captured whatever they say.
+
+**Size guard.** Before every baseline (and at every open, also when the baseline is kept) the engine lists what the hidden
+repository would hold (`git ls-files --cached --others --exclude-standard`) and adds up the sizes: more than **20 000 files**
+→ `folder_too_large:files`, more than **1 GiB** → `folder_too_large:bytes` (an untracked file at least the large-file limit,
+§39.1, is not counted — a snapshot keeps only a stub of it), a listing that takes more than **60 s** →
+`folder_too_large:scan`. Nothing is committed then.
+
+**Baseline.** At the first `track_without_git` the folder's current state becomes the hidden repository's HEAD and index —
+one commit "ReviewGate baseline" (`git add -A`, untracked large files left out). Reviews are turn by turn (A → B snapshots),
+never "since the baseline", so the first turn shows only what Claude changed. **Re-baseline rule:** at every later open,
+when no review is waiting (no persisted review in the hidden repository), the folder's state is committed again as a new
+"ReviewGate baseline" when it differs from HEAD — what changed while ReviewGate was closed is simply the new starting point,
+never a giant review. While a review waits, HEAD stays as it was and the review is restored as in a repository (§8; what
+changed meanwhile shows as `external`, §31).
+
+**Persistence.** The choice is remembered per folder: `reviewgate-shadow.json` (`{version, path, createdAt}`) in the hidden
+repository, written once the first baseline succeeded (a refused `track_without_git` remembers nothing). An `open_project`
+of a folder that is no repository and has it opens straight on the hidden repository — no `gitInit` prompt. When that open
+fails (the folder grew past the size guard, …) the engine sends `error{scope:"git", code:"folder_too_large" | "track_failed"}`
+and sets `state.gitInit` again so the user can choose another way.
+
+**A folder that becomes a real repository.** `open_project` always looks for a real repository first (plain git discovery,
+the registry ignored): once the folder (or a folder above it) is a repository — the user ran `git init`, or chose `init_repo`
+— it opens as one (`vcs: "git"`), and the hidden repository is left alone on disk (its chats and review history stay there;
+nothing deletes it). If the `.git` goes away again, the next open uses the hidden repository again (re-baselined by the rule above). A `git
+init` Claude runs in the folder during a turn takes effect at the next open; until then the engine keeps using the hidden
+repository (git never adds a `.git` folder to a tree, so it never shows in the review).
+
+**Claude in the folder.** The CLI runs in the folder as in a terminal: its own `git` commands fail there ("not a git
+repository"). The hooks' snapshots (post-Bash, terminal chats) go through `runGit` and use the hidden repository; an edit
+into the hidden repository is git's own data for the M23 guard (§33.3), as an edit into `.git` would be.
