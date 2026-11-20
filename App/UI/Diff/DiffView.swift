@@ -133,6 +133,7 @@ struct DiffView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .diffSplitWidth()   // §34.11: split only where two columns read (the header's picker says why not)
         .onChange(of: file?.path) { _, path in
             if let jump = model.diffJump, jump.path != path { model.diffJump = nil }   // a link whose file never showed is dropped
             store.side.selectionAnchor = path.map { SideAnchor(path: $0) }
@@ -349,6 +350,7 @@ struct DiffView: View {
                 guard items.indices.contains(index) else { return }
                 lineSelection.select(DiffPlanList.rowKey(items[index]), extend: true)
             },
+            pickKey: { key in lineSelection.select(key, extend: true) },
             copySelection: { selectedLinesText(diff, file: file) },
             draftText: { line in noteDrafts.text(path: file.path, side: Self.noteSide(line), line: Self.noteLine(line)) },
             draftChanged: { line, text in noteDrafts.set(text, path: file.path, side: Self.noteSide(line), line: Self.noteLine(line)) },
@@ -695,6 +697,7 @@ struct DiffViewHeader: View {
     @Binding var confirmRevertSelected: Bool
     let onAddNote: () -> Void
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
+    @Environment(\.diffSplitFits) private var splitFits
 
     var body: some View {
         // The file's unsent notes — what Request changes sends (wave2 mac-flow, §34.4: sent ones are "요청함" cards).
@@ -746,7 +749,7 @@ struct DiffViewHeader: View {
                 controls(measuring: measuring)
             } compact: {
                 FullOrCompact { measuring in
-                    controls(measuring: measuring).labelStyle(.iconOnly)
+                    controls(measuring: measuring, iconOnly: true).labelStyle(.iconOnly)
                 } compact: {
                     foldedControls
                 }
@@ -783,6 +786,7 @@ struct DiffViewHeader: View {
                     Toggle("Ignore whitespace", systemImage: "space", isOn: $ignoreWhitespace)
                 }
                 Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                if !showFullFile { DiffLayoutMenuToggle(fits: splitFits) }   // §34.11 (off here: the pane is too narrow)
                 Button("Find in diff", systemImage: "magnifyingglass") { model.diffFindTick += 1 }
                 Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
                     .disabled(file.status == .deleted)
@@ -794,7 +798,7 @@ struct DiffViewHeader: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
+            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
             .accessibilityLabel("More diff options")
             .accessibilityIdentifier("Diff header more")
             verdictControls(measuring: false).labelStyle(.iconOnly)
@@ -802,7 +806,8 @@ struct DiffViewHeader: View {
     }
 
     /// `measuring`: the hidden copy FullOrCompact sizes — it registers no shortcut (the one on screen is the only ⌥⌘N).
-    private func controls(measuring: Bool) -> some View {
+    /// `iconOnly`: the narrower header, the layout picker's segments as icons too.
+    private func controls(measuring: Bool, iconOnly: Bool = false) -> some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)
             if showsHunkControls, selectedHunks > 0 {
@@ -823,7 +828,8 @@ struct DiffViewHeader: View {
                 .accessibilityLabel("Add note")
                 .accessibilityIdentifier("Add note")
             if !showFullFile { WhitespaceToggle(isOn: $ignoreWhitespace, file: file) }   // wave4c w4c-review — §41.3 공백 무시
-            DiffLineOptions { model.diffFindTick += 1 }   // wave2 mac-diff: 줄바꿈, diff에서 찾기 (the diff or its full file)
+            // wave2 mac-diff: 줄바꿈, diff에서 찾기 (the diff or its full file); §34.11 합쳐 보기 | 나란히 보기 over the diff
+            DiffLineOptions(showsLayout: !showFullFile, iconOnly: iconOnly) { model.diffFindTick += 1 }
             Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
                 .toggleStyle(.button)
                 .labelStyle(.iconOnly)

@@ -16,6 +16,8 @@ struct DiffRow: View {
     var isCurrentMatch = false
     /// Part of the lines picked for copying (`DiffLineSelection`): drawn tinted.
     var selected = false
+    /// §34.11: one side of a split row — that side's line number only, and the row fills the side's height.
+    var splitSide: DiffSide? = nil
 
     static let font = Font.system(.body, design: .monospaced)
     static let gutterWidth: CGFloat = 44
@@ -45,8 +47,12 @@ struct DiffRow: View {
                 .help(line.text)
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
-                gutter(line.oldNo)
-                gutter(line.newNo)
+                if let splitSide {
+                    gutter(splitSide == .old ? line.oldNo : line.newNo)
+                } else {
+                    gutter(line.oldNo)
+                    gutter(line.newNo)
+                }
                 Text(marker)
                     .font(Self.font)
                     .foregroundStyle(.secondary)
@@ -54,7 +60,7 @@ struct DiffRow: View {
                 DiffCodeText(text: line.text, styled: styled, faint: line.wsOnly)
                     .font(Self.font)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: splitSide == nil ? nil : .infinity, alignment: .topLeading)
             .background(background)
             .background(selected ? Self.selectionFill : Color.clear)
         }

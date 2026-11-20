@@ -13,4 +13,6 @@ enum DiffPrefsKeys {
     static let ignoreWhitespace = "diffIgnoreWhitespace"
     /// "줄바꿈" (Bool, default on) — the key the diff already uses.
     static let wrapLines = DiffCodeMetrics.wrapLinesKey
+    /// "합쳐 보기 | 나란히 보기" (`DiffLayoutMode` raw value, default unified) — §34.11.
+    static let diffLayout = "diffLayout"
 }

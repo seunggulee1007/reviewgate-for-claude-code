@@ -13,6 +13,7 @@ struct ViewMenuCommands: Commands {
     @AppStorage(DiffPrefsKeys.showFullFile) private var showFullFile = false
     @AppStorage(DiffPrefsKeys.ignoreWhitespace) private var ignoreWhitespace = false
     @AppStorage(DiffPrefsKeys.wrapLines) private var wrapLines = true
+    @AppStorage(DiffPrefsKeys.diffLayout) private var diffLayout = DiffLayoutMode.unified
 
     var body: some Commands {
         // M15: View → Refresh (⌘R) — the review re-diff, branches, workbenches, PRs; on the PR tab only the PR lists.
@@ -66,6 +67,10 @@ struct ViewMenuCommands: Commands {
                 .accessibilityIdentifier("View menu Ignore whitespace")
             Toggle("Wrap Lines", isOn: $wrapLines)
                 .accessibilityIdentifier("View menu Wrap lines")
+            // §34.11: 합쳐 보기 | 나란히 보기 — every diff; a pane too narrow for split stays unified until it is wide enough.
+            Toggle("Split Diff", isOn: Binding(get: { diffLayout == .split }, set: { diffLayout = $0 ? .split : .unified }))
+                .keyboardShortcut("l", modifiers: [.command, .option])
+                .accessibilityIdentifier("View menu Split diff")
             Divider()
             // polish PX-12: one text size for the app (the diff, the chat, the message box), kept across launches.
             Button("Zoom In") { textScale = TextScale.larger(textScale) }

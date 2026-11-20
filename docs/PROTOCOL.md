@@ -3176,6 +3176,10 @@ as git tools and GitHub do). The choice is remembered per user, for every diff.
   unified.
 - Binary files, image previews and the "no textual diff" / truncated placeholders are the same in both; the full-file view
   keeps its own layout.
+- **Mac.** A segmented "Unified | Split" in each diff header (the review diff, live, history and PR diffs — icons in a
+  narrow header, the "⋯" menu's "Split Diff" in the narrowest), View › Split Diff (⌥⌘L) and Settings › General › Diff;
+  `UserDefaults` `diffLayout`. Each pane measures itself (`diffSplitWidth()`); split rows are built only while split shows,
+  from the rows the List already has (`DiffSplitCache`), one List row per split row.
 
 ## 35. 0.2.2 engine follow-ups
 

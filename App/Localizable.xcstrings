@@ -1713,6 +1713,22 @@
         }
       }
     },
+    "A diff pane too narrow for two columns stays unified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A diff pane too narrow for two columns stays unified"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "두 열이 들어가지 않는 좁은 diff 패널은 합쳐 보기로 보여요"
+          }
+        }
+      }
+    },
     "A fresh chat in this workbench gets only the plan file — the long research conversation is not carried on": {
       "localizations": {
         "en": {
@@ -10535,6 +10551,22 @@
         }
       }
     },
+    "Diff layout": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diff layout"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diff 보기 방식"
+          }
+        }
+      }
+    },
     "Diff range": {
       "localizations": {
         "en": {
@@ -11475,6 +11507,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "소리"
+          }
+        }
+      }
+    },
+    "Split": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나란히 보기"
+          }
+        }
+      }
+    },
+    "Split Diff": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split Diff"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diff 나란히 보기"
+          }
+        }
+      }
+    },
+    "Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나란히 보기는 왼쪽에 이전 버전, 오른쪽에 새 버전을 보여요 — diff 패널이 좁으면 넓어질 때까지 합쳐 보기로 보여요."
           }
         }
       }
@@ -15840,18 +15920,18 @@
         }
       }
     },
-    "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
+    "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+            "value": "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "더 보기: 메모 추가 (⌥⌘N), 공백 무시, 줄바꿈, diff에서 찾기 (⌥⌘F), 전체 파일, 에디터에서 열기 (⇧⌘E)"
+            "value": "더 보기: 메모 추가 (⌥⌘N), 공백 무시, 줄바꿈, 나란히 보기 (⌥⌘L), diff에서 찾기 (⌥⌘F), 전체 파일, 에디터에서 열기 (⇧⌘E)"
           }
         }
       }
@@ -29350,6 +29430,22 @@
         }
       }
     },
+    "Too narrow for split — widen the pane or hide the sidebar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too narrow for split — widen the pane or hide the sidebar"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나란히 보기에는 너무 좁아요 — 패널을 넓히거나 사이드바를 숨기세요"
+          }
+        }
+      }
+    },
     "Tool calls (%lld)": {
       "localizations": {
         "en": {
@@ -29938,6 +30034,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "답변을 입력하세요"
+          }
+        }
+      }
+    },
+    "Unified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unified"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "합쳐 보기"
+          }
+        }
+      }
+    },
+    "Unified: one column · Split: the old version on the left, the new on the right": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unified: one column · Split: the old version on the left, the new on the right"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "합쳐 보기: 한 열 · 나란히 보기: 왼쪽은 이전 버전, 오른쪽은 새 버전"
           }
         }
       }
