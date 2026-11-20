@@ -1015,5 +1015,10 @@
   "Command Prompt": "명령 프롬프트",
   "What the terminal panel at the bottom of the window opens (Ctrl+`). It needs no preview and runs in the project's folder.": "창 아래 터미널 패널(Ctrl+`)이 여는 셸이에요. 미리 보기를 켜지 않아도 되고, 프로젝트 폴더에서 실행돼요.",
   "Claude Code itself in this column (Ctrl+Alt+T)": "이 칸에서 Claude Code를 그대로 실행 (Ctrl+Alt+T)",
-  "ReviewGate's chat UI in this column (Ctrl+Alt+Shift+T)": "이 칸에서 ReviewGate의 채팅 UI (Ctrl+Alt+Shift+T)"
+  "ReviewGate's chat UI in this column (Ctrl+Alt+Shift+T)": "이 칸에서 ReviewGate의 채팅 UI (Ctrl+Alt+Shift+T)",
+  "Pastes it into Claude Code's prompt in the terminal chat as typed — press Enter there to send it": "입력한 그대로 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 보내려면 터미널에서 Enter를 누르세요",
+  "Paste into Claude Code's prompt in the terminal — press Enter there to send it": "터미널의 Claude Code 입력란에 붙여넣어요 — 보내려면 터미널에서 Enter를 누르세요",
+  "Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Enter there": "보고서를 터미널의 Claude Code 입력란에 붙여넣어요 — Claude에게 시킬 일을 덧붙이고 터미널에서 Enter를 누르세요",
+  "Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat — you read it and press Enter there": "아직 답하지 않은 스레드를 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Enter를 누르세요",
+  "Pastes this thread into Claude Code's prompt in the terminal chat — you read it and press Enter there": "이 스레드를 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Enter를 누르세요"
 }
