@@ -262,7 +262,7 @@ import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffor
 // MARK: terminal-chat (§57)
 import { HookServer, RETIRED_REASON } from "./session/hookServer.js";
 import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js";
-import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
+import { HOOK_TOKEN_ENV, hookSettings, type HookSettingsOptions, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
 import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
@@ -2743,7 +2743,8 @@ export class ReviewEngine {
       throw new CommandRefused(`terminal_cli_too_old:${version ?? "unknown"} (needs ${MIN_TERMINAL_CLI})`, { code: "terminal_cli_too_old" });
     }
     const configDir = claudeConfigDir(this.childEnv());
-    const managed = (this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir })).settings;
+    const managedPolicy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const managed = managedPolicy.settings;
     const known = this.requireSession(sessionId);
     // §57.16: the engine's config dir and the one the terminal was seen using — refused when either says hooks are off.
     let off: ReturnType<typeof hooksDisabled> = null;
@@ -2766,7 +2767,10 @@ export class ReviewEngine {
       meta.cliSessionId = cliId;
       this.persistSessions();
     }
-    const settings = hookSettings(server.url, { permissionRequest: this.terminalFeature("permissionBridge") });
+    const settings = hookSettings(server.url, {
+      permissionRequest: this.terminalFeature("permissionBridge"),
+      statusLine: this.terminalFeature("statusLine") ? this.terminalStatusLine(meta, server.statusUrl, managedPolicy) : null,
+    });
     const mcpConfigFile = await this.terminalMcpConfigFile(meta);
     const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings), mcpConfigFile });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
@@ -2825,6 +2829,21 @@ export class ReviewEngine {
     writeFileSync(file, json, { mode: 0o600 });
     chmodSync(file, 0o600); // an existing file keeps its mode through writeFileSync
     return file;
+  }
+
+  /**
+   * §57.13: the statusLine tee of a spawn — the user's own status line as their claude resolves it (the project's too: the
+   * TUI runs it once the folder is trusted; the learned config dir's user settings), its padding and refresh copied.
+   */
+  private terminalStatusLine(meta: SessionMeta, statusUrl: string, managed: ManagedPolicy): NonNullable<HookSettingsOptions["statusLine"]> {
+    const dirs = this.terminalConfigDirs(meta);
+    const own = resolveStatusLine({ configDir: dirs[dirs.length - 1]!, cwd: this.project?.path ?? null, managed, trustProject: true }).config;
+    return {
+      statusUrl,
+      userCommand: own?.command ?? null,
+      ...(own ? { padding: own.padding } : {}),
+      ...(own?.refreshIntervalMs ? { refreshInterval: Math.max(1, Math.round(own.refreshIntervalMs / 1000)) } : {}),
+    };
   }
 
   /** §57.16: the config dirs a terminal chat's CLI may use — the engine's, then the one its hooks showed (when another). */
@@ -7567,6 +7586,12 @@ export class ReviewEngine {
         return;
       case "terminal_config_dir": // §57.16
         if (source instanceof TerminalSession) this.onTerminalConfigDir(source.chatId, ev.dir);
+        return;
+      case "terminal_status": // §57.13: the strip's cost / context; the session's cost comes with turn_end
+        if (ev.status.contextTokens !== null) this.hud.contextTokens = ev.status.contextTokens;
+        if (ev.status.contextWindow !== null) this.hud.contextWindow = ev.status.contextWindow;
+        if (ev.status.model) this.sessionState.model = ev.status.model;
+        this.touchChurn();
         return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);

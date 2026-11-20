@@ -15,6 +15,8 @@ export type HookOutput = Record<string, unknown>;
 export interface TerminalHookHandler {
   /** One hook's input (the CLI's JSON); resolves with the answer. `signal` aborts when the CLI gave up on the request. */
   handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput>;
+  /** §57.13: what the TUI's status line was given (the statusLine tee posts it to `/status`); answered `{}` whatever it does. */
+  handleStatus?(input: Record<string, unknown>): void;
 }
 
 /** The body cap (enforced while streaming). */
@@ -70,6 +72,11 @@ export class HookServer {
     return `http://127.0.0.1:${this.listenPort ?? 0}/hook`;
   }
 
+  /** §57.13: where the statusLine tee posts (`start` first). */
+  get statusUrl(): string {
+    return `http://127.0.0.1:${this.listenPort ?? 0}/status`;
+  }
+
   /** A fresh token routed to `handler` (32 random bytes, hex). */
   issue(handler: TerminalHookHandler): string {
     const token = randomBytes(32).toString("hex");
@@ -117,7 +124,7 @@ export class HookServer {
       res.end(text);
     };
     const path = (req.url ?? "").split("?")[0];
-    if (path !== "/hook") {
+    if (path !== "/hook" && path !== "/status") {
       req.resume();
       return reply(404);
     }
@@ -166,6 +173,17 @@ export class HookServer {
       }
       if (!input || typeof input !== "object" || Array.isArray(input)) return reply(400);
       const body = input as Record<string, unknown>;
+      if (path === "/status") {
+        // §57.13: display only — a retired token's status is dropped, every answer is `{}`.
+        if (route !== "retired") {
+          try {
+            route.handler.handleStatus?.(body);
+          } catch (e) {
+            this.log(`terminal status failed: ${String(e)}`);
+          }
+        }
+        return reply(200);
+      }
       if (route === "retired") {
         this.log(`terminal hook ${String(body.hook_event_name)} of a retired token: blocked`);
         return reply(200, retiredAnswer(body.hook_event_name));

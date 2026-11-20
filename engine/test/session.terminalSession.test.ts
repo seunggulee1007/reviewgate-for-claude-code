@@ -404,4 +404,33 @@ describe("TerminalSession", () => {
     expect(await r.hook(ups("p3"))).toEqual({});
     expect(r.ts.state.promptId).toBe("p3");
   });
+
+  it("§57.13 status: the first sample is the baseline, growth goes into the next turn_end, a drop is a new baseline", async () => {
+    const r = rig();
+    const status = (cost: number, ctx = 1000) => r.ts.handleStatus({ cost: { total_cost_usd: cost }, model: { id: "claude-acme-test", display_name: "Acme" }, context_window: { context_window_size: 200_000, current_usage: { input_tokens: ctx, cache_creation_input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 7 } } });
+    r.ts.setToken("t1");
+    status(0.5); // a resumed conversation's earlier cost: not this chat's new spend
+    expect(r.ts.state.status).toMatchObject({ costUsd: 0.5, model: "claude-acme-test", modelName: "Acme", contextTokens: 1015, contextWindow: 200_000 });
+    expect(r.of("terminal_status")).toHaveLength(1);
+    await r.hook(ups("p1"));
+    status(0.75, 2000);
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    let end = r.of("turn_end").at(-1)!;
+    expect(end.usage.costUsd).toBeCloseTo(0.25);
+    expect(end.usage).toMatchObject({ contextTokens: 2015, contextWindow: 200_000 });
+    status(0.1); // /clear: the total starts again — a new baseline, nothing negative
+    status(0.3);
+    await r.hook(ups("p2"));
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    end = r.of("turn_end").at(-1)!;
+    expect(end.usage.costUsd).toBeCloseTo(0.2);
+    // A new spawn: its first sample is a baseline again.
+    r.ts.setToken("t2");
+    status(5);
+    await r.hook(ups("p3"));
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(r.of("turn_end").at(-1)!.usage.costUsd).toBe(0);
+    r.ts.handleStatus({ nonsense: true });
+    expect(r.ts.state.status).toMatchObject({ costUsd: null, model: null, contextTokens: null });
+  });
 });

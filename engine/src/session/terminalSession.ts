@@ -6,7 +6,7 @@
  * `turn_end` (snapshot B: the review). It never starts or stops the CLI.
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
-import type { BackgroundTask, PermissionMode, TerminalSessionState, TerminalWaiting } from "../protocol.js";
+import type { BackgroundTask, PermissionMode, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
 import { statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
@@ -150,6 +150,10 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private configDir: string | null;
   private lastTranscript: string | null = null;
   private plansDir: string | undefined;
+  /** §57.13: the last status line input, the CLI's last total cost (the baseline; null until the first after a spawn) and the cost since the last turn_end. */
+  private status: TerminalStatus | null = null;
+  private costTotal: number | null = null;
+  private turnCost = 0;
 
   constructor(private readonly opts: TerminalSessionOptions) {
     this.cliSessionId = opts.cliSessionId;
@@ -174,6 +178,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       promptId: this.open?.promptId ?? null,
       waiting: this.waiting ? { ...this.waiting } : null,
       interruptSuspected: this.interruptSuspected,
+      ...(this.status ? { status: { ...this.status } } : {}),
     };
   }
 
@@ -232,6 +237,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     if (this.token && this.retireToken) this.retireToken(this.token);
     this.token = token;
     if (retire) this.retireToken = retire;
+    this.costTotal = null; // §57.13: the new spawn's first status is the baseline
     this.running = false;
     this.hooksSeen = false;
     this.waiting = null;
@@ -286,6 +292,36 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     if (!this.open) return false;
     this.closeTurn("ended_by_user");
     return true;
+  }
+
+  /**
+   * §57.13: the TUI's status line ran (the tee posted its input). The cost the CLI reports is its session's total: what it
+   * grew by since the last sample is this chat's (the first sample after a spawn, and one that went down — a resume,
+   * `/clear` — is the new baseline); it goes into the next `turn_end`.
+   */
+  handleStatus(input: Record<string, unknown>): void {
+    if (this.disposed) return;
+    const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+    const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+    const cost = num(obj(input.cost).total_cost_usd);
+    const model = obj(input.model);
+    const cw = obj(input.context_window);
+    const usage = obj(cw.current_usage);
+    const parts = [usage.input_tokens, usage.cache_creation_input_tokens, usage.cache_read_input_tokens].map(num);
+    const contextTokens = parts.every((p) => p === null) ? null : parts.reduce<number>((n, p) => n + (p ?? 0), 0);
+    if (cost !== null) {
+      if (this.costTotal !== null && cost >= this.costTotal) this.turnCost += cost - this.costTotal;
+      this.costTotal = cost;
+    }
+    this.status = {
+      costUsd: cost,
+      model: str(model.id),
+      modelName: str(model.display_name),
+      contextTokens,
+      contextWindow: num(cw.context_window_size),
+      at: new Date(this.now()).toISOString(),
+    };
+    this.opts.emit({ type: "terminal_status", status: { ...this.status } });
   }
 
   // ---- hooks
@@ -618,11 +654,18 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.open = null;
     this.interruptSuspected = false;
     const toolFiles: ToolFileEntry[] = [...this.touched.values()].map((t) => ({ path: t.path, tools: [...t.tools], count: t.count, toolUseIds: [...t.toolUseIds] }));
+    const cost = this.turnCost;
+    this.turnCost = 0;
     this.opts.emit({
       type: "turn_end",
       stopReason,
       sessionId: this.opts.chatId,
-      usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, durationMs: Math.max(0, this.now() - turn.openedAt), cacheReadTokens: 0, cacheCreationTokens: 0, contextTokens: 0 },
+      // §57.13: the cost the status line saw grow since the last turn_end, and the context it last reported.
+      usage: {
+        inputTokens: 0, outputTokens: 0, costUsd: cost, durationMs: Math.max(0, this.now() - turn.openedAt), cacheReadTokens: 0, cacheCreationTokens: 0,
+        contextTokens: this.status?.contextTokens ?? 0,
+        ...(this.status?.contextWindow ? { contextWindow: this.status.contextWindow } : {}),
+      },
       toolFiles,
       budget: { files: 0, lines: 0, denied: false },
       changedOutside: [...this.changedOutside].sort(),

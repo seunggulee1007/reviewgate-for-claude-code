@@ -45,18 +45,44 @@ type HttpHook = {
   onFailure?: "block";
 };
 
-/** What a spawn's `--settings` carries besides the review hooks (§57.15). */
+/** What a spawn's `--settings` carries besides the review hooks (§57.13, §57.15). */
 export type HookSettingsOptions = {
   /** §57.15: a PermissionRequest hook — only for a client that answers bridged dialogs (else nobody would). */
   permissionRequest?: boolean;
+  /**
+   * §57.13: a `statusLine` that posts the CLI's status input to `statusUrl` and then runs the user's own command (null:
+   * none — the tee prints nothing); `padding` / `refreshInterval` (seconds) are the user's.
+   */
+  statusLine?: { statusUrl: string; userCommand: string | null; padding?: number; refreshInterval?: number } | null;
 };
+
+/** A word for `/bin/sh` that is exactly `s` (single quotes; a `'` inside as `'\''`). */
+export function shQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * §57.13: the statusLine command of a terminal chat — POSIX sh (the CLI runs it with `/bin/sh -c` on macOS). It reads the
+ * status JSON once, posts it in the background to the hook server (the token from the env through `-H @-`, never argv;
+ * never through a proxy; at most 1 s) and pipes the same JSON into the user's own command, whose output and exit status
+ * pass through.
+ */
+export function statusLineTeeCommand(o: { statusUrl: string; userCommand: string | null }): string {
+  const post =
+    `j=$(cat); printf '${HOOK_TOKEN_HEADER}: %s\\n' "$${HOOK_TOKEN_ENV}" | /usr/bin/curl -sS -m 1 --noproxy '*' -H @- ` +
+    `-H 'Content-Type: application/json' --data-binary "$j" ${shQuote(o.statusUrl)} >/dev/null 2>&1 &`;
+  return o.userCommand ? `${post}\nprintf '%s' "$j" | /bin/sh -c ${shQuote(o.userCommand)}` : post;
+}
 
 /**
  * The `--settings` object: every hook posts to `url` with the token header (interpolated by the CLI from the env).
  * `onFailure: "block"` only where blocking is fail-closed (UserPromptSubmit, PreToolUse) — never on Stop, where "block"
  * means "keep Claude going". PostToolUse / PostToolUseFailure match every tool (§57.16: any later hook clears `waiting`).
  */
-export function hookSettings(url: string, opts: HookSettingsOptions = {}): { hooks: Record<string, { matcher?: string; hooks: HttpHook[] }[]> } {
+export function hookSettings(url: string, opts: HookSettingsOptions = {}): {
+  hooks: Record<string, { matcher?: string; hooks: HttpHook[] }[]>;
+  statusLine?: { type: "command"; command: string; padding?: number; refreshInterval?: number };
+} {
   const h = (timeout: number, block = false): HttpHook => ({
     type: "http",
     url,
@@ -79,6 +105,16 @@ export function hookSettings(url: string, opts: HookSettingsOptions = {}): { hoo
       Notification: [{ hooks: [h(10)] }],
       SessionEnd: [{ hooks: [h(5)] }],
     },
+    ...(opts.statusLine
+      ? {
+          statusLine: {
+            type: "command" as const,
+            command: statusLineTeeCommand(opts.statusLine),
+            ...(opts.statusLine.padding !== undefined ? { padding: opts.statusLine.padding } : {}),
+            ...(opts.statusLine.refreshInterval !== undefined ? { refreshInterval: opts.statusLine.refreshInterval } : {}),
+          },
+        }
+      : {}),
   };
 }
 

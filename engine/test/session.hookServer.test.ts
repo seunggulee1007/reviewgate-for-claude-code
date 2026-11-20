@@ -125,6 +125,27 @@ describe("HookServer", () => {
     expect((await post(port, { token, body: JSON.stringify({ hook_event_name: "UserPromptSubmit" }) })).status).toBe(500);
   });
 
+  it("§57.13 /status: 401 without the token, 200 {} to handleStatus, a retired token 200 {} and dropped, 405, 413; /hook unchanged", async () => {
+    const { server, port } = await started();
+    expect(server.statusUrl).toBe(`http://127.0.0.1:${port}/status`);
+    const got: Record<string, unknown>[] = [];
+    const h = { ...recorder({ hook: 1 }), handleStatus: (i: Record<string, unknown>) => void got.push(i) };
+    const token = server.issue(h);
+    const body = JSON.stringify({ cost: { total_cost_usd: 1 } });
+    expect((await post(port, { path: "/status", body })).status).toBe(401);
+    expect(await post(port, { token, path: "/status", body })).toEqual({ status: 200, type: "application/json", json: {} });
+    expect(got).toEqual([{ cost: { total_cost_usd: 1 } }]);
+    expect(h.inputs).toEqual([]);
+    expect(await post(port, { token, path: "/status", method: "GET" })).toMatchObject({ status: 405 });
+    expect((await post(port, { token, path: "/status", body: new Blob([" ".repeat(HOOK_BODY_MAX + 1)]) })).status).toBe(413);
+    expect((await post(port, { token, body: JSON.stringify({ hook_event_name: "Stop" }) })).json).toEqual({ hook: 1 });
+    // A handler without handleStatus: still {}.
+    expect((await post(port, { token: server.issue(recorder()), path: "/status", body })).json).toEqual({});
+    server.retire(token);
+    expect(await post(port, { token, path: "/status", body })).toMatchObject({ status: 200, json: {} });
+    expect(got).toHaveLength(1);
+  });
+
   it("close() frees the port and retires every token", async () => {
     const { server, port } = await started();
     server.issue(recorder());

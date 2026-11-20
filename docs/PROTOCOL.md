@@ -8843,7 +8843,8 @@ and hold no token:
  "PostToolUseFailure":[{"hooks":[H(120)]}],
  "CwdChanged":[{"hooks":[H(10)]}],
  "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
- "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
+ "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]},
+ "statusLine":{"type":"command","command":"<tee>"[,"padding":n][,"refreshInterval":s]}}   // §57.13, the Mac app only
 H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
             "allowedEnvVars":["RG_HOOK_TOKEN"],"timeout":t[,"onFailure":"block"]}
 ```
@@ -8870,6 +8871,7 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
 | Invalid JSON, or not an object | 400 | `{}` |
 | The chat's handler failed | 500 | `{}` (fails closed on UserPromptSubmit / PreToolUse) |
 | Valid request | 200 | the decision JSON (§57.4) |
+| `POST /status` (§57.13): valid, or a retired token (dropped) | 200 | `{}` — the same token check, 405 / 413 / 400 as `/hook` |
 
 - **One token per spawn.** Each `terminal_spec` issues a fresh token (32 random bytes, hex) routed to the current
   terminal chat and retires the chat's previous one; switching chats or closing the project retires it too.
@@ -9202,6 +9204,34 @@ before `--settings` (the option takes several values, so a flag follows it).
 - **`${VAR}` is not expanded by the engine**: the CLI expands it from the PTY's environment (the user's login shell), and
   secrets stay out of the file. (Unverified against the CLI: if it does not expand there, the engine will expand only
   variables of its own environment into this 0600 file.)
+
+### 57.13 Cost and the status line
+
+A terminal chat's cost, model and context come from the TUI's own status line: `--settings` gains a top-level
+`statusLine` (only for a client that shows it: `terminalFeature("statusLine")`, the Mac app) whose command is a tee —
+pure POSIX sh (the CLI runs statusLine commands with `/bin/sh -c` on macOS):
+
+```sh
+j=$(cat); printf 'X-ReviewGate-Token: %s\n' "$RG_HOOK_TOKEN" | /usr/bin/curl -sS -m 1 --noproxy '*' -H @- -H 'Content-Type: application/json' --data-binary "$j" 'http://127.0.0.1:<port>/status' >/dev/null 2>&1 &
+printf '%s' "$j" | /bin/sh -c '<the user's command, POSIX-quoted>'      # only when the user has one
+```
+
+- The token goes in through `-H @-` (never argv); `--noproxy '*'` keeps the post off any proxy. The user's command gets
+  the same stdin, cwd and env; its output and exit status pass through, so their status line looks the same. With none
+  configured the tee prints nothing (the TUI may keep an empty row).
+- **Which command.** The user's resolved status line (§44.2) with the project's own trusted (`trustProject`: the TUI runs
+  it itself once the folder is trusted, so `allowedProjectStatusLine` does not apply), read from the learned config dir
+  (§57.16); its `padding` and `refreshInterval` are copied. A managed statusLine outranks the flag settings, so with one
+  the tee does not run and no cost shows. A statusLine edited mid-session is picked up at the next Restart.
+- **`POST /status`** (same token, limits and statuses as `/hook`) → `TerminalSession.handleStatus`. It reads
+  `cost.total_cost_usd`, `model.id` / `model.display_name` and `context_window` (`context_window_size`, the
+  `current_usage` input + cache tokens) into `state.session.terminal.status`. The cost is the CLI session's total: the
+  first sample after each spawn is the baseline, growth since the last sample is added to the turn's cost, and a total
+  that went down (a resume, `/clear`) is a new baseline. `turn_end.usage.costUsd` carries that cost (spent between turns:
+  with the next turn) and `contextTokens` / `contextWindow` the last sample — so `meta.costUSD` and `hud.sessionCostUSD`
+  follow the existing path. The current chat's status also sets `hud.contextTokens` / `contextWindow` and
+  `state.session.model` (HUD churn, §45.2). A background terminal's status feeds nothing.
+- **Risk.** A forged `/status` (anything holding the token) can only inflate the displayed cost.
 
 ### 57.16 Hook coverage, proxy and config dir
 

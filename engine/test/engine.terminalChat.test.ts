@@ -657,4 +657,31 @@ describe("terminal chats (§57)", () => {
     const mid = await newTerminal(main);
     expect((await spec(main, mid)).argv).not.toContain("--mcp-config");
   });
+
+  it("§57.13 the statusLine tee: the user's line wrapped, /status feeds the strip and the HUD, the turn's cost reaches the chat", async () => {
+    const config = temp("rg-term-config");
+    writeFileSync(join(config, "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "acme-status", padding: 1, refreshInterval: 10 } }));
+    const r = await rig({ config });
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    const settings = JSON.parse(s.argv[s.argv.indexOf("--settings") + 1]!) as { statusLine: { command: string; padding: number; refreshInterval: number } };
+    expect(settings.statusLine).toMatchObject({ type: "command", padding: 1, refreshInterval: 10 });
+    expect(settings.statusLine.command).toContain(`/bin/sh -c 'acme-status'`);
+    expect(settings.statusLine.command).toContain(s.url.replace(/\/hook$/, "/status"));
+    const status = async (cost: number) => {
+      const res = await fetch(s.url.replace(/\/hook$/, "/status"), { method: "POST", headers: { "Content-Type": "application/json", "X-ReviewGate-Token": s.token }, body: JSON.stringify({ cost: { total_cost_usd: cost }, model: { id: "claude-acme-test", display_name: "Acme" }, context_window: { context_window_size: 200000, current_usage: { input_tokens: 4000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 } } }) });
+      expect(res.status).toBe(200);
+    };
+    await status(0.01);
+    const st = await r.h.waitFor((x) => x.session.terminal?.status != null, "status");
+    expect(st.session.terminal?.status).toMatchObject({ costUsd: 0.01, model: "claude-acme-test", modelName: "Acme", contextTokens: 4000, contextWindow: 200000 });
+    expect(st.hud).toMatchObject({ contextTokens: 4000, contextWindow: 200000 });
+    const answer = await hook(s, ups("p1"));
+    expect(answer.decision).toBeUndefined();
+    await status(0.0223);
+    await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
+    const done = await r.h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "turn over");
+    expect(done.hud.sessionCostUSD).toBeCloseTo(0.0123);
+    expect(done.sessions.list.find((m) => m.id === id)?.costUSD).toBeCloseTo(0.0123);
+  });
 });
