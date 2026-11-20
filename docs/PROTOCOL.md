@@ -9044,6 +9044,14 @@ chat's id);
     restart) and sends `terminal_exited`. Moved, the chat is a record here: "옮김 → <name>" with [그 창 열기] instead
     of a terminal (no spec is asked for). In the target window, until the first hook, "<from>에서 옮겨왔어요 — 터미널에서
     이어서 입력하세요".
+  - *Permission cards* (§57.15, `terminal.permissions`, oldest first) between the strip and the terminal: "Claude Code가
+    <tool> 사용을 요청해요", the summary (monospaced, selectable), ReviewGate's own reason in orange when the §57.8 guard
+    asked first, and [거부] / [한 번 허용] (and [허용하고 따라가기] when `canFollow`, EnterWorktree) →
+    `terminal_permission_response`. "또는 터미널에서 답하기": the TUI's dialog stays open and whichever is answered first
+    counts; "always allow" stays in the TUI. Answered in the TUI first, the engine refuses `permission_gone` — only logged,
+    the card goes with the next state. While a card exists its attention key is `termperm:<chat>:<requestId>` (a
+    notification at once; the plain `term:` wait of that dialog is not raised too). Settings › Session › "터미널 채팅의 허용
+    요청에 ReviewGate에서도 답하기" (`terminalPermissionBridge`, default on, `set_settings` live).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
   restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter).

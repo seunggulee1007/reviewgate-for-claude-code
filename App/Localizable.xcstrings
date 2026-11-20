@@ -3297,6 +3297,22 @@
         }
       }
     },
+    "Allow it; once Claude Code is in the new worktree, this chat moves to that worktree's window and is reviewed there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow it; once Claude Code is in the new worktree, this chat moves to that worktree's window and is reviewed there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "허용해요. Claude Code가 새 워크트리로 들어가면 이 채팅이 그 워크트리 창으로 옮겨가 거기서 리뷰돼요"
+          }
+        }
+      }
+    },
     "Allow messages to this session for the session": {
       "localizations": {
         "en": {
@@ -3469,6 +3485,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 호출만 허용합니다 (입력창이 비어 있을 때 ⌘↩)"
+          }
+        }
+      }
+    },
+    "Allow this one call — to always allow it, answer in the terminal instead": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow this one call — to always allow it, answer in the terminal instead"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 호출만 허용해요 — 항상 허용하려면 터미널에서 답하세요"
           }
         }
       }
@@ -3757,6 +3789,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "질문에 답변"
+          }
+        }
+      }
+    },
+    "Answer terminal chats' permission prompts in ReviewGate too": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer terminal chats' permission prompts in ReviewGate too"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅의 허용 요청에 ReviewGate에서도 답하기"
           }
         }
       }
@@ -4753,6 +4801,22 @@
         }
       }
     },
+    "Claude Code asks to use %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code asks to use %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 %@ 사용을 요청해요"
+          }
+        }
+      }
+    },
     "Claude Code changed into %@, another worktree of this repository — its changes there are not reviewed here": {
       "localizations": {
         "en": {
@@ -5037,6 +5101,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code가 추정한 값이라 청구 금액이 아니에요. 리뷰한 턴: 이 채팅에서 ReviewGate가 리뷰한 턴들의 비용이에요."
+          }
+        }
+      }
+    },
+    "Claude Code's permission dialog in a terminal chat also shows as a card over the terminal, with Allow once and Deny, and notifies you at once; whichever you answer first counts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's permission dialog in a terminal chat also shows as a card over the terminal, with Allow once and Deny, and notifies you at once; whichever you answer first counts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서 Claude Code의 허용 대화상자가 터미널 위에 한 번 허용 / 거부 카드로도 나오고 바로 알려줘요. 먼저 답한 쪽이 적용돼요"
           }
         }
       }
@@ -11767,6 +11847,22 @@
         }
       }
     },
+    "Or answer in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or answer in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "또는 터미널에서 답하기"
+          }
+        }
+      }
+    },
     "Paste a Prompt": {
       "localizations": {
         "en": {
@@ -11779,6 +11875,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "붙여넣기"
+          }
+        }
+      }
+    },
+    "Permission request from Claude Code: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission request from Claude Code: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code의 허용 요청: %@"
           }
         }
       }
@@ -11843,6 +11955,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "질문"
+          }
+        }
+      }
+    },
+    "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거부해요 — Claude Code는 ReviewGate에서 거부됐다는 말을 듣고 그것 없이 계속해요"
           }
         }
       }
@@ -28882,6 +29010,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널은 %@ 모드로 시작합니다 — ReviewGate에는 없는 모드입니다"
+          }
+        }
+      }
+    },
+    "The terminal's own dialog is still open — whichever you answer first counts. “Always allow” is only in the terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal's own dialog is still open — whichever you answer first counts. “Always allow” is only in the terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 대화상자도 열려 있어요 — 먼저 답한 쪽이 적용돼요. “항상 허용”은 터미널에서만 할 수 있어요."
+          }
+        }
+      }
+    },
+    "The terminal's own dialog stays open either way, and \"always allow\" is only there. Off: answer in the terminal only. Applies to the next permission prompt.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal's own dialog stays open either way, and \"always allow\" is only there. Off: answer in the terminal only. Applies to the next permission prompt."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어느 쪽이든 터미널의 대화상자는 열려 있고, \"항상 허용\"은 거기서만 할 수 있어요. 끄면 터미널에서만 답해요. 다음 허용 요청부터 적용돼요."
           }
         }
       }

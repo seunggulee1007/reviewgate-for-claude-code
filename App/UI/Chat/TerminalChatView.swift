@@ -36,6 +36,7 @@ struct TerminalChatView: View {
             VStack(spacing: 0) {
                 TerminalStatusStrip(chatId: id, host: host)
                 TerminalStage2Rows()
+                TerminalPermissionCards()   // §57.15
                 Divider()
                 TerminalContainer(host: host)
                     .overlay { TerminalEndedOverlay(chatId: id, host: host) }
@@ -469,5 +470,84 @@ private struct MovedTerminalChatPlaceholder: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Moved terminal chat")
+    }
+}
+
+// MARK: terminal-stage2 (§57.15)
+
+/// Claude Code's permission dialogs the app may answer, over the terminal: the tool, what it would do, ReviewGate's own
+/// reason when it asked first, and Allow / Deny (and Allow and Follow for EnterWorktree). The TUI's dialog stays live —
+/// whichever is answered first wins; "always allow" stays in the terminal.
+private struct TerminalPermissionCards: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var store
+
+    var body: some View {
+        let permissions = store.terminalPermissions
+        if !permissions.isEmpty {
+            VStack(spacing: 6) {
+                ForEach(permissions) { card($0) }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(Color.orange.wash(colorScheme, light: 0.08, dark: 0.16))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("Terminal chat permissions")
+        }
+    }
+
+    private func card(_ permission: TerminalPermission) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: "hand.raised.fill").foregroundStyle(.orange).accessibilityHidden(true)
+                Text("Claude Code asks to use \(permission.toolName)")
+                    .font(.callout.weight(.semibold))
+                Spacer(minLength: 4)
+                Text("Or answer in the terminal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help(String(localized: "The terminal's own dialog is still open — whichever you answer first counts. “Always allow” is only in the terminal."))
+            }
+            if !permission.summary.isEmpty {
+                Text(verbatim: permission.summary)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(3)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                    .help(permission.summary)
+                    .accessibilityIdentifier("Terminal permission summary")
+            }
+            if let reason = permission.reason {
+                Label(reason, systemImage: "exclamationmark.shield")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("Terminal permission reason")
+            }
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Deny") { store.terminalPermissionResponse(requestId: permission.requestId, allow: false) }
+                    .controlSize(.small)
+                    .help(String(localized: "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it"))
+                    .accessibilityIdentifier("Terminal permission deny")
+                if permission.canFollow {
+                    Button(ChatMoveText.allowAndFollowTitle) {
+                        store.terminalPermissionResponse(requestId: permission.requestId, allow: true, follow: true)
+                    }
+                    .controlSize(.small)
+                    .help(String(localized: "Allow it; once Claude Code is in the new worktree, this chat moves to that worktree's window and is reviewed there"))
+                    .accessibilityIdentifier("Terminal permission allow and follow")
+                }
+                Button("Allow once") { store.terminalPermissionResponse(requestId: permission.requestId, allow: true) }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .help(String(localized: "Allow this one call — to always allow it, answer in the terminal instead"))
+                    .accessibilityIdentifier("Terminal permission allow")
+            }
+        }
+        .padding(8)
+        .background(.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Permission request from Claude Code: \(permission.toolName)"))
+        .accessibilityIdentifier("Terminal permission \(permission.requestId)")
     }
 }
