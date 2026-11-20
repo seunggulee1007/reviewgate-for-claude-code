@@ -40,13 +40,17 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     /// Called once at launch (the delegate must be set before a click is delivered).
     func start() {
         UNUserNotificationCenter.current().delegate = self
-        // MARK: terminal-stage2 (§57.15): a terminal chat's permission notification answers from the banner too.
+        // MARK: terminal-stage2 (§57.15): a terminal chat's permission notification answers from the banner too — Allow Once
+        // only on an unlocked Mac and only when what is asked shows whole; otherwise Deny, and a click opens the card.
+        let deny = UNNotificationAction(identifier: TerminalPermissionNotification.denyAction, title: TerminalPermissionNotification.denyTitle,
+                                        options: [.destructive])
         UNUserNotificationCenter.current().setNotificationCategories([
             UNNotificationCategory(identifier: TerminalPermissionNotification.category, actions: [
-                UNNotificationAction(identifier: TerminalPermissionNotification.allowAction, title: TerminalPermissionNotification.allowTitle),
-                UNNotificationAction(identifier: TerminalPermissionNotification.denyAction, title: TerminalPermissionNotification.denyTitle,
-                                     options: [.destructive]),
+                UNNotificationAction(identifier: TerminalPermissionNotification.allowAction, title: TerminalPermissionNotification.allowTitle,
+                                     options: [.authenticationRequired]),
+                deny,
             ], intentIdentifiers: []),
+            UNNotificationCategory(identifier: TerminalPermissionNotification.categoryWithoutAllow, actions: [deny], intentIdentifiers: []),
         ])
         observeBadge()
         // wave4b w4-notify: ask now (not at the first notification, which the question would hold back) and notice a
@@ -170,7 +174,7 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         var info: [String: String] = ["projectPath": scope]
         info.merge(target.userInfo) { old, _ in old }
         content.userInfo = info
-        if event.isTerminalPermission { content.categoryIdentifier = TerminalPermissionNotification.category }   // §57.15
+        if let category = TerminalPermissionNotification.category(for: event) { content.categoryIdentifier = category }   // §57.15
         // §39.7: no sound here — `handle` played this kind's own (a sound by name only resolves from Library/Sounds).
         // One live notification per window and kind: a newer "turn finished" replaces the older one.
         let request = UNNotificationRequest(identifier: DeliveredNotifications.identifier(scope: scope, kind: event.kind),

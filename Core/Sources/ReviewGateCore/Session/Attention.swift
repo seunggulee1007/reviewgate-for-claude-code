@@ -32,6 +32,8 @@ public struct AttentionEvent: Sendable, Equatable {
     // MARK: terminal-stage2
     /// §57.10: the chat it is about when that is not the live one (a background terminal chat) — a click opens it.
     public var chatId: String?
+    /// §57.15: a terminal permission whose notification may offer Allow Once (what is asked shows whole in it).
+    public var allowsQuickAllow = false
 
     public init(kind: Kind, title: String, body: String, key: String) {
         self.kind = kind

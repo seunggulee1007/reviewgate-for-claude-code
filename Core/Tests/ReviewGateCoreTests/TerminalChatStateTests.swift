@@ -254,6 +254,20 @@ import Testing
         #expect(TerminalPermissionNotification.answer(actionIdentifier: "com.apple.UNNotificationDefaultActionIdentifier") == nil)
     }
 
+    @Test func allowOnceOnlyWhenTheWholeRequestShowsInTheNotification() {
+        func category(_ summary: String) -> String? {
+            let p = TerminalPermission(requestId: "r1", toolName: "Bash", summary: summary, since: "t")
+            return TerminalPermissionNotification.category(for: AttentionEvent.terminalPermission(p, chatId: "t1"))
+        }
+        #expect(category("Bash: ls") == TerminalPermissionNotification.category)
+        // A second line, a summary the notification clips (over 160) or one the engine clipped (its "…"): Deny only.
+        #expect(category("Bash: echo hi\nrm -rf build") == TerminalPermissionNotification.categoryWithoutAllow)
+        #expect(category("Bash: " + String(repeating: "a", count: 200)) == TerminalPermissionNotification.categoryWithoutAllow)
+        #expect(category("Bash: echo " + String(repeating: "b", count: 20) + "…") == TerminalPermissionNotification.categoryWithoutAllow)
+        let wait = TerminalWaiting(kind: .permission, message: "m", since: "t")
+        #expect(TerminalPermissionNotification.category(for: AttentionEvent.terminalWaiting(wait, chatId: "t1")) == nil)
+    }
+
     @Test func answersGoThroughTheCommandSink() {
         let app = makeState()
         var fired: [EngineCommand] = []

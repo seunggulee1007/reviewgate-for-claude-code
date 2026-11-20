@@ -199,12 +199,13 @@ extension AttentionEvent {
     /// §57.15: a permission dialog of a terminal chat the app may answer — "허용이 필요해요" over its summary (and ReviewGate's
     /// own reason when it asked first).
     public static func terminalPermission(_ permission: TerminalPermission, chatId: String) -> AttentionEvent {
-        let summary = clip(permission.summary, 160)
+        let summary = clip(permission.summary, TerminalPermissionNotification.shownSummaryMax)
         let body = permission.reason.map { "\(summary.isEmpty ? permission.toolName : summary) — \(clip($0, 120))" }
             ?? (summary.isEmpty ? permission.toolName : summary)
         var event = AttentionEvent(kind: .permission, title: String(localized: "Permission needed in the terminal", bundle: .module),
                                    body: body, key: "termperm:\(chatId):\(permission.requestId)")
         event.requestId = permission.requestId
+        event.allowsQuickAllow = TerminalPermissionNotification.showsWhole(permission.summary)
         return event
     }
 
@@ -215,8 +216,24 @@ extension AttentionEvent {
 /// §57.15: the Allow / Deny actions on a terminal permission's notification (`UNNotificationCategory`).
 public enum TerminalPermissionNotification {
     public static let category = "terminalPermission"
+    /// Deny only (a click opens the chat): what is asked does not show whole in the notification.
+    public static let categoryWithoutAllow = "terminalPermission.noAllow"
     public static let allowAction = "terminalPermission.allow"
     public static let denyAction = "terminalPermission.deny"
+    /// The longest summary a notification shows whole (`AttentionEvent.clip`).
+    static let shownSummaryMax = 160
+
+    /// The summary reads in the notification exactly as asked: one line, not clipped here or by the engine (its `…`).
+    static func showsWhole(_ summary: String) -> Bool {
+        !summary.contains(where: \.isNewline) && summary.count <= shownSummaryMax && !summary.hasSuffix("…")
+    }
+
+    /// The notification's category for `event` (nil: not a terminal permission). Allow Once only when the whole request
+    /// shows; otherwise Deny, and a click opens the card.
+    public static func category(for event: AttentionEvent) -> String? {
+        guard event.isTerminalPermission else { return nil }
+        return event.allowsQuickAllow ? category : categoryWithoutAllow
+    }
 
     /// `allow` for an action of this category (nil: the notification itself was clicked, or another action).
     public static func answer(actionIdentifier: String) -> Bool? {

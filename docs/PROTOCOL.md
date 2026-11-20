@@ -9106,7 +9106,10 @@ chat's id);
     counts; "always allow" stays in the TUI. Answered in the TUI first, the engine refuses `permission_gone` — only logged,
     the card goes with the next state. While a card exists its attention key is `termperm:<chat>:<requestId>` (a
     notification at once; the plain `term:` wait of that dialog is not raised too). That notification carries [한 번 허용]
-    and [거부] (`UNNotificationCategory` `terminalPermission`): an action answers without bringing the window forward,
+    and [거부] (`UNNotificationCategory` `terminalPermission`; [한 번 허용] asks to unlock the Mac first,
+    `.authenticationRequired`). Only [거부] (`terminalPermission.noAllow`) when the summary does not show whole in the
+    notification — a second line, over 160 characters, or clipped by the engine (`…`) — so nothing unseen is allowed from
+    the banner; a click opens the card. An action answers without bringing the window forward,
     only while that chat is still the live one; a click on the banner itself shows the terminal as before. Settings › Session › "터미널 채팅의 허용
     요청에 ReviewGate에서도 답하기" (`terminalPermissionBridge`, default on, `set_settings` live).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
