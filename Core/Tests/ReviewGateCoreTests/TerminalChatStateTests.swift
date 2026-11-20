@@ -313,15 +313,19 @@ import Testing
         #expect(app.canRequestChanges)
         app.requestChanges(extraMessage: nil)
         #expect(fired == [.requestChanges(extra: nil, noteIds: nil)])
-        // A turn Claude started itself (no prompt id), or no notes: not here.
+        // A turn Claude started itself (no prompt id) takes it too; a PTY that is not running, or no notes: not here.
         var own = snapshot(seq: 2, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true))
         own.reviewNotes = s.reviewNotes
         app.handle(.state(own))
+        #expect(app.canRequestChanges)
+        var exited = snapshot(seq: 3, phase: .running, terminal: TerminalSessionInfo(running: false, hooksSeen: true, promptId: "p1"))
+        exited.reviewNotes = s.reviewNotes
+        app.handle(.state(exited))
         #expect(!app.canRequestChanges)
-        app.handle(.state(snapshot(seq: 3, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true, promptId: "p1"))))
+        app.handle(.state(snapshot(seq: 4, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true, promptId: "p1"))))
         #expect(!app.canRequestChanges)
         // A chat-kind chat: only the gate decides.
-        var chat = snapshot(seq: 4, phase: .running, current: "c1")
+        var chat = snapshot(seq: 5, phase: .running, current: "c1")
         chat.reviewNotes = s.reviewNotes
         app.handle(.state(chat))
         #expect(!app.canRequestChanges)

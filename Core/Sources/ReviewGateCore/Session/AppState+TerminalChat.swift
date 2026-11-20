@@ -113,10 +113,10 @@ extension AppState {
         (sessionsInfo?.backgroundTerminals ?? []).filter { $0.waiting != nil && $0.chatId != currentSessionId }
     }
 
-    /// §57.14: the live terminal chat's prompt-backed turn runs and notes wait — Request changes is staged for that turn's
+    /// §57.14: a turn of the live terminal chat runs and notes wait — Request changes is staged for that turn's
     /// Stop (`via: "stop"`); the gate's own `canRequestChanges` is false while a turn runs.
     var terminalTurnTakesRequest: Bool {
-        guard isTerminalChat, viewingChat == nil, gatePhase == .running, terminalInfo?.promptId != nil else { return false }
+        guard isTerminalChat, viewingChat == nil, gatePhase == .running, terminalInfo?.running == true else { return false }
         return !unsentNotes.isEmpty && gate.collectError == nil
     }
 
