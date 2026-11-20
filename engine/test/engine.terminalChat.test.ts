@@ -710,12 +710,12 @@ describe("terminal chats (§57)", () => {
     expect(i).toBe(2);
     expect(s.argv[i + 2]).toBe("--settings");
     const file = s.argv[i + 1]!;
-    expect((statSync(file).mode & 0o777).toString(8)).toBe("600");
+    if (process.platform !== "win32") expect((statSync(file).mode & 0o777).toString(8)).toBe("600"); // Windows has no POSIX modes
     const cfg = JSON.parse(readFileSync(file, "utf8")) as { mcpServers: Record<string, { env?: Record<string, string> }> };
     expect(Object.keys(cfg.mcpServers).sort()).toEqual(["db", "docs"]);
     expect(cfg.mcpServers.db!.env).toEqual({ TOKEN: "${ACME_TOKEN}" });
     expect(s.argv.join(" ")).not.toContain("ACME_TOKEN"); // the config is a file, not argv
-    expect((statSync(dirname(file)).mode & 0o777).toString(8)).toBe("700");
+    if (process.platform !== "win32") expect((statSync(dirname(file)).mode & 0o777).toString(8)).toBe("700");
     // Closing the project removes it (the next spawn writes its own).
     await r.h.engine.handle({ type: "close_project" });
     expect(() => statSync(file)).toThrow();

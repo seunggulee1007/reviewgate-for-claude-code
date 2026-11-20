@@ -1,5 +1,5 @@
 import { mkdirSync, realpathSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
@@ -569,7 +569,7 @@ describe("TerminalSession", () => {
     expect(r.ts.state.permissions![0]).toMatchObject({ toolName: "EnterWorktree", canFollow: true });
     await r.ts.dispose();
     expect(await w).toEqual({});
-    expect(permissionSummary("Write", { file_path: "notes.txt" }, "/work/acme")).toBe(join("/work/acme", "notes.txt"));
+    expect(permissionSummary("Write", { file_path: "notes.txt" }, "/work/acme")).toBe(resolve("/work/acme", "notes.txt")); // resolve: a drive letter on Windows
     expect(permissionSummary("mcp__acme__q", { q: "x".repeat(400) }, "/").length).toBe(300);
   });
 
