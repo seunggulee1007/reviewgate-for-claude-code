@@ -103,9 +103,11 @@ struct DiffView: View {
                 // wave2 mac-flow (§34.2): read while Claude works — the review as it was before this turn.
                 StaleDiffBannerSlot()
                 HunkRefusalBannerSlot(file: file, isReviewLocked: isReviewLocked)
-                // §31: shown even without a recorded cause — it says so (and offers a side question) instead of hiding.
-                WhyChangedSection(file: file)
-                Divider()
+                // Only with something to say: a reason, a call's own sentence, or where an outside change came from.
+                if WhyChangedSection.isShown(for: file, store: store) {
+                    WhyChangedSection(file: file)
+                    Divider()
+                }
                 if truncated, !showFullFile {
                     truncatedBanner(file)
                     Divider()
