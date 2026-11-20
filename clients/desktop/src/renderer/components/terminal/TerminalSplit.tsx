@@ -14,8 +14,7 @@ import { isComposing } from "../../ime";
 import { useStore } from "../../store";
 import { measureCellWidth, reviewDrawerWidth, reviewPanelWidth, reviewWidthForShare, terminalMinWidth, terminalReviewLayout, terminalShareOf, REVIEW_FLOOR, type TerminalReviewLayout } from "../../terminalLayout";
 import { focusLiveTerminal, liveTerminalChatId } from "../../terminal/terminalChat";
-import { terminalConfig } from "../../terminal/termHost";
-import { TERMINAL_FONT_FAMILY } from "../../terminal/termHostOptions";
+import { clampFontSize, TERMINAL_FONT_FAMILY } from "../../terminal/termHostOptions";
 import ChatPane from "../chat/ChatPane";
 import DiffPane from "../diff/DiffPane";
 import { LiveDiffPane } from "../diff/LiveDiffPane";
@@ -35,7 +34,7 @@ export function TerminalSplit() {
   const historyOpen = useStore((s) => s.historyView !== null);
   const liveOpen = useStore((s) => s.liveView !== null && s.historyView === null);
   const share = useStore((s) => s.ui.terminalReviewSplit);
-  const fontSize = terminalConfig().fontSize;
+  const fontSize = useStore((s) => clampFontSize(s.settings?.terminalFontSize));
   const setUI = useStore((s) => s.setUI);
   const cell = useMemo(() => measureCellWidth(`${fontSize}px ${TERMINAL_FONT_FAMILY}`), [fontSize]);
   const minTerminal = terminalMinWidth(cell);

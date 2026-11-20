@@ -19,7 +19,7 @@ export function startPendingSwitchDrain(): () => void {
         const q = useStore.getState().queue;
         return q.items.length > 0 || q.inflight;
       },
-      newChat: () => useStore.getState().newChat(),
+      newChat: (kind) => (kind === "terminal" ? useStore.getState().newTerminalChat() : useStore.getState().newClassicChat()), // §57.5
       openChat: (id) => useStore.getState().openChat(id),
       untilLive: (id) => untilLive(id),
       enqueue: (text, extras) => useStore.getState().enqueueMessage(text, false, extras ?? {}),

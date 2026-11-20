@@ -7,7 +7,10 @@
 import { useEffect } from "react";
 import { onThemeChange } from "../theme";
 import { useStore } from "../store";
+import type { AppSettings } from "../../shared/ipc";
 import { adoptTerminal, configureTerminals, hasTerminal, initTermHost } from "./termHost";
+import { clampFontSize } from "./termHostOptions";
+import { usePtyInfo } from "./ptyInfo";
 
 export function useTermHost(): void {
   useEffect(() => {
@@ -19,14 +22,25 @@ export function useTermHost(): void {
     const off = initTermHost(pty, {
       openLink: (uri) => void rg.openExternal(uri),
       copy: (text) => void rg.copyText(text),
+      onFontSize: (size) => void useStore.getState().saveSettings({ terminalFontSize: size }),
       log,
     });
     const offTheme = onThemeChange((theme) => configureTerminals({ theme }));
     let alive = true;
     void pty
       .info()
-      .then((info) => alive && configureTerminals({ osBuild: info.osBuild }))
+      .then((info) => {
+        if (!alive) return;
+        usePtyInfo.setState({ info });
+        configureTerminals({ osBuild: info.osBuild });
+      })
       .catch(() => undefined);
+    // Settings › Terminal: the font size and the renderer; Ctrl+= / Ctrl+- / Ctrl+0 in a terminal save the size.
+    const applySettings = (s: AppSettings | null) => configureTerminals({ fontSize: clampFontSize(s?.terminalFontSize), gpu: s?.terminalGpu === "off" ? "off" : "auto" });
+    applySettings(useStore.getState().settings);
+    const offSettings = useStore.subscribe((s, prev) => {
+      if (s.settings !== prev.settings) applySettings(s.settings);
+    });
     void pty
       .list()
       .then(async (list) => {
@@ -42,6 +56,7 @@ export function useTermHost(): void {
       alive = false;
       off();
       offTheme();
+      offSettings();
     };
   }, []);
 }
