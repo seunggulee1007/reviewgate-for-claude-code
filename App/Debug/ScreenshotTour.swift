@@ -3120,6 +3120,9 @@ private final class Tour {
             _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing }
         }
 
+        // 8b. Stage 2 (§57.10–57.15) on the live terminal.
+        if let h = hub.host(for: chatId), h.state.isRunning { await terminalStage2(chatId: chatId, host: h) }
+
         // 9. The window closes: every PTY ends and none starts again, whatever the engine reports meanwhile (claude's
         // SessionEnd hook, the exit report — here the exit report, as the fake sends no SessionEnd).
         await entry.model.shell.stopAll()
@@ -3128,6 +3131,101 @@ private final class Tour {
         try await Task.sleep(for: .seconds(3))
         let respawned = hub.host(for: chatId).map { "\($0.state)" } ?? (hub.spawning.isEmpty ? nil : "spawning")
         log("terminal: window close → " + (respawned == nil ? "no claude started again" : "— LOST (\(respawned!))"))
+    }
+
+    // MARK: terminal-stage2 (§57.10–57.15)
+
+    /// Stage 2 on the live terminal chat (in a review with notes.txt pending): the status line's cost in the strip, a wait
+    /// cleared by a WebFetch PostToolUse, a permission card answered from the app, Request changes reaching the next
+    /// prompt's context, and a switch away and back keeping the same PTY (a write from the background denied meanwhile).
+    /// The fake's lines: `status`, `wait`, `webfetch`, `perm`, `bgwrite` (scripts/screenshots.sh).
+    private func terminalStage2(chatId: String, host: TerminalHost) async {
+        let hub = entry.model.terminals
+        let window = entry.window
+
+        // 3. §57.13: the statusLine tee — the fake runs the settings' command; the strip shows its cost.
+        host.send(text: "status\r")
+        let ran = await waitFor(seconds: 15) { host.screenText().contains("status: ") }
+        let costCame = await waitFor(seconds: 10) { [store] in store.terminalInfo?.status?.costUsd == 0.0123 }
+        let status = store.terminalInfo?.status
+        let shown = status?.costUsd.map { HUDStrip.usd($0) }
+        log("terminal: status line → " + (ran && costCame && shown == "$0.01"
+            ? "the strip's cost shows \(shown ?? "?"), context \(status?.contextPercent.map { "\($0)%" } ?? "-"), model \(status?.modelName ?? "-")"
+            : "— SILENT (\(Self.lastLines(host, 2)); status \(String(describing: status)))"))
+
+        // 6. §57.16: a permission wait (a WebFetch dialog) clears with the tool's PostToolUse.
+        host.send(text: "wait\r")
+        let waiting = await waitFor(seconds: 10) { [store] in store.terminalWaiting != nil }
+        host.send(text: "webfetch\r")
+        let cleared = await waitFor(seconds: 10) { [store] in store.terminalWaiting == nil }
+        log("terminal: WebFetch wait → " + (waiting && cleared ? "shown, then cleared by its PostToolUse" : "— LOST (shown \(waiting), cleared \(cleared))"))
+
+        // 4. §57.15: a permission dialog shows as a card; Allow from the app reaches the fake.
+        host.send(text: "perm\r")
+        let carded = await waitFor(seconds: 10) { [store] in !store.terminalPermissions.isEmpty }
+        if carded, let permission = store.terminalPermissions.first {
+            try? await Task.sleep(for: .milliseconds(500))
+            if let window { try? write(try render(window), "terminal-chat-permission-dark") }
+            store.terminalPermissionResponse(requestId: permission.requestId, allow: true)
+            let allowed = await waitFor(seconds: 10) { host.screenText().contains("perm: allow") }
+            let gone = await waitFor(seconds: 5) { [store] in store.terminalPermissions.isEmpty }
+            log("terminal: permission card → " + (allowed && gone ? "\"\(permission.summary)\" allowed from the app, the fake got allow"
+                                                                   : "— LOST (\(Self.lastLines(host, 2)), cards \(store.terminalPermissions.count))"))
+        } else {
+            log("terminal: permission card — SILENT (\(Self.lastLines(host, 2)))")
+        }
+
+        // 5. §57.14: a note and Request changes in the review — staged for the next prompt, then in its context.
+        if let file = store.changedFiles.first(where: { $0.state == .pending }) {
+            store.addNote(path: file.path, line: 1, side: .new, excerpt: "", body: "Use a bullet list here")
+            let noted = await waitFor(seconds: 10) { [store] in !store.unsentNotes.isEmpty && store.canRequestChanges }
+            store.requestChanges(extraMessage: nil)
+            let queued = await waitFor(seconds: 10) { [store] in store.terminalInfo?.requestQueued?.via == .nextPrompt }
+            if let window { try? write(try render(window), "terminal-chat-request-dark") }
+            host.send(text: "go on\r")
+            let told = await waitFor(seconds: 30) {
+                let text = host.screenText()
+                return text.contains("Requested changes") && text.contains("Use a bullet list here")
+            }
+            log("terminal: request changes → " + (noted && queued && told ? "queued for the next prompt, then in its context"
+                                                                         : "— LOST (noted \(noted), queued \(queued), \(Self.lastLines(host, 3)))"))
+            _ = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing || store.gatePhase == .idle }
+        } else {
+            log("terminal: request changes — LOST (no pending file to note)")
+        }
+
+        // 2 + 1. §57.10: a switch to a new chat keeps this terminal running in the background; its write is denied there;
+        // text typed and not sent survives the switch back, with the same pid and no new spec.
+        guard let pid = Self.pid(host) else { return log("terminal: background — SILENT (the terminal is not running)") }
+        let spawnsBefore = host.screenText().components(separatedBy: "fake-claude session=").count
+        guard await store.newChat() else { return log("terminal: background — SILENT (New Chat refused)") }
+        let away = await waitFor(seconds: 30) { [store] in store.currentSessionId != chatId && store.isTerminalChat }
+        let kept = await waitFor(seconds: 10) { [store] in store.backgroundTerminal(chatId: chatId)?.running == true }
+        try? await Task.sleep(for: .milliseconds(500))
+        let alive = hub.host(for: chatId) === host && Self.pid(host) == pid
+        log("terminal: switch away → " + (away && kept && alive ? "background kept (pid \(pid))"
+                                                                : "— LOST (away \(away), engine kept \(kept), host kept \(alive), \(host.state))"))
+        host.send(text: "bgwrite\r")
+        let denied = await waitFor(seconds: 10) { host.screenText().contains("bgwrite: deny") }
+        let line = host.screenLines().last { $0.contains("bgwrite:") }?.trimmingCharacters(in: .whitespaces) ?? ""
+        log("terminal: background write → " + (denied && host.screenText().contains("reviewing another chat") ? "denied — \(line.prefix(120))" : "— LOST (\(line))"))
+        let second = store.currentSessionId
+        _ = await waitFor(seconds: 15) { second.flatMap { hub.host(for: $0) }?.screenText().contains("fake-claude session=") == true }
+        _ = await waitFor(seconds: 10) { [store] in store.terminalInfo?.running == true }
+        host.send(text: "partial")
+        try? await Task.sleep(for: .milliseconds(300))
+        guard await store.openChat(id: chatId) else { return log("terminal: switch back — LOST (refused)") }
+        let back = await waitFor(seconds: 15) { [store] in store.currentSessionId == chatId && store.terminalInfo?.running == true }
+        try? await Task.sleep(for: .milliseconds(500))
+        let samePid = hub.host(for: chatId) === host && Self.pid(host) == pid
+        let noSpawn = host.screenText().components(separatedBy: "fake-claude session=").count == spawnsBefore && !host.disconnected
+        let partial = host.screenText().contains("partial")
+        let secondKept = second.map { store.backgroundTerminal(chatId: $0)?.running == true } ?? false
+        log("terminal: switch back → " + (back && samePid && noSpawn && partial
+            ? "background kept — same pid \(pid), \"partial\" still typed, no new spec; the other chat now runs in the background (\(secondKept))"
+            : "— LOST (back \(back), same pid \(samePid), no new spawn \(noSpawn), partial \(partial), \(Self.lastLines(host, 2)))"))
+        if let window { try? write(try render(window), "terminal-chat-background-back-dark") }
+        host.send(text: "\u{15}")   // ^U: the typed line goes (the tty's kill character), nothing is sent
     }
 
     /// §57.5: the fake claude's own winsize (TIOCGWINSZ through Node's `stdout.columns`, asked with a `size` line) is the
