@@ -18174,7 +18174,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 폴더는 git 저장소가 아니에요 — 여기서는 commit, 브랜치, 워크벤치, PR을 쓸 수 없어요"
+            "value": "이 폴더는 git 저장소가 아니에요 — 여기서는 커밋, 브랜치, 워크벤치, PR을 쓸 수 없어요"
           }
         }
       }

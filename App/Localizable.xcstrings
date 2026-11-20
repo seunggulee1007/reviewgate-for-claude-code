@@ -29601,7 +29601,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 폴더는 git 저장소가 아닙니다"
+            "value": "이 폴더는 git 저장소가 아니에요"
           }
         }
       }
@@ -35311,7 +35311,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "git 없이 추적: ReviewGate가 이 폴더 밖에 숨은 사본을 두고 Claude가 바꾼 내용을 보여줘요. 폴더 자체는 건드리지 않아요. 대신 commit, 브랜치, 워크벤치, PR은 쓸 수 없어요."
+            "value": "git 없이 추적: ReviewGate가 이 폴더 밖에 숨은 사본을 두고 Claude가 바꾼 내용을 보여줘요. 폴더 자체는 건드리지 않아요. 대신 커밋, 브랜치, 워크벤치, PR은 쓸 수 없어요."
           }
         }
       }
@@ -35359,7 +35359,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 폴더를 git 저장소로 만들어요 (git init) — commit, 브랜치, 워크벤치, PR을 평소처럼 쓸 수 있어요"
+            "value": "이 폴더를 git 저장소로 만들어요 (git init) — 커밋, 브랜치, 워크벤치, PR을 평소처럼 쓸 수 있어요"
           }
         }
       }
@@ -35503,7 +35503,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ReviewGate가 이 폴더의 숨은 사본을 폴더 밖에 두고 Claude가 바꾼 내용을 보여 주고 되돌려요. 폴더 자체에는 .git이 없어요. commit, 브랜치, 워크벤치, PR은 쓸 수 없어요 — 쓰려면 이 폴더에 git을 초기화하세요."
+            "value": "ReviewGate가 이 폴더의 숨은 사본을 폴더 밖에 두고 Claude가 바꾼 내용을 보여 주고 되돌려요. 폴더 자체에는 .git이 없어요. 커밋, 브랜치, 워크벤치, PR은 쓸 수 없어요 — 쓰려면 이 폴더에 git을 초기화하세요."
           }
         }
       }
