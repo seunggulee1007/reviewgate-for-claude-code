@@ -33,6 +33,7 @@ import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
 import { backgroundKeyJustHandled } from "./background"; // §52
 import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-chrome-09)
+import { useTermHost } from "./terminal/useTermHost"; // §57.10
 
 declare global {
   interface Window {
@@ -53,6 +54,7 @@ export function App() {
   const sideOpen = useStore((s) => s.sidePanelOpen);
   const boardOpen = useStore((s) => s.boardOpen); // MARK: wave5 w5-board
   useReviewShortcuts();
+  useTermHost(); // §57.10: the window's terminals (terminal chats, the shell panel)
   useNotificationNotices(); // MARK: wave4b w4-notify — §39.6: a clicked notification lands on its card; the OS refusing one
   // polish-03: ⌘⇧R / Ctrl+Shift+R is always the reject shortcut — never the browser's force reload.
   useRejectShortcut(() => {

@@ -1,0 +1,6 @@
+/* §57.10: terminals (xterm.js) — a terminal chat's column and the bottom shell panel. */
+.term-view { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; padding: 4px 0 0 4px; background: var(--term-bg, #ffffff); }
+:root[data-theme="dark"] .term-view { --term-bg: #1a1a1c; }
+.term-view .term-host { width: 100%; height: 100%; }
+.term-view .xterm { height: 100%; }
+.term-view .xterm:focus-within { outline: none; }
