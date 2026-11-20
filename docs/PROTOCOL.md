@@ -8917,7 +8917,8 @@ chat's id);
 - **One prompt at a time.** A UserPromptSubmit that comes while the previous one is still waiting (the CLI gave up on it,
   a forged hook) blocks the earlier one at once (the session's timeout reason). The engine adopts prompts one after the
   other: the later one waits for the adoption in flight within its own budget (100 s), else it is blocked ("ReviewGate is
-  still starting the review of your previous prompt. Send this one again in a moment."). Each `terminal_prompt` carries a
+  still starting the review of your previous prompt. Send this one again in a moment."). An adoption that never settles
+  holds the queue at most 10 s past its own deadline (logged warn; that prompt was already blocked by its own timer). Each `terminal_prompt` carries a
   sequence number and the engine answers that number: an answer reaches only its own prompt; one whose prompt no longer
   waits takes the late path (an ok ends the turn it opened at once, `prompt_timeout`).
 - **Esc gives no Stop** (Claude Code does not run Stop on a user interrupt). An interrupted turn stays running —

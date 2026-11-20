@@ -341,6 +341,9 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
 /** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
 type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
 
+/** §57.4: how long past its own deadline a terminal prompt's adoption may hold the queue (it never settled: logged, dropped). */
+const TERMINAL_ADOPT_GRACE_MS = 10_000;
+
 /** §57.4: a terminal prompt that came while the previous one was still being adopted, and waited past its budget. */
 const TERMINAL_PROMPT_QUEUED_REASON = "ReviewGate is still starting the review of your previous prompt. Send this one again in a moment.";
 
@@ -2741,9 +2744,13 @@ export class ReviewEngine {
       }
       await this.adoptTerminalPrompt(ts, ev, deadline);
     })();
-    // The queue's tail settles only when this one and every one before it did (a prompt refused early leaves the earlier
-    // one in flight).
-    const tail = prior ? Promise.all([prior, run]).then(() => undefined) : run;
+    // The queue's tail settles when this one and every one before it did (a prompt refused early leaves the earlier one in
+    // flight) — or at the latest TERMINAL_ADOPT_GRACE_MS after this prompt's own deadline: an adoption that never settles
+    // (its prompt was blocked by its own timer long before) must not block every later prompt.
+    const all = prior ? Promise.all([prior, run]).then(() => undefined) : run;
+    const tail = settlesWithin(all, deadline + TERMINAL_ADOPT_GRACE_MS - Date.now()).then((settled) => {
+      if (!settled) this.log("warn", "terminal: a prompt adoption never settled; the queue moves on");
+    });
     this.terminalAdopting = tail;
     // Both handlers: a rejected adoption must not become an unhandled rejection (it would end the engine process).
     const clear = (): void => {
@@ -2822,7 +2829,8 @@ export class ReviewEngine {
         this.log("info", "terminal prompt: its review summary never reached Claude; it goes with the next prompt");
       }
       this.touch();
-      await this.checkConcurrent("send");
+      // §57.4: not awaited — the adoption (and the queue behind it) is done once the prompt has its answer.
+      void this.checkConcurrent("send").catch((e: unknown) => this.log("debug", `terminal: the concurrent-CLI check failed: ${errorMessage(e)}`));
     } catch (e) {
       this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
       if (!started && taken) this.gate.restoreSummary(taken);

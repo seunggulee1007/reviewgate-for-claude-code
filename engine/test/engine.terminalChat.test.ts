@@ -50,11 +50,11 @@ const platform = { ...fakePlatform, isWindows: process.platform === "win32" };
 
 type Rig = { h: Harness; dir: string; config: string; claude: string };
 
-async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal" } = {}): Promise<Rig> {
+async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal"; promptWaitMs?: number } = {}): Promise<Rig> {
   const dir = o.dir ?? makeRepo();
   const config = o.config ?? temp("rg-term-config");
   const claude = makeFakeClaude(temp("rg-term-bin"), o.version);
-  const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY });
+  const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY, dataDir: temp("rg-term-data"), ...(o.promptWaitMs ? { terminalPromptWaitMs: o.promptWaitMs } : {}) });
   harnesses.push(h);
   await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
   await h.settle();
@@ -488,5 +488,20 @@ describe("terminal chats (§57)", () => {
     await r.h.waitFor((st) => st.gate.phase === "reviewing", "collected");
     expect(r.h.engine.state.changedFiles.map((f) => f.path)).toEqual(["auto.txt"]);
     expect(r.h.ofType("auto_turn").map((e) => e.trigger)).toEqual(["continue"]);
+  });
+
+  it("§57.4 a prompt adoption that never settles holds the queue only until its deadline + 10 s", async () => {
+    const r = await rig({ promptWaitMs: 300 });
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    const engine = r.h.engine as unknown as { followHeadMove: () => Promise<void> };
+    const real = engine.followHeadMove.bind(r.h.engine);
+    engine.followHeadMove = () => new Promise<void>(() => undefined); // the seam: this adoption never settles
+    expect(await hook(s, ups("p1"))).toMatchObject({ decision: "block" }); // the session's own timer (wait + 10 s)
+    engine.followHeadMove = real;
+    // The queue moved on: the next prompt is adopted (not blocked with "still starting the review of your previous prompt").
+    const next = await hook(s, ups("p2", "go on"));
+    expect(next.decision).toBeUndefined();
+    await r.h.waitFor((st) => st.gate.phase === "running" && st.session.terminal?.promptId === "p2", "p2 running");
   });
 });
