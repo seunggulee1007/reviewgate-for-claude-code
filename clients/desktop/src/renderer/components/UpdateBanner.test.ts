@@ -102,6 +102,26 @@ describe("the update banner (§48 Windows)", () => {
     expect(testIds(failed)).toEqual(["Update result", "Retry update", "Open release page", "Dismiss update result"]);
   });
 
+  it("in Korean", async () => {
+    const { initI18n } = await import("../i18n");
+    initI18n("ko", "win32");
+    try {
+      const available = amp(html({ release }));
+      expect(available).toContain("ReviewGate 0.6.0 버전이 나왔어요");
+      expect(available).toContain(">설치하고 다시 시작<");
+      expect(available).toContain(">다운로드 페이지<");
+      expect(available).toContain("GitHub에서 설치 파일을 내려받아 체크섬을 확인한 뒤");
+      const downloading = amp(html({ install: { kind: "downloading", received: 12_400_000, total: 115_300_000, version: "0.6.0" } }));
+      expect(downloading).toContain("ReviewGate 0.6.0 설치 중");
+      expect(downloading).toContain("받는 중 12.4 / 115.3 MB");
+      expect(downloading).toContain('aria-label="내려받기 진행률"');
+      expect(amp(html({ install: { kind: "ready", version: "0.6.0" } }))).not.toContain("Ready —");
+      expect(amp(html({ notice: { kind: "failed", version: "0.6.0", why: "ReviewGate 0.5.17이(가) 그대로 설치되어 있어요." } }))).toContain("ReviewGate 0.6.0을(를) 설치하지 못했어요");
+    } finally {
+      initI18n("en", "win32");
+    }
+  });
+
   it("megabytes", () => {
     expect(received(12_400_000, 24_000_000)).toBe("12.4 / 24.0 MB");
     expect(received(30_000_000, 24_000_000)).toBe("24.0 / 24.0 MB");
