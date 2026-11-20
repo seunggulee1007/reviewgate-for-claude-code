@@ -995,5 +995,6 @@
   "Stale lines on the screen? ⌃L redraws it": "화면에 지난 줄이 남았나요? ⌃L로 다시 그려요",
   "Stale lines on the screen? Ctrl+L redraws it": "화면에 지난 줄이 남았나요? Ctrl+L로 다시 그려요",
   "Find in terminal": "터미널에서 찾기",
-  "Find in the terminal's screen and scrollback": "터미널 화면과 스크롤백에서 찾아요"
+  "Find in the terminal's screen and scrollback": "터미널 화면과 스크롤백에서 찾아요",
+  "Drag to resize the review panel": "드래그해서 리뷰 패널 크기 조절"
 }

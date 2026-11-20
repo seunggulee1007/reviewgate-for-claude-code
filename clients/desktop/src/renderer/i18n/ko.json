@@ -1147,6 +1147,7 @@
   "Draft kept — reopen the chat to get it back (⌘⇧T)": "초안을 남겨 뒀어요 — 채팅을 다시 열면 돌아와요 (⌘⇧T)",
   "Drag to make the message box taller — double-click for its own height": "끌어서 입력란을 키워요 — 두 번 클릭하면 원래 높이로 돌아가요",
   "Drag to resize": "드래그해 크기 조절",
+  "Drag to resize the review panel": "드래그해서 리뷰 패널 크기 조절",
   "Drag to resize the terminal panel": "드래그해서 터미널 패널 크기 조절",
   "Drop files to mention them, or images to attach": "파일을 놓으면 언급하고, 이미지를 놓으면 첨부해요",
   "Duration": "소요 시간",
