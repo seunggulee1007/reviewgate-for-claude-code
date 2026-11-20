@@ -301,6 +301,32 @@ import Testing
         #expect(TerminalStage2Text.requestChangesPrompt == "Please make the changes requested in the review notes.")
     }
 
+    @Test func requestChangesReachesARunningTerminalTurn() {
+        let app = makeState()
+        var fired: [EngineCommand] = []
+        app.commandSink = { fired.append($0) }
+        var s = snapshot(seq: 1, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true, promptId: "p1"))
+        s.reviewNotes = [ReviewNote(id: "n1", path: "notes.txt", line: 1, side: .new, excerpt: "", body: "Use a list")]
+        app.handle(.state(s))
+        // The gate refuses while a turn runs; a terminal turn stages it for its Stop.
+        #expect(!app.state.gate.canRequestChanges)
+        #expect(app.canRequestChanges)
+        app.requestChanges(extraMessage: nil)
+        #expect(fired == [.requestChanges(extra: nil, noteIds: nil)])
+        // A turn Claude started itself (no prompt id), or no notes: not here.
+        var own = snapshot(seq: 2, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true))
+        own.reviewNotes = s.reviewNotes
+        app.handle(.state(own))
+        #expect(!app.canRequestChanges)
+        app.handle(.state(snapshot(seq: 3, phase: .running, terminal: TerminalSessionInfo(running: true, hooksSeen: true, promptId: "p1"))))
+        #expect(!app.canRequestChanges)
+        // A chat-kind chat: only the gate decides.
+        var chat = snapshot(seq: 4, phase: .running, current: "c1")
+        chat.reviewNotes = s.reviewNotes
+        app.handle(.state(chat))
+        #expect(!app.canRequestChanges)
+    }
+
     @Test func thePermissionBridgeSettingDefaultsOn() {
         let defaults = UserDefaults(suiteName: "TerminalChatStateTests.\(UUID().uuidString)")!
         #expect(AppSettings.terminalPermissionBridge(defaults: defaults))

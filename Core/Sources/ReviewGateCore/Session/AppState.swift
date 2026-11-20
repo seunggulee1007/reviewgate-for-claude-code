@@ -505,7 +505,8 @@ public final class AppState {
     public var changesRequestedFiles: [ChangedFile] { changedFiles.filter { $0.state == .changesRequested } }
     public var hasPendingReview: Bool { !pendingFiles.isEmpty || !changesRequestedFiles.isEmpty }
     public var canSend: Bool { gate.canSend }
-    public var canRequestChanges: Bool { gate.canRequestChanges }
+    /// §57.14: a terminal chat also takes it while its prompt-backed turn runs (staged for that turn's Stop).
+    public var canRequestChanges: Bool { gate.canRequestChanges || terminalTurnTakesRequest }
     /// The explicit "Accept N & Send" action is offered: files are pending, none is changes-requested
     /// (those go through Request changes) and a message can be sent. Plain Send never accepts anything.
     public var canAcceptAndSend: Bool {
