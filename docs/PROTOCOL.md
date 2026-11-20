@@ -9689,3 +9689,13 @@ repository (git never adds a `.git` folder to a tree, so it never shows in the r
 **Claude in the folder.** The CLI runs in the folder as in a terminal: its own `git` commands fail there ("not a git
 repository"). The hooks' snapshots (post-Bash, terminal chats) go through `runGit` and use the hidden repository; an edit
 into the hidden repository is git's own data for the M23 guard (§33.3), as an edit into `.git` would be.
+
+**Mac.** The git-init prompt (`App/UI/GitInitSheet.swift`) offers **Track without git** as its default, recommended button
+next to "Initialize git here", "Choose another folder…" and Cancel (the candidate subfolders as before), under one line:
+ReviewGate keeps a hidden copy outside the folder to show what Claude changed; the folder is not touched; commit,
+branches, workbenches and PRs are off. A folder that `looksUnsafe` is confirmed first ("Track this folder without git?"),
+and a `folder_unsafe` refusal opens the same confirmation, then resends with `confirm: true`. `folder_too_large` says which
+limit (more than 20,000 files / more than 1 GB / listing took too long) and suggests git init or a smaller folder;
+`track_failed` and the rest show their text — in the prompt itself (`AppState.gitInitProblem`), which stays open; the
+`error{folder_too_large | track_failed}` of a remembered folder's reopen fills the same line when the prompt comes back.
+`locked_by_other_session` goes to the takeover alert as a refused open does.

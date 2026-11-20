@@ -25,7 +25,6 @@ struct MainWindow: View {
     @Binding var tab: MainTab
     @Environment(WindowModel.self) private var model
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var confirmUnsafeInit = false
     /// Mirrors `store.needsGitInit` so the sheet is driven by plain view state.
     @State private var showGitInit = false
     @State private var showNewBranch = false
@@ -321,7 +320,7 @@ struct MainWindow: View {
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
         }
         .sheet(isPresented: $showGitInit, onDismiss: { if store.needsGitInit { store.cancelGitInit() } }) {
-            gitInitSheet
+            GitInitSheet()
         }
     }
 
@@ -1109,66 +1108,6 @@ struct MainWindow: View {
         .help(Text("Switch project (⌘⇧O)") + Text(verbatim: "\n" + (store.projectInfo?.root ?? store.projectURL?.path ?? "")))
         .accessibilityLabel("Project switcher")
         .accessibilityIdentifier("Project switcher")
-    }
-
-    // MARK: Not a git repository
-
-    private var gitInitSheet: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("This folder is not a git repository", systemImage: "exclamationmark.triangle")
-                .font(.headline)
-            Text(store.projectURL?.path ?? "")
-                .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-            Text("ReviewGate uses git snapshots to show and revert each turn's changes, so it needs a repository to work in.")
-                .font(.callout)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !store.gitCandidates.isEmpty {
-                Text("Git repositories inside this folder:").font(.subheadline.weight(.medium))
-                List(store.gitCandidates, id: \.self) { url in
-                    Button {
-                        ProjectOpener.open(url, store: store)
-                    } label: {
-                        Label(url.lastPathComponent, systemImage: "folder.badge.gearshape")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(url.path)
-                    .accessibilityIdentifier("Git candidate \(url.lastPathComponent)")
-                }
-                .listStyle(.bordered)
-                .frame(minHeight: 120, maxHeight: 240)
-                .accessibilityIdentifier("Git candidates")
-            }
-
-            HStack {
-                Button("Initialize git here", role: .destructive) {
-                    if store.gitInitLooksUnsafe {
-                        confirmUnsafeInit = true
-                    } else {
-                        Task { await store.initRepository() }
-                    }
-                }
-                .accessibilityIdentifier("Initialize git")
-                Spacer()
-                Button("Choose another folder…") {
-                    store.cancelGitInit()
-                    ProjectOpener.choose(store: store)
-                }
-                .accessibilityIdentifier("Choose another folder")
-                Button("Cancel", role: .cancel) { store.cancelGitInit() }
-                    .keyboardShortcut(.cancelAction)
-            }
-        }
-        .padding(20)
-        .frame(width: 480)
-        .alert("Initialize git in this folder?", isPresented: $confirmUnsafeInit) {
-            Button("Initialize anyway", role: .destructive) { Task { await store.initRepository() } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This looks like a large or personal folder (\(store.projectURL?.path ?? "")). Initializing git here is probably a mistake.")
-        }
     }
 }
 
