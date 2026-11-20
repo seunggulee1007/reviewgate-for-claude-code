@@ -75,6 +75,7 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 | `main/editor.ts`, `main/winCmd.ts` | Open in VS Code / IntelliJ; cmd.exe quoting for `.cmd` / `.bat` shims |
 | `main/winClaude.ts` | resolves an npm `claude.cmd` shim to a spawnable program |
 | `main/orphans.ts` | child-process listing for the e2e (ps / PowerShell CIM / wmic) |
+| `main/pty/` | PROTOCOL §57.10: `nodePty.ts` (loading, availability), `selftest.ts` (`--rg-pty-selftest`), `terminalLaunch.ts` (claude / shell launches), `ptyHub.ts` (a window's PTYs, flow control, lifecycle), `ptyWindow.ts` (the hub wired to Electron) |
 | `main/e2e.ts` | `--e2e` harness: report / screenshot / secondary-window IPC, orphan-process count, exit code |
 | `preload.ts`, `shared/ipc.ts` | the `window.rg` bridge |
 | `renderer/App.tsx` | layout: Sidebar (Changes \| PRs) · `DiffPane` / `PRDetail` · `ChatPane` · `<Dialogs />`; empty state with recents; menu actions — each pane inside an `ErrorBoundary` |

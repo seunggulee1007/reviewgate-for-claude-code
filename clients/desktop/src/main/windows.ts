@@ -22,6 +22,10 @@ import { routeMovedChat } from "./chatMove.js"; // MARK: wave4b w4b-follow
 import { sameMenuState, validMenuState, type MenuEnabled } from "../shared/menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
 import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows (polish-07)
 import { textContextMenu } from "./contextMenu.js"; // MARK: polish p-lifecycle (P3-transcript-09 / P4-composer-11)
+// MARK: terminal-win — PROTOCOL §57.10: each window's PTYs (terminal chat, shell panel) live in main
+import { ptyAvailable } from "./pty/nodePty.js";
+import type { PtyHub } from "./pty/ptyHub.js";
+import { createWindowPtyHub } from "./pty/ptyWindow.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const PRELOAD = join(here, "preload.cjs");
@@ -48,6 +52,8 @@ export type Workbench = {
   menuEnabled?: MenuEnabled | null;
   /** The chat tabs the menu last listed for this window (their ids and titles). */
   menuTabs?: string;
+  /** MARK: terminal-win — §57.10: this window's PTYs. */
+  pty: PtyHub;
 };
 type Config = { e2e: E2EMode | null; rebuildMenu: () => void };
 
@@ -66,6 +72,10 @@ let nextExtrasQuery = 1;
 
 export function initWindows(c: Config): void {
   config = c;
+  // MARK: terminal-win — §57.10: the last resort when main goes down without the window closes — no PTY child outlives it.
+  process.on("exit", () => {
+    for (const w of windows.values()) w.pty.killAllSync();
+  });
   // MARK: polish p-lifecycle (P1-chrome-01): what only a window's page knows — the lines its parts registered, the message
   // being typed, the queue, side questions — for the question main is about to ask (src/shared/closeGuard.ts).
   ipcMain.on("rg:closeGuardExtras", (evt, id: unknown, raw: unknown) => {
@@ -203,11 +213,20 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     env: process.env as Record<string, string>,
     log: (level, msg) => logLine(prefix, level, msg),
   });
-  const wb: Workbench = { win, engine, projectPath: null, projectRoot: null, closing: false };
+  const wb = { win, engine, projectPath: null, projectRoot: null, closing: false } as Workbench;
+  wb.pty = createWindowPtyHub({
+    win,
+    engine,
+    projectPath: () => wb.projectRoot ?? wb.projectPath,
+    fullRepaint: () => true,
+    log: (level, msg) => logLine(prefix, level, msg),
+  });
   windows.set(id, wb);
   logLine("main", "main", `window ${prefix}: new engine${opts.project ? ` for ${opts.project}` : ""} (${windows.size} open)`);
 
   engine.on((ev: EngineEvent) => {
+    // MARK: terminal-win — §57.10: the chat PTY follows the current chat; a project change or close ends the window's PTYs.
+    if (ev.type === "state") wb.pty.onEngineState(ev.state);
     if (ev.type === "state") {
       const path = ev.state.project?.path ?? null;
       const root = ev.state.project?.root ?? null;
@@ -265,6 +284,8 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     protocolVersion: 2,
     client: process.platform === "win32" ? "windows" : "mac",
     settings: engineSettings(settings),
+    // MARK: terminal-win — §57.10: static per process (node-pty loaded; ConPTY on Windows 10 1903 or later).
+    capabilities: { terminalChat: ptyAvailable() },
   };
   void engine.handle(hello);
 
@@ -299,12 +320,14 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     persistWindows();
     // P1-chrome-05: the window goes at once; its engine stops behind it.
     if (!win.isDestroyed()) win.hide();
-    void withTimeout(engine.dispose(), 3000).finally(() => {
+    // §57.10: the window's PTYs end first (their claude reports to this engine), inside the same 3 s.
+    void withTimeout(wb.pty.killAll().then(() => engine.dispose()), 3000).finally(() => {
       if (!win.isDestroyed()) win.destroy();
     });
   }
   win.on("closed", () => {
     windows.delete(id);
+    void wb.pty.killAll().catch(() => undefined);
     // P1-chrome-02 / P5-sheets-54: the last window going away keeps the list it was in (`persistWindows` writes none then).
     persistWindows();
     void engine.dispose().catch(() => undefined);
@@ -372,7 +395,7 @@ export async function restoreWindows(): Promise<boolean> {
 
 export async function disposeAll(): Promise<void> {
   shuttingDown = true;
-  await Promise.all([...windows.values()].map((w) => w.engine.dispose().catch(() => undefined)));
+  await Promise.all([...windows.values()].map((w) => w.pty.killAll().catch(() => undefined).then(() => w.engine.dispose().catch(() => undefined))));
 }
 
 // MARK: wave4 w4-safety / polish p-lifecycle (P1-chrome-01)
