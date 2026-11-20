@@ -8964,6 +8964,14 @@ chat's id);
   `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`, `LANG` / `LC_CTYPE=en_US.UTF-8`,
   `CLAUDE_CODE_NATIVE_CURSOR=1` (the IME's candidate window follows the input caret), then only the spec's `RG_*` /
   `CLAUDE_CODE_*` keys. After the start: IUTF8 on the PTY, then `terminal_started {pid}`.
+  - *NO_PROXY after the rc.* The line is `exec /bin/sh -c '<wrapper>' rg-claude <argv…>`: the wrapper appends
+    `127.0.0.1,localhost,::1` to `NO_PROXY` and `no_proxy` (keeping what the user's rc exported) and `exec "$@"`s claude,
+    so a proxy set in the rc never takes the hook posts. Both `exec`s keep the pid, so `terminal_started` is claude's.
+  - *Shell families* (`TerminalLaunch.shellFamily`). POSIX shells (sh, bash, zsh, ksh, dash) and fish (its own quoting:
+    `\\`, `\'`) run `-l -i -c`; csh / tcsh run `-i -c` (they take `-l` only alone — the `-` of argv[0] makes the login
+    shell) with a backslash before each newline inside quotes, and fall back to zsh if a word holds `!` (history expands
+    it even in quotes; the engine's argv has none — a test checks). Any other shell (nu, pwsh, elvish, xonsh) cannot read
+    the quoting: `/bin/zsh -l -i -c` runs the same line, so that shell's own PATH setup does not load.
 - **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
   shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
   SIGKILL after 3 s, to the PTY's whole process group — what claude started there goes too; text typed and not sent is
