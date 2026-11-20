@@ -8782,8 +8782,8 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
   (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
-  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
-  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `side_promote
+  {as:"message"}`; `request_changes` and `chat_move` work there since Stage 2, §57.14 / §57.12); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
   `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
@@ -9204,6 +9204,36 @@ before `--settings` (the option takes several values, so a flag follows it).
 - **`${VAR}` is not expanded by the engine**: the CLI expands it from the PTY's environment (the user's login shell), and
   secrets stay out of the file. (Unverified against the CLI: if it does not expand there, the engine will expand only
   variables of its own environment into this 0600 file.)
+
+### 57.12 Worktrees: follow and move
+
+- **Detection.** PostToolUse now covers every tool (§57.16), so the main agent's `EnterWorktree` / `ExitWorktree` (no
+  `agent_id`) give the same `scope_notice` a chat's hooks give (`worktreeToolNotice`). `CwdChanged` gives the TUI's new
+  folder (`terminal_cwd`).
+- **Following.** The mode that decides is the TUI's last `permission_mode` (from its hooks), not the chat's. In auto mode
+  — and only for a client that moves terminal chats (`terminalFeature("worktreeMove")`: the Mac app) — EnterWorktree moves
+  the chat at once (as a chat's "허용하고 따라가기"), ExitWorktree back to another worktree likewise. Otherwise
+  `state.session.terminal.elsewhere {path, name, toolName: "EnterWorktree" | "ExitWorktree" | "CwdChanged", canMove}`
+  offers the move; this window's own folder (or a folder that is no worktree of this repository) clears it. A `cd`
+  (CwdChanged) is only ever offered, never followed.
+- **`chat_move {path, interrupt?, followUp?}` of a terminal chat.** Refused as a chat's (`chat_is_record` — also for a
+  terminal chat continued elsewhere —, the target's refusals, `collect_failed`, `session_busy` while a turn runs without
+  `interrupt`; `terminal_chat` for a client that does not move terminal chats). Then:
+  1. `state.session.terminal.moving {path, name}`: from now on UserPromptSubmit is blocked and PreToolUse denied with
+     "This chat is moving to <name> in ReviewGate; it continues there."; an open turn stays open.
+  2. The app sees `moving`, ends the PTY (no restart) and sends `terminal_exited`. The engine waits for the claude pid's
+     exit (or `terminal_exited`) up to 5 s; on timeout `moving` clears, the chat stays, refused `cli_still_running`.
+  3. The PTY's end closes an open turn (`terminal_exited`): it is collected and its review stays **here**.
+  4. The handoff is a chat move's (§39.4): the meta keeps `kind: "terminal"`, `cliSessionId`, `cliKnown`, `cliConfigDir`;
+     `followUp` is null and `terminalFollowUp` holds the follow-up when a turn was stopped (auto-follow: the
+     `chatMoveFollowUp` text). `movedTo`, `chat_moved` as for a chat.
+  5. This window's current chat is now a terminal **record**: its session waits for nothing, `terminal_spec` is refused
+     `chat_is_record`; the app shows the moved placeholder.
+- **The target window** takes the chat as any moved chat and makes it current: a terminal chat. `terminal_spec` resumes
+  it: the conversation counts as gone only when the CLI has no record under the target's folder nor under `movedFrom`'s
+  (in each config dir, §57.16) — so a move never silently starts a fresh conversation. `terminalFollowUp` goes into the
+  first real prompt's `additionalContext` (prepended), then is dropped; nothing is typed into the PTY. The trust question
+  of the new folder is the TUI's own (the engine never writes trust into `.claude.json`).
 
 ### 57.13 Cost and the status line
 

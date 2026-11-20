@@ -265,7 +265,7 @@ import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js
 import { HOOK_TOKEN_ENV, hookSettings, type HookSettingsOptions, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
-import type { SessionKind, TerminalRequestQueued, TerminalSpecEvent } from "./protocol.js";
+import type { SessionKind, TerminalElsewhere, TerminalRequestQueued, TerminalSpecEvent } from "./protocol.js";
 export { ENGINE_VERSION };
 export { CommandRefused } from "./errors.js";
 
@@ -335,7 +335,7 @@ export const TERMINAL_PROMPT_WAIT_MS = 100_000;
 const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "permission_response", "set_permission_mode",
   "set_model", "plan_response", "plan_follow", "rewind", "compact", "peer_accept", "task_stop", "task_background", "stop_agent",
-  "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
+  "retry_extensions", "mcp_reconnect", "mcp_toggle",
 ]);
 
 /** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
@@ -2742,6 +2742,9 @@ export class ReviewEngine {
     const project = this.project;
     if (!project || this.gitInit !== null || !this.sessions) throw new CommandRefused("no_project");
     const ts = this.requireTerminal(sessionId);
+    // §57.12: a terminal chat moved / continued elsewhere is a record here — no claude for it.
+    const rec = this.requireSession(sessionId);
+    if (rec.movedTo !== undefined || rec.continuedIn !== undefined) throw new CommandRefused(`chat_is_record:${sessionId}`, { code: "chat_is_record" });
     const tc = await this.locate();
     if (!tc.claude) throw new CommandRefused("cli_not_found", { code: "cli_not_found" });
     const version = parseCliVersion(tc.claudeVersion);
@@ -2884,10 +2887,11 @@ export class ReviewEngine {
    * each of them says gone (its projects folder for the project exists without the record). Unknown is never gone.
    */
   private terminalCliGone(meta: SessionMeta, cliId: string): boolean {
-    const cwd = this.project!.path;
+    // §57.12: a moved chat's conversation is recorded under the folder it ran in before the move.
+    const cwds = [this.project!.path, ...(meta.movedFrom?.path ? [meta.movedFrom.path] : [])];
     const envs = this.terminalConfigDirs(meta).map((dir) => ({ ...this.childEnv(), CLAUDE_CONFIG_DIR: dir }));
-    if (envs.some((env) => cliSessionExists(cwd, cliId, env))) return false;
-    return envs.every((env) => cliSessionGone(cwd, cliId, env));
+    if (envs.some((env) => cwds.some((cwd) => cliSessionExists(cwd, cliId, env)))) return false;
+    return envs.every((env) => cwds.every((cwd) => cliSessionGone(cwd, cliId, env)));
   }
 
   /** §57.10: what a background terminal reports — ids and config dir go to its own chat; waits and state touch; nothing else. */
@@ -7497,7 +7501,8 @@ export class ReviewEngine {
         if (ev.code === "worktree_outside_review" && ev.reasonCode === "worktree_command") {
           // M05b: EnterWorktree moved the CLI into that worktree — in auto mode the chat follows at once, as "허용하고 따라가기".
           const entered = ev.toolName === "EnterWorktree";
-          if (entered && ev.toolUseId && !this.followAfterTool.has(ev.toolUseId) && this.sessionState.permissionMode === "auto") {
+          // §57.12: a terminal chat follows by the TUI's own mode, and only for a client that moves terminal chats.
+          if (entered && ev.toolUseId && !this.followAfterTool.has(ev.toolUseId) && this.chatPermissionMode() === "auto" && this.canMoveChat()) {
             this.followAfterTool.set(ev.toolUseId, { path: ev.path ?? null, followUp: this.chatMoveFollowUp(ev.path ?? null) });
           }
           const followed = ev.toolUseId !== undefined && this.followAfterTool.has(ev.toolUseId);
@@ -7505,6 +7510,9 @@ export class ReviewEngine {
           if (ev.worktreesBefore && ev.toolUseId) this.noteWorktreesBefore(ev.toolUseId, ev.path ?? null, ev.worktreesBefore);
           const made = this.afterWorktreeCommand(ev.path ?? null, ev.toolUseId ?? null);
           if (followed) return; // the chat follows: no "outside the review" warning for it
+          // §57.12: the terminal's strip offers the move.
+          const ts = this.terminal;
+          if (entered && ts) void made.then((root) => this.noteTerminalElsewhere(ts, root ?? ev.path ?? null, "EnterWorktree"));
           if (ev.worktreesBefore) {
             // Said once it is there and listed (its row offers to move this chat into it); nothing when it was not made —
             // except for EnterWorktree, which entered it either way (an existing worktree too).
@@ -7642,6 +7650,9 @@ export class ReviewEngine {
         return;
       case "terminal_config_dir": // §57.16
         if (source instanceof TerminalSession) this.onTerminalConfigDir(source.chatId, ev.dir);
+        return;
+      case "terminal_cwd": // §57.12: a `cd` of the TUI's shell — offered as a move, never followed
+        if (source instanceof TerminalSession) void this.noteTerminalElsewhere(source, ev.cwd, "CwdChanged");
         return;
       case "terminal_status": // §57.13: the strip's cost / context; the session's cost comes with turn_end
         if (ev.status.contextTokens !== null) this.hud.contextTokens = ev.status.contextTokens;
@@ -8236,6 +8247,8 @@ export class ReviewEngine {
    * as a record (`movedTo`) and `chat_moved` tells the client to open the target's window. The review stays here.
    */
   private async chatMove(path: unknown, interrupt: boolean, followUp: unknown): Promise<void> {
+    const ts = this.terminal; // MARK: terminal-chat — §57.12: the app ends its PTY; the engine waits for that
+    if (ts) return this.terminalChatMove(ts, path, interrupt, followUp);
     const project = this.project;
     const cp = this.gate.checkpoint;
     const idx = this.sessions;
@@ -8306,6 +8319,126 @@ export class ReviewEngine {
     this.approvedPlan = null;
     this.emit({ type: "chat_moved", sessionId: meta.id, path: target.root, name: target.name, baseline, interrupted });
     this.touch();
+    await this.startSession(project.path, null, this.recordOnlyId());
+  }
+
+  /** §57.12: the mode that decides whether a worktree move is followed at once — a terminal chat's is its TUI's. */
+  private chatPermissionMode(): PermissionMode {
+    return this.terminal?.permissionMode ?? this.sessionState.permissionMode;
+  }
+
+  /** §57.12: the current chat can move between worktrees (a terminal chat only for a client that ends its PTY for it). */
+  private canMoveChat(): boolean {
+    return this.terminal === null || this.terminalFeature("worktreeMove");
+  }
+
+  private elsewhereOf(target: { root: string; name: string }, toolName: TerminalElsewhere["toolName"]): TerminalElsewhere {
+    return { path: target.root, name: target.name, toolName, canMove: this.canMoveChat() };
+  }
+
+  /**
+   * §57.12: the terminal's TUI works in `path` now (EnterWorktree, a `cd`): another worktree of this repository is offered as
+   * a move (`terminal.elsewhere`); this window's own folder, or anything else, clears the offer. A `cd` never moves the chat.
+   */
+  private async noteTerminalElsewhere(ts: TerminalSession, path: string | null, toolName: TerminalElsewhere["toolName"]): Promise<void> {
+    const cp = this.gate.checkpoint;
+    if (!cp || !path) return;
+    let target: ReturnType<typeof moveTarget> = { refused: "path_not_found" };
+    try {
+      target = moveTarget(path, cp.root, await listWorktrees(cp.root));
+    } catch (e) {
+      this.log("debug", `terminal: worktree list: ${errorMessage(e)}`);
+    }
+    if (this.closed || this.session !== ts) return;
+    ts.setElsewhere("refused" in target ? null : this.elsewhereOf(target, toolName));
+  }
+
+  /**
+   * §57.12 `chat_move` of a terminal chat: refused as a chat's is (`chat_is_record`, the target's, `collect_failed`,
+   * `session_busy` without `interrupt`). The chat is marked `moving` (its hooks fail closed), the app ends its PTY (that ends
+   * an open turn: collected and reviewed here), the engine waits for the exit (`cli_still_running` after
+   * CHAT_MOVE_EXIT_WAIT_MS: the chat stays), then hands the chat over as a chat move does — kind, `cliSessionId` and
+   * `cliKnown` with it, and the follow-up as `terminalFollowUp` (never typed). This window keeps it as a terminal record.
+   */
+  private async terminalChatMove(ts: TerminalSession, path: unknown, interrupt: boolean, followUp: unknown): Promise<void> {
+    const project = this.project;
+    const cp = this.gate.checkpoint;
+    const idx = this.sessions;
+    const dir = this.projectGitDir;
+    const chatId = this.currentSessionId;
+    if (!project || !cp || this.gitInit !== null || !idx || !dir || !chatId) throw new CommandRefused("no_project");
+    if (!this.terminalFeature("worktreeMove")) throw new CommandRefused("terminal_chat:chat_move", { code: "terminal_chat" });
+    const meta = idx.get(chatId);
+    if (!meta) throw new CommandRefused("no_project");
+    if (meta.movedTo !== undefined || meta.continuedIn !== undefined || meta.resumeFailed === true) throw new CommandRefused(`chat_is_record:${meta.id}`, { code: "chat_is_record" });
+    const target = moveTarget(path, cp.root, await listWorktrees(cp.root));
+    if ("refused" in target) throw new CommandRefused(await moveRefusal(target.refused, path, cp.root));
+    const targetGitDir = await resolveGitDir(target.root).catch(() => null);
+    if (!targetGitDir) throw new CommandRefused("not_a_worktree");
+    this.guardMoveReview();
+    if (this.gate.collecting || this.gate.reverting) await this.settleForMove();
+    const interrupted = ts.isTurnActive || this.gate.running;
+    if (interrupted && !interrupt) throw new CommandRefused("session_busy");
+    this.cancelAutoRestart();
+    // The app sees `moving`, ends the PTY (no restart) and sends terminal_exited; the pid's exit is enough here (that
+    // command waits behind this one on the main lane).
+    ts.beginMove({ path: target.root, name: target.name });
+    this.touch();
+    const pid = ts.pid;
+    const exited = !ts.state.running || (await Promise.race([
+      ts.waitExit(CHAT_MOVE_EXIT_WAIT_MS),
+      pid !== undefined ? waitForExit(pid, CHAT_MOVE_EXIT_WAIT_MS) : new Promise<boolean>(() => undefined),
+    ]));
+    if (!exited || this.session !== ts) {
+      ts.endMove();
+      this.touch();
+      this.log("warn", `chat_move: the terminal of chat ${meta.id} has not ended; the chat stays here`);
+      throw new CommandRefused("cli_still_running");
+    }
+    if (ts.state.running) ts.ptyExited(); // its open turn ends: collected (and reviewed) here
+    await this.settleForMove();
+    this.guardMoveReview();
+    await this.side.stopAll();
+    await this.stopSession();
+    await this.persistChain.catch(() => undefined);
+    const at = new Date().toISOString();
+    const from = { path: project.root, name: basename(project.root), at };
+    const baseline: ChatMoveBaseline = this.createdWorktrees.get(meta.id)?.has(canonicalPath(target.root)) ? "head" : "disk";
+    const { movedFrom: _was, movedTo: _never, ...rest } = meta;
+    const handoff: ChatHandoff = {
+      version: 1,
+      meta: { ...structuredClone(rest), ...(this.isResumable(meta) || meta.cliSessionId !== undefined ? { cliKnown: true as const } : {}), movedFrom: from },
+      from,
+      to: target.root,
+      baseline,
+      followUp: null,
+      terminalFollowUp: interrupted && typeof followUp === "string" && followUp.trim() ? followUp.trim() : null,
+      permissionMode: this.userMode(),
+      at,
+    };
+    try {
+      await writeHandoff(targetGitDir, handoff, sessionTranscriptPath(dir, meta.id));
+    } catch (e) {
+      this.log("warn", `chat_move: the handoff could not be written (${errorMessage(e)}); the chat stays here`);
+      await this.startSession(project.path, meta.id);
+      throw e;
+    }
+    meta.movedTo = { path: target.root, name: target.name, at };
+    this.persistSessions();
+    this.log("info", `terminal chat ${meta.id} moved to ${target.root} (review from ${baseline}${interrupted ? ", turn stopped" : ""})`);
+    this.sessionState = this.freshSessionState();
+    this.sessionState.rememberedAllows = [...this.rememberedAllows];
+    this.applyCachedCapabilities();
+    this.hud = initialHud();
+    this.chatLines = { added: 0, removed: 0 };
+    this.contextWarned = false;
+    this.agents.reset();
+    this.budgetUsage = { ...ZERO_USAGE };
+    this.autoRestartsThisTurn = 0;
+    this.approvedPlan = null;
+    this.emit({ type: "chat_moved", sessionId: meta.id, path: target.root, name: target.name, baseline, interrupted });
+    this.touch();
+    // A terminal record: its session waits for hooks as any terminal chat's, but terminal_spec refuses it (chat_is_record).
     await this.startSession(project.path, null, this.recordOnlyId());
   }
 
@@ -8404,6 +8537,12 @@ export class ReviewEngine {
       { code: head ? "chat_moved_in" : "chat_moved_in_disk", path: from, sessionId: got.meta.id },
     );
     this.touch();
+    // §57.12: a terminal chat's follow-up is never sent or typed — its first prompt here carries it.
+    if (got.meta.kind === "terminal") {
+      const ts = this.terminal;
+      if (ts && ts.chatId === got.meta.id) ts.setFirstPromptContext(got.handoff.terminalFollowUp ?? null);
+      return;
+    }
     const text = got.handoff.followUp;
     if (text) void this.handle({ type: "send", text });
   }
@@ -8543,11 +8682,13 @@ export class ReviewEngine {
   private afterWorktreeExit(path: string | null, toolUseId: string | null): void {
     const cp = this.gate.checkpoint;
     if (!cp || !path) return;
+    const ts = this.terminal;
     void listWorktrees(cp.root)
       .then((list) => {
         const target = moveTarget(path, cp.root, list);
+        if (ts && !this.closed) ts.setElsewhere("refused" in target ? null : this.elsewhereOf(target, "ExitWorktree")); // §57.12
         if ("refused" in target || this.closed) return;
-        if (this.sessionState.permissionMode !== "auto") {
+        if (this.chatPermissionMode() !== "auto" || !this.canMoveChat()) {
           this.scopeNotice({ type: "scope_notice", code: "worktree_outside_review", toolName: "ExitWorktree", ...(toolUseId ? { toolUseId } : {}), path: target.root });
           return;
         }

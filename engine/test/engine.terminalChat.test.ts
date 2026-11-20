@@ -6,7 +6,8 @@ import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
 import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
-import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, STOP_FEEDBACK_PREFIX } from "../src/session/terminalSession.js";
+import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, movingReason, STOP_FEEDBACK_PREFIX } from "../src/session/terminalSession.js";
+import { spawn, type ChildProcess } from "node:child_process";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { fakePlatform, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeFakeClaude } from "./helpers/fakeClaude.js";
@@ -750,6 +751,96 @@ describe("terminal chats (§57)", () => {
       const answer = await hook(s, ups("p2", "go on"));
       expect(String((answer.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext ?? "")).not.toContain("Requested changes");
       expect(await refusal(r.h, { type: "terminal_request_cancel", sessionId: "other" })).toMatchObject({ ok: false, code: "terminal_not_current" });
+    });
+  });
+
+  describe("§57.12 worktrees: follow and move", () => {
+    const children: ChildProcess[] = [];
+    afterEach(() => {
+      for (const c of children.splice(0)) if (c.exitCode === null) c.kill("SIGKILL");
+    });
+    /** A stand-in for the PTY's claude: our own `sleep`, ended by pid like the app ends its PTY. */
+    const fakePty = (): ChildProcess => {
+      const c = spawn("sleep", ["30"], { stdio: "ignore" });
+      children.push(c);
+      return c;
+    };
+    const twoWorktrees = (): { dir: string; wt: string } => {
+      const dir = makeRepo();
+      const wt = join(temp("rg-term-wt"), "feat");
+      sh(dir, "worktree", "add", "-q", "-b", "feat", wt);
+      return { dir, wt: realpathSync(wt) };
+    };
+
+    it.skipIf(process.platform === "win32")("chat_move: moving → the PTY ends → its turn is reviewed here → handoff; the target resumes it with the follow-up as context", async () => {
+      const { dir, wt } = twoWorktrees();
+      const r = await rig({ dir });
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      const pty = fakePty();
+      await r.h.engine.handle({ type: "terminal_started", sessionId: id, pid: pty.pid! });
+      await hook(s, ups("p1", "make a note"));
+      write(r.dir, "moved.txt", "half\n");
+      await hook(s, { hook_event_name: "PostToolUse", ...write_("moved.txt", "w1"), tool_response: {} });
+      // Busy without interrupt: refused.
+      expect(await refusal(r.h, { type: "chat_move", path: wt })).toMatchObject({ ok: false, error: "session_busy" });
+      const reply = refusal(r.h, { type: "chat_move", path: wt, interrupt: true, followUp: "Please go on in feat." });
+      const st = await r.h.waitFor((x) => x.session.terminal?.moving != null, "moving");
+      expect(st.session.terminal?.moving).toEqual({ path: wt, name: "feat" });
+      expect(await hook(s, ups("p2"))).toEqual({ decision: "block", reason: movingReason("feat") });
+      pty.kill("SIGTERM"); // the app ends the PTY …
+      void r.h.engine.handle({ type: "terminal_exited", sessionId: id, exitCode: 0 }); // … and says so (behind chat_move)
+      expect(await reply).toMatchObject({ ok: true });
+      const moved = r.h.ofType("chat_moved").at(-1)!;
+      expect(moved).toMatchObject({ sessionId: id, path: wt, interrupted: true });
+      const after = await r.h.waitFor((x) => x.gate.phase === "reviewing", "reviewed here");
+      expect(after.changedFiles.map((f) => f.path)).toEqual(["moved.txt"]);
+      const meta = after.sessions.list.find((m) => m.id === id)!;
+      expect(meta.movedTo?.path).toBe(wt);
+      expect(await refusal(r.h, { type: "terminal_spec", sessionId: id })).toMatchObject({ ok: false, code: "chat_is_record" });
+      expect(await refusal(r.h, { type: "chat_move", path: wt })).toMatchObject({ ok: false, code: "chat_is_record" });
+
+      // The target: its window takes the chat; the CLI's record is under the source folder, the target's projects folder
+      // exists without it — resumed all the same (never a silent fresh start).
+      const record = cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: r.config });
+      mkdirSync(dirname(record), { recursive: true });
+      writeFileSync(record, "");
+      mkdirSync(dirname(cliSessionFile(wt, id, { CLAUDE_CONFIG_DIR: r.config })), { recursive: true });
+      const there = await rig({ dir: wt, config: r.config });
+      const tst = await there.h.waitFor((x) => x.sessions.currentId === id && x.session.terminal !== undefined, "the moved terminal chat");
+      expect(tst.sessions.list.find((m) => m.id === id)).toMatchObject({ kind: "terminal", cliKnown: true, movedFrom: { path: r.dir } });
+      const s2 = await spec(there, id);
+      expect(s2.resume).toBe(true);
+      expect(s2.argv[1]).toBe(`--resume=${id}`);
+      expect(s2.cwd).toBe(wt);
+      const first = await hook(s2, ups("q1", "continue"));
+      const ctx = String((first.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext);
+      expect(ctx).toContain("Please go on in feat.");
+      await hook(s2, { hook_event_name: "Stop" });
+      await there.h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "q1 over");
+      const second = await hook(s2, ups("q2", "more"));
+      expect(String((second.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext ?? "")).not.toContain("Please go on");
+    });
+
+    it("EnterWorktree (not auto) and a cd offer the move (elsewhere); a cd back clears it; auto mode follows at once", async () => {
+      const { dir, wt } = twoWorktrees();
+      const r = await rig({ dir });
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await hook(s, { hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: { name: "feat" }, tool_use_id: "e1", tool_response: { worktreePath: wt, worktreeBranch: "feat" } });
+      let st = await r.h.waitFor((x) => x.session.terminal?.elsewhere != null, "elsewhere");
+      expect(st.session.terminal?.elsewhere).toEqual({ path: wt, name: "feat", toolName: "EnterWorktree", canMove: true });
+      await hook(s, { hook_event_name: "CwdChanged", old_cwd: wt, new_cwd: r.dir });
+      st = await r.h.waitFor((x) => x.session.terminal?.elsewhere == null, "back here");
+      await hook(s, { hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: join(wt) });
+      st = await r.h.waitFor((x) => x.session.terminal?.elsewhere != null, "cd elsewhere");
+      expect(st.session.terminal?.elsewhere).toMatchObject({ toolName: "CwdChanged", path: wt });
+      expect(st.sessions.list.find((m) => m.id === id)?.movedTo).toBeUndefined(); // a cd never moves the chat
+
+      // Auto mode (the TUI's own, from the hook): EnterWorktree moves the chat at once (no PTY running here: nothing to end).
+      await hook(s, { hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: { name: "feat" }, tool_use_id: "e2", tool_response: { worktreePath: wt }, permission_mode: "auto" });
+      await r.h.waitFor((x) => x.sessions.list.find((m) => m.id === id)?.movedTo !== undefined, "followed");
+      expect(r.h.ofType("chat_moved").at(-1)).toMatchObject({ sessionId: id, path: wt });
     });
   });
 });

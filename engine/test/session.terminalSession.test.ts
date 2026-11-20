@@ -5,7 +5,7 @@ import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, movingReason, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -462,5 +462,24 @@ describe("TerminalSession", () => {
     await r.ts.handleHook({ hook_event_name: "Stop", stop_hook_active: false, session_id: "chat-1", cwd: r.dir }, ac.signal);
     ac.abort();
     expect(lost).toEqual([["n1"]]);
+  });
+
+  it("§57.12 EnterWorktree / ExitWorktree → scope_notice (main agent only); moving blocks prompts and write tools; waitExit", async () => {
+    const r = rig();
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: { name: "x" }, tool_use_id: "e1", tool_response: { worktreePath: "/work/acme/x", worktreeBranch: "x" } });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: {}, tool_use_id: "e2", agent_id: "a1", tool_response: { worktreePath: "/work/acme/y" } });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "ExitWorktree", tool_input: {}, tool_use_id: "x1", tool_response: { originalCwd: r.dir } });
+    expect(r.of("scope_notice").map((n) => [n.code, n.toolName, n.path])).toEqual([["worktree_outside_review", "EnterWorktree", "/work/acme/x"], ["worktree_exited", "ExitWorktree", r.dir]]);
+    r.ts.started(99);
+    r.ts.beginMove({ path: "/work/acme/x", name: "x" });
+    expect(r.ts.state.moving).toEqual({ path: "/work/acme/x", name: "x" });
+    expect(await r.hook(ups("p1"))).toEqual({ decision: "block", reason: movingReason("x") });
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "a.txt") }, "w1"))).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: movingReason("x") } });
+    expect(await r.ts.waitExit(20)).toBe(false);
+    const waiting = r.ts.waitExit(5000);
+    r.ts.ptyExited();
+    expect(await waiting).toBe(true);
+    r.ts.endMove();
+    expect(r.ts.state.moving).toBeUndefined();
   });
 });

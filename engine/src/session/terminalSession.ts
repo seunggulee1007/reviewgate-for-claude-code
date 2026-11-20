@@ -6,7 +6,7 @@
  * `turn_end` (snapshot B: the review). It never starts or stops the CLI.
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
-import type { BackgroundTask, PermissionMode, TerminalRequestQueued, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
+import type { BackgroundTask, PermissionMode, TerminalElsewhere, TerminalPlace, TerminalRequestQueued, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
 import { statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
@@ -28,6 +28,7 @@ import {
   readOnlyContextOf,
   toolFile,
   UNPROMPTED_REASON,
+  worktreeToolNotice,
   type HookContext,
 } from "./hooks.js";
 import { changedWithin, WINDOW_MARGIN_MS } from "./provenance.js";
@@ -88,6 +89,10 @@ export const BACKGROUND_PROMPT_REASON =
 export const BACKGROUND_TOOL_REASON =
   "ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the user " +
   "switches back to this chat.";
+/** §57.12: what a prompt or write tool gets while the chat moves to another worktree (its PTY is about to end). */
+export function movingReason(name: string): string {
+  return `This chat is moving to ${name} in ReviewGate; it continues there.`;
+}
 /** §57.14: how a Request changes delivered at Stop starts (the TUI shows Stop block reasons as "Stop hook error"). */
 export const STOP_FEEDBACK_PREFIX = "Review notes from the user in ReviewGate — address them before you finish:\n\n";
 /** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
@@ -164,6 +169,13 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private turnCost = 0;
   /** §57.14: a Request changes waiting to reach Claude. */
   private queued: TerminalRequestQueued | null = null;
+  /** §57.12: where the chat moves (its hooks answer fail-closed until the PTY ends), and another worktree the TUI works in. */
+  private moving: TerminalPlace | null = null;
+  private elsewhere: TerminalElsewhere | null = null;
+  /** §57.12: waits for the PTY's end (`ptyExited`). */
+  private exitWaiters: (() => void)[] = [];
+  /** §57.12: a moved chat's follow-up — the first prompt's `additionalContext` here, then dropped. */
+  private firstPromptContext: string | null = null;
 
   constructor(private readonly opts: TerminalSessionOptions) {
     this.cliSessionId = opts.cliSessionId;
@@ -190,7 +202,57 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       interruptSuspected: this.interruptSuspected,
       ...(this.status ? { status: { ...this.status } } : {}),
       ...(this.queued ? { requestQueued: { ...this.queued, noteIds: this.queued.noteIds ? [...this.queued.noteIds] : null } } : {}),
+      ...(this.moving ? { moving: { ...this.moving } } : {}),
+      ...(this.elsewhere ? { elsewhere: { ...this.elsewhere } } : {}),
     };
+  }
+
+  /** §57.12: the TUI's last `permission_mode` (null before a hook said one) — whether a worktree move is followed at once. */
+  get permissionMode(): PermissionMode | null {
+    return this.ctx.permissionMode ?? null;
+  }
+
+  /** §57.12: the chat moves to `place` — prompts are blocked and write tools denied until its PTY ends (an open turn stays). */
+  beginMove(place: TerminalPlace): void {
+    this.moving = { ...place };
+    this.elsewhere = null;
+    this.touch();
+  }
+
+  /** §57.12: the move did not happen (the PTY did not end in time): the chat works here again. */
+  endMove(): void {
+    if (!this.moving) return;
+    this.moving = null;
+    this.touch();
+  }
+
+  /** §57.12: another worktree of the repository the TUI works in (null: here). */
+  setElsewhere(e: TerminalElsewhere | null): void {
+    if (JSON.stringify(e) === JSON.stringify(this.elsewhere)) return;
+    this.elsewhere = e ? { ...e } : null;
+    this.touch();
+  }
+
+  /** §57.12: the moved chat's follow-up, for the first prompt here. */
+  setFirstPromptContext(text: string | null): void {
+    this.firstPromptContext = text && text.trim() ? text : null;
+  }
+
+  /** §57.12: resolves true once the PTY ended (`ptyExited`, or it never ran), false after `ms`. */
+  waitExit(ms: number): Promise<boolean> {
+    if (!this.running || this.disposed) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        this.exitWaiters = this.exitWaiters.filter((w) => w !== done);
+        resolve(false);
+      }, ms);
+      timer.unref?.();
+      this.exitWaiters.push(done);
+    });
   }
 
   /** §57.14: the staged Request changes (null: none). */
@@ -302,6 +364,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   /** `terminal_exited`: the PTY ended — an open turn ends. */
   ptyExited(): void {
     this.running = false;
+    for (const w of this.exitWaiters.splice(0)) w();
     this.waiting = null;
     this.settlePrompt({ ok: false, reason: RETIRED_REASON });
     this.settleAdoption({ ok: false });
@@ -352,6 +415,12 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
     if (this.background) return this.backgroundHook(input);
+    if (this.moving && (event === "UserPromptSubmit" || event === "PreToolUse")) {
+      // §57.12: the chat continues in the other worktree; nothing more starts here.
+      this.hooksSeen = true;
+      const reason = movingReason(this.moving.name);
+      return event === "UserPromptSubmit" ? { decision: "block", reason } : preToolAnswer({ decision: "deny", reason });
+    }
     this.hooksSeen = true;
     // `/clear` or `/resume` in the TUI: the conversation the next prompt runs in (or the one that ended) is the chat's from
     // now on — only from those two events, and only a UUID (the id goes into the next spawn's argv).
@@ -470,7 +539,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const a = await answer;
     if (!a.ok) return { decision: "block", reason: a.reason };
     this.openTurn({ promptId, hookPromptId: promptId, openedAt: this.now() }, a.checkpointTree);
-    return a.additionalContext ? { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: a.additionalContext } } : {};
+    // §57.12: a moved chat's follow-up goes with its first real prompt here (a slash command keeps it).
+    const first = this.firstPromptContext && !(typeof input.prompt === "string" && input.prompt.trim().startsWith("/")) ? this.firstPromptContext : null;
+    if (first) this.firstPromptContext = null;
+    const context = [first, a.additionalContext].filter((p): p is string => !!p).join("\n\n");
+    return context ? { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: context } } : {};
   }
 
   private async onPreTool(input: Record<string, unknown>): Promise<HookOutput> {
@@ -536,6 +609,12 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const ti = input.tool_input && typeof input.tool_input === "object" ? (input.tool_input as Record<string, unknown>) : {};
     const failed = input.hook_event_name === "PostToolUseFailure";
     if (failed && input.is_interrupt === true) this.interruptSuspected = true;
+    // §57.12: the main agent's EnterWorktree / ExitWorktree — where the TUI went, as a chat's hooks report it.
+    if (name === "EnterWorktree" || name === "ExitWorktree") {
+      const notice = worktreeToolNotice(input);
+      if (notice) this.opts.emit({ type: "scope_notice", ...notice });
+      return;
+    }
     if (!this.open) {
       this.opts.log("debug", `terminal: ${name} ended with no review turn open`);
       return;

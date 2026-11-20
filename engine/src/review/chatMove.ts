@@ -23,6 +23,11 @@ export type ChatHandoff = {
   baseline: ChatMoveBaseline;
   /** Sent once in the target after the move (only when a running turn was stopped for it). */
   followUp: string | null;
+  /**
+   * §57.12: a terminal chat's follow-up (its turn was stopped for the move) — never sent or typed: the target's terminal
+   * puts it into its first prompt's `additionalContext`. Absent / null for a chat.
+   */
+  terminalFollowUp?: string | null;
   /** §11: the permission mode follows the chat. */
   permissionMode: PermissionMode | null;
   /** ISO-8601 */
@@ -58,6 +63,7 @@ function validHandoff(v: unknown): ChatHandoff | null {
     to: typeof h.to === "string" ? h.to : "",
     baseline: h.baseline === "head" ? "head" : "disk",
     followUp: typeof h.followUp === "string" && h.followUp.trim() ? h.followUp : null,
+    ...(typeof h.terminalFollowUp === "string" && h.terminalFollowUp.trim() ? { terminalFollowUp: h.terminalFollowUp } : {}),
     permissionMode: isPermissionMode(h.permissionMode) ? h.permissionMode : null,
     at: h.at,
   };
