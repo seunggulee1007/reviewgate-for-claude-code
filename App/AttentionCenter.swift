@@ -124,7 +124,8 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         guard let url = entry.store.projectURL else { return }
         let scope = AppSettings.projectKey(url)
         guard coalescer.shouldPost(event, scope: scope) else { return }
-        let target = AttentionTarget(kind: event.kind, chatId: entry.store.currentSessionId, requestId: event.requestId)
+        // §57.10: a background terminal chat's wait names its own chat.
+        let target = AttentionTarget(kind: event.kind, chatId: event.chatId ?? entry.store.currentSessionId, requestId: event.requestId)
         post(event, scope: scope, project: entry.store.windowTitle, target: target)
         playSound(NotificationSoundCategory(event: event))   // §39.7: also when macOS shows nothing (off, not asked yet)
         // MARK: polish p-lifecycle (P1-chrome-11): Claude waits for the user while the app is behind — the Dock icon bounces
@@ -251,7 +252,10 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     private func updateBadge() {
         let (label, waiting) = withObservationTracking {
             let stores = WorkbenchRegistry.shared.stores
-            let waitingStores = stores.filter { $0.pendingPermission != nil || $0.pendingPlan != nil || $0.terminalWaiting != nil }   // §57.5
+            let waitingStores = stores.filter {
+                $0.pendingPermission != nil || $0.pendingPlan != nil || $0.terminalWaiting != nil   // §57.5
+                    || !$0.backgroundTerminalsWaiting.isEmpty   // §57.10
+            }
             // §31: changes from outside the app are not Claude's work waiting for review — not counted.
             let label = DockBadge.label(pendingCounts: stores.map { $0.dockBadgeCount }, anyWaiting: !waitingStores.isEmpty)
             return (label, Set(waitingStores.compactMap { $0.projectURL.map(AppSettings.projectKey) }))

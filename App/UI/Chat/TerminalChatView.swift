@@ -101,6 +101,11 @@ private struct TerminalStatusStrip: View {
     private static var trustText: String { String(localized: "If Claude Code asks whether to trust this folder, choose Yes") }
 
     private func status(_ info: TerminalSessionInfo?) -> (String, String, Color, String) {
+        if host.disconnected, model.terminals.lostInBackground.contains(chatId) {
+            // MARK: terminal-stage2 (§57.10): the engine dropped this chat's terminal while another chat was live.
+            return (String(localized: "ReviewGate lost this terminal while it was in the background. Restart it"), "bolt.horizontal.circle",
+                    .orange, String(localized: "While another chat was the live one, ReviewGate stopped reviewing this terminal, so Claude Code's prompts and edits are refused until you restart it (the conversation is resumed; text typed and not sent is lost)"))
+        }
         if host.disconnected {
             return (String(localized: "ReviewGate restarted — this terminal is no longer reviewed. Restart it"), "bolt.horizontal.circle",
                     .orange, String(localized: "The engine that reviews this terminal restarted, so Claude Code's prompts and edits are refused until you restart the terminal (the conversation is resumed)"))
@@ -191,19 +196,44 @@ private struct TerminalStartProblem: View {
     }
 }
 
-/// A terminal chat shown read-only: its terminal runs only while it is the live chat.
+/// A terminal chat shown read-only: its terminal shows only while it is the live chat — kept running in the background
+/// (§57.10) or started again when the user continues in it.
 private struct ViewedTerminalChatPlaceholder: View {
+    @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
+
     var body: some View {
+        let id = store.viewingChat?.id
+        let background = id.flatMap { model.terminals.host(for: $0) }.map { $0.state.isRunning } ?? false
+        let waiting = background ? store.backgroundTerminal(chatId: id)?.waiting : nil
         VStack(spacing: 0) {
             VStack(spacing: 8) {
-                Image(systemName: "terminal").font(.largeTitle).foregroundStyle(.secondary)
+                Image(systemName: waiting != nil ? "bell.badge" : "terminal").font(.largeTitle)
+                    .foregroundStyle(waiting != nil ? Color.orange : Color.secondary)
                 Text("This chat runs Claude Code in a terminal")
                     .font(.headline)
-                Text("Its terminal runs while it is the live chat. Continue in it to start Claude Code again — the conversation is resumed.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
+                if let waiting {
+                    // MARK: terminal-stage2 (§57.10): it waits in its TUI — the user answers there once it is the live chat.
+                    Text(waiting.kind == .permission ? "Its Claude Code waits for your permission — continue in this chat to answer it in the terminal."
+                                                     : "Its Claude Code asked you a question — continue in this chat to answer it in the terminal.")
+                        .font(.callout)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 380)
+                        .accessibilityIdentifier("Viewed terminal chat waiting")
+                } else if background {
+                    Text("Its Claude Code keeps running in the background — continue in this chat to type in it. What you typed and did not send is still there.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 380)
+                        .accessibilityIdentifier("Viewed terminal chat background")
+                } else {
+                    Text("Its terminal runs while it is the live chat. Continue in it to start Claude Code again — the conversation is resumed.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 380)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityIdentifier("Viewed terminal chat")

@@ -297,7 +297,11 @@ struct ChatTabStrip: View {
         if host.disconnected { return .stopped }
         switch host.state {
         case .exited, .failed: return .stopped
-        case .idle, .starting, .running: return .plain
+        case .idle, .starting: return .plain
+        case .running:
+            // MARK: terminal-stage2 (§57.10): its Claude Code keeps running while another chat is the live one.
+            guard tab.id != store.currentSessionId else { return .plain }
+            return store.backgroundTerminal(chatId: tab.id)?.waiting != nil ? .backgroundWaiting : .background
         }
     }
 }
@@ -428,8 +432,9 @@ private struct ChatTab: View {
     /// §39.2: Claude's session is on this chat while another one is shown (a hollow dot when it is idle).
     var isLive = false
     // MARK: terminal-chat (§57.5)
-    enum TerminalBadge { case plain, stopped }
-    /// A terminal chat (nil: a chat); `.stopped`: its Claude Code exited or lost ReviewGate — Restart is in the chat.
+    enum TerminalBadge { case plain, stopped, background, backgroundWaiting }
+    /// A terminal chat (nil: a chat); `.stopped`: its Claude Code exited or lost ReviewGate — Restart is in the chat;
+    /// `.background` (§57.10): it keeps running while another chat is the live one; `.backgroundWaiting`: and waits there.
     var terminal: TerminalBadge?
     @State private var hovering = false
 
@@ -456,6 +461,18 @@ private struct ChatTab: View {
                                 .help(String(localized: "Claude Code is not running in this terminal — Restart it in the chat"))
                                 .accessibilityLabel(Text("Claude Code stopped"))
                                 .accessibilityIdentifier("Chat tab terminal stopped")
+                        } else if terminal == .background {
+                            Circle().fill(Color.green.opacity(0.8)).frame(width: 6, height: 6)
+                                .help(String(localized: "Claude Code keeps running in the background — continue in this chat to type in it"))
+                                .accessibilityLabel(Text("Claude Code running in the background"))
+                                .accessibilityIdentifier("Chat tab terminal background")
+                        } else if terminal == .backgroundWaiting {
+                            Image(systemName: "bell.badge.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                                .help(String(localized: "Claude Code waits for you in this terminal — continue in this chat to answer it"))
+                                .accessibilityLabel(Text("Claude Code waits for you in this terminal"))
+                                .accessibilityIdentifier("Chat tab terminal waiting")
                         }
                     }
                     Text(verbatim: title)
@@ -489,7 +506,7 @@ private struct ChatTab: View {
             .foregroundStyle(.secondary)
             .opacity(hovering || isCurrent ? 1 : 0.35)
             .disabled(!canClose)
-            .help(canClose ? String(localized: "Close tab (⌘⇧W) — the chat stays in History") : (blocker ?? String(localized: "The only open chat cannot be closed")))
+            .help(canClose ? closeHelp : (blocker ?? String(localized: "The only open chat cannot be closed")))
             .accessibilityLabel(Text("Close the tab ‘\(title)’"))   // polish P4-composer-33: which tab
             .accessibilityIdentifier("Close chat tab \(title)")
         }
@@ -499,6 +516,13 @@ private struct ChatTab: View {
     }
 
     private var title: String { meta.title.isEmpty ? String(localized: "New chat") : meta.title }
+
+    /// §57.10: closing a background terminal's tab ends its Claude Code.
+    private var closeHelp: String {
+        terminal == .background || terminal == .backgroundWaiting
+            ? String(localized: "Close tab (⌘⇧W) — its Claude Code running in the background stops; the chat stays in History")
+            : String(localized: "Close tab (⌘⇧W) — the chat stays in History")
+    }
 
     /// polish P4-composer-33: the whole title (a long one is cut) and its key; the running one says Claude is there.
     private var tabHelp: String {

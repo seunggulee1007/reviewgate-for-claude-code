@@ -8973,10 +8973,22 @@ chat's id);
     it even in quotes; the engine's argv has none — a test checks). Any other shell (nu, pwsh, elvish, xonsh) cannot read
     the quoting: `/bin/zsh -l -i -c` runs the same line, so that shell's own PATH setup does not load.
 - **When it runs** (`TerminalHub`, one per window). The live terminal chat's terminal starts once that chat is the live,
-  shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat ends it (SIGTERM,
-  SIGKILL after 3 s, to the PTY's whole process group — what claude started there goes too; text typed and not sent is
-  lost), then sends `terminal_exited` (accepted for a chat the engine left);
-  showing another chat read-only does not. A terminal chat shown
+  shown one and its session is up (`terminal_spec` → PTY → `terminal_started`). A switch to another chat keeps it running
+  in the background when the engine kept its hooks (`state.sessions.backgroundTerminals`, §57.10): the same PTY, its
+  scrollback and the TUI's unsent input stay, and switching back shows it again — no new spec, no new token. Otherwise
+  (the engine refused to park it: a turn open, the gate busy) the switch ends it as before (SIGTERM, SIGKILL after 3 s, to
+  the PTY's whole process group — what claude started there goes too; text typed and not sent is lost), then sends
+  `terminal_exited` (accepted for a chat the engine left); showing another chat read-only does not.
+  - *Background terminals* (§57.10, `TerminalHub`). At most 4 per window: one more ends the least recently shown
+    (`terminal_exited`). Closing a background chat's tab ends its Claude Code (the tab's × says so). Its tab shows a green
+    dot ("Claude Code가 백그라운드에서 계속 실행 중이에요"), or an orange bell while it waits in its TUI; the wait is an
+    attention event once per wait (`term:<chat>:<since>`, the same key as when it is live — switching back raises nothing
+    new) and counts for the Dock's "!". Its notification's click makes that chat the live one (`session_open`, held while
+    Claude works elsewhere) and gives its terminal the keyboard. Shown read-only, the chat says its Claude Code keeps
+    running (or waits) and offers [이 채팅으로 이어가기]. Back as the live chat, a terminal the engine no longer runs (an
+    engine restart, a session it dropped) is never respawned by itself: the strip turns orange ("백그라운드에 있는 동안
+    ReviewGate가 이 터미널을 놓쳤어요") and Restart resumes the conversation. After an engine restart a background PTY is
+    kept, disconnected, like the live one. A terminal chat shown
   read-only has no terminal: it says so and offers [이 채팅으로 이어가기]. The window closing or the app quitting ends the
   PTYs (all at once, not one after another), and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
   shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.

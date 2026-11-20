@@ -4,13 +4,25 @@ import ReviewGateCore
 
 // MARK: terminal-chat (§57.5)
 /// One window's terminal chats (`WindowModel.terminals`): the host of each terminal chat by chat id. The live chat's host
-/// starts when that chat is the live, shown one (`terminal_spec` → PTY → `terminal_started`); a switch to another chat ends
-/// it (the engine retired its hook token with the switch). After an engine restart (its hook port changed) a running host
-/// is marked disconnected and offers Restart — it is never killed by itself.
+/// starts when that chat is the live, shown one (`terminal_spec` → PTY → `terminal_started`). A switch to another chat
+/// keeps it running in the background when the engine kept its hooks (`state.sessions.backgroundTerminals`, §57.10) —
+/// at most `maxBackgroundTerminals`, least recently shown first out — and ends it otherwise (the engine retired its hook
+/// token). After an engine restart (its hook port changed) a running host is marked disconnected and offers Restart — it
+/// is never killed by itself.
 @MainActor @Observable
 final class TerminalHub {
-    /// The terminal chats' hosts by chat id (at most the live chat's, plus one that is being stopped).
+    /// The terminal chats' hosts by chat id: the live chat's, the background ones (§57.10), and one being stopped.
     private(set) var chatHosts: [String: TerminalHost] = [:]
+    // MARK: terminal-stage2 (§57.10)
+    /// Background terminals per window; one more stops the least recently shown.
+    static let maxBackgroundTerminals = 4
+    /// Chats whose background terminal the engine lost (it restarted, or dropped the session): shown again, the strip says
+    /// so and offers Restart — never a respawn by itself, which would lose what was typed.
+    private(set) var lostInBackground: Set<String> = []
+    /// When each chat's terminal was last the live one (the cap's order).
+    @ObservationIgnored private var lastShown: [String: Date] = [:]
+    /// Background hosts not yet checked against the engine since they became the live chat again.
+    @ObservationIgnored private var returning: Set<String> = []
     /// Why the chat's terminal could not start (the engine's refusal in the user's words); Try Again clears it.
     private(set) var specErrors: [String: String] = [:]
     /// Chats whose spec is being asked for now.
@@ -71,6 +83,7 @@ final class TerminalHub {
     func restart(chatId: String) async {
         guard let store, !closing, chatId == store.currentSessionId, store.isTerminalChat else { return }
         specErrors[chatId] = nil
+        lostInBackground.remove(chatId)
         if let host = chatHosts[chatId], host.state.isRunning {
             await host.stop()
             store.terminalExited(sessionId: chatId, exitCode: nil)
@@ -137,6 +150,8 @@ final class TerminalHub {
             _ = store.sessionInfo.terminal
             _ = store.gatePhase
             _ = store.errorBanner
+            _ = store.sessionsInfo?.backgroundTerminals   // §57.10
+            _ = store.sessionsInfo?.openTabIds
         } onChange: {
             Task { @MainActor [weak self] in
                 self?.sync()
@@ -156,22 +171,42 @@ final class TerminalHub {
             return
         }
         let current = store.projectURL == nil ? nil : store.currentSessionId
-        // A switch away: the old terminal ends (any unsent TUI input is lost — the engine already retired its token).
+        let kept = Set((store.sessionsInfo?.backgroundTerminals ?? []).filter(\.running).map(\.chatId))
+        let openTabs = Set(store.sessionsInfo?.openTabIds ?? [])
+        // A switch away: the old terminal keeps running when the engine kept its hooks (§57.10) or when the engine restarted
+        // under it (never killed by itself); else it ends (unsent TUI input is lost — the engine retired its token). A
+        // background terminal whose tab closed ends too.
         for (id, host) in chatHosts where id != current || !store.isTerminalChat {
-            chatHosts[id] = nil
-            enginePIDAtSpawn[id] = nil
-            let wasRunning = host.state.isRunning
-            Task { [weak store] in
-                await host.stop()
-                // The engine takes it for a chat it left already (it stopped that session with the switch).
-                if wasRunning { store?.terminalExited(sessionId: id, exitCode: nil) }
+            let engineMoved = enginePIDAtSpawn[id].map { $0 != store.enginePID } ?? false
+            if current != nil, host.state.isRunning, kept.contains(id) || engineMoved, openTabs.isEmpty || openTabs.contains(id) {
+                returning.insert(id)
+                if engineMoved { host.disconnected = true }
+                continue
             }
+            stopHost(id)
+        }
+        // §57.10: the cap — the least recently shown background terminals end first.
+        let background = chatHosts.keys.filter { $0 != current && chatHosts[$0]?.state.isRunning == true }
+        if background.count > Self.maxBackgroundTerminals {
+            let oldest = background.sorted { (lastShown[$0] ?? .distantPast) < (lastShown[$1] ?? .distantPast) }
+            for id in oldest.prefix(background.count - Self.maxBackgroundTerminals) { stopHost(id) }
         }
         specErrors = specErrors.filter { $0.key == current }
+        lostInBackground = lostInBackground.filter { chatHosts[$0] != nil }
         guard let current, store.isTerminalChat else { return }
         if let host = chatHosts[current] {
+            lastShown[current] = Date()
             if host.state.isRunning, let spawned = enginePIDAtSpawn[current], let now = store.enginePID, now != spawned {
                 host.disconnected = true
+            }
+            // §57.10: back from the background — once the engine runs this chat again, it must still have its terminal; a
+            // lost one is disconnected and offers Restart (never a respawn, which would lose the TUI's unsent input).
+            if returning.contains(current), store.sessionInfo.sessionId == current, !store.sessionInfo.starting {
+                returning.remove(current)
+                if host.state.isRunning, store.sessionInfo.terminal?.running != true {
+                    host.disconnected = true
+                    lostInBackground.insert(current)
+                }
             }
             return
         }
@@ -179,6 +214,20 @@ final class TerminalHub {
         guard store.shownChatId == current, store.sessionInfo.sessionId == current, !store.sessionInfo.starting,
               !spawning.contains(current), specErrors[current] == nil else { return }
         Task { await spawn(current) }
+    }
+
+    /// Ends chat `id`'s PTY and forgets its host; the engine hears `terminal_exited` when it was running (accepted for a
+    /// chat it left already, and it disposes a background terminal of that chat).
+    private func stopHost(_ id: String) {
+        guard let host = chatHosts.removeValue(forKey: id) else { return }
+        enginePIDAtSpawn[id] = nil
+        lastShown[id] = nil
+        returning.remove(id)
+        let wasRunning = host.state.isRunning
+        Task { [weak store] in
+            await host.stop()
+            if wasRunning { store?.terminalExited(sessionId: id, exitCode: nil) }
+        }
     }
 
     private func spawn(_ chatId: String) async {
