@@ -8798,7 +8798,8 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
 - **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
   chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project` —
   the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
-  state). Such a session is never parked (§9.1): switching away stops it and retires its token.
+  state). Such a session is never parked (§9.1). Switching away keeps an idle, running one in the background (§57.10);
+  otherwise it stops and its token is retired.
 - **Spawn.** The app asks `terminal_spec {sessionId}` for the current chat (refused `terminal_not_current` otherwise),
   runs `argv` in its PTY with `env` and `cwd`, then sends `terminal_started {sessionId, pid}` (`running`; the pid is
   never reported as another Claude in the worktree, §31). `terminal_exited {sessionId, exitCode}` when the PTY ends: an
@@ -9155,6 +9156,33 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   (`continueAsTerminalBlocker`): a record, no conversation yet, files waiting in the review, Claude working. Over the
   record a teal bar: "이 대화는 터미널 채팅 '<title>'에서 이어져요 — 이 채팅은 기록으로 남아요" with [열기] (opens the terminal
   chat). A refusal is a non-fatal row in those words.
+
+### 57.10 Background terminals
+
+A switch away from a terminal chat no longer ends its Claude Code. The engine keeps the chat's `TerminalSession` and its
+live token in a per-window map; the PTY keeps running, so the TUI's unsent input and scrollback stay. Switching back
+makes the same object current again: no `terminal_spec`, no new token, no respawn.
+
+- **When.** On a switch (`session_new`, `session_open`, `session_continue_terminal`, a record opened), the current terminal
+  chat goes to the background when all hold: the client runs background terminals (`terminalFeature("background")`: the
+  Mac app; a capability can open it to others later), `terminal.running`, no review turn open, the gate neither running,
+  collecting nor reverting, no prompt being adopted, no turn of another CLI being taken, the chat not a record. Otherwise
+  the switch stops it and retires its token as before.
+- **Fail-closed hooks.** In the background a hook gets: UserPromptSubmit → `{decision:"block", reason}` ("This terminal
+  chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in ReviewGate and send
+  it again."); PreToolUse (the write tools) → the guard's deny when it denies (§57.8), else `permissionDecision:"deny"`
+  ("ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the
+  user switches back to this chat."); PermissionRequest → `{}` (the TUI answers) and `waiting`; Notification → `waiting`
+  as in §57.4; every other event `{}`. `/clear` / `/resume` (`session_id`) and the config dir (§57.16) are still
+  followed, for that chat. Nothing reaches the review; no turn opens.
+- **State.** `state.sessions.backgroundTerminals: [{chatId, running, hooksSeen, waiting}]` (absent when none). The app
+  raises attention from a background `waiting` as from the current chat's.
+- **Ends** (the token retired; the app ends the PTY when the entry disappears): `terminal_exited {sessionId}` for that
+  chat (its tab closed, the app's cap), `session_delete`, `open_project` / `switch_project`, `close_project`, the engine's
+  disposal, and a switch to that chat when it became a record. The engine has no cap; the app keeps at most four.
+- **pids.** A background terminal's claude pid is never "another Claude in this worktree" (§31).
+- **Risk.** A background task or an MCP tool of the background terminal can still write files: those are tree changes,
+  shown in the current window's review as external changes (§31) — not hidden, but not reviewed under that chat.
 
 ### 57.16 Hook coverage, proxy and config dir
 

@@ -6,6 +6,7 @@ import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
 import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
+import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON } from "../src/session/terminalSession.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { fakePlatform, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeFakeClaude } from "./helpers/fakeClaude.js";
@@ -527,5 +528,93 @@ describe("terminal chats (§57)", () => {
     await r.h.engine.dispose();
     const again = await rig({ dir: r.dir, config: r.config });
     expect(again.h.engine.state.sessions.list.find((m) => m.id === id)?.cliConfigDir).toBe(other);
+  });
+
+  describe("§57.10 background terminals", () => {
+    const pids = (r: Rig): number[] => [...((r.h.engine as unknown as { ownCliPids(): Set<number> | null }).ownCliPids() ?? [])].sort();
+    const toChat = async (r: Rig, id: string): Promise<string> =>
+      (await (async () => {
+        await r.h.engine.handle({ type: "session_new" });
+        return r.h.waitFor((st) => st.session.terminal === undefined && st.sessions.currentId !== id, "chat");
+      })()).sessions.currentId!;
+
+    it("a switch keeps the running terminal's token: its hooks answer fail-closed; switching back needs no spec", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: id, pid: 5151 });
+      await turn(r, s, "p1");
+      await r.h.engine.handle({ type: "accept_all" });
+      const chat = await toChat(r, id);
+      let st = r.h.engine.state;
+      expect(st.sessions.backgroundTerminals).toEqual([{ chatId: id, running: true, hooksSeen: true, waiting: null }]);
+      expect(pids(r)).toContain(5151);
+      // Not RETIRED_REASON: the background answers.
+      expect(await hook(s, ups("p2"))).toEqual({ decision: "block", reason: BACKGROUND_PROMPT_REASON });
+      const deny = (reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
+      expect(await hook(s, { hook_event_name: "PreToolUse", ...write_("bg.txt", "w9", "p2") })).toEqual(deny(BACKGROUND_TOOL_REASON));
+      write(r.dir, "README.md", "edited elsewhere\n");
+      expect(await hook(s, { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "git reset --hard" }, tool_use_id: "b9", prompt_id: "p2" })).toEqual(deny(TERMINAL_GIT_DENY_REASON));
+      sh(r.dir, "checkout", "--", "README.md");
+      // A wait still raises attention, on the background entry.
+      await hook(s, { hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use Bash" });
+      st = await r.h.waitFor((x) => x.sessions.backgroundTerminals?.[0]?.waiting !== null, "background waiting");
+      expect(st.sessions.backgroundTerminals?.[0]?.waiting).toMatchObject({ kind: "permission" });
+      expect(st.session.terminal).toBeUndefined(); // the chat's own state shows nothing of it
+      expect(st.gate.phase).not.toBe("running"); // nothing reached the review
+      // /clear in the background terminal is still followed for its own chat.
+      const cleared = "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a";
+      await hook(s, { hook_event_name: "SessionEnd", reason: "clear", session_id: cleared });
+      await r.h.waitFor((x) => x.sessions.list.find((m) => m.id === id)?.cliSessionId === cleared, "background cliSessionId");
+      expect(r.h.engine.state.sessions.list.find((m) => m.id === chat)?.cliSessionId).toBeUndefined();
+
+      // Back: the same session and token, running, no new spec; the next prompt is reviewed.
+      await r.h.engine.handle({ type: "session_open", sessionId: id });
+      st = await r.h.waitFor((x) => x.sessions.currentId === id && x.session.terminal !== undefined, "terminal current");
+      expect(st.session.terminal?.running).toBe(true);
+      expect(st.sessions.backgroundTerminals).toBeUndefined();
+      await turn(r, s, "p3", "again.txt");
+    });
+
+    it("parking is refused while a turn is open: the switch ends the terminal (its token retired)", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: id, pid: 5252 });
+      await hook(s, ups("p1"));
+      // A switch is refused while the turn runs (session_busy); Review now ends it, then the review stands.
+      expect(await refusal(r.h, { type: "session_new" })).toMatchObject({ ok: false });
+      // The never-started terminal: nothing to keep either.
+      const r2 = await rig();
+      const id2 = await newTerminal(r2);
+      const s2 = await spec(r2, id2);
+      await toChat(r2, id2);
+      expect(r2.h.engine.state.sessions.backgroundTerminals).toBeUndefined();
+      expect(await hook(s2, ups("p1"))).toEqual({ decision: "block", reason: RETIRED_REASON });
+    });
+
+    it("terminal_exited, session_delete and close_project end a background terminal", async () => {
+      const r = await rig();
+      const one = await newTerminal(r);
+      const s1 = await spec(r, one);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: one, pid: 6001 });
+      const two = await newTerminal(r);
+      const s2 = await spec(r, two);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: two, pid: 6002 });
+      const three = await newTerminal(r);
+      const s3 = await spec(r, three);
+      await r.h.engine.handle({ type: "terminal_started", sessionId: three, pid: 6003 });
+      await toChat(r, three);
+      expect(r.h.engine.state.sessions.backgroundTerminals?.map((b) => b.chatId).sort()).toEqual([one, two, three].sort());
+      expect(pids(r)).toEqual([6001, 6002, 6003]);
+      await r.h.engine.handle({ type: "terminal_exited", sessionId: one, exitCode: 0 });
+      expect(await hook(s1, ups("x"))).toEqual({ decision: "block", reason: RETIRED_REASON });
+      expect(await refusal(r.h, { type: "session_delete", sessionId: two })).toMatchObject({ ok: true });
+      expect(await hook(s2, ups("x"))).toEqual({ decision: "block", reason: RETIRED_REASON });
+      expect(r.h.engine.state.sessions.backgroundTerminals?.map((b) => b.chatId)).toEqual([three]);
+      await r.h.engine.handle({ type: "close_project" });
+      expect(await hook(s3, ups("x"))).toEqual({ decision: "block", reason: RETIRED_REASON });
+      expect(r.h.engine.state.sessions.backgroundTerminals).toBeUndefined();
+    });
   });
 });

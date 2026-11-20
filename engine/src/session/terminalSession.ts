@@ -74,6 +74,14 @@ export const PROMPT_TIMEOUT_REASON = "ReviewGate could not start the review of t
 export const ADOPT_BUSY_REASON =
   "ReviewGate was still busy with the last turn's changes and could not start reviewing this one in time, so this call " +
   "was blocked. Wait a moment, then try it again.";
+/** §57.10: a prompt typed into a terminal chat that runs in the background (another chat is current). */
+export const BACKGROUND_PROMPT_REASON =
+  "This terminal chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in " +
+  "ReviewGate and send it again.";
+/** §57.10: a write tool of a terminal chat that runs in the background. */
+export const BACKGROUND_TOOL_REASON =
+  "ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the user " +
+  "switches back to this chat.";
 /** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
 const PROMPT_CANCELLED_REASON = "Claude Code stopped waiting for ReviewGate's answer to this prompt.";
 
@@ -125,6 +133,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private interruptSuspected = false;
   private open: OpenTurn | null = null;
   private disposed = false;
+  /** §57.10: another chat is current — the hooks answer fail-closed (prompts blocked, write tools denied). */
+  private background = false;
   private token: string | null = null;
   private retireToken: ((token: string) => void) | null = null;
   /** The prompt waiting for the engine's answer; `seq` is its `terminal_prompt`'s, so an answer reaches only its own. */
@@ -169,6 +179,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   get isTurnActive(): boolean {
     return this.open !== null;
+  }
+
+  /** §57.10: the chat runs in the background (`setBackground`). */
+  get isBackground(): boolean {
+    return this.background;
   }
 
   // ---- ClaudeSessionLike: the TUI does all of this itself
@@ -222,6 +237,16 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.waiting = null;
   }
 
+  /**
+   * §57.10: another chat became current (true) — the token stays live, the PTY keeps running, its hooks answer fail-closed —
+   * or this chat is current again (false): the same object, the same token, nothing respawned.
+   */
+  setBackground(on: boolean): void {
+    if (this.background === on) return;
+    this.background = on;
+    this.touch();
+  }
+
   /** `terminal_started`: the PTY runs claude. */
   started(pid: number): void {
     this.pid = pid;
@@ -268,6 +293,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   async handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput> {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
+    if (this.background) return this.backgroundHook(input);
     this.hooksSeen = true;
     // `/clear` or `/resume` in the TUI: the conversation the next prompt runs in (or the one that ended) is the chat's from
     // now on — only from those two events, and only a UUID (the id goes into the next spawn's argv).
@@ -315,6 +341,44 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
           if (this.open) this.closeTurn("session_end");
           return {};
         default:
+          return {};
+      }
+    } finally {
+      this.touch();
+    }
+  }
+
+  /**
+   * §57.10: a hook while another chat is current — nothing of it may escape the review: prompts are blocked, write tools
+   * denied (the guard's deny first, so its reason wins), waits still raise attention; the session id and config dir are
+   * still followed. Everything else is answered `{}`.
+   */
+  private async backgroundHook(input: Record<string, unknown>): Promise<HookOutput> {
+    const event = input.hook_event_name;
+    this.hooksSeen = true;
+    const sid = event === "UserPromptSubmit" || event === "SessionEnd" ? input.session_id : undefined;
+    if (isCliSessionId(sid) && sid !== this.cliSessionId) {
+      this.cliSessionId = sid;
+      this.opts.emit({ type: "terminal_session_id", sessionId: sid });
+    }
+    if (event !== "Notification") this.waiting = null;
+    this.noteTranscript(input.transcript_path);
+    try {
+      switch (event) {
+        case "UserPromptSubmit":
+          return { decision: "block", reason: BACKGROUND_PROMPT_REASON };
+        case "PreToolUse": {
+          const guard = await this.guard(input);
+          if (guard?.decision === "deny") return preToolAnswer(guard);
+          return preToolAnswer({ decision: "deny", reason: BACKGROUND_TOOL_REASON });
+        }
+        case "PermissionRequest":
+          return this.onPermissionRequest(input);
+        case "Notification":
+          this.onNotification(input);
+          return {};
+        default:
+          this.opts.log("debug", `terminal (background): ${String(event)} answered {}`);
           return {};
       }
     } finally {
