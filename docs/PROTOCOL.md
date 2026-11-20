@@ -8183,7 +8183,9 @@ pieces). Clients only.
   name none for it — no tooltip of the Windows client spells a key it does not have.
 - **View menu** (Mac). The sidebar's tabs from the keyboard (⌥⌘1–4; ⌘1–9 stay the chat tabs); 최신 메시지로 이동 ⌥⌘↓
   (the "↓ 최신" pill's action, `jumpToLatestTick`); the diff's 전체 파일 보기 / 공백 무시 / 줄바꿈 switches (`DiffPrefsKeys`,
-  shared with the diff header, kept across files and launches); 확대 / 축소 / 실제 크기 — one text size for the app (0.8–1.6 in
+  shared with the diff header, kept across files, windows and launches — one value: the review diff reads the same key the
+  menu's check shows; a deleted file, which has no full file, shows its diff and leaves the choice for the next file; a chat
+  link to a line turns 전체 파일 보기 and 공백 무시 off to show that line); 확대 / 축소 / 실제 크기 — one text size for the app (0.8–1.6 in
   steps of 0.1, kept; `TextScale`), which the message box's font follows.
 - **Edit menu** (Mac). 채팅에서 찾기 ⌘F finds where the user is: the History tab's search on that tab
   (`historySearchFocusTick`), the diff after a click in it (`lastFocusArea`), else the chat. 다음 찾기 ⌘G / 이전 찾기 ⇧⌘G step

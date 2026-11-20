@@ -24,7 +24,11 @@ struct DiffView: View {
     /// `DiffDisplay.foldLineThreshold` (3 000) — a diff the engine has already cut at 20 000 never reached this one.
     static let collapseThreshold = 20_000
 
-    @State private var showFullFile = false
+    /// "Full file" and "공백 무시": the user's, kept across files, windows and launches like wrap and split — one value with
+    /// View › Show Full File / Ignore Whitespace (`DiffPrefsKeys`). A deleted file has no full file: its diff shows, the
+    /// choice stays for the next file.
+    @AppStorage(DiffPrefsKeys.showFullFile) private var fullFileOn = false
+    private var showFullFile: Bool { fullFileOn && file?.status != .deleted }
     @State private var composerLine: DiffLine?
     /// The note being written, per file: kept when its composer closes for another file, the -w view or the full file, and
     /// opened again on its line when that diff is back. By anchor — another diff of the file numbers its line objects anew.
@@ -56,7 +60,7 @@ struct DiffView: View {
     @State private var contextHighlighted: [Int: AttributedString] = [:]
     // MARK: wave4c w4c-review
     /// §41.3 "공백 무시": the range diffed with `-w`, read-only (no part revert, note or line side question there).
-    @State private var ignoreWhitespace = false
+    @AppStorage(DiffPrefsKeys.ignoreWhitespace) private var ignoreWhitespace = false
     /// The lines picked for ⌘C / "Copy selected lines" (a click, ⇧-click, a drag over the rows).
     @State private var lineSelection = DiffLineSelection()
     /// What the list scrolls to on `scrollTick`: find's current match, or the line of a chat link (`WindowModel.diffJump`).
@@ -91,7 +95,8 @@ struct DiffView: View {
                 // when a turn starts or ends (`isReviewLocked`, `isDiffUnavailable`); of the list's rows only the hunk
                 // headers draw again then (their revert controls lock), the others compare equal.
                 DiffViewHeader(file: file, diff: diff, showsHunkControls: showsHunkControls(file), canRejectHunks: canRejectHunks(file),
-                               selectedHunks: selectedHunks.count, editorLine: { firstChangedLine }, showFullFile: $showFullFile,
+                               selectedHunks: selectedHunks.count, editorLine: { firstChangedLine },
+                               showFullFile: Binding(get: { showFullFile }, set: { fullFileOn = $0 }),
                                ignoreWhitespace: $ignoreWhitespace, confirmRevertSelected: $confirmRevertSelected,
                                onAddNote: { openComposer() })
                 Divider()
@@ -143,7 +148,6 @@ struct DiffView: View {
             composerLine = nil
             clickedLine = nil
             selectedHunks = []
-            if file?.status == .deleted { showFullFile = false }   // it has none, and its toggle is off: never stuck in it
             resetLineState()   // wave2 mac-diff
             reopenNoteDraft()
         }
@@ -466,7 +470,7 @@ extension DiffView {
     /// outside the diff's hunks leaves the diff as it is.
     private func showJump(_ jump: DiffJump) {
         guard let line = jump.line else { return }
-        showFullFile = false
+        fullFileOn = false   // the switches are the user's (`DiffPrefsKeys`): the View menu shows them off now too
         ignoreWhitespace = false
         Task {
             try? await Task.sleep(for: .milliseconds(150))   // the pane may just have opened (0.15 s) with its list
