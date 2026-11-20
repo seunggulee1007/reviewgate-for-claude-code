@@ -266,6 +266,7 @@ import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, isCliSessionId, MIN_TERMIN
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
 import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
+import type { ClientCapabilities } from "./protocol.js"; // §57.10
 export { ENGINE_VERSION };
 export { CommandRefused } from "./errors.js";
 
@@ -471,6 +472,8 @@ export class ReviewEngine {
 
   private settings: Settings = { ...DEFAULT_SETTINGS, budget: { ...DEFAULT_SETTINGS.budget }, bashAllowPatterns: [] };
   private clientEnv: Record<string, string> = {};
+  /** §57.10: what the client said it can do in `hello`. */
+  private clientCaps: ClientCapabilities = {};
   private toolchain: ToolchainState = { claude: null, gh: null, git: null, claudeVersion: null, ghVersion: null };
   private toolchainPromise: Promise<Toolchain> | null = null;
   private toolchainPath: string | null = null;
@@ -1058,6 +1061,7 @@ export class ReviewEngine {
       case "hello": {
         this.clientEnv = { ...(cmd.env ?? {}) };
         this.lockOwner.client = cmd.client;
+        this.clientCaps = { ...(cmd.capabilities ?? {}) };
         this.applySettings(cmd.settings);
         this.toolchainPromise = null;
         void this.locate().catch(() => undefined);
@@ -2389,13 +2393,15 @@ export class ReviewEngine {
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
   }
 
-  /** §57.7: the kind of a chat the engine makes by itself — `settings.newChatKind`, terminal only for the Mac (and tests). */
+  /** §57.7: the kind of a chat the engine makes by itself — `settings.newChatKind`, terminal only for a client that runs terminal chats. */
   private firstChatKind(): SessionKind | undefined {
     return this.settings.newChatKind === "terminal" && this.terminalClient() ? "terminal" : undefined;
   }
 
+  /** §57.10: mac and test always run terminal chats; a windows client when its hello advertises `capabilities.terminalChat`. */
   private terminalClient(): boolean {
-    return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
+    const c = this.lockOwner.client;
+    return c === "mac" || c === "test" || (c === "windows" && this.clientCaps.terminalChat === true);
   }
 
   private async sessionNew(kind?: SessionKind): Promise<void> {
