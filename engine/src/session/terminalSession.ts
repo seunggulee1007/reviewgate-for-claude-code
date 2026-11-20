@@ -409,7 +409,10 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   setBackground(on: boolean): void {
     if (this.background === on) return;
     this.background = on;
-    if (on) this.settlePermissions(); // §57.15: background terminals never bridge
+    if (on) {
+      this.settlePermissions(); // §57.15: background terminals never bridge
+      this.settleAdoption({ ok: false }); // a write waiting to start a turn here is denied: no turn opens in the background
+    }
     this.touch();
   }
 

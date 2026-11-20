@@ -415,6 +415,17 @@ describe("TerminalSession", () => {
     expect(r.ts.state.promptId).toBe("p3");
   });
 
+  it("§57.10 a write waiting to start a turn is denied when the chat goes to the background", async () => {
+    const r = rig({ adoptWaitMs: 60_000 });
+    r.ts.setToken("tok-1");
+    r.ts.started(77);
+    const pending = r.hook(pre("Write", { file_path: join(r.dir, "a.txt"), content: "x" }, "w1"));
+    await vi.waitFor(() => expect(r.of("auto_turn_start")).toHaveLength(1));
+    r.ts.setBackground(true);
+    expect(await pending).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect(r.ts.state.promptId).toBeNull();
+  });
+
   it("§57.10 / §57.12 MCP and worktree tools: on in the foreground (no turn adopted), denied in the background and while moving", async () => {
     const r = rig();
     r.ts.setToken("tok-1");

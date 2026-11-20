@@ -9282,7 +9282,7 @@ makes the same object current again: no `terminal_spec`, no new token, no respaw
   ("ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the
   user switches back to this chat."); PermissionRequest → `{}` (the TUI answers) and `waiting`; Notification → `waiting`
   as in §57.4; every other event `{}`. `/clear` / `/resume` (`session_id`) and the config dir (§57.16) are still
-  followed, for that chat. Nothing reaches the review; no turn opens.
+  followed, for that chat. Nothing reaches the review; no turn opens (a write still waiting to start one is denied).
 - **State.** `state.sessions.backgroundTerminals: [{chatId, running, hooksSeen, waiting}]` (absent when none). The app
   raises attention from a background `waiting` as from the current chat's.
 - **Ends** (the token retired; the app ends the PTY when the entry disappears): `terminal_exited {sessionId}` for that
