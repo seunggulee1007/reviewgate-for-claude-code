@@ -253,6 +253,8 @@ describe("terminal chats (§57)", () => {
     const winSettings = JSON.parse(s.argv[s.argv.indexOf("--settings") + 1]!) as { hooks: Record<string, unknown>; statusLine?: unknown };
     expect(winSettings.hooks.PermissionRequest).toBeUndefined();
     expect(winSettings.statusLine).toBeUndefined();
+    // §57.14: Request changes stays a Stage 1 refusal there (its UI does not show a queued request).
+    expect(await refusal(win.h, { type: "request_changes" })).toMatchObject({ ok: false, code: "terminal_chat" });
     // The in-process reply goes to the caller only: no listener (the renderer's `rg:evt`) sees the spec or its token.
     expect(win.h.events.some((e) => e.type === "terminal_spec" || JSON.stringify(e).includes(s.token))).toBe(false);
     // Over stdio (the Mac's sidecar: no in-process caller) the reply is the event itself.

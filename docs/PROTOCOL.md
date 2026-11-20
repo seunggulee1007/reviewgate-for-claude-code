@@ -9449,7 +9449,8 @@ type ClientCapabilities = {
   else differs: `terminal_spec` has no Windows-specific fields (the client resolves argv[0] itself). The Stage 2 features
   (§57.10 background terminals, §57.12 worktree follow / move, §57.13 the status line tee, §57.15 the permission bridge)
   stay mac / test only (`terminalFeature`): a windows terminal chat's spec has no `PermissionRequest` hook and no
-  `statusLine`, a switch away ends it as in Stage 1, and `chat_move` stays `terminal_chat`.
+  `statusLine`, a switch away ends it as in Stage 1, and `chat_move` and `request_changes` (§57.14) stay
+  `terminal_chat`.
 - **Where the PTY lives** (`clients/desktop/src/main/pty/`). node-pty 1.1.0 in Electron main, ConPTY with its bundled
   `conpty.dll` (`useConpty`, `useConptyDll`); one `PtyHub` per window. The hello's `capabilities.terminalChat` is
   whether node-pty loaded (and, on Windows, build ≥ 18309) — static per process; Settings' "Terminal chat (preview)" is

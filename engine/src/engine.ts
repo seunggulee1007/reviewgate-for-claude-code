@@ -342,7 +342,7 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
 const TERMINAL_FOLLOW_ARM_MS = 120_000;
 
 /** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
-type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
+type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove" | "requestChanges";
 
 /** §57.4: how long past its own deadline a terminal prompt's adoption may hold the queue (it never settled: logged, dropped). */
 const TERMINAL_ADOPT_GRACE_MS = 10_000;
@@ -2435,7 +2435,7 @@ export class ReviewEngine {
 
   /**
    * §57.10–57.15: the Stage 2 terminal features a client runs itself — background terminals, the permission bridge, the
-   * status line tee, following / moving between worktrees. The mac app (and tests) today; the one place a client
+   * status line tee, following / moving between worktrees, Request changes (it shows the queued request). The mac app (and tests) today; the one place a client
    * capability (`hello`) can open one to another client later.
    */
   private terminalFeature(_feature: TerminalFeature): boolean {
@@ -4311,7 +4311,11 @@ export class ReviewEngine {
 
   private async requestChanges(extra: string | null, noteIds?: readonly string[]): Promise<void> {
     const ts = this.terminal; // MARK: terminal-chat — §57.14: staged, never typed into the TUI
-    if (ts) return this.terminalRequestChanges(ts, extra, noteIds);
+    if (ts) {
+      // §57.14: only for a client that shows the queued request (`terminal.requestQueued`); elsewhere as in Stage 1.
+      if (!this.terminalFeature("requestChanges")) throw new CommandRefused("terminal_chat:request_changes", { code: "terminal_chat" });
+      return this.terminalRequestChanges(ts, extra, noteIds);
+    }
     if (!canRequestChanges(this.slices())) {
       // M30 (§3): a failed collection leaves the input open but not a change request (retry first, or send).
       const why = blockedReason(this.slices()) ?? (this.gate.collectError !== null ? "collect_failed" : "no_notes");
