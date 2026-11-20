@@ -222,8 +222,8 @@ struct WhitespaceDiffBody: View {
                 // §34.11: split rows only while split is shown (one pass over the lines).
                 let layout = split ? DiffSplit.layout(lines: lines) : nil
                 DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
-                              resetKey: AnyHashable(key), scrollTarget: layout?.rowId(forLineKey: find.state.currentKey) ?? find.state.currentKey,
-                              scrollTick: find.scrollTick, scrollColumn: find.currentColumn, split: split) {
+                              resetKey: AnyHashable(key), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                              scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
                     if let layout {
                         ForEach(layout.rows) { row in
                             Group {
@@ -249,7 +249,8 @@ struct WhitespaceDiffBody: View {
                 }
             }
             .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
-                      rowsKey: AnyHashable([AnyHashable(key), AnyHashable(lines.count)]), tick: model.diffFindTick)
+                      rowsKey: AnyHashable([AnyHashable(key), AnyHashable(lines.count)]), tick: model.diffFindTick,
+                      changes: { DiffChangeNavigation.rows(lines: lines) })
         }
         .accessibilityIdentifier("Whitespace diff")
     }

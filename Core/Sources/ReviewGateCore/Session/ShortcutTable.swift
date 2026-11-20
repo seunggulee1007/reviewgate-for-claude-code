@@ -77,8 +77,8 @@ public enum ShortcutTable {
             ShortcutRow("Undo Accept", mac: "⌘⇧U", windows: "—", note: "Mac app only"),   // MARK: polish p-lifecycle (P1-chrome-10)
             ShortcutRow("Next Pending File", mac: "⌘]", windows: "Ctrl+]"),
             ShortcutRow("Previous Pending File", mac: "⌘[", windows: "Ctrl+["),
-            ShortcutRow("Next Change", mac: "⌥⌘]", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)
-            ShortcutRow("Previous Change", mac: "⌥⌘[", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)
+            ShortcutRow("Next Change", mac: "⌥⌘]", windows: "—", note: "Mac app only · after a file’s last change, the next file"),   // r2-review-flow (polish)
+            ShortcutRow("Previous Change", mac: "⌥⌘[", windows: "—", note: "Mac app only · before a file’s first change, the previous file"),   // r2-review-flow (polish)
             ShortcutRow("Add a review note on the selected line", mac: "⌥⌘N", windows: "Ctrl+Alt+N"),
             ShortcutRow("Ask About Selection…", mac: "⌥⌘/", windows: "Ctrl+Alt+/"),
             ShortcutRow("Open in Editor", mac: "⌘⇧E", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)

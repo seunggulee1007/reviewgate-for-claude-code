@@ -171,14 +171,18 @@ struct ReviewCommands: Commands {
                 .disabled(!menu.canUndoReject)
                 .accessibilityIdentifier("Review menu Undo reject")
             Divider()
-            // polish P2-review-20: the next / previous change inside the file's diff (⌘] / ⌘[ move between files).
+            // polish P2-review-20: the next / previous change block of the diff on screen (the review's, its full file or -w
+            // view, a live, history or PR diff), then the next / previous file of its list (⌘] / ⌘[ go to pending files).
+            let changeOff = model?.changeNavigationPanes.isEmpty != false
             Button("Next Change") { model?.nextChangeTick += 1 }
                 .keyboardShortcut("]", modifiers: [.command, .option])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true)
+                .disabled(changeOff)
+                .help(changeOff ? Text("No diff is on screen") : Text("The next change in this file, then the first change of the next file"))
                 .accessibilityIdentifier("Review menu Next change")
             Button("Previous Change") { model?.previousChangeTick += 1 }
                 .keyboardShortcut("[", modifiers: [.command, .option])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true)
+                .disabled(changeOff)
+                .help(changeOff ? Text("No diff is on screen") : Text("The previous change in this file, then the last change of the previous file"))
                 .accessibilityIdentifier("Review menu Previous change")
             Button("Next Pending File") { store?.selectNextPending() }
                 .keyboardShortcut("]", modifiers: .command)

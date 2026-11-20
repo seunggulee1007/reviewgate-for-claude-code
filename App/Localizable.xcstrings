@@ -11399,6 +11399,54 @@
         }
       }
     },
+    "Mac app only · after a file’s last change, the next file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac app only · after a file’s last change, the next file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 앱에만 있어요 · 파일의 마지막 변경 다음은 다음 파일"
+          }
+        }
+      }
+    },
+    "Mac app only · before a file’s first change, the previous file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac app only · before a file’s first change, the previous file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac 앱에만 있어요 · 파일의 첫 변경 앞은 이전 파일"
+          }
+        }
+      }
+    },
+    "No diff is on screen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No diff is on screen"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "화면에 diff가 없어요"
+          }
+        }
+      }
+    },
     "None is picked — nothing to play": {
       "localizations": {
         "en": {
@@ -11571,6 +11619,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "오류·사용량 한도·로그인으로 멈췄을 때"
+          }
+        }
+      }
+    },
+    "The next change in this file, then the first change of the next file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The next change in this file, then the first change of the next file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일의 다음 변경, 마지막 변경 뒤에는 다음 파일의 첫 변경으로"
+          }
+        }
+      }
+    },
+    "The previous change in this file, then the last change of the previous file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The previous change in this file, then the last change of the previous file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일의 이전 변경, 첫 변경 앞에는 이전 파일의 마지막 변경으로"
           }
         }
       }

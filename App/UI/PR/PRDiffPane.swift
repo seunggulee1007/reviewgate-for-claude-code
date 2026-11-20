@@ -73,6 +73,9 @@ struct PRDiffPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Review › Next / Previous Change: then the next file of the PR.
+        .diffChangeNavigation(find, file: file?.filename, files: { store.files.map(\.filename) },
+                              open: { name in if let next = store.files.first(where: { $0.filename == name }) { store.selectFile(next) } })
         .diffSplitWidth()   // §34.11
         .onChange(of: file?.id) { _, _ in
             composer = nil
@@ -202,8 +205,8 @@ struct PRDiffPane: View {
                 DiffSplitReader { split in
                     let layout = split ? DiffSplit.layout(items) : nil   // §34.11: built only while split is shown
                     DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
-                                  resetKey: AnyHashable(file.filename), scrollTarget: layout?.rowId(forLineKey: find.state.currentKey) ?? find.state.currentKey,
-                                  scrollTick: find.scrollTick, scrollColumn: find.currentColumn, split: split) {
+                                  resetKey: AnyHashable(file.filename), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                  scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
                         if let layout {
                             // One List row per split row: each side's comments, drafts and composer under its line.
                             ForEach(layout.rows) { row in
@@ -252,7 +255,7 @@ struct PRDiffPane: View {
                 }
                 .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                           rowsKey: AnyHashable([AnyHashable(file.filename), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
-                          tick: model.diffFindTick)
+                          tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
             }
         } else {
             VStack(spacing: 8) {

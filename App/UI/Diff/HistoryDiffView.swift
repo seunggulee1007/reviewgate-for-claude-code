@@ -50,6 +50,12 @@ struct HistoryDiffView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .diffSplitWidth()   // §34.11
+        // Review › Next / Previous Change: then the next file of that round.
+        .diffChangeNavigation(find, file: store.historySelection?.path, files: { store.historyEntry?.files.map(\.path) ?? [] },
+                              open: { path in
+                                  guard let entry = store.historySelection?.entryId else { return }
+                                  Task { await store.openHistoryDiff(entryId: entry, path: path) }
+                              })
         .task(id: HighlightKey(selection: store.historySelection, lineCount: store.historyDiff?.allLines.count ?? -1, dark: colorScheme == .dark)) {
             highlighted = nil
             guard let path = store.historySelection?.path, let diff = store.historyDiff, !diff.isBinary else { return }
@@ -198,8 +204,8 @@ struct HistoryDiffView: View {
                         }
                         let context = HistoryRowContext(selection: selection, diff: diff, items: items, notes: notes, picked: picked, rowKey: rowKey)
                         DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
-                                      resetKey: AnyHashable(selection), scrollTarget: layout?.rowId(forLineKey: find.state.currentKey) ?? find.state.currentKey,
-                                      scrollTick: find.scrollTick, scrollColumn: find.currentColumn, split: split) {
+                                      resetKey: AnyHashable(selection), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                      scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
                             if let rows {
                                 ForEach(rows) { row in
                                     Group {
@@ -230,7 +236,7 @@ struct HistoryDiffView: View {
                     .diffLineCopying(revision: lineSelection.revision) { selectedLinesText(items) }
                     .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                               rowsKey: AnyHashable([AnyHashable(selection), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
-                              tick: model.diffFindTick)
+                              tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
                 }
             }
         } else {

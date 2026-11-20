@@ -134,6 +134,9 @@ struct DiffView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .diffSplitWidth()   // §34.11: split only where two columns read (the header's picker says why not)
+        // Review › Next / Previous Change: the diff, its full file or its -w view; then the next file of the list on screen.
+        .diffChangeNavigation(find, file: file?.path, files: { store.displayOrderedFiles.map(\.path) },
+                              open: { store.selectFile(path: $0) })
         .onChange(of: file?.path) { _, path in
             if let jump = model.diffJump, jump.path != path { model.diffJump = nil }   // a link whose file never showed is dropped
             store.side.selectionAnchor = path.map { SideAnchor(path: $0) }
@@ -156,8 +159,8 @@ struct DiffView: View {
             if !on { reopenNoteDraft() }
         }
         .onChange(of: find.scrollTick) { _, _ in
-            scrollKey = find.state.currentKey
-            scrollColumn = find.currentColumn
+            scrollKey = find.scrollKey   // find's current match, or Review › Next / Previous Change's block
+            scrollColumn = find.scrollColumn
             scrollTick += 1
         }
         // A chat link's file and line (`WindowModel.diffJump`), once this file's diff is on screen.
@@ -280,7 +283,8 @@ struct DiffView: View {
                              actions: rowActions(file: file, diff: diff))
                     .equatable()
                     .diffFind(find, rows: { findRows(diff, plan: plan) },
-                              rowsKey: FindRowsKey(path: file.path, diff: diff, items: plan.items.count), tick: model.diffFindTick)
+                              rowsKey: FindRowsKey(path: file.path, diff: diff, items: plan.items.count), tick: model.diffFindTick,
+                              changes: { DiffChangeNavigation.rows(items: plan.items) })
             }
         } else {
             VStack(spacing: 8) {

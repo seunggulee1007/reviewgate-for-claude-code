@@ -50,6 +50,9 @@ struct LiveDiffView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .diffSplitWidth()   // §34.11
+        // Review › Next / Previous Change: then the next file of the turn's changes so far.
+        .diffChangeNavigation(find, file: store.liveSelection, files: { store.liveChanges?.files.map(\.path) ?? [] },
+                              open: { path in Task { await store.openLiveDiff(path) } })
         // MARK: wave7 w7-state — §45.2: the count without building every line per body; at most 3 000 lines are coloured, as
         // in the review diff (a larger one shows plain).
         .task(id: HighlightKey(path: store.liveSelection, lineCount: lineCount, dark: colorScheme == .dark)) {
@@ -170,8 +173,8 @@ struct LiveDiffView: View {
                         }
                         DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
                                       resetKey: AnyHashable(store.liveSelection),
-                                      scrollTarget: layout?.rowId(forLineKey: find.state.currentKey) ?? find.state.currentKey,
-                                      scrollTick: find.scrollTick, scrollColumn: find.currentColumn, split: split) {
+                                      scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                      scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
                             if let layout {
                                 ForEach(layout.rows) { row in
                                     Group {
@@ -203,7 +206,8 @@ struct LiveDiffView: View {
                     }
                     .diffLineCopying(revision: lineSelection.revision) { selectedLinesText(lines) }
                     .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
-                              rowsKey: FindRowsKey(path: store.liveSelection ?? "", diff: diff), tick: model.diffFindTick)
+                              rowsKey: FindRowsKey(path: store.liveSelection ?? "", diff: diff), tick: model.diffFindTick,
+                              changes: { DiffChangeNavigation.rows(lines: lines) })
                 }
             }
         } else {

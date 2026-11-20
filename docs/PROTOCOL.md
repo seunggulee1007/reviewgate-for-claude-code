@@ -8189,8 +8189,14 @@ pieces). Clients only.
   (`historySearchFocusTick`), the diff after a click in it (`lastFocusArea`), else the chat. 다음 찾기 ⌘G / 이전 찾기 ⇧⌘G step
   the chat's find (`transcriptFindNextTick` / `…PreviousTick`), its bar closed too; while the bar is open its own ⌘G buttons
   answer first.
-- **Review menu** (Mac). 다음 변경 ⌥⌘] / 이전 변경 ⌥⌘[ move inside the file's diff (`nextChangeTick` /
-  `previousChangeTick`; ⌘] / ⌘[ still move between files); 메모 추가… ⌥⌘N (`addNoteTick`, off while the diff cannot open a
+- **Review menu** (Mac). 다음 변경 ⌥⌘] / 이전 변경 ⌥⌘[ go to the next / previous change block of the diff on screen
+  (`nextChangeTick` / `previousChangeTick`, `DiffChangeNavigation`): a run of added / removed lines with nothing else between
+  them (a closed fold — a large diff's hunk, a generated file — is one), the same blocks unified or split; the review diff's
+  full file and -w view step through their own changed lines. Past the file's last / first block it goes on to the first /
+  last block of the next / previous file of the list the diff came from — the review's files in their order on screen, the
+  turn's live changes, the history round's files, the PR's files — and beeps at the list's ends. Both are off ("화면에 diff가
+  없어요") while no diff pane with a file is on screen (`changeNavigationPanes`); ⌘] / ⌘[ still move between pending files.
+  메모 추가… ⌥⌘N (`addNoteTick`, off while the diff cannot open a
   note — `canAddNote`); 에디터에서 열기 ⌘⇧E (the editor of Settings, else the first installed); 경로 복사 ⌥⌘C ("경로 복사됨");
   이 브랜치로 PR 만들기… ⌥⌘K (it was only in the branch menu and the commit banner). Workbenches › 워크벤치 새로고침 is no longer
   the same name as View › 새로고침 (⌘R).
