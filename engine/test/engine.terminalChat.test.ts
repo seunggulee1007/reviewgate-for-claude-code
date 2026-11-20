@@ -238,6 +238,7 @@ describe("terminal chats (§57)", () => {
     expect(await refusal(off.h, { type: "session_new", kind: "terminal" })).toMatchObject({ ok: false, code: "terminal_unsupported" });
 
     const win = await rig({ client: "windows", capabilities: { terminalChat: true } });
+    writeFileSync(join(win.config, "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "acme-status" } }));
     // session_continue_terminal passes the client check (the chat has no conversation yet: the next check refuses).
     expect(await refusal(win.h, { type: "session_continue_terminal", sessionId: win.h.engine.state.sessions.currentId! })).toMatchObject({ ok: false, code: "nothing_to_continue" });
     // session_new {kind} is accepted and persisted; terminal_spec replies.
@@ -247,6 +248,10 @@ describe("terminal chats (§57)", () => {
     expect(s.sessionId).toBe(id);
     expect(s.argv[0]).toBe(win.claude);
     expect(s.token).toMatch(/^[0-9a-f]{64}$/);
+    // The Stage 2 features (§57.10–57.16) stay mac / test only: no permission bridge, no status line tee.
+    const winSettings = JSON.parse(s.argv[s.argv.indexOf("--settings") + 1]!) as { hooks: Record<string, unknown>; statusLine?: unknown };
+    expect(winSettings.hooks.PermissionRequest).toBeUndefined();
+    expect(winSettings.statusLine).toBeUndefined();
 
     // firstChatKind honours newChatKind: "terminal" for it.
     const first = await rig({ client: "windows", capabilities: { terminalChat: true }, newChatKind: "terminal" });
