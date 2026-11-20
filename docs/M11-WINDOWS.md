@@ -33,6 +33,27 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
   passes `pathToClaudeCodeExecutable` = the located claude and fails with `cli_not_found` when there is none), and a
   mac-built Windows installer used to carry the **darwin-arm64** one. No win32 package is needed either.
 
+### Terminal: node-pty and xterm.js (Stage 3, PROTOCOL §57.10)
+
+- **Pins (exact).** `node-pty` 1.1.0 (a `dependency`: it ships) and `@xterm/xterm` 6.0.0 with `@xterm/addon-fit` 0.11.0,
+  `-webgl` 0.19.0, `-unicode11` 0.9.0, `-web-links` 0.12.0, `-search` 0.16.0, `-clipboard` 0.2.0 (`devDependencies`:
+  vite bundles them into the renderer, as with Monaco and React). Licences: `clients/desktop/THIRD_PARTY_NOTICES.md`,
+  shipped next to the app as `resources/THIRD_PARTY_NOTICES.md` (`extraResources`).
+- **No rebuild for Electron.** node-pty 1.1.0 is built with node-addon-api (N-API), so its prebuilds
+  (`prebuilds/{win32-x64,win32-arm64,darwin-x64,darwin-arm64}`) load in Electron 44 as they are; `npmRebuild: false`
+  stays. win32-x64 carries ConPTY itself (`prebuilds/win32-x64/conpty/{conpty.dll,OpenConsole.exe}`), which the app always
+  uses (`useConptyDll`). If a future node-pty drops prebuilds: `npx @electron/rebuild -f -w node-pty -v 44.5.1`.
+- **Linux (CI only).** There is no linux prebuild: `npm ci` compiles it with node-gyp (python, make, g++ — present on the
+  GitHub ubuntu runner). npm ≥ 11.19 blocks dependency install scripts unless `allowScripts` lists them, so the root
+  `package.json` allows `node-pty@1.1.0` (and only it). Bumping node-pty means bumping that entry too.
+- **Packaging.** `asarUnpack: node_modules/node-pty/**` — the `.node` files, the conout worker thread, `conpty.dll` /
+  `OpenConsole.exe` and the console-list agent must be real files; main requires node-pty from
+  `resources/app.asar.unpacked/node_modules/node-pty` by path. Excluded: node-pty's `src`, `deps` (winpty sources),
+  `third_party` (a second ConPTY copy), `scripts`, `typings`, `binding.gyp`, every `.pdb`, `node-addon-api`, and the
+  other OS's prebuilds (win: `darwin-*` and `win32-arm64`; mac: `win32-*`).
+- **No fuse that disables RunAsNode**: node-pty's console-list agent `fork()`s, and the engine's `cli.js` version probe
+  runs Electron as Node.
+
 ## Layout of `clients/desktop/src`
 
 | Path | Role |

@@ -8,5 +8,8 @@
   ],
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@^4.43.0"
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true
   }
 }

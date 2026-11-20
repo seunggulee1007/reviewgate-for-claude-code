@@ -13,8 +13,24 @@ files:
   # and refuses to start a session when none is found. So no platform binary ships, for any target
   # (a mac-built win installer used to carry claude-agent-sdk-darwin-arm64) — docs/M11-WINDOWS.md.
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  # node-pty (terminal chat / shell panel, docs/M11-WINDOWS.md "Terminal"): only lib/ and the prebuilds run; the
+  # sources, winpty sources, the duplicate third_party ConPTY copy, build scripts, typings, debug symbols and the
+  # compile-time node-addon-api stay out.
+  - "!node_modules/node-pty/{src,deps,third_party,scripts,typings}/**"
+  - "!node_modules/node-pty/binding.gyp"
+  - "!node_modules/node-pty/prebuilds/**/*.pdb"
+  - "!node_modules/node-addon-api/**"
+# node-pty runs from real files: its .node binaries, the conout worker thread, conpty.dll / OpenConsole.exe and the
+# console-list agent cannot load from inside app.asar. main/pty/nodePty.ts requires it from app.asar.unpacked by path.
+asarUnpack:
+  - "node_modules/node-pty/**"
+extraResources:
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
 # The engine spawns external `claude` / `gh` / `git` from PATH (or the Settings overrides); nothing is bundled.
 win:
+  files:
+    - "!node_modules/node-pty/prebuilds/{darwin-*,win32-arm64}/**"
   target:
     - target: nsis
       arch: [x64]
@@ -25,6 +41,10 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
 mac:
+  files:
+    - "!node_modules/node-pty/prebuilds/win32-*/**"
   target: dir
   identity: null
+# node-pty 1.1.0 is N-API (node-addon-api) with prebuilds for win32 / darwin: Electron loads them without a rebuild.
+# No electronFuses that turn off RunAsNode: node-pty's console-list agent fork()s, and the engine's cli.js probe needs it.
 npmRebuild: false
