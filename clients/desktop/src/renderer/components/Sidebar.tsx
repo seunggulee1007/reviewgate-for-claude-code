@@ -14,6 +14,7 @@ import { TabStatusDot } from "./TabAttention";
 import { OtherSessionsSection } from "./OtherSessions"; // MARK: wave3 desktop-session
 import { removeRecent, useRecentEntries } from "../recentProjects"; // MARK: wave4 w4-install
 import { runAsTaskEnabled } from "../runAsTask"; // MARK: §49
+import { isShadowProject, shadowProjectLine, trackWithoutGitHelp } from "../noGit"; // §59
 
 export function Sidebar() {
   const tab = useStore((s) => s.tab);
@@ -21,15 +22,16 @@ export function Sidebar() {
   const project = useStore((s) => s.state.project);
   const gitInit = useStore((s) => s.state.gitInit);
   const width = useStore((s) => s.ui.sidebarWidth);
+  const shadow = useStore((s) => isShadowProject(s.state)); // §59: no PRs without a repository
   return (
     <div className="sidebar" style={width ? { width } : undefined}>
       <div className="segmented" role="tablist" data-testid="Sidebar tab">
         <button type="button" className={tab === "changes" ? "active" : ""} onClick={() => setTab("changes")}>{t("Changes")}<TabStatusDot /></button>
-        <button type="button" className={tab === "prs" ? "active" : ""} onClick={() => setTab("prs")}>{t("PRs")}</button>
+        {!shadow && <button type="button" className={tab === "prs" ? "active" : ""} onClick={() => setTab("prs")} data-testid="PRs tab">{t("PRs")}</button>}
         <button type="button" className={tab === "history" ? "active" : ""} onClick={() => setTab("history")} title={t("Review history")} data-testid="History tab">{t("History")}</button>
       </div>
       <hr />
-      {tab === "prs" ? (
+      {tab === "prs" && !shadow ? (
         <PRList />
       ) : tab === "history" && project ? (
         <HistoryList />
@@ -96,7 +98,10 @@ function ProjectHeader() {
         )}
       </div>
       <div className="caption muted truncate" title={root} data-testid="Project root">{displayPath(root)}</div>
-      {info && (
+      {info && isShadowProject(state) ? (
+        // §59: tracked without git — no branch, no remote; one calm line instead
+        <div className="caption muted truncate" title={trackWithoutGitHelp()} data-testid="Not a git repository">{shadowProjectLine()}</div>
+      ) : info && (
         <div className="row" style={{ gap: 6 }}>
           <BranchSwitcher />
           {info.remoteURL ? (
@@ -160,24 +165,29 @@ function ProjectSwitcher() {
     items.push({ kind: "item", label: t("{0} — not found", lastComponent(p)), title: t("Not found: {0}", displayPath(p)), disabled: true, testId: `Missing recent ${p}` });
   }
   if (missing.length > 0) items.push({ kind: "item", label: t("Remove Missing from List"), onClick: () => void removeRecent(null), testId: "Remove missing recents" });
-  items.push({ kind: "sep" }, { kind: "head", label: t("Workbenches") });
-  for (const wb of state.workbenches.list) {
-    const isCurrent = current !== null && samePath(wb.path, current);
-    items.push({
-      kind: "item",
-      label: workbenchTitle(wb, isCurrent),
-      title: displayPath(wb.path),
-      disabled: isCurrent,
-      testId: `Workbench ${wb.branch ?? wb.path}`,
-      onClick: () => void window.rg.openWorkbenchWindow(wb.path),
-    });
+  // §59: a folder tracked without git has no workbenches — the whole section is left out.
+  if (!isShadowProject(state)) {
+    items.push({ kind: "sep" }, { kind: "head", label: t("Workbenches") });
+    for (const wb of state.workbenches.list) {
+      const isCurrent = current !== null && samePath(wb.path, current);
+      items.push({
+        kind: "item",
+        label: workbenchTitle(wb, isCurrent),
+        title: displayPath(wb.path),
+        disabled: isCurrent,
+        testId: `Workbench ${wb.branch ?? wb.path}`,
+        onClick: () => void window.rg.openWorkbenchWindow(wb.path),
+      });
+    }
+    if (state.workbenches.list.length === 0) items.push({ kind: "item", label: t("No workbenches"), disabled: true });
+    items.push(
+      { kind: "item", label: t("New Workbench…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench" }), testId: "New Workbench…" },
+      // MARK: §49 — "업무로 실행…" starts with an empty task
+      ...(runAsTask ? [{ kind: "item" as const, label: t("Run as Task…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench", task: "" }), testId: "Run as Task…" }] : []),
+      { kind: "item", label: t("Prune"), disabled: !state.project, onClick: () => void pruneWorkbenches() },
+    );
   }
-  if (state.workbenches.list.length === 0) items.push({ kind: "item", label: t("No workbenches"), disabled: true });
   items.push(
-    { kind: "item", label: t("New Workbench…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench" }), testId: "New Workbench…" },
-    // MARK: §49 — "업무로 실행…" starts with an empty task
-    ...(runAsTask ? [{ kind: "item" as const, label: t("Run as Task…"), disabled: !state.project, onClick: () => openDialog({ kind: "newWorkbench", task: "" }), testId: "Run as Task…" }] : []),
-    { kind: "item", label: t("Prune"), disabled: !state.project, onClick: () => void pruneWorkbenches() },
     { kind: "sep" },
     { kind: "item", label: t("Open Project…"), onClick: () => void chooseAndOpen("switch") },
     { kind: "item", label: t("Open in New Window…"), title: newWindowHint, onClick: () => void window.rg.openInNewWindow(), testId: "Open in New Window…" },

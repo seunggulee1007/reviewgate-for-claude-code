@@ -10,6 +10,8 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "switch_project",
   "close_project",
   "init_repo",
+  // §59: review a folder that is no repository through a hidden one outside it
+  "track_without_git",
   "cancel_git_init",
   "restart_session",
   "send",

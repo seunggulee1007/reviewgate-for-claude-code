@@ -86,6 +86,16 @@ describe("the Windows menu bar (P1-chrome-09)", () => {
     expect(sent).toEqual([{ type: "accept_all" }, { type: "sidebar_tab", tab: "changes" }, { type: "chat_tab", index: 1 }, { type: "close_project" }]);
   });
 
+  it("§59: a folder tracked without git leaves New Workbench, Run as Task and PRs off; the review items stay", async () => {
+    const shadow = { ...state(), project: { path: "C:/Users/dev/notes", root: "C:/Users/dev/notes", name: "notes", branch: null, vcs: "shadow" } } as unknown as ReviewState;
+    const items = await menu({ state: shadow, menu: null });
+    const enabled = (label: string) => items.find((i) => i.label === label)?.enabled;
+    for (const label of ["New Workbench…", "Run as Task…", "PRs"]) expect(enabled(label), label).toBe(false);
+    for (const label of ["Changes", "History", "Close Project", "Add a review note on the selected line"]) expect(enabled(label), label).toBe(true);
+    const repo = await menu({ state: state(), menu: null });
+    for (const label of ["New Workbench…", "PRs"]) expect(repo.find((i) => i.label === label)?.enabled, label).toBe(true);
+  });
+
   it("without a project the project items are off", async () => {
     const items = await menu({ state: state({ project: false }), menu: null });
     for (const label of ["Accept", "Add a review note on the selected line", "New chat", "Close Project", "Go to File…", "Changes"]) {

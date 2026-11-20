@@ -37,6 +37,7 @@ import type {
 } from "@reviewgate/engine";
 import type { AppSettings } from "../shared/ipc";
 import { engineRequest, refusalOf } from "./engineRequest";
+import { isShadowProject, type TrackOutcome } from "./noGit"; // §59
 import { errorEventText, presentationOf, refusalMessage } from "./errorCodes";
 import { canAcceptAndSend, isDiffCollapsed } from "./friction";
 import { t } from "./i18n";
@@ -330,6 +331,9 @@ export type Dialog =
   // MARK: wave4d w4d-windows — polish-08: Help › Keyboard Shortcuts (components/dialogs/ShortcutsDialog.tsx)
   | { kind: "shortcuts" };
 
+/** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
+const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);
+
 /** Sidebar tab: the live review, the PR browser, or the review history (docs/PROTOCOL.md §14). */
 export type Tab = "changes" | "prs" | "history";
 
@@ -498,6 +502,11 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   cancelTakeover(): void;
   closeProject(): Promise<void>;
   initRepository(): Promise<void>;
+  /**
+   * §59 `track_without_git` (`confirm` once the user agreed to a `looksUnsafe` folder): `confirm` — ask, then call again
+   * with `true`; `failed` — the refusal's words (the prompt stays). Another session's lock opens the take-over dialog.
+   */
+  trackWithoutGit(confirm?: boolean): Promise<TrackOutcome>;
   cancelGitInit(): void;
   /** `restart_session` (docs/PROTOCOL.md §8): new Claude session for the open project, gate untouched. */
   restartSession(): Promise<void>;
@@ -1134,6 +1143,8 @@ export const useStore = create<Store>((set, get, api) => {
       if (sessionsOf(previous).currentId) set({ contextWarning: null });
     }
     if (snapshot.gitInit && !previous.gitInit) set({ dialog: { kind: "gitInit" } });
+    // §59: a folder tracked without git has no PRs — the PRs tab (restored, or left open) falls back to Changes.
+    if (isShadowProject(snapshot) && get().tab === "prs") get().setTab("changes");
     if (!snapshot.gitInit && previous.gitInit && get().dialog?.kind === "gitInit") set({ dialog: null });
     // Queue: a started turn ends the wait for it; another chat must not receive this chat's queue.
     const q = get().queue;
@@ -1527,6 +1538,28 @@ export const useStore = create<Store>((set, get, api) => {
     async initRepository() {
       if (!get().state.gitInit) return;
       await get().run({ type: "init_repo" }, { fatal: true });
+    },
+
+    async trackWithoutGit(confirm = false) {
+      const path = get().state.gitInit?.path;
+      if (!path) return { kind: "ok" };
+      try {
+        await engineRequest({ type: "track_without_git", ...(confirm ? { confirm: true } : {}) });
+        await get().settle();
+        return { kind: "ok" };
+      } catch (e) {
+        const r = refusalOf(e);
+        if (r.code === "folder_unsafe") return { kind: "confirm" };
+        if (r.code === "locked_by_other_session") {
+          // §59: the prompt is gone (gitInit cleared) and the folder remembered — Take over reopens it with `takeover`.
+          await get().settle();
+          if (await rg().focusProjectWindow(path)) return { kind: "ok" };
+          set({ lockedProjectPath: path, refusedLockPid: Number(r.detail) || 0, dialog: { kind: "lockConflict" } });
+          return { kind: "ok" };
+        }
+        appendLog(`[warn] track_without_git: ${r.error}`);
+        return { kind: "failed", text: refusalMessage(r) };
+      }
     },
 
     cancelGitInit() {
@@ -2168,25 +2201,27 @@ export const useStore = create<Store>((set, get, api) => {
 
     // ------------------------------------------------------------ branches / workbenches
 
+    // §59: a folder tracked without git (`vcs: "shadow"`) has no branches, workbenches, commits or PRs — the engine would
+    // refuse every one of these `not_a_git_repo`, so none is sent (the UI hides or disables them too).
     async refreshBranches() {
-      if (!get().state.project) return;
+      if (!get().state.project || isShadowProject(get().state)) return;
       await get().run({ type: "branches" }, { reportFailure: false });
     },
 
     async switchBranch(name) {
       const s = get().state;
-      if (!s.project || s.branches.switchBlocker) return;
+      if (!s.project || s.branches.switchBlocker || isShadowProject(s)) return;
       await get().run({ type: "switch_branch", name }, { reportFailure: false });
     },
 
     async createBranch(name) {
       const s = get().state;
-      if (!s.project || s.branches.switchBlocker) return;
+      if (!s.project || s.branches.switchBlocker || isShadowProject(s)) return;
       await get().run({ type: "create_branch", name }, { reportFailure: false });
     },
 
     async refreshWorkbenches() {
-      if (!get().state.project) return;
+      if (!get().state.project || isShadowProject(get().state)) return;
       await get().run({ type: "workbench_list" }, { reportFailure: false });
     },
 
@@ -2204,13 +2239,13 @@ export const useStore = create<Store>((set, get, api) => {
     },
 
     async pruneWorkbenches() {
-      if (!get().state.project) return;
+      if (!get().state.project || isShadowProject(get().state)) return;
       await get().run({ type: "workbench_prune" });
       await get().refreshWorkbenches();
     },
 
     async createPR(base, title, body, draft, meta) {
-      if (!get().state.project) return null;
+      if (!get().state.project || isShadowProject(get().state)) return null;
       try {
         const reply = await engineRequest({ type: "pr_create", base, title: title ?? undefined, body: body ?? undefined, draft: draft || undefined, ...(meta ?? {}) });
         await get().settle();
@@ -2226,6 +2261,7 @@ export const useStore = create<Store>((set, get, api) => {
 
     async commitAccepted({ message, paths, push }) {
       if (!get().state.project) return "no_project";
+      if (isShadowProject(get().state)) return "not_a_git_repo";
       try {
         // `commit` / `push` land in `@reviewgate/engine` with M12; the cast keeps older engine typings compiling.
         await engineRequest({ type: "commit", message, paths, push } as unknown as EngineCommand);
@@ -2243,6 +2279,7 @@ export const useStore = create<Store>((set, get, api) => {
 
     async pushNow() {
       if (!get().state.project) return "no_project";
+      if (isShadowProject(get().state)) return "not_a_git_repo";
       try {
         await engineRequest({ type: "push" } as unknown as EngineCommand);
         await get().settle();
@@ -2260,6 +2297,7 @@ export const useStore = create<Store>((set, get, api) => {
     // ------------------------------------------------------------ PR browser
 
     async prRefresh() {
+      if (isShadowProject(get().state)) return;
       await get().run({ type: "pr_list" }, { reportFailure: false });
     },
     async prRefreshAccounts() {
@@ -2271,6 +2309,7 @@ export const useStore = create<Store>((set, get, api) => {
       await get().prRefresh();
     },
     async prOpen(pr) {
+      if (isShadowProject(get().state)) return;
       const id = `${pr.host}/${pr.repo}#${pr.number}`;
       await get().run({ type: "pr_open", summaryId: id }, { reportFailure: false });
     },
@@ -2324,6 +2363,7 @@ export const useStore = create<Store>((set, get, api) => {
     // ------------------------------------------------------------ ui
 
     setTab(tab) {
+      if (tab === "prs" && isShadowProject(get().state)) return; // §59: no PRs without a repository
       set({ tab, ...(tab !== "history" ? { historyView: null } : {}) });
       if (get().ui.tab !== tab) get().setUI({ tab });
       if (tab === "history") void get().loadReviewHistory();
@@ -2336,6 +2376,7 @@ export const useStore = create<Store>((set, get, api) => {
       get().setUI({ diffCollapsed: !(collapsedNow ?? isDiffCollapsed(state, ui, selectedPath)) });
     },
     openDialog(d) {
+      if (d && NEEDS_REPO_DIALOGS.has(d.kind) && isShadowProject(get().state)) return; // §59: the engine would refuse what they send
       // Replacing / closing the §19.1 confirm any other way keeps the user's edits.
       if (get().dialog?.kind === "forceReject" && d?.kind !== "forceReject") settleConfirm(false);
       set({ dialog: d });

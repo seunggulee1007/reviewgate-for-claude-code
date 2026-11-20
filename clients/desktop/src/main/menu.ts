@@ -49,6 +49,8 @@ export function buildMenu(opts: MenuHandlers): void {
   const focused = opts.focused();
   const state = focused?.state ?? null;
   const hasProject = state?.project != null;
+  // §59: a folder tracked without git has no workbenches and no PRs (the engine refuses them `not_a_git_repo`).
+  const hasRepo = hasProject && state?.project?.vcs !== "shadow";
   const can = hasProject ? (focused?.menu ?? NOTHING_ENABLED) : NOTHING_ENABLED;
   // MARK: wave4 w4-install (daily-17): no temporary folders; a folder that is gone is shown but never opened.
   const entries = recentEntries(settings.recentProjects);
@@ -59,10 +61,11 @@ export function buildMenu(opts: MenuHandlers): void {
   const pty = ptyInfo();
   const terminal = { chat: settings.terminalChatPreview === true && pty.available, panel: pty.shells.length > 0 };
   // `t("File")` stands for the UI language.
-  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, runAsTask, can, terminal]);
+  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, hasRepo, runAsTask, can, terminal]);
   if (signature === lastSignature) return;
   lastSignature = signature;
   const needsProject = { enabled: hasProject };
+  const needsRepo = { enabled: hasRepo };
 
   const recents = entries.filter((e) => e.exists).map((e) => e.path);
   const missingItems: MenuItemConstructorOptions[] = entries
@@ -101,9 +104,9 @@ export function buildMenu(opts: MenuHandlers): void {
       { label: t("Go to File…"), accelerator: "CmdOrCtrl+P", ...needsProject, click: () => dispatch({ type: "quick_open" }, () => undefined) },
       { label: t("Find in Project…"), accelerator: "CmdOrCtrl+Shift+F", ...needsProject, click: () => dispatch({ type: "project_search" }, () => undefined) },
       { type: "separator" },
-      { label: t("New Workbench…"), ...needsProject, click: () => dispatch({ type: "new_workbench" }, opts.newWindow) },
+      { label: t("New Workbench…"), ...needsRepo, click: () => dispatch({ type: "new_workbench" }, opts.newWindow) },
       // MARK: §49 — "Run as Task…" while Settings › Workbenches › "업무로 실행" is on (a settings change rebuilds the menu)
-      ...(runAsTask ? [{ label: t("Run as Task…"), ...needsProject, click: () => dispatch({ type: "run_as_task" }, opts.newWindow) }] : []),
+      ...(runAsTask ? [{ label: t("Run as Task…"), ...needsRepo, click: () => dispatch({ type: "run_as_task" }, opts.newWindow) }] : []),
       { type: "separator" },
       // MARK: polish p-lifecycle (P1-chrome-06): the project menu's Close Project here too (it asks first — P1-chrome-03).
       { label: t("Close Project"), ...needsProject, click: () => dispatch({ type: "close_project" }, () => undefined) },
@@ -137,7 +140,7 @@ export function buildMenu(opts: MenuHandlers): void {
       { type: "separator" },
       { label: t("Changes"), ...shownKey("CmdOrCtrl+Alt+1"), ...needsProject, click: () => dispatch({ type: "sidebar_tab", tab: "changes" }, () => undefined) },
       { label: t("History"), ...shownKey("CmdOrCtrl+Alt+2"), ...needsProject, click: () => dispatch({ type: "sidebar_tab", tab: "history" }, () => undefined) },
-      { label: t("PRs"), ...shownKey("CmdOrCtrl+Alt+3"), ...needsProject, click: () => dispatch({ type: "sidebar_tab", tab: "prs" }, () => undefined) },
+      { label: t("PRs"), ...shownKey("CmdOrCtrl+Alt+3"), ...needsRepo, click: () => dispatch({ type: "sidebar_tab", tab: "prs" }, () => undefined) },
       { type: "separator" },
       ...devItems,
       { role: "resetZoom", label: t("Actual Size") },

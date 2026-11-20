@@ -27,6 +27,7 @@ import {
   type GateNoticeKind,
 } from "../reviewGate";
 import { useStore } from "../store";
+import { isShadowProject, notGitRepoReason } from "../noGit"; // §59
 import "./reviewGate.css";
 import { RejectUndoBanner } from "./trust/TrustViews"; // MARK: wave4c w4c-trust (§41.2)
 
@@ -97,6 +98,7 @@ function ConcurrentBanner() {
   const sessions = useStore((s) => s.state.gate.concurrentClaude ?? NO_SESSIONS);
   const dismiss = useStore((s) => s.dismissConcurrentClaude);
   const openDialog = useStore((s) => s.openDialog);
+  const noRepo = useStore((s) => (isShadowProject(s.state) ? notGitRepoReason() : null)); // §59
   if (sessions.length === 0) return null;
   return (
     <GateBanner
@@ -104,7 +106,7 @@ function ConcurrentBanner() {
       testId="Concurrent Claude banner"
       text={concurrentText(sessions)}
       actions={
-        <button type="button" className="small" onClick={() => openDialog({ kind: "newWorkbench" })} title={t("A git worktree of this repository with its own Claude session — the other session's edits no longer mix in")} data-testid="Create workbench">
+        <button type="button" className="small" disabled={noRepo !== null} onClick={() => openDialog({ kind: "newWorkbench" })} title={noRepo ?? t("A git worktree of this repository with its own Claude session — the other session's edits no longer mix in")} data-testid="Create workbench">
           {t("Create workbench")}
         </button>
       }

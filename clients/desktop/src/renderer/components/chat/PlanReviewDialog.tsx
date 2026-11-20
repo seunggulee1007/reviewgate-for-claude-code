@@ -12,6 +12,7 @@ import { Markdown } from "./Markdown";
 import "./planReview.css";
 import { planStepWhy } from "../../whyQuestions"; // MARK: wave5 w5-fixes (§43.5)
 import { useStore } from "../../store"; // MARK: wave5 w5-fixes
+import { isShadowProject, notGitRepoReason } from "../../noGit"; // §59
 import "./why.css"; // MARK: wave5 w5-fixes
 
 export type PlanAnswers = {
@@ -112,6 +113,8 @@ export function PlanReviewDialog(props: {
  */
 export function PlanApproveButtons({ busy, handoffBlocker, answers }: { busy: boolean; handoffBlocker: string | null; answers: Pick<PlanAnswers, "approve" | "newChat" | "workbench"> }) {
   const runMode = useStore((s) => planApproveMode(s.state, s.autoModeUnavailable));
+  // §59: no workbench without a repository (`plan_response {into: "workbench"}` is refused `not_a_git_repo`)
+  const noRepo = useStore((s) => (isShadowProject(s.state) ? notGitRepoReason() : null));
   return (
     <>
       {/* MARK: wave6 w6-terminal — §44.1: the new chat / workbench starts in that mode too, so the label says auto */}
@@ -119,8 +122,8 @@ export function PlanApproveButtons({ busy, handoffBlocker, answers }: { busy: bo
         title={handoffBlocker ?? t("A fresh chat in this workbench gets only the plan file — the long research conversation is not carried on")} data-testid="Approve plan new chat">
         {runMode === "auto" ? t("Implement in a new chat (auto mode)") : t("Implement in a new chat")}
       </button>
-      <button type="button" disabled={busy || handoffBlocker !== null} onClick={answers.workbench}
-        title={handoffBlocker ?? t("Create a workbench (branch + folder); its window implements the plan in a fresh chat")} data-testid="Approve plan new workbench">
+      <button type="button" disabled={busy || handoffBlocker !== null || noRepo !== null} onClick={answers.workbench}
+        title={noRepo ?? handoffBlocker ?? t("Create a workbench (branch + folder); its window implements the plan in a fresh chat")} data-testid="Approve plan new workbench">
         {runMode === "auto" ? t("Implement in a new workbench… (auto mode)") : t("Implement in a new workbench…")}
       </button>
       <button type="button" disabled={busy} onClick={() => answers.approve("acceptEdits")} title={t("Approve and switch to Accept edits: file edits are applied without asking, the review still holds them")} data-testid="Approve plan accept edits">

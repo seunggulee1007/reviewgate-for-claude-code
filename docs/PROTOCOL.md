@@ -9710,3 +9710,23 @@ Task… / Refresh Workbenches, the composer's Run as Task, the plan's "Implement
 "Open as Workbench" where it would create one. Nothing is sent on its own that would be refused: `refreshBranches`,
 `refreshWorkbenches`, the PR list's refresh, `commit_format` and `pr_draft` return early, and the new-workbench / PR sheets
 never open there.
+
+**Windows client.** The git-init dialog (`GitInitDialog.tsx`) puts **Track without git** first (recommended, with one line:
+a hidden copy outside the folder shows what Claude changed, the folder is not touched, commit / branches / workbenches /
+PRs are off), then Initialize git here, the candidate subfolders, Choose another folder… and Cancel. It sends
+`track_without_git` without `confirm`; `folder_unsafe` turns the dialog into an in-app confirm ("Track this folder without
+git?") whose answer resends it with `confirm: true`. `folder_too_large` names the limit (more than 20,000 files / more than
+1 GB / the listing took too long) and suggests git init or a smaller folder; any other refusal shows its words in the dialog;
+`locked_by_other_session` opens the take-over dialog on the folder. The reopen errors (`error{code:"folder_too_large" |
+"track_failed"}`) use the same words on the banner.
+
+In shadow mode (`project.vcs === "shadow"`, `noGit.ts`) the Windows client hides what needs a repository and disables single
+buttons with the tooltip "This folder is not a git repository": the sidebar has no PRs tab (a PRs tab left open falls back
+to Changes; View › PRs is off) and the project header shows "Not a git repository — changes tracked by ReviewGate" instead
+of the branch and remote line; the project menu has no Workbenches section (File › New Workbench… / Run as Task… are off).
+Disabled with the reason: Commit (`commitLockReason`, also ⌘⇧K), the plan's "Implement in a new workbench…", the
+composer's Run as Task, "Create workbench" on the other-session banner and "Open as a workbench" on a blocked worktree.
+The store never sends `branches`, `switch_branch`, `create_branch`, `workbench_list`, `workbench_prune`, `pr_list`,
+`pr_open`, `commit`, `push` or `pr_create` for such a project, and never opens the dialogs that would (commit, new
+workbench / branch, create PR, submit review) — so none of the automatic refreshes (project header, window focus) is ever
+refused `not_a_git_repo`.

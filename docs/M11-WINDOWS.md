@@ -291,6 +291,7 @@ Scenarios
 - [ ] File → New Workbench… → a second window opens on the new worktree with its own session; the first window's Workbench menu lists it.
 - [ ] Open the same folder in a second window (File → New Window → Open Project… same path) → "This workbench is already open" dialog; Take over works.
 - [ ] PRs tab: the list from GHE loads (Mine / Review requested), opening a PR shows files + diff, an inline draft comment + Submit review (COMMENT) lands on GHE.
+- [ ] A folder that is no git repository (e.g. `C:\Users\dev\notes`): the dialog's **Track without git** opens it (no `.git` appears in it), a turn's edits are reviewed as usual (accept / reject), the header says "Not a git repository — changes tracked by ReviewGate", the PRs tab and the Workbenches menu section are gone, Commit is disabled with the reason (PROTOCOL §59).
 - [ ] Korean UI: with a Korean Windows locale the UI is in Korean; shortcuts read `Ctrl+…`.
 
 Needs a real Windows machine (2026-10-20 hardening — verified on macOS only by unit tests / smoke launch):
