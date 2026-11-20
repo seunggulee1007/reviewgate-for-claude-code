@@ -82,6 +82,9 @@ public final class AppState {
     /// `state.project` / `state.gitInit`, and the folder either names (the project, else the one waiting for `git init`).
     public private(set) var projectInfo: ProjectInfo?
     public private(set) var gitInitInfo: GitInitInfo?
+    /// §59: why the folder of `gitInitInfo` could not be tracked without git (a refused `track_without_git`, or a remembered
+    /// folder whose reopen failed) — the prompt shows it; nil once the prompt goes away.
+    public private(set) var gitInitProblem: String?
     public private(set) var projectURL: URL?
     /// `state.session` / `state.toolchain`.
     public private(set) var sessionInfo: SessionInfo = ReviewState.empty.session
@@ -572,6 +575,11 @@ public final class AppState {
     public var needsGitInit: Bool { gitInitInfo != nil }
     public var gitCandidates: [URL] { (gitInitInfo?.candidates ?? []).map { URL(fileURLWithPath: $0) } }
     public var gitInitLooksUnsafe: Bool { gitInitInfo?.looksUnsafe ?? false }
+    /// §59: the open folder is no git repository — it is reviewed through a hidden repository outside it, so commit,
+    /// branches, workbenches and PRs are off.
+    public var isShadowProject: Bool { projectInfo?.vcs == .shadow }
+    /// Why commit / branches / workbenches / PRs are off here; nil in a git repository.
+    public var notGitRepositoryReason: String? { isShadowProject ? EngineMessages.notGitRepositoryText : nil }
     /// `node` from the local locator, `claude` from `state.toolchain`; nil until the engine started.
     public var toolchain: Toolchain? {
         nodeToolchain.map {
@@ -803,6 +811,38 @@ public final class AppState {
         await run(.initRepo, fatal: true)
     }
 
+    /// §59 `track_without_git`: reviews the pending folder through a hidden repository outside it, then starts the session.
+    /// `confirm` once the user agreed to a folder that looks unsafe (`folder_unsafe`). A refusal keeps the prompt, with the
+    /// reason in `gitInitProblem`; `locked_by_other_session` hands over to the takeover alert as an open does.
+    public func trackWithoutGit(confirm: Bool = false) async -> TrackWithoutGitOutcome {
+        guard let pending = gitInitInfo else { return .tracked }
+        gitInitProblem = nil
+        do {
+            try await request(.trackWithoutGit(confirm: confirm))
+            await settle()
+            return .tracked
+        } catch let error as EngineClientError {
+            switch error.refusalCode {
+            case "folder_unsafe":
+                return .needsConfirm
+            case "locked_by_other_session":
+                await settle()
+                guard case let .refused(message, _, _, _) = error else { return .locked }
+                refusedLock = LockConflict(pid: Int(message.split(separator: ":", maxSplits: 1).last ?? "") ?? 0, since: "", client: "")
+                lockedProjectURL = URL(fileURLWithPath: pending.path)
+                return .locked
+            default:
+                let text = error.userMessage
+                if gitInitInfo != nil { gitInitProblem = text } else { fail(text, fatal: false) }
+                return .refused(text)
+            }
+        } catch {
+            let text = error.localizedDescription
+            if gitInitInfo != nil { gitInitProblem = text } else { fail(text, fatal: false) }
+            return .refused(text)
+        }
+    }
+
     /// Dismisses the git-init offer without starting a session.
     public func cancelGitInit() {
         guard needsGitInit else { return }
@@ -828,6 +868,7 @@ public final class AppState {
 
     private func resetProjectView() {
         transcript = []
+        gitInitProblem = nil
         dropLiveText()   // MARK: wave7 w7-chat (§45.1)
         promptHistoryCache = nil
         restoredTranscriptIDs = []
@@ -2250,6 +2291,8 @@ public final class AppState {
         if fatal { finishStreamingAssistant() }
         noteLongWork(detail)   // wave4 w4-longwork (§38.2): the usage limit's reset ("풀리면 이어서 하기")
         let text = EngineMessages.error(message: message, detail: detail)
+        // §59: a remembered folder that could not be reopened without git — the prompt that comes back says why too.
+        if detail.code == "folder_too_large" || detail.code == "track_failed" { gitInitProblem = text }
         // §21 / §22 run on their own lanes: they never add a row to the main conversation or pause its queue.
         if !fatal {
             switch detail.code {
@@ -2325,6 +2368,7 @@ public final class AppState {
         }
         put(\.projectInfo, s.project)
         put(\.gitInitInfo, s.gitInit)
+        if s.gitInit == nil { put(\.gitInitProblem, nil) }   // §59: the prompt went away, and its problem with it
         put(\.projectURL, (s.project?.path ?? s.gitInit?.path).map { URL(fileURLWithPath: $0) })
         put(\.sessionInfo, s.session)
         put(\.engineToolchain, s.toolchain)
@@ -2608,6 +2652,18 @@ public final class AppState {
 }
 
 /// M13 (audit 4.2): the non-modal error banner's content — the last `error` event with its scope.
+/// §59: what `AppState.trackWithoutGit` came back with.
+public enum TrackWithoutGitOutcome: Sendable, Equatable {
+    /// The folder is open on its hidden repository; the session starts.
+    case tracked
+    /// `folder_unsafe`: the folder looks large or personal — ask, then call again with `confirm: true`.
+    case needsConfirm
+    /// `locked_by_other_session`: the takeover alert takes it from here.
+    case locked
+    /// Any other refusal, in the user's words (also `AppState.gitInitProblem` while the prompt stays).
+    case refused(String)
+}
+
 public struct ErrorBanner: Sendable, Equatable {
     public var message: String
     public var scope: ErrorScope

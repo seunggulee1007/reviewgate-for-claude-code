@@ -154,6 +154,13 @@ public enum EngineMessages {
         case "unsupported_remote": return String(localized: "The origin remote is not a GitHub URL: \(detail)", bundle: .module)
         case "git_identity_missing": return String(localized: "Set your Git name and email first (git config --global user.name / user.email)", bundle: .module)
         case "git_init_not_needed": return String(localized: "This folder is already a Git repository", bundle: .module)
+        // §59: track without git
+        case "folder_unsafe": return String(localized: "This looks like a large or personal folder — confirm that it should be tracked without git", bundle: .module)
+        case "folder_too_large": return folderTooLargeText(detail)
+        case "track_failed":
+            return underlying.isEmpty ? String(localized: "Could not track this folder without git", bundle: .module)
+                : String(localized: "Could not track this folder without git: \(underlying)", bundle: .module)
+        case "not_a_git_repo": return String(localized: "This folder is not a git repository — commit, branches, workbenches and PRs are off here", bundle: .module)
         case "nothing_to_commit": return String(localized: "Nothing to commit — accept files first", bundle: .module)
         case "nothing_to_push": return String(localized: "Nothing to push", bundle: .module)
         case "nothing_to_retry": return String(localized: "Nothing to retry", bundle: .module)
@@ -295,6 +302,11 @@ public enum EngineMessages {
         case "unprompted_blocked": return String(localized: "Claude tried to work without a request; it was blocked and nothing was modified.", bundle: .module)
         case "project_open_failed": return String(localized: "Could not open the project: \(underlying)", bundle: .module)
         case "git_init_failed": return String(localized: "Could not initialize the Git repository: \(underlying)", bundle: .module)
+        // §59: a remembered folder that could not be reopened without git (`folder_too_large:<limit> — …` / git's text).
+        case "folder_too_large":
+            let limit = EngineMessages.detail(of: message, code: "folder_too_large").split(separator: " ", maxSplits: 1).first.map(String.init) ?? ""
+            return folderTooLargeText(limit)
+        case "track_failed": return refusal(code: "track_failed", error: "track_failed: \(message)")
         case "collect_failed": return String(localized: "Could not collect the changes: \(underlying)", bundle: .module)
         case "refresh_failed", "revert_failed", "branch_failed", "workbench_failed", "commit_failed", "command_failed":
             return refusal(code: detail.code, error: underlying)
@@ -308,6 +320,21 @@ public enum EngineMessages {
             }
             return refusal(code: "mcp_failed", error: underlying)
         default: return message
+        }
+    }
+
+    // MARK: §59 track without git
+
+    /// "This folder is not a git repository" — why commit, branches, workbenches and PRs are off in a folder tracked without git.
+    public static var notGitRepositoryText: String { String(localized: "This folder is not a git repository", bundle: .module) }
+
+    /// `folder_too_large:<limit>`: which of the size guard's limits the folder is over, and the ways out.
+    static func folderTooLargeText(_ limit: String) -> String {
+        switch limit {
+        case "files": String(localized: "This folder has more than 20,000 files — too many to track without git. Initialize a git repository instead, or open a smaller folder.", bundle: .module)
+        case "bytes": String(localized: "This folder holds more than 1 GB — too much to track without git. Initialize a git repository instead, or open a smaller folder.", bundle: .module)
+        case "scan": String(localized: "Listing this folder's files took too long, so it cannot be tracked without git. Initialize a git repository instead, or open a smaller folder.", bundle: .module)
+        default: String(localized: "This folder is too large to track without git. Initialize a git repository instead, or open a smaller folder.", bundle: .module)
         }
     }
 

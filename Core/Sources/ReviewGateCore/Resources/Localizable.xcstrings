@@ -18114,6 +18114,150 @@
           }
         }
       }
+    },
+    "This looks like a large or personal folder — confirm that it should be tracked without git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This looks like a large or personal folder — confirm that it should be tracked without git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "큰 폴더나 개인 폴더로 보여요 — git 없이 추적할지 먼저 확인하세요"
+          }
+        }
+      }
+    },
+    "Could not track this folder without git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not track this folder without git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 git 없이 추적하지 못했어요"
+          }
+        }
+      }
+    },
+    "Could not track this folder without git: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not track this folder without git: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더를 git 없이 추적하지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "This folder is not a git repository — commit, branches, workbenches and PRs are off here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder is not a git repository — commit, branches, workbenches and PRs are off here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더는 git 저장소가 아니에요 — 여기서는 commit, 브랜치, 워크벤치, PR을 쓸 수 없어요"
+          }
+        }
+      }
+    },
+    "This folder is not a git repository": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder is not a git repository"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더는 git 저장소가 아니에요"
+          }
+        }
+      }
+    },
+    "This folder has more than 20,000 files — too many to track without git. Initialize a git repository instead, or open a smaller folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder has more than 20,000 files — too many to track without git. Initialize a git repository instead, or open a smaller folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더에는 파일이 2만 개가 넘어서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "This folder holds more than 1 GB — too much to track without git. Initialize a git repository instead, or open a smaller folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder holds more than 1 GB — too much to track without git. Initialize a git repository instead, or open a smaller folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더는 1GB가 넘어서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "Listing this folder's files took too long, so it cannot be tracked without git. Initialize a git repository instead, or open a smaller folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listing this folder's files took too long, so it cannot be tracked without git. Initialize a git repository instead, or open a smaller folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더의 파일 목록을 만드는 데 너무 오래 걸려서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "This folder is too large to track without git. Initialize a git repository instead, or open a smaller folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder is too large to track without git. Initialize a git repository instead, or open a smaller folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더는 너무 커서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
