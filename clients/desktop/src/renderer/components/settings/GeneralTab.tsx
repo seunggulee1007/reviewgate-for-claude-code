@@ -20,6 +20,7 @@ import { SideModelPicker, SideWebSetting } from "./SideSettings"; // MARK: wave4
 import { StatusLineSettingsSection } from "./StatusLineSettings"; // MARK: wave6 w6-statusline
 import { DEFAULT_SYSTEM_PROMPT_APPEND } from "../../../shared/systemPrompt"; // §54
 import { TerminalSettingsSection } from "./TerminalSettings"; // MARK: terminal-win (§57.17)
+import { UpdateSettingsSection } from "./UpdateSettings"; // §48 Windows
 
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
@@ -107,6 +108,8 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
         {/* MARK: wave4b w4-notify — one switch per group, where to look in the OS */}
         <NotificationGroupsSection settings={settings} patch={patch} />
       </section>
+      {/* §48 Windows: automatic checks, the install as the banner shows it, Check Now */}
+      <UpdateSettingsSection settings={settings} patch={patch} />
       <section>
         <h4>{t("Limits")}</h4>
         {/* §54: off by default — Claude works through a task as in the terminal; the numbers apply only while it is on */}
