@@ -213,9 +213,15 @@ describe("a fake claude through a real PTY drives one review turn (§57.10)", ()
     // 10. Killed: nothing left behind (Windows counts node.exe and OpenConsole.exe children).
     await hub.kill(OWNER, again.ptyId);
     expect(exits.find((e) => e.ptyId === again.ptyId)).toMatchObject({ reason: "killed" });
+    // Only the PTY's kind of child counts: the engine runs git in the background meanwhile.
+    const ptyKind = (names: string[]) => names.filter((n) => /node|openconsole|claude|(^|[\\/])sh$/i.test(n)).sort();
+    let last: string[] = [];
     await until("no orphans", () => {
       const now = countOrphans(process.pid);
-      return now.orphans >= 0 && JSON.stringify(now.orphanNames.sort()) === JSON.stringify(baseline);
-    }, 20_000);
+      last = ptyKind(now.orphanNames);
+      return now.orphans >= 0 && JSON.stringify(last) === JSON.stringify(ptyKind(baseline));
+    }, 20_000).catch((err: Error) => {
+      throw new Error(`${err.message}: left ${JSON.stringify(last)}, before ${JSON.stringify(ptyKind(baseline))}`);
+    });
   }, 180_000);
 });
