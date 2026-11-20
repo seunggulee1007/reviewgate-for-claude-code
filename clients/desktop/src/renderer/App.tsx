@@ -34,7 +34,9 @@ import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-
 import { backgroundKeyJustHandled } from "./background"; // §52
 import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-chrome-09)
 import { useTermHost } from "./terminal/useTermHost"; // §57.10
-import { useTerminalChatPty } from "./terminal/terminalChat"; // §57.10
+import { diffCollapsedNow, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.10
+import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
+import { useViewing } from "./viewedChat"; // §57.5
 
 declare global {
   interface Window {
@@ -54,9 +56,13 @@ export function App() {
   const liveOpen = useStore((s) => s.liveView !== null && s.historyView === null);
   const sideOpen = useStore((s) => s.sidePanelOpen);
   const boardOpen = useStore((s) => s.boardOpen); // MARK: wave5 w5-board
+  // §57.5: a terminal chat on screen lays the window out terminal-first (components/terminal/TerminalSplit.tsx).
+  const viewingId = useViewing()?.id ?? null;
+  const terminalFirst = useStore((s) => shownChatIsTerminal(s.state, viewingId));
   useReviewShortcuts();
   useTermHost(); // §57.10: the window's terminals (terminal chats, the shell panel)
   useTerminalChatPty(); // §57.10: the live terminal chat's PTY and its waits
+  useTerminalReviewReopen(); // §57.5: a terminal chat's review panel opens again with each review
   useNotificationNotices(); // MARK: wave4b w4-notify — §39.6: a clicked notification lands on its card; the OS refusing one
   // polish-03: ⌘⇧R / Ctrl+Shift+R is always the reject shortcut — never the browser's force reload.
   useRejectShortcut(() => {
@@ -115,7 +121,7 @@ export function App() {
           s.openDialog({ kind: "shortcuts" });
           break;
         case "toggle_diff_pane":
-          if (s.state.project) s.toggleDiffPane();
+          if (s.state.project) s.toggleDiffPane(diffCollapsedNow()); // §57.5
           break;
         case "toggle_agent_panel":
           if (s.state.project) s.toggleAgentPanel();
@@ -154,6 +160,11 @@ export function App() {
           <div className="panes">
             {tab === "prs" ? (
               <ErrorBoundary name="PR" className="pane diff"><PRDetail /></ErrorBoundary>
+            ) : hasProject && terminalFirst ? (
+              <>
+                <TerminalSplit />
+                {sideOpen && <ErrorBoundary name="Side" className="side-panel"><SidePanel /></ErrorBoundary>}
+              </>
             ) : hasProject ? (
               <>
                 {diffCollapsed && !historyOpen && !liveOpen ? (

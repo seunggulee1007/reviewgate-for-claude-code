@@ -30,6 +30,14 @@
 .terminal-viewed h3 { margin: 0; color: var(--fg); }
 .terminal-viewed .caption { max-width: 380px; }
 
+/* §57.5: a terminal chat's window — the review panel beside the terminal, or a drawer over its left side. */
+.terminal-split { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.terminal-split > .pane.chat { flex: 1 1 auto; min-width: 0; }
+.review-side { display: flex; min-width: 0; min-height: 0; }
+.review-side > .pane.diff, .review-drawer > .pane.diff { flex: 1; min-width: 0; border-right: 0; }
+.review-drawer { position: absolute; bottom: 0; z-index: 20; display: flex; min-height: 0; background: var(--bg); border-right: 1px solid var(--border); box-shadow: 4px 0 14px rgba(0, 0, 0, 0.22); }
+:root[data-theme="dark"] .review-drawer { box-shadow: 4px 0 14px rgba(0, 0, 0, 0.55); }
+
 /* §57.5: a terminal chat's tab — a terminal glyph, an orange dot while its Claude Code is not running. */
 .chat-tab .tab-kind { position: relative; display: inline-flex; color: var(--fg-2); flex: none; }
 .chat-tab .tab-kind.stopped::after { content: ""; position: absolute; right: -2px; top: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }

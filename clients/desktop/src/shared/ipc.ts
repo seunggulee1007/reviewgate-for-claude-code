@@ -188,6 +188,8 @@ export type ProjectUI = {
   tab?: "changes" | "prs" | "history";
   selectedPath?: string | null;
   diffCollapsed?: boolean;
+  /** §57.5: a terminal chat's split — the terminal's share beside the review panel (0…1; absent: 0.55). */
+  terminalReviewSplit?: number;
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };

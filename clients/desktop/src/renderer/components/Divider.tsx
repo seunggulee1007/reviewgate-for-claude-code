@@ -1,7 +1,7 @@
 /** Vertical drag handle between panes (M15): reports the pointer's x-delta live and the final value on release. */
 import { useRef } from "react";
 
-export function Divider(props: { onDrag: (dx: number) => void; onEnd: () => void; testId?: string }) {
+export function Divider(props: { onDrag: (dx: number) => void; onEnd: () => void; testId?: string; /** its tooltip and accessible name */ label?: string }) {
   const startX = useRef(0);
   const onMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -23,5 +23,5 @@ export function Divider(props: { onDrag: (dx: number) => void; onEnd: () => void
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   };
-  return <div className="divider" role="separator" aria-orientation="vertical" onMouseDown={onMouseDown} data-testid={props.testId} />;
+  return <div className="divider" role="separator" aria-orientation="vertical" aria-label={props.label} title={props.label} onMouseDown={onMouseDown} data-testid={props.testId} />;
 }

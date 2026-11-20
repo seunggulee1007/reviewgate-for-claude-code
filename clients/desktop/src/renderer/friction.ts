@@ -25,3 +25,10 @@ export const canAcceptAndSend = (s: ReviewState): boolean =>
  */
 export const isDiffCollapsed = (s: ReviewState, ui: ProjectUI, selectedPath: string | null): boolean =>
   ui.diffCollapsed ?? (s.changedFiles.length === 0 && selectedPath === null);
+
+/**
+ * §57.5: the review panel of a terminal chat (`terminal`) is collapsed while nothing is pending — the terminal takes the
+ * width — unless the user chose otherwise (⌘⇧D, `ui.diffCollapsed`); a chat-kind chat keeps `isDiffCollapsed`.
+ */
+export const reviewPanelCollapsed = (s: ReviewState, ui: ProjectUI, selectedPath: string | null, terminal: boolean): boolean =>
+  terminal ? (ui.diffCollapsed ?? s.gate.pendingCount === 0) : isDiffCollapsed(s, ui, selectedPath);

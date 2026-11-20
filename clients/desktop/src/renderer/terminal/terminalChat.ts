@@ -15,6 +15,8 @@ import { measureCellWidth } from "../terminalLayout";
 import { terminalStartRefusal } from "../terminalStrip";
 import { adoptTerminal, chatTerminalOf, disposeTerminal, estimateSize, focusTerminal, hasTerminal, markRestarted, subscribeTerminals, terminalConfig, terminalStatus } from "./termHost";
 import { TERMINAL_FONT_FAMILY } from "./termHostOptions";
+import { reviewPanelCollapsed } from "../friction";
+import { useViewedChat, viewingOf } from "../viewedChat";
 
 /** One terminal chat's PTY: its id once open, a start on its way, or why it could not start. */
 export type ChatPty = { ptyId: string | null; opening: boolean; failed: string | null; startedAt: number };
@@ -43,6 +45,11 @@ export function chatKindOf(state: ReviewState, id: string | null | undefined): S
 export function liveTerminalChatId(state: ReviewState): string | null {
   const id = sessionsOf(state).currentId;
   return id && chatKindOf(state, id) === "terminal" ? id : null;
+}
+
+/** The chat on screen (the live one, or one shown read-only) is a terminal chat: the window lays out terminal-first. */
+export function shownChatIsTerminal(state: ReviewState, viewingId: string | null | undefined): boolean {
+  return chatKindOf(state, viewingId ?? sessionsOf(state).currentId) === "terminal";
 }
 
 /** Claude Code waits in the live terminal chat's TUI. */
@@ -126,6 +133,13 @@ export async function restartChatPty(sessionId: string): Promise<void> {
 export function focusLiveTerminal(): boolean {
   const id = liveTerminalChatId(useStore.getState().state);
   return id ? focusTerminal(chatPtyOf(id).ptyId ?? chatTerminalOf(id)) : false;
+}
+
+/** Whether the review panel / diff pane is collapsed on screen now (⌘⇧D toggles what the user sees). */
+export function diffCollapsedNow(): boolean {
+  const s = useStore.getState();
+  const viewing = viewingOf(useViewedChat.getState().chat, s.state);
+  return reviewPanelCollapsed(s.state, s.ui, s.selectedPath, shownChatIsTerminal(s.state, viewing?.id));
 }
 
 /** The live terminal chat's PTY id when its Claude Code runs. */

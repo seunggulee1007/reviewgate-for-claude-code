@@ -29,8 +29,9 @@ export default function ChatPane() {
   // §57.5 / §57.10: a terminal chat's column is Claude Code itself — no transcript, HUD, cards or composer.
   const terminal = useStore((s) => chatKindOf(s.state, viewing?.id ?? s.state.sessions?.currentId) === "terminal");
   if (terminal) {
+    // The terminal split (TerminalSplit) sizes it: the chat column's remembered width is a chat's.
     return (
-      <div className="pane chat" style={width && !fullWidth ? { flex: `0 1 ${width}px` } : undefined} data-testid="Chat pane">
+      <div className="pane chat" data-testid="Chat pane">
         <ChatTabs />
         <TerminalChatColumn />
       </div>
