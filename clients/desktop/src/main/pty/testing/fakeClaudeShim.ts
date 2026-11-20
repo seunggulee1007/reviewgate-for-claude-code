@@ -14,8 +14,12 @@ export function writeFakeClaude(dir: string, node = process.execPath, windows = 
   const script = join(dir, "fake-claude.cjs");
   copyFileSync(FAKE_SCRIPT, script);
   if (windows) {
+    // `.js` like npm's cli.js: the Agent SDK runs only `.js` / `.mjs` under node and spawns anything else as a binary
+    // (`.cjs` failed with spawn EFTYPE). The package.json keeps it CommonJS whatever sits above the temp folder.
+    copyFileSync(FAKE_SCRIPT, join(dir, "fake-claude.js"));
+    writeFileSync(join(dir, "package.json"), `{"type":"commonjs"}\n`);
     const shim = join(dir, "claude.cmd");
-    writeFileSync(shim, `@ECHO off\r\nnode "%~dp0\\fake-claude.cjs" %*\r\n`);
+    writeFileSync(shim, `@ECHO off\r\nnode "%~dp0\\fake-claude.js" %*\r\n`);
     return shim;
   }
   const sh = join(dir, "claude");
