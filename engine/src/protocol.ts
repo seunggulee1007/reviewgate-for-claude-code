@@ -417,6 +417,8 @@ export type Settings = {
    * never reads it — the client names the kind it wants (live).
    */
   newChatKind?: SessionKind;
+  /** §57.15: answer Claude Code's permission dialogs of a terminal chat from the app too (default true; live). */
+  terminalPermissionBridge?: boolean;
 };
 
 // ---------------------------------------------------------------- §34 review round 2
@@ -674,6 +676,10 @@ export type EngineCommand =
   | Cmd<"terminal_exited", { sessionId: string; exitCode: number | null }>
   /** §57: "Review now" — ends the open turn (Esc left it open); refused `no_turn` when none is open. */
   | Cmd<"terminal_end_turn", { sessionId: string }>
+  /** §57.14: unstages a Request changes of the terminal chat; refused `no_request_queued`. */
+  | Cmd<"terminal_request_cancel", { sessionId: string }>
+  /** §57.15: answers a bridged permission dialog; refused `permission_gone` (answered in the TUI, or stale), `follow_not_allowed`. */
+  | Cmd<"terminal_permission_response", { sessionId: string; requestId: string; allow: boolean; message?: string; follow?: boolean }>
   /** §52: stops a background task (`Query.stopTask`). */
   | Cmd<"task_stop", { taskId: string }>
   /** §52: Ctrl+B — the running Bash call (all foreground tasks without an id) goes on in the background; replies `task_background`. */
@@ -1047,7 +1053,45 @@ export type TerminalSessionState = {
   waiting: TerminalWaiting | null;
   /** A tool call ended `is_interrupt` (Esc) and no Stop came: the turn stays open until the next prompt, idle_prompt, End turn or exit. */
   interruptSuspected: boolean;
+  /** §57.13: the TUI's last status line input (statusLine tee), null before the first. */
+  status?: TerminalStatus | null;
+  /** §57.14: a Request changes waiting to reach Claude. */
+  requestQueued?: TerminalRequestQueued | null;
+  /** §57.15: permission dialogs the app may answer, oldest first (empty / absent: none). */
+  permissions?: TerminalPermission[];
+  /** §57.12: the chat is moving to another worktree — the app ends its PTY now (no restart). */
+  moving?: TerminalPlace | null;
+  /** §57.12: Claude Code works in another worktree of this repository (EnterWorktree, a cd) — the strip offers the move. */
+  elsewhere?: TerminalElsewhere | null;
 };
+
+/** §57.13: what the terminal's status line was last given (cost of the CLI session so far, model, context). */
+export type TerminalStatus = {
+  costUsd: number | null;
+  model: string | null;
+  modelName: string | null;
+  contextTokens: number | null;
+  contextWindow: number | null;
+  /** ISO-8601 */
+  at: string;
+};
+/** §57.14: a Request changes staged for the terminal chat — at the running turn's Stop, or with the next prompt. */
+export type TerminalRequestQueued = { via: "stop" | "next_prompt"; noteIds: string[] | null; extra: string | null; at: string };
+/** §57.15: a Claude Code permission dialog the app may answer (`terminal_permission_response`). */
+export type TerminalPermission = {
+  requestId: string;
+  toolName: string;
+  summary: string;
+  reason: string | null;
+  since: string;
+  /** EnterWorktree only: "Allow and follow" is offered. */
+  canFollow?: boolean;
+};
+/** §57.12: a worktree of this repository. */
+export type TerminalPlace = { path: string; name: string };
+export type TerminalElsewhere = TerminalPlace & { toolName: "EnterWorktree" | "CwdChanged"; canMove: boolean };
+/** §57.10: a terminal chat of this window whose Claude Code keeps running while another chat is current. */
+export type BackgroundTerminalState = { chatId: string; running: boolean; hooksSeen: boolean; waiting: TerminalWaiting | null };
 
 export type ToolchainState = {
   claude: string | null;
@@ -1429,6 +1473,8 @@ export type SessionMeta = {
   continuedFrom?: string;
   /** A chat whose conversation goes on in that terminal chat (`session_continue_terminal`): it stays as a record. */
   continuedIn?: string;
+  /** §57.16: the CLI config dir the terminal really uses (learned from a hook's `transcript_path`). */
+  cliConfigDir?: string;
 };
 
 export type SessionsState = {
@@ -1438,6 +1484,8 @@ export type SessionsState = {
   currentId: string | null;
   /** Tabs the client keeps open (`tabs_set`); persisted per worktree. */
   openTabIds: string[];
+  /** §57.10: terminal chats of this window whose Claude Code keeps running while another chat is current. Absent = none. */
+  backgroundTerminals?: BackgroundTerminalState[];
 };
 
 export type ReviewState = {

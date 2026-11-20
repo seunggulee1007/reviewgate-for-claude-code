@@ -1404,6 +1404,12 @@ export class ReviewEngine {
       case "terminal_end_turn": // §57.4 "Review now": a turn Esc left open ends here
         if (!this.requireTerminal(cmd.sessionId).endTurnByUser()) throw new CommandRefused("no_turn", { code: "no_turn" });
         return;
+      case "terminal_request_cancel": // §57.14
+        this.terminalRequestCancel(cmd.sessionId);
+        return;
+      case "terminal_permission_response": // §57.15
+        this.terminalPermissionResponse(cmd);
+        return;
       case "session_open":
         await this.sessionOpen(cmd.sessionId);
         return;
@@ -2674,6 +2680,18 @@ export class ReviewEngine {
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
+  }
+
+  /** §57.14 `terminal_request_cancel`: unstages the chat's Request changes; refused `no_request_queued` when none is staged. */
+  private terminalRequestCancel(sessionId: string): void {
+    this.requireTerminal(sessionId);
+    throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+  }
+
+  /** §57.15 `terminal_permission_response`: answers one bridged dialog; refused `permission_gone` when it is no longer open. */
+  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
+    this.requireTerminal(cmd.sessionId);
+    throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
   }
 
   /** §57: the TUI runs another CLI conversation (`/clear`, `/resume`): the chat resumes that one from now on. */
@@ -9059,6 +9077,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_started":
     case "terminal_exited":
     case "terminal_end_turn":
+    case "terminal_request_cancel": // §57.14
+    case "terminal_permission_response": // §57.15
       return "session";
     case "side_ask":
     case "side_list":

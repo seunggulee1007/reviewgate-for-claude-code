@@ -8748,8 +8748,28 @@ type TerminalSpecEvent = { type: "terminal_spec"; id?: string; sessionId: string
   resume: boolean };               // true: argv has --resume=<id>; false: --session-id=<id>
 type TerminalWaiting = { kind: "permission" | "question"; message: string; since: string };
 type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
-  waiting: TerminalWaiting | null; interruptSuspected: boolean };
+  waiting: TerminalWaiting | null; interruptSuspected: boolean;
+  // Stage 2 — all optional, absent = none:
+  status?: TerminalStatus | null;              // §57.13: the TUI's last status line input (the statusLine tee)
+  requestQueued?: TerminalRequestQueued | null; // §57.14: a Request changes waiting to reach Claude
+  permissions?: TerminalPermission[];          // §57.15: dialogs the app may answer, oldest first
+  moving?: TerminalPlace | null;               // §57.12: the chat moves to another worktree — the app ends its PTY now
+  elsewhere?: TerminalElsewhere | null };      // §57.12: Claude Code works in another worktree — the strip offers the move
+type TerminalStatus = { costUsd: number | null; model: string | null; modelName: string | null;
+  contextTokens: number | null; contextWindow: number | null; at: string };
+type TerminalRequestQueued = { via: "stop" | "next_prompt"; noteIds: string[] | null; extra: string | null; at: string };
+type TerminalPermission = { requestId: string; toolName: string; summary: string; reason: string | null; since: string;
+  canFollow?: boolean };                       // EnterWorktree only: "Allow and follow" is offered
+type TerminalPlace = { path: string; name: string };
+type TerminalElsewhere = TerminalPlace & { toolName: "EnterWorktree" | "CwdChanged"; canMove: boolean };
+type BackgroundTerminalState = { chatId: string; running: boolean; hooksSeen: boolean; waiting: TerminalWaiting | null };
 // SessionState gains:  terminal?: TerminalSessionState | null   (null / absent for a chat-kind session)
+// SessionsState gains: backgroundTerminals?: BackgroundTerminalState[]   (§57.10; absent = none)
+// SessionMeta gains:   cliConfigDir?: string    (§57.16: the CLI config dir the terminal really uses; absolute)
+// Settings gains:      terminalPermissionBridge?: boolean   (§57.15; default true, live)
+terminal_request_cancel { sessionId }            // §57.14: unstages a Request changes; refused `no_request_queued`
+terminal_permission_response { sessionId; requestId; allow: boolean; message?: string; follow?: boolean }
+                                                 // §57.15: refused `permission_gone`, `follow_not_allowed`
 ```
 
 - **No new broadcast event.** `terminal_spec` is a reply only; everything else rides on `state.session.terminal` and the
@@ -8768,7 +8788,10 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
   turn; `cli_not_found` as elsewhere.
-- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
+- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands (nor `terminal_request_cancel` /
+  `terminal_permission_response`), so its renderer cannot send them.
+- **Stage 2 commands** reply `result`. `terminal_request_cancel` and `terminal_permission_response` are refused
+  `terminal_not_current` like the other `terminal_*` commands; their own refusals are in §57.14 and §57.15.
 
 ### 57.2 Lifecycle and resume
 

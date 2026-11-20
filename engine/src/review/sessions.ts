@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { SessionKind, SessionMeta, TranscriptItem } from "../protocol.js";
 import { isCliSessionId } from "../session/terminalSpec.js";
 import { readJSON, writeAtomicJSON } from "./persist.js";
@@ -77,6 +77,7 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...(isCliSessionId(o.cliSessionId) ? { cliSessionId: o.cliSessionId } : {}), // §57.2: a UUID or nothing (it goes into argv)
     ...(typeof o.continuedFrom === "string" && o.continuedFrom ? { continuedFrom: o.continuedFrom } : {}), // §57.9
     ...(typeof o.continuedIn === "string" && o.continuedIn ? { continuedIn: o.continuedIn } : {}),
+    ...(typeof o.cliConfigDir === "string" && isAbsolute(o.cliConfigDir) ? { cliConfigDir: o.cliConfigDir } : {}), // §57.16
   };
 }
 
