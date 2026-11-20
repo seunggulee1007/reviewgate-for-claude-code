@@ -373,6 +373,9 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     // MARK: terminal-default
     /// §57.7: the kind of the chat the engine makes by itself when a project has none (its first open); live.
     public var newChatKind: SessionKind?
+    // MARK: terminal-stage2
+    /// §57.15: answer Claude Code's permission dialogs from the app too (engine default true; live).
+    public var terminalPermissionBridge: Bool?
 
     public init(budget: Budget? = nil, ignorePatterns: [String]? = nil, autoAllowTools: [String]? = nil,
                 loadUserSettings: Bool? = nil, systemPromptAppend: String? = nil, claudePath: String? = nil,
@@ -556,6 +559,12 @@ public enum EngineCommand: Sendable, Equatable {
     case terminalEndTurn(sessionId: String)
     /// MARK: terminal-continue — §57.9: chat `sessionId`'s conversation goes on in a new terminal chat (the chat a record).
     case sessionContinueTerminal(sessionId: String)
+    // MARK: terminal-stage2
+    /// §57.14: unstage a terminal chat's Request changes; refused `no_request_queued`.
+    case terminalRequestCancel(sessionId: String)
+    /// §57.15: answer a bridged permission dialog (`follow`: EnterWorktree only); refused `permission_gone` when the TUI
+    /// answered first or it is stale.
+    case terminalPermissionResponse(sessionId: String, requestId: String, allow: Bool, message: String? = nil, follow: Bool = false)
     case sessionOpen(id: String)
     case sessionRename(id: String, title: String)
     case sessionArchive(id: String, archived: Bool)
@@ -779,6 +788,8 @@ public enum EngineCommand: Sendable, Equatable {
         case .terminalStarted: "terminal_started"
         case .terminalExited: "terminal_exited"
         case .terminalEndTurn: "terminal_end_turn"
+        case .terminalRequestCancel: "terminal_request_cancel"   // terminal-stage2 (§57.14)
+        case .terminalPermissionResponse: "terminal_permission_response"   // §57.15
         case .sessionOpen: "session_open"
         case .sessionRename: "session_rename"
         case .sessionArchive: "session_archive"
@@ -922,7 +933,8 @@ extension EngineCommand: Encodable {
             try encodeSteerTakeBackFields(to: encoder)
         case .btwAsk:   // §56.1
             try encodeBtwFields(to: encoder)
-        case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal:   // §57
+        case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal,
+             .terminalRequestCancel, .terminalPermissionResponse:   // §57
             try encodeTerminalChatFields(to: encoder)
         case .interruptTakeBack:   // §56.2
             try encodeInterruptTakeBackFields(to: encoder)
@@ -2429,23 +2441,33 @@ public struct SessionsInfo: Codable, Sendable, Equatable {
     public var list: [SessionMeta]
     public var currentId: String?
     public var openTabIds: [String]
+    /// MARK: terminal-stage2 — §57.10: terminal chats of this window whose Claude Code keeps running while another chat is
+    /// current (absent or malformed → none).
+    public var backgroundTerminals: [BackgroundTerminalInfo]
 
-    public init(list: [SessionMeta], currentId: String?, openTabIds: [String]) {
+    public init(list: [SessionMeta], currentId: String?, openTabIds: [String], backgroundTerminals: [BackgroundTerminalInfo] = []) {
         self.list = list
         self.currentId = currentId
         self.openTabIds = openTabIds
+        self.backgroundTerminals = backgroundTerminals
     }
 
     public static let empty = SessionsInfo(list: [], currentId: nil, openTabIds: [])
 
-    private enum CodingKeys: String, CodingKey { case list, currentId, openTabIds }
+    private enum CodingKeys: String, CodingKey { case list, currentId, openTabIds, backgroundTerminals }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             list: try c.decodeIfPresent([SessionMeta].self, forKey: .list) ?? [],
             currentId: try c.decodeIfPresent(String.self, forKey: .currentId),
-            openTabIds: try c.decodeIfPresent([String].self, forKey: .openTabIds) ?? [])
+            openTabIds: try c.decodeIfPresent([String].self, forKey: .openTabIds) ?? [],
+            backgroundTerminals: lenientElements(BackgroundTerminalInfo.self, c, .backgroundTerminals))
+    }
+
+    /// §57.10: the background terminal of chat `id` (nil: none).
+    public func backgroundTerminal(_ id: String) -> BackgroundTerminalInfo? {
+        backgroundTerminals.first { $0.chatId == id }
     }
 }
 

@@ -76,16 +76,36 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
     public let waiting: TerminalWaiting?
     /// A tool call ended by Esc and no Stop came: the turn stays open until the next prompt, idle, Review now or exit.
     public let interruptSuspected: Bool
+    // MARK: terminal-stage2
+    /// §57.13: the TUI's last status line input (the statusLine tee); nil before the first.
+    public let status: TerminalStatus?
+    /// §57.14: a Request changes waiting to reach Claude.
+    public let requestQueued: TerminalRequestQueued?
+    /// §57.15: permission dialogs the app may answer, oldest first.
+    public let permissions: [TerminalPermission]
+    /// §57.12: the chat is moving to another worktree — the app ends its PTY now (no restart).
+    public let moving: TerminalPlace?
+    /// §57.12: Claude Code works in another worktree of this repository (EnterWorktree, a cd) — the strip offers the move.
+    public let elsewhere: TerminalElsewhere?
 
-    public init(running: Bool, hooksSeen: Bool, promptId: String? = nil, waiting: TerminalWaiting? = nil, interruptSuspected: Bool = false) {
+    public init(running: Bool, hooksSeen: Bool, promptId: String? = nil, waiting: TerminalWaiting? = nil, interruptSuspected: Bool = false,
+                status: TerminalStatus? = nil, requestQueued: TerminalRequestQueued? = nil, permissions: [TerminalPermission] = [],
+                moving: TerminalPlace? = nil, elsewhere: TerminalElsewhere? = nil) {
         self.running = running
         self.hooksSeen = hooksSeen
         self.promptId = promptId
         self.waiting = waiting
         self.interruptSuspected = interruptSuspected
+        self.status = status
+        self.requestQueued = requestQueued
+        self.permissions = permissions
+        self.moving = moving
+        self.elsewhere = elsewhere
     }
 
-    private enum CodingKeys: String, CodingKey { case running, hooksSeen, promptId, waiting, interruptSuspected }
+    private enum CodingKeys: String, CodingKey {
+        case running, hooksSeen, promptId, waiting, interruptSuspected, status, requestQueued, permissions, moving, elsewhere
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -94,6 +114,162 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
         promptId = (try? c.decodeIfPresent(String.self, forKey: .promptId)) ?? nil
         waiting = (try? c.decodeIfPresent(TerminalWaiting.self, forKey: .waiting)) ?? nil
         interruptSuspected = (try? c.decodeIfPresent(Bool.self, forKey: .interruptSuspected)) ?? false
+        status = lenientValue(TerminalStatus.self, c, .status)
+        requestQueued = lenientValue(TerminalRequestQueued.self, c, .requestQueued)
+        permissions = lenientElements(TerminalPermission.self, c, .permissions)
+        moving = lenientValue(TerminalPlace.self, c, .moving)
+        elsewhere = lenientValue(TerminalElsewhere.self, c, .elsewhere)
+    }
+}
+
+// MARK: terminal-stage2 (§57.10–57.15)
+
+/// §57.13: what the TUI's status line last saw (cost so far in the CLI's session, model, context).
+public struct TerminalStatus: Codable, Sendable, Equatable {
+    public let costUsd: Double?
+    public let model: String?
+    public let modelName: String?
+    public let contextTokens: Int?
+    public let contextWindow: Int?
+    public let at: String
+
+    public init(costUsd: Double?, model: String?, modelName: String?, contextTokens: Int?, contextWindow: Int?, at: String) {
+        self.costUsd = costUsd
+        self.model = model
+        self.modelName = modelName
+        self.contextTokens = contextTokens
+        self.contextWindow = contextWindow
+        self.at = at
+    }
+
+    private enum CodingKeys: String, CodingKey { case costUsd, model, modelName, contextTokens, contextWindow, at }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        costUsd = lenientValue(Double.self, c, .costUsd)
+        model = lenientValue(String.self, c, .model)
+        modelName = lenientValue(String.self, c, .modelName)
+        contextTokens = lenientValue(Int.self, c, .contextTokens)
+        contextWindow = lenientValue(Int.self, c, .contextWindow)
+        at = try c.decode(String.self, forKey: .at)
+    }
+
+    /// The context used, 0…100 (nil without both numbers).
+    public var contextPercent: Int? {
+        guard let used = contextTokens, let window = contextWindow, window > 0 else { return nil }
+        return min(100, max(0, Int((Double(used) / Double(window) * 100).rounded())))
+    }
+}
+
+/// §57.14: a Request changes staged for Claude — at this turn's Stop (`stop`) or with the next prompt (`next_prompt`).
+public struct TerminalRequestQueued: Codable, Sendable, Equatable {
+    public enum Via: String, Codable, Sendable { case stop, nextPrompt = "next_prompt" }
+    public let via: Via
+    public let noteIds: [String]?
+    public let extra: String?
+    public let at: String
+
+    public init(via: Via, noteIds: [String]? = nil, extra: String? = nil, at: String) {
+        self.via = via
+        self.noteIds = noteIds
+        self.extra = extra
+        self.at = at
+    }
+}
+
+/// §57.15: one of Claude Code's permission dialogs the app may answer (`terminal_permission_response`).
+public struct TerminalPermission: Codable, Sendable, Equatable, Identifiable {
+    public var id: String { requestId }
+    public let requestId: String
+    public let toolName: String
+    public let summary: String
+    /// ReviewGate's own reason (the §57.8 git guard's), when it asked first.
+    public let reason: String?
+    public let since: String
+    /// EnterWorktree only: "Allow and follow" is offered (absent → false).
+    public let canFollow: Bool
+
+    public init(requestId: String, toolName: String, summary: String, reason: String? = nil, since: String, canFollow: Bool = false) {
+        self.requestId = requestId
+        self.toolName = toolName
+        self.summary = summary
+        self.reason = reason
+        self.since = since
+        self.canFollow = canFollow
+    }
+
+    private enum CodingKeys: String, CodingKey { case requestId, toolName, summary, reason, since, canFollow }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        requestId = try c.decode(String.self, forKey: .requestId)
+        toolName = try c.decode(String.self, forKey: .toolName)
+        summary = lenientValue(String.self, c, .summary) ?? ""
+        reason = lenientValue(String.self, c, .reason)
+        since = try c.decode(String.self, forKey: .since)
+        canFollow = lenientValue(Bool.self, c, .canFollow) ?? false
+    }
+}
+
+/// §57.12: a worktree of this repository (where the chat moves to).
+public struct TerminalPlace: Codable, Sendable, Equatable {
+    public let path: String
+    public let name: String
+
+    public init(path: String, name: String) {
+        self.path = path
+        self.name = name
+    }
+}
+
+/// §57.12: Claude Code works in another worktree (`toolName`: `EnterWorktree` or `CwdChanged`).
+public struct TerminalElsewhere: Codable, Sendable, Equatable {
+    public let path: String
+    public let name: String
+    public let toolName: String
+    public let canMove: Bool
+
+    public init(path: String, name: String, toolName: String, canMove: Bool) {
+        self.path = path
+        self.name = name
+        self.toolName = toolName
+        self.canMove = canMove
+    }
+
+    private enum CodingKeys: String, CodingKey { case path, name, toolName, canMove }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        path = try c.decode(String.self, forKey: .path)
+        name = try c.decode(String.self, forKey: .name)
+        toolName = lenientValue(String.self, c, .toolName) ?? ""
+        canMove = lenientValue(Bool.self, c, .canMove) ?? false
+    }
+}
+
+/// §57.10: `state.sessions.backgroundTerminals[]` — a terminal chat of this window whose Claude Code keeps running while
+/// another chat is current.
+public struct BackgroundTerminalInfo: Codable, Sendable, Equatable {
+    public let chatId: String
+    public let running: Bool
+    public let hooksSeen: Bool
+    public let waiting: TerminalWaiting?
+
+    public init(chatId: String, running: Bool, hooksSeen: Bool = false, waiting: TerminalWaiting? = nil) {
+        self.chatId = chatId
+        self.running = running
+        self.hooksSeen = hooksSeen
+        self.waiting = waiting
+    }
+
+    private enum CodingKeys: String, CodingKey { case chatId, running, hooksSeen, waiting }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        chatId = try c.decode(String.self, forKey: .chatId)
+        running = lenientValue(Bool.self, c, .running) ?? false
+        hooksSeen = lenientValue(Bool.self, c, .hooksSeen) ?? false
+        waiting = lenientValue(TerminalWaiting.self, c, .waiting)
     }
 }
 
@@ -137,7 +313,7 @@ enum TerminalChatWire {
 }
 
 extension EngineCommand {
-    private enum TerminalChatKeys: String, CodingKey { case kind, sessionId, pid, exitCode }
+    private enum TerminalChatKeys: String, CodingKey { case kind, sessionId, pid, exitCode, requestId, allow, message, follow }
 
     /// `session_new {kind}` and the `terminal_*` commands' fields (`type` is written by the caller).
     func encodeTerminalChatFields(to encoder: Encoder) throws {
@@ -145,8 +321,15 @@ extension EngineCommand {
         switch self {
         case .sessionNewTerminal:
             try c.encode(SessionKind.terminal, forKey: .kind)
-        case let .terminalSpec(sessionId), let .terminalEndTurn(sessionId), let .sessionContinueTerminal(sessionId):
+        case let .terminalSpec(sessionId), let .terminalEndTurn(sessionId), let .sessionContinueTerminal(sessionId),
+             let .terminalRequestCancel(sessionId):
             try c.encode(sessionId, forKey: .sessionId)
+        case let .terminalPermissionResponse(sessionId, requestId, allow, message, follow):   // §57.15
+            try c.encode(sessionId, forKey: .sessionId)
+            try c.encode(requestId, forKey: .requestId)
+            try c.encode(allow, forKey: .allow)
+            try c.encodeIfPresent(message, forKey: .message)
+            if follow { try c.encode(true, forKey: .follow) }
         case let .terminalStarted(sessionId, pid):
             try c.encode(sessionId, forKey: .sessionId)
             try c.encode(pid, forKey: .pid)
