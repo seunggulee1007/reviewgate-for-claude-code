@@ -372,7 +372,8 @@ extension View {
 
 // MARK: - Header controls
 
-/// "Wrap lines" (remembered) and "Find in diff" (⌥⌘F) for a diff header — after "Unified | Split" (§34.11) over a diff.
+/// A diff header's controls outside the review's: "Unified | Split" (§34.11, over a diff) and a "⋯" with "Wrap lines"
+/// (remembered) and "Find in diff" (⌥⌘F) — the same pattern as the review header. The "⋯" is filled while wrapping is off.
 struct DiffLineOptions: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     /// The unified / split picker (not over the full file, which has one column).
@@ -383,19 +384,22 @@ struct DiffLineOptions: View {
 
     var body: some View {
         if showsLayout { DiffLayoutPicker(iconOnly: iconOnly) }
-        Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
-            .toggleStyle(.button)
-            .labelStyle(.iconOnly)
-            .fixedSize()
-            .help("Wrap long lines — turn off to keep each on one line and scroll sideways")
-            .accessibilityLabel("Wrap lines")
-            .accessibilityIdentifier("Wrap lines")
-        Button("Find in diff", systemImage: "magnifyingglass", action: onFind)
-            .labelStyle(.iconOnly)
-            .fixedSize()
-            .help("Find in diff (⌥⌘F)")
-            .accessibilityLabel("Find in diff")
-            .accessibilityIdentifier("Find in diff")
+        Menu {
+            Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                .help("Wrap long lines — turn off to keep each on one line and scroll sideways")
+                .accessibilityIdentifier("Wrap lines")
+            Button("Find in diff", systemImage: "magnifyingglass", action: onFind)
+                .help("Find in diff (⌥⌘F)")
+                .accessibilityIdentifier("Find in diff")
+        } label: {
+            Image(systemName: wrapLines ? "ellipsis.circle" : "ellipsis.circle.fill")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("More: Wrap lines, Find in diff (⌥⌘F)")
+        .accessibilityLabel("More diff options")
+        .accessibilityIdentifier("Diff header more")
     }
 }
 

@@ -147,6 +147,11 @@ struct ChatTabStrip: View {
                     Divider()
                     Button("Import a CLI session…") { model.showCliImport = true }
                         .accessibilityIdentifier("Chat menu import CLI session")
+                    // The sidebar's block of other sessions shows only when there are some: the name they send to is here.
+                    if let me = store.sessionTools.selfSession, let copy = PeerSessionText.selfCopyText(me) {
+                        Button("Copy this window's name for other sessions") { Clipboard.copy(copy) }
+                            .accessibilityIdentifier("Chat menu copy peer name")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")

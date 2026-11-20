@@ -35187,6 +35187,118 @@
           }
         }
       }
+    },
+    "%lld/%lld viewed · %lld pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld/%lld viewed · %lld pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld/%2$lld 확인 · 대기 %3$lld개"
+          }
+        }
+      }
+    },
+    "Commit (%lld)…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit (%lld)…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit (%lld)…"
+          }
+        }
+      }
+    },
+    "More: Reject all, AI pre-review, Finish review, order and grouping of the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Reject all, AI pre-review, Finish review, order and grouping of the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
+          }
+        }
+      }
+    },
+    "More: Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 공백 무시, 줄바꿈, diff에서 찾기 (⌥⌘F), 전체 파일, 편집기에서 열기 (⇧⌘E)"
+          }
+        }
+      }
+    },
+    "More review actions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More review actions"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 동작 더 보기"
+          }
+        }
+      }
+    },
+    "Copy this window's name for other sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy this window's name for other sessions"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 세션에 보이는 이 창 이름 복사"
+          }
+        }
+      }
+    },
+    "More: Wrap lines, Find in diff (⌥⌘F)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Wrap lines, Find in diff (⌥⌘F)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 줄바꿈, diff에서 찾기 (⌥⌘F)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

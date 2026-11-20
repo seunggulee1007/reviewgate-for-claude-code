@@ -18,9 +18,13 @@ struct WhyChangedSection: View {
         if causes.isEmpty {
             if let why, why.source != .noRecord {
                 whyOnlyRow(why)
-            } else {
-                noCauseRow
+            } else if file.isExternal {
+                noCauseRow   // where an outside change came from is worth a line; "no cause recorded" for Claude's is not
             }
+        } else if !Self.hasContent(causes, why: why) {
+            // Calls with no sentence of Claude's before them and no reason of the engine's: nothing to say — hidden, not
+            // a panel of "No explanation was written…" (the calls are in the chat, the row's "Why?" asks about the file).
+            EmptyView()
         } else {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
@@ -77,6 +81,20 @@ struct WhyChangedSection: View {
     }
 
     // MARK: wave2 mac-diff
+
+    /// Real content: the engine's reason, or a call with its rationale, a slash command's own work, or a hand-over note.
+    private static func hasContent(_ causes: [ChangeCause], why: WhyLine?) -> Bool {
+        if let why, why.source != .noRecord { return true }
+        return causes.contains { $0.rationale != nil || $0.command != nil || $0.delegation != nil }
+    }
+
+    /// Whether the panel draws anything for `file` — the diff view leaves out its divider when it does not.
+    static func isShown(for file: ChangedFile, store: AppState) -> Bool {
+        let causes = ChangeCause.causes(for: file, in: store.transcriptIndex)
+        let why = WhyDisplay.line(for: file)
+        if causes.isEmpty { return (why != nil && why?.source != .noRecord) || file.isExternal }
+        return hasContent(causes, why: why)
+    }
 
     /// The collapsed header's one line: the file's reason (an earlier one marked as such), else the first call's.
     private func collapsedSummary(why: WhyLine?, causes: [ChangeCause]) -> String? {

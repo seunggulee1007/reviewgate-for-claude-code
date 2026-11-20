@@ -734,10 +734,6 @@ struct MainWindow: View {
                         .accessibilityIdentifier("Workbench badge")
                 }
             }
-            Text(store.projectInfo?.root ?? store.projectURL?.path ?? "")
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                .help(store.projectInfo?.root ?? store.projectURL?.path ?? "")
-                .accessibilityIdentifier("Project root")
             // Branch / remote only make sense once the folder is an opened git repository.
             if let info = store.projectInfo {
                 HStack(spacing: 6) {
@@ -749,12 +745,7 @@ struct MainWindow: View {
                             .lineLimit(1).truncationMode(.middle)
                             .help(remote)
                             .accessibilityIdentifier("Project remote")
-                    } else {
-                        Label("no remote", systemImage: "cloud.slash")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("Project remote")
-                    }
+                    }   // no remote: nothing to say (a plain local repository is not a warning)
                 }
             }
             if let model = store.model {
@@ -1100,6 +1091,11 @@ struct MainWindow: View {
             Button("Reveal in Finder") {
                 if let url = store.projectURL { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             }
+            // The folder's path is no longer a line of the header: here and in the name's tooltip.
+            Button("Copy Path", systemImage: "doc.on.doc") {
+                if let path = store.projectInfo?.root ?? store.projectURL?.path { Clipboard.copy(path, toast: String(localized: "Path copied")) }
+            }
+            .accessibilityIdentifier("Copy project path")
             Button("Close Project") { Task { await store.closeProject() } }
         } label: {
             HStack(spacing: 4) {
@@ -1110,7 +1106,7 @@ struct MainWindow: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Switch project (⌘⇧O)")
+        .help(Text("Switch project (⌘⇧O)") + Text(verbatim: "\n" + (store.projectInfo?.root ?? store.projectURL?.path ?? "")))
         .accessibilityLabel("Project switcher")
         .accessibilityIdentifier("Project switcher")
     }

@@ -41,21 +41,26 @@ struct OtherSessionsSection: View {
     var body: some View {
         if store.projectInfo != nil, store.sessionTools.sessionsSupported {
             VStack(alignment: .leading, spacing: 0) {
-                Divider()
-                header
-                if expanded {
-                    rows
-                    PeerSelfLine() // MARK: wave4d w4d-peers — §42.2
-                    footer
+                // Drawn only when another session runs here; the look-up runs either way. "Import a CLI session…" is in the
+                // chat menu ("⋯" beside the chat tabs) and the window's own name for them is there too.
+                if !store.otherClaudeSessions.isEmpty {
+                    Divider()
+                    header
+                    if expanded {
+                        rows
+                        PeerSelfLine() // MARK: wave4d w4d-peers — §42.2
+                        footer
+                    }
                 }
-            }
-            .task(id: RefreshKey(root: store.projectInfo?.root, engine: store.isEngineRunning, frontmost: activeState == .key)) {
-                // Only while this window is in front: the registry is read every 30 s, and once when it comes back.
-                guard activeState == .key, store.projectInfo != nil, store.isEngineRunning else { return }
-                while !Task.isCancelled {
-                    await store.sessionTools.refreshSessions()
-                    try? await Task.sleep(for: .seconds(30))
-                }
+                Color.clear.frame(height: 0)
+                    .task(id: RefreshKey(root: store.projectInfo?.root, engine: store.isEngineRunning, frontmost: activeState == .key)) {
+                        // Only while this window is in front: the registry is read every 30 s, and once when it comes back.
+                        guard activeState == .key, store.projectInfo != nil, store.isEngineRunning else { return }
+                        while !Task.isCancelled {
+                            await store.sessionTools.refreshSessions()
+                            try? await Task.sleep(for: .seconds(30))
+                        }
+                    }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("Other Claude sessions")

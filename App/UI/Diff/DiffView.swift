@@ -103,9 +103,11 @@ struct DiffView: View {
                 // wave2 mac-flow (§34.2): read while Claude works — the review as it was before this turn.
                 StaleDiffBannerSlot()
                 HunkRefusalBannerSlot(file: file, isReviewLocked: isReviewLocked)
-                // §31: shown even without a recorded cause — it says so (and offers a side question) instead of hiding.
-                WhyChangedSection(file: file)
-                Divider()
+                // Only with something to say: a reason, a call's own sentence, or where an outside change came from.
+                if WhyChangedSection.isShown(for: file, store: store) {
+                    WhyChangedSection(file: file)
+                    Divider()
+                }
                 if truncated, !showFullFile {
                     truncatedBanner(file)
                     Divider()
@@ -791,34 +793,50 @@ struct DiffViewHeader: View {
                     .accessibilityLabel("Revert selected")
                     .accessibilityIdentifier("Revert selected hunks")
             }
-            Menu {
-                Button("Add note", systemImage: "text.bubble") { onAddNote() }
-                    .disabled(addNoteDisabled)
-                if !showFullFile, !file.isBinary {
-                    Toggle("Ignore whitespace", systemImage: "space", isOn: $ignoreWhitespace)
-                }
-                Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
-                if !showFullFile { DiffLayoutMenuToggle(fits: splitFits) }   // §34.11 (off here: the pane is too narrow)
-                Button("Find in diff", systemImage: "magnifyingglass") { model.diffFindTick += 1 }
-                Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
-                    .disabled(file.status == .deleted)
-                Divider()
-                DiffEditorMenuItems(file: file, line: editorLine)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
-            .accessibilityLabel("More diff options")
-            .accessibilityIdentifier("Diff header more")
+            moreMenu(folded: true)
             verdictControls(measuring: false).labelStyle(.iconOnly)
         }
     }
 
+    /// "⋯": whitespace, wrapping, find, the full file and the editors — at every width. `folded`: the narrowest header, where
+    /// the note and the unified / split choice come in here too.
+    private func moreMenu(folded: Bool) -> some View {
+        Menu {
+            if folded {
+                Button("Add note", systemImage: "text.bubble") { onAddNote() }
+                    .disabled(addNoteDisabled)
+            }
+            if !showFullFile, !file.isBinary {
+                Toggle("Ignore whitespace", systemImage: "space", isOn: $ignoreWhitespace)
+                    .accessibilityIdentifier("Ignore whitespace")
+            }
+            Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                .accessibilityIdentifier("Wrap lines")
+            if folded, !showFullFile { DiffLayoutMenuToggle(fits: splitFits) }   // §34.11 (off here: the pane is too narrow)
+            Button("Find in diff", systemImage: "magnifyingglass") { model.diffFindTick += 1 }
+                .accessibilityIdentifier("Find in diff")
+            Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
+                .disabled(file.status == .deleted)
+                .accessibilityIdentifier("Full file")
+            Divider()
+            DiffEditorMenuItems(file: file, line: editorLine)
+        } label: {
+            // Filled while a view option is on that the header no longer shows.
+            Image(systemName: (ignoreWhitespace && !showFullFile) || showFullFile ? "ellipsis.circle.fill" : "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(folded
+              ? "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+              : "More: Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
+        .accessibilityLabel("More diff options")
+        .accessibilityIdentifier("Diff header more")
+    }
+
     /// `measuring`: the hidden copy FullOrCompact sizes — it registers no shortcut (the one on screen is the only ⌥⌘N).
     /// `iconOnly`: the narrower header, the layout picker's segments as icons too.
+    /// Visible: Add note, Unified | Split, Reject, Accept; the rest is in "⋯".
     private func controls(measuring: Bool, iconOnly: Bool = false) -> some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)
@@ -839,18 +857,8 @@ struct DiffViewHeader: View {
                       : String(localized: "Add a review note on the selected line (or the first changed line); send them with Request changes (⌘⇧C)") + " (⌥⌘N)")
                 .accessibilityLabel("Add note")
                 .accessibilityIdentifier("Add note")
-            if !showFullFile { WhitespaceToggle(isOn: $ignoreWhitespace, file: file) }   // wave4c w4c-review — §41.3 공백 무시
-            // wave2 mac-diff: 줄바꿈, diff에서 찾기 (the diff or its full file); §34.11 합쳐 보기 | 나란히 보기 over the diff
-            DiffLineOptions(showsLayout: !showFullFile, iconOnly: iconOnly) { model.diffFindTick += 1 }
-            Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
-                .toggleStyle(.button)
-                .labelStyle(.iconOnly)
-                .fixedSize()
-                .disabled(file.status == .deleted)
-                .help(file.status == .deleted ? Text("A deleted file has no full file to show") : Text("Full file"))
-                .accessibilityLabel("Full file")
-                .accessibilityIdentifier("Full file")
-            DiffEditorButton(file: file, line: editorLine)
+            if !showFullFile { DiffLayoutPicker(iconOnly: iconOnly) }   // §34.11 합쳐 보기 | 나란히 보기 over the diff
+            moreMenu(folded: false)
             verdictControls(measuring: measuring)
         }
     }

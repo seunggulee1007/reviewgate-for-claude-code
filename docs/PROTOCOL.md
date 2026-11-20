@@ -3778,6 +3778,9 @@ See the terminal Claude sessions working in this repository, and carry one into 
   sessions in this repository" — name, folder, "Working" / "Waiting for input" / "Idle" — refreshed every 30 s while the
   window is frontmost; "Import a CLI session" sheet; "Continue in terminal" copies `cd <folder> && claude --resume <id>`;
   an imported chat says "The review gate applies from here on").
+- *Mac layout:* the sidebar block "Other Claude sessions in this repository" is drawn only while there is at least one other
+  session (the 30 s look-up runs either way); "Import a CLI session…" and this window's name for them
+  (`PeerSelfLine`'s text) are in the chat menu beside the chat tabs. The Windows client is unchanged.
 
 ### 36.10 Side questions during a turn (SME-02)
 
@@ -3938,6 +3941,9 @@ Claude reviews the round first; its findings sit on the diff lines, outside the 
 - Owners: engine-flow (`side/`, `review/gate.ts` + `review/persist.ts`, `session/hooks.ts`); screens mac-/desktop-flow
   ("AI pre-review" in the Changes head; "Pre-reviewing…" / "%d findings" / failed with the reason; file list badges; diff
   line marks with an inline card — "Add as note", "Ask in a side thread", "Dismiss" —; cancel).
+  *Mac layout (calmer Changes header):* the start items ("AI pre-review", "Pre-review the selected file only", "Effort") are in
+  the header's "⋯" menu with Reject all, Finish review… and the order / grouping; the header itself shows only a run's
+  status ("Pre-reviewing…" + cancel, "%d findings", failed) while there is one. The Windows client is unchanged.
 - *Engine notes (`review/prereview.ts`, `side/threads.ts` `startDetached`):* the fork's prompt is the slash command on its
   first line and the scope, the patch and the file list after it (the CLI hands the rest of the message to `/code-review` as its
   arguments; verified with CLI 2.1.309: the review keeps to the patch and reports through `ReportFindings` without a Bash
