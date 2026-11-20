@@ -1551,7 +1551,7 @@ public final class AppState {
 
     /// Reloads `state.branches` (and `projectInfo.branch`). Failures only go to `logs`.
     public func refreshBranches() async {
-        guard projectInfo != nil else { return }
+        guard projectInfo != nil, !isShadowProject else { return }   // §59: refused `not_a_git_repo` there
         do {
             _ = try await client.request(.branches)
             await settle()
@@ -1576,7 +1576,7 @@ public final class AppState {
 
     /// `workbench_list` → `state.workbenches`. Failures only go to `logs` (older engines refuse it).
     public func refreshWorkbenches() async {
-        guard projectInfo != nil else { return }
+        guard projectInfo != nil, !isShadowProject else { return }   // §59: refused `not_a_git_repo` there
         do {
             _ = try await client.request(.workbenchList)
             await settle()

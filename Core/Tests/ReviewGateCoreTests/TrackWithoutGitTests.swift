@@ -64,6 +64,27 @@ import Testing
         #expect(store.notGitRepositoryReason == "This folder is not a git repository")
     }
 
+    @Test func whatNeedsARepositoryIsOffWithItsReason() async {
+        let store = makeStore()
+        var s = ReviewState.empty
+        s.seq = 1
+        s.project = ProjectInfo(path: "/work/acme-notes", root: "/work/acme-notes", name: "acme-notes", branch: nil, remoteURL: nil, vcs: .shadow)
+        store.handle(.state(s))
+        let reason = "This folder is not a git repository"
+        #expect(store.commitLockReason == reason)
+        #expect(!store.canOpenCommitSheet)
+        #expect(store.chatMoveBlocker == reason)
+        #expect(store.planWorkbenchBlocker == reason)
+        #expect(await store.loadCommitFormat() == nil)
+        await settle { store.menuState.isShadowProject }
+        #expect(store.menuState.isShadowProject)
+        #expect(!store.menuState.canCommit)
+    }
+
+    private func settle(_ condition: () -> Bool) async {
+        for _ in 0..<100 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
     @Test func anUnsafeFolderAsksFirstAndTheConfirmGoesOnTheWire() async {
         let store = makeStore()
         pendingPrompt(store, unsafe: true)

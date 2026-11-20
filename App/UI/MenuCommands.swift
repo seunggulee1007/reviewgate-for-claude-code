@@ -51,7 +51,8 @@ struct ViewMenuCommands: Commands {
             ForEach(Array(MainTab.allCases.enumerated()), id: \.element) { index, tab in
                 Button(tab.title) { focused?.model.tab = tab }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [.command, .option])
-                    .disabled(!menu.hasProject && tab != .prs)
+                    .disabled((!menu.hasProject && tab != .prs) || (tab == .prs && menu.isShadowProject))
+                    .help(tab == .prs && menu.isShadowProject ? EngineMessages.notGitRepositoryText : "")   // §59
                     .accessibilityIdentifier("View menu tab \(tab.rawValue)")
             }
             // polish P3-transcript-17: back to the newest message, following it again (the "↓ 최신" pill).
@@ -237,11 +238,13 @@ struct ReviewCommands: Commands {
             Button("Commit Accepted…") { model?.showCommit = true }
                 .keyboardShortcut("k", modifiers: [.command, .shift])
                 .disabled(!menu.canCommit)
+                .help(menu.isShadowProject ? EngineMessages.notGitRepositoryText : "")   // §59
                 .accessibilityIdentifier("Review menu Commit accepted")
             // polish P5-sheets-46: the PR sheet from the menu bar too (it was only in the branch menu and the commit banner).
             Button("Create PR from this branch…") { model?.createPRTick += 1 }
                 .keyboardShortcut("k", modifiers: [.command, .option])
-                .disabled(!menu.hasProject)
+                .disabled(!menu.hasProject || menu.isShadowProject)
+                .help(menu.isShadowProject ? EngineMessages.notGitRepositoryText : "")   // §59
                 .accessibilityIdentifier("Review menu Create PR")
         }
     }
@@ -257,17 +260,22 @@ struct WorkbenchCommands: Commands {
         CommandMenu("Workbenches") {
             let store = focused?.store
             let menu = store?.menuState ?? MenuState()
+            // §59: a folder tracked without git has no worktrees — every item says why.
+            let noGit = menu.isShadowProject ? EngineMessages.notGitRepositoryText : ""
             Button("New Workbench…") { focused?.model.showNewWorkbench = true }
-                .disabled(!menu.hasProject)
+                .disabled(!menu.hasProject || menu.isShadowProject)
+                .help(noGit)
                 .accessibilityIdentifier("Workbenches menu New Workbench…")
             if runAsTaskEnabled {   // §49
                 Button("Run as Task…") { focused?.model.runAsTask("") }
-                    .disabled(!menu.hasProject)
+                    .disabled(!menu.hasProject || menu.isShadowProject)
+                    .help(noGit)
                     .accessibilityIdentifier("Workbenches menu Run as Task…")
             }
             // polish P1-chrome-36: not the same name as View › Refresh (⌘R).
             Button("Refresh Workbenches") { if let store { Task { await store.refreshWorkbenches() } } }
-                .disabled(!menu.hasProject)
+                .disabled(!menu.hasProject || menu.isShadowProject)
+                .help(noGit)
             Divider()
             if !menu.workbenches.isEmpty {
                 ForEach(menu.workbenches) { wb in

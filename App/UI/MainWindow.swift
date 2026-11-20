@@ -95,10 +95,16 @@ struct MainWindow: View {
             // wave1 mac-review — §31–32: reverting changes from outside the app, the stale-review sheet, Finish review.
             .modifier(ReviewProvenanceModals())
             .modifier(SessionToolsModals())   // wave3 mac-session (§36.9): CLI 세션 가져오기
-            .sheet(isPresented: $model.showNewWorkbench, onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil }) {
+            // §59: every way in is off in a folder tracked without git; this keeps a stray one from opening the sheet.
+            .sheet(isPresented: Binding(get: { model.showNewWorkbench && !store.isShadowProject }, set: { model.showNewWorkbench = $0 }), onDismiss: { model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil }) {
                 NewWorkbenchSheet(initialBranch: model.newWorkbenchBranch ?? "") { url in workbenchCreated(url) }   // wave4d w4d-plan
             }
-            .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil { showCreatePR = true } }   // polish P5-sheets-46
+            .onChange(of: model.showNewWorkbench) { _, show in
+                guard show, store.isShadowProject else { return }
+                model.showNewWorkbench = false
+                model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil
+            }
+            .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil, !store.isShadowProject { showCreatePR = true } }   // polish P5-sheets-46
             .sheet(isPresented: $showCreatePR) {
                 CreatePRSheet()
             }
@@ -122,7 +128,7 @@ struct MainWindow: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
                 Picker("Sidebar", selection: $tab) {
-                    ForEach(MainTab.allCases) { Text($0.title).tag($0) }
+                    ForEach(MainTab.allCases.filter { $0 != .prs || !store.isShadowProject }) { Text($0.title).tag($0) }   // §59: no PRs
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -275,6 +281,7 @@ struct MainWindow: View {
         .onChange(of: store.needsGitInit, initial: true) { _, needs in showGitInit = needs }
         .onChange(of: store.projectInfo?.root, initial: true) { _, root in restoreUIState(root: root) }
         .onChange(of: tab) { _, new in updateUIState { $0.sidebarTab = new.rawValue } }
+        .onChange(of: tab == .prs && store.isShadowProject, initial: true) { _, hidden in if hidden { tab = .changes } }   // §59
         .onChange(of: store.selectedPath) { _, path in
             if let path {
                 updateUIState { $0.selectedPath = path }
@@ -734,7 +741,9 @@ struct MainWindow: View {
                 }
             }
             // Branch / remote only make sense once the folder is an opened git repository.
-            if let info = store.projectInfo {
+            if store.isShadowProject {
+                noGitLine   // §59
+            } else if let info = store.projectInfo {
                 HStack(spacing: 6) {
                     branchSwitcher(info)
                     if let remote = info.remoteURL {
@@ -768,6 +777,16 @@ struct MainWindow: View {
             Task { await store.refreshWorkbenches() }
         }
         .sheet(isPresented: $showNewBranch) { newBranchSheet }
+    }
+
+    /// §59: in place of the branch line — the folder is tracked without git, calmly, with what that means on hover.
+    private var noGitLine: some View {
+        Label("Not a git repository — changes tracked by ReviewGate", systemImage: "eye")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1).truncationMode(.tail)
+            .help("ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them.")
+            .accessibilityIdentifier("Not a git repository")
     }
 
     /// `state.pr.lastCreatedPR` after "Create PR from this branch…": the URL plus Open / dismiss.
@@ -1078,8 +1097,10 @@ struct MainWindow: View {
                 }
             }
             Divider()
-            workbenchSection
-            Divider()
+            if !store.isShadowProject {   // §59: no worktrees without a repository
+                workbenchSection
+                Divider()
+            }
             PeerInboundProjectMenu()   // wave1 mac-session (§29)
             Divider()
             Button("Open Project…") { ProjectOpener.choose(store: store) }

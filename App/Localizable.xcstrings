@@ -35475,6 +35475,38 @@
           }
         }
       }
+    },
+    "Not a git repository — changes tracked by ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not a git repository — changes tracked by ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git 저장소 아님 — ReviewGate가 변경을 추적해요"
+          }
+        }
+      }
+    },
+    "ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate keeps a hidden copy of this folder outside it to show and revert what Claude changed; the folder itself has no .git. Commit, branches, workbenches and PRs are off — initialize git in the folder to have them."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 이 폴더의 숨은 사본을 폴더 밖에 두고 Claude가 바꾼 내용을 보여 주고 되돌려요. 폴더 자체에는 .git이 없어요. commit, 브랜치, 워크벤치, PR은 쓸 수 없어요 — 쓰려면 이 폴더에 git을 초기화하세요."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

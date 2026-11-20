@@ -9699,3 +9699,14 @@ limit (more than 20,000 files / more than 1 GB / listing took too long) and sugg
 `track_failed` and the rest show their text — in the prompt itself (`AppState.gitInitProblem`), which stays open; the
 `error{folder_too_large | track_failed}` of a remembered folder's reopen fills the same line when the prompt comes back.
 `locked_by_other_session` goes to the takeover alert as a refused open does.
+
+In a project with `vcs: "shadow"` (`AppState.isShadowProject`) the Mac hides what is whole sections — the PRs tab (a window
+on it goes back to Changes), the branch line of the project header (in its place a calm "Not a git repository — changes
+tracked by ReviewGate", its tooltip naming the hidden copy) and the Workbenches part of the project menu — and disables the
+single controls with the reason "This folder is not a git repository" as their tooltip: Commit… (and Review › Commit
+Accepted…, via `commitLockReason`), Review › Create PR from this branch…, View › PRs, Workbenches › New Workbench… / Run as
+Task… / Refresh Workbenches, the composer's Run as Task, the plan's "Implement in a new workbench…"
+(`planWorkbenchBlocker`), "Move to workbench" (`chatMoveBlocker`), "Create workbench" on the concurrent-session notice and
+"Open as Workbench" where it would create one. Nothing is sent on its own that would be refused: `refreshBranches`,
+`refreshWorkbenches`, the PR list's refresh, `commit_format` and `pr_draft` return early, and the new-workbench / PR sheets
+never open there.

@@ -120,6 +120,7 @@ public final class PRStore {
     // MARK: - Lists
 
     public func refresh() async {
+        guard app?.isShadowProject != true else { return }   // §59: no PRs without a repository (`not_a_git_repo`)
         await app?.run(.prList)
     }
 

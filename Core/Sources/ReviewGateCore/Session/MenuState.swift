@@ -39,6 +39,8 @@ public struct ChatMenuTab: Equatable, Sendable, Identifiable {
 
 public struct MenuState: Equatable, Sendable {
     public var hasProject = false
+    /// §59: the folder is tracked without git — commit, branches, workbenches and PRs are off.
+    public var isShadowProject = false
     public var isRefreshing = false
     // Review
     /// The selected file is pending and accept / reject may run now (reject: it is captured, too) — and its diff is what
@@ -93,6 +95,7 @@ public struct MenuState: Equatable, Sendable {
     /// What `store`'s menus show now (reads the slices and client state the menus need, never the HUD).
     @MainActor public init(_ store: AppState) {
         hasProject = store.projectInfo != nil
+        isShadowProject = store.isShadowProject
         isRefreshing = store.isRefreshing
         let selected = store.selectedFile
         let onScreen = !store.codeBrowser.isOpen && store.historySelection == nil && store.liveSelection == nil

@@ -13,6 +13,8 @@ struct PlanReviewSheet: View {
     var refusal: String?
     /// Why the new chat / workbench items cannot be used (nil: they can).
     var handoffBlocker: String?
+    /// §59: why the new workbench item cannot be used (`AppState.planWorkbenchBlocker`; nil: as `handoffBlocker`).
+    var workbenchBlocker: String? = nil
     @Binding var notes: [Int: String]
     @Binding var general: String
     var onApprove: (PermissionMode) -> Void
@@ -147,7 +149,7 @@ struct PlanReviewSheet: View {
             .disabled(isLocked)
             .help("Stay in plan mode and send your notes back for a revision")
             .accessibilityIdentifier("Plan review keep planning")
-            PlanApproveMenu(isLocked: isLocked, handoffBlocker: handoffBlocker, runMode: runMode,   // wave6 w6-terminal (§44.1)
+            PlanApproveMenu(isLocked: isLocked, handoffBlocker: handoffBlocker, workbenchBlocker: workbenchBlocker, runMode: runMode,   // wave6 w6-terminal (§44.1)
                             onApprove: { onApprove($0); dismiss() },
                             onApproveNewChat: { onApproveNewChat($0); dismiss() },
                             onApproveWorkbench: { mode in
@@ -170,6 +172,8 @@ struct PlanReviewSheet: View {
 struct PlanApproveMenu: View {
     var isLocked: Bool
     var handoffBlocker: String?
+    /// §59: why the new workbench item cannot be used — a folder tracked without git (nil: as `handoffBlocker`).
+    var workbenchBlocker: String? = nil
     var runMode: PermissionMode = .default
     var onApprove: (PermissionMode) -> Void
     var onApproveNewChat: (PermissionMode) -> Void
@@ -191,11 +195,11 @@ struct PlanApproveMenu: View {
             Button(runMode == .auto ? String(localized: "Implement in a new workbench… (auto mode)") : String(localized: "Implement in a new workbench…")) {
                 onApproveWorkbench(runMode)
             }
-                .disabled(handoffBlocker != nil)
-                .help(handoffBlocker ?? String(localized: "Create a workbench (branch + folder); its window implements the plan in a fresh chat"))
+                .disabled((workbenchBlocker ?? handoffBlocker) != nil)
+                .help(workbenchBlocker ?? handoffBlocker ?? String(localized: "Create a workbench (branch + folder); its window implements the plan in a fresh chat"))
                 .accessibilityIdentifier("Approve plan new workbench")
-            if let handoffBlocker {
-                Text(verbatim: handoffBlocker)
+            if let reason = handoffBlocker ?? workbenchBlocker {
+                Text(verbatim: reason)
             }
         } label: {
             if runMode == .auto {

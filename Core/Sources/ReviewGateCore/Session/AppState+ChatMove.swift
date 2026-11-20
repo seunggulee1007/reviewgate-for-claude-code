@@ -158,6 +158,7 @@ extension AppState {
     /// Why the banner's "Move This Chat There" is off right now (nil = it can be pressed).
     public var chatMoveBlocker: String? {
         if projectInfo == nil { return String(localized: "No project is open.", bundle: .module) }
+        if let reason = notGitRepositoryReason { return reason }   // §59: no worktrees without a repository
         if currentChatMovedTo != nil { return ChatMoveText.refusal("chat_is_record") }
         if isMovingChat { return String(localized: "Moving the chat…", bundle: .module) }
         return nil
