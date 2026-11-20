@@ -12,7 +12,7 @@
  * xterm and its addons are loaded on first use (a separate chunk; the tests never load them — `setTerminalLoader`).
  */
 import type { ITerminalAddon, ITerminalOptions, Terminal } from "@xterm/xterm";
-import type { PtyBridge, PtyExit } from "../../shared/ipc";
+import type { PtyBridge, PtyExit, ShellKind } from "../../shared/ipc";
 import { sanitizePaste } from "../terminalPaste";
 import { ackStep, isOpenableLink, steppedFontSize, terminalOptions, terminalTheme, usesWebgl, type TermOptionsInput } from "./termHostOptions";
 import { terminalKeyAction, xtermHandles } from "./terminalKeys";
@@ -36,6 +36,8 @@ type Entry = {
   ptyId: string;
   kind: "chat" | "shell";
   sessionId?: string;
+  /** A shell tab's shell. */
+  shell?: ShellKind;
   /** The persistent element the terminal is opened in; views re-parent it. */
   host: HTMLDivElement;
   term: Terminal | null;
@@ -184,7 +186,7 @@ function onExit(ev: PtyExit): void {
 }
 
 /** Registers `ptyId` (a PTY main just opened or still runs) and starts its terminal. Idempotent. */
-export function adoptTerminal(ptyId: string, kind: "chat" | "shell", opts: { sessionId?: string; replay?: string; status?: TerminalStatus } = {}): void {
+export function adoptTerminal(ptyId: string, kind: "chat" | "shell", opts: { sessionId?: string; shell?: ShellKind; replay?: string; status?: TerminalStatus } = {}): void {
   if (entries.has(ptyId)) return;
   const host = document.createElement("div");
   host.className = "term-host";
@@ -192,6 +194,7 @@ export function adoptTerminal(ptyId: string, kind: "chat" | "shell", opts: { ses
     ptyId,
     kind,
     ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
+    ...(opts.shell ? { shell: opts.shell } : {}),
     host,
     term: null,
     fit: null,
@@ -428,6 +431,11 @@ export function hasTerminal(ptyId: string | null | undefined): boolean {
 export function chatTerminalOf(sessionId: string): string | null {
   for (const e of entries.values()) if (e.kind === "chat" && e.sessionId === sessionId) return e.ptyId;
   return null;
+}
+
+/** A shell tab's shell (null: not a shell, or not known). */
+export function terminalShellOf(ptyId: string): ShellKind | null {
+  return entries.get(ptyId)?.shell ?? null;
 }
 
 /** The shell PTYs, in the order they were opened. */

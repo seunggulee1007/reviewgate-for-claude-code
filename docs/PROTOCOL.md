@@ -9189,7 +9189,13 @@ type ClientCapabilities = {
   preview off; only the ways to make one go.
 - **The shell panel**: PowerShell (`pwsh`, else Windows PowerShell, `-NoLogo`) or Command Prompt (`%ComSpec%`) in the
   window's project folder, with the same environment minus `RG_*`, `CLAUDE_CODE_NATIVE_CURSOR` and
-  `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`. Available whenever node-pty loads, on Windows.
+  `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`. Available whenever node-pty loads, on Windows. In the window it sits below the
+  diff and chat row (not on the PRs tab), at its remembered height (`ui.terminalPanelHeight`, at least 80 px, the window
+  keeping 200 px above; its top edge drags), with a tab per shell, `+` (PowerShell / Command Prompt) and × (the shell
+  ends). Exit 0 closes a tab, any other exit keeps it with "exited (n)", Restart and Close; the last tab closing hides the
+  panel; hiding it or switching tabs never ends a shell. Ctrl+` (the physical Backquote key, also from inside a
+  terminal): hidden → shown and focused (a first tab of Settings' default shell if none); shown and focused → hidden, the
+  keyboard back to the chat's terminal or message box; shown elsewhere → focused.
 
 ## 58. Accept N & Continue
 

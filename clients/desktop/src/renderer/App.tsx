@@ -35,6 +35,7 @@ import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-
 import { useTermHost } from "./terminal/useTermHost"; // §57.10
 import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.10
 import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
+import { ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.10
 import { useViewing } from "./viewedChat"; // §57.5
 
 declare global {
@@ -62,6 +63,7 @@ export function App() {
   useTermHost(); // §57.10: the window's terminals (terminal chats, the shell panel)
   useTerminalChatPty(); // §57.10: the live terminal chat's PTY and its waits
   useTerminalReviewReopen(); // §57.5: a terminal chat's review panel opens again with each review
+  useShellPanelHost(); // §57.10: Ctrl+` and the shell tabs' exits
   useNotificationNotices(); // MARK: wave4b w4-notify — §39.6: a clicked notification lands on its card; the OS refusing one
   // polish-03: ⌘⇧R / Ctrl+Shift+R is always the reject shortcut — never the browser's force reload.
   useRejectShortcut(() => {
@@ -187,6 +189,8 @@ export function App() {
               <ErrorBoundary name="Start" className="pane diff"><NoProject /></ErrorBoundary>
             )}
           </div>
+          {/* §57.10: the bottom terminal panel (PowerShell / Command Prompt) — no Claude, no preview needed */}
+          {tab !== "prs" && hasProject && <ErrorBoundary name="Terminal panel"><ShellPanel /></ErrorBoundary>}
           {agentPanelOpen && tab !== "prs" && hasProject && <ErrorBoundary name="Agents" className="agent-panel"><AgentPanel /></ErrorBoundary>}
         </div>
         {boardOpen && hasProject && <ErrorBoundary name="Agent board"><BoardDialog /></ErrorBoundary>}{/* MARK: wave5 w5-board */}

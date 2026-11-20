@@ -38,6 +38,16 @@
 .review-drawer { position: absolute; bottom: 0; z-index: 20; display: flex; min-height: 0; background: var(--bg); border-right: 1px solid var(--border); box-shadow: 4px 0 14px rgba(0, 0, 0, 0.22); }
 :root[data-theme="dark"] .review-drawer { box-shadow: 4px 0 14px rgba(0, 0, 0, 0.55); }
 
+/* §57.6 / §57.10: the bottom shell panel — tabs, a drag edge on top, one terminal at a time. */
+.shell-panel { position: relative; display: flex; flex-direction: column; flex: none; min-height: 80px; border-top: 1px solid var(--border); background: var(--bg); }
+.shell-drag { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: row-resize; z-index: 5; }
+.shell-drag:hover { background: var(--accent-bg); }
+.shell-tabs { display: flex; align-items: center; gap: 2px; padding: 2px 6px; border-bottom: 1px solid var(--border); background: var(--bg-2); min-height: 28px; }
+.shell-tab { display: inline-flex; align-items: center; gap: 5px; max-width: 220px; padding: 2px 6px; border-radius: 5px; font-size: 12px; color: var(--fg-2); cursor: default; }
+.shell-tab.active { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
+.shell-tab .close { padding: 0 2px; }
+.shell-body { position: relative; display: flex; flex: 1; min-height: 0; }
+
 /* §57.5: a terminal chat's tab — a terminal glyph, an orange dot while its Claude Code is not running. */
 .chat-tab .tab-kind { position: relative; display: inline-flex; color: var(--fg-2); flex: none; }
 .chat-tab .tab-kind.stopped::after { content: ""; position: absolute; right: -2px; top: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }

@@ -1,6 +1,7 @@
 /**
  * §57.5 / §57.9 / §57.10: the menu bar's terminal-chat items (src/main/menu.ts shows them while "Terminal chat (preview)"
- * is on and a PTY can run): Chat › New Terminal Chat, New Chat (Classic), Continue as Terminal Chat. The store loads on
+ * is on and a PTY can run): Chat › New Terminal Chat, New Chat (Classic), Continue as Terminal Chat; View › Toggle Terminal
+ * Panel whenever the shell panel can open. The store loads on
  * first use (as menuActions.lifecycle.ts does), so this table stays importable without a window.
  */
 import type { MenuActionHandlers } from "./menuActions";
@@ -26,4 +27,6 @@ export const terminalMenuActions: MenuActionHandlers = {
   new_terminal_chat: () => void newOfKind("terminal"),
   new_classic_chat: () => void newOfKind("classic"),
   continue_as_terminal: () => void continueShownChat(),
+  // View › Toggle Terminal Panel (Ctrl+`, the renderer's key): the bottom shell panel.
+  toggle_terminal_panel: () => void import("./components/terminal/ShellPanel").then((m) => m.toggleShellPanelFromMenu()),
 };

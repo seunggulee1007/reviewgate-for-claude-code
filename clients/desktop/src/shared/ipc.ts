@@ -203,6 +203,8 @@ export type ProjectUI = {
   diffCollapsed?: boolean;
   /** §57.5: a terminal chat's split — the terminal's share beside the review panel (0…1; absent: 0.55). */
   terminalReviewSplit?: number;
+  /** §57.10: the bottom shell panel's height in px (at least 80; the window keeps 200 above it). */
+  terminalPanelHeight?: number;
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };

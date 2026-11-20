@@ -137,6 +137,8 @@ export function terminalStartRefusal(code: string, error = ""): string | null {
       return t("Claude Code's command line would be longer than Windows allows — turn off some MCP servers or plugins and try again");
     case "spawn_failed":
       return error.trim() ? t("Claude Code could not be started in the terminal: {0}", error.trim()) : t("Claude Code could not be started in the terminal");
+    case "no_project":
+      return t("Open a project first (⌘O)");
     case "not_current":
     case "terminal_not_current":
       return t("This terminal chat is not the live chat anymore — continue in it first");
