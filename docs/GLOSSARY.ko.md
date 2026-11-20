@@ -3,6 +3,8 @@
 Mac(App/·Core 의 Localizable.xcstrings)과 Electron(ko.extra.json → gen-i18n.mjs → ko.json)이 같은 말을 쓴다.
 키(영어)는 그대로 두고 한국어 값만 이 표에 맞춘다. 새 문구도 이 표를 따른다. (wave4 w4-input, 감사 polish-04 · comp-20)
 
+**Claude Code 가 영어로 보여주는 이름은 번역하지 않는다** (effort, MCP, hook 처럼). 어설프게 옮긴 말보다 사용자가 터미널에서 보는 그 말이 낫다. 한국어로 자연스러운 말(리뷰, 수락, 메모)만 옮긴다.
+
 | 영어 | 한국어 | 뜻 / 쓰지 않는 말 |
 |---|---|---|
 | Review | 리뷰 | 파일 리뷰 전체. "검토"는 쓰지 않는다. 그냥 "살펴보다"는 "확인" |
@@ -18,7 +20,7 @@ Mac(App/·Core 의 Localizable.xcstrings)과 Electron(ko.extra.json → gen-i18n
 | Workbench | 워크벤치 | "작업대"는 쓰지 않는다 |
 | Remote | 원격 (저장소) | "리모트"는 쓰지 않는다 |
 | Idle | 쉬는 중 | 파일의 "대기"와 섞지 않는다 |
-| Effort | 추론 강도 | "노력 수준"은 쓰지 않는다 |
+| Effort | effort | Claude Code 화면과 같은 영어 그대로. "추론 강도"·"노력"으로 옮기지 않는다. 단계는 낮음·보통·높음·매우 높음·최대 |
 | Refresh | 새로고침 | 붙여 쓴다 |
 | sidecar | 엔진 | 내부 이름은 사용자 문구에 드러내지 않는다 |
 | Side question | 곁질문 | |

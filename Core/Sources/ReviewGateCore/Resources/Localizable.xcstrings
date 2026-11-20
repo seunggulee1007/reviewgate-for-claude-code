@@ -15198,7 +15198,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "알 수 없는 추론 강도입니다"
+            "value": "알 수 없는 effort 단계입니다"
           }
         }
       }

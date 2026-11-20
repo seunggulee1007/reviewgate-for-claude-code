@@ -7442,7 +7442,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 이번 라운드의 변경을 읽기 전용 곁 세션에서 먼저 리뷰합니다 — 지적은 대화가 아니라 diff 줄에 달립니다(추론 강도 %@)"
+            "value": "Claude가 이번 라운드의 변경을 읽기 전용 곁 세션에서 먼저 리뷰합니다 — 지적은 대화가 아니라 diff 줄에 달립니다(effort %@)"
           }
         }
       }
@@ -11474,7 +11474,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "추론 강도"
+            "value": "Effort"
           }
         }
       }
@@ -14123,7 +14123,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "추론 강도가 높을수록 더 오래 생각하고 비용이 더 듭니다."
+            "value": "effort가 높을수록 더 오래 생각하고 비용이 더 들어요."
           }
         }
       }
