@@ -250,6 +250,10 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .progress { height: 4px; width: 44px; background: var(--bg-3); border-radius: 2px; overflow: hidden; }
 .progress > div { height: 100%; }
+/* §48 Windows: the update's download in the banner and Settings › Updates; [What's New]'s notes */
+.progress.update-progress { width: 120px; flex: none; }
+.progress.update-progress > div { background: var(--accent); transition: width 0.2s ease; }
+.update-notes { max-height: 55vh; overflow: auto; }
 
 /* ---------------------------------------------------------------- layout */
 .app-shell { display: flex; flex-direction: column; height: 100%; }

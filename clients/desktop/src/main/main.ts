@@ -6,7 +6,7 @@
 import { app, BrowserWindow, clipboard, shell } from "electron";
 import { statSync, writeFileSync } from "node:fs";
 import { release, tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { basename, join, sep } from "node:path";
 import { configureNodePty, nodePty } from "./pty/nodePty.js"; // MARK: terminal-win (§57.17)
 import { runPtySelftest, selftestArg } from "./pty/selftest.js";
 import { buildMenu, type MenuHandlers } from "./menu.js";
@@ -17,7 +17,8 @@ import { e2eOutArg, e2eUserDataArg, installTerminalE2E } from "./e2eTerminal.js"
 import { installIPC } from "./ipc.js";
 import { installNotifications } from "./notifications.js";
 import { installReadiness } from "./readiness.js"; // MARK: polish p-lifecycle (P5-sheets-44)
-import { checkForUpdatesNow, installUpdates } from "./update.js"; // MARK: polish p-lifecycle (P5-sheets-49)
+import { afterEnginesStopped, checkForUpdatesNow, installUpdates } from "./update.js"; // MARK: polish p-lifecycle (P5-sheets-49), §48 Windows
+import { closeGuardReason } from "../shared/closeGuard.js";
 import { appUserModelId } from "./notify.js"; // MARK: wave4b w4-notify
 import { logDir, logLine } from "./log.js";
 import { redactLog } from "./logRedact.js";
@@ -183,7 +184,10 @@ app.on("before-quit", (e) => {
   persistWindows();
   // P1-chrome-05 / P5-sheets-53: the windows go at once, and a stuck engine never holds the quit (at most 6 s).
   hideAllWindows();
-  void withTimeout(disposeAll(), 6000).then(() => app.exit(0));
+  // §48 Windows: a quit for an update starts the installer once every engine has stopped (nothing of ours is left for it).
+  void withTimeout(disposeAll(), 6000)
+    .then(() => afterEnginesStopped())
+    .finally(() => app.exit(0));
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin" || E2E) app.quit();
@@ -216,7 +220,24 @@ void app.whenReady().then(async () => {
   });
   installNotifications({ focusWindow });
   installReadiness(); // MARK: polish p-lifecycle (P5-sheets-44): the empty window's checklist
-  if (!E2E && !E2E_TERMINAL) installUpdates(); // MARK: polish p-lifecycle (P5-sheets-49): at launch, then every 6 hours
+  // MARK: polish p-lifecycle (P5-sheets-49): at launch, then every 6 hours. §48 Windows: the restart waits for the windows
+  // where Claude works or a card waits, and quits without asking (they are idle, or the user said Restart Now).
+  if (!E2E && !E2E_TERMINAL)
+    installUpdates({
+      blockers: () =>
+        allWorkbenches().flatMap((w) => {
+          const reason = !w.closing && !w.win.isDestroyed() ? closeGuardReason(w.engine.state) : null;
+          return reason ? [{ id: w.win.id, name: basename(w.projectRoot ?? w.projectPath ?? ""), reason }] : [];
+        }),
+      quit: () => {
+        quitConfirmed = true;
+        app.quit();
+      },
+      focus: (id) => {
+        const win = BrowserWindow.fromId(id);
+        if (win && !win.isDestroyed()) focusWindow(win);
+      },
+    });
 
   if (E2E_TERMINAL) {
     installTerminalE2E(process.env.REVIEWGATE_PROJECT ?? "", { createWindow: (o) => createWindow(o), disposeAll, claudePath: () => loadSettings().claudePath }, e2eOutArg(process.argv));

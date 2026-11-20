@@ -3,11 +3,12 @@
  * "review restored" banner, the §19.6 slow-start hint (auto-hides after 8 s; docs/PROTOCOL.md §8) and the commit banner (Changes tab).
  * wave1 desktop-review: the §31–32 gate banners (GateBanners) and a restored banner that stays while the review is stale
  * or brought outside changes with it.
- * polish p-lifecycle (P5-sheets-49): a newer release, in every window (src/main/update.ts).
+ * polish p-lifecycle (P5-sheets-49): a newer release, in every window (src/main/update.ts); §48 Windows: its install
+ * (UpdateBanner.tsx).
  */
 import { useEffect, useRef, useState } from "react";
-import type { UpdateStatus } from "../../shared/ipc";
 import { t } from "../i18n";
+import { UpdateBanner } from "./UpdateBanner";
 import { restoredNotice, staleLines } from "../reviewGate";
 import { useStore } from "../store";
 import { CommitBanner } from "./diff/CommitBanner";
@@ -64,36 +65,6 @@ function RestoredBanner() {
       )}
       <button type="button" className="small" onClick={() => setDismissed(true)} data-testid="Dismiss restored">
         {t("Dismiss")}
-      </button>
-    </div>
-  );
-}
-
-// MARK: polish p-lifecycle — P5-sheets-49: "ReviewGate 0.6.0 버전이 나왔어요" — [릴리스 페이지 열기] [나중에].
-export function UpdateBanner() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null);
-  useEffect(() => {
-    const rg = window.rg;
-    let live = true;
-    void rg.updateStatus?.().then((s) => live && setStatus(s));
-    const off = rg.onUpdateStatus?.((s) => setStatus(s));
-    return () => {
-      live = false;
-      off?.();
-    };
-  }, []);
-  if (!status) return null;
-  const detail = t("This app is {0}; the latest release is {1}.", status.current, status.version);
-  return (
-    <div className="banner blue" role="status" data-testid="Update banner">
-      <span className="grow truncate" title={detail}>
-        <strong>{t("ReviewGate {0} is available", status.version)}</strong> · {detail}
-      </span>
-      <button type="button" className="small primary" onClick={() => void window.rg.openUpdate?.()} title={status.page} data-testid="Open release page">
-        {t("Open Release Page")}
-      </button>
-      <button type="button" className="small" onClick={() => void window.rg.dismissUpdate?.()} title={t("Hide this version — the next one is announced again")} data-testid="Dismiss update">
-        {t("Later")}
       </button>
     </div>
   );

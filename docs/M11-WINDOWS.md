@@ -79,6 +79,7 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 | `main/editor.ts`, `main/winCmd.ts` | Open in VS Code / IntelliJ; cmd.exe quoting for `.cmd` / `.bat` shims |
 | `main/winClaude.ts` | resolves an npm `claude.cmd` shim to a spawnable program |
 | `main/orphans.ts` | child-process listing for the e2e (ps / PowerShell CIM / wmic) |
+| `main/update.ts`, `main/updateDownload.ts`, `main/updateVerify.ts`, `main/updateInstall.ts` | PROTOCOL §48: the release check and the in-app update (download from GitHub hosts, checksum / name / version / PE checks, the wait for Claude, the installer after the engines stop, the launch's notice) |
 | `main/pty/` | PROTOCOL §57.17: `nodePty.ts` (loading, availability), `selftest.ts` (`--rg-pty-selftest`), `terminalLaunch.ts` (claude / shell launches), `ptyHub.ts` (a window's PTYs, flow control, lifecycle), `ptyWindow.ts` (the hub wired to Electron) |
 | `main/e2e.ts` | `--e2e` harness: report / screenshot / secondary-window IPC, orphan-process count, exit code |
 | `preload.ts`, `shared/ipc.ts` | the `window.rg` bridge |
@@ -251,6 +252,23 @@ Artifacts built on macOS:
 - `clients/desktop/release/win-unpacked/` — the unpacked x64 app (488 MB)
 - `clients/desktop/release/mac-arm64/ReviewGate.app` — unsigned arm64 .app for local runs (441 MB)
 
+## Updating (PROTOCOL §48 "Windows")
+
+- **By hand: run the new installer over the old one — no uninstall needed.** It finds the installed ReviewGate, installs
+  into the same folder (also one you picked), runs the old version's uninstaller silently first, and keeps your settings
+  and logs (`%APPDATA%\ReviewGate`) and the Start menu / desktop shortcuts. What guarantees it is in
+  `clients/desktop/electron-builder.yml`: `appId` fixed and no `nsis.guid` (the GUID that keys the install's registry
+  entry), `productName` fixed, `perMachine: false`, `deleteAppDataOnUninstall: false`.
+- **From the app** (0.5.18 on): the banner's [Install and Restart] downloads `ReviewGate-Setup-X.Y.Z.exe` and its
+  `.sha256` from the GitHub release (GitHub hosts only, ≤ 400 MB), checks the checksum, the name, the version and the PE
+  header, waits until no window has Claude working or a card waiting, then quits and runs
+  `ReviewGate-Setup-X.Y.Z.exe /S /currentuser --updated --force-run` once every engine has stopped. ReviewGate reopens
+  as X and says "Updated to ReviewGate X" (or why it did not install, with [Try Again]). [Download Page] is always
+  there for doing it by hand. An all-users install (under Program Files) is not updated from the app.
+- **What the checksum is worth.** It comes from the same release as the installer: it catches a corrupted or truncated
+  download, not a compromised release. The installer is not code-signed yet; Authenticode verification before running it
+  comes with the SignPath signing.
+
 ## Windows verification checklist (for a Windows tester)
 
 Prerequisites
@@ -314,6 +332,28 @@ Settings › Session › "Terminal chat (preview)" for the items below.
       1903 or later".
 - [ ] A long `--settings` / `--mcp-config` once Stage 2 adds flags: the 30,000-character guard refuses with "The command
       line for Claude Code is too long for Windows" rather than failing in CreateProcess.
+
+Updating — PROTOCOL §48 "Windows". What CI proves: download + verify of a fake release served from 127.0.0.1 (redirect,
+cap, checksum, PE header) on windows-latest, the steps and the installer's argv in vitest. Needs a real Windows machine
+with an older release installed (e.g. 0.5.17 per user) and a newer one published with its installer and `.sha256`:
+- [ ] The banner: [Install and Restart] → "Downloading … / … MB" with the bar moving → "Checking the download's
+      checksum…" → "Ready — ReviewGate closes and reopens as X" → the windows close, and within ~30 s ReviewGate reopens
+      as X (Help shows X) with "Updated to ReviewGate X" and [What's New]; the windows that were open are back.
+- [ ] With Claude working in a window: "… is ready. Claude is working — …", the window's button brings it forward,
+      the restart happens by itself when the turn ends; [Restart Now] asks first; [Cancel] removes
+      `%APPDATA%\ReviewGate\updates\…`.
+- [ ] **SmartScreen / Defender on the silent install.** The app writes the installer itself (no browser), so no
+      Mark-of-the-Web (`Zone.Identifier`) is expected and SmartScreen should not ask — unverified: note whether
+      SmartScreen, a UAC prompt, or a Defender scan / block appears, and how long the install takes with real-time
+      protection on. Check `Get-Item …\ReviewGate-Setup-X.Y.Z.exe -Stream *` before the restart (no `Zone.Identifier`).
+- [ ] No UAC prompt for the per-user install; the install folder (also a custom one) and both shortcuts are the same
+      afterwards; `%APPDATA%\ReviewGate\settings.json` is untouched apart from the update's two keys, which are gone after
+      the relaunch.
+- [ ] Running the new installer by hand over the old one (no uninstall) upgrades in place the same way.
+- [ ] Behind a proxy (system proxy settings): the download goes through it.
+- [ ] Failure paths: a release without the `.exe` (Install off, says why); the network cut mid-download (why, [Try
+      Again]); an install under Program Files (Install off: "installed for all users").
+- [ ] Task Manager after the update: no `claude.exe` / `node.exe` left from the old version.
 
 Release notes (the preview's known limits, for the release that ships it)
 - Terminal chat on Windows is a **preview**, off by default (Settings › Session); it has not been verified on a real Windows

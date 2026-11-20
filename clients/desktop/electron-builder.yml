@@ -36,10 +36,24 @@ win:
       arch: [x64]
   # rcedit (icon / version resource) needs wine on macOS; the installer builds without it.
   signAndEditExecutable: false
+# A new installer run over an installed ReviewGate upgrades it in place — no uninstall first (docs/M11-WINDOWS.md
+# "Updating", PROTOCOL §48 Windows). What guarantees it, with electron-builder 26's NSIS templates:
+# - `appId` above never changes and there is no `nsis.guid`: the GUID derived from it keys the install's registry entry
+#   (HKCU\Software\<GUID> InstallLocation, KeepShortcuts), so the new installer finds the old install, installs into the
+#   same folder (also one the user picked) and runs the old uninstaller silently with `/currentuser --updated
+#   --keep-shortcuts` before copying the new files;
+# - `productName` never changes either (the folder %LOCALAPPDATA%\Programs\ReviewGate, the shortcuts, "Uninstall
+#   ReviewGate.exe" — the in-app update looks for it);
+# - `deleteAppDataOnUninstall: false`: %APPDATA%\ReviewGate (settings.json, logs) is never removed, and `--updated` keeps
+#   it even if this ever changed;
+# - `perMachine: false`: per user, no elevation. The in-app update runs `/S /currentuser --updated --force-run`
+#   (src/main/updateInstall.ts INSTALLER_ARGS): silent, this user's install, and ReviewGate started when it is done.
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
 mac:
   files:
     - "!node_modules/node-pty/prebuilds/win32-*/**"

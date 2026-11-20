@@ -125,13 +125,21 @@ const bridge: RGBridge = {
   },
   // MARK: polish p-lifecycle — P5-sheets-49: a newer release for the banner
   updateStatus: () => ipcRenderer.invoke("rg:updateStatus"),
-  onUpdateStatus: (cb: (status: UpdateStatus | null) => void) => {
-    const listener = (_e: Electron.IpcRendererEvent, status: UpdateStatus | null) => cb(status);
+  onUpdateStatus: (cb: (status: UpdateStatus) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, status: UpdateStatus) => cb(status);
     ipcRenderer.on("rg:updateStatus", listener);
     return () => ipcRenderer.removeListener("rg:updateStatus", listener);
   },
   openUpdate: () => ipcRenderer.invoke("rg:openUpdate"),
   dismissUpdate: () => ipcRenderer.invoke("rg:dismissUpdate"),
+  // §48 Windows: the in-app install
+  installUpdate: () => ipcRenderer.invoke("rg:installUpdate"),
+  cancelUpdate: () => ipcRenderer.invoke("rg:cancelUpdate"),
+  restartNowForUpdate: () => ipcRenderer.invoke("rg:restartNowForUpdate"),
+  dismissUpdateNotice: (which: "install" | "notice") => ipcRenderer.invoke("rg:dismissUpdateNotice", which),
+  checkUpdatesNow: () => ipcRenderer.invoke("rg:checkUpdatesNow"),
+  focusUpdateBlocker: (id: number) => ipcRenderer.invoke("rg:focusUpdateBlocker", id),
+  updateNotes: (version: string) => ipcRenderer.invoke("rg:updateNotes", version),
   notify: (req: NotifyRequest) => ipcRenderer.invoke("rg:notify", req),
   // MARK: wave4b w4-notify — §39.6
   onNotificationClick: (cb: (click: NotificationClick) => void) => {

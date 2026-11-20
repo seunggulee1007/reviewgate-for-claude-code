@@ -170,6 +170,10 @@ export type AppSettings = {
   autoCheckUpdates?: boolean;
   /** MARK: polish p-lifecycle (P5-sheets-49): the release whose banner the user closed with Later (main writes it). */
   dismissedUpdateVersion?: string;
+  /** §48 Windows: written as the app quits to install an update, taken once by the next launch (main only). */
+  pendingUpdateInstall?: { from: string; to: string; why?: string };
+  /** §48 Windows (the Mac's P5-sheets-48): the launch after an update's restart reopens the windows once, whatever `reopenLastProjects` says. */
+  restoreOnceAfterRelaunch?: boolean;
   // MARK: terminal-win — PROTOCOL §57.17 (terminal-stage3 plan §2.3)
   /** Settings › Session › "Terminal chat (preview)": shows the terminal-chat entry points (absent = off). */
   terminalChatPreview?: boolean;
@@ -290,9 +294,30 @@ export type ReadinessCheck = { ok: boolean; detail?: string };
 /** What ReviewGate needs before a project opens: the Claude Code CLI, the GitHub CLI's login (PRs, updates), git's identity (commits). */
 export type Readiness = { claude: ReadinessCheck; ghLogin: ReadinessCheck; gitIdentity: ReadinessCheck };
 
-// MARK: polish p-lifecycle — P5-sheets-49
-/** A newer release than the running one (src/main/update.ts): the banner of every window. */
-export type UpdateStatus = { version: string; current: string; page: string };
+// MARK: polish p-lifecycle — P5-sheets-49 / §48 Windows: the update as every window's banner and Settings › Updates show it
+/** The in-app install from [Install and Restart] to the quit, or why it failed (src/main/updateInstall.ts). */
+export type UpdateInstallState =
+  | { kind: "downloading"; received: number; total: number | null }
+  | { kind: "verifying" }
+  /** Claude works (or a card waits) in these windows: "acme-api: Claude is working". */
+  | { kind: "waiting"; blockers: { id: number; line: string }[] }
+  | { kind: "ready" }
+  | { kind: "failed"; why: string };
+/** What the launch after an update says once: the version now running, or why the update did not install. */
+export type UpdateNoticeState = { kind: "updated"; version: string; from: string; hasNotes: boolean } | { kind: "failed"; version: string; why: string };
+export type UpdateStatus = {
+  current: string;
+  /** A newer release (null: none, or closed with Later while nothing is under way). `why`: it cannot be installed from the app. */
+  release: { version: string; page: string; hasNotes: boolean; why: string | null } | null;
+  /** The install under way or failed, for `version`. */
+  install: (UpdateInstallState & { version: string }) | null;
+  notice: UpdateNoticeState | null;
+  /** The release page of the version shown (the installer is there to download by hand), else the releases page. */
+  downloadPage: string;
+  /** The last check's result ("ReviewGate is up to date", why it failed …); null before the first. */
+  lastCheck: { at: number; text: string } | null;
+  checking: boolean;
+};
 
 /** `rg:notify` (src/main/notify.ts validates it): what needs the user while the window is in the background. */
 export type NotifyKind = "turn_done" | "permission" | "plan" | "question" | "error" | "side_answer" | "peer_message" | "agents_done"; // wave3 desktop-agents: agents_done = §36.4
@@ -417,11 +442,22 @@ export type RGBridge = {
   reportMenuState?(state: MenuEnabled): void;
   /** P1-chrome-13: main says something it did happened (Help › Copy Diagnostics → "진단 정보를 복사했어요 — …"). */
   onToast?(cb: (text: string) => void): () => void;
-  /** P5-sheets-49: a newer release (null: none, or closed with Later), and when that changes; its page; Later. */
-  updateStatus?(): Promise<UpdateStatus | null>;
-  onUpdateStatus?(cb: (status: UpdateStatus | null) => void): () => void;
+  /** P5-sheets-49 / §48 Windows: the update's state, and when it changes; its download page; Later. */
+  updateStatus?(): Promise<UpdateStatus>;
+  onUpdateStatus?(cb: (status: UpdateStatus) => void): () => void;
   openUpdate?(): Promise<void>;
   dismissUpdate?(): Promise<void>;
+  /** §48 Windows: [Install and Restart] / [Try Again]; [Cancel]; [Restart Now]; [×] on a failure or the launch's notice. */
+  installUpdate?(): Promise<void>;
+  cancelUpdate?(): Promise<void>;
+  restartNowForUpdate?(): Promise<void>;
+  dismissUpdateNotice?(which: "install" | "notice"): Promise<void>;
+  /** Settings › Updates [Check Now] (the result lands in `lastCheck`). */
+  checkUpdatesNow?(): Promise<void>;
+  /** A window the restart waits for, brought to the front. */
+  focusUpdateBlocker?(id: number): Promise<void>;
+  /** [What's New]: that version's release notes (Markdown), null when they could not be read. */
+  updateNotes?(version: string): Promise<string | null>;
   /** §24 attach button: main's image file dialog (png / jpeg / gif / webp, ≤ 5) — each file read and checked in main. [] when cancelled. */
   pickImages(): Promise<PickedImage[]>;
   /** OS path separator ("\\" on Windows) — for display only; paths are sent to the engine as given. */
