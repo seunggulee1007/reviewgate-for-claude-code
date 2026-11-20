@@ -46,6 +46,15 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 - **Linux (CI only).** There is no linux prebuild: `npm ci` compiles it with node-gyp (python, make, g++ — present on the
   GitHub ubuntu runner). npm ≥ 11.19 blocks dependency install scripts unless `allowScripts` lists them, so the root
   `package.json` allows `node-pty@1.1.0` (and only it). Bumping node-pty means bumping that entry too.
+- **Loading** (`main/pty/nodePty.ts`): lazily, once per process. Packaged: `require(<resources>/app.asar.unpacked/
+  node_modules/node-pty)` by path; development: `require("node-pty")`. On Windows it needs build ≥ 18309 (Windows 10
+  1903) — below that there is no PTY ("Terminal chat needs Windows 10 1903 or later"; winpty is never used). The result
+  is hello's `capabilities.terminalChat` and `rg:pty:info`. macOS (development): the darwin prebuild's `spawn-helper`
+  comes without its executable bit (`posix_spawnp failed`); the loader sets it back.
+- **Self-test.** `ReviewGate.exe --rg-pty-selftest=<out.json>` (or `npx electron clients/desktop --rg-pty-selftest=…`)
+  loads node-pty, runs `%ComSpec% /d /c echo rg-pty-ok` through ConPTY with the bundled `conpty.dll`, writes
+  `{ok, nodePtyDir, conptyDll, openConsole, electron, osBuild, error?}` and exits 0 / 1. It runs before the
+  single-instance lock (a running ReviewGate is not disturbed) and opens no window and no settings.
 - **Packaging.** `asarUnpack: node_modules/node-pty/**` — the `.node` files, the conout worker thread, `conpty.dll` /
   `OpenConsole.exe` and the console-list agent must be real files; main requires node-pty from
   `resources/app.asar.unpacked/node_modules/node-pty` by path. Excluded: node-pty's `src`, `deps` (winpty sources),

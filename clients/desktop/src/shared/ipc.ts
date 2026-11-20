@@ -411,6 +411,39 @@ export type RGBridge = {
   e2eOpenSecondary(): Promise<unknown>;
   /** `git log -1 --format=%H%n%s` of the e2e project (null when git fails). */
   e2eGitLog(): Promise<string | null>;
+  /** PROTOCOL §57.10: terminal chats and the shell panel — PTYs that live in main (src/main/pty/). */
+  pty: PtyBridge;
+};
+
+// MARK: terminal-win — PROTOCOL §57.10: the `rg:pty:*` contract (terminal-stage3 plan §2.2). The renderer never supplies
+// a file, args, env or cwd: main builds every launch, asks the engine for `terminal_spec` and keeps the hook token.
+
+export type ShellKind = "powershell" | "cmd";
+export type PtyOpen =
+  | { kind: "chat"; sessionId: string; cols: number; rows: number }
+  | { kind: "shell"; shell: ShellKind; cols: number; rows: number };
+export type PtyRefusal =
+  | "pty_unavailable" | "terminal_needs_native_claude" | "terminal_cmdline_too_long" | "spawn_failed"
+  | "not_current" // not the current terminal chat
+  | (string & {}); // engine codes passed through: cli_not_found, terminal_cli_too_old, terminal_hooks_disabled, terminal_not_current, no_project
+export type PtyOpenResult = { ok: true; ptyId: string } | { ok: false; code: PtyRefusal; error: string };
+export type PtyExit = { ptyId: string; exitCode: number | null; quickNoHooks: boolean; reason: "exited" | "killed" | "switched" | "closed" };
+export type PtyInfo = { available: boolean; reason: string | null; osBuild: number | null; shells: ShellKind[] };
+export type PtyListEntry = { ptyId: string; kind: "chat" | "shell"; sessionId?: string; shell?: ShellKind; running: boolean };
+export type PtyAttach = { replay: string; running: boolean; exit: PtyExit | null };
+export type PtyBridge = {
+  info(): Promise<PtyInfo>; // invoke rg:pty:info
+  open(req: PtyOpen): Promise<PtyOpenResult>; // invoke rg:pty:open (chat: idempotent for a running PTY of that chat)
+  restart(ptyId: string): Promise<PtyOpenResult>; // invoke rg:pty:restart (chat only)
+  kill(ptyId: string): Promise<void>; // invoke rg:pty:kill
+  attach(ptyId: string): Promise<PtyAttach | null>; // after a renderer reload
+  list(): Promise<PtyListEntry[]>;
+  input(ptyId: string, data: string): void; // send rg:pty:input   (≤ 1 MiB / call)
+  resize(ptyId: string, cols: number, rows: number): void; // send rg:pty:resize  (int, cols 2..1000, rows 1..500)
+  ack(ptyId: string, chars: number): void; // send rg:pty:ack
+  focus(focused: boolean): void; // send rg:pty:focus → webContents.setIgnoreMenuShortcuts
+  onData(cb: (ptyId: string, data: string) => void): () => void; // rg:pty:data (batched)
+  onExit(cb: (e: PtyExit) => void): () => void; // rg:pty:exit
 };
 
 declare global {
