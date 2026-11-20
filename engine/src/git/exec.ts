@@ -1,4 +1,5 @@
 import { devNull } from "node:os";
+import { realpathLenient, samePath } from "../platform/paths.js";
 import { exec, type ExecResult } from "../util/exec.js";
 
 export type GitOptions = {
@@ -13,6 +14,11 @@ export type GitOptions = {
    * user-initiated commit / push set this; see `runGit`.
    */
   userHooks?: boolean;
+  /**
+   * §59: plain repository discovery from `root`, never the hidden repository registered for it (`registerShadowRepo`) —
+   * the open's first call, which must notice a folder that became a real repository.
+   */
+  discover?: boolean;
 };
 
 export type GitResult = ExecResult & { readonly text: string };
@@ -54,7 +60,8 @@ export function setGitIsWindows(value: boolean): void {
 /**
  * `git -C root -c core.quotepath=off -c core.fsmonitor= [-c core.hooksPath=<null device>] [...] args`
  * with `LC_ALL=C`, stdout as a Buffer. `root` is expected in git's forward-slash form (as printed by
- * `rev-parse --show-toplevel`).
+ * `rev-parse --show-toplevel`). §59: a folder registered with `registerShadowRepo` runs on its hidden repository
+ * (`--git-dir=… --work-tree=…` after `-C`) unless `opts.discover`.
  *
  * Repository config is not trusted to run programs on the app's behalf: an fsmonitor command or a
  * hook planted in `.git/` (by a tool, a script or a cloned repo) would otherwise run on every snapshot
@@ -69,7 +76,7 @@ export function setGitIsWindows(value: boolean): void {
  * snapshot's `git add -A`); `git config` through Bash is a command the user or the CLI judged.
  */
 export async function runGit(root: string, args: string[], opts: GitOptions = {}): Promise<GitResult> {
-  const prefix = ["-C", root, "-c", "core.quotepath=off", "-c", "core.fsmonitor="];
+  const prefix = ["-C", root, ...(opts.discover ? [] : shadowArgs(root)), "-c", "core.quotepath=off", "-c", "core.fsmonitor="];
   if (!opts.userHooks) prefix.push("-c", `core.hooksPath=${devNull}`);
   if (isWindows) prefix.push("-c", "core.longpaths=true");
   const out = await exec(gitPath, [...prefix, ...args], {
@@ -82,6 +89,57 @@ export async function runGit(root: string, args: string[], opts: GitOptions = {}
     throw new GitCommandError("git " + args.join(" "), out.stderr, out.status);
   }
   return Object.assign(out, { text: out.stdout.toString("utf8") });
+}
+
+// ---------------------------------------------------------------- §59 folders tracked without git
+
+type ShadowEntry = { workTree: string; gitDir: string; refs: number };
+const shadowRepos: ShadowEntry[] = [];
+
+/**
+ * §59: from now on every `runGit` whose root is `workTree` (the same folder, also through a symlink) runs on the hidden
+ * repository `gitDir` (`--git-dir=<gitDir> --work-tree=<workTree>`) instead of discovering one — the folder itself never
+ * gets a `.git`. Counted: each registration is undone by calling the function returned, once. A folder below `workTree`
+ * (a nested repository of its own) still discovers as before.
+ */
+export function registerShadowRepo(workTree: string, gitDir: string): () => void {
+  let entry = shadowRepos.find((e) => samePath(e.workTree, workTree));
+  if (entry) {
+    entry.gitDir = gitDir;
+    entry.refs += 1;
+  } else {
+    entry = { workTree, gitDir, refs: 1 };
+    shadowRepos.push(entry);
+  }
+  const held = entry;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    held.refs -= 1;
+    if (held.refs <= 0) {
+      const i = shadowRepos.indexOf(held);
+      if (i >= 0) shadowRepos.splice(i, 1);
+    }
+  };
+}
+
+/** §59: the hidden repository registered for exactly `root` (as named or through symlinks); null for any other folder. */
+export function shadowGitDirFor(root: string): string | null {
+  if (shadowRepos.length === 0) return null;
+  const hit = shadowRepos.find((e) => samePath(e.workTree, root)) ?? shadowRepos.find((e) => samePath(e.workTree, realpathLenient(root)));
+  return hit ? hit.gitDir : null;
+}
+
+/** §59: the work trees registered now (`registerShadowRepo`). */
+export function shadowWorkTrees(): string[] {
+  return shadowRepos.map((e) => e.workTree);
+}
+
+/** §59: `["--git-dir=…", "--work-tree=…"]` when `root` is a registered folder, else nothing (for a git started outside `runGit`). */
+export function shadowArgs(root: string): string[] {
+  const gitDir = shadowGitDirFor(root);
+  return gitDir ? [`--git-dir=${gitDir}`, `--work-tree=${root}`] : [];
 }
 
 /** Splits `-z` output into UTF-8 fields, dropping the empty field after the trailing NUL. */

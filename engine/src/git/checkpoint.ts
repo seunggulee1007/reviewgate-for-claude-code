@@ -88,7 +88,7 @@ function firstLine(s: string): string {
 
 /** `git init -q` in `directory`. */
 export async function initRepository(directory: string): Promise<void> {
-  await runGit(directory, ["init", "-q"]);
+  await runGit(directory, ["init", "-q"], { discover: true });
 }
 
 /**
@@ -114,15 +114,18 @@ export class OpenSupersededError extends Error {
 }
 
 /**
- * Resolves the toplevel of the repository containing `directory`; throws `NotARepositoryError`, `GitTimeoutError` when git
+ * Resolves the toplevel of the repository containing `directory` (§59: or the folder a hidden repository is registered
+ * for, unless `discover`); throws `NotARepositoryError`, `GitTimeoutError` when git
  * does not answer within `OPEN_GIT_TIMEOUT_MS`, `OpenSupersededError` once `signal` aborts.
  */
-export async function openCheckpoint(directory: string, signal?: AbortSignal): Promise<GitCheckpoint> {
+export async function openCheckpoint(directory: string, signal?: AbortSignal, opts: { discover?: boolean } = {}): Promise<GitCheckpoint> {
   const ms = openGitTimeoutMs;
   const timeout = () => new GitTimeoutError("git rev-parse", ms, OPEN_GIT_HINT);
   let out: GitResult;
   try {
-    const run = runGit(directory, ["rev-parse", "--show-toplevel"], { allowFailure: true, timeoutMs: ms });
+    // §59 `discover`: the open's own call ignores a hidden repository registered for the folder (one that became a real
+    // repository uses it); the hooks' checkpoint of a folder tracked without git finds the hidden one.
+    const run = runGit(directory, ["rev-parse", "--show-toplevel"], { allowFailure: true, timeoutMs: ms, ...(opts.discover ? { discover: true } : {}) });
     out = await withDeadline(signal ? supersedable(run, signal) : run, ms + GIT_DEADLINE_GRACE_MS, timeout);
   } catch (e) {
     if (e instanceof GitTimeoutError || e instanceof OpenSupersededError) throw e;

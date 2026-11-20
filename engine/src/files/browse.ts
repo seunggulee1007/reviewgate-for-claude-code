@@ -3,7 +3,7 @@
 import { spawn } from "node:child_process";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { CommandRefused } from "../errors.js";
-import { getGitPath } from "../git/exec.js";
+import { getGitPath, shadowArgs } from "../git/exec.js";
 import { repoRelativeInside } from "../platform/paths.js";
 import type { ProjectSearchMatch } from "../protocol.js";
 
@@ -89,7 +89,7 @@ export function searchProject(root: string, opts: ProjectSearchOptions): Promise
     ? Math.min(PROJECT_SEARCH_MAX_LIMIT, Math.floor(opts.limit)) : PROJECT_SEARCH_DEFAULT_LIMIT;
   // The user's git config must not change the output or refuse the search: `submodule.recurse` makes `--untracked` fatal,
   // `grep.column` / `grep.fullName` / `grep.fallbackToNoIndex` change what a line holds.
-  const args = ["-C", root, "-c", "core.quotepath=off", "-c", "submodule.recurse=false", "-c", "grep.column=false", "-c", "grep.fullName=false",
+  const args = ["-C", root, ...shadowArgs(root), "-c", "core.quotepath=off", "-c", "submodule.recurse=false", "-c", "grep.column=false", "-c", "grep.fullName=false",
     "-c", "grep.fallbackToNoIndex=false", "grep", "-n", "-z", "-I", "--no-color", "--untracked", "-F"];
   if (!caseSensitive) args.push("-i");
   if (opts.wholeWord === true) args.push("-w");
