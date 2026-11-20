@@ -557,7 +557,12 @@ describe("terminal chats (§57)", () => {
     const record = cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: other });
     mkdirSync(dirname(record), { recursive: true });
     writeFileSync(record, "");
+    // A later hook of the spawn cannot move it (only the first hook of a spawn names the dir).
     await hook(s, { hook_event_name: "Notification", notification_type: "idle_prompt", message: "", transcript_path: record });
+    expect(r.h.engine.state.sessions.list.find((m) => m.id === id)?.cliConfigDir).toBeUndefined();
+    // The next spawn's first hook does.
+    const s2 = await spec(r, id);
+    await hook(s2, { hook_event_name: "Notification", notification_type: "idle_prompt", message: "", transcript_path: record });
     await r.h.waitFor((st) => st.sessions.list.find((m) => m.id === id)?.cliConfigDir === other, "cliConfigDir");
     // The engine's own dir has the project's folder without the record: not gone, it is in the learned one.
     const ownProjects = dirname(cliSessionFile(r.dir, id, { CLAUDE_CONFIG_DIR: r.config }));

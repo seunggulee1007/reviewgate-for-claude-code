@@ -196,6 +196,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   /** §57.16: the config dir learned from `transcript_path` (and the last path read, so each is checked once). */
   private configDir: string | null;
   private lastTranscript: string | null = null;
+  /** §57.16: this spawn's first hook was looked at for the config dir — later hooks never change it. */
+  private transcriptNoted = false;
   private plansDir: string | undefined;
   /** §57.13: the last status line input, the CLI's last total cost (the baseline; null until the first after a spawn) and the cost since the last turn_end. */
   private status: TerminalStatus | null = null;
@@ -394,6 +396,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.token = token;
     if (retire) this.retireToken = retire;
     this.costTotal = null; // §57.13: the new spawn's first status is the baseline
+    this.transcriptNoted = false; // §57.16: its first hook names the config dir
     this.running = false;
     this.hooksSeen = false;
     this.waiting = null;
@@ -839,9 +842,12 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   /**
    * §57.16: every hook names its conversation's file, `<configDir>/projects/<key>/<id>.jsonl` — so the config dir the CLI
    * really uses (the PTY's login shell may export its own CLAUDE_CONFIG_DIR). Taken only in that shape, absolute, with a
-   * `projects` directory there; a change emits `terminal_config_dir`. Read-only checks only ever use it.
+   * `projects` directory there; a change emits `terminal_config_dir`. Only the first hook of a spawn counts (a later hook's
+   * path cannot move it). Read-only checks only ever use it — never to pick a command to run.
    */
   private noteTranscript(raw: unknown): void {
+    if (this.transcriptNoted) return;
+    this.transcriptNoted = true;
     if (typeof raw !== "string" || raw === this.lastTranscript) return;
     this.lastTranscript = raw;
     const dir = configDirOfTranscript(raw);

@@ -358,7 +358,7 @@ describe("TerminalSession", () => {
     expect(r.of("terminal_cwd")).toEqual([{ type: "terminal_cwd", cwd: "/work/acme/feature" }]);
   });
 
-  it("§57.16 transcript_path → terminal_config_dir (once per dir); a malformed path is ignored", async () => {
+  it("§57.16 the first hook of a spawn names the config dir (transcript_path → terminal_config_dir); a later hook never moves it; a malformed path is ignored", async () => {
     const r = rig();
     const config = realpathSync(makeTempDir("rg-term-cfg"));
     dirs.push(config);
@@ -366,12 +366,20 @@ describe("TerminalSession", () => {
     const file = join(config, "projects", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl");
     for (const bad of ["/dev/null", "relative/projects/x/0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl", join(config, "other", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl"), join(config, "projects", "-work-acme", "notes.jsonl"), join("/nonexistent", "projects", "k", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl")]) {
       expect(configDirOfTranscript(bad), bad).toBeNull();
+      r.ts.setToken(null); // a new spawn: this is its first hook
       await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: bad });
     }
     expect(r.of("terminal_config_dir")).toHaveLength(0);
+    r.ts.setToken(null);
     await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
     await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
     expect(r.of("terminal_config_dir")).toEqual([{ type: "terminal_config_dir", dir: config }]);
+    // A later hook of the same spawn naming another (well-formed) dir does not move it.
+    const forged = realpathSync(makeTempDir("rg-term-cfg-forged"));
+    dirs.push(forged);
+    mkdirSync(join(forged, "projects", "-work-acme"), { recursive: true });
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: join(forged, "projects", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl") });
+    expect(r.of("terminal_config_dir")).toHaveLength(1);
   });
 
   it("§57.10 background: prompts blocked, write tools denied (the guard's deny first), waits still raised; back again keeps the token", async () => {

@@ -9419,11 +9419,12 @@ request is already aborted, it answers `{}` at once (the TUI's dialog) after rai
   dialogs (`terminalFeature("permissionBridge")`: the Mac app); it sets `waiting` at once (§57.15).
 - **CwdChanged** (`H(10)`) reports a `cd` of the TUI's shell (`terminal_cwd`, §57.12). It has no decision.
 - **Config dir.** The PTY's login shell can export its own `CLAUDE_CONFIG_DIR`. Every hook carries `transcript_path` =
-  `<configDir>/projects/<key>/<uuid>.jsonl`; the session takes `<configDir>` from it when it has exactly that shape, is
-  absolute and `<configDir>/projects` is a directory, and when it changed emits it — persisted as `SessionMeta.cliConfigDir`.
+  `<configDir>/projects/<key>/<uuid>.jsonl`; the session takes `<configDir>` from the first hook of each spawn (a later
+  hook's path never moves it) when it has exactly that shape, is absolute and `<configDir>/projects` is a directory, and
+  when it changed emits it — persisted as `SessionMeta.cliConfigDir`.
   `terminal_spec` then reads both dirs: refused `terminal_hooks_disabled` when either says hooks are off; the conversation
   is "gone" (§57.2) only when no dir has the record and each says gone; plan files are under the learned dir's `plans`.
-  A forged path only feeds read-only checks, and only makes them stricter.
+  A forged path only feeds read-only checks, and only makes them stricter; it never picks a command to run (§57.13).
 
 ### 57.17 The Windows client
 
