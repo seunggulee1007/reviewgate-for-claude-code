@@ -11,6 +11,13 @@
 # - the engine's data dir is a fresh folder under SHOTS_DIR (never ~/.reviewgate); workbenches would go there too;
 # - the session loads no user settings (no ~/.claude skills, plugins, hooks, MCP servers or CLAUDE.md); the app starts
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
+# - a layout on the fake claude (SHOTS_LAYOUT=terminal) never reads ~/.claude at all: the app and its engine get
+#   CLAUDE_CONFIG_DIR=SHOTS_DIR/claude-config, a fresh folder whose settings.json holds only a harmless status line
+#   (`echo acme-status`) for the terminal chat's status line tee (§57.13) to wrap;
+# - the layouts on the real claude (the README run and every other SHOTS_LAYOUT, composer among them) keep the user's
+#   config dir — the CLI needs its login — and never run the user's status line: the build's showStatusLine is off (no
+#   status line under the chat, §44.2) and the tour opens chats only (newChatKind chat), never a terminal chat whose TUI
+#   or tee (§57.13) would run it;
 # - the demo project is only ever deleted when it carries the marker this script wrote into its .git folder.
 # The turn leaves a session record under ~/.claude/projects (as any Claude Code run in that folder does).
 # On macOS 26 the build runs in the compatibility design (what macOS 15 shows): a window rendering itself cannot draw
@@ -407,6 +414,16 @@ rl.on("line", async (line) => {
 EOF
   chmod +x "$CLAUDE_BIN"
 fi
+# A layout on the fake claude: the app and its engine get a Claude Code config dir of their own (CLAUDE_CONFIG_DIR), so
+# nothing reads the user's ~/.claude — no user settings, hooks, status line, skills, plugins, plans, MCP servers or
+# conversations. Its settings.json has a harmless status line for §57.13's tee to wrap.
+TOUR_CLAUDE_CONFIG=""
+if [ "$CLAUDE_BIN" != claude ]; then
+  TOUR_CLAUDE_CONFIG="$SHOTS_DIR/claude-config"
+  rm -rf "$TOUR_CLAUDE_CONFIG"
+  mkdir -p "$TOUR_CLAUDE_CONFIG"
+  printf '%s\n' '{"statusLine":{"type":"command","command":"echo acme-status"}}' > "$TOUR_CLAUDE_CONFIG/settings.json"
+fi
 CLI_VERSION="$("$CLAUDE_BIN" --version | awk '{print $1}')"
 ENGINE_VERSION="$(sed -n 's/.*ENGINE_VERSION = "\(.*\)".*/\1/p' "$ROOT/engine/src/version.ts")"
 node "$ROOT/scripts/verified-cli.mjs" record "$DATA" "$CLI_VERSION" "$ENGINE_VERSION" tour   # no "unverified CLI" banner
@@ -470,6 +487,8 @@ else
 fi
 # `open` (a launch the app is activated for) hands its own environment to the app: a minimal one, so nothing of this
 # shell (a Claude Code session's CLAUDE_* variables included) reaches the app, its engine or the claude it starts.
+set --
+[ -z "$TOUR_CLAUDE_CONFIG" ] || set -- --env "CLAUDE_CONFIG_DIR=$TOUR_CLAUDE_CONFIG"
 env -i HOME="$HOME" USER="$USER" LOGNAME="${LOGNAME:-$USER}" SHELL="${SHELL:-/bin/zsh}" TMPDIR="${TMPDIR:-/tmp}" \
   PATH="$NODE_DIR:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
   open $OPEN_FLAGS -a "$APP" --stdout "$SHOTS_DIR/app.log" --stderr "$SHOTS_DIR/app.log" \
@@ -477,7 +496,7 @@ env -i HOME="$HOME" USER="$USER" LOGNAME="${LOGNAME:-$USER}" SHELL="${SHELL:-/bi
   --env "REVIEWGATE_SCREENSHOT_QUIET=$QUIET" \
   --env "REVIEWGATE_SCREENSHOT_TOUR=$RAW" --env "REVIEWGATE_SCREENSHOT_PROMPT=${SHOTS_PROMPT:-}" \
   --env "REVIEWGATE_SCREENSHOT_MODEL=${SHOTS_MODEL:-}" --env "REVIEWGATE_SCREENSHOT_LAYOUT=${SHOTS_LAYOUT:-}" \
-  --env "REVIEWGATE_TERMINAL_SHELL=/bin/sh" \
+  --env "REVIEWGATE_TERMINAL_SHELL=/bin/sh" ${1+"$@"} \
   --args -AppleLanguages "($UI_LANG)" -AppleLocale "$UI_LOCALE" -ApplePersistenceIgnoreState YES &
 OPEN_PID=$!
 waited=0
