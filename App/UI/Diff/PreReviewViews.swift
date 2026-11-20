@@ -10,16 +10,15 @@ import ReviewGateCore
 /// The Changes head's row: the button (with the effort and "this file only") and the status of the latest run.
 struct PreReviewHeadControl: View {
     @Environment(AppState.self) private var store
-    @AppStorage(AppSettings.Key.preReviewEffort) private var effortRaw = PreReviewEffort.medium.rawValue
-
-    private var effort: PreReviewEffort { PreReviewEffort(rawValue: effortRaw) ?? .medium }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                status
-                Spacer(minLength: 4)
-                startButton
+            // Only a run's status (and its cancel) — starting one is in the Changes header's "⋯" (`PreReviewMenuItems`).
+            if case .idle = store.preReviewStatus {} else {
+                HStack(spacing: 6) {
+                    status
+                    Spacer(minLength: 4)
+                }
             }
             if let line = reasonLine {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -98,35 +97,38 @@ struct PreReviewHeadControl: View {
         }
     }
 
-    private var startButton: some View {
-        Menu {
-            Picker("Effort", selection: $effortRaw) {
-                ForEach(PreReviewEffort.allCases) { Text(verbatim: $0.title).tag($0.rawValue) }
-            }
-            .pickerStyle(.inline)
-            Divider()
-            Button("Pre-review the selected file only") {
-                if let path = store.selectedPath { start(scope: .files, paths: [path]) }
-            }
-            .disabled(store.selectedPath == nil)
-        } label: {
-            Label("AI pre-review", systemImage: "sparkles")
-        } primaryAction: {
-            start(scope: .round, paths: nil)
-        }
-        .menuStyle(.button)
-        .controlSize(.small)
-        .fixedSize()
-        .disabled(store.preReviewBlocker != nil)
-        .help(store.preReviewBlocker ?? String(localized: "Claude reviews this round's changes first, in a read-only side session — findings go on the diff lines, not into the chat (effort \(effort.title))"))
-        .accessibilityLabel("AI pre-review")
-        .accessibilityIdentifier("AI pre-review")
-    }
-
     /// An engine without §36.13, or the last start / cancel / dismiss refused (one line; the next action clears it).
     private var reasonLine: String? {
         if !store.flow.preReviewSupported { return FlowText.updateReason }
         return store.flow.preReviewError
+    }
+
+}
+
+/// The Changes header's "⋯" items for the AI pre-review: the round, the selected file only, and the effort.
+struct PreReviewMenuItems: View {
+    @Environment(AppState.self) private var store
+    @AppStorage(AppSettings.Key.preReviewEffort) private var effortRaw = PreReviewEffort.medium.rawValue
+
+    private var effort: PreReviewEffort { PreReviewEffort(rawValue: effortRaw) ?? .medium }
+
+    var body: some View {
+        Button("AI pre-review", systemImage: "sparkles") { start(scope: .round, paths: nil) }
+            .disabled(store.preReviewBlocker != nil)
+            .help(store.preReviewBlocker ?? String(localized: "Claude reviews this round's changes first, in a read-only side session — findings go on the diff lines, not into the chat (effort \(effort.title))"))
+            .accessibilityLabel("AI pre-review")
+            .accessibilityIdentifier("AI pre-review")
+        Button("Pre-review the selected file only") {
+            if let path = store.selectedPath { start(scope: .files, paths: [path]) }
+        }
+        .disabled(store.preReviewBlocker != nil || store.selectedPath == nil)
+        Menu("Effort") {
+            Picker("Effort", selection: $effortRaw) {
+                ForEach(PreReviewEffort.allCases) { Text(verbatim: $0.title).tag($0.rawValue) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        }
     }
 
     private func start(scope: PreReviewScope, paths: [String]?) {

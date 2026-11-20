@@ -150,7 +150,10 @@ struct ChangedFilesList: View {
                                     // the List and only its very edges selected. The way back from the code browser is `listSelection`.
                             }
                         } header: {
-                            sectionHeader(section, showsOrder: section.id == sections.first?.id)
+                            // One plain "Claude changes N" group says nothing the progress row above does not — no header then.
+                            if !(sections.count == 1 && section.kind == .claude && section.folder == nil) {
+                                sectionHeader(section)
+                            }
                         }
                     }
                 }
@@ -198,17 +201,15 @@ struct ChangedFilesList: View {
         return Binding(get: { shown }, set: { store.selectedPath = $0 })
     }
 
+    /// Two rows above the list: what has been looked at, then the two actions used most — Accept all and Commit — and a
+    /// "⋯" with the rest (Reject all, AI pre-review, Finish review, the order and the grouping). Every item keeps its
+    /// reason for being disabled as a tooltip.
     private var header: some View {
         let pending = store.pendingFiles.count
         let accepted = store.acceptedPaths.count
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text("\(store.changedFiles.count) changed · \(pending) pending")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .help("Next pending file ⌘] · previous ⌘[")   // polish P2-review-01 (Electron's words)
-                Spacer()
+        return VStack(alignment: .leading, spacing: 6) {
+            reviewProgress(pending: pending)
+            HStack(spacing: 6) {
                 // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
                 // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
                 Button("Accept all") { AcceptAllAction.run(store: store, model: model) }
@@ -219,12 +220,19 @@ struct ChangedFilesList: View {
                             : String(localized: "Accept every pending file — the notice that follows can undo it"), action: "Accept All…")))
                     .accessibilityLabel("Accept all")
                     .accessibilityIdentifier("Accept all")
-                Button("Reject all") { model.showRejectAll = true }
+                Spacer(minLength: 4)
+                // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
+                // r2-review-flow M28: the sheet takes pending files too ("검토 완료로 표시하고 커밋").
+                Button(accepted > 0 ? String(localized: "Commit (\(accepted))…") : String(localized: "Commit…"), systemImage: "checkmark.seal") { model.showCommit = true }
+                    .labelStyle(.titleOnly)
                     .controlSize(.small)
-                    .disabled(pending == 0 || store.isRejectLocked)
-                    .help(pending == 0 ? String(localized: "No pending files") : (store.rejectLockReason ?? String(localized: "Revert Claude's pending changes to the start of the turn; changes from outside the app stay unless you add them")))
-                    .accessibilityLabel("Reject all")
-                    .accessibilityIdentifier("Reject all")
+                    .disabled(!store.canOpenCommitSheet)
+                    // A blocked action is never only greyed out (§37.1 and a turn, its collection, a revert).
+                    .help(store.commitLockReason ?? (accepted > 0 ? String(localized: "Commit the accepted files (⌘⇧K)")
+                        : String(localized: "Commit — the files you tick are marked reviewed as they are committed (⌘⇧K)")))
+                    .accessibilityLabel("Commit accepted")
+                    .accessibilityIdentifier("Commit accepted")
+                moreMenu(pending: pending)
             }
             if pending > 0, store.isRunning, !store.isShowingStaleDiff, let reason = store.rejectLockReason {
                 // A blocked action is never only greyed out: one line says why — here unless the diff's banner says it.
@@ -234,38 +242,68 @@ struct ChangedFilesList: View {
                     .lineLimit(2)
                     .accessibilityIdentifier("Reject waits for the turn")
             }
-            reviewProgress
             if !store.changedFiles.isEmpty || !store.flow.runs.isEmpty {
-                PreReviewHeadControl()   // wave3 mac-flow (§36.13): AI 사전 리뷰 — status, cancel
-            }
-            // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
-            HStack {
-                // §31.5: always here — empties the list (and its notes) without touching a file.
-                Button("Finish review…") { model.showFinishReview = true }
-                    .controlSize(.small)
-                    .disabled(!store.canFinishReview)
-                    .help(store.finishReviewBlocker ?? String(localized: "Empty the review list without touching any file — what is still pending stays on disk as it is and becomes the baseline of the next message"))
-                    .accessibilityLabel("Finish review")
-                    .accessibilityIdentifier("Finish review")
-                Spacer()
-                // r2-review-flow M28: the sheet takes pending files too ("검토 완료로 표시하고 커밋").
-                Button(accepted > 0 ? String(localized: "Commit accepted (\(accepted))…") : String(localized: "Commit…"), systemImage: "checkmark.seal") { model.showCommit = true }
-                    .labelStyle(.titleOnly)
-                    .controlSize(.small)
-                    .disabled(!store.canOpenCommitSheet)
-                    // A blocked action is never only greyed out (§37.1 and a turn, its collection, a revert).
-                    .help(store.commitLockReason ?? (accepted > 0 ? String(localized: "Commit the accepted files (⌘⇧K)")
-                        : String(localized: "Commit — the files you tick are marked reviewed as they are committed (⌘⇧K)")))
-                    .accessibilityLabel("Commit accepted")
-                    .accessibilityIdentifier("Commit accepted")
+                PreReviewHeadControl()   // wave3 mac-flow (§36.13): AI 사전 리뷰 — only while a run is active or has a result
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
     }
 
-    /// "3/7 viewed": how much of the review the user has actually looked at (diffs shown this review).
+    /// "⋯": what the header does not show all the time. The rejects, the finish and the pre-review keep their tooltips.
+    private func moreMenu(pending: Int) -> some View {
+        Menu {
+            // §31 (M3): reverts Claude's pending changes; the confirmation names what stays.
+            Button("Reject all", systemImage: "arrow.uturn.backward") { model.showRejectAll = true }
+                .disabled(pending == 0 || store.isRejectLocked)
+                .help(pending == 0 ? String(localized: "No pending files") : (store.rejectLockReason ?? String(localized: "Revert Claude's pending changes to the start of the turn; changes from outside the app stay unless you add them")))
+                .accessibilityLabel("Reject all")
+                .accessibilityIdentifier("Reject all")
+            PreReviewMenuItems()   // wave3 mac-flow (§36.13)
+            // §31.5: always here — empties the list (and its notes) without touching a file.
+            Button("Finish review…", systemImage: "flag.checkered") { model.showFinishReview = true }
+                .disabled(!store.canFinishReview)
+                .help(store.finishReviewBlocker ?? String(localized: "Empty the review list without touching any file — what is still pending stays on disk as it is and becomes the baseline of the next message"))
+                .accessibilityLabel("Finish review")
+                .accessibilityIdentifier("Finish review")
+            Divider()
+            Menu("Order", systemImage: "arrow.up.arrow.down") {
+                Picker("Order", selection: $riskOrder) {
+                    Text("Risk first").tag(true)
+                    Text("Git order").tag(false)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+            .help("Order: riskiest files first, or the order git lists them")
+            .accessibilityIdentifier("Changed files order")
+            // MARK: wave4b w4b-files — §40.2 (comp-14): "묶기", kept per project; a bulk change folds by folder itself.
+            Menu("Group the list", systemImage: "rectangle.3.group") {
+                Picker("Group the list", selection: Binding(get: { store.fileGroupBy }, set: { store.setFileGroupBy($0); groupByTick &+= 1 })) {
+                    ForEach(FileGroupBy.allCases, id: \.self) { by in
+                        Text(verbatim: by.label).tag(by)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            }
+            .disabled(store.isBulkChange)
+            .help(store.isBulkChange ? String(localized: "A bulk change is folded by folder") : String(localized: "Group the list"))
+            .accessibilityIdentifier("Group by")
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .menuStyle(.button)
+        .menuIndicator(.hidden)
+        .controlSize(.small)
+        .fixedSize()
+        .help("More: Reject all, AI pre-review, Finish review, order and grouping of the list")
+        .accessibilityLabel("More review actions")
+        .accessibilityIdentifier("Changes header more")
+    }
+
+    /// "3/7 viewed · 2 pending": how much of the review the user has actually looked at (diffs shown this review).
     @ViewBuilder
-    private var reviewProgress: some View {
+    private func reviewProgress(pending: Int) -> some View {
         let total = store.changedFiles.count
         if total > 0 {
             let viewed = store.viewedChangedCount
@@ -274,10 +312,12 @@ struct ChangedFilesList: View {
                     .progressViewStyle(.linear)
                     .tint(viewed == total ? .green : .accentColor)
                     .controlSize(.small)
-                Text("\(viewed)/\(total) viewed")
+                Text("\(viewed)/\(total) viewed · \(pending) pending")
                     .font(.caption.weight(.medium).monospacedDigit())
                     .foregroundStyle(viewed == total ? Color.green : Color.secondary)
+                    .lineLimit(1)
                     .fixedSize()
+                    .help("Files whose diff you have opened in this review · Next pending file ⌘] · previous ⌘[")
                 // wave2 mac-flow (§34.5): viewed is per content — files that changed after you looked are counted apart.
                 // wave3 check-clients: pending ones only, as the rows and Electron (a decided file has nothing left to look at).
                 let changed = store.changedSinceViewedPendingFiles.count
@@ -289,7 +329,6 @@ struct ChangedFilesList: View {
                         .accessibilityIdentifier("Changed since viewed count")
                 }
             }
-            .help("Files whose diff you have opened in this review")
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("Review progress")
         }
@@ -422,7 +461,7 @@ struct ChangedFilesList: View {
     }
 
     /// "설정·훅 (Claude 동작 변경) N" / "Claude 변경 N" / "앱 밖 변경 M"; the first group carries the order picker.
-    private func sectionHeader(_ section: ChangedFileSection, showsOrder: Bool) -> some View {
+    private func sectionHeader(_ section: ChangedFileSection) -> some View {
         HStack(spacing: 4) {
             if section.folder != nil {   // MARK: wave4b w4b-bigturn — §39.1: a bulk list's folder opens / folds
                 let open = model.changesExpandedFolders.contains(section.id)
@@ -446,31 +485,6 @@ struct ChangedFilesList: View {
                 .truncationMode(.tail)
                 .help(section.help)
             Spacer()
-            if showsOrder {
-                Picker("Order", selection: $riskOrder) {
-                    Text("Risk first").tag(true)
-                    Text("Git order").tag(false)
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-                .controlSize(.mini)
-                .help("Order: riskiest files first, or the order git lists them")
-                .accessibilityIdentifier("Changed files order")
-                // MARK: wave4b w4b-files — §40.2 (comp-14): "묶기", kept per project; a bulk change folds by folder itself.
-                Picker("Group the list", selection: Binding(get: { store.fileGroupBy }, set: { store.setFileGroupBy($0); groupByTick &+= 1 })) {
-                    ForEach(FileGroupBy.allCases, id: \.self) { by in
-                        Text(verbatim: by.label).tag(by)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-                .controlSize(.mini)
-                .disabled(store.isBulkChange)
-                .help(store.isBulkChange ? String(localized: "A bulk change is folded by folder") : String(localized: "Group the list"))
-                .accessibilityIdentifier("Group by")
-            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Changes section \(section.kind.rawValue)")
