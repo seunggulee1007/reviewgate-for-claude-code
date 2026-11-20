@@ -1020,5 +1020,7 @@
   "Paste into Claude Code's prompt in the terminal — press Enter there to send it": "터미널의 Claude Code 입력란에 붙여넣어요 — 보내려면 터미널에서 Enter를 누르세요",
   "Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Enter there": "보고서를 터미널의 Claude Code 입력란에 붙여넣어요 — Claude에게 시킬 일을 덧붙이고 터미널에서 Enter를 누르세요",
   "Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat — you read it and press Enter there": "아직 답하지 않은 스레드를 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Enter를 누르세요",
-  "Pastes this thread into Claude Code's prompt in the terminal chat — you read it and press Enter there": "이 스레드를 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Enter를 누르세요"
+  "Pastes this thread into Claude Code's prompt in the terminal chat — you read it and press Enter there": "이 스레드를 터미널 채팅의 Claude Code 입력란에 붙여넣어요 — 읽고 터미널에서 Enter를 누르세요",
+  "Hide the terminal panel (Ctrl+`) — its shells keep running": "터미널 패널 숨기기 (Ctrl+`) — 셸은 계속 실행돼요",
+  "Starting the shell…": "셸을 시작하는 중…"
 }
