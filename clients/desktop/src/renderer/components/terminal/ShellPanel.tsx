@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { t, usesMacKeys } from "../../i18n";
 import { Icon } from "../../icons";
+import { isEnter } from "../../ime";
 import { useStore } from "../../store";
 import { usePtyInfo } from "../../terminal/ptyInfo";
 import { clampPanelHeight, closeShell, forgetShell, openShell, restartShell, shellExitKeepsTab, shellTabTitle, toggleShellPanel, useShellPanel } from "../../terminal/shellPanel";
@@ -119,7 +120,7 @@ export function ShellPanel() {
               title={project ? t("{0} — in {1}", title, project) : title}
               onClick={() => useShellPanel.setState({ active: id })}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (isEnter(e) || e.key === " ") {
                   e.preventDefault();
                   useShellPanel.setState({ active: id });
                 }
