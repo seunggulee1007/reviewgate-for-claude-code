@@ -10,7 +10,7 @@ import { hasTerminal, mountTerminal, subscribeTerminals, terminalsVersion } from
 
 export function TerminalView(props: { ptyId: string; label: string; testId?: string; title?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useSyncExternalStore(subscribeTerminals, terminalsVersion);
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
   const known = hasTerminal(props.ptyId);
   useEffect(() => {
     if (!ref.current || !known) return;

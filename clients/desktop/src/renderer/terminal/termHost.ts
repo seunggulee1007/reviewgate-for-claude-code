@@ -411,6 +411,15 @@ export function disposeTerminal(ptyId: string): void {
   setTimeout(syncFocus, 0);
 }
 
+/** Main restarted the PTY under the same id: it runs again (the old screen stays until the program repaints it). */
+export function markRestarted(ptyId: string): void {
+  const e = entries.get(ptyId);
+  if (!e) return;
+  e.status = { running: true, exit: null };
+  e.unacked = 0;
+  notify();
+}
+
 export function hasTerminal(ptyId: string | null | undefined): boolean {
   return ptyId != null && entries.has(ptyId);
 }

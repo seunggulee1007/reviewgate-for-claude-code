@@ -23,6 +23,9 @@ export function changesStatus(s: Pick<ReviewState, "session" | "gate">): Changes
   const perms = s.session.pendingPermissions ?? (s.session.pendingPermission ? [s.session.pendingPermission] : []);
   if (perms.some((p) => p.toolName === "AskUserQuestion")) return { kind: "waiting", reason: "question" };
   if (perms.length > 0) return { kind: "waiting", reason: "permission" };
+  // §57.5: Claude Code waits in a terminal chat's TUI (a permission prompt, a question).
+  const termWait = s.session.terminal?.waiting;
+  if (termWait) return { kind: "waiting", reason: termWait.kind };
   if (s.session.pendingPlan) return { kind: "waiting", reason: "plan" };
   // r2-peers: `auto` runs a message from a live session of the user's by itself; one the registry does not vouch for waits.
   const held = visiblePeerInbox(s.session).filter((m) => m.state === "held");

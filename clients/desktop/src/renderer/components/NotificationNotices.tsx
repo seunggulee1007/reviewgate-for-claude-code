@@ -11,6 +11,7 @@ import { notificationClickPlan, type ClickReveal } from "../notifyClick";
 import { sessionsOf } from "../sessions";
 import { useStore } from "../store";
 import { viewChat } from "../viewedChat";
+import { focusLiveTerminal, liveTerminalChatId } from "../terminal/terminalChat"; // §57.10
 import { revealPermissionCard } from "./chat/PermissionBits";
 
 /** The OS refused one of this window's notifications (main says so once per window). */
@@ -44,7 +45,9 @@ export function useNotificationNotices(): void {
       const plan = notificationClickPlan(click, { tab: s.tab, currentChatId: sessions.currentId, openTabIds: sessions.openTabIds });
       if (plan.tab) s.setTab(plan.tab);
       // After the tab / chat has rendered its rows (a chat shown read-only once its saved rows are read). Nothing switches.
-      const reveal = () => void setTimeout(() => revealInDom(plan.reveal), 300);
+      // §57.5: a live terminal chat has no cards — its terminal takes the keyboard instead.
+      const terminal = plan.showChat !== null && plan.showChat === liveTerminalChatId(s.state);
+      const reveal = () => void setTimeout(() => (terminal ? focusLiveTerminal() : revealInDom(plan.reveal)), 300);
       if (plan.showChat) void viewChat(plan.showChat).then(reveal, reveal);
       else reveal();
     });

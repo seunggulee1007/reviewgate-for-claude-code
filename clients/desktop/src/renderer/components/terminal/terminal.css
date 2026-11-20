@@ -4,3 +4,32 @@
 .term-view .term-host { width: 100%; height: 100%; }
 .term-view .xterm { height: 100%; }
 .term-view .xterm:focus-within { outline: none; }
+
+/* §57.5: a terminal chat's column — the strip, the terminal, the overlay once Claude Code exited. */
+.terminal-chat { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.terminal-strip { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--border); min-height: 28px; }
+.terminal-strip.disconnected { background: var(--orange-bg); }
+.terminal-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 11.5px; color: var(--fg-2); }
+.terminal-status.accent { color: var(--accent); }
+.terminal-status.orange { color: var(--orange); }
+.terminal-status .short { display: none; }
+@container chat (max-width: 520px) {
+  .terminal-status:has(.short) .long { display: none; }
+  .terminal-status .short { display: inline; }
+}
+.terminal-strip button.active { background: var(--accent-bg); }
+.terminal-find { padding: 4px 8px; border-bottom: 1px solid var(--border); gap: 4px; }
+.terminal-find input { flex: 1; min-width: 80px; }
+.terminal-body { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
+.terminal-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.35); }
+.terminal-overlay-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 380px; padding: 20px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); text-align: center; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3); }
+.terminal-overlay-title { font-weight: 600; justify-content: center; }
+.terminal-starting, .terminal-problem { align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; }
+.terminal-problem .selectable { user-select: text; max-width: 420px; white-space: pre-wrap; }
+.terminal-viewed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; text-align: center; color: var(--fg-2); }
+.terminal-viewed h3 { margin: 0; color: var(--fg); }
+.terminal-viewed .caption { max-width: 380px; }
+
+/* §57.5: a terminal chat's tab — a terminal glyph, an orange dot while its Claude Code is not running. */
+.chat-tab .tab-kind { position: relative; display: inline-flex; color: var(--fg-2); flex: none; }
+.chat-tab .tab-kind.stopped::after { content: ""; position: absolute; right: -2px; top: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }

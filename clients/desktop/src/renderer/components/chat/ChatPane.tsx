@@ -18,12 +18,24 @@ import { MovedChatBar } from "./ChatMoveViews"; // MARK: wave4b w4b-follow
 import "./chat.css";
 import "./composer.css";
 import { useViewing } from "../../viewedChat"; // MARK: wave4b w4b-tabs
+import { chatKindOf } from "../../terminal/terminalChat"; // §57.10
+import { TerminalChatColumn } from "../terminal/TerminalChatColumn"; // §57.10
 
 export default function ChatPane() {
   const width = useStore((s) => s.ui.chatWidth);
   // With the diff pane collapsed (M16) the chat takes the whole width regardless of the remembered split.
   const fullWidth = useStore((s) => isDiffCollapsed(s.state, s.ui, s.selectedPath));
   const viewing = useViewing(); // MARK: wave4b w4b-tabs — §39.2: the running chat's plan waits until it is shown
+  // §57.5 / §57.10: a terminal chat's column is Claude Code itself — no transcript, HUD, cards or composer.
+  const terminal = useStore((s) => chatKindOf(s.state, viewing?.id ?? s.state.sessions?.currentId) === "terminal");
+  if (terminal) {
+    return (
+      <div className="pane chat" style={width && !fullWidth ? { flex: `0 1 ${width}px` } : undefined} data-testid="Chat pane">
+        <ChatTabs />
+        <TerminalChatColumn />
+      </div>
+    );
+  }
   return (
     <div className="pane chat" style={width && !fullWidth ? { flex: `0 1 ${width}px` } : undefined} data-testid="Chat pane">
       <ChatTabs />

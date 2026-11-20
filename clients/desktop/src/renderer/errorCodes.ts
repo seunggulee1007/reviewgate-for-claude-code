@@ -12,6 +12,7 @@ import { autoModeErrorText, autoModeRefusalText } from "./autoMode"; // MARK: wa
 import { scopeRowText } from "./scopeNotices"; // MARK: r1-scope
 import { gitNoticeText } from "./gitNotices"; // MARK: r1-git
 import { reviewFlowNoticeText } from "./rejectSchedule"; // MARK: r2-review-flow (M32)
+import { terminalStartRefusal } from "./terminalStrip"; // MARK: terminal-win (§57.10)
 
 /** `error` event codes (§19.6 "Claude CLI / API failures" + "Other engine error codes"). */
 export const ERROR_EVENT_CODES = [
@@ -161,6 +162,13 @@ export const REFUSAL_CODES = [
   "invalid_since",
   "no_live_turn",
   "not_a_live_file",
+  // MARK: terminal-win — §57.1 / §57.10: a terminal chat's refusals (terminalStrip.ts has their words)
+  "terminal_chat",
+  "terminal_unsupported",
+  "terminal_not_current",
+  "terminal_cli_too_old",
+  "terminal_hooks_disabled",
+  "no_turn",
   // §22 MCP servers
   "invalid_mcp_name",
   "invalid_mcp_scope",
@@ -491,6 +499,13 @@ function lfsMissingText(platform: string): string {
 export function refusalCodeText(code: string, detail: string, paths?: string[]): string | null {
   const d = detail.trim();
   switch (code) {
+    case "terminal_chat":
+    case "terminal_unsupported":
+    case "terminal_not_current":
+    case "terminal_cli_too_old":
+    case "terminal_hooks_disabled":
+    case "no_turn":
+      return terminalStartRefusal(code, d); // §57.1 / §57.10
     case "auto_mode_unavailable": // MARK: wave4b w4b-auto (§39.5)
       return autoModeRefusalText();
     case "binary_file":

@@ -9,7 +9,7 @@
  * a right-click menu, drag to reorder, a middle click closes, the tabs scroll on their own (+ and History… stay), ✎ on a
  * tab with an unsent draft, Ctrl/⌘+Shift+T reopens the last closed tab and Ctrl+Tab / Ctrl+PgDn step through them.
  */
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { t, usesMacKeys } from "../../i18n";
 import { tKey } from "../../shortcutKeys";
 import { chatTabKey } from "../../keymap";
@@ -28,6 +28,9 @@ import { isEnter } from "../../ime";
 import { PointerMenu, type AgentMenuItem } from "../agents/AgentBits";
 import { RecordOnlyBadge } from "./RecordOnly";
 import { MovedChatBadge } from "./ChatMoveViews"; // MARK: wave4b w4b-follow
+import { useTerminalChats } from "../../terminal/terminalChat"; // §57.10
+import { subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost"; // §57.10
+import "../terminal/terminal.css"; // §57.10: the tab's terminal glyph
 
 /** A blocked shortcut says why on the banner, like the disabled button's tooltip (never a silent no-op). */
 const sayWhy = (message: string) => useStore.setState({ lastError: message, errorBanner: { message, scope: "session", fatal: false } });
@@ -81,6 +84,10 @@ export function ChatTabs() {
   const shown = viewing?.id ?? sessions.currentId;
   const ids = sessions.openTabIds;
   const root = state.project?.root ?? null;
+  // §57.5: the live terminal chat's Claude Code exited, could not start, or the engine stopped hearing it.
+  const liveChatPty = useTerminalChats((s) => (sessions.currentId ? s.bySession[sessions.currentId] : undefined));
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
+  const terminalStopped = liveChatPty !== undefined && (liveChatPty.failed !== null || (liveChatPty.ptyId !== null && !terminalStatus(liveChatPty.ptyId).running));
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; id: string } | null>(null);
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
   /** P4-composer-34: the strip fades only at an end with tabs out of sight. */
@@ -291,6 +298,17 @@ export function ChatTabs() {
             >
               {current && running && <span className="dot green" data-testid="Chat running" aria-label={t("Claude's session is on this chat")} />}
               {live && !running && <span className="dot hollow" data-testid="Chat live" aria-label={t("Claude's session is on this chat")} />}
+              {/* §57.5: a terminal chat — its glyph, an orange dot while its Claude Code is not running */}
+              {sessions.list.find((m) => m.id === id)?.kind === "terminal" &&
+                (current && terminalStopped ? (
+                  <span className="tab-kind stopped" role="img" title={t("Claude Code is not running in this terminal — Restart it in the chat")} aria-label={t("Claude Code is not running in this terminal — Restart it in the chat")} data-testid="Chat tab terminal stopped">
+                    <Icon name="terminal" size={12} />
+                  </span>
+                ) : (
+                  <span className="tab-kind" role="img" title={t("Terminal chat — Claude Code itself runs in this chat")} aria-label={t("Terminal chat")} data-testid="Chat tab terminal">
+                    <Icon name="terminal" size={12} />
+                  </span>
+                ))}
               {renaming?.id === id ? (
                 <input
                   className="tab-rename"
