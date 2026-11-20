@@ -218,7 +218,7 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     win,
     engine,
     projectPath: () => wb.projectRoot ?? wb.projectPath,
-    fullRepaint: () => true,
+    fullRepaint: () => loadSettings().terminalFullRepaint !== false,
     log: (level, msg) => logLine(prefix, level, msg),
   });
   windows.set(id, wb);

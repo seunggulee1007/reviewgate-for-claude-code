@@ -31,6 +31,17 @@ describe("sanitizeSettingsPatch", () => {
     expect(rejected).toHaveLength(10);
   });
 
+  it("§57.10: the terminal chat (preview) settings, each with its values", () => {
+    const good = { terminalChatPreview: true, newChatKind: "terminal", terminalGpu: "off", terminalShell: "cmd", terminalFullRepaint: false, terminalFontSize: 28 };
+    expect(sanitizeSettingsPatch(good)).toEqual({ patch: good, rejected: [] });
+    expect(sanitizeSettingsPatch({ terminalFontSize: 9 }).patch).toEqual({ terminalFontSize: 9 });
+    const bad = sanitizeSettingsPatch({ terminalChatPreview: "on", newChatKind: "classic", terminalGpu: "webgl", terminalShell: "bash", terminalFullRepaint: 1, terminalFontSize: 29 });
+    expect(bad.patch).toEqual({});
+    expect(bad.rejected).toHaveLength(6);
+    expect(sanitizeSettingsPatch({ terminalFontSize: 8 }).rejected).toEqual(["terminalFontSize"]);
+    expect(sanitizeSettingsPatch({ terminalFontSize: 12.5 }).rejected).toEqual(["terminalFontSize"]);
+  });
+
   it("keeps the §33 permission switches only as booleans", () => {
     const ok = sanitizeSettingsPatch({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });
     expect(ok.patch).toEqual({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });

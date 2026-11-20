@@ -21,9 +21,14 @@ export type MenuEnabled = {
   chatSwitch: boolean;
   /** A turn runs (Stop). */
   stop: boolean;
+  /**
+   * MARK: terminal-win — §57.10: the chat on screen is a terminal chat — the TUI does Find, Request Changes and the like
+   * itself, so those items are off (as on the Mac), and Continue as Terminal Chat is off.
+   */
+  terminalChat: boolean;
 };
 
-export const MENU_ENABLED_KEYS: readonly (keyof MenuEnabled)[] = ["accept", "reject", "pending", "acceptAll", "rejectAll", "finishReview", "commit", "createPR", "chatSwitch", "stop"];
+export const MENU_ENABLED_KEYS: readonly (keyof MenuEnabled)[] = ["accept", "reject", "pending", "acceptAll", "rejectAll", "finishReview", "commit", "createPR", "chatSwitch", "stop", "terminalChat"];
 
 /** Everything off — a window that has not said (or has no project). */
 export const NOTHING_ENABLED: MenuEnabled = Object.fromEntries(MENU_ENABLED_KEYS.map((k) => [k, false])) as MenuEnabled;

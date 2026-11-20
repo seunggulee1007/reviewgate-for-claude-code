@@ -21,7 +21,10 @@ vi.mock("electron", () => ({
   },
   shell: { openPath: async () => "", openExternal: async () => undefined },
 }));
-vi.mock("./settings.js", () => ({ loadSettings: () => ({ recentProjects: [] }) }));
+const settings: { recentProjects: string[]; terminalChatPreview?: boolean } = { recentProjects: [] };
+vi.mock("./settings.js", () => ({ loadSettings: () => settings }));
+const pty = { available: true, reason: null as string | null, osBuild: 22631, shells: ["powershell", "cmd"] };
+vi.mock("./pty/nodePty.js", () => ({ ptyInfo: () => pty }));
 
 import { initI18n } from "../renderer/i18n";
 
@@ -100,6 +103,41 @@ describe("the Windows menu bar (P1-chrome-09)", () => {
     expect(built.builds).toBe(before);
     buildMenu({ ...handlers, focused: () => ({ state: state(), menu: { ...NOTHING_ENABLED, stop: true } }) });
     expect(built.builds).toBe(before + 1);
+  });
+
+  it("§57.10: terminal chat items only while the preview is on and a PTY runs; the panel toggle whenever shells can open; a terminal chat turns off its chat-only items", async () => {
+    const labels = (items: MenuItemConstructorOptions[]) => items.map((i) => i.label);
+    settings.terminalChatPreview = false;
+    let items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true } });
+    for (const label of ["New Terminal Chat", "New Chat (Classic)", "Continue as Terminal Chat"]) expect(labels(items), label).not.toContain(label);
+    const panel = items.find((i) => i.label === "Toggle Terminal Panel");
+    expect(panel?.accelerator).toBe("Ctrl+`");
+    expect(panel?.registerAccelerator).toBe(false);
+
+    settings.terminalChatPreview = true;
+    items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true } });
+    const find = (label: string) => items.find((i) => i.label === label);
+    expect(find("New Terminal Chat")).toMatchObject({ accelerator: "CmdOrCtrl+Alt+T", registerAccelerator: false, enabled: true });
+    expect(find("New Chat (Classic)")).toMatchObject({ accelerator: "CmdOrCtrl+Alt+Shift+T", registerAccelerator: false, enabled: true });
+    expect(find("Continue as Terminal Chat")?.enabled).toBe(true);
+    expect(find("Find in Chat…")?.enabled).toBe(true);
+    expect(find("Request Changes")?.enabled).toBe(true);
+    sent.length = 0;
+    for (const label of ["New Terminal Chat", "New Chat (Classic)", "Continue as Terminal Chat", "Toggle Terminal Panel"]) (find(label)?.click as unknown as () => void)();
+    expect(sent).toEqual([{ type: "new_terminal_chat" }, { type: "new_classic_chat" }, { type: "continue_as_terminal" }, { type: "toggle_terminal_panel" }]);
+
+    // The shown chat is a terminal chat: Find in Chat, Request Changes and Continue are off.
+    items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true, terminalChat: true } });
+    for (const label of ["Find in Chat…", "Request Changes", "Continue as Terminal Chat"]) expect(items.find((i) => i.label === label)?.enabled, label).toBe(false);
+
+    // No PTY (node-pty did not load, Windows before 1903): neither the chat items nor the panel.
+    pty.available = false;
+    pty.shells = [];
+    items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true } });
+    for (const label of ["New Terminal Chat", "Toggle Terminal Panel"]) expect(labels(items), label).not.toContain(label);
+    pty.available = true;
+    pty.shells = ["powershell", "cmd"];
+    settings.terminalChatPreview = false;
   });
 
   it("Open Recent ends with Clear Menu; the jump list starts the app with each folder, quoted (P1-chrome-07)", async () => {

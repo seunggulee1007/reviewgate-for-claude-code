@@ -170,6 +170,19 @@ export type AppSettings = {
   autoCheckUpdates?: boolean;
   /** MARK: polish p-lifecycle (P5-sheets-49): the release whose banner the user closed with Later (main writes it). */
   dismissedUpdateVersion?: string;
+  // MARK: terminal-win — PROTOCOL §57.10 (terminal-stage3 plan §2.3)
+  /** Settings › Session › "Terminal chat (preview)": shows the terminal-chat entry points (absent = off). */
+  terminalChatPreview?: boolean;
+  /** "New chats open as" — used only while the preview is on (absent = "chat"). */
+  newChatKind?: "chat" | "terminal";
+  /** The terminal's renderer: WebGL with a DOM fallback ("auto", absent) or the DOM renderer ("off"). */
+  terminalGpu?: "auto" | "off";
+  /** The shell panel's default shell (absent = "powershell"). */
+  terminalShell?: "powershell" | "cmd";
+  /** `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` for a terminal chat's claude (absent = on). */
+  terminalFullRepaint?: boolean;
+  /** xterm font size, 9…28 (absent = 13). */
+  terminalFontSize?: number;
   /** Filled by the main process (not persisted): the OS locale for `t()`. */
   locale?: string;
 };
@@ -252,7 +265,13 @@ export type MenuAction =
   | { type: "quick_open" }
   | { type: "project_search" }
   // P1-chrome-06: File › Close Project (it asks first — P1-chrome-03)
-  | { type: "close_project" };
+  | { type: "close_project" }
+  // MARK: terminal-win — §57.10: Chat › New Terminal Chat / New Chat (Classic) / Continue as Terminal Chat (while the preview
+  // is on and a PTY is available), View › Toggle Terminal Panel (Ctrl+`, whenever the shell panel is available)
+  | { type: "new_terminal_chat" }
+  | { type: "new_classic_chat" }
+  | { type: "continue_as_terminal" }
+  | { type: "toggle_terminal_panel" };
 
 // MARK: polish p-foundation — P5-sheets-44
 /**

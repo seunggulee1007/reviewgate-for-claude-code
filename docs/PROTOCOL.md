@@ -9179,6 +9179,14 @@ type ClientCapabilities = {
   kills what is left. `rg:pty:exit` carries `quickNoHooks` (the chat's PTY ended within 10 s and no hook came: the trust
   dialog's "No, exit" or a CLI that cannot reach the hooks). While a terminal has the keyboard, `rg:pty:focus` turns the
   window's menu accelerators off (`setIgnoreMenuShortcuts`) so Ctrl+B / R / O / P / N reach the TUI.
+- **Settings and menus.** `AppSettings` gains `terminalChatPreview` (false), `newChatKind` ("chat"), `terminalGpu`
+  ("auto" / "off"), `terminalShell` ("powershell" / "cmd"), `terminalFullRepaint` (true) and `terminalFontSize` (9…28,
+  13), all renderer-writable. The engine's `newChatKind` is `"terminal"` only while the preview is on and "New chats open
+  as" is Terminal. While the preview is on and a PTY can run, Chat lists New Terminal Chat (Ctrl+Alt+T), New Chat
+  (Classic) (Ctrl+Alt+Shift+T) and Continue as Terminal Chat; View lists Toggle Terminal Panel (Ctrl+`) whenever the shell
+  panel can open — the renderer owns those keys. `MenuEnabled.terminalChat` (the chat on screen is a terminal chat) turns
+  Find in Chat, Request Changes and Continue as Terminal Chat off. A terminal chat that exists keeps working with the
+  preview off; only the ways to make one go.
 - **The shell panel**: PowerShell (`pwsh`, else Windows PowerShell, `-NoLogo`) or Command Prompt (`%ComSpec%`) in the
   window's project folder, with the same environment minus `RG_*`, `CLAUDE_CODE_NATIVE_CURSOR` and
   `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`. Available whenever node-pty loads, on Windows.
