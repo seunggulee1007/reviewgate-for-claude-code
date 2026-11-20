@@ -9446,7 +9446,9 @@ type ClientCapabilities = {
   only a UI preference.
 - **The token never reaches the renderer.** Main asks for `terminal_spec`, spawns, and sends `terminal_started {pid}` /
   `terminal_exited` itself; the IPC guard lets the renderer send only `terminal_end_turn` and
-  `session_continue_terminal`. The renderer talks to the PTYs over `rg:pty:*` (`info`, `open`, `restart`, `kill`,
+  `session_continue_terminal`. The `terminal_spec` reply goes to main's in-process request only: the engine does not
+  broadcast a `terminal_spec` that has an in-process caller (over stdio, the Mac's sidecar, the reply is the event), and
+  main never forwards a `terminal_spec` on `rg:evt`. The renderer talks to the PTYs over `rg:pty:*` (`info`, `open`, `restart`, `kill`,
   `attach`, `list` invoked; `input`, `resize`, `ack`, `focus` sent; `data`, `exit` received) and never names a file,
   arguments, environment or folder. A PTY id belongs to the window that opened it; any other sender is ignored and
   logged. Refusals: `pty_unavailable`, `not_current`, `terminal_needs_native_claude`, `terminal_cmdline_too_long`,

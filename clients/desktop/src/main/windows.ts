@@ -11,6 +11,7 @@ import { createPlatform, ReviewEngine, type EngineEvent, type HelloCommand } fro
 import type { OpenWindow, WindowBounds } from "../shared/ipc.js";
 import type { E2EMode } from "./e2e.js";
 import { logLine } from "./log.js";
+import { forwardsToRenderer } from "./ipcGuard.js"; // §57.17
 import { syncFlowSettings } from "./flowSync.js"; // MARK: wave3 desktop-flow
 import { addRecentProject, engineSettings, loadSettings, saveSettings, setCachedCapabilities } from "./settings.js";
 import { mergedAllowPatterns } from "./projectPatterns.js";
@@ -277,6 +278,7 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     }
     // MARK: wave4b w4b-follow — §39.4: the chat went to another worktree; that worktree's window takes it (or opens).
     if (ev.type === "chat_moved" && !shuttingDown) routeMovedChat(wb, ev, { findWindowFor, focusWindow, openWindow: (path) => createWindow({ project: path }) });
+    if (!forwardsToRenderer(ev)) return; // §57.17: the hook token stays in main
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send("rg:evt", ev);
   });
 

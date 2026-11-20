@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { isAppURL, isSafeExternalURL, validateCommand } from "./ipcGuard.js";
+import type { EngineEvent } from "@reviewgate/engine";
+import { forwardsToRenderer, isAppURL, isSafeExternalURL, validateCommand } from "./ipcGuard.js";
 
 /** Every command type the renderer sends with `engineRequest({ type: "…" })` (its tests aside). */
 function rendererCommandTypes(): Map<string, string> {
@@ -97,6 +98,14 @@ describe("isSafeExternalURL / validateCommand", () => {
     for (const type of ["terminal_spec", "terminal_started", "terminal_exited", "terminal_request_cancel", "terminal_permission_response"]) {
       expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(false);
     }
+  });
+
+  it("§57.17: no rg:evt carries a terminal_spec — its hook token and argv stay in main", () => {
+    const token = "t".repeat(64);
+    const spec = { type: "terminal_spec", sessionId: "s", argv: ["claude", "--settings", "{}"], env: { RG_HOOK_TOKEN: token }, cwd: "/work/acme", resume: false } as EngineEvent;
+    expect(forwardsToRenderer(spec)).toBe(false);
+    expect(forwardsToRenderer({ ...spec, id: "r1" } as EngineEvent)).toBe(false);
+    expect(forwardsToRenderer({ type: "result", id: "r2", ok: true } as EngineEvent)).toBe(true);
   });
 
   it("allows what the renderer sends: unaccept (Accept all's Undo) and the live changes of a running turn (§34.6)", () => {

@@ -3,7 +3,7 @@
  * issue pass through `rg:cmd` / `rg:request`. `hello` is sent by main itself and `set_settings` is
  * derived from `rg:setSettings` — a renderer forging either (e.g. `claudePath`) is refused.
  */
-import type { EngineCommand, EngineCommandType } from "@reviewgate/engine";
+import type { EngineCommand, EngineCommandType, EngineEvent } from "@reviewgate/engine";
 
 const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandType>([
   "open_project",
@@ -175,6 +175,14 @@ export function validateCommand(raw: unknown): Validated {
   if (typeof type !== "string") return { ok: false, error: "rejected command: missing type" };
   if (!CLIENT_COMMANDS.has(type as EngineCommandType)) return { ok: false, error: `rejected command: ${type}` };
   return { ok: true, cmd: raw as EngineCommand };
+}
+
+/**
+ * §57.17: whether an engine event may go to the renderer (`rg:evt`). Never a `terminal_spec`: its env carries the hook
+ * token and its argv the hook URL — main asks for it and spawns the PTY itself.
+ */
+export function forwardsToRenderer(ev: EngineEvent): boolean {
+  return ev.type !== "terminal_spec";
 }
 
 /** `^https?://` only — `file:`, `smb:`, custom URL handlers etc. never reach the shell (§2.2). */

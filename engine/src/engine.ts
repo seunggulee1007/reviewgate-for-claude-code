@@ -9246,6 +9246,9 @@ export class ReviewEngine {
       this.pending.delete(id);
       if (ev.type === "result" && !ev.ok) p.reject(new Error(ev.error));
       else p.resolve(ev);
+      // §57.17: an in-process `terminal_spec` (the Electron main asked) goes to its caller only — its hook token and argv
+      // never reach the listeners, which forward events to the renderer.
+      if (ev.type === "terminal_spec") return;
     }
     this.emit(ev);
   }
