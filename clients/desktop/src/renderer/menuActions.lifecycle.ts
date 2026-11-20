@@ -65,7 +65,11 @@ export const lifecycleMenuActions: MenuActionHandlers = {
     if (a.index >= 0 && a.index < 9) pressKey({ key: String(a.index + 1), code: `Digit${a.index + 1}` });
   },
   stop: withStore((s) => {
-    if (s.state.gate.phase === "running") s.interrupt();
+    if (s.state.gate.phase !== "running") return;
+    // §57.10: a terminal chat's Stop is Esc to its Claude Code (the engine has no turn of its own to interrupt there).
+    const live = s.state.sessions?.list.find((m) => m.id === s.state.sessions?.currentId);
+    if (live?.kind === "terminal") void import("./terminal/terminalChat").then((m) => m.stopLiveTerminal());
+    else s.interrupt();
   }),
   find_chat: press("f", "KeyF"),
   find_diff: press("f", "KeyF", { alt: true }),

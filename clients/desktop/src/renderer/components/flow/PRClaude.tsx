@@ -15,6 +15,7 @@ import { isProjectRepo, prLineAnchor, prThreads, threadOf, unresolvedThreads } f
 import { supportsWorkbenchSetup } from "../../storeFlow";
 import { useStore } from "../../store";
 import "./flow.css";
+import { liveTerminalChatId } from "../../terminal/terminalChat"; // §57.7
 
 /** Where the draft lands, for the buttons' tooltips: the PR head's workbench window, or this window. */
 function destination(state: ReviewState, headRef: string): string {
@@ -25,6 +26,12 @@ function destination(state: ReviewState, headRef: string): string {
 /** Why "Send to Claude" cannot work from this window; null = it can. */
 function sendBlocker(state: ReviewState): string | null {
   return state.project ? null : t("Open the project in this window first (⌘O) — the comments go to its Claude");
+}
+
+/** §57.7: the draft stays in this window and its live chat is a terminal chat — it is pasted into Claude Code there. */
+function pastesHere(state: ReviewState, headRef: string): boolean {
+  const elsewhere = state.workbenches.list.some((w) => w.branch === headRef && !w.isCurrent && w.path !== state.workbenches.current);
+  return !elsewhere && liveTerminalChatId(state) !== null;
 }
 
 /** The PR head's Claude actions: "Open as workbench" (or the workbench that has the head already) and "Send all unresolved". */
@@ -76,7 +83,7 @@ export function PRClaudeHeaderButtons({ pr }: { pr: PRDetail }) {
         className="small"
         disabled={sendBlocked !== null}
         onClick={() => void sendPrThreads(unresolved)}
-        title={sendBlocked ?? t("Puts the threads you have not answered yet into Claude's message box in {0} — you read it and send it", destination(state, pr.headRefName))}
+        title={sendBlocked ?? (pastesHere(state, pr.headRefName) ? t("Pastes the threads you have not answered yet into Claude Code's prompt in the terminal chat — you read it and press Enter there") : t("Puts the threads you have not answered yet into Claude's message box in {0} — you read it and send it", destination(state, pr.headRefName)))}
         data-testid="Send all unresolved"
       >
         {t("Send all unresolved")}
@@ -102,7 +109,7 @@ export function SendCommentButton({ comment }: { comment: PRComment }) {
         const thread = threadOf(comment, state.pr.comments);
         if (thread) void sendPrThreads([thread]);
       }}
-      title={blocker ?? t("Puts this thread into Claude's message box in {0} — you read it and send it", destination(state, pr.headRefName))}
+      title={blocker ?? (pastesHere(state, pr.headRefName) ? t("Pastes this thread into Claude Code's prompt in the terminal chat — you read it and press Enter there") : t("Puts this thread into Claude's message box in {0} — you read it and send it", destination(state, pr.headRefName)))}
       data-testid="Send comment to Claude"
     >
       {t("Send to Claude")}

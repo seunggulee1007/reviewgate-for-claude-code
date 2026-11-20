@@ -27,14 +27,13 @@ import { Toast } from "./components/Toast";
 import { useRejectShortcut } from "./rejectShortcut";
 import { showToast } from "./toast";
 import { LiveDiffPane } from "./components/diff/LiveDiffPane"; // MARK: wave2 desktop-flow
-import { insertIntoComposer } from "./composerBridge"; // MARK: wave3 desktop-flow
 import { useNotificationNotices } from "./components/NotificationNotices"; // MARK: wave4b w4-notify
 import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
 import { backgroundKeyJustHandled } from "./background"; // §52
 import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-chrome-09)
 import { useTermHost } from "./terminal/useTermHost"; // §57.10
-import { diffCollapsedNow, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.10
+import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.10
 import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
 import { useViewing } from "./viewedChat"; // §57.5
 
@@ -110,7 +109,7 @@ export function App() {
         // MARK: wave3 desktop-flow — §36.14: PR comments another window sent here ("Send to Claude"); never sent by itself.
         case "composer_draft":
           s.setTab("changes");
-          insertIntoComposer(action.text);
+          draftToLiveChat(action.text); // §57.7: a live terminal chat gets it pasted (no Enter)
           break;
         // MARK: wave4b w4b-follow — §39.4: another window handed its chat to this worktree.
         case "chat_receive":

@@ -535,7 +535,10 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
       if (!s.state.project) return null;
       // This window: the chat comes forward with the draft after what is typed — the user reads it and sends it.
       get().setTab("changes");
-      insertIntoComposer(text);
+      // §57.7: the live chat being a terminal chat, the draft is pasted into its Claude Code (no Enter) — loaded on use
+      // (terminal/terminalChat.ts reads the store).
+      if (get().state.sessions?.list.some((m) => m.id === get().state.sessions?.currentId && m.kind === "terminal")) void import("./terminal/terminalChat").then((m) => m.pasteWithToast(text));
+      else insertIntoComposer(text);
       return "this";
     },
   };

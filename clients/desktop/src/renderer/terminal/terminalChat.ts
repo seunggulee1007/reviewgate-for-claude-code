@@ -16,6 +16,10 @@ import { terminalStartRefusal } from "../terminalStrip";
 import { adoptTerminal, chatTerminalOf, disposeTerminal, estimateSize, focusTerminal, hasTerminal, markRestarted, subscribeTerminals, terminalConfig, terminalStatus } from "./termHost";
 import { TERMINAL_FONT_FAMILY } from "./termHostOptions";
 import { reviewPanelCollapsed } from "../friction";
+import { pastedText, pasteRefusal } from "../terminalPaste";
+import { showToast } from "../toast";
+import { insertIntoComposer } from "../composerBridge";
+import { acceptsPaste, pasteIntoTerminal, sendToTerminal } from "./termHost";
 import { useViewedChat, viewingOf } from "../viewedChat";
 
 /** One terminal chat's PTY: its id once open, a start on its way, or why it could not start. */
@@ -140,6 +144,47 @@ export function diffCollapsedNow(): boolean {
   const s = useStore.getState();
   const viewing = viewingOf(useViewedChat.getState().chat, s.state);
   return reviewPanelCollapsed(s.state, s.ui, s.selectedPath, shownChatIsTerminal(s.state, viewing?.id));
+}
+
+/**
+ * §57.7 "Paste into the terminal" (an explicit click only): `text` goes into the live terminal chat's Claude Code as one
+ * bracketed paste — never an Enter — and its terminal takes the keyboard. Returns why it could not (null: pasted).
+ */
+export function pasteIntoLiveTerminal(text: string): string | null {
+  const s = useStore.getState();
+  const live = liveTerminalChatId(s.state);
+  const shown = live !== null && viewingOf(useViewedChat.getState().chat, s.state) === null;
+  const ptyId = live ? (chatPtyOf(live).ptyId ?? chatTerminalOf(live)) : null;
+  const why = pasteRefusal({ liveTerminalChat: shown, running: terminalStatus(ptyId).running, bracketed: acceptsPaste(ptyId) }, text);
+  if (why !== null || !pasteIntoTerminal(ptyId, text)) return why ?? pasteRefusal({ liveTerminalChat: true, running: true, bracketed: false }, text);
+  focusTerminal(ptyId);
+  // From the PRs tab the terminal is not on screen yet: the keyboard goes to it once it is.
+  setTimeout(() => focusTerminal(ptyId), 300);
+  return null;
+}
+
+/** The paste with its toast — "Pasted … press Enter there", or why not. True when it was pasted. */
+export function pasteWithToast(text: string): boolean {
+  const why = pasteIntoLiveTerminal(text);
+  showToast(why ?? pastedText());
+  return why === null;
+}
+
+/**
+ * A draft a flow hands to "the chat" (PR comments' Send to Claude, from this window or another): the composer of a chat,
+ * or — the live chat being a terminal chat — a paste into its Claude Code (this click is the explicit one).
+ */
+export function draftToLiveChat(text: string): void {
+  if (liveTerminalChatId(useStore.getState().state)) pasteWithToast(text);
+  else insertIntoComposer(text);
+}
+
+/** Stop (Ctrl+.) in a terminal chat: Esc to its Claude Code, as pressing Esc in the TUI does. False: not a running terminal chat. */
+export function stopLiveTerminal(): boolean {
+  const ptyId = liveTerminalPty();
+  if (!ptyId) return false;
+  sendToTerminal(ptyId, "\x1b");
+  return true;
 }
 
 /** The live terminal chat's PTY id when its Claude Code runs. */
