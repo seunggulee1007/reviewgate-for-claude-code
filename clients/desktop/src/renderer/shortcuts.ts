@@ -12,6 +12,7 @@ import { isRunning, useStore } from "./store";
 import { isAskAboutKey } from "./keymap";
 import { windowKey } from "./keymap"; // MARK: wave4d w4d-windows
 import { runAcceptAll } from "./acceptAllAction"; // MARK: r2-review-flow (M28)
+import { diffCollapsedNow, liveTerminalChatId, stopLiveTerminal } from "./terminal/terminalChat"; // §57.5 / §57.17
 
 /** The anchor of the current diff selection: the first selected line of the shown file (+ the selected text). */
 export function selectionAnchor(): { anchor: SideAnchor | null; context?: string } {
@@ -53,6 +54,13 @@ export function useReviewShortcuts(): void {
       const wk = windowKey(e);
       if (wk === "stop") {
         if (s.dialog || !isRunning(s.state)) return;
+        // §57.17: in a terminal chat Stop is Esc to its Claude Code — unless a shell of the bottom panel has the keyboard.
+        if (liveTerminalChatId(s.state) !== null) {
+          if ((e.target as Element | null)?.closest?.(".shell-panel")) return;
+          e.preventDefault();
+          stopLiveTerminal();
+          return;
+        }
         e.preventDefault();
         s.interrupt();
         return;
@@ -84,7 +92,7 @@ export function useReviewShortcuts(): void {
       if (e.shiftKey) {
         if (e.key.toLowerCase() !== "d" || !s.state.project) return;
         e.preventDefault();
-        s.toggleDiffPane();
+        s.toggleDiffPane(diffCollapsedNow()); // §57.5: what is on screen (a terminal chat has its own rule)
         return;
       }
       if (e.key !== "]" && e.key !== "[") return;

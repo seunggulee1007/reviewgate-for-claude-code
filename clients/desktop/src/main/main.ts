@@ -4,12 +4,16 @@
  * Windows and their engines live in src/main/windows.ts, the `rg:*` handlers in src/main/ipc.ts.
  */
 import { app, BrowserWindow, clipboard, shell } from "electron";
-import { statSync } from "node:fs";
+import { statSync, writeFileSync } from "node:fs";
+import { release, tmpdir } from "node:os";
 import { join, sep } from "node:path";
+import { configureNodePty, nodePty } from "./pty/nodePty.js"; // MARK: terminal-win (§57.17)
+import { runPtySelftest, selftestArg } from "./pty/selftest.js";
 import { buildMenu, type MenuHandlers } from "./menu.js";
 import { secondInstanceAction, type SecondInstanceData } from "./singleInstance.js";
 import { applyAppearance, detectWindowsClaude, loadSettings, saveSettings } from "./settings.js";
 import { installE2E, type E2EMode } from "./e2e.js";
+import { e2eOutArg, e2eUserDataArg, installTerminalE2E } from "./e2eTerminal.js"; // MARK: terminal-win (§57.17)
 import { installIPC } from "./ipc.js";
 import { installNotifications } from "./notifications.js";
 import { installReadiness } from "./readiness.js"; // MARK: polish p-lifecycle (P5-sheets-44)
@@ -43,17 +47,36 @@ import { currentLanguage, initI18n, t } from "../renderer/i18n"; // MARK: wave4 
 import { helpLinks } from "./links.js"; // MARK: polish p-lifecycle (P1-chrome-08)
 
 app.setPath("userData", join(app.getPath("appData"), "ReviewGate"));
+// MARK: terminal-win — §57.17: an e2e run keeps everything in its scratch folder (`--rg-user-data`, honoured only with an
+// e2e flag); `--e2e-terminal` is the hidden terminal-chat run (src/main/e2eTerminal.ts, Windows CI).
+const E2E_TERMINAL = process.argv.includes("--e2e-terminal");
+const e2eUserData = e2eUserDataArg(process.argv);
+if (e2eUserData) app.setPath("userData", e2eUserData);
 // Every renderer is sandboxed (the windows also set `sandbox: true`); navigation is app-only (src/main/navigationGuard.ts).
 app.enableSandbox();
 // MARK: wave4b w4-notify — Windows shows toasts only for the AUMID of the installer's Start menu shortcut (= appId).
 if (process.platform === "win32") app.setAppUserModelId(appUserModelId(app.isPackaged, process.execPath));
 installNavigationGuards(APP_ORIGIN);
 const E2E: E2EMode | null = process.argv.includes("--e2e") ? { project: process.env.REVIEWGATE_PROJECT ?? "" } : null;
+// MARK: terminal-win — PROTOCOL §57.17: node-pty loads from app.asar.unpacked when packaged (src/main/pty/nodePty.ts).
+configureNodePty({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
+// `--rg-pty-selftest[=<out.json>]`: node-pty + ConPTY under this Electron, then exit — no lock, no window, no settings.
+const PTY_SELFTEST = selftestArg(process.argv);
+if (PTY_SELFTEST) {
+  void runPtySelftest({ load: nodePty(), platform: process.platform, arch: process.arch, osRelease: release(), env: process.env, cwd: tmpdir(), electron: process.versions.electron ?? null })
+    .then((r) => {
+      const json = JSON.stringify(r);
+      if (PTY_SELFTEST.out) writeFileSync(PTY_SELFTEST.out, json);
+      else process.stdout.write(`${json}\n`);
+      app.exit(r.ok ? 0 : 1);
+    })
+    .catch(() => app.exit(1));
+}
 
 // Audit daily-19: one ReviewGate process per user — a second launch hands its project to this one and quits instead of
 // opening the same worktrees with a second set of engines (src/main/singleInstance.ts). The --e2e harness skips the lock.
 const secondLaunchData: SecondInstanceData = { project: process.env.REVIEWGATE_PROJECT ?? "" };
-const primaryInstance = E2E !== null || app.requestSingleInstanceLock(secondLaunchData);
+const primaryInstance = E2E !== null || E2E_TERMINAL || PTY_SELFTEST !== null || app.requestSingleInstanceLock(secondLaunchData);
 if (!primaryInstance) app.exit(0);
 const isDirectory = (p: string): boolean => {
   try {
@@ -166,19 +189,20 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin" || E2E) app.quit();
 });
 app.on("activate", () => {
+  if (PTY_SELFTEST) return;
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 // MARK: polish p-lifecycle (P1-chrome-09): another window in front — its project, its items, its chat tabs.
 app.on("browser-window-focus", () => rebuildMenu());
 
 void app.whenReady().then(async () => {
-  if (!primaryInstance) return;
+  if (!primaryInstance || PTY_SELFTEST) return;
   logLine("main", "main", `ReviewGate ${app.getVersion()} electron ${process.versions.electron} ${process.platform} ${sep}`);
   initI18n(app.getLocale(), process.platform); // MARK: wave4 w4-safety
   applyAppearance();
   // win32: an npm `claude.cmd` cannot be spawned without a shell (EINVAL) — resolve it before any engine starts.
   await detectWindowsClaude();
-  initWindows({ e2e: E2E, rebuildMenu });
+  initWindows({ e2e: E2E, rebuildMenu, hidden: E2E_TERMINAL });
   rebuildMenu();
   installIPC({
     engineFor,
@@ -188,10 +212,16 @@ void app.whenReady().then(async () => {
     openInNewWindow,
     focusProjectWindow,
     rebuildMenu,
+    ptyHubFor: (sender) => workbenchFor(sender)?.pty, // MARK: terminal-win (§57.17)
   });
   installNotifications({ focusWindow });
   installReadiness(); // MARK: polish p-lifecycle (P5-sheets-44): the empty window's checklist
-  if (!E2E) installUpdates(); // MARK: polish p-lifecycle (P5-sheets-49): at launch, then every 6 hours
+  if (!E2E && !E2E_TERMINAL) installUpdates(); // MARK: polish p-lifecycle (P5-sheets-49): at launch, then every 6 hours
+
+  if (E2E_TERMINAL) {
+    installTerminalE2E(process.env.REVIEWGATE_PROJECT ?? "", { createWindow: (o) => createWindow(o), disposeAll, claudePath: () => loadSettings().claudePath }, e2eOutArg(process.argv));
+    return;
+  }
 
   if (E2E) {
     installE2E(E2E, { createWindow, disposeAll });

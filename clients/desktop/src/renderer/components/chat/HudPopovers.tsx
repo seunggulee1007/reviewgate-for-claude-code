@@ -9,6 +9,7 @@ import { t } from "../../i18n";
 import { currentModelOption, effortForSwitch } from "../../hudModel";
 import { useStore } from "../../store";
 import { AutoModelPickerSection, useModelMode } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
+import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.17
 
 /** A fixed popover above (or below, when there is no room) `anchor`, closed by Escape / a click outside. */
 export function AnchoredPopover(props: { anchor: HTMLElement | null; onClose: () => void; children: ReactNode; className?: string; testId?: string; width?: number }) {
@@ -30,7 +31,7 @@ export function AnchoredPopover(props: { anchor: HTMLElement | null; onClose: ()
       props.onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") props.onClose();
+      if (e.key === "Escape" && !isTerminalTarget(e.target)) props.onClose();
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);

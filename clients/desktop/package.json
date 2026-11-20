@@ -11,6 +11,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
     "e2e": "node scripts/build.mjs && electron . --e2e",
+    "e2e:terminal": "node scripts/build.mjs && node scripts/e2e-terminal.mjs",
     "dist:win": "node scripts/build.mjs && electron-builder --win nsis --x64",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac dir",
     "test": "vitest run"
@@ -19,12 +20,20 @@
     "@anthropic-ai/claude-agent-sdk": "0.3.270",
     "diff": "^8.0.2",
     "dompurify": "3.4.15",
-    "marked": "18.0.13"
+    "marked": "18.0.13",
+    "node-pty": "1.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@xterm/addon-clipboard": "0.2.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/addon-web-links": "0.12.0",
+    "@xterm/addon-webgl": "0.19.0",
+    "@xterm/xterm": "6.0.0",
     "electron": "44.5.1",
     "electron-builder": "^26.0.0",
     "esbuild": "^0.25.0",

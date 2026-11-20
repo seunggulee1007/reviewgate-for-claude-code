@@ -586,11 +586,18 @@ export type Cmd<T extends string, P = {}> = { type: T; id?: string } & P;
 
 export type ClientKind = "mac" | "windows" | "test";
 
+/** What a client can do beyond its kind (§57.17). Absent = nothing extra. */
+export type ClientCapabilities = {
+  /** §57.17: the client can run a terminal chat's PTY. Honoured for a `windows` client (mac / test always can). */
+  terminalChat?: boolean;
+};
+
 export type HelloCommand = Cmd<"hello", {
   protocolVersion: 2;
   client: ClientKind;
   env?: Record<string, string>;
   settings: Settings;
+  capabilities?: ClientCapabilities;
 }>;
 
 export type EngineCommand =

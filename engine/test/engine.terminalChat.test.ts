@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TerminalSpecEvent } from "../src/protocol.js";
+import type { ClientCapabilities, TerminalSpecEvent } from "../src/protocol.js";
 import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
@@ -52,13 +52,13 @@ const platform = { ...fakePlatform, isWindows: process.platform === "win32" };
 
 type Rig = { h: Harness; dir: string; config: string; claude: string };
 
-async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal"; promptWaitMs?: number } = {}): Promise<Rig> {
+async function rig(o: { client?: "mac" | "windows" | "test"; version?: string; managed?: ManagedPolicy; dir?: string; config?: string; newChatKind?: "chat" | "terminal"; promptWaitMs?: number; capabilities?: ClientCapabilities } = {}): Promise<Rig> {
   const dir = o.dir ?? makeRepo();
   const config = o.config ?? temp("rg-term-config");
   const claude = makeFakeClaude(temp("rg-term-bin"), o.version);
   const h = makeHarness({ platform, env: { CLAUDE_CONFIG_DIR: config }, managedPolicy: () => o.managed ?? NO_MANAGED_POLICY, dataDir: temp("rg-term-data"), ...(o.promptWaitMs ? { terminalPromptWaitMs: o.promptWaitMs } : {}) });
   harnesses.push(h);
-  await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
+  await h.engine.handle({ type: "hello", protocolVersion: 2, client: o.client ?? "mac", ...(o.capabilities ? { capabilities: o.capabilities } : {}), settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com", ...(o.newChatKind ? { newChatKind: o.newChatKind } : {}) } });
   await h.settle();
   const opened = await h.open(dir);
   expect(opened.session.open).toBe(true);
@@ -230,6 +230,36 @@ describe("terminal chats (§57)", () => {
     const managed = await rig({ managed: { settings: { allowManagedHooksOnly: true }, sources: [{ kind: "file", path: "/etc/example/managed-settings.json" }], failed: null } });
     const mId = await newTerminal(managed);
     expect(await refusal(managed.h, { type: "terminal_spec", sessionId: mId })).toMatchObject({ ok: false, code: "terminal_hooks_disabled", error: "terminal_hooks_disabled:allowManagedHooksOnly" });
+  });
+
+  it("§57.17 a windows client whose hello advertises capabilities.terminalChat runs terminal chats; mac ignores it", async () => {
+    // Without the capability (or with it false) a windows client stays refused.
+    const off = await rig({ client: "windows", capabilities: { terminalChat: false } });
+    expect(await refusal(off.h, { type: "session_new", kind: "terminal" })).toMatchObject({ ok: false, code: "terminal_unsupported" });
+
+    const win = await rig({ client: "windows", capabilities: { terminalChat: true } });
+    // session_continue_terminal passes the client check (the chat has no conversation yet: the next check refuses).
+    expect(await refusal(win.h, { type: "session_continue_terminal", sessionId: win.h.engine.state.sessions.currentId! })).toMatchObject({ ok: false, code: "nothing_to_continue" });
+    // session_new {kind} is accepted and persisted; terminal_spec replies.
+    const id = await newTerminal(win);
+    expect(win.h.engine.state.sessions.list.find((m) => m.id === id)?.kind).toBe("terminal");
+    const s = await spec(win, id);
+    expect(s.sessionId).toBe(id);
+    expect(s.argv[0]).toBe(win.claude);
+    expect(s.token).toMatch(/^[0-9a-f]{64}$/);
+
+    // firstChatKind honours newChatKind: "terminal" for it.
+    const first = await rig({ client: "windows", capabilities: { terminalChat: true }, newChatKind: "terminal" });
+    const st = first.h.engine.state;
+    expect(st.sessions.list.find((m) => m.id === st.sessions.currentId)?.kind).toBe("terminal");
+
+    // A later hello without capabilities takes it back.
+    await first.h.engine.handle({ type: "hello", protocolVersion: 2, client: "windows", settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: first.claude, ghHost: "github.com" } });
+    expect(await refusal(first.h, { type: "session_new", kind: "terminal" })).toMatchObject({ ok: false, code: "terminal_unsupported" });
+
+    // On a mac client the capability changes nothing (false does not take terminal chats away).
+    const mac = await rig({ capabilities: { terminalChat: false } });
+    expect(await newTerminal(mac)).toBeTruthy();
   });
 
   it("§57.8 the guard: git that changes the repository asks, git that throws work away is denied, an outside edit asks", async () => {

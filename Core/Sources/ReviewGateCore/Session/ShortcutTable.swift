@@ -58,7 +58,7 @@ public enum ShortcutTable {
             ShortcutRow("Zoom In", mac: "⌘+", windows: "Ctrl+="),   // r2-review-flow (polish)
             ShortcutRow("Zoom Out", mac: "⌘-", windows: "Ctrl+-"),   // r2-review-flow (polish)
             ShortcutRow("Actual Size", mac: "⌘0", windows: "Ctrl+0"),   // r2-review-flow (polish)
-            ShortcutRow("Toggle Terminal Panel", mac: "⌃`", windows: "—", note: "Mac app only"),   // MARK: terminal-chat (§57.6)
+            ShortcutRow("Toggle Terminal Panel", mac: "⌃`", windows: "Ctrl+`"),   // MARK: terminal-chat (§57.6) · terminal-win (§57.17)
         ]),
         ShortcutSection("Find", rows: [
             ShortcutRow("Find in Chat…", mac: "⌘F", windows: "Ctrl+F"),
@@ -88,8 +88,8 @@ public enum ShortcutTable {
         ]),
         ShortcutSection("Chat", rows: [
             ShortcutRow("New chat", mac: "⌘T", windows: "Ctrl+T"),
-            ShortcutRow("New Terminal Chat", mac: "⌃⌘T", windows: "—", note: "Mac app only"),   // MARK: terminal-chat (§57.5)
-            ShortcutRow("New Chat (Classic)", mac: "⌃⌥⌘T", windows: "—", note: "Mac app only"),   // MARK: terminal-default (§57.7)
+            ShortcutRow("New Terminal Chat", mac: "⌃⌘T", windows: "Ctrl+Alt+T"),   // MARK: terminal-chat (§57.5) · terminal-win (§57.17)
+            ShortcutRow("New Chat (Classic)", mac: "⌃⌥⌘T", windows: "Ctrl+Alt+Shift+T"),   // MARK: terminal-default (§57.7) · terminal-win (§57.17)
             ShortcutRow("Close Chat Tab", mac: "⌘⇧W", windows: "Ctrl+Shift+W"),
             ShortcutRow("Chat tabs 1–9", mac: "⌘1…⌘9", windows: "Ctrl+1…Ctrl+9"),
             // MARK: r2-chats-cards — polish PX-19 / P4-composer-05

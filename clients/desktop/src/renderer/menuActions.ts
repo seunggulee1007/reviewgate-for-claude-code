@@ -15,6 +15,7 @@
 import type { MenuAction } from "../shared/ipc";
 import { lifecycleMenuActions } from "./menuActions.lifecycle";
 import { windowMenuActions } from "./menuActions.window";
+import { terminalMenuActions } from "./menuActions.terminal"; // §57.17
 
 type ActionOf<K extends MenuAction["type"]> = Extract<MenuAction, { type: K }>;
 
@@ -22,7 +23,7 @@ type ActionOf<K extends MenuAction["type"]> = Extract<MenuAction, { type: K }>;
 export type MenuActionHandlers = { [K in MenuAction["type"]]?: (action: ActionOf<K>) => void };
 
 const registered = new Map<string, (action: MenuAction) => void>();
-const tables: MenuActionHandlers[] = [lifecycleMenuActions, windowMenuActions];
+const tables: MenuActionHandlers[] = [lifecycleMenuActions, windowMenuActions, terminalMenuActions];
 
 /** Handles `type` until the returned function is called (the latest registration of a type wins). */
 export function registerMenuAction<K extends MenuAction["type"]>(type: K, handler: (action: ActionOf<K>) => void): () => void {

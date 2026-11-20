@@ -19,6 +19,7 @@ import { NotificationGroupsSection } from "../NotificationNotices"; // MARK: wav
 import { SideModelPicker, SideWebSetting } from "./SideSettings"; // MARK: wave4b w4b-side
 import { StatusLineSettingsSection } from "./StatusLineSettings"; // MARK: wave6 w6-statusline
 import { DEFAULT_SYSTEM_PROMPT_APPEND } from "../../../shared/systemPrompt"; // §54
+import { TerminalSettingsSection } from "./TerminalSettings"; // MARK: terminal-win (§57.17)
 
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
@@ -175,6 +176,7 @@ export function GeneralTab({ settings }: { settings: AppSettings }) {
         </label>
         <div className="note">{t("Off (the default): as in the terminal, a subagent works in the background and Claude answers your messages meanwhile; what it changes still goes into the next review, and Claude goes on when it is done. On: Claude waits for its subagents before it answers, as before. Takes effect when the session restarts.")}</div>
       </section>
+      <TerminalSettingsSection settings={settings} patch={patch} />{/* MARK: terminal-win — §57.17 */}
       <section>
         <h4>{t("Side questions")}</h4>
         <div className="field-row">

@@ -170,6 +170,19 @@ export type AppSettings = {
   autoCheckUpdates?: boolean;
   /** MARK: polish p-lifecycle (P5-sheets-49): the release whose banner the user closed with Later (main writes it). */
   dismissedUpdateVersion?: string;
+  // MARK: terminal-win — PROTOCOL §57.17 (terminal-stage3 plan §2.3)
+  /** Settings › Session › "Terminal chat (preview)": shows the terminal-chat entry points (absent = off). */
+  terminalChatPreview?: boolean;
+  /** "New chats open as" — used only while the preview is on (absent = "chat"). */
+  newChatKind?: "chat" | "terminal";
+  /** The terminal's renderer: WebGL with a DOM fallback ("auto", absent) or the DOM renderer ("off"). */
+  terminalGpu?: "auto" | "off";
+  /** The shell panel's default shell (absent = "powershell"). */
+  terminalShell?: "powershell" | "cmd";
+  /** `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` for a terminal chat's claude (absent = on). */
+  terminalFullRepaint?: boolean;
+  /** xterm font size, 9…28 (absent = 13). */
+  terminalFontSize?: number;
   /** Filled by the main process (not persisted): the OS locale for `t()`. */
   locale?: string;
 };
@@ -188,6 +201,10 @@ export type ProjectUI = {
   tab?: "changes" | "prs" | "history";
   selectedPath?: string | null;
   diffCollapsed?: boolean;
+  /** §57.5: a terminal chat's split — the terminal's share beside the review panel (0…1; absent: 0.55). */
+  terminalReviewSplit?: number;
+  /** §57.17: the bottom shell panel's height in px (at least 80; the window keeps 200 above it). */
+  terminalPanelHeight?: number;
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };
@@ -252,7 +269,13 @@ export type MenuAction =
   | { type: "quick_open" }
   | { type: "project_search" }
   // P1-chrome-06: File › Close Project (it asks first — P1-chrome-03)
-  | { type: "close_project" };
+  | { type: "close_project" }
+  // MARK: terminal-win — §57.17: Chat › New Terminal Chat / New Chat (Classic) / Continue as Terminal Chat (while the preview
+  // is on and a PTY is available), View › Toggle Terminal Panel (Ctrl+`, whenever the shell panel is available)
+  | { type: "new_terminal_chat" }
+  | { type: "new_classic_chat" }
+  | { type: "continue_as_terminal" }
+  | { type: "toggle_terminal_panel" };
 
 // MARK: polish p-foundation — P5-sheets-44
 /**
@@ -411,6 +434,39 @@ export type RGBridge = {
   e2eOpenSecondary(): Promise<unknown>;
   /** `git log -1 --format=%H%n%s` of the e2e project (null when git fails). */
   e2eGitLog(): Promise<string | null>;
+  /** PROTOCOL §57.17: terminal chats and the shell panel — PTYs that live in main (src/main/pty/). */
+  pty: PtyBridge;
+};
+
+// MARK: terminal-win — PROTOCOL §57.17: the `rg:pty:*` contract (terminal-stage3 plan §2.2). The renderer never supplies
+// a file, args, env or cwd: main builds every launch, asks the engine for `terminal_spec` and keeps the hook token.
+
+export type ShellKind = "powershell" | "cmd";
+export type PtyOpen =
+  | { kind: "chat"; sessionId: string; cols: number; rows: number }
+  | { kind: "shell"; shell: ShellKind; cols: number; rows: number };
+export type PtyRefusal =
+  | "pty_unavailable" | "terminal_needs_native_claude" | "terminal_cmdline_too_long" | "spawn_failed"
+  | "not_current" // not the current terminal chat
+  | (string & {}); // engine codes passed through: cli_not_found, terminal_cli_too_old, terminal_hooks_disabled, terminal_not_current, no_project
+export type PtyOpenResult = { ok: true; ptyId: string } | { ok: false; code: PtyRefusal; error: string };
+export type PtyExit = { ptyId: string; exitCode: number | null; quickNoHooks: boolean; reason: "exited" | "killed" | "switched" | "closed" };
+export type PtyInfo = { available: boolean; reason: string | null; osBuild: number | null; shells: ShellKind[] };
+export type PtyListEntry = { ptyId: string; kind: "chat" | "shell"; sessionId?: string; shell?: ShellKind; running: boolean };
+export type PtyAttach = { replay: string; running: boolean; exit: PtyExit | null };
+export type PtyBridge = {
+  info(): Promise<PtyInfo>; // invoke rg:pty:info
+  open(req: PtyOpen): Promise<PtyOpenResult>; // invoke rg:pty:open (chat: idempotent for a running PTY of that chat)
+  restart(ptyId: string): Promise<PtyOpenResult>; // invoke rg:pty:restart (chat only)
+  kill(ptyId: string): Promise<void>; // invoke rg:pty:kill
+  attach(ptyId: string): Promise<PtyAttach | null>; // after a renderer reload
+  list(): Promise<PtyListEntry[]>;
+  input(ptyId: string, data: string): void; // send rg:pty:input   (≤ 1 MiB / call)
+  resize(ptyId: string, cols: number, rows: number): void; // send rg:pty:resize  (int, cols 2..1000, rows 1..500)
+  ack(ptyId: string, chars: number): void; // send rg:pty:ack
+  focus(focused: boolean): void; // send rg:pty:focus → webContents.setIgnoreMenuShortcuts
+  onData(cb: (ptyId: string, data: string) => void): () => void; // rg:pty:data (batched)
+  onExit(cb: (e: PtyExit) => void): () => void; // rg:pty:exit
 };
 
 declare global {

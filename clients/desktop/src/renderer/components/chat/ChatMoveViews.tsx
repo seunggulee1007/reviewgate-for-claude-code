@@ -6,8 +6,10 @@
 import { useState, type ReactNode } from "react";
 import type { ChatMoveRef } from "@reviewgate/engine";
 import { chatMoveNeedsStop, folderName, moveChat, movedChatOf, useChatMoveNotice } from "../../chatMove";
-import { sessionsOf } from "../../sessions";
-import { useViewing } from "../../viewedChat";
+import { sessionsOf, sessionSwitchRefusal } from "../../sessions";
+import { stopViewing, useViewing } from "../../viewedChat";
+import { continuedBannerText } from "../../continueTerminal"; // MARK: terminal-win (§57.9)
+import { Icon } from "../../icons";
 import { t } from "../../i18n";
 import { useStore } from "../../store";
 import { Modal } from "../Menu";
@@ -18,6 +20,40 @@ export function MovedChatBar() {
   const moved = useStore((s) => movedChatOf(s.state, shownId ?? sessionsOf(s.state).currentId));
   const notice = useChatMoveNotice((s) => s.text);
   const setNotice = useChatMoveNotice((s) => s.set);
+  // MARK: terminal-win — §57.9: a record whose conversation goes on in a terminal chat names it, with [Open].
+  const continued = useStore((s) => {
+    const list = sessionsOf(s.state).list;
+    const target = list.find((m) => m.id === (shownId ?? sessionsOf(s.state).currentId))?.continuedIn;
+    return target ? (list.find((m) => m.id === target) ?? null) : null;
+  });
+  const switchWhy = useStore((s) => sessionSwitchRefusal(s.state));
+  const liveId = useStore((s) => sessionsOf(s.state).currentId);
+  if (!moved && continued) {
+    const isLive = continued.id === liveId;
+    return (
+      <div className="banner green chat-move-bar" role="status" data-testid="Continued chat bar">
+        <span className="icon" aria-hidden="true">
+          <Icon name="terminal" size={14} />
+        </span>
+        <span className="text grow">{continuedBannerText(continued.title.trim() || t("New chat"))}</span>
+        <span className="actions">
+          <button
+            type="button"
+            className="small"
+            disabled={!isLive && switchWhy !== null}
+            title={!isLive && switchWhy !== null ? switchWhy : t("Open the terminal chat this conversation continues in")}
+            onClick={() => {
+              if (isLive) stopViewing();
+              else void useStore.getState().openChat(continued.id);
+            }}
+            data-testid="Open continued terminal chat"
+          >
+            {t("Open")}
+          </button>
+        </span>
+      </div>
+    );
+  }
   if (moved) {
     return (
       <div className="banner blue chat-move-bar" role="status" data-testid="Moved chat bar">

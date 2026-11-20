@@ -76,6 +76,8 @@ export type SideSlice = {
   sideMainOnlyFor(key: string): SideMainOnly | null;
   /** [메인 대화로 보내기]: the request goes to the main conversation as typed — "sent", or "queued" behind a running turn. */
   sendSideToMain(key: string, anchorKey?: string): "sent" | "queued" | null;
+  /** §57.7: the question went into a terminal chat's Claude Code as a paste instead — it is done here as a send is. */
+  dropSideMainOnly(key: string, anchorKey?: string): void;
 
   /** §21 events → `side`; true when the event was one of them. */
   applySideEvent(ev: EngineEvent): boolean;
@@ -267,12 +269,16 @@ export const createSideSlice: StateCreator<Store, [], [], SideSlice> = (set, get
       const q = get().queue;
       const queued = q.items.length > 0 || nextToSend({ ...q, items: [{ id: 0, text: request.text }] }, get().state.gate) === null;
       get().enqueueMessage(request.text);
+      get().dropSideMainOnly(key, anchorKey);
+      return queued ? "queued" : "sent";
+    },
+
+    dropSideMainOnly(key, anchorKey) {
       set((s) => {
         const { [key]: _gone, ...rest } = s.sideMainOnly;
         return { sideMainOnly: rest, sideNotice: null, ...(key === "" ? { sideView: { kind: "list" } as SideView } : {}) };
       });
       if (key === "" && anchorKey !== undefined) get().setSideComposeDraft(anchorKey, "");
-      return queued ? "queued" : "sent";
     },
 
     askAbout(anchor, opts = {}) {

@@ -26,6 +26,7 @@ import { useStore } from "../../store";
 import { stopViewing, useViewedChat } from "../../viewedChat"; // MARK: wave4b w4b-tabs (§39.2)
 import { ModeSuggestion } from "./ModeSuggestion";
 import "./permissions.css";
+import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.17
 
 export const MAC = typeof window !== "undefined" && window.rg?.platform === "darwin";
 export const MOD = MAC ? "⌘" : "Ctrl+";
@@ -55,6 +56,7 @@ export function useCardShortcuts(enabled: boolean, requestId: string, allowSessi
   useEffect(() => {
     if (!enabled) return;
     const onKey = (e: KeyboardEvent) => {
+      if (isTerminalTarget(e.target)) return; // §57.17: a terminal's keys are its program's
       const answer = cardShortcut(e, { mac: MAC, focus: document.activeElement, requestId, allowSession, dialogOpen: useStore.getState().dialog !== null });
       if (!answer) return;
       e.preventDefault();

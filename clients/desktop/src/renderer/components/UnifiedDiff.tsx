@@ -27,6 +27,7 @@ import { fileMetaLines } from "../fileMeta"; // MARK: wave4b w4b-files
 import { diffLinePrefix } from "../a11yText"; // MARK: wave4d w4d-speed
 import "./a11y.css";
 import { windowKey } from "../keymap"; // MARK: wave4d w4d-windows
+import { isTerminalTarget } from "../terminal/terminalKeys"; // §57.17
 
 export type LineKey = { side: "old" | "new"; line: number };
 
@@ -145,6 +146,7 @@ export function UnifiedDiff(props: {
         return;
       }
       // The physical key too: with the Korean 2-set layout active the F key can arrive as "ㄹ".
+      if (isTerminalTarget(e.target)) return; // §57.17: Ctrl+F in a terminal is the program's
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || (e.key.toLowerCase() !== "f" && e.code !== "KeyF")) return;
       const pane = paneRef.current;
       const active = document.activeElement;

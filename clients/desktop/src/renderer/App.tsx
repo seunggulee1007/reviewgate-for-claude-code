@@ -27,12 +27,16 @@ import { Toast } from "./components/Toast";
 import { useRejectShortcut } from "./rejectShortcut";
 import { showToast } from "./toast";
 import { LiveDiffPane } from "./components/diff/LiveDiffPane"; // MARK: wave2 desktop-flow
-import { insertIntoComposer } from "./composerBridge"; // MARK: wave3 desktop-flow
 import { useNotificationNotices } from "./components/NotificationNotices"; // MARK: wave4b w4-notify
 import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
 import { backgroundKeyJustHandled } from "./background"; // §52
 import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-chrome-09)
+import { useTermHost } from "./terminal/useTermHost"; // §57.17
+import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.17
+import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
+import { ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.17
+import { useViewing } from "./viewedChat"; // §57.5
 
 declare global {
   interface Window {
@@ -52,7 +56,14 @@ export function App() {
   const liveOpen = useStore((s) => s.liveView !== null && s.historyView === null);
   const sideOpen = useStore((s) => s.sidePanelOpen);
   const boardOpen = useStore((s) => s.boardOpen); // MARK: wave5 w5-board
+  // §57.5: a terminal chat on screen lays the window out terminal-first (components/terminal/TerminalSplit.tsx).
+  const viewingId = useViewing()?.id ?? null;
+  const terminalFirst = useStore((s) => shownChatIsTerminal(s.state, viewingId));
   useReviewShortcuts();
+  useTermHost(); // §57.17: the window's terminals (terminal chats, the shell panel)
+  useTerminalChatPty(); // §57.17: the live terminal chat's PTY and its waits
+  useTerminalReviewReopen(); // §57.5: a terminal chat's review panel opens again with each review
+  useShellPanelHost(); // §57.17: Ctrl+` and the shell tabs' exits
   useNotificationNotices(); // MARK: wave4b w4-notify — §39.6: a clicked notification lands on its card; the OS refusing one
   // polish-03: ⌘⇧R / Ctrl+Shift+R is always the reject shortcut — never the browser's force reload.
   useRejectShortcut(() => {
@@ -100,7 +111,7 @@ export function App() {
         // MARK: wave3 desktop-flow — §36.14: PR comments another window sent here ("Send to Claude"); never sent by itself.
         case "composer_draft":
           s.setTab("changes");
-          insertIntoComposer(action.text);
+          draftToLiveChat(action.text); // §57.7: a live terminal chat gets it pasted (no Enter)
           break;
         // MARK: wave4b w4b-follow — §39.4: another window handed its chat to this worktree.
         case "chat_receive":
@@ -111,7 +122,7 @@ export function App() {
           s.openDialog({ kind: "shortcuts" });
           break;
         case "toggle_diff_pane":
-          if (s.state.project) s.toggleDiffPane();
+          if (s.state.project) s.toggleDiffPane(diffCollapsedNow()); // §57.5
           break;
         case "toggle_agent_panel":
           if (s.state.project) s.toggleAgentPanel();
@@ -150,6 +161,11 @@ export function App() {
           <div className="panes">
             {tab === "prs" ? (
               <ErrorBoundary name="PR" className="pane diff"><PRDetail /></ErrorBoundary>
+            ) : hasProject && terminalFirst ? (
+              <>
+                <TerminalSplit />
+                {sideOpen && <ErrorBoundary name="Side" className="side-panel"><SidePanel /></ErrorBoundary>}
+              </>
             ) : hasProject ? (
               <>
                 {diffCollapsed && !historyOpen && !liveOpen ? (
@@ -173,6 +189,8 @@ export function App() {
               <ErrorBoundary name="Start" className="pane diff"><NoProject /></ErrorBoundary>
             )}
           </div>
+          {/* §57.17: the bottom terminal panel (PowerShell / Command Prompt) — no Claude, no preview needed */}
+          {tab !== "prs" && hasProject && <ErrorBoundary name="Terminal panel"><ShellPanel /></ErrorBoundary>}
           {agentPanelOpen && tab !== "prs" && hasProject && <ErrorBoundary name="Agents" className="agent-panel"><AgentPanel /></ErrorBoundary>}
         </div>
         {boardOpen && hasProject && <ErrorBoundary name="Agent board"><BoardDialog /></ErrorBoundary>}{/* MARK: wave5 w5-board */}

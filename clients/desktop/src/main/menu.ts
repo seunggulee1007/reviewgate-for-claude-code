@@ -13,6 +13,7 @@ import type { MenuAction } from "../shared/ipc.js";
 import { NOTHING_ENABLED, type MenuEnabled } from "../shared/menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
 import { currentLanguage, t } from "../renderer/i18n"; // MARK: wave4d w4d-windows (polish-07): the menu bar in the UI language (`initI18n` in main.ts)
 import { helpLinks } from "./links.js"; // MARK: polish p-lifecycle (P1-chrome-08)
+import { ptyInfo } from "./pty/nodePty.js"; // MARK: terminal-win (§57.17)
 
 const isMac = process.platform === "darwin";
 
@@ -53,8 +54,12 @@ export function buildMenu(opts: MenuHandlers): void {
   const entries = recentEntries(settings.recentProjects);
   const tabs = chatTabs(state);
   const runAsTask = settings.runAsTaskEnabled !== false;
+  // MARK: terminal-win — §57.17: the terminal chat items while the preview is on and a PTY can run; the panel's toggle
+  // whenever the shell panel can open (Windows with node-pty).
+  const pty = ptyInfo();
+  const terminal = { chat: settings.terminalChatPreview === true && pty.available, panel: pty.shells.length > 0 };
   // `t("File")` stands for the UI language.
-  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, runAsTask, can]);
+  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, runAsTask, can, terminal]);
   if (signature === lastSignature) return;
   lastSignature = signature;
   const needsProject = { enabled: hasProject };
@@ -124,6 +129,8 @@ export function buildMenu(opts: MenuHandlers): void {
       { label: t("Toggle Side Questions"), ...shownKey("CmdOrCtrl+Alt+S"), click: () => dispatch({ type: "toggle_side_panel" }, () => undefined) },
       // MARK: wave5 w5-board — §43.1: the agent board (the Mac's Window › Agent Board).
       { label: t("Agent Board"), ...shownKey("CmdOrCtrl+Alt+B"), click: () => dispatch({ type: "toggle_board" }, () => undefined) },
+      // MARK: terminal-win — §57.17: the bottom shell panel (PowerShell / Command Prompt tabs); the renderer owns Ctrl+`.
+      ...(terminal.panel ? [{ label: t("Toggle Terminal Panel"), ...shownKey("Ctrl+`"), ...needsProject, click: () => dispatch({ type: "toggle_terminal_panel" }, () => undefined) }] : []),
       // MARK: polish p-lifecycle (P1-chrome-20): the sidebar's tabs, in the Mac's order (the keys are the renderer's).
       { type: "separator" },
       { label: t("Changes"), ...shownKey("CmdOrCtrl+Alt+1"), ...needsProject, click: () => dispatch({ type: "sidebar_tab", tab: "changes" }, () => undefined) },
@@ -164,10 +171,10 @@ export function buildMenu(opts: MenuHandlers): void {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [appMenu()] : []),
     file,
-    editMenu(needsProject),
+    editMenu(needsProject, can),
     view,
     reviewMenu(can, hasProject),
-    chatMenu(needsProject, can, tabs),
+    chatMenu(needsProject, can, tabs, terminal.chat),
     windowMenu(),
     help,
   ];
@@ -227,7 +234,8 @@ function reviewMenu(can: MenuEnabled, project: boolean): MenuItemConstructorOpti
       { type: "separator" },
       item(t("Add a review note on the selected line"), { type: "add_note" }, project, "CmdOrCtrl+Alt+N"),
       item(t("Ask About Selection…"), { type: "ask_selection" }, project, "CmdOrCtrl+Alt+/"),
-      item(t("Request Changes"), { type: "request_changes" }, project, "CmdOrCtrl+Shift+C"),
+      // §57.17: a terminal chat's changes are asked for in the TUI (as on the Mac).
+      item(t("Request Changes"), { type: "request_changes" }, project && !can.terminalChat, "CmdOrCtrl+Shift+C"),
       item(t("Commit Accepted…"), { type: "commit" }, can.commit, "CmdOrCtrl+Shift+K"),
       item(t("Create PR from this branch…"), { type: "create_pr" }, can.createPR),
     ],
@@ -245,11 +253,20 @@ export function chatTabs(state: Pick<ReviewState, "sessions"> | null): string[] 
 }
 
 // MARK: polish p-lifecycle — P4-composer-06: the Mac's Chat menu (⌘T, ⌘⇧W, the tabs at ⌘1…⌘9) and Stop (⌘.).
-function chatMenu(needsProject: { enabled: boolean }, can: MenuEnabled, tabs: string[]): MenuItemConstructorOptions {
+function chatMenu(needsProject: { enabled: boolean }, can: MenuEnabled, tabs: string[], terminalChat = false): MenuItemConstructorOptions {
+  // MARK: terminal-win — §57.17: both kinds while "Terminal chat (preview)" is on; Continue for a chat (not a terminal chat).
+  const terminalItems: MenuItemConstructorOptions[] = terminalChat
+    ? [
+        { label: t("New Terminal Chat"), ...shownKey("CmdOrCtrl+Alt+T"), enabled: can.chatSwitch, click: () => dispatch({ type: "new_terminal_chat" }, () => undefined) },
+        { label: t("New Chat (Classic)"), ...shownKey("CmdOrCtrl+Alt+Shift+T"), enabled: can.chatSwitch, click: () => dispatch({ type: "new_classic_chat" }, () => undefined) },
+        { label: t("Continue as Terminal Chat"), enabled: can.chatSwitch && !can.terminalChat, click: () => dispatch({ type: "continue_as_terminal" }, () => undefined) },
+      ]
+    : [];
   return {
     label: mn(t("Chat"), "C"),
     submenu: [
       { label: t("New chat"), ...shownKey("CmdOrCtrl+T"), enabled: can.chatSwitch, click: () => dispatch({ type: "new_chat" }, () => undefined) },
+      ...terminalItems,
       { label: t("Close Chat Tab"), ...shownKey("CmdOrCtrl+Shift+W"), ...needsProject, click: () => dispatch({ type: "close_chat_tab" }, () => undefined) },
       ...(tabs.length > 0 ? [{ type: "separator" as const }] : []),
       ...tabs.map((title, index): MenuItemConstructorOptions => ({
@@ -301,7 +318,7 @@ function appMenu(): MenuItemConstructorOptions {
   };
 }
 
-function editMenu(needsProject: { enabled: boolean }): MenuItemConstructorOptions {
+function editMenu(needsProject: { enabled: boolean }, can: MenuEnabled): MenuItemConstructorOptions {
   return {
     label: mn(t("Edit"), "E"),
     submenu: [
@@ -317,7 +334,8 @@ function editMenu(needsProject: { enabled: boolean }): MenuItemConstructorOption
       { role: "selectAll", label: t("Select All") },
       // MARK: polish p-lifecycle (P1-chrome-09): the Mac's Edit › Find in Chat (⌘F) and Find in Diff (⌥⌘F).
       { type: "separator" },
-      { label: t("Find in Chat…"), ...shownKey("CmdOrCtrl+F"), ...needsProject, click: () => dispatch({ type: "find_chat" }, () => undefined) },
+      // §57.17: a terminal chat has no transcript to search here (the TUI's own search does it).
+      { label: t("Find in Chat…"), ...shownKey("CmdOrCtrl+F"), enabled: needsProject.enabled && !can.terminalChat, click: () => dispatch({ type: "find_chat" }, () => undefined) },
       { label: t("Find in Diff…"), ...shownKey("CmdOrCtrl+Alt+F"), ...needsProject, click: () => dispatch({ type: "find_diff" }, () => undefined) },
     ],
   };

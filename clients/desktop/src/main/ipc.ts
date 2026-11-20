@@ -29,6 +29,9 @@ import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows (polish-07): d
 import { projectOpenPath } from "./sessionSettings.js";
 import { pinnedVersionPath } from "./cliPin.js";
 import { isDirectory, isTransientProjectPath, recentEntries, withoutRecent } from "./recentProjects.js"; // MARK: wave4 w4-install
+import { ptyInfo } from "./pty/nodePty.js"; // MARK: terminal-win (§57.17)
+import type { PtyHub } from "./pty/ptyHub.js";
+import type { PtyOpenResult } from "../shared/ipc.js";
 
 type Deps = {
   engineFor: (sender: WebContents) => ReviewEngine | undefined;
@@ -41,6 +44,8 @@ type Deps = {
   /** M19: focus another window that already has `path` open. */
   focusProjectWindow: (path: string, exceptId?: number) => boolean;
   rebuildMenu: () => void;
+  /** MARK: terminal-win — §57.17: the sender window's PtyHub. */
+  ptyHubFor: (sender: WebContents) => PtyHub | undefined;
 };
 
 export function installIPC(deps: Deps): void {
@@ -274,7 +279,23 @@ export function installIPC(deps: Deps): void {
     if (r.canceled) return [];
     return Promise.all(r.filePaths.slice(0, MAX_ATTACHMENTS).map((path) => readPickedImage(path)));
   });
-  ipcMain.handle("rg:toolchainInfo", (): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
+  // MARK: terminal-win — PROTOCOL §57.17: whether this process can run PTYs (node-pty loaded; ConPTY on Windows ≥ 1903).
+  ipcMain.handle("rg:pty:info", () => ptyInfo());
+  // The window's PtyHub checks that the sender owns the PTY; the renderer never names a file, args, env or cwd.
+  const hub = (sender: WebContents) => deps.ptyHubFor(sender);
+  const noHub: PtyOpenResult = { ok: false, code: "pty_unavailable", error: "no terminal for this window" };
+  ipcMain.handle("rg:pty:open", (evt, req: unknown) => hub(evt.sender)?.open(evt.sender.id, req) ?? noHub);
+  ipcMain.handle("rg:pty:restart", (evt, ptyId: unknown) => hub(evt.sender)?.restart(evt.sender.id, ptyId) ?? noHub);
+  ipcMain.handle("rg:pty:kill", async (evt, ptyId: unknown) => {
+    await hub(evt.sender)?.kill(evt.sender.id, ptyId);
+  });
+  ipcMain.handle("rg:pty:attach", (evt, ptyId: unknown) => hub(evt.sender)?.attach(evt.sender.id, ptyId) ?? null);
+  ipcMain.handle("rg:pty:list", (evt) => hub(evt.sender)?.list(evt.sender.id) ?? []);
+  ipcMain.on("rg:pty:input", (evt, ptyId: unknown, data: unknown) => hub(evt.sender)?.input(evt.sender.id, ptyId, data));
+  ipcMain.on("rg:pty:resize", (evt, ptyId: unknown, cols: unknown, rows: unknown) => hub(evt.sender)?.resize(evt.sender.id, ptyId, cols, rows));
+  ipcMain.on("rg:pty:ack", (evt, ptyId: unknown, chars: unknown) => hub(evt.sender)?.ack(evt.sender.id, ptyId, chars));
+  ipcMain.on("rg:pty:focus", (evt, focused: unknown) => hub(evt.sender)?.focus(evt.sender.id, focused));
+  ipcMain.handle("rg:toolchainInfo",(): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
   // MARK: wave3 desktop-flow (src/main/flowWindows.ts)
   /** §36.12: the new workbench's window takes its failed setup's report once its project is open. */
   ipcMain.handle("rg:takeWorkbenchSetupReport", (_e, paths: unknown) => setupReports.take(paths));

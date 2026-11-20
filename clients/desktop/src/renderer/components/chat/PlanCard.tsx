@@ -17,6 +17,7 @@ import { Markdown } from "./Markdown";
 // MARK: wave4d w4d-plan — §42.1: the plan at full size with per-step notes; implement in a new chat / workbench
 import { planHandoffBlocker, planNoteCount, planNotesMessage, suggestPlanBranch } from "../../planReview";
 import { PlanApproveButtons, PlanReviewDialog } from "./PlanReviewDialog";
+import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.17
 
 export function PlanCard() {
   const state = useStore((s) => s.state);
@@ -52,6 +53,7 @@ export function PlanCard() {
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (isTerminalTarget(e.target)) return; // §57.17: Esc in a terminal is the program's
       // wave4d w4d-plan: the large plan view's Esc closes it, never answers the plan.
       const overlayOpen = document.querySelector('[role="menu"], .popover, [data-testid="Plan review"]') !== null;
       if (!planEscape(e, { focus: document.activeElement, dialogOpen: useStore.getState().dialog !== null, overlayOpen })) return;

@@ -30,6 +30,15 @@ export function chatTabKey(e: ShortcutKey): ChatTabKey | null {
   return digit ? { kind: "tab", index: Number(digit) - 1 } : null;
 }
 
+/**
+ * §57.5 / §57.17: Ctrl+Alt+T a new terminal chat, Ctrl+Alt+Shift+T a classic one (the Mac's ⌃⌘T / ⌃⌥⌘T). The physical
+ * key decides (a Korean input source reads T as "ㅅ").
+ */
+export function terminalChatKey(e: ShortcutKey): "terminal" | "classic" | null {
+  if (!mod(e) || !e.altKey || !(e.code === "KeyT" || e.key.toLowerCase() === "t")) return null;
+  return e.shiftKey ? "classic" : "terminal";
+}
+
 /** ⌘↩ = "message" (to the main conversation), ⌥⌘↩ = "note" in a side thread's follow-up field; never the IME's Enter. */
 export function sideThreadKey(e: ShortcutKey & ImeKeyLike): "message" | "note" | null {
   if (!mod(e) || e.shiftKey || !isEnter(e)) return null;

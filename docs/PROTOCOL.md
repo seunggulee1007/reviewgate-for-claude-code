@@ -63,7 +63,7 @@ type Settings = {
 };
 
 type EngineCommand =
-  | Cmd<"hello", { protocolVersion: 2; client: "mac" | "windows" | "test"; env?: Record<string,string>; settings: Settings }>  // → ready, then state
+  | Cmd<"hello", { protocolVersion: 2; client: "mac" | "windows" | "test"; env?: Record<string,string>; settings: Settings; capabilities?: { terminalChat?: boolean } }>  // → ready, then state; capabilities §57.17
   | Cmd<"set_settings", { settings: Partial<Settings> }>   // budget, ignorePatterns, ghHost apply live; the rest on the next open_project
   | Cmd<"open_project", { path: string; takeover?: boolean }>   // closes the current project if any → state (project | gitInit | lockConflict); takeover overrides another session's lock (§6)
   | Cmd<"switch_project", { path: string; takeover?: boolean }> // alias of open_project (the client confirmed a pending review)
@@ -8728,7 +8728,8 @@ Extensions › MCP servers only (§22). No engine command is new: the list is `m
 A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The
 engine never spawns it: it tells the app how to start it (`terminal_spec`), receives Claude Code's http hooks on
 127.0.0.1, and maps them onto the review gate — snapshot A at the prompt, B at the stop, the turn diff, accept / reject
-and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1.
+and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1; the Windows client from
+Stage 3 when its hello advertises `capabilities.terminalChat` (§57.17).
 
 ### 57.1 The contract
 
@@ -8785,19 +8786,22 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
   `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `side_promote
-  {as:"message"}`; `request_changes` and `chat_move` work there since Stage 2, §57.14 / §57.12); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  {as:"message"}`; `request_changes` and `chat_move` work there since Stage 2, §57.14 / §57.12); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac, test, or a
+  windows client whose hello advertises `capabilities.terminalChat`;
   `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
   turn; `cli_not_found` as elsewhere.
-- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands (nor `terminal_request_cancel` /
-  `terminal_permission_response`), so its renderer cannot send them.
+- **Windows.** The desktop client's IPC guard does not list `terminal_spec`, `terminal_started` or `terminal_exited`, so
+  its renderer cannot send them: the client's main process sends them itself (§57.17). It does not list
+  `terminal_request_cancel` / `terminal_permission_response` either: the Stage 2 features (§57.10–57.16) are Mac only.
 - **Stage 2 commands** reply `result`. `terminal_request_cancel` and `terminal_permission_response` are refused
   `terminal_not_current` like the other `terminal_*` commands; their own refusals are in §57.14 and §57.15.
 
 ### 57.2 Lifecycle and resume
 
-- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
+- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients, and a `windows` client with
+  `capabilities.terminalChat`, §57.17) and switches to it as any new
   chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project` —
   the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
   state). Such a session is never parked (§9.1). Switching away keeps an idle, running one in the background (§57.10);
@@ -9116,9 +9120,10 @@ real TUI. The chat UI stays one menu item away; chats keep the kind they were ma
   (`SessionKind.rawValue`; absent or unknown = terminal). Its tooltip says what each kind is. A change goes to every
   window's engine at once (`set_settings {newChatKind}`).
 - **The engine** (`Settings.newChatKind`, live): the kind of the chat the engine makes by itself when a project has none —
-  its first open (a new project, a new workbench's window), or a current chat that is gone. `"terminal"` only from the
-  `mac` and `test` clients; any other client gets a chat (the Windows client never sends it and has no terminal chat;
-  `session_new {kind:"terminal"}` from it stays `terminal_unsupported`). `session_new` never reads it: the client names
+  its first open (a new project, a new workbench's window), or a current chat that is gone. `"terminal"` only for mac,
+  test, or a windows client whose hello advertises `capabilities.terminalChat` (§57.17); any other client gets a chat
+  (`session_new {kind:"terminal"}` from it stays `terminal_unsupported`). The Windows client sends `"terminal"` only
+  while its "Terminal chat (preview)" is on and "New chats open as" is Terminal. `session_new` never reads it: the client names
   the kind. A chat the engine makes to send something itself is always a chat: a plan handed over (§42.1), a task handed
   to its workbench (§49), the fallback after a failed resume (§30), a rewind's fork (§38.3), `/clear` in a chat (§41.1).
 - **Entry points on the Mac** (all held while Claude works, §9):
@@ -9182,7 +9187,8 @@ its own before the review was accepted. The PreToolUse hook (`Edit|Write|MultiEd
 ### 57.9 Continue a chat as a terminal chat
 
 Now that a new chat is a terminal chat, a chat's Claude conversation must not be stranded in the chat UI: "Continue as
-Terminal Chat" carries it into a new terminal chat (the real TUI resumes it). Mac only.
+Terminal Chat" carries it into a new terminal chat (the real TUI resumes it). Mac, and the Windows client with
+`capabilities.terminalChat` (§57.17).
 
 ```ts
 session_continue_terminal { sessionId }   // reply: result; the new terminal chat is the current one (state, transcript_restore)
@@ -9191,8 +9197,8 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   continuedIn?: string;     // that chat: the terminal chat its conversation goes on in — it is a record from now on
 ```
 
-- **Refused** (`CommandRefused("<code>:<detail>", {code})`): `terminal_unsupported` (a client other than mac / test — the
-  desktop client's IPC guard does not list it either), `session_busy` / `collect_failed` (as a switch, §9), `not_a_chat`
+- **Refused** (`CommandRefused("<code>:<detail>", {code})`): `terminal_unsupported` (a client other than mac / test, or a
+  windows client without `capabilities.terminalChat`, §57.17), `session_busy` / `collect_failed` (as a switch, §9), `not_a_chat`
   (a terminal chat), `chat_is_record` (`resumeFailed`, `movedTo` or already `continuedIn`), `nothing_to_continue` (the CLI
   has no conversation of it yet: not `cliKnown`, not confirmed, no record file), `review_pending` (files wait in the
   review — accepted or rejected first, so nothing pending is dropped and the terminal chat's review starts from its own
@@ -9375,6 +9381,74 @@ request is already aborted, it answers `{}` at once (the TUI's dialog) after rai
   `terminal_spec` then reads both dirs: refused `terminal_hooks_disabled` when either says hooks are off; the conversation
   is "gone" (§57.2) only when no dir has the record and each says gone; plan files are under the learned dir's `plans`.
   A forged path only feeds read-only checks, and only makes them stricter.
+
+### 57.17 The Windows client
+
+```ts
+type ClientCapabilities = {
+  terminalChat?: boolean;   // the client can run a terminal chat's PTY; honoured for a `windows` client (mac / test always can)
+};
+// HelloCommand gains:  capabilities?: ClientCapabilities
+```
+
+- **The engine.** `hello` stores the capabilities (a later `hello` replaces them). A `windows` client with
+  `capabilities.terminalChat: true` passes the same check as mac and test: `session_new {kind:"terminal"}`,
+  `session_continue_terminal`, `terminal_spec` and `Settings.newChatKind` (§57.7) work for it. Without it — or with
+  `false` — everything stays `terminal_unsupported` as before. On a mac or test client the field changes nothing. Nothing
+  else differs: `terminal_spec` has no Windows-specific fields (the client resolves argv[0] itself). The Stage 2 features
+  (§57.10 background terminals, §57.12 worktree follow / move, §57.13 the status line tee, §57.15 the permission bridge)
+  stay mac / test only (`terminalFeature`): a windows terminal chat's spec has no `PermissionRequest` hook and no
+  `statusLine`, a switch away ends it as in Stage 1, and `chat_move` stays `terminal_chat`.
+- **Where the PTY lives** (`clients/desktop/src/main/pty/`). node-pty 1.1.0 in Electron main, ConPTY with its bundled
+  `conpty.dll` (`useConpty`, `useConptyDll`); one `PtyHub` per window. The hello's `capabilities.terminalChat` is
+  whether node-pty loaded (and, on Windows, build ≥ 18309) — static per process; Settings' "Terminal chat (preview)" is
+  only a UI preference.
+- **The token never reaches the renderer.** Main asks for `terminal_spec`, spawns, and sends `terminal_started {pid}` /
+  `terminal_exited` itself; the IPC guard lets the renderer send only `terminal_end_turn` and
+  `session_continue_terminal`. The renderer talks to the PTYs over `rg:pty:*` (`info`, `open`, `restart`, `kill`,
+  `attach`, `list` invoked; `input`, `resize`, `ack`, `focus` sent; `data`, `exit` received) and never names a file,
+  arguments, environment or folder. A PTY id belongs to the window that opened it; any other sender is ignored and
+  logged. Refusals: `pty_unavailable`, `not_current`, `terminal_needs_native_claude`, `terminal_cmdline_too_long`,
+  `spawn_failed`, `invalid_request`, `no_project`, and the engine's codes passed through (`cli_not_found`,
+  `terminal_cli_too_old`, `terminal_hooks_disabled`, `terminal_not_current`).
+- **The launch** (`terminalLaunch.ts`). argv[0] through `resolveClaudeExecutable`: a `.exe` as is; npm's `cli.js` under
+  a real `node.exe` (beside the shim, else PATH) — never Electron-as-node, which does not attach to the pseudoconsole; a
+  `.cmd` / `.bat` is refused (`terminal_needs_native_claude`): CreateProcess would re-parse the line through cmd.exe and
+  the `--settings` JSON holds `"` and `|`. The command line is the client's own (every argument MSVCRT-quoted), handed to
+  node-pty as a string; above 30,000 characters `terminal_cmdline_too_long`. `${RG_HOOK_TOKEN}` stays literal (no shell
+  runs). The environment is the whole parent one merged case-insensitively, minus `CLAUDECODE`,
+  `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`, `CLAUDE_AGENT_SDK_*`, `ELECTRON_*`, `NODE_OPTIONS`,
+  `VITE_DEV_SERVER_URL`, `REVIEWGATE_*` and any `RG_*` (the user's other `CLAUDE_*` stay: on Windows they are user
+  settings), plus `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`,
+  `CLAUDE_CODE_NATIVE_CURSOR=1`, `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` (while on) and the spec's `RG_*` /
+  `CLAUDE_CODE_*` keys. On macOS (development only — the client counts as `mac` there) argv runs directly with the Mac's
+  Stage 1 environment.
+- **Lifecycle.** At most one chat PTY per window; opening a running chat's PTY again returns it. Output goes out in
+  batches (5 ms or 64 KiB) with a 512 KiB replay for a reloaded page; over 100,000 unacknowledged characters the PTY
+  pauses, below 5,000 it resumes. The chat PTY ends (`switched`) when its chat stops being the current one or the project
+  closes or changes — main watches the engine's state, so this holds with the renderer gone; a project change or close
+  ends the shell tabs too. A kill closes the pseudoconsole; a process still alive 3 s later has its tree killed
+  (`taskkill /T /F`). A window's close and the quit end every PTY in parallel before the engine stops; `process` exit
+  kills what is left. `rg:pty:exit` carries `quickNoHooks` (the chat's PTY ended within 10 s and no hook came: the trust
+  dialog's "No, exit" or a CLI that cannot reach the hooks). While a terminal has the keyboard, `rg:pty:focus` turns the
+  window's menu accelerators off (`setIgnoreMenuShortcuts`) so Ctrl+B / R / O / P / N reach the TUI.
+- **Settings and menus.** `AppSettings` gains `terminalChatPreview` (false), `newChatKind` ("chat"), `terminalGpu`
+  ("auto" / "off"), `terminalShell` ("powershell" / "cmd"), `terminalFullRepaint` (true) and `terminalFontSize` (9…28,
+  13), all renderer-writable. The engine's `newChatKind` is `"terminal"` only while the preview is on and "New chats open
+  as" is Terminal. While the preview is on and a PTY can run, Chat lists New Terminal Chat (Ctrl+Alt+T), New Chat
+  (Classic) (Ctrl+Alt+Shift+T) and Continue as Terminal Chat; View lists Toggle Terminal Panel (Ctrl+`) whenever the shell
+  panel can open — the renderer owns those keys. `MenuEnabled.terminalChat` (the chat on screen is a terminal chat) turns
+  Find in Chat, Request Changes and Continue as Terminal Chat off. A terminal chat that exists keeps working with the
+  preview off; only the ways to make one go.
+- **The shell panel**: PowerShell (`pwsh`, else Windows PowerShell, `-NoLogo`) or Command Prompt (`%ComSpec%`) in the
+  window's project folder, with the same environment minus `RG_*`, `CLAUDE_CODE_NATIVE_CURSOR` and
+  `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`. Available whenever node-pty loads, on Windows. In the window it sits below the
+  diff and chat row (not on the PRs tab), at its remembered height (`ui.terminalPanelHeight`, at least 80 px, the window
+  keeping 200 px above; its top edge drags), with a tab per shell, `+` (PowerShell / Command Prompt) and × (the shell
+  ends). Exit 0 closes a tab, any other exit keeps it with "exited (n)", Restart and Close; the last tab closing hides the
+  panel; hiding it or switching tabs never ends a shell. Ctrl+` (the physical Backquote key, also from inside a
+  terminal): hidden → shown and focused (a first tab of Settings' default shell if none); shown and focused → hidden, the
+  keyboard back to the chat's terminal or message box; shown elsewhere → focused.
 
 ## 58. Accept N & Continue
 

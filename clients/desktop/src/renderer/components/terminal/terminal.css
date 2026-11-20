@@ -1,0 +1,53 @@
+/* §57.17: terminals (xterm.js) — a terminal chat's column and the bottom shell panel. */
+.term-view { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; padding: 4px 0 0 4px; background: var(--term-bg, #ffffff); }
+:root[data-theme="dark"] .term-view { --term-bg: #1a1a1c; }
+.term-view .term-host { width: 100%; height: 100%; }
+.term-view .xterm { height: 100%; }
+.term-view .xterm:focus-within { outline: none; }
+
+/* §57.5: a terminal chat's column — the strip, the terminal, the overlay once Claude Code exited. */
+.terminal-chat { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.terminal-strip { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid var(--border); min-height: 28px; }
+.terminal-strip.disconnected { background: var(--orange-bg); }
+.terminal-status { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 11.5px; color: var(--fg-2); }
+.terminal-status.accent { color: var(--accent); }
+.terminal-status.orange { color: var(--orange); }
+.terminal-status .short { display: none; }
+@container chat (max-width: 520px) {
+  .terminal-status:has(.short) .long { display: none; }
+  .terminal-status .short { display: inline; }
+}
+.terminal-strip button.active { background: var(--accent-bg); }
+.terminal-find { padding: 4px 8px; border-bottom: 1px solid var(--border); gap: 4px; }
+.terminal-find input { flex: 1; min-width: 80px; }
+.terminal-body { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
+.terminal-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.35); }
+.terminal-overlay-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 380px; padding: 20px; border-radius: 12px; background: var(--panel); border: 1px solid var(--border); text-align: center; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3); }
+.terminal-overlay-title { font-weight: 600; justify-content: center; }
+.terminal-starting, .terminal-problem { align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; }
+.terminal-problem .selectable { user-select: text; max-width: 420px; white-space: pre-wrap; }
+.terminal-viewed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px; text-align: center; color: var(--fg-2); }
+.terminal-viewed h3 { margin: 0; color: var(--fg); }
+.terminal-viewed .caption { max-width: 380px; }
+
+/* §57.5: a terminal chat's window — the review panel beside the terminal, or a drawer over its left side. */
+.terminal-split { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
+.terminal-split > .pane.chat { flex: 1 1 auto; min-width: 0; }
+.review-side { display: flex; min-width: 0; min-height: 0; }
+.review-side > .pane.diff, .review-drawer > .pane.diff { flex: 1; min-width: 0; border-right: 0; }
+.review-drawer { position: absolute; bottom: 0; z-index: 20; display: flex; min-height: 0; background: var(--bg); border-right: 1px solid var(--border); box-shadow: 4px 0 14px rgba(0, 0, 0, 0.22); }
+:root[data-theme="dark"] .review-drawer { box-shadow: 4px 0 14px rgba(0, 0, 0, 0.55); }
+
+/* §57.6 / §57.17: the bottom shell panel — tabs, a drag edge on top, one terminal at a time. */
+.shell-panel { position: relative; display: flex; flex-direction: column; flex: none; min-height: 80px; border-top: 1px solid var(--border); background: var(--bg); }
+.shell-drag { position: absolute; top: -3px; left: 0; right: 0; height: 6px; cursor: row-resize; z-index: 5; }
+.shell-drag:hover { background: var(--accent-bg); }
+.shell-tabs { display: flex; align-items: center; gap: 2px; padding: 2px 6px; border-bottom: 1px solid var(--border); background: var(--bg-2); min-height: 28px; }
+.shell-tab { display: inline-flex; align-items: center; gap: 5px; max-width: 220px; padding: 2px 6px; border-radius: 5px; font-size: 12px; color: var(--fg-2); cursor: default; }
+.shell-tab.active { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
+.shell-tab .close { padding: 0 2px; }
+.shell-body { position: relative; display: flex; flex: 1; min-height: 0; }
+
+/* §57.5: a terminal chat's tab — a terminal glyph, an orange dot while its Claude Code is not running. */
+.chat-tab .tab-kind { position: relative; display: inline-flex; color: var(--fg-2); flex: none; }
+.chat-tab .tab-kind.stopped::after { content: ""; position: absolute; right: -2px; top: -1px; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }

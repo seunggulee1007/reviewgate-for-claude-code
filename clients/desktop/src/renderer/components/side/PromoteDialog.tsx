@@ -10,6 +10,7 @@ import { promoteTarget, promoteUnsavedLine } from "../../sideThreads";
 import { Modal } from "../Menu";
 import { isEnter } from "../../ime";
 import { useUnsavedWork } from "../../unsavedWork";
+import { liveTerminalChatId, pasteWithToast } from "../../terminal/terminalChat"; // §57.7
 
 export function PromoteDialog() {
   const d = useStore((s) => s.promoteDraft);
@@ -22,6 +23,9 @@ export function PromoteDialog() {
     const a = th?.anchor;
     return !!a?.path && !a.entryId && s.state.changedFiles.some((f) => f.path === a.path);
   });
+  // §57.7: the engine refuses `side_promote {as: "message"}` in a terminal chat — the instruction is pasted into its Claude
+  // Code's prompt (no Enter) and the dialog closes.
+  const terminal = useStore((s) => liveTerminalChatId(s.state) !== null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const loading = d?.loading === true;
 
@@ -34,6 +38,11 @@ export function PromoteDialog() {
   if (!d) return null;
   const anchor = th?.anchor ?? null;
   const busy = d.sending;
+  const pastes = terminal && d.as === "message";
+  const go = () => {
+    if (!pastes) return void submit();
+    if (d.text.trim() && pasteWithToast(d.text.trim())) cancel();
+  };
   return (
     <Modal title={d.as === "note" ? t("Add as a review note") : t("Send to the main conversation")} onClose={busy ? undefined : cancel} wide testId="Promote dialog">
       <div className="segmented promote-as" role="radiogroup" aria-label={t("Where it goes")}>
@@ -71,13 +80,13 @@ export function PromoteDialog() {
           onKeyDown={(e) => {
             if (isEnter(e) && (e.metaKey || e.ctrlKey)) {
               e.preventDefault();
-              void submit();
+              go();
             }
           }}
           rows={9}
           data-testid="Promote text"
         />
-        <div className="tiny faint">{d.as === "message" ? t("“(곁질문에서 정리됨)” is added at the end so Claude knows where it came from.") : t("The note is kept with the review and goes to Claude with Request changes.")}</div>
+        <div className="tiny faint">{pastes ? t("Pastes it into Claude Code's prompt in the terminal chat as typed — press Enter there to send it") : d.as === "message" ? t("“(곁질문에서 정리됨)” is added at the end so Claude knows where it came from.") : t("The note is kept with the review and goes to Claude with Request changes.")}</div>
       </div>
       {d.error && (
         <div className={`banner ${d.recovery ? "orange" : "red"} promote-error`} data-testid="Promote error">
@@ -91,10 +100,17 @@ export function PromoteDialog() {
       )}
       <div className="actions">
         {busy && <span className="spinner" />}
-        <span className="tiny faint grow">{t("⌘↩ to {0}", d.as === "note" ? t("Add note") : t("Send"))}</span>
+        <span className="tiny faint grow">{t("⌘↩ to {0}", d.as === "note" ? t("Add note") : pastes ? t("Paste into the terminal") : t("Send"))}</span>
         <button type="button" onClick={cancel} disabled={busy}>{t("Cancel")}</button>
-        <button type="button" className="primary" disabled={busy || loading || !d.text.trim()} onClick={() => void submit()} data-testid="Promote submit">
-          {d.as === "note" ? t("Add note") : t("Send")}
+        <button
+          type="button"
+          className="primary"
+          disabled={busy || loading || !d.text.trim()}
+          onClick={go}
+          title={pastes ? t("Paste into Claude Code's prompt in the terminal — press Enter there to send it") : undefined}
+          data-testid="Promote submit"
+        >
+          {d.as === "note" ? t("Add note") : pastes ? t("Paste into the terminal") : t("Send")}
         </button>
       </div>
     </Modal>

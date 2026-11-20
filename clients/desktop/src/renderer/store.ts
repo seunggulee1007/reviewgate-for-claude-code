@@ -741,7 +741,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   setTab(tab: Tab): void;
   toggleSidebar(): void;
   /** ⌘⇧D: collapse / expand the diff pane, remembered per project (`ui.diffCollapsed`). */
-  toggleDiffPane(): void;
+  /** `collapsedNow`: what the window shows (§57.5: a terminal chat's review panel follows its own rule — `reviewPanelCollapsed`). */
+  toggleDiffPane(collapsedNow?: boolean): void;
   openDialog(d: Dialog | null): void;
   dismissError(): void;
   dismissStartSlow(): void;
@@ -2330,9 +2331,9 @@ export const useStore = create<Store>((set, get, api) => {
     toggleSidebar() {
       set((s) => ({ sidebarVisible: !s.sidebarVisible }));
     },
-    toggleDiffPane() {
+    toggleDiffPane(collapsedNow) {
       const { state, ui, selectedPath } = get();
-      get().setUI({ diffCollapsed: !isDiffCollapsed(state, ui, selectedPath) });
+      get().setUI({ diffCollapsed: !(collapsedNow ?? isDiffCollapsed(state, ui, selectedPath)) });
     },
     openDialog(d) {
       // Replacing / closing the §19.1 confirm any other way keeps the user's edits.

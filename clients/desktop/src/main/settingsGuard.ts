@@ -133,6 +133,13 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   confirmQuit: bool,
   returnSends: bool,
   autoCheckUpdates: bool,
+  // MARK: terminal-win — §57.17 Settings › Session › Terminal chat (preview) and the terminal's own settings
+  terminalChatPreview: bool,
+  newChatKind: oneOf("chat", "terminal"),
+  terminalGpu: oneOf("auto", "off"),
+  terminalShell: oneOf("powershell", "cmd"),
+  terminalFullRepaint: bool,
+  terminalFontSize: int(9, 28),
 };
 
 export type SanitizedPatch = { patch: Partial<AppSettings>; rejected: string[] };

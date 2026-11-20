@@ -45,7 +45,7 @@ jobs:
         continue-on-error: true
         run: |
           Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "C:\Program Files\Git"
-          Add-MpPreference -ExclusionProcess "git.exe", "node.exe", "bash.exe"
+          Add-MpPreference -ExclusionProcess "git.exe", "node.exe", "bash.exe", "OpenConsole.exe"
       - name: git identity (engine tests commit into temp repos)
         run: |
           git config --global user.name "ci"
@@ -68,6 +68,26 @@ jobs:
         run: npm test -w clients/desktop
       - name: desktop build
         run: npm run build -w clients/desktop
+      # PROTOCOL §57.17: node-pty's N-API prebuild loads in Electron 44 and ConPTY (with its bundled conpty.dll) runs a
+      # console program — before any window, no settings touched (main.ts `--rg-pty-selftest`).
+      - name: PTY self-test under Electron (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\pty.json"
+          npx electron clients/desktop "--rg-pty-selftest=$out"
+          $code = $LASTEXITCODE
+          if (-not (Test-Path $out)) { throw "the self-test wrote no result (exit $code)" }
+          $json = Get-Content $out -Raw
+          Write-Host "pty self-test: $json"
+          $r = $json | ConvertFrom-Json
+          if ($code -ne 0 -or -not $r.ok -or -not $r.conptyDll -or -not $r.openConsole) { throw "the PTY self-test failed (exit $code)" }
+      # PROTOCOL §57.17: hidden windows, scratch userData / data folder / CLAUDE_CONFIG_DIR, the node fake as claude — a
+      # terminal chat's PTY over real IPC, one review turn, a shell tab in the project, no child process left (OpenConsole
+      # counted). The IME and Ctrl+` steps run once the page has its terminal (renderer lane), skipped before.
+      - name: hidden terminal e2e (Windows)
+        if: runner.os == 'Windows'
+        run: npm run e2e:terminal -w clients/desktop
 
   mac:
     name: Core + Mac app (macos-latest)

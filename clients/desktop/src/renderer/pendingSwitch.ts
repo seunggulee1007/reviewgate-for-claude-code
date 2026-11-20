@@ -7,7 +7,7 @@
  * message held with a switch then joins that chat's queue. Only a failed collection refuses.
  */
 import { create } from "zustand";
-import type { ReviewState } from "@reviewgate/engine";
+import type { ReviewState, SessionKind } from "@reviewgate/engine";
 import { t } from "./i18n";
 import { newChatRefusal, sessionsOf } from "./sessions";
 import type { QueuedExtras } from "./sendQueue";
@@ -17,7 +17,8 @@ import type { ComposerChips } from "./composerBridge";
 export type HeldMessage = { text: string; extras?: QueuedExtras; chips?: ComposerChips };
 
 /** `messages`: held for that chat, in order (none: [이 채팅으로 이어가기] only). */
-export type PendingSwitch = { kind: "new" } | { kind: "open"; id: string; messages: HeldMessage[] };
+/** `new`: a chat of the app's chat UI; `newTerminal` (§57.5): a terminal chat. */
+export type PendingSwitch = { kind: "new" } | { kind: "newTerminal" } | { kind: "open"; id: string; messages: HeldMessage[] };
 
 export const usePendingSwitch = create<{ pending: PendingSwitch | null; inflight: boolean }>(() => ({ pending: null, inflight: false }));
 
@@ -37,6 +38,7 @@ export function pendingSwitchText(s: ReviewState, pending: PendingSwitch | null)
   if (!pending) return null;
   const live = titleOf(s, sessionsOf(s).currentId);
   if (pending.kind === "new") return t("A new chat opens once Claude is done in '{0}'", live);
+  if (pending.kind === "newTerminal") return t("A new terminal chat opens once Claude is done in '{0}'", live);
   const target = titleOf(s, pending.id);
   return pending.messages.length === 0
     ? t("Continues in '{0}' once Claude is done in '{1}'", target, live)
@@ -45,7 +47,9 @@ export function pendingSwitchText(s: ReviewState, pending: PendingSwitch | null)
 
 /** The chip's short label ("새 채팅 대기 중", "대기: <제목>"). */
 export function pendingSwitchLabel(s: ReviewState, pending: PendingSwitch): string {
-  return pending.kind === "new" ? t("New chat waits") : t("Waits: {0}", titleOf(s, pending.id));
+  if (pending.kind === "new") return t("New chat waits");
+  if (pending.kind === "newTerminal") return t("New terminal chat waits");
+  return t("Waits: {0}", titleOf(s, pending.id));
 }
 
 /** Where a held message goes back to when it will not go out (the composer takes its text and chips). */
@@ -85,7 +89,8 @@ export function cancelPendingSwitch(): void {
 export type SwitchDeps = {
   state(): ReviewState;
   queued(): boolean;
-  newChat(): Promise<boolean>;
+  /** A new chat of `kind` (absent: the app's chat UI). */
+  newChat(kind?: SessionKind): Promise<boolean>;
   openChat(id: string): Promise<boolean>;
   /** Resolves once `id` is the live chat (the snapshot after the switch). */
   untilLive(id: string): Promise<boolean>;
@@ -117,8 +122,8 @@ export async function drainPendingSwitch(deps: SwitchDeps): Promise<void> {
   }
   usePendingSwitch.setState({ pending: null, inflight: true });
   try {
-    if (pending.kind === "new") {
-      await deps.newChat();
+    if (pending.kind === "new" || pending.kind === "newTerminal") {
+      await deps.newChat(pending.kind === "newTerminal" ? "terminal" : "chat");
       return;
     }
     const switched = (await deps.openChat(pending.id)) && (await deps.untilLive(pending.id));

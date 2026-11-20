@@ -10,6 +10,7 @@ import type { NotificationClick } from "./shared/ipc.js"; // MARK: wave4b w4-not
 import type { WorkbenchSetupReport } from "./shared/flowSettings.js"; // MARK: wave3 desktop-flow
 import type { CloseGuardExtras } from "./shared/closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
 import type { MenuEnabled } from "./shared/menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
+import type { PtyExit, PtyOpen } from "./shared/ipc.js"; // MARK: terminal-win (§57.17)
 
 function arg(name: string): string | undefined {
   const p = `--${name}=`;
@@ -156,6 +157,29 @@ const bridge: RGBridge = {
   e2eScreenshot: (name: string) => ipcRenderer.invoke("rg:e2e:screenshot", name),
   e2eOpenSecondary: () => ipcRenderer.invoke("rg:e2e:openSecondary"),
   e2eGitLog: () => ipcRenderer.invoke("rg:e2e:gitLog"),
+  // MARK: terminal-win — PROTOCOL §57.17: PTYs in main; requests invoke, bytes / sizes / acks are one-way sends
+  pty: {
+    info: () => ipcRenderer.invoke("rg:pty:info"),
+    open: (req: PtyOpen) => ipcRenderer.invoke("rg:pty:open", req),
+    restart: (ptyId: string) => ipcRenderer.invoke("rg:pty:restart", ptyId),
+    kill: (ptyId: string) => ipcRenderer.invoke("rg:pty:kill", ptyId),
+    attach: (ptyId: string) => ipcRenderer.invoke("rg:pty:attach", ptyId),
+    list: () => ipcRenderer.invoke("rg:pty:list"),
+    input: (ptyId: string, data: string) => ipcRenderer.send("rg:pty:input", ptyId, data),
+    resize: (ptyId: string, cols: number, rows: number) => ipcRenderer.send("rg:pty:resize", ptyId, cols, rows),
+    ack: (ptyId: string, chars: number) => ipcRenderer.send("rg:pty:ack", ptyId, chars),
+    focus: (focused: boolean) => ipcRenderer.send("rg:pty:focus", focused),
+    onData: (cb: (ptyId: string, data: string) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, ptyId: string, data: string) => cb(ptyId, data);
+      ipcRenderer.on("rg:pty:data", listener);
+      return () => ipcRenderer.removeListener("rg:pty:data", listener);
+    },
+    onExit: (cb: (e: PtyExit) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, ev: PtyExit) => cb(ev);
+      ipcRenderer.on("rg:pty:exit", listener);
+      return () => ipcRenderer.removeListener("rg:pty:exit", listener);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld("rg", bridge);

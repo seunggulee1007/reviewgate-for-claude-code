@@ -88,6 +88,13 @@ export const DEFAULTS: AppSettings = {
   // MARK: §52
   backgroundWork: true,
   subagentsInTurn: false, // §52.2
+  // MARK: terminal-win — §57.17: terminal chat is a preview, off until turned on
+  terminalChatPreview: false,
+  newChatKind: "chat",
+  terminalGpu: "auto",
+  terminalShell: "powershell",
+  terminalFullRepaint: true,
+  terminalFontSize: 13,
 };
 
 /**
@@ -262,6 +269,11 @@ function claudeFor(s: AppSettings): string | undefined {
   return p ? resolveWindowsClaude(p, winFs, process.env) : undefined;
 }
 
+/** MARK: terminal-win — §57.17: "terminal" only while "Terminal chat (preview)" is on and "New chats open as" is Terminal. */
+export function newChatKindOf(s: Pick<AppSettings, "terminalChatPreview" | "newChatKind">): "chat" | "terminal" {
+  return s.terminalChatPreview === true && s.newChatKind === "terminal" ? "terminal" : "chat";
+}
+
 /**
  * The `hello` / `set_settings` payload (mirror of `AppSettings.engineSettings`). `projectRoot`: the window's open
  * project — its own allow patterns (`projectBashAllowPatterns`) are appended to the global ones (MARK: r2-skills-side —
@@ -323,5 +335,7 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     allowedProjectStatusLine: allowedProjectStatusLineFor(s.projectStatusLineAllowed, projectRoot),
     // MARK: wave3 desktop-session — §36.6 this project's "Load local settings" (next session start; older engines ignore it)
     loadLocalSettings: loadLocalSettingsFor(s.projectLoadLocalSettings, projectRoot),
+    // MARK: terminal-win — §57.7 / §57.17: a terminal chat by default only while the preview is on and the user chose it
+    newChatKind: newChatKindOf(s),
   } as Settings;
 }

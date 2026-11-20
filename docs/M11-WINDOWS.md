@@ -33,6 +33,40 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
   passes `pathToClaudeCodeExecutable` = the located claude and fails with `cli_not_found` when there is none), and a
   mac-built Windows installer used to carry the **darwin-arm64** one. No win32 package is needed either.
 
+### Terminal: node-pty and xterm.js (Stage 3, PROTOCOL §57.17)
+
+- **Pins (exact).** `node-pty` 1.1.0 (a `dependency`: it ships) and `@xterm/xterm` 6.0.0 with `@xterm/addon-fit` 0.11.0,
+  `-webgl` 0.19.0, `-unicode11` 0.9.0, `-web-links` 0.12.0, `-search` 0.16.0, `-clipboard` 0.2.0 (`devDependencies`:
+  vite bundles them into the renderer, as with Monaco and React). Licences: `clients/desktop/THIRD_PARTY_NOTICES.md`,
+  shipped next to the app as `resources/THIRD_PARTY_NOTICES.md` (`extraResources`).
+- **No rebuild for Electron.** node-pty 1.1.0 is built with node-addon-api (N-API), so its prebuilds
+  (`prebuilds/{win32-x64,win32-arm64,darwin-x64,darwin-arm64}`) load in Electron 44 as they are; `npmRebuild: false`
+  stays. win32-x64 carries ConPTY itself (`prebuilds/win32-x64/conpty/{conpty.dll,OpenConsole.exe}`), which the app always
+  uses (`useConptyDll`). If a future node-pty drops prebuilds: `npx @electron/rebuild -f -w node-pty -v 44.5.1`.
+- **Linux (CI only).** There is no linux prebuild: `npm ci` compiles it with node-gyp (python, make, g++ — present on the
+  GitHub ubuntu runner). npm ≥ 11.19 blocks dependency install scripts unless `allowScripts` lists them, so the root
+  `package.json` allows `node-pty@1.1.0` (and only it). Bumping node-pty means bumping that entry too.
+- **Loading** (`main/pty/nodePty.ts`): lazily, once per process. Packaged: `require(<resources>/app.asar.unpacked/
+  node_modules/node-pty)` by path; development: `require("node-pty")`. On Windows it needs build ≥ 18309 (Windows 10
+  1903) — below that there is no PTY ("Terminal chat needs Windows 10 1903 or later"; winpty is never used). The result
+  is hello's `capabilities.terminalChat` and `rg:pty:info`. macOS (development): the darwin prebuild's `spawn-helper`
+  comes without its executable bit (`posix_spawnp failed`); the loader sets it back.
+- **Self-test.** `ReviewGate.exe --rg-pty-selftest=<out.json>` (or `npx electron clients/desktop --rg-pty-selftest=…`)
+  loads node-pty, runs `%ComSpec% /d /c echo rg-pty-ok` through ConPTY with the bundled `conpty.dll`, writes
+  `{ok, nodePtyDir, conptyDll, openConsole, electron, osBuild, error?}` and exits 0 / 1. It runs before the
+  single-instance lock (a running ReviewGate is not disturbed) and opens no window and no settings. CI runs it on Windows
+  after the desktop build (`npx electron clients/desktop --rg-pty-selftest=…`, ci.yml) and in the silently installed app
+  (windows-installer.yml), which also checks that node-pty's `lib`, `conpty.node`, `conpty.dll`, `OpenConsole.exe` and
+  `resources/THIRD_PARTY_NOTICES.md` shipped and that no `.pdb`, `src`, `deps`, `third_party`, `win32-arm64` or `darwin-*`
+  did. `OpenConsole.exe` joins the Defender process exclusions of the CI job.
+- **Packaging.** `asarUnpack: node_modules/node-pty/**` — the `.node` files, the conout worker thread, `conpty.dll` /
+  `OpenConsole.exe` and the console-list agent must be real files; main requires node-pty from
+  `resources/app.asar.unpacked/node_modules/node-pty` by path. Excluded: node-pty's `src`, `deps` (winpty sources),
+  `third_party` (a second ConPTY copy), `scripts`, `typings`, `binding.gyp`, every `.pdb`, `node-addon-api`, and the
+  other OS's prebuilds (win: `darwin-*` and `win32-arm64`; mac: `win32-*`).
+- **No fuse that disables RunAsNode**: node-pty's console-list agent `fork()`s, and the engine's `cli.js` version probe
+  runs Electron as Node.
+
 ## Layout of `clients/desktop/src`
 
 | Path | Role |
@@ -45,6 +79,7 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 | `main/editor.ts`, `main/winCmd.ts` | Open in VS Code / IntelliJ; cmd.exe quoting for `.cmd` / `.bat` shims |
 | `main/winClaude.ts` | resolves an npm `claude.cmd` shim to a spawnable program |
 | `main/orphans.ts` | child-process listing for the e2e (ps / PowerShell CIM / wmic) |
+| `main/pty/` | PROTOCOL §57.17: `nodePty.ts` (loading, availability), `selftest.ts` (`--rg-pty-selftest`), `terminalLaunch.ts` (claude / shell launches), `ptyHub.ts` (a window's PTYs, flow control, lifecycle), `ptyWindow.ts` (the hub wired to Electron) |
 | `main/e2e.ts` | `--e2e` harness: report / screenshot / secondary-window IPC, orphan-process count, exit code |
 | `preload.ts`, `shared/ipc.ts` | the `window.rg` bridge |
 | `renderer/App.tsx` | layout: Sidebar (Changes \| PRs) · `DiffPane` / `PRDetail` · `ChatPane` · `<Dialogs />`; empty state with recents; menu actions — each pane inside an `ErrorBoundary` |
@@ -251,6 +286,43 @@ Needs a real Windows machine (2026-10-20 hardening — verified on macOS only by
 - [ ] `npm run e2e -w clients/desktop` on Windows: the final line has `"orphans": 0` (not `-1`) — PowerShell CIM listing works.
 - [ ] The installer no longer contains `resources\app.asar.unpacked\node_modules\@anthropic-ai\claude-agent-sdk-*` and is ~200 MB smaller; the app still starts sessions.
 - [ ] Sandboxed renderer on Windows: Monaco diff renders, Ctrl+C/V in the composer, drag-resizing panes, links in chat open the browser.
+
+Terminal chat (preview) and the shell panel — PROTOCOL §57.17 (Stage 3). What CI already proves on windows-latest: node-pty's
+prebuild loads under Electron 44 and in the installed app (`--rg-pty-selftest`, ConPTY with its bundled `conpty.dll`); the
+installer ships node-pty unpacked with only what it needs; a fake claude (npm's `claude.cmd` + `cli.js`, run under node.exe,
+never through cmd.exe) drives a review turn through ConPTY in vitest (`terminalChat.pty.test.ts`: banner, Write → review,
+the git guard, a rejected file's context, resize, 한글 bytes, ESC CR, /exit, resume, no orphans) and in a hidden Electron
+window over the real IPC (`npm run e2e:terminal`: the page cannot get `terminal_spec`, a shell tab starts in the project,
+no child left — OpenConsole counted; IME composition through CDP and Ctrl+` once the page has its terminal). Turn on
+Settings › Session › "Terminal chat (preview)" for the items below.
+- [ ] Korean IME (Microsoft 한국어 IME / TSF) in a terminal chat: composing mid-line; Enter, Esc, Ctrl+C, arrows and
+      Backspace while composing; Hanja conversion and where the candidate window sits; a composition committed when the
+      terminal loses focus. (CI's CDP composition proves the xterm → PTY UTF-8 path, not TSF.)
+- [ ] Real `claude.exe` (native installer) and an npm install (`claude.cmd` + `cli.js`, node.exe on PATH; without node the
+      chat says "Terminal chat needs the native Claude Code (claude.exe) or Node on PATH"): the trust dialog, a permission
+      wait → the strip, the notification and the taskbar; Esc → "Review now"; `/clear` and `/resume` followed; Alt+V image
+      paste; Shift+Enter is a newline; the mouse in fullscreen mode; OSC 52 copy on select; rendering with and without
+      "Repaint the whole screen each frame"; WebGL on a real GPU and over Remote Desktop (and Off).
+- [ ] Menu shortcuts stay out of the TUI while the terminal has the keyboard: Ctrl+B, R, O, P, N, T reach Claude Code;
+      Alt+letter does not open a menu; Ctrl+` on Korean, US and European layouts; AltGr characters.
+- [ ] No orphans with real children (MCP servers, Bash through Git Bash): Task Manager shows no `claude.exe`, `node.exe`,
+      `bash.exe` or `OpenConsole.exe` left after switching chats, closing the window and quitting.
+- [ ] The shell panel: PowerShell 7 (`pwsh`) and Windows PowerShell 5.1 with the user's profiles, Command Prompt; tabs keep
+      running while hidden; display scaling at 125 % / 150 %; High Contrast.
+- [ ] The first PTY spawn under SmartScreen and Defender; no firewall prompt (the hook server binds 127.0.0.1).
+- [ ] Windows 10 1903–22H2 and Windows 11; Windows 10 1809 shows the switch disabled with "Terminal chat needs Windows 10
+      1903 or later".
+- [ ] A long `--settings` / `--mcp-config` once Stage 2 adds flags: the 30,000-character guard refuses with "The command
+      line for Claude Code is too long for Windows" rather than failing in CreateProcess.
+
+Release notes (the preview's known limits, for the release that ships it)
+- Terminal chat on Windows is a **preview**, off by default (Settings › Session); it has not been verified on a real Windows
+  machine yet. The shell panel (PowerShell / Command Prompt, Ctrl+`) is on wherever the terminal can run.
+- Needs Windows 10 1903 or later, and Claude Code as `claude.exe` (or npm's `cli.js` with Node on PATH).
+- Switching to another chat ends the terminal chat's Claude Code (what was typed but not sent is lost); it resumes the same
+  conversation when you come back.
+- Korean IME inside the terminal follows xterm.js's behaviour; if it misbehaves, keep using the classic chat.
+- Request Changes, Find in Chat and the other chat-only items are off in a terminal chat: Claude Code's own TUI does them.
 
 Logs
 - `%APPDATA%\ReviewGate\logs\engine-YYYY-MM-DD.log` — every engine `log` event (`[w<id>:level]`) plus main-process lines.

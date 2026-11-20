@@ -9,7 +9,7 @@
  * a right-click menu, drag to reorder, a middle click closes, the tabs scroll on their own (+ and History… stay), ✎ on a
  * tab with an unsent draft, Ctrl/⌘+Shift+T reopens the last closed tab and Ctrl+Tab / Ctrl+PgDn step through them.
  */
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { t, usesMacKeys } from "../../i18n";
 import { tKey } from "../../shortcutKeys";
 import { chatTabKey } from "../../keymap";
@@ -28,6 +28,12 @@ import { isEnter } from "../../ime";
 import { PointerMenu, type AgentMenuItem } from "../agents/AgentBits";
 import { RecordOnlyBadge } from "./RecordOnly";
 import { MovedChatBadge } from "./ChatMoveViews"; // MARK: wave4b w4b-follow
+import { useTerminalChats } from "../../terminal/terminalChat"; // §57.17
+import { ptyAvailable, usePtyInfo } from "../../terminal/ptyInfo"; // §57.17
+import { continueAsTerminalBlocker, continueAsTerminalHelp, defaultChatKind, terminalChatsOffered } from "../../continueTerminal"; // §57.7 / §57.9
+import { terminalChatKey } from "../../keymap"; // §57.5
+import { subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost"; // §57.17
+import "../terminal/terminal.css"; // §57.17: the tab's terminal glyph
 
 /** A blocked shortcut says why on the banner, like the disabled button's tooltip (never a silent no-op). */
 const sayWhy = (message: string) => useStore.setState({ lastError: message, errorBanner: { message, scope: "session", fatal: false } });
@@ -81,7 +87,16 @@ export function ChatTabs() {
   const shown = viewing?.id ?? sessions.currentId;
   const ids = sessions.openTabIds;
   const root = state.project?.root ?? null;
+  // §57.5: the live terminal chat's Claude Code exited, could not start, or the engine stopped hearing it.
+  const liveChatPty = useTerminalChats((s) => (sessions.currentId ? s.bySession[sessions.currentId] : undefined));
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
+  const terminalStopped = liveChatPty !== undefined && (liveChatPty.failed !== null || (liveChatPty.ptyId !== null && !terminalStatus(liveChatPty.ptyId).running));
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; id: string } | null>(null);
+  const [newMenuAt, setNewMenuAt] = useState<{ x: number; y: number } | null>(null);
+  // §57.17: the terminal-chat entry points (Settings › Terminal chat (preview), a PTY that can run).
+  const settings = useStore((s) => s.settings);
+  const ptyOk = usePtyInfo((p) => p.info?.available === true);
+  const offered = terminalChatsOffered(settings, ptyOk);
   const tabRefs = useRef(new Map<string, HTMLDivElement>());
   /** P4-composer-34: the strip fades only at an end with tabs out of sight. */
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -138,6 +153,16 @@ export function ChatTabs() {
         if (!next) return;
         e.preventDefault();
         void viewChat(next);
+        return;
+      }
+      // §57.5 / §57.17: Ctrl+Alt+T a new terminal chat, Ctrl+Alt+Shift+T a classic one — while the preview offers them.
+      const kind = terminalChatKey(e);
+      if (kind !== null) {
+        if (!terminalChatsOffered(s.settings, ptyAvailable())) return;
+        e.preventDefault();
+        const why = newChatRefusal(s.state);
+        if (why !== null) sayWhy(why);
+        else void (kind === "terminal" ? s.newTerminalChat() : s.newClassicChat());
         return;
       }
       if (isReopenTabKey(e, usesMacKeys())) {
@@ -218,10 +243,30 @@ export function ChatTabs() {
       { label: t("Copy Chat ID"), onClick: () => void copyWithToast(id), testId: "Chat tab menu copy id" },
       { label: t("Show in History"), onClick: () => openDialog({ kind: "history", highlight: id }), testId: "Chat tab menu history" },
       { label: meta?.archived ? t("Unarchive") : t("Archive"), onClick: () => void archiveChat(id, !meta?.archived), testId: "Chat tab menu archive" },
+      // §57.9: the chat's conversation goes on in a new terminal chat (a terminal chat runs in one already).
+      ...(offered && meta && meta.kind !== "terminal"
+        ? [{ label: t("Continue as Terminal Chat"), onClick: () => void useStore.getState().continueAsTerminalChat(id), disabled: continueAsTerminalBlocker(state, meta, waits), hint: continueAsTerminalHelp(), testId: "Chat tab menu continue as terminal" }]
+        : []),
     ];
   };
 
-  const newTitle = newRefusal ?? (waits ? t("New chat (⌘T) — it opens once Claude is done") : t("{0} ({1})", t("New chat"), "⌘T"));
+  // §57.5 / §57.7: with the preview on, + opens the default kind and its right-click (or the menu) the other.
+  const newMenuItems = (): AgentMenuItem[] => [
+    { label: t("New Terminal Chat"), onClick: () => void useStore.getState().newTerminalChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("Claude Code itself in this column (Ctrl+Alt+T)"), testId: "New chat menu terminal" },
+    { label: t("New Chat (Classic)"), onClick: () => void useStore.getState().newClassicChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("ReviewGate's chat UI in this column (Ctrl+Alt+Shift+T)"), testId: "New chat menu classic" },
+  ];
+  const defaultTerminal = defaultChatKind(settings, offered) === "terminal";
+  const newTitle =
+    newRefusal ??
+    (offered
+      ? [
+          defaultTerminal ? t("New terminal chat — Claude Code itself in this column (⌘T)") : t("New chat — ReviewGate's chat UI (⌘T)"),
+          t("Right-click for the other kind; Settings › New chats open as changes the default"),
+          ...(waits ? [t("It opens once Claude is done")] : []),
+        ].join("\n")
+      : waits
+        ? t("New chat (⌘T) — it opens once Claude is done")
+        : t("{0} ({1})", t("New chat"), "⌘T"));
   return (
     <div className="chat-tabs" data-testid="Chat tabs">
       <div
@@ -291,6 +336,17 @@ export function ChatTabs() {
             >
               {current && running && <span className="dot green" data-testid="Chat running" aria-label={t("Claude's session is on this chat")} />}
               {live && !running && <span className="dot hollow" data-testid="Chat live" aria-label={t("Claude's session is on this chat")} />}
+              {/* §57.5: a terminal chat — its glyph, an orange dot while its Claude Code is not running */}
+              {sessions.list.find((m) => m.id === id)?.kind === "terminal" &&
+                (current && terminalStopped ? (
+                  <span className="tab-kind stopped" role="img" title={t("Claude Code is not running in this terminal — Restart it in the chat")} aria-label={t("Claude Code is not running in this terminal — Restart it in the chat")} data-testid="Chat tab terminal stopped">
+                    <Icon name="terminal" size={12} />
+                  </span>
+                ) : (
+                  <span className="tab-kind" role="img" title={t("Terminal chat — Claude Code itself runs in this chat")} aria-label={t("Terminal chat")} data-testid="Chat tab terminal">
+                    <Icon name="terminal" size={12} />
+                  </span>
+                ))}
               {renaming?.id === id ? (
                 <input
                   className="tab-rename"
@@ -337,7 +393,21 @@ export function ChatTabs() {
           {t("Tab closed · Reopen")}
         </button>
       )}
-      <button type="button" className="plain small" title={newTitle} aria-label={t("New chat")} disabled={newRefusal !== null} onClick={() => void newChat()} data-testid="New chat">
+      <button
+        type="button"
+        className="plain small"
+        title={newTitle}
+        aria-label={defaultTerminal ? t("New terminal chat") : t("New chat")}
+        aria-haspopup={offered ? "menu" : undefined}
+        disabled={newRefusal !== null}
+        onClick={() => void newChat()}
+        onContextMenu={(e) => {
+          if (!offered) return;
+          e.preventDefault();
+          setNewMenuAt({ x: e.clientX, y: e.clientY });
+        }}
+        data-testid="New chat"
+      >
         <Icon name="plus" size={14} />
       </button>
       {pending && (
@@ -352,6 +422,7 @@ export function ChatTabs() {
         {t("History…")}
       </button>
       {menuAt && <PointerMenu at={menuAt} items={menuItems(menuAt.id)} onClose={() => setMenuAt(null)} />}
+      {newMenuAt && <PointerMenu at={newMenuAt} items={newMenuItems()} onClose={() => setNewMenuAt(null)} />}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { toolDetail, toolIcon } from "../chat/ToolRows";
 import { Modal } from "../Menu";
 import { transcriptShape } from "../../transcriptShape"; // MARK: wave4d w4d-speed
 import { AgentChip, ModelChip, ResumedBadge, StopAgentButton } from "./AgentBits";
+import { liveTerminalChatId, pasteWithToast } from "../../terminal/terminalChat"; // §57.7
 
 const EMPTY_AGENTS: AgentNode[] = [];
 const MAX_CALLS = 300;
@@ -182,6 +183,7 @@ function Instructions({ text }: { text: string }) {
 /** 보고서: the whole cleaned report (or what the transcript has), copy / 메인으로 보내기 / 곁질문으로 묻기. */
 function ReportSection({ view, text, load, onClose }: { view: AgentView; text: string; load: ReportLoad; onClose: () => void }) {
   const askAbout = useStore((s) => s.askAbout);
+  const terminal = useStore((s) => liveTerminalChatId(s.state) !== null); // §57.7
   const [copied, setCopied] = useState(false);
   // §36.3: a continued agent works again — the report of its previous run stays readable meanwhile.
   const previous = view.live && view.resumeCount > 0 && text.trim().length > 0;
@@ -221,8 +223,19 @@ function ReportSection({ view, text, load, onClose }: { view: AgentView; text: s
           type="button"
           className="small"
           disabled={!has}
-          title={has ? t("Puts the report in the message box as a quote — add what Claude should do with it") : why}
+          title={
+            has
+              ? terminal
+                ? t("Pastes the report into Claude Code's prompt in the terminal — add what Claude should do with it, then press Enter there")
+                : t("Puts the report in the message box as a quote — add what Claude should do with it")
+              : why
+          }
           onClick={() => {
+            // §57.7: a terminal chat has no message box — the report is pasted into its Claude Code (no Enter).
+            if (terminal) {
+              if (pasteWithToast(reportQuote(view.label, view.description, text))) onClose();
+              return;
+            }
             onClose();
             insertIntoComposer(reportQuote(view.label, view.description, text));
             showToast(t("The report is in the message box — add what Claude should do with it"));

@@ -33,6 +33,7 @@ import { toolRowTooltip } from "../../toolRowTooltip";
 import { showToast } from "../../toast";
 import { CopyButton } from "../common/CopyButton";
 import { RelTime } from "../common/RelTime";
+import { liveTerminalChatId, pasteWithToast } from "../../terminal/terminalChat"; // §57.7
 
 export function SidePanel() {
   const view = useStore((s) => s.sideView);
@@ -323,13 +324,34 @@ function NewQuestion({ anchor, question, context }: { anchor: SideAnchor | null;
         {forkHint && <div className="tiny muted side-fork-hint" data-testid="Side fork hint">{forkHint}</div>}
       </div>
       {notice && <div className="side-notice" data-testid="Side notice">{notice}</div>}
-      {mainOnly && <SendToMain onSend={() => sendToMain("", draftKey)} />}
+      {mainOnly && <SendToMain sideKey="" anchorKey={draftKey} onSend={() => sendToMain("", draftKey)} />}
     </div>
   );
 }
 
 /** MARK: r2-skills-side — §21 (M18): [메인 대화로 보내기] — the question as typed goes to the main conversation (queued while a turn runs). */
-function SendToMain({ onSend }: { onSend: () => "sent" | "queued" | null }) {
+function SendToMain({ onSend, sideKey, anchorKey }: { onSend: () => "sent" | "queued" | null; sideKey: string; anchorKey?: string }) {
+  // §57.7: a terminal chat's Claude Code takes only what is typed — the question is pasted into its prompt (no Enter).
+  const terminal = useStore((s) => liveTerminalChatId(s.state) !== null);
+  if (terminal) {
+    return (
+      <div className="side-main-only" data-testid="Side main only">
+        <span className="caption muted">{t("Skills and slash commands run in the main conversation — send the question there as typed.")}</span>
+        <button
+          type="button"
+          className="primary small"
+          onClick={() => {
+            const request = useStore.getState().sideMainOnlyFor(sideKey);
+            if (request && pasteWithToast(request.text)) useStore.getState().dropSideMainOnly(sideKey, anchorKey);
+          }}
+          title={t("Pastes it into Claude Code's prompt in the terminal chat as typed — press Enter there to send it")}
+          data-testid="Side paste into terminal"
+        >
+          {t("Paste the question into the terminal")}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="side-main-only" data-testid="Side main only">
       <span className="caption muted">{t("Skills and slash commands run in the main conversation — send the question there as typed.")}</span>
@@ -510,7 +532,7 @@ function ThreadView({ threadId }: { threadId: string }) {
         )}
       </div>
       {notice && <div className="side-notice" data-testid="Side notice">{notice}</div>}
-      {mainOnly && !running && <SendToMain onSend={() => sendToMain(threadId)} />}
+      {mainOnly && !running && <SendToMain sideKey={threadId} onSend={() => sendToMain(threadId)} />}
       <div className="side-footer">
         {hasAnswer && !running && (
           <div className="side-promote-row">

@@ -158,6 +158,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "task_stop",
   "task_background",
   "task_output",
+  // MARK: terminal-win — §57.17: Review now, Continue as Terminal Chat. terminal_spec / terminal_started / terminal_exited
+  // stay out: main asks for the spec and reports the PTY itself (the hook token never reaches the renderer).
+  "terminal_end_turn",
+  "session_continue_terminal",
 ]);
 
 export type Validated = { ok: true; cmd: EngineCommand } | { ok: false; error: string };

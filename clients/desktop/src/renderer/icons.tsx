@@ -9,7 +9,7 @@
 import type { ReactElement } from "react";
 import "./components/common/common.css";
 
-export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check";
+export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check" | "terminal" | "search";
 
 const PATHS: Record<IconName, ReactElement> = {
   refresh: (
@@ -45,6 +45,19 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   check: <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />,
+  // §57.17: a terminal chat, the shell panel
+  terminal: (
+    <>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M4.75 6.5 6.75 8.25 4.75 10M8.25 10.25h3" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="7" cy="7" r="4" />
+      <path d="M10 10l3.5 3.5" />
+    </>
+  ),
 };
 
 /** One icon: `size` px square, drawn in the current text colour. */
