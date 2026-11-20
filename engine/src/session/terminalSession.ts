@@ -7,6 +7,7 @@
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
 import type { BackgroundTask, PermissionMode, TerminalSessionState, TerminalWaiting } from "../protocol.js";
+import { isAbsolute } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
 import { normalizeForCompare } from "../platform/paths.js";
 import { isReadOnlyCommand } from "./bashClass.js";
@@ -280,6 +281,14 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         case "Notification":
           this.onNotification(input);
           return {};
+        case "PermissionRequest":
+          return this.onPermissionRequest(input);
+        case "CwdChanged": {
+          // §57.12: the TUI's shell changed folder (a `cd`) — the engine tells whether that is another worktree.
+          const cwd = str(input.new_cwd);
+          if (cwd && isAbsolute(cwd)) this.opts.emit({ type: "terminal_cwd", cwd });
+          return {};
+        }
         case "SessionEnd":
           if (this.open) this.closeTurn("session_end");
           return {};
@@ -452,6 +461,18 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       return;
     } else this.waiting = null;
     if (this.waiting) this.opts.emit({ type: "terminal_attention", notificationType: type, message, ...(title ? { title } : {}) });
+  }
+
+  /**
+   * §57.15 / §57.16: Claude Code shows a permission dialog — `waiting` at once (not after the Notification's 6 s). The TUI
+   * answers it; any later hook of the session clears the wait.
+   */
+  private onPermissionRequest(input: Record<string, unknown>): HookOutput {
+    const tool = str(input.tool_name) ?? "a tool";
+    const message = `Claude needs your permission to use ${tool}`;
+    this.waiting = { kind: "permission", message, since: new Date(this.now()).toISOString() };
+    this.opts.emit({ type: "terminal_attention", notificationType: "permission_request", message });
+    return {};
   }
 
   // ---- the turn

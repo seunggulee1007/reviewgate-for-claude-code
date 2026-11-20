@@ -8836,8 +8836,10 @@ and hold no token:
 {"hooks":{
  "UserPromptSubmit":[{"hooks":[H(120,"block")]}],
  "PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(60,"block")]}],
- "PostToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[H(120)]}],
- "PostToolUseFailure":[{"matcher":"Bash","hooks":[H(120)]}],
+ "PermissionRequest":[{"hooks":[H(600)]}],          // §57.15: only for a client that answers it (the Mac app)
+ "PostToolUse":[{"hooks":[H(120)]}],
+ "PostToolUseFailure":[{"hooks":[H(120)]}],
+ "CwdChanged":[{"hooks":[H(10)]}],
  "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
  "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
 H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
@@ -8898,6 +8900,9 @@ chat's id);
 | Stop | The open turn ends: `turn_end {stopReason:"end_turn"}` (no usage, no budget) → snapshot B, the review. `background_tasks` it names go first, so the next turn keeps A (§52) | `{}` at once — the next prompt waits for the collection |
 | StopFailure | As Stop with `stopReason:"stop_failure:<error>"`, and a non-fatal `error {code:"api_error"}` | `{}` |
 | Notification | `permission_prompt` / `agent_needs_input` → `waiting {kind:"permission"}`; `elicitation_dialog` → `{kind:"question"}`; `idle_prompt` ends an open turn (`interrupted`) | `{}` |
+| PermissionRequest (every tool; §57.15) | `waiting {kind:"permission"}` at once, `terminal_attention`; the bridge (§57.15) offers it to the app | `{}` (the TUI's dialog), or the app's allow / deny |
+| PostToolUse / PostToolUseFailure (any other tool) | Nothing of the turn; like every hook it clears `waiting` (§57.16) | `{}` |
+| CwdChanged (§57.12) | `new_cwd` (absolute) → the engine's `elsewhere` offer | `{}` |
 | SessionEnd | An open turn ends (`session_end`) | `{}` |
 
 - **Adopting a prompt** mirrors `send` without sending: the collection in flight first (bounded by 100 s, under the
@@ -9149,6 +9154,16 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   (`continueAsTerminalBlocker`): a record, no conversation yet, files waiting in the review, Claude working. Over the
   record a teal bar: "이 대화는 터미널 채팅 '<title>'에서 이어져요 — 이 채팅은 기록으로 남아요" with [열기] (opens the terminal
   chat). A refusal is a non-fatal row in those words.
+
+### 57.16 Hook coverage, proxy and config dir
+
+- **Every tool's PostToolUse.** PostToolUse and PostToolUseFailure carry no matcher: after a WebFetch or MCP dialog the
+  next hook clears `waiting` at once (it stayed set until the next write tool or Stop before). Tools that are neither edit
+  tools nor Bash add nothing to the turn. A user's "No" in the TUI's dialog sends no hook until Stop, which clears it.
+  Cost: one local round trip per tool call (about 1 ms).
+- **PermissionRequest** is registered (no matcher, `H(600)`, no `onFailure`) only for a client that answers bridged
+  dialogs (`terminalFeature("permissionBridge")`: the Mac app); it sets `waiting` at once (§57.15).
+- **CwdChanged** (`H(10)`) reports a `cd` of the TUI's shell (`terminal_cwd`, §57.12). It has no decision.
 
 ## 58. Accept N & Continue
 

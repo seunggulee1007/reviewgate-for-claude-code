@@ -338,6 +338,9 @@ const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
   "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
 ]);
 
+/** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
+type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
+
 /** §57.4: a terminal prompt that came while the previous one was still being adopted, and waited past its budget. */
 const TERMINAL_PROMPT_QUEUED_REASON = "ReviewGate is still starting the review of your previous prompt. Send this one again in a moment.";
 
@@ -2404,6 +2407,15 @@ export class ReviewEngine {
     return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
   }
 
+  /**
+   * §57.10–57.15: the Stage 2 terminal features a client runs itself — background terminals, the permission bridge, the
+   * status line tee, following / moving between worktrees. The mac app (and tests) today; the one place a client
+   * capability (`hello`) can open one to another client later.
+   */
+  private terminalFeature(_feature: TerminalFeature): boolean {
+    return this.lockOwner.client === "mac" || this.lockOwner.client === "test";
+  }
+
   private async sessionNew(kind?: SessionKind): Promise<void> {
     // MARK: terminal-chat — §57.1: a terminal chat needs the app's PTY (Mac only in Stage 1).
     const terminal = kind === "terminal";
@@ -2676,7 +2688,8 @@ export class ReviewEngine {
       meta.cliSessionId = cliId;
       this.persistSessions();
     }
-    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(hookSettings(server.url)) });
+    const settings = hookSettings(server.url, { permissionRequest: this.terminalFeature("permissionBridge") });
+    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings) });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };

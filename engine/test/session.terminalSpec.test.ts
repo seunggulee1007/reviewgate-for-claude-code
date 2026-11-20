@@ -33,8 +33,9 @@ describe("hookSettings", () => {
       hooks: {
         UserPromptSubmit: [{ hooks: [H(120, true)] }],
         PreToolUse: [{ matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [H(60, true)] }],
-        PostToolUse: [{ matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [H(120)] }],
-        PostToolUseFailure: [{ matcher: "Bash", hooks: [H(120)] }],
+        PostToolUse: [{ hooks: [H(120)] }],
+        PostToolUseFailure: [{ hooks: [H(120)] }],
+        CwdChanged: [{ hooks: [H(10)] }],
         Stop: [{ hooks: [H(30)] }],
         StopFailure: [{ hooks: [H(30)] }],
         Notification: [{ hooks: [H(10)] }],
@@ -45,6 +46,13 @@ describe("hookSettings", () => {
     expect(JSON.stringify(s.hooks.Stop)).not.toContain("onFailure");
     expect(JSON.stringify(s)).not.toMatch(/localhost|0\.0\.0\.0/);
     expect(MIN_TERMINAL_CLI).toBe("2.1.295");
+    // §57.15: PermissionRequest only for a client that answers it — every tool, no onFailure (the TUI's dialog stays).
+    const bridged = hookSettings(URL, { permissionRequest: true });
+    expect(bridged.hooks.PermissionRequest).toEqual([{ hooks: [H(600)] }]);
+    expect(Object.keys(bridged.hooks)).toEqual(["UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "CwdChanged", "Stop", "StopFailure", "Notification", "SessionEnd"]);
+    expect(s.hooks.PermissionRequest).toBeUndefined();
+    const failing = Object.entries(bridged.hooks).filter(([, m]) => JSON.stringify(m).includes("onFailure")).map(([k]) => k);
+    expect(failing).toEqual(["UserPromptSubmit", "PreToolUse"]);
   });
 });
 

@@ -338,4 +338,21 @@ describe("TerminalSession", () => {
     expect(retired).toEqual(["a"]);
     expect(r.ts.state).toMatchObject({ running: false, hooksSeen: false });
   });
+
+  it("§57.16 any tool's PostToolUse clears waiting (a WebFetch dialog); PermissionRequest waits at once; CwdChanged → terminal_cwd", async () => {
+    const r = rig();
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "WebFetch", tool_input: { url: "https://example.com" } })).toEqual({});
+    expect(r.ts.state.waiting).toMatchObject({ kind: "permission", message: "Claude needs your permission to use WebFetch" });
+    expect(r.of("terminal_attention").at(-1)).toMatchObject({ notificationType: "permission_request" });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "WebFetch", tool_input: { url: "https://example.com" }, tool_use_id: "f1", tool_response: "ok" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(r.of("tool_use")).toHaveLength(0); // neither an edit tool nor Bash: nothing of the turn
+    await r.hook({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use mcp__acme__fetch" });
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    await r.hook({ hook_event_name: "PostToolUseFailure", tool_name: "mcp__acme__fetch", tool_input: {}, tool_use_id: "m1", error: "denied" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "/work/acme/feature" })).toEqual({});
+    await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "relative/dir" });
+    expect(r.of("terminal_cwd")).toEqual([{ type: "terminal_cwd", cwd: "/work/acme/feature" }]);
+  });
 });
