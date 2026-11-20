@@ -14,6 +14,7 @@ import { CliVersionBanner } from "./CliVersionBanner";
 import { WorkbenchSetupBanner } from "./flow/WorkbenchSetup";
 import { NotificationTroubleBanner, useNotificationTroubleShown } from "./NotificationNotices";
 import "./windowNotices.css";
+import { isTerminalTarget } from "../terminal/terminalKeys"; // §57.10
 
 export type WindowNotice = "cliVersion" | "notifications" | "setupReport";
 
@@ -59,7 +60,7 @@ export function WindowNoticesChip({ count, children, initiallyOpen = false }: { 
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape" && !isTerminalTarget(e.target)) setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);

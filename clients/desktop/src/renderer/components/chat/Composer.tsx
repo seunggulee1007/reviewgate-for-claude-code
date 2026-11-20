@@ -72,6 +72,7 @@ import { shortcutTargetId } from "../../permissionQueue"; // r2-chats-cards M24
 import { annotationsFor, clearQuestionNotes } from "../../questionNotes"; // r2-chats-cards M08b
 // MARK: r1-composer M08 — Claude's open question answered from the box
 import { currentQuestion, draftAnswers, emptyDraft, fillAnswer, isComplete, openQuestionOf, parseQuestions, pickOption, useQuestionDrafts } from "../../openQuestion";
+import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.10
 
 export function Composer() {
   const state = useStore((s) => s.state);
@@ -810,7 +811,7 @@ export function Composer() {
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== "c") return;
-      if (useStore.getState().dialog) return;
+      if (useStore.getState().dialog || isTerminalTarget(e.target)) return; // §57.10: Ctrl+Shift+C copies in a terminal
       e.preventDefault();
       requestOrFocus.current();
     };

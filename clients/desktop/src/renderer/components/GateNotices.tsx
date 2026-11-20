@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { memoryFile, memoryLabel } from "../scopeNotices"; // MARK: r1-scope (§8)
 import { useStore } from "../store";
+import { isTerminalTarget } from "../terminal/terminalKeys"; // §57.10
 
 /** `named`: how a path reads in the list (null: the path itself). */
 type Group = { label: string; paths: string[]; openable: boolean; named?: (path: string) => string | null };
@@ -24,7 +25,7 @@ function ChipPopover({ groups, onClose }: { groups: Group[]; onClose: () => void
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !isTerminalTarget(e.target)) onClose();
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);

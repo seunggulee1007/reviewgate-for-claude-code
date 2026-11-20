@@ -44,6 +44,7 @@ import { finishedLine, groupFiles } from "../../agentGlance"; // MARK: wave4b w4
 import { QuotableMarkdown } from "../side/QuoteMenu"; // MARK: wave4b w4b-side
 import { TurnEndRow } from "./TurnEndRow"; // MARK: wave4c w4c-commit (§41.1)
 import { liveAssistant, transcriptShape, type AssistantItem } from "../../transcriptShape"; // MARK: wave4d w4d-speed
+import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.10
 
 const STICKY_THRESHOLD = 24;
 
@@ -389,6 +390,7 @@ export function Transcript() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f") return;
+      if (isTerminalTarget(e.target)) return; // §57.10: Ctrl+F in a terminal is the program's
       if (e.defaultPrevented || useStore.getState().dialog) return;
       const active = document.activeElement;
       if (active?.closest(".monaco-editor")) return;

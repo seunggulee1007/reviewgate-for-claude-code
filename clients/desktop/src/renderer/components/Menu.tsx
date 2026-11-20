@@ -11,6 +11,7 @@ import { isComposing, isEnter } from "../ime";
 import { Icon } from "../icons";
 import { firstEnabled, lastEnabled, menuKeyTarget } from "./menuKeys";
 import { cycleTab, defaultButton, isDefaultButtonKey, nudge, pressDefault, pushDialog, rememberOpener, returnTarget, snapshotText, textChanged, topDialog } from "./modalDom";
+import { isTerminalTarget } from "../terminal/terminalKeys"; // §57.10
 
 export type MenuItem =
   | { kind: "item"; label: ReactNode; onClick?: (e: ReactMouseEvent) => void; disabled?: boolean; danger?: boolean; title?: string; checked?: boolean; testId?: string }
@@ -51,7 +52,8 @@ export function Menu(props: { label: ReactNode; items: MenuItem[]; title?: strin
     // Esc is the menu's while it is open, wherever the focus is: caught on the way down, so the dialog the menu sits in
     // (components/Menu.tsx Modal), the message box or a pane never sees it.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || isComposing(e)) return;
+      // §57.10: Esc in a terminal is the program's (the menu closes on the click that focused it).
+      if (e.key !== "Escape" || isComposing(e) || isTerminalTarget(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
       close(true);
