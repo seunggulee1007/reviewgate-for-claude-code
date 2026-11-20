@@ -2993,12 +2993,33 @@ private final class Tour {
         UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")
         log("terminal: layout split dragged at 1440 × 900 — \(splitCols.map(String.init).joined(separator: " → ")) columns "
             + (splitCols.count == 2 && splitCols[0] < splitCols[1] && splitCols[0] >= 80 ? "(the terminal moved with it, never under 80)" : "— LOST (the split did not move the terminal, or cut it)"))
+        // §34.11: split chosen — the review panel at its widest (the terminal at its floor, the sidebar hidden as the toggle's
+        // reason says) shows the diff side by side at 1440 × 900.
+        UserDefaults.standard.set(DiffLayoutMode.split.rawValue, forKey: DiffPrefsKeys.diffLayout)
+        UserDefaults.standard.set(0.05, forKey: "terminalReviewSplit")
+        let sidebar = Self.sidebarItem(window)
+        sidebar?.isCollapsed = true
+        try await Task.sleep(for: .milliseconds(1200))
+        let wideDiff = model.debugDiffHeaderFrame.width
+        log("diff layout: split chosen at 1440 × 900 (sidebar \(sidebar == nil ? "not found" : "hidden")) — review panel \(Int(wideDiff)) pt, split from \(Int(DiffCodeMetrics.splitMinimumWidth)) pt: "
+            + (wideDiff >= DiffCodeMetrics.splitMinimumWidth ? "split" : "unified (too narrow — CUT)"))
+        try write(try render(window), "diff-split-1440x900-dark")
+        sidebar?.isCollapsed = false
+        UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")
+        try await Task.sleep(for: .milliseconds(600))
         // Back to the laptop: one resize into the drawer layout (the terminal takes the width again).
         let backSignals = Self.reports(host, "winsize").count
         window.setFrame(NSRect(origin: window.frame.origin, size: laptop), display: true)
         _ = await waitFor(seconds: 5) { model.terminalReviewLayout == .overlay }
         try await Task.sleep(for: .milliseconds(800))
         log("terminal: layout back to 1000 × 637 — \(model.terminalReviewLayout == .overlay ? "a drawer again" : "— LOST (\(model.terminalReviewLayout))"), chat view \(size(host)), SIGWINCH ×\(Self.reports(host, "winsize").count - backSignals)")
+        // §34.11: split still chosen — the drawer is too narrow for two columns, so its diff is unified (the toggle off with
+        // the reason) until the window is wide again.
+        let drawerDiff = model.debugDiffHeaderFrame.width
+        log("diff layout: split chosen at 1000 × 637 — review drawer \(Int(drawerDiff)) pt: "
+            + (drawerDiff < DiffCodeMetrics.splitMinimumWidth ? "unified (too narrow for split)" : "split"))
+        try write(try render(window), "diff-unified-1000x637-dark")
+        UserDefaults.standard.removeObject(forKey: DiffPrefsKeys.diffLayout)
         entry.model.toggleDiffTick += 1   // closed again: the next review must open it by itself
         _ = await waitFor(seconds: 5) { !model.reviewPanelOpen }
 
@@ -3153,6 +3174,27 @@ private final class Tour {
         let cells = shell.view.terminalDimensions
         let said = rowsCols().last?.trimmingCharacters(in: .whitespaces) ?? "nothing"
         log("terminal: stty size \(step) — view \(cells.rows) \(cells.cols), stty \(said) " + (said == "\(cells.rows) \(cells.cols)" ? "(follows)" : "— LOST"))
+    }
+
+    /// §34.11: the window's sidebar column (the split view item ⌃⌘S collapses), to give the review panel its width.
+    private static func sidebarItem(_ window: NSWindow) -> NSSplitViewItem? {
+        var stack: [NSViewController] = window.contentViewController.map { [$0] } ?? []
+        while let controller = stack.popLast() {
+            if let split = controller as? NSSplitViewController, let item = split.splitViewItems.first(where: { $0.behavior == .sidebar }) {
+                return item
+            }
+            stack.append(contentsOf: controller.children)
+        }
+        // NavigationSplitView's controller may not be a child controller: find its split view instead.
+        var views: [NSView] = window.contentView.map { [$0] } ?? []
+        while let view = views.popLast() {
+            if let split = (view as? NSSplitView)?.delegate as? NSSplitViewController,
+               let item = split.splitViewItems.first(where: { $0.behavior == .sidebar }) {
+                return item
+            }
+            views.append(contentsOf: view.subviews)
+        }
+        return nil
     }
 
     /// The `CxR` of each line the fake printed as `<prefix> CxR…`, oldest first.
