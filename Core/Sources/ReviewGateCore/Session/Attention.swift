@@ -29,6 +29,9 @@ public struct AttentionEvent: Sendable, Equatable {
     /// A finished turn that stopped on a problem (usage limit, login, an API error…): it sounds as an error
     /// (`NotificationSoundCategory`). nil for every other event.
     public var stopReason: TurnStopReason.Kind?
+    // MARK: terminal-stage2
+    /// §57.10: the chat it is about when that is not the live one (a background terminal chat) — a click opens it.
+    public var chatId: String?
 
     public init(kind: Kind, title: String, body: String, key: String) {
         self.kind = kind
