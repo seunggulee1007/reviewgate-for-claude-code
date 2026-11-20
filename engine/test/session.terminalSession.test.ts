@@ -5,7 +5,7 @@ import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -432,5 +432,35 @@ describe("TerminalSession", () => {
     expect(r.of("turn_end").at(-1)!.usage.costUsd).toBe(0);
     r.ts.handleStatus({ nonsense: true });
     expect(r.ts.state.status).toMatchObject({ costUsd: null, model: null, contextTokens: null });
+  });
+
+  it("§57.14 Stop feedback: one block per staged request, never on stop_hook_active; an aborted Stop puts the notes back", async () => {
+    const lost: string[][] = [];
+    let takes = 0;
+    const r = rig();
+    const opts = (r.ts as unknown as { opts: { stopFeedback?: unknown; stopFeedbackLost?: unknown } }).opts;
+    opts.stopFeedback = () => (++takes, { message: "[Review gate] Requested changes on this turn's diff.", noteIds: ["n1"] });
+    opts.stopFeedbackLost = (ids: string[]) => void lost.push(ids);
+    await r.hook(ups("p1"));
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: false })).toEqual({}); // nothing staged
+    await r.hook(ups("p2"));
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    expect(r.ts.state.requestQueued?.via).toBe("stop");
+    const blocked = await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(blocked).toEqual({ decision: "block", reason: STOP_FEEDBACK_PREFIX + "[Review gate] Requested changes on this turn's diff." });
+    expect(r.ts.isTurnActive).toBe(true);
+    expect(r.ts.state.requestQueued).toBeUndefined();
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: true })).toEqual({}); // a continued Stop: no second block
+    expect(r.ts.isTurnActive).toBe(false);
+    expect(r.ts.state.requestQueued?.via).toBe("next_prompt"); // its turn ended without it: it goes with the next prompt
+    expect(takes).toBe(1);
+    // Aborted after the answer was made: the notes come back.
+    await r.hook(ups("p3"));
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    const ac = new AbortController();
+    await r.ts.handleHook({ hook_event_name: "Stop", stop_hook_active: false, session_id: "chat-1", cwd: r.dir }, ac.signal);
+    ac.abort();
+    expect(lost).toEqual([["n1"]]);
   });
 });

@@ -8780,7 +8780,7 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
   `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
-  (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
+  (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
   `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
   {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
@@ -9232,6 +9232,27 @@ printf '%s' "$j" | /bin/sh -c '<the user's command, POSIX-quoted>'      # only w
   follow the existing path. The current chat's status also sets `hud.contextTokens` / `contextWindow` and
   `state.session.model` (HUD churn, §45.2). A background terminal's status feeds nothing.
 - **Risk.** A forged `/status` (anything holding the token) can only inflate the displayed cost.
+
+### 57.14 Request changes
+
+`request_changes {extra?, noteIds?}` works in a terminal chat (it left the `terminal_chat` refusals). Nothing is typed into
+the TUI (no auto-Enter): the engine stages the request — `state.session.terminal.requestQueued {via, noteIds, extra, at}`
+— and the reply is `result ok`. A later request replaces a staged one. Refused as in a chat
+(`request_changes_unavailable:no_notes` / `<blocked reason>` / `collect_failed` / `no_review`).
+
+- **`via: "stop"`** — a review turn runs (the session has a turn open). At that turn's Stop (not one with
+  `stop_hook_active: true`, so one block per staged request and the CLI's 8-continuation cap is never in play) the
+  engine takes the unsent notes (`gate.takeNotesForStop`: the request message, the notes marked sent with this turn; file
+  states unchanged — the turn is still open) and the Stop answers `{decision:"block", reason:"Review notes from the user
+  in ReviewGate — address them before you finish:\n\n" + message}`. The turn stays open and ends at the next Stop. The
+  TUI shows block reasons as "Stop hook error". If the Stop request was aborted, the notes are unsent again
+  (`untakeNotesForStop`). A turn that ends without that Stop (Esc, the PTY's exit) turns the request into `next_prompt`.
+- **`via: "next_prompt"`** — the review can take a request (`canRequestChanges`). The next UserPromptSubmit adoption takes
+  it instead of `prepareAnswer`: `gate.prepareRequestChanges(extra, turn, noteIds)` keeps A, marks the noted files
+  `changesRequested` and the notes sent; `additionalContext` is the request message; the user's typed prompt is the
+  turn's prompt (its `user_message`). A slash prompt (`/…`) keeps the request staged. A prompt that cannot start undoes it
+  (`undoRequestChanges`) and stages it again.
+- **`terminal_request_cancel {sessionId}`** unstages it; refused `no_request_queued` when nothing is staged.
 
 ### 57.16 Hook coverage, proxy and config dir
 

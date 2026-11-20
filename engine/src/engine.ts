@@ -265,7 +265,7 @@ import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js
 import { HOOK_TOKEN_ENV, hookSettings, type HookSettingsOptions, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
-import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
+import type { SessionKind, TerminalRequestQueued, TerminalSpecEvent } from "./protocol.js";
 export { ENGINE_VERSION };
 export { CommandRefused } from "./errors.js";
 
@@ -333,7 +333,7 @@ export const TERMINAL_PROMPT_WAIT_MS = 100_000;
  * the app restarts the chat's PTY instead (a new spec, the conversation resumed).
  */
 const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
-  "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "request_changes", "permission_response", "set_permission_mode",
+  "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "permission_response", "set_permission_mode",
   "set_model", "plan_response", "plan_follow", "rewind", "compact", "peer_accept", "task_stop", "task_background", "stop_agent",
   "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
 ]);
@@ -2719,6 +2719,12 @@ export class ReviewEngine {
       ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
+      // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
+      stopFeedback: (q) => (this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null),
+      stopFeedbackLost: (ids) => {
+        this.gate.untakeNotesForStop(ids);
+        this.touch();
+      },
       emit: (ev) => this.onSessionEvent(ts, ev),
       log: (level, msg) => this.log(level, msg),
     });
@@ -2778,10 +2784,31 @@ export class ReviewEngine {
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
   }
 
+  /**
+   * §57.14 `request_changes` in a terminal chat: staged, never typed into the TUI — `via: "stop"` while a review turn runs
+   * (it reaches Claude as that turn's Stop block reason), else `via: "next_prompt"` once the review can take a request (it
+   * goes with the next prompt the user sends, as a chat's request would). A later request replaces a staged one.
+   */
+  private terminalRequestChanges(ts: TerminalSession, extra: string | null, noteIds?: readonly string[]): void {
+    if (noteIds && !this.gate.hasUnsentNote(noteIds)) throw new CommandRefused("request_changes_unavailable:no_notes");
+    if (this.gate.unsentNoteCount === 0) throw new CommandRefused("request_changes_unavailable:no_notes");
+    const slices = this.slices();
+    const via = ts.isTurnActive && this.gate.running ? "stop" : canRequestChanges(slices) ? "next_prompt" : null;
+    if (!via) {
+      const why = blockedReason(slices) ?? (this.gate.collectError !== null ? "collect_failed" : "no_review");
+      throw new CommandRefused(`request_changes_unavailable:${why}`);
+    }
+    ts.stageRequest({ via, noteIds: noteIds ? [...noteIds] : null, extra: extra && extra.trim() ? extra : null, at: new Date().toISOString() });
+    this.log("info", `terminal chat ${ts.chatId}: Request changes staged (${via})`);
+    this.touch();
+  }
+
   /** §57.14 `terminal_request_cancel`: unstages the chat's Request changes; refused `no_request_queued` when none is staged. */
   private terminalRequestCancel(sessionId: string): void {
-    this.requireTerminal(sessionId);
-    throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+    const ts = this.requireTerminal(sessionId);
+    if (!ts.requestQueued) throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+    ts.stageRequest(null);
+    this.touch();
   }
 
   /** §57.15 `terminal_permission_response`: answers one bridged dialog; refused `permission_gone` when it is no longer open. */
@@ -2953,6 +2980,8 @@ export class ReviewEngine {
     const trimmed = ev.prompt.trim();
     let started = false;
     let taken: SummaryPaths | null = null;
+    let requested: Awaited<ReturnType<ReviewGate["prepareRequestChanges"]>> = null;
+    let staged: TerminalRequestQueued | null = null;
     try {
       await this.terminalGateSettled(ts, deadline);
       if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
@@ -2966,27 +2995,43 @@ export class ReviewEngine {
       const slices = this.slices();
       if (!this.gate.checkpoint || !canSend(slices)) return void answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
       await this.followHeadMove();
-      await this.gate.prepareAnswer(this.takeBgCarry());
-      const keptA = this.gate.keepsTurnStart;
+      // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
+      const command = trimmed.startsWith("/");
+      // §57.14: a staged Request changes goes with this prompt (a slash command keeps it staged): A kept, the noted files
+      // `changesRequested`, the notes sent with this turn — the user's prompt is the turn's prompt.
+      const queued = ts.requestQueued;
+      if (queued && !command) {
+        staged = queued;
+        ts.stageRequest(null);
+        requested = await this.gate.prepareRequestChanges(queued.extra, this.turn + 1, queued.noteIds ?? undefined);
+        if (!requested) this.log("info", "terminal prompt: the staged Request changes has no notes left; the prompt goes alone");
+      }
+      if (!requested) await this.gate.prepareAnswer(this.takeBgCarry());
+      const keptA = requested !== null || this.gate.keepsTurnStart;
       this.gate.running = true;
       let tree: string;
-      try {
-        tree = await this.gate.snapshotStart();
-      } catch (e) {
-        this.gate.abortTurn();
-        this.touch();
-        this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
-        return void answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+      if (requested) tree = requested.checkpointTree;
+      else {
+        try {
+          tree = await this.gate.snapshotStart();
+        } catch (e) {
+          this.gate.abortTurn();
+          this.touch();
+          this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
+          return void answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+        }
       }
       const skippedAtStart = this.gate.snapshotSkipped;
       this.sessionState.pendingPlan = null;
       this.proposedPlanKeys.clear();
-      // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
-      const command = trimmed.startsWith("/");
-      const sendParts = this.gate.beginSendParts(command);
-      const { summary, notes } = sendParts;
-      taken = sendParts.taken;
-      const parts = [summary, notes].filter((p): p is string => p !== null);
+      let parts: string[];
+      if (requested) parts = [requested.message];
+      else {
+        const sendParts = this.gate.beginSendParts(command);
+        const { summary, notes } = sendParts;
+        taken = sendParts.taken;
+        parts = [summary, notes].filter((p): p is string => p !== null);
+      }
       const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
       if (!command) {
         this.commitSlice.lastUserText = trimmed;
@@ -3018,6 +3063,15 @@ export class ReviewEngine {
     } catch (e) {
       this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
       if (!started && taken) this.gate.restoreSummary(taken);
+      if (!started && requested) {
+        // §57.14: the request never reached Claude — its notes are unsent again and it is staged as it was.
+        this.gate.undoRequestChanges(requested.endTree);
+        this.dropRecord();
+        this.hud.turnStartedAt = null;
+        this.setIdle();
+        this.touch();
+        if (staged && this.session === ts && !ts.requestQueued) ts.stageRequest(staged);
+      }
       if (!started && this.gate.running) {
         this.gate.abortTurn();
         this.dropRecord();
@@ -4192,6 +4246,8 @@ export class ReviewEngine {
   }
 
   private async requestChanges(extra: string | null, noteIds?: readonly string[]): Promise<void> {
+    const ts = this.terminal; // MARK: terminal-chat — §57.14: staged, never typed into the TUI
+    if (ts) return this.terminalRequestChanges(ts, extra, noteIds);
     if (!canRequestChanges(this.slices())) {
       // M30 (§3): a failed collection leaves the input open but not a change request (retry first, or send).
       const why = blockedReason(this.slices()) ?? (this.gate.collectError !== null ? "collect_failed" : "no_notes");

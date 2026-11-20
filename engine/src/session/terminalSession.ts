@@ -6,7 +6,7 @@
  * `turn_end` (snapshot B: the review). It never starts or stops the CLI.
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
-import type { BackgroundTask, PermissionMode, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
+import type { BackgroundTask, PermissionMode, TerminalRequestQueued, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
 import { statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
@@ -56,6 +56,12 @@ export type TerminalSessionOptions = {
   /** §57.16: the CLI config dir the terminal was last seen using (`SessionMeta.cliConfigDir`); a hook that shows another emits `terminal_config_dir`. */
   configDir?: string;
   scratchDirs?: readonly string[];
+  /**
+   * §57.14: a Request changes staged `via: "stop"` reaches Claude at the open turn's Stop — the engine takes the notes
+   * (null: none left) and, when the answer never went out, puts them back (`stopFeedbackLost`).
+   */
+  stopFeedback?: (q: TerminalRequestQueued) => { message: string; noteIds: string[] } | null;
+  stopFeedbackLost?: (noteIds: string[]) => void;
   /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
   reviewPaths?: () => ReadonlySet<string>;
   emit: (ev: SessionEvent) => void;
@@ -82,6 +88,8 @@ export const BACKGROUND_PROMPT_REASON =
 export const BACKGROUND_TOOL_REASON =
   "ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the user " +
   "switches back to this chat.";
+/** §57.14: how a Request changes delivered at Stop starts (the TUI shows Stop block reasons as "Stop hook error"). */
+export const STOP_FEEDBACK_PREFIX = "Review notes from the user in ReviewGate — address them before you finish:\n\n";
 /** The CLI stopped waiting for the prompt's hook (it closed the request): what the wait settles with (nobody reads it). */
 const PROMPT_CANCELLED_REASON = "Claude Code stopped waiting for ReviewGate's answer to this prompt.";
 
@@ -154,6 +162,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private status: TerminalStatus | null = null;
   private costTotal: number | null = null;
   private turnCost = 0;
+  /** §57.14: a Request changes waiting to reach Claude. */
+  private queued: TerminalRequestQueued | null = null;
 
   constructor(private readonly opts: TerminalSessionOptions) {
     this.cliSessionId = opts.cliSessionId;
@@ -179,7 +189,19 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       waiting: this.waiting ? { ...this.waiting } : null,
       interruptSuspected: this.interruptSuspected,
       ...(this.status ? { status: { ...this.status } } : {}),
+      ...(this.queued ? { requestQueued: { ...this.queued, noteIds: this.queued.noteIds ? [...this.queued.noteIds] : null } } : {}),
     };
+  }
+
+  /** §57.14: the staged Request changes (null: none). */
+  get requestQueued(): TerminalRequestQueued | null {
+    return this.queued;
+  }
+
+  /** §57.14: stages a Request changes (null: unstages it). */
+  stageRequest(q: TerminalRequestQueued | null): void {
+    this.queued = q;
+    this.touch();
   }
 
   get isTurnActive(): boolean {
@@ -353,8 +375,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
           await this.onPostTool(input);
           return {};
         case "Stop":
-          this.onStop(input, "end_turn");
-          return {};
+          return this.stopFeedbackAnswer(input, signal) ?? (this.onStop(input, "end_turn"), {});
         case "StopFailure": {
           const error = str(input.error) ?? "unknown";
           const details = str(input.error_details);
@@ -541,6 +562,22 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     result();
   }
 
+  /**
+   * §57.14: a Request changes staged `via: "stop"` goes to Claude as this Stop's block reason — once per staged request
+   * (never on a Stop that a block continued: `stop_hook_active`), so the CLI's cap on continuations is never in play. The
+   * turn stays open; it ends at the next Stop. Null: the Stop ends the turn as usual.
+   */
+  private stopFeedbackAnswer(input: Record<string, unknown>, signal?: AbortSignal): HookOutput | null {
+    const q = this.queued;
+    if (!q || q.via !== "stop" || !this.open || input.stop_hook_active === true || signal?.aborted || !this.opts.stopFeedback) return null;
+    const taken = this.opts.stopFeedback(q);
+    this.queued = null;
+    if (!taken) return null;
+    signal?.addEventListener("abort", () => this.opts.stopFeedbackLost?.(taken.noteIds), { once: true });
+    this.opts.log("info", `terminal: the review notes went to Claude at Stop (${taken.noteIds.length})`);
+    return { decision: "block", reason: STOP_FEEDBACK_PREFIX + taken.message };
+  }
+
   private onStop(input: Record<string, unknown>, stopReason: string): void {
     this.noteBackgroundTasks(input.background_tasks);
     if (this.open) this.closeTurn(stopReason);
@@ -652,6 +689,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const turn = this.open;
     if (!turn) return;
     this.open = null;
+    // §57.14: a request for this turn's Stop that never came (Esc, an exit) goes with the next prompt instead.
+    if (this.queued?.via === "stop") this.queued = { ...this.queued, via: "next_prompt" };
     this.interruptSuspected = false;
     const toolFiles: ToolFileEntry[] = [...this.touched.values()].map((t) => ({ path: t.path, tools: [...t.tools], count: t.count, toolUseIds: [...t.toolUseIds] }));
     const cost = this.turnCost;

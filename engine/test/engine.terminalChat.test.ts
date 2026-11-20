@@ -6,7 +6,7 @@ import { cliSessionFile } from "../src/session/cliRecords.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { CONTINUED_TITLE_SUFFIX } from "../src/engine.js";
 import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_REASON } from "../src/session/terminalGuard.js";
-import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON } from "../src/session/terminalSession.js";
+import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, STOP_FEEDBACK_PREFIX } from "../src/session/terminalSession.js";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
 import { fakePlatform, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeFakeClaude } from "./helpers/fakeClaude.js";
@@ -197,7 +197,7 @@ describe("terminal chats (§57)", () => {
   it("refusals: chat-only commands (terminal_chat), another chat (terminal_not_current)", async () => {
     const r = await rig();
     const id = await newTerminal(r);
-    for (const cmd of [{ type: "restart_session" }, { type: "send", text: "hi" }, { type: "interrupt" }, { type: "set_model", model: "haiku" }, { type: "btw_ask", question: "q" }, { type: "side_promote", threadId: "t", as: "message" }] as const) {
+    for (const cmd of [{ type: "restart_session" }, { type: "send", text: "hi" }, { type: "interrupt" }, { type: "set_model", model: "haiku" }, { type: "btw_ask", question: "q" }, { type: "side_promote", threadId: "t", as: "message" }, { type: "permission_response", requestId: "x", allow: true }] as const) {
       expect(await refusal(r.h, cmd), cmd.type).toMatchObject({ ok: false, code: "terminal_chat" });
     }
     expect(await refusal(r.h, { type: "terminal_spec", sessionId: "other" })).toMatchObject({ ok: false, code: "terminal_not_current" });
@@ -683,5 +683,73 @@ describe("terminal chats (§57)", () => {
     const done = await r.h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "turn over");
     expect(done.hud.sessionCostUSD).toBeCloseTo(0.0123);
     expect(done.sessions.list.find((m) => m.id === id)?.costUSD).toBeCloseTo(0.0123);
+  });
+
+  describe("§57.14 Request changes", () => {
+    const note = (r: Rig, body: string) => r.h.engine.handle({ type: "add_note", path: "notes.txt", line: 1, side: "new", excerpt: "note", body });
+
+    it("via next_prompt: staged, then the next prompt carries the notes message; the noted file is changesRequested", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      expect(await refusal(r.h, { type: "request_changes" })).toMatchObject({ ok: false });
+      await turn(r, s, "p1");
+      await note(r, "use a bullet list");
+      expect(await refusal(r.h, { type: "request_changes", extra: "keep it short" })).toMatchObject({ ok: true });
+      expect(r.h.engine.state.session.terminal?.requestQueued).toMatchObject({ via: "next_prompt", noteIds: null, extra: "keep it short" });
+      // A slash command keeps it staged.
+      await hook(s, ups("p2", "/help"));
+      await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
+      await r.h.waitFor((x) => x.gate.phase === "reviewing", "slash turn over");
+      expect(r.h.engine.state.session.terminal?.requestQueued?.via).toBe("next_prompt");
+      const answer = await hook(s, ups("p3", "go ahead"));
+      const ctx = String((answer.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext);
+      expect(ctx).toContain("[Review gate] Requested changes");
+      expect(ctx).toContain("use a bullet list");
+      expect(ctx).toContain("keep it short");
+      const st = await r.h.waitFor((x) => x.gate.phase === "running", "request turn");
+      expect(st.session.terminal?.requestQueued).toBeUndefined();
+      expect(st.changedFiles.find((f) => f.path === "notes.txt")?.state).toBe("changesRequested");
+      expect(st.gate.canRequestChanges).toBe(false);
+      expect(r.h.ofType("user_message").at(-1)).toMatchObject({ text: "go ahead" });
+    });
+
+    it("via stop: the running turn's Stop is blocked with the notes once, the turn ends at the next Stop", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await turn(r, s, "p1");
+      await note(r, "rename the file");
+      await hook(s, ups("p2", "a question"));
+      await r.h.waitFor((x) => x.gate.phase === "running", "p2 running");
+      expect(await refusal(r.h, { type: "request_changes" })).toMatchObject({ ok: true });
+      expect(r.h.engine.state.session.terminal?.requestQueued?.via).toBe("stop");
+      const stop = await hook(s, { hook_event_name: "Stop", stop_hook_active: false });
+      expect(stop.decision).toBe("block");
+      expect(String(stop.reason).startsWith(STOP_FEEDBACK_PREFIX)).toBe(true);
+      expect(String(stop.reason)).toContain("rename the file");
+      let st = r.h.engine.state;
+      expect(st.gate.phase).toBe("running"); // the turn stays open
+      expect(st.session.terminal?.requestQueued).toBeUndefined();
+      expect(st.gate.canRequestChanges).toBe(false);
+      expect(await hook(s, { hook_event_name: "Stop", stop_hook_active: true })).toEqual({});
+      st = await r.h.waitFor((x) => x.gate.phase === "reviewing", "collected");
+      expect(r.h.ofType("turn_end")).toHaveLength(2);
+    });
+
+    it("terminal_request_cancel unstages; refused no_request_queued when nothing is staged", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      expect(await refusal(r.h, { type: "terminal_request_cancel", sessionId: id })).toMatchObject({ ok: false, code: "no_request_queued" });
+      await turn(r, s, "p1");
+      await note(r, "x");
+      await r.h.engine.handle({ type: "request_changes" });
+      expect(await refusal(r.h, { type: "terminal_request_cancel", sessionId: id })).toMatchObject({ ok: true });
+      expect(r.h.engine.state.session.terminal?.requestQueued).toBeUndefined();
+      const answer = await hook(s, ups("p2", "go on"));
+      expect(String((answer.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext ?? "")).not.toContain("Requested changes");
+      expect(await refusal(r.h, { type: "terminal_request_cancel", sessionId: "other" })).toMatchObject({ ok: false, code: "terminal_not_current" });
+    });
   });
 });
