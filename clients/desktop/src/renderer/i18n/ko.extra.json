@@ -983,5 +983,13 @@
   "Could not open {0}": "{0}을(를) 열지 못했습니다",
   "Click to show it in the file manager — it is a large file that also holds your other Claude Code state": "클릭하면 파일 관리자에서 보여 줍니다 — 크고, 다른 Claude Code 상태도 들어 있는 파일입니다",
   "Show the file that defines this server in the file manager": "이 서버를 정의한 파일을 파일 관리자에서 보기",
-  "Side answer": "곁질문 답"
+  "Side answer": "곁질문 답",
+  "Terminals are not available here: {0}": "여기서는 터미널을 쓸 수 없어요: {0}",
+  "Terminals are not available here": "여기서는 터미널을 쓸 수 없어요",
+  "Terminal chat needs the native Claude Code (claude.exe) or Node on PATH": "터미널 채팅에는 네이티브 Claude Code(claude.exe)나 PATH의 Node가 필요해요",
+  "Claude Code's command line would be longer than Windows allows — turn off some MCP servers or plugins and try again": "Claude Code의 명령줄이 Windows가 허용하는 길이보다 길어요 — MCP 서버나 플러그인을 몇 개 끄고 다시 시도하세요",
+  "Claude Code could not be started in the terminal: {0}": "터미널에서 Claude Code를 시작하지 못했어요: {0}",
+  "Claude Code could not be started in the terminal": "터미널에서 Claude Code를 시작하지 못했어요",
+  "Terminal chats are not available in this window": "이 창에서는 터미널 채팅을 쓸 수 없어요",
+  "Pasted into the terminal — press Enter there to send it": "터미널에 붙여넣었어요 — 보내려면 터미널에서 Enter를 누르세요"
 }
