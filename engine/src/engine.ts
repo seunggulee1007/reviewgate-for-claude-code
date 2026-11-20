@@ -1460,6 +1460,7 @@ export class ReviewEngine {
         if (this.parked?.chatId === meta.id) void this.disposeParked(this.parked, "its chat was deleted"); // r2-chats-cards M33 (§9.1)
         if (this.backgroundTerminals.has(meta.id)) await this.disposeBackgroundTerminals("its chat was deleted", meta.id); // §57.10
         this.sessions!.remove(meta.id);
+        this.removeTerminalMcpFiles([meta.id]); // §57.11
         void this.side.removeFor(meta.id);
         if (this.projectGitDir) removeCheckpoints(this.projectGitDir, meta.id);
         this.pruneTurnRefs();
@@ -2856,7 +2857,7 @@ export class ReviewEngine {
    * for the CLI to expand. Null (and no file) when there is nothing to add or the files could not be read.
    */
   private async terminalMcpConfigFile(meta: SessionMeta): Promise<string | null> {
-    const file = join(this.dataDir, "terminal-mcp", `${meta.id.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+    const file = this.terminalMcpFile(meta.id);
     const main = this.outsideMainCheckout();
     let json: string | null = null;
     if (main) {
@@ -2884,9 +2885,26 @@ export class ReviewEngine {
       return null;
     }
     mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    chmodSync(dirname(file), 0o700); // an existing folder keeps its mode through mkdirSync
     writeFileSync(file, json, { mode: 0o600 });
     chmodSync(file, 0o600); // an existing file keeps its mode through writeFileSync
     return file;
+  }
+
+  /** §57.11: chat `chatId`'s `--mcp-config` file (it exists only while there are servers to add). */
+  private terminalMcpFile(chatId: string): string {
+    return join(this.dataDir, "terminal-mcp", `${chatId.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+  }
+
+  /** §57.11: the `--mcp-config` files of these chats go (a deleted chat; the project closing — the next spawn writes its own). */
+  private removeTerminalMcpFiles(chatIds: string[]): void {
+    for (const id of chatIds) {
+      try {
+        rmSync(this.terminalMcpFile(id), { force: true });
+      } catch (e) {
+        this.log("warn", `terminal: could not remove the MCP config file of ${id}: ${errorMessage(e)}`);
+      }
+    }
   }
 
   /**
@@ -3267,6 +3285,7 @@ export class ReviewEngine {
     if (this.parked) await this.disposeParked(this.parked, "the project closed"); // r2-chats-cards M33 (§9.1)
     await this.disposeBackgroundTerminals("the project closed"); // §57.10
     await this.stopSession();
+    this.removeTerminalMcpFiles((this.sessions?.list() ?? []).filter((m) => m.kind === "terminal").map((m) => m.id)); // §57.11
     // Nothing pending: the persisted review has served its purpose (accepted files stay on disk).
     // Chained behind the in-flight writes so a late save cannot resurrect the file. (§34.4: sent notes do not count.)
     if (!this.gate.hasPendingReview && this.gate.unsentNoteCount === 0) {

@@ -9299,7 +9299,8 @@ folders above the main checkout, as the terminal there has them: `terminal_spec`
 before `--settings` (the option takes several values, so a flag follows it).
 
 - **The file** is `<dataDir>/terminal-mcp/<chat id>.json` (folder 0700, file 0600), `{"mcpServers":{…}}`, rewritten at
-  each spec and removed when there is nothing to add. Not inline JSON: Windows caps a command line at 32,767 characters,
+  each spec and removed when there is nothing to add, when its chat is deleted and when the project closes (an existing
+  folder is set back to 0700). Not inline JSON: Windows caps a command line at 32,767 characters,
   and other processes can read a command line.
 - **No `--strict-mcp-config`**: the user's own servers (user, local, project scope, plugins) stay.
 - **Skipped names** — the CLI's own server wins, as for a chat: user scope (`.claude.json` `mcpServers`), local scope
