@@ -162,6 +162,7 @@ struct DiffView: View {
             lineSelection.clear()
             if !on { reopenNoteDraft() }
         }
+        .onChange(of: model.addNoteTick) { _, _ in openComposer() }   // Review › Add Note… (⌥⌘N; on while `canAddNote`)
         .onChange(of: find.scrollTick) { _, _ in
             scrollKey = find.scrollKey   // find's current match, or Review › Next / Previous Change's block
             scrollColumn = find.scrollColumn
@@ -764,6 +765,9 @@ struct DiffViewHeader: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        // Review › Add Note… is on exactly when this header's "Add note" is.
+        .onChange(of: addNoteDisabled, initial: true) { _, off in model.canAddNote = !off }
+        .onDisappear { model.canAddNote = false }
         #if DEBUG
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugDiffHeaderFrame = $0 }   // the layout check
         #endif
