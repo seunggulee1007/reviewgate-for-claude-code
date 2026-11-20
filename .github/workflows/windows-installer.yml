@@ -53,7 +53,7 @@ jobs:
             -c.win.signAndEditExecutable=true \
             '-c.nsis.artifactName=ReviewGate-Setup-${version}.exe'
           ls -la release
-      - name: smoke test — silent install, the app still runs after 20 s, uninstall
+      - name: smoke test — silent install, the PTY self-test, the app still runs after 20 s, uninstall
         shell: pwsh
         env:
           ELECTRON_ENABLE_LOGGING: "1"
@@ -64,6 +64,22 @@ jobs:
             Select-Object -First 1
           if (-not $app) { throw "the silent install left no ReviewGate.exe under $env:LOCALAPPDATA\Programs" }
           Write-Host "installed: $($app.FullName) ($((Get-Item $app.FullName).VersionInfo.ProductVersion))"
+          # PROTOCOL §57.10: node-pty runs from app.asar.unpacked with ConPTY's own DLL, and only what it needs shipped.
+          $resources = Join-Path $app.DirectoryName "resources"
+          $pty = Join-Path $resources "app.asar.unpacked\node_modules\node-pty"
+          foreach ($need in @("lib\index.js", "prebuilds\win32-x64\conpty.node", "prebuilds\win32-x64\conpty\conpty.dll", "prebuilds\win32-x64\conpty\OpenConsole.exe")) {
+            if (-not (Test-Path (Join-Path $pty $need))) { throw "the installed app has no node-pty $need" }
+          }
+          if (-not (Test-Path (Join-Path $resources "THIRD_PARTY_NOTICES.md"))) { throw "the installed app has no THIRD_PARTY_NOTICES.md" }
+          $extra = @(Get-ChildItem -Path $pty -Recurse -Filter '*.pdb') + @(Get-Item -Path (Join-Path $pty "src"), (Join-Path $pty "deps"), (Join-Path $pty "third_party"), (Join-Path $pty "prebuilds\win32-arm64"), (Join-Path $pty "prebuilds\darwin-*") -ErrorAction SilentlyContinue)
+          if ($extra.Count -gt 0) { throw "the installed app ships node-pty files it never uses: $($extra.FullName -join ', ')" }
+          $selftest = "$env:RUNNER_TEMP\pty.json"
+          $st = Start-Process -FilePath $app.FullName -ArgumentList "--rg-pty-selftest=$selftest" -Wait -PassThru
+          if (-not (Test-Path $selftest)) { throw "the PTY self-test wrote no result (exit $($st.ExitCode))" }
+          $json = Get-Content $selftest -Raw
+          Write-Host "pty self-test: $json"
+          $r = $json | ConvertFrom-Json
+          if ($st.ExitCode -ne 0 -or -not $r.ok -or -not $r.conptyDll -or -not $r.openConsole) { throw "the installed app's PTY self-test failed (exit $($st.ExitCode))" }
           $p = Start-Process -FilePath $app.FullName -PassThru `
             -RedirectStandardOutput "$env:RUNNER_TEMP\app.out" -RedirectStandardError "$env:RUNNER_TEMP\app.err"
           Start-Sleep -Seconds 20

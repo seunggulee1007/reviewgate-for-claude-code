@@ -54,7 +54,11 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
 - **Self-test.** `ReviewGate.exe --rg-pty-selftest=<out.json>` (or `npx electron clients/desktop --rg-pty-selftest=…`)
   loads node-pty, runs `%ComSpec% /d /c echo rg-pty-ok` through ConPTY with the bundled `conpty.dll`, writes
   `{ok, nodePtyDir, conptyDll, openConsole, electron, osBuild, error?}` and exits 0 / 1. It runs before the
-  single-instance lock (a running ReviewGate is not disturbed) and opens no window and no settings.
+  single-instance lock (a running ReviewGate is not disturbed) and opens no window and no settings. CI runs it on Windows
+  after the desktop build (`npx electron clients/desktop --rg-pty-selftest=…`, ci.yml) and in the silently installed app
+  (windows-installer.yml), which also checks that node-pty's `lib`, `conpty.node`, `conpty.dll`, `OpenConsole.exe` and
+  `resources/THIRD_PARTY_NOTICES.md` shipped and that no `.pdb`, `src`, `deps`, `third_party`, `win32-arm64` or `darwin-*`
+  did. `OpenConsole.exe` joins the Defender process exclusions of the CI job.
 - **Packaging.** `asarUnpack: node_modules/node-pty/**` — the `.node` files, the conout worker thread, `conpty.dll` /
   `OpenConsole.exe` and the console-list agent must be real files; main requires node-pty from
   `resources/app.asar.unpacked/node_modules/node-pty` by path. Excluded: node-pty's `src`, `deps` (winpty sources),
