@@ -82,14 +82,15 @@ export function UpdateBanner() {
       off?.();
     };
   }, []);
-  if (!status) return null;
-  const detail = t("This app is {0}; the latest release is {1}.", status.current, status.version);
+  const release = status?.release;
+  if (!status || !release) return null;
+  const detail = t("This app is {0}; the latest release is {1}.", status.current, release.version);
   return (
     <div className="banner blue" role="status" data-testid="Update banner">
       <span className="grow truncate" title={detail}>
-        <strong>{t("ReviewGate {0} is available", status.version)}</strong> · {detail}
+        <strong>{t("ReviewGate {0} is available", release.version)}</strong> · {detail}
       </span>
-      <button type="button" className="small primary" onClick={() => void window.rg.openUpdate?.()} title={status.page} data-testid="Open release page">
+      <button type="button" className="small primary" onClick={() => void window.rg.openUpdate?.()} title={release.page} data-testid="Open release page">
         {t("Open Release Page")}
       </button>
       <button type="button" className="small" onClick={() => void window.rg.dismissUpdate?.()} title={t("Hide this version — the next one is announced again")} data-testid="Dismiss update">
