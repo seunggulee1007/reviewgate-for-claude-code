@@ -879,4 +879,17 @@ describe("terminal chats (§57)", () => {
     expect(await hook(os, { hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
     expect(off.h.engine.state.session.terminal?.permissions).toBeUndefined();
   });
+
+  it("§54 a budget turned on is said with the next terminal prompt, once", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await r.h.engine.handle({ type: "set_settings", settings: { budget: { maxFiles: 5, maxLines: 0 } } });
+    const first = await hook(s, ups("p1"));
+    expect(String((first.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext)).toContain("[Review gate] The user set a change budget");
+    await hook(s, { hook_event_name: "Stop" });
+    await r.h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "p1 over");
+    const second = await hook(s, ups("p2"));
+    expect(String((second.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext ?? "")).not.toContain("change budget");
+  });
 });

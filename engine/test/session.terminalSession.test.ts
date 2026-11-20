@@ -32,7 +32,7 @@ function makeRepo(): string {
 type Rig = { ts: TerminalSession; events: SessionEvent[]; dir: string; of: <T extends SessionEvent["type"]>(t: T) => Extract<SessionEvent, { type: T }>[]; hook: (input: Record<string, unknown>) => Promise<Record<string, unknown>>; tree: () => Promise<string> };
 
 /** `answer`: how the fake engine answers `terminal_prompt` (null: it does not — the test answers). */
-function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number; bridge?: boolean } = {}): Rig {
+function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number; bridge?: boolean; budget?: { maxFiles: number; maxLines: number } } = {}): Rig {
   const dir = makeRepo();
   const events: SessionEvent[] = [];
   let ts!: TerminalSession;
@@ -48,6 +48,7 @@ function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prom
     plansDir: join(dir, ".no-plans"),
     windowMarginMs: 60_000,
     ...(opts.bridge ? { permissionBridge: () => true } : {}),
+    ...(opts.budget ? { budget: opts.budget } : {}),
     emit: (ev) => {
       events.push(ev);
       if (ev.type === "terminal_prompt" && answer) void tree().then((t) => ts.answerPrompt(ev.seq, answer(ev, t)));
@@ -542,5 +543,27 @@ describe("TerminalSession", () => {
     const r = rig();
     expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
     expect(r.ts.state.permissions).toBeUndefined();
+  });
+
+  it("§54 budget in a terminal chat: the soft note after an edit, a deny past the hard limit, then only writing Bash is denied", async () => {
+    const r = rig({ budget: { maxFiles: 1, maxLines: 0 } });
+    await r.hook(ups("p1"));
+    const a = join(r.dir, "a.txt");
+    expect(await r.hook(pre("Write", { file_path: a, content: "a\n" }, "w1"))).toEqual({});
+    write(r.dir, "a.txt", "a\n");
+    const soft = await r.hook(post("Write", { file_path: a, content: "a\n" }, "w1"));
+    expect(String((soft.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext)).toMatch(/budget|Review gate/i);
+    expect(r.of("budget_event").map((e) => e.kind)).toEqual(["warn"]);
+    const denied = await r.hook(pre("Write", { file_path: join(r.dir, "b.txt"), content: "b\n" }, "w2"));
+    expect(denied).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect(r.of("budget_event").map((e) => e.kind)).toEqual(["warn", "deny"]);
+    expect(await r.hook(pre("Bash", { command: "echo x > c.txt" }, "b1"))).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect((await r.hook(pre("Bash", { command: "git status" }, "b2"))).hookSpecificOutput).toBeUndefined();
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(r.of("turn_end").at(-1)!.budget).toEqual({ files: 1, lines: 1, denied: true });
+    // A new turn counts from zero; without a budget nothing is counted.
+    r.ts.setBudget({ maxFiles: 0, maxLines: 0 });
+    await r.hook(ups("p2"));
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "d.txt"), content: "d\n" }, "w3"))).toEqual({});
   });
 });

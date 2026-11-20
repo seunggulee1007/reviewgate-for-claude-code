@@ -7991,6 +7991,8 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   deny reason then reads `files 12`, not `files 12/0`).
 - **Told to Claude** — the §38.2 note covers a budget turned on or off while a session runs. Nothing about a budget
   reaches Claude while there is none.
+- **Terminal chats** (§57.4) count, warn and deny the same way through their hooks; their system prompt names no budget,
+  so a budget that is on goes with the next prompt as the §38.2 note (`additionalContext`).
 - **Per turn, really.** The session's hooks get the turn's own start tree (§34.1), not A: a request-changes turn or a
   question keeps A for the review, and the post-Bash numstat used to count everything the review held since A — the
   earlier turns' lines too — against the new turn. A turn with no start of its own (no chat record) still gets A.
@@ -8937,9 +8939,14 @@ chat's id);
   `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
   any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
   notification); Stop needs nothing new (the running → reviewing change already notifies).
-- **Not in Stage 1:** the change budget (§54) and the chat's permission cards (allow patterns, remembered allows, the
-  plan-mode and unprompted rules) do not apply to a terminal chat — the TUI's own permission flow decides, with the guard
-  of §57.8 on top (git and edits the review does not see). A TUI `/rewind` restores files from the CLI's own history,
+- **The change budget (§54)** applies as in a chat (Stage 2): PreToolUse runs the guard's deny, then the turn's adoption,
+  then the budget (an edit over the hard limit, and after a deny a writing Bash command, is denied with the same reason),
+  then the Bash baseline; an edit tool's PostToolUse answers the soft note as `additionalContext`; the post-Bash snapshot
+  counts; `turn_end.budget` is real. The terminal's system prompt names no budget: the §38.2 note (`budgetChangeNote`)
+  goes into the next prompt's `additionalContext` when the budget differs from what this terminal was last told.
+- **Not in a terminal chat:** the chat's permission cards (allow patterns, remembered allows, the plan-mode and
+  unprompted rules) — the TUI's own permission flow decides, with the guard of §57.8 on top (git and edits the review does
+  not see), and the bridge of §57.15. A TUI `/rewind` restores files from the CLI's own history,
   outside ReviewGate's snapshots: what it restores shows as the next turn's changes.
 
 ### 57.5 The Mac app: the terminal chat
