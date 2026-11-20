@@ -991,5 +991,9 @@
   "Claude Code could not be started in the terminal: {0}": "터미널에서 Claude Code를 시작하지 못했어요: {0}",
   "Claude Code could not be started in the terminal": "터미널에서 Claude Code를 시작하지 못했어요",
   "Terminal chats are not available in this window": "이 창에서는 터미널 채팅을 쓸 수 없어요",
-  "Pasted into the terminal — press Enter there to send it": "터미널에 붙여넣었어요 — 보내려면 터미널에서 Enter를 누르세요"
+  "Pasted into the terminal — press Enter there to send it": "터미널에 붙여넣었어요 — 보내려면 터미널에서 Enter를 누르세요",
+  "Stale lines on the screen? ⌃L redraws it": "화면에 지난 줄이 남았나요? ⌃L로 다시 그려요",
+  "Stale lines on the screen? Ctrl+L redraws it": "화면에 지난 줄이 남았나요? Ctrl+L로 다시 그려요",
+  "Find in terminal": "터미널에서 찾기",
+  "Find in the terminal's screen and scrollback": "터미널 화면과 스크롤백에서 찾아요"
 }
