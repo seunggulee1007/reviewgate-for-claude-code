@@ -7236,8 +7236,70 @@ download whose identifier differs from the running app's, so a build with an old
   finds that release, the notice becomes the update banner's failure (one banner, [Try Again] / [What's New] / [×]).
   [Try Again] looks the release up when no check has and installs it, or says why it could not. No window opens for
   any of it; the notice stays until closed, for this launch only.
-- **Compatibility.** No wire change; the Electron client does not check for updates. Teammates' ad-hoc builds never
-  install an update from the app (no team to compare); they install by hand as before.
+- **Compatibility.** No wire change. Teammates' ad-hoc builds never install an update from the app (no team to compare);
+  they install by hand as before. The Windows client checks (P5-sheets-49) and, from 0.5.18, installs (below).
+- **Windows** (Electron client, `clients/desktop/src/main/update.ts`, `updateDownload.ts`, `updateVerify.ts`,
+  `updateInstall.ts`; renderer `components/UpdateBanner.tsx`, `components/settings/UpdateSettings.tsx`, `updateWords.ts`).
+  The release's `ReviewGate-Setup-X.Y.Z.exe` and `ReviewGate-Setup-X.Y.Z.exe.sha256` (attached by
+  `.github/workflows/windows-installer.yml` after the release is published — until then [Install and Restart] is off
+  and says so) are installed from the banner. The installer is **not code-signed** yet (SignPath Foundation pending).
+  - **Download.** The asset URLs come from the release reply (`browser_download_url`, `size`, GitHub's `digest`). Both
+    files go to `<userData>/updates/<version>-<id>/` (`%APPDATA%\ReviewGate\updates`) over Electron's `net` (the
+    system's proxy), https only. Redirects are not followed by the transport: each hop is checked first and must be
+    `github.com`, `release-assets.githubusercontent.com` (where github.com's 302 for a release asset goes, seen
+    2026-11) or `objects.githubusercontent.com` (before 2025) — exact host, port 443, no user info — at most 5 hops.
+    The installer is capped at 400 MB (the release's size and Content-Length checked before reading, the bytes while
+    reading), the checksum file at 4 KB; a body shorter than its Content-Length fails. The banner's [Cancel] aborts it;
+    a failure or a cancel leaves no file. The next launch removes `updates/`.
+  - **Checks.** The asset is named `ReviewGate-Setup-<version>.exe`; the version is newer than the running one (semver);
+    the file's SHA-256 is the `.sha256` file's first word (64 hex digits, any case; a second word must be the file
+    name) and GitHub's asset digest when the API reports one; the file starts with `MZ` and has `PE\0\0` where its DOS
+    header points. Any failure: "Could not install ReviewGate X" with why, [Try Again], [Download Page]; nothing ran.
+    **What this protects against:** a corrupted or truncated download. The checksum comes from the same release as
+    the installer, so it does **not** protect against a compromised release or GitHub account. Signature verification
+    (Authenticode, checked before running) comes with the SignPath signing.
+  - **Who can install.** Only the packaged app on Windows whose folder has `Uninstall ReviewGate.exe` (installed by the
+    NSIS installer) and is not under `%ProgramFiles%` / `%ProgramW6432%` / `%ProgramFiles(x86)%` (an all-users install
+    needs elevation, which the update never asks for). Otherwise [Install and Restart] is off and its tooltip says why;
+    [Download Page] stays.
+  - **Restarting.** As on the Mac: never while a window has a turn running or a card waiting (`closeGuardReason`): "ReviewGate
+    X is ready. Claude is working — ReviewGate restarts when the turn finishes." with each such window as a button
+    ("acme-api: Claude is working", a click brings it forward), [Restart Now] (asks "Restart now? The turns that run are
+    stopped.") and [Cancel] (the download is removed). Then "Ready — ReviewGate closes and reopens as X" for 2 s (looked
+    at once more), `pendingUpdateInstall = {from, to}` and `restoreOnceAfterRelaunch` in `settings.json`, and the quit
+    (no "Quit ReviewGate?" question: every window is idle, or the user said Restart Now). Only once every engine has
+    stopped (`disposeAll`, at most 6 s) is the installer started, detached, from its folder:
+    `ReviewGate-Setup-X.Y.Z.exe /S /currentuser --updated --force-run` — silent; this user's install; an update (the
+    installer does not ask about a running app, and runs the old version's uninstaller with `--updated
+    --keep-shortcuts`, which keeps `%APPDATA%\ReviewGate`); and, with `/S`, ReviewGate is started when it is done
+    (electron-builder 26's assisted installer honours `--force-run` only when silent; it passes `--updated` to the app).
+    The installer is never run by the app's own process tree while engines live, and nothing is killed by name by
+    ReviewGate (the installer itself still closes a ReviewGate.exe of this user that is running after ~1.3 s, as every
+    electron-builder update does). If the installer cannot start, the record gets `why` and the app reopens itself.
+  - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
+    Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
+    no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:
+    the installer could not start, else "ReviewGate Y is still installed.") with [Try Again] (looks the release up when
+    no check has, and installs it), [Download Page] and ×. Nothing installs by itself, so a failed install cannot loop.
+    The windows that were open reopen once, whatever "Reopen last projects" says.
+  - **Words.** The banner's title is "Installing ReviewGate X" from the click to the quit, its line the step:
+    "Downloading 12.4 / 115.3 MB" beside a bar (`role=progressbar`, named "Download progress", its value the line),
+    "Checking the download's checksum…" beside a spinner. Every button has a tooltip; [Download Page] ("Opens the release
+    page — download the installer there and run it by hand") is on the banner at every step but the 2 s "Ready". The
+    available banner: [Install and Restart] [What's New] (the notes in a dialog) [Download Page] [Later]. Help › Check for
+    Updates… offers [Install and Restart] too. Settings › General › Updates: "Check for updates automatically", the same
+    title, line and bar, [Install and Restart] / [Restart Now] / [Cancel], [Check Now] with "Last checked 14:03 — …", and
+    [Download Page]. Korean through the Mac's catalog plus `ko.extra.json`.
+  - **Verified** (vitest, every OS of CI including windows-latest): `updateDownload.test.ts` — the host allowlist,
+    redirects to GitHub's asset host followed and to anything else refused before it is asked, too many redirects, the
+    size cap (announced and streamed), a short body, cancel and progress, the checksum file, the assets, the name /
+    version / checksum / digest / PE checks, and a fake release served from 127.0.0.1 (a 302 to its asset, a 2 MB PE)
+    downloaded and verified end to end through node:http; `updateInstall.test.ts` — download → verify → ready → record
+    → quit, waiting for Claude and going on, a turn started during "Ready", Restart Now (asked), Cancel (download and
+    wait), failures, the installer's argv and spawn options, who can install, the notice from the record and no loop;
+    `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, Korean),
+    `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a real installer run by
+    the app, and the relaunch — docs/M11-WINDOWS.md "Updating" lists them for a Windows device.
 - **Verified.** Core `AppUpdateTests`: semver parsing and order, the `releases/latest` reply (assets, digest, drafts,
   bad tags), the check's outcomes through a fake `gh` (available, up to date, not logged in, 404, offline, timeout, gh
   missing), the closed version, the checksum file and digest, the TeamIdentifier and the signature / team / bundle /
@@ -8463,7 +8525,8 @@ it, and an item that cannot run now is disabled instead of doing nothing.
   version closed with Later comes back then). A newer release shows a banner in every window, also the empty one —
   "ReviewGate 0.6.0 버전이 나왔어요 · 이 앱은 0.5.10 버전이고, 최신 릴리스는 0.6.0 버전이에요." [릴리스 페이지 열기] (the
   installer is there; only a github.com page is opened) [나중에] (`dismissedUpdateVersion`: this version stays quiet, a
-  newer one shows again). Nothing is installed by the app.
+  newer one shows again). Up to 0.5.17 nothing was installed by the app; from 0.5.18 the banner installs it (§48
+  "Windows"), and [릴리스 페이지 열기] became [다운로드 페이지].
 - **Help › Keyboard Shortcuts finds a key** (P1-chrome-10). A search field on top, focused when the window opens, narrows
   the table as the user types — every word, in any order, against the action and remark in the UI language, their
   English and the keys ("거절", "ctrl+shift+k"); a section's title keeps the whole section; nothing found says so. Esc
