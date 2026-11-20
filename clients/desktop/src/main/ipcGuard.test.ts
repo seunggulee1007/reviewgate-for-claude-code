@@ -90,8 +90,10 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "btw_ask", question: "why?" }).ok).toBe(true); // §56.1
   });
 
-  it("rejects the terminal chat commands (§57: Mac only in Stage 1 — Windows has no PTY for them; §57.9 continuing a chat in one)", () => {
-    for (const type of ["terminal_spec", "terminal_started", "terminal_exited", "terminal_end_turn", "session_continue_terminal"]) {
+  it("§57.10: the renderer may send Review now and Continue as Terminal Chat; the PTY lifecycle commands stay main's own", () => {
+    for (const type of ["terminal_end_turn", "session_continue_terminal"]) expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(true);
+    // main asks for terminal_spec itself and reports the PTY: the hook token never reaches the renderer.
+    for (const type of ["terminal_spec", "terminal_started", "terminal_exited"]) {
       expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(false);
     }
   });

@@ -34,6 +34,8 @@ export function menuEnabledOf(s: Facts): MenuEnabled {
     createPR: !hasPendingReview(st) && !st.branches.isWorktreeDirty && !isRunning(st) && (st.project.branch ?? null) !== null,
     chatSwitch: sessionSwitchRefusal(st) === null,
     stop: isRunning(st),
+    // MARK: terminal-win — §57.10: the current chat is a terminal chat (its menu items are the TUI's own)
+    terminalChat: st.sessions.list.some((m) => m.id === st.sessions.currentId && m.kind === "terminal"),
   };
 }
 

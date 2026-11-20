@@ -9146,6 +9146,50 @@ type ClientCapabilities = {
   `session_continue_terminal`, `terminal_spec` and `Settings.newChatKind` (§57.7) work for it. Without it — or with
   `false` — everything stays `terminal_unsupported` as before. On a mac or test client the field changes nothing. Nothing
   else differs: `terminal_spec` has no Windows-specific fields (the client resolves argv[0] itself).
+- **Where the PTY lives** (`clients/desktop/src/main/pty/`). node-pty 1.1.0 in Electron main, ConPTY with its bundled
+  `conpty.dll` (`useConpty`, `useConptyDll`); one `PtyHub` per window. The hello's `capabilities.terminalChat` is
+  whether node-pty loaded (and, on Windows, build ≥ 18309) — static per process; Settings' "Terminal chat (preview)" is
+  only a UI preference.
+- **The token never reaches the renderer.** Main asks for `terminal_spec`, spawns, and sends `terminal_started {pid}` /
+  `terminal_exited` itself; the IPC guard lets the renderer send only `terminal_end_turn` and
+  `session_continue_terminal`. The renderer talks to the PTYs over `rg:pty:*` (`info`, `open`, `restart`, `kill`,
+  `attach`, `list` invoked; `input`, `resize`, `ack`, `focus` sent; `data`, `exit` received) and never names a file,
+  arguments, environment or folder. A PTY id belongs to the window that opened it; any other sender is ignored and
+  logged. Refusals: `pty_unavailable`, `not_current`, `terminal_needs_native_claude`, `terminal_cmdline_too_long`,
+  `spawn_failed`, `invalid_request`, `no_project`, and the engine's codes passed through (`cli_not_found`,
+  `terminal_cli_too_old`, `terminal_hooks_disabled`, `terminal_not_current`).
+- **The launch** (`terminalLaunch.ts`). argv[0] through `resolveClaudeExecutable`: a `.exe` as is; npm's `cli.js` under
+  a real `node.exe` (beside the shim, else PATH) — never Electron-as-node, which does not attach to the pseudoconsole; a
+  `.cmd` / `.bat` is refused (`terminal_needs_native_claude`): CreateProcess would re-parse the line through cmd.exe and
+  the `--settings` JSON holds `"` and `|`. The command line is the client's own (every argument MSVCRT-quoted), handed to
+  node-pty as a string; above 30,000 characters `terminal_cmdline_too_long`. `${RG_HOOK_TOKEN}` stays literal (no shell
+  runs). The environment is the whole parent one merged case-insensitively, minus `CLAUDECODE`,
+  `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`, `CLAUDE_AGENT_SDK_*`, `ELECTRON_*`, `NODE_OPTIONS`,
+  `VITE_DEV_SERVER_URL`, `REVIEWGATE_*` and any `RG_*` (the user's other `CLAUDE_*` stay: on Windows they are user
+  settings), plus `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`,
+  `CLAUDE_CODE_NATIVE_CURSOR=1`, `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` (while on) and the spec's `RG_*` /
+  `CLAUDE_CODE_*` keys. On macOS (development only — the client counts as `mac` there) argv runs directly with the Mac's
+  Stage 1 environment.
+- **Lifecycle.** At most one chat PTY per window; opening a running chat's PTY again returns it. Output goes out in
+  batches (5 ms or 64 KiB) with a 512 KiB replay for a reloaded page; over 100,000 unacknowledged characters the PTY
+  pauses, below 5,000 it resumes. The chat PTY ends (`switched`) when its chat stops being the current one or the project
+  closes or changes — main watches the engine's state, so this holds with the renderer gone; a project change or close
+  ends the shell tabs too. A kill closes the pseudoconsole; a process still alive 3 s later has its tree killed
+  (`taskkill /T /F`). A window's close and the quit end every PTY in parallel before the engine stops; `process` exit
+  kills what is left. `rg:pty:exit` carries `quickNoHooks` (the chat's PTY ended within 10 s and no hook came: the trust
+  dialog's "No, exit" or a CLI that cannot reach the hooks). While a terminal has the keyboard, `rg:pty:focus` turns the
+  window's menu accelerators off (`setIgnoreMenuShortcuts`) so Ctrl+B / R / O / P / N reach the TUI.
+- **Settings and menus.** `AppSettings` gains `terminalChatPreview` (false), `newChatKind` ("chat"), `terminalGpu`
+  ("auto" / "off"), `terminalShell` ("powershell" / "cmd"), `terminalFullRepaint` (true) and `terminalFontSize` (9…28,
+  13), all renderer-writable. The engine's `newChatKind` is `"terminal"` only while the preview is on and "New chats open
+  as" is Terminal. While the preview is on and a PTY can run, Chat lists New Terminal Chat (Ctrl+Alt+T), New Chat
+  (Classic) (Ctrl+Alt+Shift+T) and Continue as Terminal Chat; View lists Toggle Terminal Panel (Ctrl+`) whenever the shell
+  panel can open — the renderer owns those keys. `MenuEnabled.terminalChat` (the chat on screen is a terminal chat) turns
+  Find in Chat, Request Changes and Continue as Terminal Chat off. A terminal chat that exists keeps working with the
+  preview off; only the ways to make one go.
+- **The shell panel**: PowerShell (`pwsh`, else Windows PowerShell, `-NoLogo`) or Command Prompt (`%ComSpec%`) in the
+  window's project folder, with the same environment minus `RG_*`, `CLAUDE_CODE_NATIVE_CURSOR` and
+  `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT`. Available whenever node-pty loads, on Windows.
 
 ## 58. Accept N & Continue
 

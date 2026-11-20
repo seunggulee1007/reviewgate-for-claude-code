@@ -206,6 +206,7 @@ void app.whenReady().then(async () => {
     openInNewWindow,
     focusProjectWindow,
     rebuildMenu,
+    ptyHubFor: (sender) => workbenchFor(sender)?.pty, // MARK: terminal-win (§57.10)
   });
   installNotifications({ focusWindow });
   installReadiness(); // MARK: polish p-lifecycle (P5-sheets-44): the empty window's checklist
