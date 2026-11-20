@@ -8882,7 +8882,8 @@ chat's id);
   (kept while a review stands — the prompt answers it, as a question during a review does in a chat), the review summary
   and unsent notes as `additionalContext` (a prompt starting with "/" keeps them for the next one; a summary whose prompt
   no longer waited for the answer — blocked meanwhile, the CLI gave up — or whose turn could not start is put back, so
-  the next prompt carries it), the `user_message`
+  the next prompt carries it; a path decided again since — accepted, rejected or partly rejected — keeps only the newer
+  decision, so it is never listed both Accepted and Rejected), the `user_message`
   row and the title. The PreToolUse hook gets the turn's tree for Bash attribution. Any failure blocks the prompt with
   the reason.
 - **One prompt at a time.** A UserPromptSubmit that comes while the previous one is still waiting (the CLI gave up on it,

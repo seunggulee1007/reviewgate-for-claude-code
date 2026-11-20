@@ -957,3 +957,25 @@ describe("ReviewGate.beginSendParts (§57)", () => {
     }
   }
 });
+
+describe("ReviewGate.restoreSummary (§57.4)", () => {
+  type Lists = { acceptedPaths: string[]; rejectedPaths: string[]; partiallyRejectedPaths: string[] };
+  it("puts a taken summary back; the newer decision wins, so a path is never in Accepted and Rejected", () => {
+    const g = new ReviewGateClass();
+    const raw = g as unknown as Lists;
+    raw.acceptedPaths = ["b.txt"]; // accepted in the taken summary, rejected since
+    raw.rejectedPaths = [];
+    raw.partiallyRejectedPaths = [];
+    const { taken } = g.beginSendParts();
+    expect(taken).toEqual({ accepted: ["b.txt"], rejected: [], partial: [] });
+    raw.acceptedPaths = ["c.txt"];
+    raw.rejectedPaths = ["b.txt"];
+    g.restoreSummary({ accepted: ["a.txt", "b.txt"], rejected: ["c.txt", "d.txt"], partial: ["b.txt", "e.txt"] });
+    expect(raw.acceptedPaths).toEqual(["a.txt", "c.txt"]);
+    expect(raw.rejectedPaths).toEqual(["d.txt", "b.txt"]);
+    expect(raw.partiallyRejectedPaths).toEqual(["e.txt"]);
+    expect(g.lastReviewSummary).toContain("Accepted: a.txt, c.txt.");
+    const all = [...raw.acceptedPaths, ...raw.rejectedPaths];
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
