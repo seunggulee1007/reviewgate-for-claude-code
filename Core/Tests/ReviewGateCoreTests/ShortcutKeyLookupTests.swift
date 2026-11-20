@@ -38,7 +38,8 @@ import Testing
         #expect(ShortcutTable.key("Zoom In") == "⌘+")
         #expect(ShortcutTable.windowsKey("Zoom In") == "Ctrl+=")
         for row in ShortcutTable.sections.flatMap(\.rows) where row.windows == "—" {
-            #expect(row.note == "Mac app only")
+            // It may go on to say more (§34.11: what Next / Previous Change do past a file's ends).
+            #expect(row.note == "Mac app only" || (row.note ?? "").hasPrefix("Mac app only · "))
         }
     }
 }
