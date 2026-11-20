@@ -12,8 +12,11 @@ final class DiffFindModel {
     private(set) var state = DiffFindState()
     /// Bumped to focus the field again (⌥⌘F while it is open).
     private(set) var focusTick = 0
-    /// Bumped whenever the current match should be scrolled into view.
+    /// Bumped whenever the current match — or the change Review › Next / Previous Change went to — should be scrolled into view.
     private(set) var scrollTick = 0
+    /// The row the list scrolls to on `scrollTick` and its column (`DiffLinesList`): the current match, or a change block.
+    private(set) var scrollKey: String?
+    private(set) var scrollColumn: Int?
     @ObservationIgnored private var task: Task<Void, Never>?
     /// The text of each matching row (the current match's column for a list that does not wrap).
     @ObservationIgnored private var matchTexts: [String: String] = [:]
@@ -61,24 +64,91 @@ final class DiffFindModel {
             guard !Task.isCancelled, let self, self.query == q else { return }
             self.matchTexts = found.texts
             self.state.update(matches: found.keys)
-            self.scrollTick += 1
+            self.scrollToMatch()
         }
     }
 
     func next() {
         state.next()
-        scrollTick += 1
+        scrollToMatch()
     }
 
     func previous() {
         state.previous()
-        scrollTick += 1
+        scrollToMatch()
     }
 
     func isCurrent(_ key: String) -> Bool { visible && state.currentKey == key }
 
     /// Scrolls to the current match again (its row was folded until now).
-    func rescroll() { scrollTick += 1 }
+    func rescroll() { scrollToMatch() }
+
+    private func scrollToMatch() {
+        scrollKey = state.currentKey
+        scrollColumn = currentColumn
+        scrollTick += 1
+    }
+
+    // MARK: Review › Next Change / Previous Change (⌥⌘] / ⌥⌘[) — `DiffChangeNavigation` over the rows of the list on screen
+
+    /// The change rows of the list on screen (the diff, its full file, its -w view), registered by its `diffFind`.
+    @ObservationIgnored private var changeRows: (() -> [DiffChangeNavigation.Row])?
+    @ObservationIgnored private var changeRowsOwner: UUID?
+    /// Bumped when a list registers its rows: a file just entered from the one before / after it lands on its block.
+    private(set) var changeRowsRevision = 0
+    /// The block last gone to, and the file it is in (a cursor of another file is none).
+    @ObservationIgnored private var changeCursor: (file: String, key: String)?
+    /// The file just entered past the ends of the one before it, and the way it was entered.
+    @ObservationIgnored private var changeLanding: (file: String, direction: DiffChangeNavigation.Direction)?
+
+    func registerChangeRows(_ rows: @escaping () -> [DiffChangeNavigation.Row], owner: UUID) {
+        changeRows = rows
+        changeRowsOwner = owner
+        changeRowsRevision += 1
+    }
+
+    func unregisterChangeRows(owner: UUID) {
+        guard changeRowsOwner == owner else { return }   // another list of the pane registered since
+        changeRows = nil
+        changeRowsOwner = nil
+    }
+
+    /// Goes to the next / previous change block of `file`; false past its last / first one (or with no rows on screen).
+    func stepChange(_ direction: DiffChangeNavigation.Direction, file: String) -> Bool {
+        let cursor = changeCursor?.file == file ? changeCursor?.key : nil
+        guard let key = DiffChangeNavigation.target(direction, from: cursor, in: changeRows?() ?? []) else { return false }
+        scrollToChange(key, file: file)
+        return true
+    }
+
+    /// `file` is about to be entered from the one before it (`.next`) or after it: its first / last block once its rows show.
+    func landOnChange(in file: String, direction: DiffChangeNavigation.Direction) {
+        changeLanding = (file, direction)
+        changeCursor = nil
+    }
+
+    /// The rows of `file` registered: the landing waiting for it goes to its block. Another file drops it.
+    func rowsShown(file: String?) {
+        guard let landing = changeLanding else { return }
+        guard landing.file == file, let file else {
+            changeLanding = nil
+            return
+        }
+        guard let rows = changeRows?() else { return }   // its rows are not on screen yet
+        changeLanding = nil
+        guard let key = DiffChangeNavigation.entry(landing.direction, in: rows) else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))   // the list has just been made: its rows first
+            scrollToChange(key, file: file)
+        }
+    }
+
+    private func scrollToChange(_ key: String, file: String) {
+        changeCursor = (file, key)
+        scrollKey = key
+        scrollColumn = nil
+        scrollTick += 1
+    }
 }
 
 /// The find bar over a diff list: query, "3 / 17", previous / next (also ⇧↩ / ↩), close (Esc).
@@ -145,7 +215,9 @@ extension View {
     /// (`rowsKey`) search again. Only the pane on screen has this modifier in the hierarchy, so only it answers the menu.
     /// A view that shares an open model with the one before it (the diff, its full file, its -w view) searches its rows as
     /// it appears.
-    func diffFind(_ model: DiffFindModel, rows: @escaping () -> [DiffFind.Row], rowsKey: some Equatable, tick: Int) -> some View {
+    /// `changes`: the list's rows for Review › Next / Previous Change (`diffChangeNavigation` on the pane steps through them).
+    func diffFind<Key: Equatable>(_ model: DiffFindModel, rows: @escaping () -> [DiffFind.Row], rowsKey: Key, tick: Int,
+                                  changes: (() -> [DiffChangeNavigation.Row])? = nil) -> some View {
         self
             .overlay(alignment: .topTrailing) {
                 if model.visible { DiffFindBar(model: model) }
@@ -153,5 +225,61 @@ extension View {
             .onChange(of: tick) { _, _ in model.open() }
             .onChange(of: model.query) { _, _ in model.search(rows()) }
             .onChange(of: rowsKey, initial: true) { _, _ in if model.visible { model.search(rows()) } }
+            .modifier(DiffChangeRowsRegistration(model: model, rows: changes, rowsKey: rowsKey))
+    }
+
+    /// Review › Next Change / Previous Change (⌥⌘] / ⌥⌘[) on this diff pane: the next / previous change block of the list on
+    /// screen (registered by its `diffFind`), past its ends the first / last block of the next / previous file of `files` —
+    /// `open` shows a file (its rows register when they show). At the list's ends it beeps. While it is on screen with a file
+    /// the menu items are on (`WindowModel.changeNavigationPanes`).
+    func diffChangeNavigation(_ find: DiffFindModel, file: String?, files: @escaping () -> [String],
+                              open: @escaping (String) -> Void) -> some View {
+        modifier(DiffChangeNavigator(find: find, file: file, files: files, open: open))
+    }
+}
+
+/// A diff list's change rows, kept by the pane's find model while the list is on screen.
+private struct DiffChangeRowsRegistration<Key: Equatable>: ViewModifier {
+    let model: DiffFindModel
+    /// nil: not a diff (the code browser's file).
+    let rows: (() -> [DiffChangeNavigation.Row])?
+    let rowsKey: Key
+    @State private var owner = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: rowsKey, initial: true) { _, _ in if let rows { model.registerChangeRows(rows, owner: owner) } }
+            .onDisappear { model.unregisterChangeRows(owner: owner) }
+    }
+}
+
+private struct DiffChangeNavigator: ViewModifier {
+    @Environment(WindowModel.self) private var model
+    let find: DiffFindModel
+    let file: String?
+    let files: () -> [String]
+    let open: (String) -> Void
+    @State private var id = UUID()
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: model.nextChangeTick) { _, _ in go(.next) }
+            .onChange(of: model.previousChangeTick) { _, _ in go(.previous) }
+            .onChange(of: find.changeRowsRevision) { _, _ in find.rowsShown(file: file) }
+            .onChange(of: file, initial: true) { _, file in
+                if file == nil { model.changeNavigationPanes.remove(id) } else { model.changeNavigationPanes.insert(id) }
+            }
+            .onDisappear { model.changeNavigationPanes.remove(id) }
+    }
+
+    private func go(_ direction: DiffChangeNavigation.Direction) {
+        guard let file else { return }
+        if find.stepChange(direction, file: file) { return }
+        guard let other = DiffChangeNavigation.neighbour(direction, of: file, in: files()) else {
+            NSSound.beep()   // the last change of the last file (the first of the first)
+            return
+        }
+        find.landOnChange(in: other, direction: direction)
+        open(other)
     }
 }

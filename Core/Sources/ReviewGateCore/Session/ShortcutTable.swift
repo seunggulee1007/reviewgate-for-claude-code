@@ -47,6 +47,7 @@ public enum ShortcutTable {
             ShortcutRow("Toggle Sidebar", mac: "⌃⌘S", windows: "Ctrl+B"),
             ShortcutRow("Toggle Diff Pane", mac: "⌘⇧D", windows: "Ctrl+Shift+D",
                         note: "In a terminal chat: the review panel beside the terminal"),   // MARK: terminal-chat (§57.5)
+            ShortcutRow("Split Diff", mac: "⌥⌘L", windows: "Ctrl+Alt+L", note: "A diff pane too narrow for two columns stays unified"),   // §34.11
             ShortcutRow("Toggle Agent Panel", mac: "⌥⌘A", windows: "Ctrl+Alt+A"),
             ShortcutRow("Toggle Side Questions", mac: "⌥⌘S", windows: "Ctrl+Alt+S"),
             ShortcutRow("Agent Board", mac: "⌥⌘B", windows: "Ctrl+Alt+B"),   // MARK: wave5 w5-board (§43.1)
@@ -76,8 +77,8 @@ public enum ShortcutTable {
             ShortcutRow("Undo Accept", mac: "⌘⇧U", windows: "—", note: "Mac app only"),   // MARK: polish p-lifecycle (P1-chrome-10)
             ShortcutRow("Next Pending File", mac: "⌘]", windows: "Ctrl+]"),
             ShortcutRow("Previous Pending File", mac: "⌘[", windows: "Ctrl+["),
-            ShortcutRow("Next Change", mac: "⌥⌘]", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)
-            ShortcutRow("Previous Change", mac: "⌥⌘[", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)
+            ShortcutRow("Next Change", mac: "⌥⌘]", windows: "—", note: "Mac app only · after a file’s last change, the next file"),   // r2-review-flow (polish)
+            ShortcutRow("Previous Change", mac: "⌥⌘[", windows: "—", note: "Mac app only · before a file’s first change, the previous file"),   // r2-review-flow (polish)
             ShortcutRow("Add a review note on the selected line", mac: "⌥⌘N", windows: "Ctrl+Alt+N"),
             ShortcutRow("Ask About Selection…", mac: "⌥⌘/", windows: "Ctrl+Alt+/"),
             ShortcutRow("Open in Editor", mac: "⌘⇧E", windows: "—", note: "Mac app only"),   // r2-review-flow (polish)

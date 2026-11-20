@@ -59,6 +59,18 @@
 ::highlight(rg-diff-find) { background-color: color-mix(in srgb, var(--orange) 38%, transparent); color: inherit; }
 ::highlight(rg-diff-find-current) { background-color: var(--orange); color: var(--bg); }
 
+/* §34.11 split ("나란히 보기"): the old side left, the new side right — each row as tall as its taller side, a padded side
+   faint; with 줄바꿈 off both sides scroll sideways together (the rows' one horizontal scroll). */
+.unified .split-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.unified .split-side { min-width: 0; display: flex; flex-direction: column; }
+.unified .split-side.new { border-left: 1px solid var(--border); }
+.unified .split-side > .line { flex: 1 0 auto; }
+.unified .split-pad { flex: 1 0 auto; min-height: 1.5em; background: color-mix(in srgb, var(--fg-3) 8%, transparent); }
+.unified.split.nowrap .note-bubble, .unified.split.nowrap .note-composer { position: static; max-width: none; }
+.diff-tools .diff-layout { display: flex; flex: none; margin-right: 4px; }
+.diff-tools .diff-layout .diff-tool:first-child { border-radius: 4px 0 0 4px; }
+.diff-tools .diff-layout .diff-tool:last-child { border-radius: 0 4px 4px 0; }
+
 /* The line menu (줄 복사 / 경로:줄 복사) opens at the pointer. */
 .line-menu { min-width: 180px; z-index: 60; }
 .line-menu .item .mono { margin-left: auto; padding-left: 12px; }

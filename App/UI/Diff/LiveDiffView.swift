@@ -49,6 +49,10 @@ struct LiveDiffView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .diffSplitWidth()   // §34.11
+        // Review › Next / Previous Change: then the next file of the turn's changes so far.
+        .diffChangeNavigation(find, file: store.liveSelection, files: { store.liveChanges?.files.map(\.path) ?? [] },
+                              open: { path in Task { await store.openLiveDiff(path) } })
         // MARK: wave7 w7-state — §45.2: the count without building every line per body; at most 3 000 lines are coloured, as
         // in the review diff (a larger one shows plain).
         .task(id: HighlightKey(path: store.liveSelection, lineCount: lineCount, dark: colorScheme == .dark)) {
@@ -159,35 +163,51 @@ struct LiveDiffView: View {
                     }
                     let lines = diff.allLines
                     let picked = lineSelection.isEmpty ? [] : lineSelection.keys(in: lines.map(\.rowKey))
-                    DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.diffGutter, resetKey: AnyHashable(store.liveSelection),
-                                  scrollTarget: find.state.currentKey, scrollTick: find.scrollTick, scrollColumn: find.currentColumn) {
-                        // The rows' ids are their keys (what find in diff scrolls to), the ForEach's own: a `.id()` on each row would
-                        // make the List build every row to learn its id, on each pick (a click, each row a drag crosses).
-                        ForEach(lines, id: \.rowKey) { line in
-                            let key = line.rowKey
-                            let isPicked = line.kind != .hunkHeader && picked.contains(key)
-                            DiffRow(line: line, highlighted: highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil },
-                                    findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(key), selected: isPicked)
-                                // A click picks the line, ⇧-click / a drag the lines up to it, for ⌘C and "Copy selected lines".
-                                .diffLinePicking(select: { extend in
-                                    if line.kind != .hunkHeader { lineSelection.select(key, extend: extend) }
-                                }, dragTo: { index in
-                                    guard lines.indices.contains(index) else { return }
-                                    lineSelection.select(lines[index].rowKey, extend: true)
-                                })
-                                .contextMenu {
-                                    if line.kind != .hunkHeader {
-                                        DiffLineCopyMenuItems(line: line, path: store.liveSelection,
-                                                              copySelected: isPicked && picked.count > 1 ? { copySelectedLines(lines) } : nil)
+                    DiffSplitReader { split in
+                        // §34.11: split rows only while split is shown; a drag picks by the List's rows, the split ones then.
+                        let layout = split ? DiffSplit.layout(lines: lines) : nil
+                        let rows = layout?.rows
+                        let rowKey: (Int) -> String? = { index in
+                            if let rows { return rows.indices.contains(index) ? rows[index].id : nil }
+                            return lines.indices.contains(index) ? lines[index].rowKey : nil
+                        }
+                        DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
+                                      resetKey: AnyHashable(store.liveSelection),
+                                      scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                      scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
+                            if let layout {
+                                ForEach(layout.rows) { row in
+                                    Group {
+                                        switch row.kind {
+                                        case let .pair(left, right):
+                                            DiffSplitPair(left: left, right: right) { line, side in
+                                                lineRow(line, side: side, lines: lines, picked: picked, rowKey: rowKey)
+                                            }
+                                        case let .item(item):
+                                            if case let .line(line) = item.kind {
+                                                lineRow(line, side: nil, lines: lines, picked: picked, rowKey: rowKey)
+                                            }
+                                        }
                                     }
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
                                 }
-                                .listRowInsets(EdgeInsets())
-                                .listRowSeparator(.hidden)
+                            } else {
+                                // The rows' ids are their keys (what find in diff scrolls to), the ForEach's own: a `.id()` on each
+                                // row would make the List build every row to learn its id, on each pick (a click, each row a drag
+                                // crosses).
+                                ForEach(lines, id: \.rowKey) { line in
+                                    lineRow(line, side: nil, lines: lines, picked: picked, rowKey: rowKey)
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                }
+                            }
                         }
                     }
                     .diffLineCopying(revision: lineSelection.revision) { selectedLinesText(lines) }
                     .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
-                              rowsKey: FindRowsKey(path: store.liveSelection ?? "", diff: diff), tick: model.diffFindTick)
+                              rowsKey: FindRowsKey(path: store.liveSelection ?? "", diff: diff), tick: model.diffFindTick,
+                              changes: { DiffChangeNavigation.rows(lines: lines) })
                 }
             }
         } else {
@@ -197,6 +217,27 @@ struct LiveDiffView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// A line row (`side`: one side of a split row, §34.11). `rowKey`: the line key of the List row at an index, for a drag.
+    private func lineRow(_ line: DiffLine, side: DiffSide?, lines: [DiffLine], picked: Set<String>, rowKey: @escaping (Int) -> String?) -> some View {
+        let key = line.rowKey
+        let isPicked = line.kind != .hunkHeader && picked.contains(key)
+        return DiffRow(line: line, highlighted: highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil },
+                       findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(key), selected: isPicked, splitSide: side)
+            // A click picks the line, ⇧-click / a drag the lines up to it, for ⌘C and "Copy selected lines".
+            .diffLinePicking(select: { extend in
+                if line.kind != .hunkHeader { lineSelection.select(key, extend: extend) }
+            }, dragTo: { index in
+                guard let key = rowKey(index) else { return }
+                lineSelection.select(key, extend: true)
+            })
+            .contextMenu {
+                if line.kind != .hunkHeader {
+                    DiffLineCopyMenuItems(line: line, path: store.liveSelection,
+                                          copySelected: isPicked && picked.count > 1 ? { copySelectedLines(lines) } : nil)
+                }
+            }
     }
 
     /// The picked lines' code, in display order (`DiffLineSelection`).

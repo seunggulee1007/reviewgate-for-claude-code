@@ -14,6 +14,8 @@ struct DiffRowActions {
     var clickLine: (DiffLine, Bool) -> Void
     /// A drag over the rows reached the List row at this index (`diffLinePicking`).
     var dragTo: (Int) -> Void
+    /// §34.11: a drag reached the row of this line key (a split list maps its row indices to their lines).
+    var pickKey: (String) -> Void
     /// The picked lines' code (`DiffLineSelection.copyText`); nil when nothing is picked.
     var copySelection: () -> String?
     /// The note being written on this line, put aside with its file (the composer opens with it; "" for none), and every
@@ -68,6 +70,10 @@ struct DiffPlanList: View, Equatable {
     /// The lines picked for copying.
     let selection: DiffLineSelection
     let actions: DiffRowActions
+    // §34.11: split when it was chosen and the pane fits it; its rows are built only then, from `items`.
+    @AppStorage(DiffPrefsKeys.diffLayout) private var layoutMode = DiffLayoutMode.unified
+    @Environment(\.diffSplitFits) private var splitFits
+    @State private var splitCache = DiffSplitCache()
 
     /// Every input but `actions` (Sendable values only: SwiftUI may compare off the body's isolation).
     nonisolated static func == (a: DiffPlanList, b: DiffPlanList) -> Bool {
@@ -84,25 +90,67 @@ struct DiffPlanList: View, Equatable {
 
     var body: some View {
         let picked = selection.isEmpty ? [] : selection.keys(in: items.map(Self.rowKey))
-        DiffLinesList(wrap: wrap, maxColumns: maxColumns, gutter: DiffCodeMetrics.diffGutter, resetKey: AnyHashable(file.path),
-                      scrollTarget: scrollTarget, scrollTick: scrollTick, scrollColumn: scrollColumn) {
-            // The item's id is the row's key (what find in diff scrolls to): no `.id()` on the row, which would make the List
-            // build every row on each pick (a click, each row a drag crosses).
-            ForEach(items) { item in
-                row(item, picked: picked)
-                    .equatable()
-                    .listRowInsets(EdgeInsets())
-                    .listRowSeparator(.hidden)
+        let split = layoutMode == .split && splitFits ? splitCache.layout(items) : nil
+        DiffLinesList(wrap: wrap, maxColumns: maxColumns, gutter: split == nil ? DiffCodeMetrics.diffGutter : DiffCodeMetrics.splitGutter,
+                      resetKey: AnyHashable(file.path), scrollTarget: split?.rowId(forLineKey: scrollTarget) ?? scrollTarget,
+                      scrollTick: scrollTick, scrollColumn: scrollColumn, split: split != nil) {
+            if let split {
+                // One List row per split row: a pair's two sides (each with its own notes), or a full-width item.
+                let actions = splitActions(split)
+                ForEach(split.rows) { splitRow in
+                    self.splitRow(splitRow, picked: picked, actions: actions)
+                        .equatable()
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                }
+            } else {
+                // The item's id is the row's key (what find in diff scrolls to): no `.id()` on the row, which would make the
+                // List build every row on each pick (a click, each row a drag crosses).
+                ForEach(items) { item in
+                    row(item, picked: picked)
+                        .equatable()
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                }
             }
         }
         .diffLineCopying(revision: selection.revision, copy: actions.copySelection)
     }
 
+    /// The rows' actions in a split list: a drag picks by the split row under the pointer (the List's rows are those).
+    private func splitActions(_ split: DiffSplitLayout) -> DiffRowActions {
+        var actions = actions
+        let rows = split.rows, pick = actions.pickKey
+        actions.dragTo = { index in if rows.indices.contains(index) { pick(rows[index].id) } }
+        return actions
+    }
+
+    private func splitRow(_ splitRow: DiffSplitRow, picked: Set<String>, actions: DiffRowActions) -> DiffSplitPlanRow {
+        switch splitRow.kind {
+        case let .item(item):
+            return DiffSplitPlanRow(id: splitRow.id, full: row(item, picked: picked, actions: actions))
+        case let .pair(left, right):
+            func side(_ line: DiffLine?, _ side: DiffSide) -> DiffPlanRow? {
+                guard let line else { return nil }
+                var cell = row(DiffDisplayItem(id: DiffDisplayItem.key(line), kind: line.id < 0 ? .context(line) : .line(line)),
+                               picked: picked, actions: actions)
+                cell.splitSide = side
+                // An unchanged line's notes, findings and composer are under its right (new-side) copy only.
+                if DiffSplit.anchorSide(of: line) != side {
+                    cell.showsExtras = false
+                    cell.hasFindingMark = false
+                }
+                return cell
+            }
+            return DiffSplitPlanRow(id: splitRow.id, left: side(left, .old), right: side(right, .new))
+        }
+    }
+
     /// A row's key: the item's id, which for a line is its `DiffDisplayItem.key` (what find in diff scrolls to).
     static func rowKey(_ item: DiffDisplayItem) -> String { item.id }
 
-    private func row(_ item: DiffDisplayItem, picked: Set<String>) -> DiffPlanRow {
-        var row = DiffPlanRow(item: item, file: file, generation: generation, wholeReview: wholeReview, actions: actions)
+    private func row(_ item: DiffDisplayItem, picked: Set<String>, actions: DiffRowActions? = nil) -> DiffPlanRow {
+        var row = DiffPlanRow(item: item, file: file, generation: generation, wholeReview: wholeReview, actions: actions ?? self.actions)
         switch item.kind {
         case let .line(line), let .context(line):
             row.highlight = highlight(for: line)
@@ -174,6 +222,9 @@ struct DiffPlanRow: View, Equatable {
     /// Picked for copying, and one of several picked rows (its menu offers "Copy selected lines").
     var selected = false
     var inMultiSelection = false
+    /// §34.11: one side of a split row, and whether its notes / findings / composer show here (a line's anchor side).
+    var splitSide: DiffSide?
+    var showsExtras = true
     let actions: DiffRowActions
 
     init(item: DiffDisplayItem, file: ChangedFile, generation: Int, wholeReview: Bool, actions: DiffRowActions) {
@@ -192,9 +243,14 @@ struct DiffPlanRow: View, Equatable {
             && a.hasFindingMark == b.hasFindingMark && a.composerOpen == b.composerOpen && a.hunk == b.hunk
             && a.contextLoading == b.contextLoading && a.contextBlocked == b.contextBlocked && a.canCollapseAll == b.canCollapseAll
             && a.selected == b.selected && a.inMultiSelection == b.inMultiSelection
+            && a.splitSide == b.splitSide && a.showsExtras == b.showsExtras
     }
 
     static let bubbleInsets = EdgeInsets(top: 2, leading: DiffRow.gutterWidth * 2 + 20, bottom: 2, trailing: 12)
+    /// Under one side of a split row: past that side's single gutter.
+    static let splitBubbleInsets = EdgeInsets(top: 2, leading: DiffRow.gutterWidth + 20, bottom: 2, trailing: 8)
+
+    var bubbleInsets: EdgeInsets { splitSide == nil ? Self.bubbleInsets : Self.splitBubbleInsets }
 
     var body: some View {
         // One view, whatever the item: the List counts its rows without building them.
@@ -216,6 +272,64 @@ struct DiffPlanRow: View, Equatable {
                 DiffFoldRow(kind: .large(lines: lines), open: open) { actions.toggleLarge() }
             }
         }
+    }
+}
+
+/// §34.11: one row of a split list — a full-width item, or a pair's two sides (`DiffSplitPair`); equal inputs skip it.
+struct DiffSplitPlanRow: View, Equatable {
+    let id: String
+    var full: DiffPlanRow?
+    var left: DiffPlanRow?
+    var right: DiffPlanRow?
+
+    init(id: String, full: DiffPlanRow) {
+        self.id = id
+        self.full = full
+    }
+
+    init(id: String, left: DiffPlanRow?, right: DiffPlanRow?) {
+        self.id = id
+        self.left = left
+        self.right = right
+    }
+
+    nonisolated static func == (a: DiffSplitPlanRow, b: DiffSplitPlanRow) -> Bool {
+        a.id == b.id && a.full == b.full && a.left == b.left && a.right == b.right
+    }
+
+    var body: some View {
+        if let full {
+            full
+        } else {
+            DiffSplitPair(left: left?.line, right: right?.line) { _, side in
+                if let cell = side == .old ? left : right { cell }
+            }
+        }
+    }
+}
+
+private extension DiffPlanRow {
+    /// The line of a line row (a split side's).
+    var line: DiffLine? {
+        switch item.kind {
+        case let .line(line), let .context(line): line
+        default: nil
+        }
+    }
+}
+
+/// A split list's rows, built again only when the plan's items change (a hover or a pick draws the list again, not this).
+@MainActor
+final class DiffSplitCache {
+    private var items: [DiffDisplayItem]?
+    private var value: DiffSplitLayout?
+
+    func layout(_ items: [DiffDisplayItem]) -> DiffSplitLayout {
+        if let value, self.items == items { return value }
+        let layout = DiffSplit.layout(items)
+        self.items = items
+        value = layout
+        return layout
     }
 }
 
@@ -255,15 +369,15 @@ private struct DiffLineStack: View {
         } else {
             lineRow
         }
-        if line.kind != .hunkHeader {
+        if line.kind != .hunkHeader, row.showsExtras {
             ForEach(row.notes) { note in
                 ReviewNoteCard(note: note)   // wave2 mac-flow (§34.4): a sent note reads "요청함: …" with 반영 확인
-                    .padding(DiffPlanRow.bubbleInsets)
+                    .padding(row.bubbleInsets)
             }
             // wave3 mac-flow (§36.13): the AI pre-review's findings on this (new-side) line.
             ForEach(row.findings) { item in
                 PreReviewFindingCard(item: item, excerpt: line.text)
-                    .padding(DiffPlanRow.bubbleInsets)
+                    .padding(row.bubbleInsets)
             }
             if row.composerOpen {
                 CommentComposer(
@@ -276,7 +390,7 @@ private struct DiffLineStack: View {
                         row.actions.submitNote(line, body)
                     },
                     onCancel: { row.actions.cancelNote() })
-                    .padding(DiffPlanRow.bubbleInsets)
+                    .padding(row.bubbleInsets)
             }
         }
     }
@@ -293,7 +407,7 @@ private struct DiffLineStack: View {
     private var lineRow: some View {
         HoverRow { hovered in
             DiffRow(line: line, highlighted: row.highlight, findQuery: row.findQuery, isCurrentMatch: row.isCurrentMatch,
-                    selected: row.selected)
+                    selected: row.selected, splitSide: row.splitSide)
                 .accessibilityActions {
                     if let anchor {
                         Button("Add note on this line") { row.actions.openComposer(line) }

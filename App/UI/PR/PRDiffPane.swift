@@ -73,6 +73,10 @@ struct PRDiffPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Review › Next / Previous Change: then the next file of the PR.
+        .diffChangeNavigation(find, file: file?.filename, files: { store.files.map(\.filename) },
+                              open: { name in if let next = store.files.first(where: { $0.filename == name }) { store.selectFile(next) } })
+        .diffSplitWidth()   // §34.11
         .onChange(of: file?.id) { _, _ in
             composer = nil
             more = DiffMoreLines()
@@ -198,70 +202,60 @@ struct PRDiffPane: View {
                 // MARK: wave4c w4c-review — the rows with "Show 20 more lines" between the hunks (a modified / renamed file)
                 let items = more.items(diff, truncated: truncated, offersContext: ReviewLeftovers.prOffersContext(status: file.status, isBinary: diff.isBinary))
                 // wave2 mac-diff: wrapped or scrolled sideways together (DiffLinesList), find in diff, copy.
-                DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.diffGutter, resetKey: AnyHashable(file.filename),
-                              scrollTarget: find.state.currentKey, scrollTick: find.scrollTick, scrollColumn: find.currentColumn) {
-                    ForEach(items) { item in
-                      switch item.kind {
-                      case .line(let line), .context(let line):
-                        let key = Self.key(for: line)
-                        diffRow(line, key: key)
-                            .id(DiffDisplayItem.key(line))
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                        if let key {
-                            ForEach(byLine[key] ?? []) { comment in
-                                CommentBubble(comment: comment) { composer = Composer(key: key, replyTo: comment) }
-                                    .listRowInsets(Self.bubbleInsets)
-                                    .listRowSeparator(.hidden)
-                            }
-                            ForEach(draftsByLine[key] ?? []) { draft in
+                DiffSplitReader { split in
+                    let layout = split ? DiffSplit.layout(items) : nil   // §34.11: built only while split is shown
+                    DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
+                                  resetKey: AnyHashable(file.filename), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                  scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
+                        if let layout {
+                            // One List row per split row: each side's comments, drafts and composer under its line.
+                            ForEach(layout.rows) { row in
                                 Group {
-                                    if composer?.editing?.id == draft.id {
-                                        CommentComposer(submitTitle: String(localized: "Save"), submitID: "Save draft",
-                                                        initialText: draft.body,
-                                                        onSubmit: { body in saveEdit(draft, body: body) },
-                                                        onCancel: { composer = nil })
-                                    } else {
-                                        DraftBubble(draft: draft, onEdit: { composer = Composer(key: key, editing: draft) }) {
-                                            store.removeDraft(id: draft.id)
+                                    switch row.kind {
+                                    case let .pair(left, right):
+                                        DiffSplitPair(left: left, right: right) { line, side in
+                                            VStack(alignment: .leading, spacing: 0) {
+                                                let key = Self.key(for: line)
+                                                diffRow(line, key: key, side: side)
+                                                if let key, DiffSplit.anchorSide(of: line) == side {
+                                                    lineThread(key, file: file, byLine: byLine, draftsByLine: draftsByLine, insets: DiffPlanRow.splitBubbleInsets)
+                                                }
+                                            }
+                                        }
+                                    case let .item(item):
+                                        if case let .line(line) = item.kind {
+                                            diffRow(line, key: nil)
+                                        } else {
+                                            expanderRow(item, file: file, diff: diff)
                                         }
                                     }
                                 }
-                                .listRowInsets(Self.bubbleInsets)
+                                .id(row.id)
+                                .listRowInsets(EdgeInsets())
                                 .listRowSeparator(.hidden)
                             }
-                            if let composer, composer.key == key, composer.editing == nil {
-                                // What is typed is the store's (`commentDrafts`): another file or another line's + closes
-                                // the composer, and this line's + opens it again with the text.
-                                let draftKey = Self.draftKey(file, composer)
-                                CommentComposer(
-                                    submitTitle: composer.replyTo == nil ? String(localized: "Add to review") : String(localized: "Reply"),
-                                    submitID: composer.replyTo == nil ? "Add to review" : "Reply",
-                                    isBusy: store.isSubmitting,
-                                    initialText: store.commentDrafts[draftKey] ?? "",
-                                    onTextChange: { store.commentDrafts[draftKey] = $0.isEmpty ? nil : $0 },
-                                    onSubmit: { body in submit(body, for: file, composer: composer) },
-                                    onCancel: {
-                                        store.commentDrafts[draftKey] = nil
-                                        self.composer = nil
-                                    })
-                                    .listRowInsets(Self.bubbleInsets)
+                        } else {
+                            ForEach(items) { item in
+                              switch item.kind {
+                              case .line(let line), .context(let line):
+                                let key = Self.key(for: line)
+                                diffRow(line, key: key)
+                                    .id(DiffDisplayItem.key(line))
+                                    .listRowInsets(EdgeInsets())
                                     .listRowSeparator(.hidden)
+                                if let key {
+                                    lineThread(key, file: file, byLine: byLine, draftsByLine: draftsByLine, insets: nil)
+                                }
+                              default:
+                                expanderRow(item, file: file, diff: diff)
+                              }
                             }
                         }
-                      default:
-                        // MARK: wave4c w4c-review — §41.3
-                        MoreLinesExpanderRow(item: item, more: $more) { gap, direction in
-                            revealMoreLines($more, gap: gap, direction: direction, diff: diff) {
-                                try await store.fileLines(filename: file.filename)
-                            }
-                        }
-                      }
                     }
                 }
                 .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                           rowsKey: AnyHashable([AnyHashable(file.filename), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
-                          tick: model.diffFindTick)
+                          tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
             }
         } else {
             VStack(spacing: 8) {
@@ -274,12 +268,72 @@ struct PRDiffPane: View {
 
     private static let bubbleInsets = EdgeInsets(top: 2, leading: DiffRow.gutterWidth * 2 + 20, bottom: 2, trailing: 12)
 
+    /// MARK: wave4c w4c-review — §41.3: "Show 20 more lines" from the PR's head commit.
+    private func expanderRow(_ item: DiffDisplayItem, file: PRFile, diff: FileDiff) -> some View {
+        MoreLinesExpanderRow(item: item, more: $more) { gap, direction in
+            revealMoreLines($more, gap: gap, direction: direction, diff: diff) {
+                try await store.fileLines(filename: file.filename)
+            }
+        }
+    }
+
+    /// The comments, drafts and open composer on one line: List rows of their own in the unified list (`insets` nil), or
+    /// stacked under the line's side in a split row (§34.11).
+    @ViewBuilder
+    private func lineThread(_ key: LineKey, file: PRFile, byLine: [LineKey: [PRComment]], draftsByLine: [LineKey: [DraftComment]],
+                            insets: EdgeInsets?) -> some View {
+        ForEach(byLine[key] ?? []) { comment in
+            CommentBubble(comment: comment) { composer = Composer(key: key, replyTo: comment) }
+                .padding(insets ?? EdgeInsets())
+                .listRowInsets(Self.bubbleInsets)
+                .listRowSeparator(.hidden)
+        }
+        ForEach(draftsByLine[key] ?? []) { draft in
+            Group {
+                if composer?.editing?.id == draft.id {
+                    CommentComposer(submitTitle: String(localized: "Save"), submitID: "Save draft",
+                                    initialText: draft.body,
+                                    onSubmit: { body in saveEdit(draft, body: body) },
+                                    onCancel: { composer = nil })
+                } else {
+                    DraftBubble(draft: draft, onEdit: { composer = Composer(key: key, editing: draft) }) {
+                        store.removeDraft(id: draft.id)
+                    }
+                }
+            }
+            .padding(insets ?? EdgeInsets())
+            .listRowInsets(Self.bubbleInsets)
+            .listRowSeparator(.hidden)
+        }
+        if let composer, composer.key == key, composer.editing == nil {
+            // What is typed is the store's (`commentDrafts`): another file or another line's + closes
+            // the composer, and this line's + opens it again with the text.
+            let draftKey = Self.draftKey(file, composer)
+            CommentComposer(
+                submitTitle: composer.replyTo == nil ? String(localized: "Add to review") : String(localized: "Reply"),
+                submitID: composer.replyTo == nil ? "Add to review" : "Reply",
+                isBusy: store.isSubmitting,
+                initialText: store.commentDrafts[draftKey] ?? "",
+                onTextChange: { store.commentDrafts[draftKey] = $0.isEmpty ? nil : $0 },
+                onSubmit: { body in submit(body, for: file, composer: composer) },
+                onCancel: {
+                    store.commentDrafts[draftKey] = nil
+                    self.composer = nil
+                })
+                .padding(insets ?? EdgeInsets())
+                .listRowInsets(Self.bubbleInsets)
+                .listRowSeparator(.hidden)
+        }
+    }
+
     /// A diff line with the hover-only "+" gutter button (hidden on hunk headers). wave4d w4d-speed (polish-09): the hover is
     /// the row's own (`HoverRow`), so a pointer move redraws one row, not the pane; VoiceOver gets "Add comment" as an action.
-    private func diffRow(_ line: DiffLine, key: LineKey?) -> some View {
+    /// `side`: one side of a split row (§34.11) — an unchanged line's left copy comments on its right (new-side) anchor.
+    private func diffRow(_ line: DiffLine, key: LineKey?, side: DiffSide? = nil) -> some View {
         let highlight = highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil }
         return HoverRow { hovered in
-            DiffRow(line: line, highlighted: highlight, findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(DiffDisplayItem.key(line)))
+            DiffRow(line: line, highlighted: highlight, findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(DiffDisplayItem.key(line)),
+                    splitSide: side)
                 .accessibilityActions {
                     if let key { Button("Add comment") { composer = Composer(key: key, replyTo: nil) } }
                 }

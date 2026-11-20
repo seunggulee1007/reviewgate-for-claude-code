@@ -38,8 +38,137 @@ enum DiffCodeMetrics {
     }()
     /// Line number gutters + the +/− marker of a diff row (`DiffRow`).
     @MainActor static let diffGutter: CGFloat = (DiffRow.gutterWidth + 6) * 2 + 16
-    /// One gutter + the marker (the full-file view).
+    /// One gutter + the marker (the full-file view, and each side of a split diff).
     @MainActor static let fileGutter: CGFloat = DiffRow.gutterWidth + 6 + 16
+    /// §34.11: one side of a split diff — its line numbers and the marker.
+    @MainActor static let splitGutter: CGFloat = fileGutter
+    /// §34.11: the narrowest diff pane that shows split (`DiffSplit.minimumWidth`, about 730 pt); narrower shows unified.
+    @MainActor static let splitMinimumWidth = CGFloat(DiffSplit.minimumWidth(columnWidth: Double(columnWidth), gutter: Double(splitGutter)))
+}
+
+// MARK: - §34.11 Unified or split
+
+private struct DiffSplitFitsKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The diff pane is wide enough for split (`DiffCodeMetrics.splitMinimumWidth`); set by `diffSplitWidth()`.
+    var diffSplitFits: Bool {
+        get { self[DiffSplitFitsKey.self] }
+        set { self[DiffSplitFitsKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// A diff pane's root: tells the header's toggle and the rows below whether split fits (`diffSplitFits`) — measured
+    /// as a yes / no, so resizing the pane changes it only when it crosses `splitMinimumWidth`.
+    func diffSplitWidth() -> some View { modifier(DiffSplitWidth()) }
+}
+
+private struct DiffSplitWidth: ViewModifier {
+    @State private var fits = false
+
+    func body(content: Content) -> some View {
+        let minimum = DiffCodeMetrics.splitMinimumWidth
+        content
+            .environment(\.diffSplitFits, fits)
+            .onGeometryChange(for: Bool.self) { $0.size.width >= minimum } action: { fits = $0 }
+    }
+}
+
+/// The layout a diff list shows now: split when it was chosen and fits, else unified — `content(split)`.
+struct DiffSplitReader<Content: View>: View {
+    @AppStorage(DiffPrefsKeys.diffLayout) private var mode = DiffLayoutMode.unified
+    @Environment(\.diffSplitFits) private var fits
+    @ViewBuilder let content: (Bool) -> Content
+
+    var body: some View { content(mode == .split && fits) }
+}
+
+/// One split row's two sides: the old on the left, the new on the right, as tall as the taller one; a padded side is a
+/// faint empty cell.
+struct DiffSplitPair<Cell: View>: View {
+    let left: DiffLine?
+    let right: DiffLine?
+    @ViewBuilder let cell: (DiffLine, DiffSide) -> Cell
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            half(left, .old)
+            Divider()
+            half(right, .new)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func half(_ line: DiffLine?, _ side: DiffSide) -> some View {
+        Group {
+            if let line {
+                cell(line, side)
+                    // An unchanged line is on both sides: VoiceOver reads it once, on the right.
+                    .accessibilityHidden(side == .old && line.kind == .context)
+            } else {
+                DiffSplitFiller()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// The empty side of a split row (an added line has no old side, a removed one no new side).
+struct DiffSplitFiller: View {
+    var body: some View {
+        Color.secondary.opacity(0.07)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityHidden(true)
+    }
+}
+
+/// "합쳐 보기 | 나란히 보기" (remembered; ⌥⌘L is View › Split Diff): off with the reason while the pane is too narrow, which
+/// shows unified until it is wide enough again.
+struct DiffLayoutPicker: View {
+    @AppStorage(DiffPrefsKeys.diffLayout) private var mode = DiffLayoutMode.unified
+    @Environment(\.diffSplitFits) private var fits
+    /// A narrow header: the segments are icons.
+    var iconOnly = false
+
+    static let shortcut = "⌥⌘L"
+    static var tooNarrow: String { String(localized: "Too narrow for split — widen the pane or hide the sidebar") }
+
+    var body: some View {
+        Picker("Diff layout", selection: Binding(get: { fits ? mode : .unified }, set: { mode = $0 })) {
+            segment(.unified, title: "Unified", systemImage: "rectangle")
+            segment(.split, title: "Split", systemImage: "rectangle.split.2x1")
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .disabled(!fits)
+        .help(fits ? Text("Unified: one column · Split: the old version on the left, the new on the right") + Text(verbatim: " (\(Self.shortcut))")
+              : Text(verbatim: Self.tooNarrow))
+        .accessibilityLabel("Diff layout")
+        .accessibilityIdentifier("Diff layout")
+    }
+
+    private func segment(_ value: DiffLayoutMode, title: LocalizedStringKey, systemImage: String) -> some View {
+        Group {
+            if iconOnly { Image(systemName: systemImage).accessibilityLabel(Text(title)) } else { Text(title) }
+        }
+        .tag(value)
+    }
+}
+
+/// The folded header's "⋯" item for the same choice.
+struct DiffLayoutMenuToggle: View {
+    @AppStorage(DiffPrefsKeys.diffLayout) private var mode = DiffLayoutMode.unified
+    let fits: Bool
+
+    var body: some View {
+        Toggle("Split Diff", systemImage: "rectangle.split.2x1",
+               isOn: Binding(get: { fits && mode == .split }, set: { mode = $0 ? .split : .unified }))
+            .disabled(!fits)
+    }
 }
 
 // MARK: - The list
@@ -59,12 +188,14 @@ struct DiffLinesList<Content: View>: View {
     var scrollTick = 0
     /// Not wrapping: the column the target's match starts at, scrolled into view sideways too.
     var scrollColumn: Int? = nil
+    /// §34.11: two sides of code (`gutter` is each side's), each half the width, scrolled sideways together.
+    var split = false
     @ViewBuilder let content: () -> Content
 
     @State private var offset: CGFloat = 0
     @State private var width: CGFloat = 0
 
-    private var viewport: CGFloat { max(0, width - gutter) }
+    private var viewport: CGFloat { max(0, (split ? (width - 1) / 2 : width) - gutter) }
     private var extent: CGFloat { CGFloat(maxColumns) * DiffCodeMetrics.columnWidth + 24 }
     private var maxOffset: CGFloat { wrap ? 0 : max(0, extent - viewport) }
     private var shownOffset: CGFloat { min(offset, maxOffset) }
@@ -241,12 +372,17 @@ extension View {
 
 // MARK: - Header controls
 
-/// "Wrap lines" (remembered) and "Find in diff" (⌥⌘F) for a diff header.
+/// "Wrap lines" (remembered) and "Find in diff" (⌥⌘F) for a diff header — after "Unified | Split" (§34.11) over a diff.
 struct DiffLineOptions: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
+    /// The unified / split picker (not over the full file, which has one column).
+    var showsLayout = true
+    /// A narrow header: the picker's segments are icons.
+    var iconOnly = false
     let onFind: () -> Void
 
     var body: some View {
+        if showsLayout { DiffLayoutPicker(iconOnly: iconOnly) }
         Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
             .toggleStyle(.button)
             .labelStyle(.iconOnly)
@@ -266,12 +402,21 @@ struct DiffLineOptions: View {
 /// Settings › General: the same "Wrap lines" as the diff headers.
 struct DiffSettingsSection: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
+    @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
 
     var body: some View {
         Section("Diff") {
             Toggle("Wrap lines", isOn: $wrapLines)
                 .accessibilityIdentifier("Settings wrap lines")
             Text("Off: each line stays on one line and all lines of a diff scroll sideways together (trackpad, or Shift + scroll wheel).")
+                .font(.caption).foregroundStyle(.secondary)
+            // §34.11: the same choice as the diff headers' picker (⌥⌘L).
+            Picker("Diff layout", selection: $layout) {
+                Text("Unified").tag(DiffLayoutMode.unified)
+                Text("Split").tag(DiffLayoutMode.split)
+            }
+            .accessibilityIdentifier("Settings diff layout")
+            Text("Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

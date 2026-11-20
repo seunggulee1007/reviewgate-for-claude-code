@@ -13,6 +13,7 @@ struct ViewMenuCommands: Commands {
     @AppStorage(DiffPrefsKeys.showFullFile) private var showFullFile = false
     @AppStorage(DiffPrefsKeys.ignoreWhitespace) private var ignoreWhitespace = false
     @AppStorage(DiffPrefsKeys.wrapLines) private var wrapLines = true
+    @AppStorage(DiffPrefsKeys.diffLayout) private var diffLayout = DiffLayoutMode.unified
 
     var body: some Commands {
         // M15: View → Refresh (⌘R) — the review re-diff, branches, workbenches, PRs; on the PR tab only the PR lists.
@@ -66,6 +67,10 @@ struct ViewMenuCommands: Commands {
                 .accessibilityIdentifier("View menu Ignore whitespace")
             Toggle("Wrap Lines", isOn: $wrapLines)
                 .accessibilityIdentifier("View menu Wrap lines")
+            // §34.11: 합쳐 보기 | 나란히 보기 — every diff; a pane too narrow for split stays unified until it is wide enough.
+            Toggle("Split Diff", isOn: Binding(get: { diffLayout == .split }, set: { diffLayout = $0 ? .split : .unified }))
+                .keyboardShortcut("l", modifiers: [.command, .option])
+                .accessibilityIdentifier("View menu Split diff")
             Divider()
             // polish PX-12: one text size for the app (the diff, the chat, the message box), kept across launches.
             Button("Zoom In") { textScale = TextScale.larger(textScale) }
@@ -166,14 +171,18 @@ struct ReviewCommands: Commands {
                 .disabled(!menu.canUndoReject)
                 .accessibilityIdentifier("Review menu Undo reject")
             Divider()
-            // polish P2-review-20: the next / previous change inside the file's diff (⌘] / ⌘[ move between files).
+            // polish P2-review-20: the next / previous change block of the diff on screen (the review's, its full file or -w
+            // view, a live, history or PR diff), then the next / previous file of its list (⌘] / ⌘[ go to pending files).
+            let changeOff = model?.changeNavigationPanes.isEmpty != false
             Button("Next Change") { model?.nextChangeTick += 1 }
                 .keyboardShortcut("]", modifiers: [.command, .option])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true)
+                .disabled(changeOff)
+                .help(changeOff ? Text("No diff is on screen") : Text("The next change in this file, then the first change of the next file"))
                 .accessibilityIdentifier("Review menu Next change")
             Button("Previous Change") { model?.previousChangeTick += 1 }
                 .keyboardShortcut("[", modifiers: [.command, .option])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true)
+                .disabled(changeOff)
+                .help(changeOff ? Text("No diff is on screen") : Text("The previous change in this file, then the last change of the previous file"))
                 .accessibilityIdentifier("Review menu Previous change")
             Button("Next Pending File") { store?.selectNextPending() }
                 .keyboardShortcut("]", modifiers: .command)

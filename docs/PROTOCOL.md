@@ -3152,6 +3152,39 @@ Engine behavior (`session/testCommands.ts`, `session/toolOutput.ts`, `review/tes
   (`not_a_live_file:<path>`). Reused: `stale_diff` (`expectedBaseTree`), `session_running` (`reject*` / `finish_review`
   while a turn runs, `accept*` while collecting), `not_a_changed_file`, `no_project`.
 
+### 34.11 Unified and split diffs ("합쳐 보기 | 나란히 보기")
+
+Client-only (no protocol change): every line diff — the review's, its whitespace-ignoring view, a running turn's, a past
+round's and a PR's — shows unified (one column, the default) or split (the old version on the left, the new on the right,
+as git tools and GitHub do). The choice is remembered per user, for every diff.
+
+- **Rows.** Split rows are built from the unified rows, so folds, "Show 20 more lines", find in diff and line keys are the
+  same in both. A run of changed lines — `del` / `add` lines with nothing between them, never across a hunk header, an
+  unchanged line or a fold — pairs its i-th removed line with its i-th added line, the shorter side padded with an empty
+  cell; a removed line after added ones starts another run. An unchanged line (one revealed from the full file too) is on
+  both sides with its old and new number; hunk headers (with their "Revert this part" controls), expanders and folds stay
+  full width. Each side has one line-number gutter and its own §34.7 changed-part marks. A row is as tall as its taller
+  side; with "Wrap lines" off both sides scroll sideways together. Core `DiffSplit` (`DiffSplitTests`), Windows
+  `diffSplit.ts`.
+- **Anchors.** A line's notes, PR comments, AI pre-review findings and the note composer sit under it on its anchor side —
+  a removed line's on the left (its old number), an added or unchanged line's on the right (its new number) — the
+  anchors the unified layout already uses. An unchanged line's left copy takes the same "+" / "?" / menu, all for its
+  new-side anchor.
+- **Width.** Split needs two readable columns: per side a gutter plus 38 characters of the diff font (Mac ≈ 730 pt for
+  the diff pane). A narrower pane shows unified, with the toggle off and its reason ("Too narrow for split — widen the
+  pane or hide the sidebar"), and goes back to split by itself once wide enough — a terminal chat's review drawer is
+  unified.
+- Binary files, image previews and the "no textual diff" / truncated placeholders are the same in both; the full-file view
+  keeps its own layout.
+- **Mac.** A segmented "Unified | Split" in each diff header (the review diff, live, history and PR diffs — icons in a
+  narrow header, the "⋯" menu's "Split Diff" in the narrowest), View › Split Diff (⌥⌘L) and Settings › General › Diff;
+  `UserDefaults` `diffLayout`. Each pane measures itself (`diffSplitWidth()`); split rows are built only while split shows,
+  from the rows the List already has (`DiffSplitCache`), one List row per split row.
+- **Windows.** "Unified | Split" in the row above every line diff (`UnifiedDiff`: the review diff and its whitespace view,
+  live, history and PR diffs), View › Split Diff and Ctrl+Alt+L; `localStorage` `rg.diff.layout`. The pane measures
+  itself (`ResizeObserver`; unified until measured); folds keep the DOM of a 20 000-line diff bounded in both layouts. The
+  full-file (Monaco) view keeps its own side-by-side toggle.
+
 ## 35. 0.2.2 engine follow-ups
 
 An adversarial pass over the §29–§33 engine code that shipped in 0.2.1, and the engine follow-ups of the first
@@ -8152,14 +8185,22 @@ pieces). Clients only.
   name none for it — no tooltip of the Windows client spells a key it does not have.
 - **View menu** (Mac). The sidebar's tabs from the keyboard (⌥⌘1–4; ⌘1–9 stay the chat tabs); 최신 메시지로 이동 ⌥⌘↓
   (the "↓ 최신" pill's action, `jumpToLatestTick`); the diff's 전체 파일 보기 / 공백 무시 / 줄바꿈 switches (`DiffPrefsKeys`,
-  shared with the diff header, kept across files and launches); 확대 / 축소 / 실제 크기 — one text size for the app (0.8–1.6 in
+  shared with the diff header, kept across files, windows and launches — one value: the review diff reads the same key the
+  menu's check shows; a deleted file, which has no full file, shows its diff and leaves the choice for the next file; a chat
+  link to a line turns 전체 파일 보기 and 공백 무시 off to show that line); 확대 / 축소 / 실제 크기 — one text size for the app (0.8–1.6 in
   steps of 0.1, kept; `TextScale`), which the message box's font follows.
 - **Edit menu** (Mac). 채팅에서 찾기 ⌘F finds where the user is: the History tab's search on that tab
   (`historySearchFocusTick`), the diff after a click in it (`lastFocusArea`), else the chat. 다음 찾기 ⌘G / 이전 찾기 ⇧⌘G step
   the chat's find (`transcriptFindNextTick` / `…PreviousTick`), its bar closed too; while the bar is open its own ⌘G buttons
   answer first.
-- **Review menu** (Mac). 다음 변경 ⌥⌘] / 이전 변경 ⌥⌘[ move inside the file's diff (`nextChangeTick` /
-  `previousChangeTick`; ⌘] / ⌘[ still move between files); 메모 추가… ⌥⌘N (`addNoteTick`, off while the diff cannot open a
+- **Review menu** (Mac). 다음 변경 ⌥⌘] / 이전 변경 ⌥⌘[ go to the next / previous change block of the diff on screen
+  (`nextChangeTick` / `previousChangeTick`, `DiffChangeNavigation`): a run of added / removed lines with nothing else between
+  them (a closed fold — a large diff's hunk, a generated file — is one), the same blocks unified or split; the review diff's
+  full file and -w view step through their own changed lines. Past the file's last / first block it goes on to the first /
+  last block of the next / previous file of the list the diff came from — the review's files in their order on screen, the
+  turn's live changes, the history round's files, the PR's files — and beeps at the list's ends. Both are off ("화면에 diff가
+  없어요") while no diff pane with a file is on screen (`changeNavigationPanes`); ⌘] / ⌘[ still move between pending files.
+  메모 추가… ⌥⌘N (`addNoteTick`, off while the diff cannot open a
   note — `canAddNote`); 에디터에서 열기 ⌘⇧E (the editor of Settings, else the first installed); 경로 복사 ⌥⌘C ("경로 복사됨");
   이 브랜치로 PR 만들기… ⌥⌘K (it was only in the branch menu and the commit banner). Workbenches › 워크벤치 새로고침 is no longer
   the same name as View › 새로고침 (⌘R).

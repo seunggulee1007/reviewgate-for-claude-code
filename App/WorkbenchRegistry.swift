@@ -155,9 +155,12 @@ final class WindowModel {
     /// P2-review-19: Review › "메모 추가…" (⌥⌘N) asks the diff for the composer; the diff says whether it can open one now.
     var addNoteTick = 0
     var canAddNote = false
-    /// P2-review-20: Review › "다음 변경" / "이전 변경" (⌥⌘] / ⌥⌘[) — the diff scrolls to the next / previous hunk.
+    /// P2-review-20: Review › "다음 변경" / "이전 변경" (⌥⌘] / ⌥⌘[) — the diff on screen goes to the next / previous change
+    /// block, past the file's last / first one to the next / previous file (`diffChangeNavigation`).
     var nextChangeTick = 0
     var previousChangeTick = 0
+    /// The diff panes on screen with a file (review, live, history, PR): the change items are on while there is one.
+    var changeNavigationPanes: Set<UUID> = []
     /// P3-transcript-17: View › "최신 메시지로 이동" (⌥⌘↓), Edit › "다음 찾기" / "이전 찾기" (⌘G / ⇧⌘G), and a page of the
     /// chat up / down from the message box (PageUp / PageDown).
     var jumpToLatestTick = 0

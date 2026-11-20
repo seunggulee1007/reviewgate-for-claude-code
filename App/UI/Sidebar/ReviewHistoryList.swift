@@ -11,6 +11,8 @@ struct ReviewHistoryList: View {
     /// search (`historyQuery`; wave4 w4-history — §38.3: a past change by path, request, note or commit subject) — the
     /// window's, so a trip to another tab keeps them.
     @Environment(WindowModel.self) private var model
+    /// Edit › Find in Chat (⌘F) on the History tab focuses the search (`historySearchFocusTick`).
+    @FocusState private var searchFocused: Bool
 
     /// A round ends with the next fresh send (new snapshot A), an emptied review, or a chat switch: reload then. The round
     /// in progress also changes with each collection, verdict and note (wave2 mac-flow, §34.4).
@@ -27,6 +29,7 @@ struct ReviewHistoryList: View {
             TextField("Search paths, requests, notes, commits", text: $model.historyQuery)   // wave4 w4-history (§38.3)
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
+                .focused($searchFocused)
                 .onExitCommand { model.historyQuery = "" }   // Esc clears, as the find bars close
                 .overlay(alignment: .trailing) {
                     // Inside the field (an overlay: the row keeps its height as the button comes and goes).
@@ -45,6 +48,7 @@ struct ReviewHistoryList: View {
             content
         }
         .task(id: reloadKey) { await store.loadReviewHistory() }
+        .onChange(of: model.historySearchFocusTick) { _, _ in searchFocused = true }
     }
 
     private var header: some View {

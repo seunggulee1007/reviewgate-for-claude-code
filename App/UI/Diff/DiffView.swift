@@ -24,7 +24,11 @@ struct DiffView: View {
     /// `DiffDisplay.foldLineThreshold` (3 000) — a diff the engine has already cut at 20 000 never reached this one.
     static let collapseThreshold = 20_000
 
-    @State private var showFullFile = false
+    /// "Full file" and "공백 무시": the user's, kept across files, windows and launches like wrap and split — one value with
+    /// View › Show Full File / Ignore Whitespace (`DiffPrefsKeys`). A deleted file has no full file: its diff shows, the
+    /// choice stays for the next file.
+    @AppStorage(DiffPrefsKeys.showFullFile) private var fullFileOn = false
+    private var showFullFile: Bool { fullFileOn && file?.status != .deleted }
     @State private var composerLine: DiffLine?
     /// The note being written, per file: kept when its composer closes for another file, the -w view or the full file, and
     /// opened again on its line when that diff is back. By anchor — another diff of the file numbers its line objects anew.
@@ -56,7 +60,7 @@ struct DiffView: View {
     @State private var contextHighlighted: [Int: AttributedString] = [:]
     // MARK: wave4c w4c-review
     /// §41.3 "공백 무시": the range diffed with `-w`, read-only (no part revert, note or line side question there).
-    @State private var ignoreWhitespace = false
+    @AppStorage(DiffPrefsKeys.ignoreWhitespace) private var ignoreWhitespace = false
     /// The lines picked for ⌘C / "Copy selected lines" (a click, ⇧-click, a drag over the rows).
     @State private var lineSelection = DiffLineSelection()
     /// What the list scrolls to on `scrollTick`: find's current match, or the line of a chat link (`WindowModel.diffJump`).
@@ -91,7 +95,8 @@ struct DiffView: View {
                 // when a turn starts or ends (`isReviewLocked`, `isDiffUnavailable`); of the list's rows only the hunk
                 // headers draw again then (their revert controls lock), the others compare equal.
                 DiffViewHeader(file: file, diff: diff, showsHunkControls: showsHunkControls(file), canRejectHunks: canRejectHunks(file),
-                               selectedHunks: selectedHunks.count, editorLine: { firstChangedLine }, showFullFile: $showFullFile,
+                               selectedHunks: selectedHunks.count, editorLine: { firstChangedLine },
+                               showFullFile: Binding(get: { showFullFile }, set: { fullFileOn = $0 }),
                                ignoreWhitespace: $ignoreWhitespace, confirmRevertSelected: $confirmRevertSelected,
                                onAddNote: { openComposer() })
                 Divider()
@@ -133,13 +138,16 @@ struct DiffView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .diffSplitWidth()   // §34.11: split only where two columns read (the header's picker says why not)
+        // Review › Next / Previous Change: the diff, its full file or its -w view; then the next file of the list on screen.
+        .diffChangeNavigation(find, file: file?.path, files: { store.displayOrderedFiles.map(\.path) },
+                              open: { store.selectFile(path: $0) })
         .onChange(of: file?.path) { _, path in
             if let jump = model.diffJump, jump.path != path { model.diffJump = nil }   // a link whose file never showed is dropped
             store.side.selectionAnchor = path.map { SideAnchor(path: $0) }
             composerLine = nil
             clickedLine = nil
             selectedHunks = []
-            if file?.status == .deleted { showFullFile = false }   // it has none, and its toggle is off: never stuck in it
             resetLineState()   // wave2 mac-diff
             reopenNoteDraft()
         }
@@ -154,9 +162,10 @@ struct DiffView: View {
             lineSelection.clear()
             if !on { reopenNoteDraft() }
         }
+        .onChange(of: model.addNoteTick) { _, _ in openComposer() }   // Review › Add Note… (⌥⌘N; on while `canAddNote`)
         .onChange(of: find.scrollTick) { _, _ in
-            scrollKey = find.state.currentKey
-            scrollColumn = find.currentColumn
+            scrollKey = find.scrollKey   // find's current match, or Review › Next / Previous Change's block
+            scrollColumn = find.scrollColumn
             scrollTick += 1
         }
         // A chat link's file and line (`WindowModel.diffJump`), once this file's diff is on screen.
@@ -279,7 +288,8 @@ struct DiffView: View {
                              actions: rowActions(file: file, diff: diff))
                     .equatable()
                     .diffFind(find, rows: { findRows(diff, plan: plan) },
-                              rowsKey: FindRowsKey(path: file.path, diff: diff, items: plan.items.count), tick: model.diffFindTick)
+                              rowsKey: FindRowsKey(path: file.path, diff: diff, items: plan.items.count), tick: model.diffFindTick,
+                              changes: { DiffChangeNavigation.rows(items: plan.items) })
             }
         } else {
             VStack(spacing: 8) {
@@ -349,6 +359,7 @@ struct DiffView: View {
                 guard items.indices.contains(index) else { return }
                 lineSelection.select(DiffPlanList.rowKey(items[index]), extend: true)
             },
+            pickKey: { key in lineSelection.select(key, extend: true) },
             copySelection: { selectedLinesText(diff, file: file) },
             draftText: { line in noteDrafts.text(path: file.path, side: Self.noteSide(line), line: Self.noteLine(line)) },
             draftChanged: { line, text in noteDrafts.set(text, path: file.path, side: Self.noteSide(line), line: Self.noteLine(line)) },
@@ -460,7 +471,7 @@ extension DiffView {
     /// outside the diff's hunks leaves the diff as it is.
     private func showJump(_ jump: DiffJump) {
         guard let line = jump.line else { return }
-        showFullFile = false
+        fullFileOn = false   // the switches are the user's (`DiffPrefsKeys`): the View menu shows them off now too
         ignoreWhitespace = false
         Task {
             try? await Task.sleep(for: .milliseconds(150))   // the pane may just have opened (0.15 s) with its list
@@ -695,6 +706,7 @@ struct DiffViewHeader: View {
     @Binding var confirmRevertSelected: Bool
     let onAddNote: () -> Void
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
+    @Environment(\.diffSplitFits) private var splitFits
 
     var body: some View {
         // The file's unsent notes — what Request changes sends (wave2 mac-flow, §34.4: sent ones are "요청함" cards).
@@ -746,13 +758,16 @@ struct DiffViewHeader: View {
                 controls(measuring: measuring)
             } compact: {
                 FullOrCompact { measuring in
-                    controls(measuring: measuring).labelStyle(.iconOnly)
+                    controls(measuring: measuring, iconOnly: true).labelStyle(.iconOnly)
                 } compact: {
                     foldedControls
                 }
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        // Review › Add Note… is on exactly when this header's "Add note" is.
+        .onChange(of: addNoteDisabled, initial: true) { _, off in model.canAddNote = !off }
+        .onDisappear { model.canAddNote = false }
         #if DEBUG
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugDiffHeaderFrame = $0 }   // the layout check
         #endif
@@ -783,6 +798,7 @@ struct DiffViewHeader: View {
                     Toggle("Ignore whitespace", systemImage: "space", isOn: $ignoreWhitespace)
                 }
                 Toggle("Wrap lines", systemImage: "arrow.turn.down.left", isOn: $wrapLines)
+                if !showFullFile { DiffLayoutMenuToggle(fits: splitFits) }   // §34.11 (off here: the pane is too narrow)
                 Button("Find in diff", systemImage: "magnifyingglass") { model.diffFindTick += 1 }
                 Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
                     .disabled(file.status == .deleted)
@@ -794,7 +810,7 @@ struct DiffViewHeader: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
+            .help("More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
             .accessibilityLabel("More diff options")
             .accessibilityIdentifier("Diff header more")
             verdictControls(measuring: false).labelStyle(.iconOnly)
@@ -802,7 +818,8 @@ struct DiffViewHeader: View {
     }
 
     /// `measuring`: the hidden copy FullOrCompact sizes — it registers no shortcut (the one on screen is the only ⌥⌘N).
-    private func controls(measuring: Bool) -> some View {
+    /// `iconOnly`: the narrower header, the layout picker's segments as icons too.
+    private func controls(measuring: Bool, iconOnly: Bool = false) -> some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)
             if showsHunkControls, selectedHunks > 0 {
@@ -823,7 +840,8 @@ struct DiffViewHeader: View {
                 .accessibilityLabel("Add note")
                 .accessibilityIdentifier("Add note")
             if !showFullFile { WhitespaceToggle(isOn: $ignoreWhitespace, file: file) }   // wave4c w4c-review — §41.3 공백 무시
-            DiffLineOptions { model.diffFindTick += 1 }   // wave2 mac-diff: 줄바꿈, diff에서 찾기 (the diff or its full file)
+            // wave2 mac-diff: 줄바꿈, diff에서 찾기 (the diff or its full file); §34.11 합쳐 보기 | 나란히 보기 over the diff
+            DiffLineOptions(showsLayout: !showFullFile, iconOnly: iconOnly) { model.diffFindTick += 1 }
             Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
                 .toggleStyle(.button)
                 .labelStyle(.iconOnly)

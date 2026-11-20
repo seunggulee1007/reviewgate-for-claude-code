@@ -324,6 +324,10 @@ struct TranscriptPane: View {
             .onChange(of: model.notificationRevealTick) { _, _ in revealNotified(proxy) }
             .onAppear { revealNotified(proxy) }
             .onChange(of: model.findTick) { _, _ in openFind() }
+            // View › Jump to Latest (⌥⌘↓); Edit › Find Next / Find Previous (⌘G / ⇧⌘G), the bar closed too.
+            .onChange(of: model.jumpToLatestTick) { _, _ in LatestPill.jump(view, proxy: proxy) }
+            .onChange(of: model.transcriptFindNextTick) { _, _ in stepFind(1, proxy: proxy) }
+            .onChange(of: model.transcriptFindPreviousTick) { _, _ in stepFind(-1, proxy: proxy) }
             // MARK: wave4 w4-history — §38.3: a chat-history search match, once its row is shown.
             .onChange(of: store.transcriptJumpItem) { _, item in
                 guard let item else { return }
@@ -398,6 +402,17 @@ struct TranscriptPane: View {
         let shown = cache.shown(store)
         view.findMatches = TranscriptSearch.matches(view.findQuery, in: shown.model.nodes) { shown.lookups.searchText(shown.liveItem($0)) }
         if view.findIndex >= view.findMatches.count { view.findIndex = max(0, view.findMatches.count - 1) }
+    }
+
+    /// ⌘G / ⇧⌘G from the menu: the next / previous match of the last query, its bar closed too (its matches are found
+    /// again: they are dropped when it closes); with no query yet the bar opens for one.
+    private func stepFind(_ step: Int, proxy: ScrollViewProxy) {
+        guard !view.findQuery.isEmpty else { return openFind() }
+        if !view.findVisible {
+            recomputeMatches()
+            cache.shown(store).lookups.dropSearchTexts()   // §45.1: kept while the bar is open only
+        }
+        jumpToMatch(view.findIndex + step, proxy: proxy)
     }
 
     /// Selects match `index` (wrapping), expands the agent groups around it and scrolls it to the middle.
@@ -640,15 +655,7 @@ private struct LatestPill: View {
     var body: some View {
         if !view.follow {
             Button {
-                view.follow = true
-                view.unseen = 0
-                if view.cutShort {
-                    // §45.1: after a jump far back the newest rows are shown again first, then the view goes to them.
-                    view.showLatest()
-                    DispatchQueue.main.async { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
-                }
+                Self.jump(view, proxy: proxy)
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.down")
@@ -665,6 +672,19 @@ private struct LatestPill: View {
             .help("Scroll to the newest message and keep following")
             .accessibilityIdentifier("Jump to latest")
             .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+
+    /// The pill's action — View › Jump to Latest (⌥⌘↓, `WindowModel.jumpToLatestTick`) too.
+    static func jump(_ view: TranscriptViewState, proxy: ScrollViewProxy) {
+        view.follow = true
+        view.unseen = 0
+        if view.cutShort {
+            // §45.1: after a jump far back the newest rows are shown again first, then the view goes to them.
+            view.showLatest()
+            DispatchQueue.main.async { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
+        } else {
+            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(TranscriptPane.bottomID, anchor: .bottom) }
         }
     }
 }

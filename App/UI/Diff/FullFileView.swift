@@ -46,7 +46,8 @@ struct FullFilePane: View {
                                            description: Text("Files over 20,000 lines or 2 MB are not shown in full; use the diff view."))
                 } else {
                     lines(content)
-                        .diffFind(find, rows: { Self.findRows(content) }, rowsKey: AnyHashable(content.lines.count), tick: model.diffFindTick)
+                        .diffFind(find, rows: { Self.findRows(content) }, rowsKey: AnyHashable(content.lines.count), tick: model.diffFindTick,
+                                  changes: { Self.changeRows(content, keys: rowsCache.keys(content)) })
                 }
             } else {
                 VStack(spacing: 8) {
@@ -118,7 +119,7 @@ struct FullFilePane: View {
         let picked = lineSelection.isEmpty ? [] : lineSelection.keys(in: keys)
         return ScrollViewReader { proxy in
             DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.fileGutter, resetKey: AnyHashable(file.path),
-                          scrollTarget: find.state.currentKey, scrollTick: find.scrollTick, scrollColumn: find.currentColumn) {
+                          scrollTarget: find.scrollKey, scrollTick: find.scrollTick, scrollColumn: find.scrollColumn) {
                 // MARK: wave7 w7-state — §45.2: one List row per element — the file's lines and the deleted lines after each
                 // (before line 1 too) in display order, each with its own key — so the List knows its rows without building them.
                 // The ids are the ForEach's own (the keys find and the first-change scroll go to): a `.id()` on each row would
@@ -267,6 +268,16 @@ struct FullFilePane: View {
         let numbers = key.dropFirst().split(separator: "-").compactMap { Int($0) }
         if key.hasPrefix("D"), numbers.count == 2 { return .deleted(anchor: numbers[0], offset: numbers[1]) }
         return .line(numbers.first ?? 1)
+    }
+
+    /// Review › Next / Previous Change: a changed line or a deleted one is a change.
+    static func changeRows(_ content: FullFileView, keys: [String]) -> [DiffChangeNavigation.Row] {
+        keys.map { key in
+            switch row(key) {
+            case let .line(number): DiffChangeNavigation.Row(key: key, isChange: content.changedNewLines.contains(number))
+            case .deleted: DiffChangeNavigation.Row(key: key, isChange: true)
+            }
+        }
     }
 
     /// Every row in display order: the deleted lines before line 1, then each line followed by the ones deleted after it.

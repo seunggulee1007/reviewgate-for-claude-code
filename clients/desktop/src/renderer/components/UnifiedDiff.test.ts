@@ -142,3 +142,72 @@ describe("20줄 더 보기", () => {
     expect((html.match(/The file changed on disk after this diff/g) ?? []).length).toBe(3); // 2 tooltips + 1 visible line
   });
 });
+
+describe("split (§34.11)", () => {
+  const diff: FileDiff = {
+    oldPath: "B.java",
+    newPath: "B.java",
+    isBinary: false,
+    hunks: [
+      {
+        id: 0,
+        header: "@@ -10,4 +10,4 @@",
+        lines: [
+          { id: 0, kind: "hunkHeader", oldNo: null, newNo: null, text: "@@ -10,4 +10,4 @@" },
+          { id: 1, kind: "context", oldNo: 10, newNo: 10, text: "keep" },
+          { id: 2, kind: "del", oldNo: 11, newNo: null, text: "gone1", segments: [[0, 5]] },
+          { id: 3, kind: "del", oldNo: 12, newNo: null, text: "gone2" },
+          { id: 4, kind: "add", oldNo: null, newNo: 11, text: "came1", segments: [[0, 5]] },
+          { id: 5, kind: "context", oldNo: 13, newNo: 12, text: "tail" },
+        ],
+      },
+    ],
+  };
+  /** Each split row's two sides' line ids ("_" = padded). */
+  const pairs = (html: string) =>
+    html
+      .split('<div class="split-row">')
+      .slice(1)
+      .map((row) => [...row.matchAll(/<div class="split-side (?:old|new)"[^>]*>(?:<div class="split-pad">|<div class="line[^"]*" data-id="(\d+)")/g)].map((s) => s[1] ?? "_").join("|"));
+
+  it("is unified until chosen and wide enough — never before the pane is measured", () => {
+    expect(render({ diff })).not.toContain("split-row");
+    expect(render({ diff })).toContain('data-layout="unified"');
+  });
+
+  it("puts removed lines left of the added ones, pads the shorter side and keeps the hunk header full width", () => {
+    const html = render({ diff, forceLayout: "split" });
+    expect(html).toContain('class="unified scroll wrap split"');
+    expect(pairs(html)).toEqual(["1|1", "2|4", "3|_", "5|5"]);
+    // The header row is no split row; the changed parts stay marked on both sides.
+    expect(html).toMatch(/<div class="line hunk"[^>]*data-id="0"/);
+    expect(html).toContain('<span class="seg">gone1</span>');
+    expect(html).toContain('<span class="seg">came1</span>');
+  });
+
+  it("shows one line number per side: old on the left, new on the right", () => {
+    const html = render({ diff, forceLayout: "split" });
+    expect(html).toMatch(/<div class="split-side old"><div class="line del[^"]*" data-id="2"[^>]*><span class="sr-only">[^<]*<\/span><span class="no" aria-hidden="true">11<\/span><span class="gutter-add"/);
+    expect(html).toMatch(/<div class="split-side new"><div class="line add[^"]*" data-id="4"[^>]*><span class="sr-only">[^<]*<\/span><span class="no" aria-hidden="true">11<\/span><span class="gutter-add"/);
+    // An unchanged line's left copy is not read twice.
+    expect(html).toContain('<div class="split-side old" aria-hidden="true"><div class="line " data-id="1"');
+  });
+
+  it("puts notes under a line's anchor side — a removed line's on the left, an unchanged line's once, on the right", () => {
+    const extra = (line: DiffLine) => (line.kind === "hunkHeader" ? null : createElement("div", { className: "note-bubble" }, `note-${line.id}`));
+    const html = render({ diff, forceLayout: "split", extra });
+    expect((html.match(/note-1</g) ?? []).length).toBe(1);
+    expect(html).toMatch(/<div class="split-side old">(?:(?!split-side new).)*note-2</);
+    expect(html).toMatch(/<div class="split-side new">(?:(?!split-row).)*note-4</);
+    expect(html).toMatch(/<div class="split-side new">(?:(?!split-row).)*note-1</);
+  });
+
+  it("offers the toggle in the tools row — off with the reason while the pane is too narrow", () => {
+    const narrow = render({ diff });
+    expect(narrow).toMatch(/data-testid="Diff layout"/);
+    expect(narrow).toContain("Too narrow for split — widen the pane or hide the sidebar");
+    expect(narrow).toMatch(/<button[^>]*aria-checked="true"[^>]*disabled=""[^>]*data-testid="Diff layout unified"/);
+    const wide = render({ diff, forceLayout: "split" });
+    expect(wide).toMatch(/<button[^>]*aria-checked="true"[^>]*data-testid="Diff layout split"/);
+  });
+});

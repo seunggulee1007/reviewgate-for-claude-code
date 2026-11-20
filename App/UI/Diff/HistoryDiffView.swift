@@ -49,6 +49,13 @@ struct HistoryDiffView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .diffSplitWidth()   // §34.11
+        // Review › Next / Previous Change: then the next file of that round.
+        .diffChangeNavigation(find, file: store.historySelection?.path, files: { store.historyEntry?.files.map(\.path) ?? [] },
+                              open: { path in
+                                  guard let entry = store.historySelection?.entryId else { return }
+                                  Task { await store.openHistoryDiff(entryId: entry, path: path) }
+                              })
         .task(id: HighlightKey(selection: store.historySelection, lineCount: store.historyDiff?.allLines.count ?? -1, dark: colorScheme == .dark)) {
             highlighted = nil
             guard let path = store.historySelection?.path, let diff = store.historyDiff, !diff.isBinary else { return }
@@ -187,59 +194,49 @@ struct HistoryDiffView: View {
                             .padding(6)
                     }
                     // wave2 mac-diff: wrapped or scrolled sideways together (DiffLinesList), find in diff, copy.
-                    DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.diffGutter, resetKey: AnyHashable(selection),
-                                  scrollTarget: find.state.currentKey, scrollTick: find.scrollTick, scrollColumn: find.currentColumn) {
-                        ForEach(items) { item in
-                          // MARK: wave7 w7-state — §45.2: one List row per item (the line and its notes stacked), so the List
-                          // knows its rows from the items alone. The item's id is the row's key (what find in diff scrolls to):
-                          // no `.id()` on the row, which would make the List build every row on each pick.
-                          VStack(alignment: .leading, spacing: 0) {
-                            switch item.kind {
-                            case .line(let line), .context(let line):
-                              let key = DiffDisplayItem.key(line)
-                              let isPicked = line.kind != .hunkHeader && picked.contains(key)
-                              DiffRow(line: line, highlighted: highlighted.flatMap { line.id >= 0 && $0.indices.contains(line.id) ? $0[line.id] : nil },
-                                      findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(key), selected: isPicked)
-                                  // A click picks the line, ⇧-click / a drag the lines up to it, for ⌘C and "Copy selected lines".
-                                  .diffLinePicking(select: { extend in
-                                      if line.kind != .hunkHeader { lineSelection.select(key, extend: extend) }
-                                  }, dragTo: { index in
-                                      guard items.indices.contains(index) else { return }
-                                      lineSelection.select(DiffPlanList.rowKey(items[index]), extend: true)
-                                  })
-                                  .contextMenu {
-                                      if line.kind != .hunkHeader {
-                                          SideQuestionMenuItems(anchor: SideAnchor(path: selection.path, line: line.kind == .del ? line.oldNo : line.newNo,
-                                                                                   side: line.kind == .del ? .old : .new, entryId: selection.entryId),
-                                                                whyTitle: "Ask Why This Line Changed", composeTitle: "Ask About This Line…")
-                                          Divider()
-                                          DiffLineCopyMenuItems(line: line, path: selection.path,
-                                                                copySelected: isPicked && picked.count > 1 ? { copySelectedLines(items) } : nil)
-                                      }
-                                  }
-                              if line.kind != .hunkHeader {
-                                  ForEach(Array(notesOn(line, notes).enumerated()), id: \.offset) { _, note in
-                                      HistoryNoteBubble(note: note)
-                                          .padding(EdgeInsets(top: 2, leading: DiffRow.gutterWidth * 2 + 20, bottom: 2, trailing: 12))
-                                  }
-                              }
-                            default:
-                              // MARK: wave4c w4c-review — §41.3
-                              MoreLinesExpanderRow(item: item, more: $more) { gap, direction in
-                                  revealMoreLines($more, gap: gap, direction: direction, diff: diff) {
-                                      try await store.historyFileLines(entryId: selection.entryId, path: selection.path)
-                                  }
-                              }
+                    DiffSplitReader { split in
+                        // §34.11: split rows only while split is shown; a drag picks by the List's rows, the split ones then.
+                        let layout = split ? DiffSplit.layout(items) : nil
+                        let rows = layout?.rows
+                        let rowKey: (Int) -> String? = { index in
+                            if let rows { return rows.indices.contains(index) ? rows[index].id : nil }
+                            return items.indices.contains(index) ? DiffPlanList.rowKey(items[index]) : nil
+                        }
+                        let context = HistoryRowContext(selection: selection, diff: diff, items: items, notes: notes, picked: picked, rowKey: rowKey)
+                        DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
+                                      resetKey: AnyHashable(selection), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                                      scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
+                            if let rows {
+                                ForEach(rows) { row in
+                                    Group {
+                                        switch row.kind {
+                                        case let .pair(left, right):
+                                            DiffSplitPair(left: left, right: right) { line, side in
+                                                VStack(alignment: .leading, spacing: 0) { lineRow(line, side: side, context) }
+                                            }
+                                        case let .item(item):
+                                            itemRow(item, context)
+                                        }
+                                    }
+                                    .listRowInsets(EdgeInsets())
+                                    .listRowSeparator(.hidden)
+                                }
+                            } else {
+                                ForEach(items) { item in
+                                    // MARK: wave7 w7-state — §45.2: one List row per item (the line and its notes stacked), so the
+                                    // List knows its rows from the items alone. The item's id is the row's key (what find in diff
+                                    // scrolls to): no `.id()` on the row, which would make the List build every row on each pick.
+                                    itemRow(item, context)
+                                        .listRowInsets(EdgeInsets())
+                                        .listRowSeparator(.hidden)
+                                }
                             }
-                          }
-                          .listRowInsets(EdgeInsets())
-                          .listRowSeparator(.hidden)
                         }
                     }
                     .diffLineCopying(revision: lineSelection.revision) { selectedLinesText(items) }
                     .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                               rowsKey: AnyHashable([AnyHashable(selection), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
-                              tick: model.diffFindTick)
+                              tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
                 }
             }
         } else {
@@ -248,6 +245,70 @@ struct HistoryDiffView: View {
                 Text("Loading diff…").font(.caption).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// What a row of the list draws with.
+    private struct HistoryRowContext {
+        let selection: HistorySelection
+        let diff: FileDiff
+        let items: [DiffDisplayItem]
+        let notes: [ReviewHistoryNote]
+        let picked: Set<String>
+        /// The line key of the List row at an index (a drag picks up to it).
+        let rowKey: (Int) -> String?
+    }
+
+    /// One unified row (a line and its notes, or "Show 20 more lines"); a split list's full-width rows too.
+    @ViewBuilder
+    private func itemRow(_ item: DiffDisplayItem, _ context: HistoryRowContext) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            switch item.kind {
+            case .line(let line), .context(let line):
+                lineRow(line, side: nil, context)
+            default:
+                // MARK: wave4c w4c-review — §41.3
+                MoreLinesExpanderRow(item: item, more: $more) { gap, direction in
+                    let selection = context.selection
+                    revealMoreLines($more, gap: gap, direction: direction, diff: context.diff) {
+                        try await store.historyFileLines(entryId: selection.entryId, path: selection.path)
+                    }
+                }
+            }
+        }
+    }
+
+    /// A line and the notes sent on it (`side`: one side of a split row, §34.11 — the notes under their anchor side).
+    @ViewBuilder
+    private func lineRow(_ line: DiffLine, side: DiffSide?, _ context: HistoryRowContext) -> some View {
+        let selection = context.selection
+        let key = DiffDisplayItem.key(line)
+        let isPicked = line.kind != .hunkHeader && context.picked.contains(key)
+        DiffRow(line: line, highlighted: highlighted.flatMap { line.id >= 0 && $0.indices.contains(line.id) ? $0[line.id] : nil },
+                findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(key), selected: isPicked, splitSide: side)
+            // A click picks the line, ⇧-click / a drag the lines up to it, for ⌘C and "Copy selected lines".
+            .diffLinePicking(select: { extend in
+                if line.kind != .hunkHeader { lineSelection.select(key, extend: extend) }
+            }, dragTo: { index in
+                guard let key = context.rowKey(index) else { return }
+                lineSelection.select(key, extend: true)
+            })
+            .contextMenu {
+                if line.kind != .hunkHeader {
+                    SideQuestionMenuItems(anchor: SideAnchor(path: selection.path, line: line.kind == .del ? line.oldNo : line.newNo,
+                                                             side: line.kind == .del ? .old : .new, entryId: selection.entryId),
+                                          whyTitle: "Ask Why This Line Changed", composeTitle: "Ask About This Line…")
+                    Divider()
+                    DiffLineCopyMenuItems(line: line, path: selection.path,
+                                          copySelected: isPicked && context.picked.count > 1 ? { copySelectedLines(context.items) } : nil)
+                }
+            }
+        if line.kind != .hunkHeader, side == nil || side == DiffSplit.anchorSide(of: line) {
+            ForEach(Array(notesOn(line, context.notes).enumerated()), id: \.offset) { _, note in
+                HistoryNoteBubble(note: note)
+                    .padding(side == nil ? EdgeInsets(top: 2, leading: DiffRow.gutterWidth * 2 + 20, bottom: 2, trailing: 12)
+                             : DiffPlanRow.splitBubbleInsets)
+            }
         }
     }
 

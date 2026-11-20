@@ -20,6 +20,7 @@ import { segmentParts } from "../diffSegments";
 import { MAX_FIND_MATCHES, findInDiff } from "../diffTools";
 import { stepIndex } from "../transcriptFind";
 import { DiffFindBar, DiffToolsRow } from "./diff/DiffTools";
+import { anchorSide, effectiveLayout, splitMinWidth, splitRows, type DiffLayout } from "../diffSplit"; // §34.11
 import { LineMenu, type LineMenuAt, type LineMenuItem } from "./diff/LineMenu";
 import "./diff/diffLines.css";
 import { isEnter } from "../ime";
@@ -105,15 +106,29 @@ export function UnifiedDiff(props: {
   lineMenuItems?: (line: DiffLine) => LineMenuItem[];
   /** MARK: wave4c w4c-review — false: a line shown by "20줄 더 보기" takes no "+" / "?" (the PR diff: GitHub comments need a diff line). */
   revealedActions?: boolean;
+  /** §34.11: this layout whatever the choice and the width (unset: the remembered choice, split only where it fits). */
+  forceLayout?: DiffLayout;
 }) {
   const { diff } = props;
   const wrap = useDiffPrefs((s) => s.wrap);
+  // §34.11: split where two columns read — the pane's width is measured (0 until then: unified first, never a split flash).
+  const chosenLayout = useDiffPrefs((s) => s.layout);
+  const [paneWidth, setPaneWidth] = useState(0);
   const [folds, setFolds] = useStateFor<FoldState>(diff, NO_FOLDS);
   const [revealed, setRevealed] = useStateFor<ContextState>(diff, NO_CONTEXT);
   const [menu, setMenu] = useState<LineMenuAt | null>(null);
   const [find, setFind] = useState<FindState>(FIND_CLOSED);
   const paneRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setPaneWidth(entry?.contentRect.width ?? 0));
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [diff.isBinary, diff.hunks.length === 0]); // the pane exists only for a diff with lines
+  const splitFits = props.forceLayout ? props.forceLayout === "split" : paneWidth >= splitMinWidth();
+  const layout = props.forceLayout ?? effectiveLayout(chosenLayout, paneWidth);
 
   // Memoized rows get stable callbacks; they read the latest props through this ref.
   const latest = useRef(props);
@@ -266,32 +281,59 @@ export function UnifiedDiff(props: {
   const plan = planFolds(diff, props.generated, pinnedLines(diff, props.highlighted, props.anchoredLines, props.markedLines).reduce((f, id) => revealLine(f, diff, id), folds));
   const byId = new Map<number, DiffLine>();
   linesById.current = byId;
-  const rows: ReactNode[] = [];
+  // The rows in display order: code lines (drawn below, one column or two — §34.11) and every other row as it is.
+  const rows: RowEntry[] = [];
 
   const codeRow = (line: DiffLine, hunk: DiffHunk | null, flags: string, actions?: ReactNode) => {
     byId.set(line.id, line);
+    rows.push({ line, hunk, flags, actions });
+  };
+
+  /** A code line (`side`: one side of a split row) and, on its anchor side, what sits under it (notes, comments, composer). */
+  const drawCode = (entry: CodeEntry, side?: "old" | "new") => {
+    const { line, hunk } = entry;
     const key = lineKey(line);
     const id = key ? keyId(key) : null;
     const hl = id && props.highlighted?.has(id) ? " note-line" : "";
     const anchored = id && props.anchoredLines?.has(id) ? " side-anchored" : "";
     const marked = id !== null && props.markedLines?.has(id) === true; // MARK: wave3 desktop-flow — §36.13
-    rows.push(
-      <Fragment key={line.id}>
+    const anchorHere = side === undefined || side === anchorSide(line);
+    return (
+      <Fragment key={side ? `${side}-${line.id}` : line.id}>
         <Row
           line={line}
+          side={side}
           hunkId={hunk && line.id >= 0 ? hunk.id : null}
-          flags={`${hl}${flags}${anchored}${marked ? " prereview-line" : ""}`}
-          mark={marked ? (props.markTitle ?? "") : null}
+          flags={`${hl}${entry.flags}${anchored}${marked && anchorHere ? " prereview-line" : ""}`}
+          mark={marked && anchorHere ? (props.markTitle ?? "") : null}
           canAdd={props.onAdd !== undefined && (props.noteSides !== "new" || line.kind !== "del") && (props.revealedActions !== false || line.id >= 0)}
           canAsk={props.onAsk !== undefined && (props.revealedActions !== false || line.id >= 0)}
           onAdd={onAdd}
           onAsk={onAsk}
           header={hunk?.header}
-          actions={actions}
+          actions={entry.actions}
         />
-        {props.extra?.(line, key)}
-      </Fragment>,
+        {anchorHere && props.extra?.(line, key)}
+      </Fragment>
     );
+  };
+
+  const drawRows = (): ReactNode[] => {
+    const draw = (entry: RowEntry) => (isCode(entry) ? drawCode(entry) : entry);
+    if (layout !== "split") return rows.map(draw);
+    return splitRows(rows, (entry) => (isCode(entry) && entry.line.kind !== "hunkHeader" ? entry.line : null)).map((row) => {
+      if (row.kind === "full") return draw(row.row);
+      const left = row.left as CodeEntry | null;
+      const right = row.right as CodeEntry | null;
+      return (
+        <div key={`split-${(left ?? right)!.line.id}`} className="split-row">
+          <div className="split-side old" aria-hidden={left !== null && left === right ? true : undefined /* an unchanged line is read once, on the right */}>
+            {left ? drawCode(left, "old") : <div className="split-pad" />}
+          </div>
+          <div className="split-side new">{right ? drawCode(right, "new") : <div className="split-pad" />}</div>
+        </div>
+      );
+    });
   };
 
   /** A gap's revealed lines around its "20줄 더 보기" row (the lines below the previous hunk, then those above the next). */
@@ -365,7 +407,7 @@ export function UnifiedDiff(props: {
 
   return (
     <div className="unified-pane" ref={paneRef}>
-      <DiffToolsRow onFind={openFind}>{props.toolbar}</DiffToolsRow>
+      <DiffToolsRow onFind={openFind} layout={{ fits: splitFits, shown: layout }}>{props.toolbar}</DiffToolsRow>
       {find.open && (
         <DiffFindBar
           query={find.query}
@@ -379,13 +421,14 @@ export function UnifiedDiff(props: {
         />
       )}
       <div
-        className={`unified scroll ${wrap ? "wrap" : "nowrap"}`}
+        className={`unified scroll ${wrap ? "wrap" : "nowrap"}${layout === "split" ? " split" : ""}`}
         data-testid="Unified diff"
+        data-layout={layout}
         ref={scrollRef}
         tabIndex={0}
         onContextMenu={onContextMenu}
       >
-        <div className="unified-rows">{rows}</div>
+        <div className="unified-rows">{drawRows()}</div>
       </div>
       {menu && createPortal(<LineMenu at={menu} path={props.path} oldPath={diff.oldPath} onClose={closeMenu} onOpen={props.onOpenLine} items={props.lineMenuItems?.(menu.line)} />, document.body)}
     </div>
@@ -394,8 +437,18 @@ export function UnifiedDiff(props: {
 
 // MARK: wave2 desktop-diff — rows
 
+/** A code line of the list before it is drawn (one column, or a side of a split row — §34.11); other rows are drawn already. */
+type CodeEntry = { line: DiffLine; hunk: DiffHunk | null; flags: string; actions?: ReactNode };
+type RowEntry = CodeEntry | ReactNode;
+
+function isCode(entry: RowEntry): entry is CodeEntry {
+  return typeof entry === "object" && entry !== null && "line" in entry && "flags" in entry;
+}
+
 type RowProps = {
   line: DiffLine;
+  /** §34.11: one side of a split row — that side's line number only. */
+  side?: "old" | "new";
   /** The hunk the line belongs to (`data-hunk`); null for a revealed context line. */
   hunkId: number | null;
   /** Extra classes (note-line / hunk-sel / side-anchored / context-extra), each with its leading space. */
@@ -428,8 +481,8 @@ const Row = memo(function Row(p: RowProps) {
     >
       {/* MARK: wave4d w4d-speed — polish-10: read as "추가된 줄 42: …" (the numbers and the sign are not read; the hover gutters are hidden until hovered) */}
       <span className="sr-only">{diffLinePrefix(line)} </span>
-      <span className="no" aria-hidden="true">{line.oldNo ?? ""}</span>
-      <span className="no" aria-hidden="true">{line.newNo ?? ""}</span>
+      {p.side !== "new" && <span className="no" aria-hidden="true">{line.oldNo ?? ""}</span>}
+      {p.side !== "old" && <span className="no" aria-hidden="true">{line.newNo ?? ""}</span>}
       <span className="gutter-add" onClick={() => key && p.canAdd && p.onAdd(line, key)} title={p.canAdd && key ? t("{0} ({1})", t("Add note"), "⌥⌘N") : undefined}>
         {p.canAdd && key ? "+" : ""}
       </span>

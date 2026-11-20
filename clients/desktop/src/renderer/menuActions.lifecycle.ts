@@ -73,6 +73,7 @@ export const lifecycleMenuActions: MenuActionHandlers = {
   }),
   find_chat: press("f", "KeyF"),
   find_diff: press("f", "KeyF", { alt: true }),
+  diff_layout: press("l", "KeyL", { alt: true }), // §34.11
   sidebar_tab: (a) =>
     withStore((s) => {
       if (s.state.project) s.setTab(a.tab);

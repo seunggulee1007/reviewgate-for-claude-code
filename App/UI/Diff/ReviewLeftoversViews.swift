@@ -218,29 +218,56 @@ struct WhitespaceDiffBody: View {
                     .font(.caption).foregroundStyle(.orange)
                     .padding(6)
             }
-            DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.diffGutter, resetKey: AnyHashable(key),
-                          scrollTarget: find.state.currentKey, scrollTick: find.scrollTick, scrollColumn: find.currentColumn) {
-                ForEach(lines) { line in
-                    DiffRow(line: line, highlighted: highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil },
-                            findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(DiffDisplayItem.key(line)))
-                        .id(DiffDisplayItem.key(line))
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .contextMenu {
-                            if line.kind != .hunkHeader {
-                                Button("Ask Why This Line Changed", systemImage: "questionmark.bubble") {}
-                                    .disabled(true)
-                                Text(verbatim: ReviewLeftovers.whitespaceViewNote)
-                                Divider()
-                                DiffLineCopyMenuItems(line: line, path: file.path)
+            DiffSplitReader { split in
+                // §34.11: split rows only while split is shown (one pass over the lines).
+                let layout = split ? DiffSplit.layout(lines: lines) : nil
+                DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
+                              resetKey: AnyHashable(key), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
+                              scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
+                    if let layout {
+                        ForEach(layout.rows) { row in
+                            Group {
+                                switch row.kind {
+                                case let .pair(left, right):
+                                    DiffSplitPair(left: left, right: right) { line, side in lineRow(line, side: side) }
+                                case let .item(item):
+                                    if case let .line(line) = item.kind { lineRow(line, side: nil) }
+                                }
                             }
+                            .id(row.id)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
                         }
+                    } else {
+                        ForEach(lines) { line in
+                            lineRow(line, side: nil)
+                                .id(DiffDisplayItem.key(line))
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                        }
+                    }
                 }
             }
             .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
-                      rowsKey: AnyHashable([AnyHashable(key), AnyHashable(lines.count)]), tick: model.diffFindTick)
+                      rowsKey: AnyHashable([AnyHashable(key), AnyHashable(lines.count)]), tick: model.diffFindTick,
+                      changes: { DiffChangeNavigation.rows(lines: lines) })
         }
         .accessibilityIdentifier("Whitespace diff")
+    }
+
+    /// A read-only line (`side`: one side of a split row, §34.11).
+    private func lineRow(_ line: DiffLine, side: DiffSide?) -> some View {
+        DiffRow(line: line, highlighted: highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil },
+                findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(DiffDisplayItem.key(line)), splitSide: side)
+            .contextMenu {
+                if line.kind != .hunkHeader {
+                    Button("Ask Why This Line Changed", systemImage: "questionmark.bubble") {}
+                        .disabled(true)
+                    Text(verbatim: ReviewLeftovers.whitespaceViewNote)
+                    Divider()
+                    DiffLineCopyMenuItems(line: line, path: file.path)
+                }
+            }
     }
 }
 

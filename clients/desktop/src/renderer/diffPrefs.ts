@@ -5,6 +5,7 @@
  * market-06). Kept out of the main store so the line renderer stays store-free (and testable without a window).
  */
 import { create } from "zustand";
+import type { DiffLayout } from "./diffSplit";
 
 const WRAP_KEY = "rg.diff.wrap";
 
@@ -25,7 +26,18 @@ function write(key: string, value: boolean): void {
   }
 }
 
-type DiffPrefs = { wrap: boolean; toggleWrap(): void };
+// §34.11: "합쳐 보기 | 나란히 보기" — unified by default; a pane too narrow for split shows unified anyway (diffSplit.ts).
+const LAYOUT_KEY = "rg.diff.layout";
+
+function readLayout(): DiffLayout {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === "split" ? "split" : "unified";
+  } catch {
+    return "unified";
+  }
+}
+
+type DiffPrefs = { wrap: boolean; toggleWrap(): void; layout: DiffLayout; setLayout(layout: DiffLayout): void; toggleLayout(): void };
 
 export const useDiffPrefs = create<DiffPrefs>((set, get) => ({
   wrap: read(WRAP_KEY, true),
@@ -33,5 +45,17 @@ export const useDiffPrefs = create<DiffPrefs>((set, get) => ({
     const wrap = !get().wrap;
     write(WRAP_KEY, wrap);
     set({ wrap });
+  },
+  layout: readLayout(),
+  setLayout(layout) {
+    try {
+      localStorage.setItem(LAYOUT_KEY, layout);
+    } catch {
+      /* private mode, no window (tests) */
+    }
+    set({ layout });
+  },
+  toggleLayout() {
+    get().setLayout(get().layout === "split" ? "unified" : "split");
   },
 }));

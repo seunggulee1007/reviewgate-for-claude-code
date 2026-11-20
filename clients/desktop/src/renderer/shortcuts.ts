@@ -13,6 +13,7 @@ import { isAskAboutKey } from "./keymap";
 import { windowKey } from "./keymap"; // MARK: wave4d w4d-windows
 import { runAcceptAll } from "./acceptAllAction"; // MARK: r2-review-flow (M28)
 import { diffCollapsedNow, liveTerminalChatId, stopLiveTerminal } from "./terminal/terminalChat"; // §57.5 / §57.17
+import { useDiffPrefs } from "./diffPrefs"; // §34.11
 
 /** The anchor of the current diff selection: the first selected line of the shown file (+ the selected text). */
 export function selectionAnchor(): { anchor: SideAnchor | null; context?: string } {
@@ -63,6 +64,13 @@ export function useReviewShortcuts(): void {
         }
         e.preventDefault();
         s.interrupt();
+        return;
+      }
+      // §34.11: ⌥⌘L (Ctrl+Alt+L) — every diff unified or split (a pane too narrow for split stays unified).
+      if (wk === "diffLayout") {
+        if (s.dialog) return;
+        e.preventDefault();
+        useDiffPrefs.getState().toggleLayout();
         return;
       }
       // MARK: wave5 w5-board — §43.1: ⌥⌘B (Ctrl+Alt+B) opens / closes the agent board.
