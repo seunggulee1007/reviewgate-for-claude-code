@@ -63,7 +63,7 @@ type Settings = {
 };
 
 type EngineCommand =
-  | Cmd<"hello", { protocolVersion: 2; client: "mac" | "windows" | "test"; env?: Record<string,string>; settings: Settings }>  // → ready, then state
+  | Cmd<"hello", { protocolVersion: 2; client: "mac" | "windows" | "test"; env?: Record<string,string>; settings: Settings; capabilities?: { terminalChat?: boolean } }>  // → ready, then state; capabilities §57.10
   | Cmd<"set_settings", { settings: Partial<Settings> }>   // budget, ignorePatterns, ghHost apply live; the rest on the next open_project
   | Cmd<"open_project", { path: string; takeover?: boolean }>   // closes the current project if any → state (project | gitInit | lockConflict); takeover overrides another session's lock (§6)
   | Cmd<"switch_project", { path: string; takeover?: boolean }> // alias of open_project (the client confirmed a pending review)
@@ -8726,7 +8726,8 @@ Extensions › MCP servers only (§22). No engine command is new: the list is `m
 A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The
 engine never spawns it: it tells the app how to start it (`terminal_spec`), receives Claude Code's http hooks on
 127.0.0.1, and maps them onto the review gate — snapshot A at the prompt, B at the stop, the turn diff, accept / reject
-and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1.
+and the `state` / `turn_end` / `turn_summary` events work as in a chat. Mac only in Stage 1; the Windows client from
+Stage 3 when its hello advertises `capabilities.terminalChat` (§57.10).
 
 ### 57.1 The contract
 
@@ -8763,16 +8764,19 @@ type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: st
   (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
   `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
-  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac, test, or a
+  windows client whose hello advertises `capabilities.terminalChat`;
   `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
   turn; `cli_not_found` as elsewhere.
-- **Windows.** The desktop client's IPC guard does not list the `terminal_*` commands, so its renderer cannot send them.
+- **Windows.** The desktop client's IPC guard does not list `terminal_spec`, `terminal_started` or `terminal_exited`, so
+  its renderer cannot send them: the client's main process sends them itself (§57.10).
 
 ### 57.2 Lifecycle and resume
 
-- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients) and switches to it as any new
+- **Start.** `session_new {kind: "terminal"}` makes the chat (only `mac` and `test` clients, and a `windows` client with
+  `capabilities.terminalChat`, §57.10) and switches to it as any new
   chat. Whenever the current chat is a terminal chat — a switch, `session_open`, `open_project` —
   the engine starts no CLI: the chat's session only waits for hooks (`state.session.open`, `ready`; `terminal` holds its
   state). Such a session is never parked (§9.1): switching away stops it and retires its token.
@@ -9029,9 +9033,10 @@ real TUI. The chat UI stays one menu item away; chats keep the kind they were ma
   (`SessionKind.rawValue`; absent or unknown = terminal). Its tooltip says what each kind is. A change goes to every
   window's engine at once (`set_settings {newChatKind}`).
 - **The engine** (`Settings.newChatKind`, live): the kind of the chat the engine makes by itself when a project has none —
-  its first open (a new project, a new workbench's window), or a current chat that is gone. `"terminal"` only from the
-  `mac` and `test` clients; any other client gets a chat (the Windows client never sends it and has no terminal chat;
-  `session_new {kind:"terminal"}` from it stays `terminal_unsupported`). `session_new` never reads it: the client names
+  its first open (a new project, a new workbench's window), or a current chat that is gone. `"terminal"` only for mac,
+  test, or a windows client whose hello advertises `capabilities.terminalChat` (§57.10); any other client gets a chat
+  (`session_new {kind:"terminal"}` from it stays `terminal_unsupported`). The Windows client sends `"terminal"` only
+  while its "Terminal chat (preview)" is on and "New chats open as" is Terminal. `session_new` never reads it: the client names
   the kind. A chat the engine makes to send something itself is always a chat: a plan handed over (§42.1), a task handed
   to its workbench (§49), the fallback after a failed resume (§30), a rewind's fork (§38.3), `/clear` in a chat (§41.1).
 - **Entry points on the Mac** (all held while Claude works, §9):
@@ -9095,7 +9100,8 @@ its own before the review was accepted. The PreToolUse hook (`Edit|Write|MultiEd
 ### 57.9 Continue a chat as a terminal chat
 
 Now that a new chat is a terminal chat, a chat's Claude conversation must not be stranded in the chat UI: "Continue as
-Terminal Chat" carries it into a new terminal chat (the real TUI resumes it). Mac only.
+Terminal Chat" carries it into a new terminal chat (the real TUI resumes it). Mac, and the Windows client with
+`capabilities.terminalChat` (§57.10).
 
 ```ts
 session_continue_terminal { sessionId }   // reply: result; the new terminal chat is the current one (state, transcript_restore)
@@ -9104,8 +9110,8 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   continuedIn?: string;     // that chat: the terminal chat its conversation goes on in — it is a record from now on
 ```
 
-- **Refused** (`CommandRefused("<code>:<detail>", {code})`): `terminal_unsupported` (a client other than mac / test — the
-  desktop client's IPC guard does not list it either), `session_busy` / `collect_failed` (as a switch, §9), `not_a_chat`
+- **Refused** (`CommandRefused("<code>:<detail>", {code})`): `terminal_unsupported` (a client other than mac / test, or a
+  windows client without `capabilities.terminalChat`, §57.10), `session_busy` / `collect_failed` (as a switch, §9), `not_a_chat`
   (a terminal chat), `chat_is_record` (`resumeFailed`, `movedTo` or already `continuedIn`), `nothing_to_continue` (the CLI
   has no conversation of it yet: not `cliKnown`, not confirmed, no record file), `review_pending` (files wait in the
   review — accepted or rejected first, so nothing pending is dropped and the terminal chat's review starts from its own
@@ -9125,6 +9131,21 @@ session_continue_terminal { sessionId }   // reply: result; the new terminal cha
   (`continueAsTerminalBlocker`): a record, no conversation yet, files waiting in the review, Claude working. Over the
   record a teal bar: "이 대화는 터미널 채팅 '<title>'에서 이어져요 — 이 채팅은 기록으로 남아요" with [열기] (opens the terminal
   chat). A refusal is a non-fatal row in those words.
+
+### 57.10 The Windows client
+
+```ts
+type ClientCapabilities = {
+  terminalChat?: boolean;   // the client can run a terminal chat's PTY; honoured for a `windows` client (mac / test always can)
+};
+// HelloCommand gains:  capabilities?: ClientCapabilities
+```
+
+- **The engine.** `hello` stores the capabilities (a later `hello` replaces them). A `windows` client with
+  `capabilities.terminalChat: true` passes the same check as mac and test: `session_new {kind:"terminal"}`,
+  `session_continue_terminal`, `terminal_spec` and `Settings.newChatKind` (§57.7) work for it. Without it — or with
+  `false` — everything stays `terminal_unsupported` as before. On a mac or test client the field changes nothing. Nothing
+  else differs: `terminal_spec` has no Windows-specific fields (the client resolves argv[0] itself).
 
 ## 58. Accept N & Continue
 

@@ -14,7 +14,8 @@ export async function buildMain({ watch = false } = {}) {
     target: "node20",
     sourcemap: true,
     alias: { "@reviewgate/engine": enginePath },
-    external: ["electron", "@anthropic-ai/claude-agent-sdk"],
+    // node-pty: a native module loaded at run time (main/pty/nodePty.ts; packaged: from app.asar.unpacked).
+    external: ["electron", "@anthropic-ai/claude-agent-sdk", "node-pty"],
     logLevel: "info",
   };
   const main = { ...common, entryPoints: [`${root}src/main/main.ts`], outfile: `${root}dist/main/main.mjs`, format: "esm" };
