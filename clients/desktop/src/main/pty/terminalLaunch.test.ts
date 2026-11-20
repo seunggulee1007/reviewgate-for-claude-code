@@ -201,6 +201,14 @@ describe("buildChatLaunch on Windows (§57.17)", () => {
     const off = buildChatLaunch(win({ fullRepaint: false }));
     expect(off.ok && off.env.CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT).toBeUndefined();
   });
+
+  it("§57.16 NO_PROXY: the user's list (any spelling) keeps its name and gains the loopback; none → the loopback alone", () => {
+    const own = buildChatLaunch(win({ parentEnv: { ...PARENT, no_proxy: "corp.example" } }));
+    expect(own.ok && own.env.no_proxy).toBe("corp.example,127.0.0.1,localhost,::1");
+    expect(own.ok && Object.keys(own.env).filter((k) => k.toUpperCase() === "NO_PROXY")).toEqual(["no_proxy"]);
+    const none = buildChatLaunch(win({}));
+    expect(none.ok && none.env.NO_PROXY).toBe("127.0.0.1,localhost,::1");
+  });
 });
 
 describe("buildShellLaunch (§57.17)", () => {

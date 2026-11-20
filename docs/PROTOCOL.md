@@ -9472,8 +9472,9 @@ type ClientCapabilities = {
   `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SSE_PORT`, `CLAUDE_AGENT_SDK_*`, `ELECTRON_*`, `NODE_OPTIONS`,
   `VITE_DEV_SERVER_URL`, `REVIEWGATE_*` and any `RG_*` (the user's other `CLAUDE_*` stay: on Windows they are user
   settings), plus `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=ReviewGate`, `TERM_PROGRAM_VERSION`,
-  `CLAUDE_CODE_NATIVE_CURSOR=1`, `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` (while on) and the spec's `RG_*` /
-  `CLAUDE_CODE_*` keys. On macOS (development only — the client counts as `mac` there) argv runs directly with the Mac's
+  `CLAUDE_CODE_NATIVE_CURSOR=1`, `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1` (while on), the spec's `RG_*` /
+  `CLAUDE_CODE_*` keys, and `NO_PROXY` (whatever its spelling: one variable on Windows) with `127.0.0.1,localhost,::1`
+  appended, so a proxy in the user's environment never takes the hook posts (as the Mac's wrapper, §57.16). On macOS (development only — the client counts as `mac` there) argv runs directly with the Mac's
   Stage 1 environment.
 - **Lifecycle.** At most one chat PTY per window; opening a running chat's PTY again returns it. Output goes out in
   batches (5 ms or 64 KiB) with a 512 KiB replay for a reloaded page; over 100,000 unacknowledged characters the PTY

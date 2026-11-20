@@ -105,6 +105,9 @@ export function specEnvAllowed(key: string): boolean {
 
 const isBatch = (p: string) => /\.(cmd|bat)$/i.test(p);
 
+/** §57.16: the hook posts go to 127.0.0.1 — a proxy the user's environment names never takes them. */
+export const LOOPBACK_NO_PROXY = "127.0.0.1,localhost,::1";
+
 export type ChatLaunchInput = {
   spec: TerminalSpecEvent;
   platform: LaunchPlatform;
@@ -152,6 +155,9 @@ export function buildChatLaunch(a: ChatLaunchInput): Launch | LaunchRefusal {
   setWin(env, "CLAUDE_CODE_NATIVE_CURSOR", "1"); // the IME composition follows the TUI's real caret
   if (a.fullRepaint) setWin(env, "CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT", "1");
   for (const [k, v] of Object.entries(spec.env)) if (specEnvAllowed(k)) setWin(env, k, v);
+  // §57.16: one variable on Windows (NO_PROXY and no_proxy are the same name): the user's list, then the loopback.
+  const noProxy = getWin(env, "NO_PROXY");
+  setWin(env, "NO_PROXY", noProxy ? `${noProxy},${LOOPBACK_NO_PROXY}` : LOOPBACK_NO_PROXY);
   return { ok: true, file, args, env, cwd: spec.cwd };
 }
 
