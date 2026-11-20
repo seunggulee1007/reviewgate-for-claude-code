@@ -244,6 +244,16 @@ import Testing
         #expect(raised.count == 3)
     }
 
+    @Test func aTerminalPermissionNotificationOffersAllowAndDeny() {
+        let p = TerminalPermission(requestId: "r1", toolName: "Bash", summary: "Bash: ls", since: "t")
+        #expect(AttentionEvent.terminalPermission(p, chatId: "t1").isTerminalPermission)
+        let wait = TerminalWaiting(kind: .permission, message: "m", since: "t")
+        #expect(!AttentionEvent.terminalWaiting(wait, chatId: "t1").isTerminalPermission)
+        #expect(TerminalPermissionNotification.answer(actionIdentifier: TerminalPermissionNotification.allowAction) == true)
+        #expect(TerminalPermissionNotification.answer(actionIdentifier: TerminalPermissionNotification.denyAction) == false)
+        #expect(TerminalPermissionNotification.answer(actionIdentifier: "com.apple.UNNotificationDefaultActionIdentifier") == nil)
+    }
+
     @Test func answersGoThroughTheCommandSink() {
         let app = makeState()
         var fired: [EngineCommand] = []

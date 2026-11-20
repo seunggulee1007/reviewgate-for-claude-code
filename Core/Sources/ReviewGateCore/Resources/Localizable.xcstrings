@@ -1585,6 +1585,22 @@
         }
       }
     },
+    "Allow Once": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Once"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번 허용"
+          }
+        }
+      }
+    },
     "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)": {
       "localizations": {
         "en": {
@@ -5779,6 +5795,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "거부함 · %@"
+          }
+        }
+      }
+    },
+    "Deny": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거부"
           }
         }
       }

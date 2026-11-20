@@ -40,6 +40,14 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
     /// Called once at launch (the delegate must be set before a click is delivered).
     func start() {
         UNUserNotificationCenter.current().delegate = self
+        // MARK: terminal-stage2 (§57.15): a terminal chat's permission notification answers from the banner too.
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(identifier: TerminalPermissionNotification.category, actions: [
+                UNNotificationAction(identifier: TerminalPermissionNotification.allowAction, title: TerminalPermissionNotification.allowTitle),
+                UNNotificationAction(identifier: TerminalPermissionNotification.denyAction, title: TerminalPermissionNotification.denyTitle,
+                                     options: [.destructive]),
+            ], intentIdentifiers: []),
+        ])
         observeBadge()
         // wave4b w4-notify: ask now (not at the first notification, which the question would hold back) and notice a
         // change made in System Settings when the user comes back.
@@ -162,6 +170,7 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         var info: [String: String] = ["projectPath": scope]
         info.merge(target.userInfo) { old, _ in old }
         content.userInfo = info
+        if event.isTerminalPermission { content.categoryIdentifier = TerminalPermissionNotification.category }   // §57.15
         // §39.7: no sound here — `handle` played this kind's own (a sound by name only resolves from Library/Sounds).
         // One live notification per window and kind: a newer "turn finished" replaces the older one.
         let request = UNNotificationRequest(identifier: DeliveredNotifications.identifier(scope: scope, kind: event.kind),
@@ -220,9 +229,19 @@ final class AttentionCenter: NSObject, UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         let path = info["projectPath"] as? String
         let target = AttentionTarget(userInfo: info)
+        let answer = TerminalPermissionNotification.answer(actionIdentifier: response.actionIdentifier)
         await MainActor.run {
             guard let path else { NSApp.activate(ignoringOtherApps: true); return }
             let url = URL(fileURLWithPath: path)
+            // MARK: terminal-stage2 (§57.15): Allow / Deny on the banner answer the dialog without bringing the window
+            // forward — only while that chat is still the live one (else the engine has no such dialog for it).
+            if let answer {
+                if let target, let requestId = target.requestId, let entry = WorkbenchRegistry.shared.entry(for: url),
+                   target.chatId == nil || target.chatId == entry.store.currentSessionId {
+                    entry.store.terminalPermissionResponse(requestId: requestId, allow: answer)
+                }
+                return
+            }
             guard WorkbenchRegistry.shared.focusWindow(for: url) else {
                 NSApp.activate(ignoringOtherApps: true)
                 return

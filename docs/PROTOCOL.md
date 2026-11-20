@@ -9050,7 +9050,9 @@ chat's id);
     `terminal_permission_response`. "또는 터미널에서 답하기": the TUI's dialog stays open and whichever is answered first
     counts; "always allow" stays in the TUI. Answered in the TUI first, the engine refuses `permission_gone` — only logged,
     the card goes with the next state. While a card exists its attention key is `termperm:<chat>:<requestId>` (a
-    notification at once; the plain `term:` wait of that dialog is not raised too). Settings › Session › "터미널 채팅의 허용
+    notification at once; the plain `term:` wait of that dialog is not raised too). That notification carries [한 번 허용]
+    and [거부] (`UNNotificationCategory` `terminalPermission`): an action answers without bringing the window forward,
+    only while that chat is still the live one; a click on the banner itself shows the terminal as before. Settings › Session › "터미널 채팅의 허용
     요청에 ReviewGate에서도 답하기" (`terminalPermissionBridge`, default on, `set_settings` live).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after

@@ -200,6 +200,28 @@ extension AttentionEvent {
         event.requestId = permission.requestId
         return event
     }
+
+    /// §57.15: a terminal chat's bridged permission dialog — its notification offers Allow / Deny.
+    public var isTerminalPermission: Bool { key.hasPrefix("termperm:") && requestId != nil }
+}
+
+/// §57.15: the Allow / Deny actions on a terminal permission's notification (`UNNotificationCategory`).
+public enum TerminalPermissionNotification {
+    public static let category = "terminalPermission"
+    public static let allowAction = "terminalPermission.allow"
+    public static let denyAction = "terminalPermission.deny"
+
+    /// `allow` for an action of this category (nil: the notification itself was clicked, or another action).
+    public static func answer(actionIdentifier: String) -> Bool? {
+        switch actionIdentifier {
+        case allowAction: true
+        case denyAction: false
+        default: nil
+        }
+    }
+
+    public static var allowTitle: String { String(localized: "Allow Once", bundle: .module) }
+    public static var denyTitle: String { String(localized: "Deny", bundle: .module) }
 }
 
 /// §57.1: the engine's refusals of a terminal chat, in the user's words.
