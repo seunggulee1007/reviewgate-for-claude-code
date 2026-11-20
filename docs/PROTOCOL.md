@@ -9276,7 +9276,9 @@ makes the same object current again: no `terminal_spec`, no new token, no respaw
   the switch stops it and retires its token as before.
 - **Fail-closed hooks.** In the background a hook gets: UserPromptSubmit → `{decision:"block", reason}` ("This terminal
   chat is in the background in ReviewGate, so its prompts cannot be reviewed now. Switch to its tab in ReviewGate and send
-  it again."); PreToolUse (the write tools) → the guard's deny when it denies (§57.8), else `permissionDecision:"deny"`
+  it again."); PreToolUse (the write tools, and MCP / EnterWorktree / ExitWorktree calls: a second fail-closed entry,
+  matcher `mcp__.*|EnterWorktree|ExitWorktree`, in the spec of a client that runs background terminals or moves chats,
+  answered `{}` in the foreground) → the guard's deny when it denies (§57.8), else `permissionDecision:"deny"`
   ("ReviewGate is reviewing another chat in this folder now, so this chat cannot change files. Stop and wait until the
   user switches back to this chat."); PermissionRequest → `{}` (the TUI answers) and `waiting`; Notification → `waiting`
   as in §57.4; every other event `{}`. `/clear` / `/resume` (`session_id`) and the config dir (§57.16) are still
@@ -9322,7 +9324,8 @@ before `--settings` (the option takes several values, so a flag follows it).
 - **`chat_move {path, interrupt?, followUp?}` of a terminal chat.** Refused as a chat's (`chat_is_record` — also for a
   terminal chat continued elsewhere —, the target's refusals, `collect_failed`, `session_busy` while a turn runs without
   `interrupt`; `terminal_chat` for a client that does not move terminal chats). Then:
-  1. `state.session.terminal.moving {path, name}`: from now on UserPromptSubmit is blocked and PreToolUse denied with
+  1. `state.session.terminal.moving {path, name}`: from now on UserPromptSubmit is blocked and PreToolUse (the write,
+     MCP and worktree tools, §57.10) denied with
      "This chat is moving to <name> in ReviewGate; it continues there."; an open turn stays open.
   2. The app sees `moving`, ends the PTY (no restart) and sends `terminal_exited`. The engine waits for the claude pid's
      exit (or `terminal_exited`) up to 5 s; on timeout `moving` clears, the chat stays, refused `cli_still_running`.

@@ -628,6 +628,9 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   }
 
   private async onPreTool(input: Record<string, unknown>): Promise<HookOutput> {
+    // §57.10 / §57.12: an MCP or worktree tool reaches this hook only so a background or moving chat denies it; here it goes on.
+    const toolName = str(input.tool_name) ?? "";
+    if (toolName !== "Bash" && !EDIT_TOOLS_RE.test(toolName)) return {};
     // MARK: terminal-guard — §57.8: git that throws away work is blocked before any turn starts; git that changes the
     // repository and edits the review does not see make the TUI ask, in every mode.
     const guard = await this.guard(input);

@@ -415,6 +415,21 @@ describe("TerminalSession", () => {
     expect(r.ts.state.promptId).toBe("p3");
   });
 
+  it("§57.10 / §57.12 MCP and worktree tools: on in the foreground (no turn adopted), denied in the background and while moving", async () => {
+    const r = rig();
+    r.ts.setToken("tok-1");
+    r.ts.started(77);
+    const deny = (reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
+    const calls = [pre("mcp__acme__deploy", { env: "prod" }, "m1"), pre("EnterWorktree", { name: "feat" }, "e1"), pre("ExitWorktree", {}, "x1")];
+    for (const c of calls) expect(await r.hook(c), c.tool_name).toEqual({});
+    expect(r.of("auto_turn_start")).toHaveLength(0);
+    r.ts.setBackground(true);
+    for (const c of calls) expect(await r.hook(c), c.tool_name).toEqual(deny(BACKGROUND_TOOL_REASON));
+    r.ts.setBackground(false);
+    r.ts.beginMove({ path: "/work/acme-feat", name: "acme-feat" });
+    for (const c of calls) expect(await r.hook(c), c.tool_name).toEqual(deny(movingReason("acme-feat")));
+  });
+
   it("§57.13 status: the first sample is the baseline, growth goes into the next turn_end, a drop is a new baseline", async () => {
     const r = rig();
     const status = (cost: number, ctx = 1000) => r.ts.handleStatus({ cost: { total_cost_usd: cost }, model: { id: "claude-acme-test", display_name: "Acme" }, context_window: { context_window_size: 200_000, current_usage: { input_tokens: ctx, cache_creation_input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 7 } } });

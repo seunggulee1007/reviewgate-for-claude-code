@@ -2792,6 +2792,7 @@ export class ReviewEngine {
     }
     const settings = hookSettings(server.url, {
       permissionRequest: this.terminalFeature("permissionBridge"),
+      elsewhereTools: this.terminalFeature("background") || this.terminalFeature("worktreeMove"),
       statusLine: this.terminalFeature("statusLine") ? this.terminalStatusLine(server.statusUrl, managedPolicy) : null,
     });
     const mcpConfigFile = await this.terminalMcpConfigFile(meta);

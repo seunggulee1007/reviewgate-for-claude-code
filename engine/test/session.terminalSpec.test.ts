@@ -54,6 +54,12 @@ describe("hookSettings", () => {
     expect(bridged.hooks.PermissionRequest).toEqual([{ hooks: [H(600)] }]);
     expect(Object.keys(bridged.hooks)).toEqual(["UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "CwdChanged", "Stop", "StopFailure", "Notification", "SessionEnd"]);
     expect(s.hooks.PermissionRequest).toBeUndefined();
+    // §57.10 / §57.12: MCP and worktree tools reach PreToolUse (fail-closed) only for a client with background terminals or moves.
+    expect(hookSettings(URL, { elsewhereTools: true }).hooks.PreToolUse).toEqual([
+      { matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [H(60, true)] },
+      { matcher: "mcp__.*|EnterWorktree|ExitWorktree", hooks: [H(60, true)] },
+    ]);
+    expect(s.hooks.PreToolUse).toHaveLength(1);
     const failing = Object.entries(bridged.hooks).filter(([, m]) => JSON.stringify(m).includes("onFailure")).map(([k]) => k);
     expect(failing).toEqual(["UserPromptSubmit", "PreToolUse"]);
   });

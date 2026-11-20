@@ -35,6 +35,11 @@ export const TERMINAL_SYSTEM_APPEND =
 
 /** The write tools whose calls start / attribute a review turn. */
 export const TERMINAL_WRITE_TOOLS_MATCHER = "Edit|Write|MultiEdit|NotebookEdit|Bash";
+/**
+ * §57.10 / §57.12: the other tools that act outside the review — MCP servers and the worktree tools. They reach the hook
+ * only so a background or moving chat can deny them; in the foreground the answer is `{}`.
+ */
+export const TERMINAL_ELSEWHERE_TOOLS_MATCHER = "mcp__.*|EnterWorktree|ExitWorktree";
 
 type HttpHook = {
   type: "http";
@@ -49,6 +54,8 @@ type HttpHook = {
 export type HookSettingsOptions = {
   /** §57.15: a PermissionRequest hook — only for a client that answers bridged dialogs (else nobody would). */
   permissionRequest?: boolean;
+  /** §57.10 / §57.12: a PreToolUse entry for MCP and worktree tools — only for a client that runs background terminals or moves chats. */
+  elsewhereTools?: boolean;
   /**
    * §57.13: a `statusLine` that posts the CLI's status input to `statusUrl` and then runs the user's own command (null:
    * none — the tee prints nothing); `padding` / `refreshInterval` (seconds) are the user's.
@@ -94,7 +101,10 @@ export function hookSettings(url: string, opts: HookSettingsOptions = {}): {
   return {
     hooks: {
       UserPromptSubmit: [{ hooks: [h(120, true)] }],
-      PreToolUse: [{ matcher: TERMINAL_WRITE_TOOLS_MATCHER, hooks: [h(60, true)] }],
+      PreToolUse: [
+        { matcher: TERMINAL_WRITE_TOOLS_MATCHER, hooks: [h(60, true)] },
+        ...(opts.elsewhereTools ? [{ matcher: TERMINAL_ELSEWHERE_TOOLS_MATCHER, hooks: [h(60, true)] }] : []),
+      ],
       // §57.15: no onFailure — a failure leaves the TUI's own dialog in charge.
       ...(opts.permissionRequest ? { PermissionRequest: [{ hooks: [h(600)] }] } : {}),
       PostToolUse: [{ hooks: [h(120)] }],
