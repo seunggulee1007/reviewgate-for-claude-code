@@ -2619,6 +2619,7 @@ export class ReviewEngine {
   /** §57.10: the chat's background terminal is current again — the same session and token; nothing is respawned. */
   private resumeBackgroundTerminal(ts: TerminalSession, meta: SessionMeta): void {
     ts.setBackground(false);
+    ts.setBudget(this.settings.budget); // §54: it may have changed meanwhile
     this.session = ts;
     this.sessionStart = { resume: null, gotInfo: false, ready: true };
     this.sessionState.open = true;
@@ -2726,6 +2727,7 @@ export class ReviewEngine {
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
       // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
       stopFeedback: (q) => (this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null),
+      budget: this.settings.budget, // §54
       // §57.15: the setting (default on) and a client that answers the dialogs.
       permissionBridge: () => this.settings.terminalPermissionBridge !== false && this.terminalFeature("permissionBridge"),
       stopFeedbackLost: (ids) => {
@@ -3056,6 +3058,9 @@ export class ReviewEngine {
         taken = sendParts.taken;
         parts = [summary, notes].filter((p): p is string => p !== null);
       }
+      // §54: the budget Claude was told in this terminal changed (it was told none at first) — said with the prompt.
+      const budgetNote = command ? null : budgetChangeNote(ts.toldBudget, this.settings.budget);
+      if (budgetNote) parts.push(budgetNote);
       const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
       if (!command) {
         this.commitSlice.lastUserText = trimmed;
@@ -3076,7 +3081,9 @@ export class ReviewEngine {
       this.gate.noteTurnStart(this.turnRecord?.startTree ?? null); // §34.1: "this turn" starts here
       if (this.session !== ts) throw new Error("the terminal chat was left");
       started = true;
-      if (!answer({ ok: true, additionalContext: parts.length > 0 ? parts.join("\n\n") : null, checkpointTree: this.turnHookTree(tree) }) && taken) {
+      const delivered = answer({ ok: true, additionalContext: parts.length > 0 ? parts.join("\n\n") : null, checkpointTree: this.turnHookTree(tree) });
+      if (delivered && budgetNote) ts.toldBudget = budgetNumbers(this.settings.budget);
+      if (!delivered && taken) {
         // The prompt no longer waited (blocked meanwhile, the CLI gave up): Claude never got the summary — the next one does.
         this.gate.restoreSummary(taken);
         this.log("info", "terminal prompt: its review summary never reached Claude; it goes with the next prompt");

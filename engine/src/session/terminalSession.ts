@@ -7,7 +7,7 @@
  */
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
 import { randomUUID } from "node:crypto";
-import type { BackgroundTask, PermissionMode, TerminalElsewhere, TerminalPermission, TerminalPlace, TerminalRequestQueued, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
+import type { BackgroundTask, Budget, PermissionMode, TerminalElsewhere, TerminalPermission, TerminalPlace, TerminalRequestQueued, TerminalSessionState, TerminalStatus, TerminalWaiting } from "../protocol.js";
 import { statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
@@ -29,6 +29,10 @@ import {
   readOnlyContextOf,
   toolFile,
   UNPROMPTED_REASON,
+  budgetAfterBash,
+  budgetPreBash,
+  budgetPreEdit,
+  budgetSoftNote,
   worktreeToolNotice,
   type HookContext,
 } from "./hooks.js";
@@ -64,6 +68,8 @@ export type TerminalSessionOptions = {
    */
   stopFeedback?: (q: TerminalRequestQueued) => { message: string; noteIds: string[] } | null;
   stopFeedbackLost?: (noteIds: string[]) => void;
+  /** §54 / §57.4: the change budget (opt-in; none = nothing counted or denied). */
+  budget?: Budget;
   /** §57.15: whether Claude Code's permission dialogs are offered to the app (the setting, the client); false: the TUI only. */
   permissionBridge?: () => boolean;
   /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
@@ -207,9 +213,14 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   /** §57.15: the dialogs offered to the app, each one open hook request (oldest first); the guard's recent `ask` reasons. */
   private permissions = new Map<string, { entry: TerminalPermission; settle: (out: HookOutput) => void }>();
   private guardAsks = new Map<string, { reason: string; at: number }>();
+  /** §54: the change budget the next turn counts against (`setBudget` changes it live, as a chat's). */
+  private budget: Budget;
+  /** §54: the budget numbers Claude was last told in this terminal (its system prompt names none). */
+  toldBudget: { maxFiles: number; maxLines: number } = { maxFiles: 0, maxLines: 0 };
 
   constructor(private readonly opts: TerminalSessionOptions) {
     this.cliSessionId = opts.cliSessionId;
+    this.budget = opts.budget ?? { maxFiles: 0, maxLines: 0 };
     this.configDir = opts.configDir ?? null;
     this.plansDir = opts.configDir ? join(opts.configDir, "plans") : opts.plansDir;
     this.ctx = this.freshContext();
@@ -343,7 +354,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   async interrupt(): Promise<void> {}
   respondPermission(): void {}
-  setBudget(): void {}
+  /** §54: the budget changed in Settings — the running turn counts against the new one, as a chat's. */
+  setBudget(budget: Budget): void {
+    this.budget = budget;
+    this.ctx.budget.setBudget(budget);
+  }
   setPermissionSettings(): void {}
   async setPermissionMode(): Promise<void> {}
 
@@ -501,9 +516,11 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         case "PreToolUse":
           return await this.onPreTool(input);
         case "PostToolUse":
-        case "PostToolUseFailure":
-          await this.onPostTool(input);
-          return {};
+        case "PostToolUseFailure": {
+          const note = await this.onPostTool(input);
+          // §54: past the soft limit, an edit tool's answer tells Claude (as a chat's PostToolUse does).
+          return note ? { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: note } } : {};
+        }
         case "Stop":
           return this.stopFeedbackAnswer(input, signal) ?? (this.onStop(input, "end_turn"), {});
         case "StopFailure": {
@@ -621,6 +638,13 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } };
       }
     }
+    // §54: the change budget (opt-in) — after the turn's adoption, before the Bash baseline.
+    const ti = input.tool_input && typeof input.tool_input === "object" ? (input.tool_input as Record<string, unknown>) : {};
+    const tool = str(input.tool_name) ?? "";
+    const overBudget = tool === "Bash"
+      ? budgetPreBash(this.ctx, String(ti.command ?? ""))
+      : EDIT_TOOLS_RE.test(tool) ? budgetPreEdit(this.ctx, tool, ti, toolFile(ti, str(input.cwd) ?? this.opts.cwd)) : null;
+    if (overBudget) return overBudget as HookOutput;
     if (input.tool_name === "Bash") await this.beforeBash(input);
     return guard ? preToolAnswer(guard) : {};
   }
@@ -673,7 +697,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     return await pending.promise;
   }
 
-  private async onPostTool(input: Record<string, unknown>): Promise<void> {
+  /** Resolves with the §54 soft note for an edit tool's answer (null: none). */
+  private async onPostTool(input: Record<string, unknown>): Promise<string | null> {
     const name = str(input.tool_name) ?? "";
     const id = str(input.tool_use_id);
     const ti = input.tool_input && typeof input.tool_input === "object" ? (input.tool_input as Record<string, unknown>) : {};
@@ -683,21 +708,21 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     if (name === "EnterWorktree" || name === "ExitWorktree") {
       const notice = worktreeToolNotice(input);
       if (notice) this.opts.emit({ type: "scope_notice", ...notice });
-      return;
+      return null;
     }
     if (!this.open) {
       this.opts.log("debug", `terminal: ${name} ended with no review turn open`);
-      return;
+      return null;
     }
-    if (!id) return;
+    if (!id) return null;
     const result = (): void => this.opts.emit({ type: "tool_result", toolUseId: id, isError: failed, preview: preview(failed ? input.error : input.tool_response) });
     if (name === "Bash") {
       this.opts.emit({ type: "tool_use", id, name, input: ti });
       await this.afterBash(input, id, String(ti.command ?? ""));
       result();
-      return;
+      return null;
     }
-    if (!EDIT_TOOLS_RE.test(name)) return;
+    if (!EDIT_TOOLS_RE.test(name)) return null;
     const file = toolFile(ti, this.opts.cwd);
     this.opts.emit({ type: "tool_use", id, name, input: ti, ...(file ? { file } : {}) });
     if (file && !failed) {
@@ -709,6 +734,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       }
     }
     result();
+    return failed || input.hook_event_name !== "PostToolUse" ? null : budgetSoftNote(this.ctx);
   }
 
   /**
@@ -831,7 +857,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
 
   private freshContext(): HookContext {
     return {
-      budget: new BudgetState({ maxFiles: 0, maxLines: 0 }),
+      budget: new BudgetState(this.budget),
       cwd: this.opts.cwd,
       ignorePatterns: this.opts.ignorePatterns,
       autoAllowTools: new Set(),
@@ -882,7 +908,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         ...(this.status?.contextWindow ? { contextWindow: this.status.contextWindow } : {}),
       },
       toolFiles,
-      budget: { files: 0, lines: 0, denied: false },
+      budget: { files: this.ctx.budget.files.size, lines: this.ctx.budget.lines, denied: this.ctx.budget.denied }, // §54
       changedOutside: [...this.changedOutside].sort(),
       planFiles: [],
       toolWindows: [...(this.ctx.toolWindows?.values() ?? [])].filter((w) => w.end !== null).map((w) => ({ ...w })),
@@ -936,6 +962,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       for (const f of attributed) this.touch_(f, "Bash", toolUseId);
       if (attributed.length > 0) this.opts.emit({ type: "tool_files", toolUseId, files: attributed });
       this.opts.emit({ type: "bash_snapshot", toolUseId, tree, root: cp.root });
+      await budgetAfterBash(ctx, cp, tree, attributed); // §54
     } catch (e) {
       this.opts.log("debug", `terminal: snapshot after Bash failed: ${String(e)}`);
     }
