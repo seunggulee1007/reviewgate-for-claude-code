@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TerminalSpecEvent } from "../src/protocol.js";
@@ -616,5 +616,45 @@ describe("terminal chats (§57)", () => {
       expect(await hook(s3, ups("x"))).toEqual({ decision: "block", reason: RETIRED_REASON });
       expect(r.h.engine.state.sessions.backgroundTerminals).toBeUndefined();
     });
+  });
+
+  it("§57.11 a workbench outside the main checkout: --mcp-config names a 0600 file with the servers above it, ${VAR} unexpanded", async () => {
+    const root = temp("rg-term-mcp");
+    const acme = join(root, "work", "acme");
+    const app = join(acme, "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(join(acme, ".mcp.json"), JSON.stringify({ mcpServers: {
+      db: { command: "node", args: ["db.js"], env: { TOKEN: "${ACME_TOKEN}" } },
+      gh: { command: "node" }, local1: { command: "node" }, rejected: { command: "node" }, docs: { type: "http", url: "https://docs.example.com/mcp" },
+    } }));
+    sh(app, "init", "-q", "-b", "main");
+    sh(app, "config", "user.email", "test@example.com");
+    sh(app, "config", "user.name", "Test");
+    write(app, "a.txt", "a\n");
+    sh(app, "add", "-A");
+    sh(app, "commit", "-qm", "init");
+    const wt = join(root, "managed", "feat");
+    mkdirSync(join(root, "managed"), { recursive: true });
+    sh(app, "worktree", "add", "-q", "-b", "feat", wt);
+    const config = temp("rg-term-config");
+    writeFileSync(join(config, ".claude.json"), JSON.stringify({ mcpServers: { gh: { command: "x" } }, projects: { [wt]: { mcpServers: { local1: { command: "x" } } } } }));
+    writeFileSync(join(config, "settings.json"), JSON.stringify({ disabledMcpjsonServers: ["rejected"] }));
+    const r = await rig({ dir: wt, config });
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    const i = s.argv.indexOf("--mcp-config");
+    expect(i).toBe(2);
+    expect(s.argv[i + 2]).toBe("--settings");
+    const file = s.argv[i + 1]!;
+    expect((statSync(file).mode & 0o777).toString(8)).toBe("600");
+    const cfg = JSON.parse(readFileSync(file, "utf8")) as { mcpServers: Record<string, { env?: Record<string, string> }> };
+    expect(Object.keys(cfg.mcpServers).sort()).toEqual(["db", "docs"]);
+    expect(cfg.mcpServers.db!.env).toEqual({ TOKEN: "${ACME_TOKEN}" });
+    expect(s.argv.join(" ")).not.toContain("ACME_TOKEN"); // the config is a file, not argv
+
+    // The main checkout itself gets none.
+    const main = await rig({ dir: app });
+    const mid = await newTerminal(main);
+    expect((await spec(main, mid)).argv).not.toContain("--mcp-config");
   });
 });

@@ -17,7 +17,7 @@ import {
   type CheckpointRecord,
   type ForkPoint,
 } from "./review/checkpoints.js";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -242,7 +242,7 @@ import { agentHistoryFromRows } from "./session/agentHistoryRows.js"; // MARK: w
 import type { ModelCost } from "./protocol.js"; // MARK: wave4d w4d-agents2 (§42.4)
 // MARK: wave4d w4d-config — §42.3
 import { McpFileIndex, mcpOriginOf } from "./mcp/mcpOrigin.js";
-import { inheritedMcpFiles, inheritedMcpServers, mainCheckoutOf, rejectedMcpjsonServers, type InheritedMcpServer } from "./mcp/mcpInherit.js";
+import { inheritedMcpFiles, inheritedMcpServers, knownMcpNames, mainCheckoutOf, rejectedMcpjsonServers, terminalMcpConfig, type InheritedMcpServer } from "./mcp/mcpInherit.js";
 import { applyMcpToggle, loadRepoToggles, loadWorktreeToggles, mcpOffBy, mcpOffNames, repoTogglesStamp, saveRepoToggle, saveWorktreeToggles, type McpToggles } from "./mcp/mcpScopes.js";
 import { claudeJsonPath } from "./session/localSettings.js";
 import { describeMemoryFile, instructionTarget, projectInstructionFiles, readInstruction, subagentList, writeInstruction } from "./instructions/claudeMd.js";
@@ -2767,7 +2767,8 @@ export class ReviewEngine {
       this.persistSessions();
     }
     const settings = hookSettings(server.url, { permissionRequest: this.terminalFeature("permissionBridge") });
-    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings) });
+    const mcpConfigFile = await this.terminalMcpConfigFile(meta);
+    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings), mcpConfigFile });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
@@ -2783,6 +2784,47 @@ export class ReviewEngine {
   private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
     this.requireTerminal(cmd.sessionId);
     throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+  }
+
+  /**
+   * §57.11: in a worktree outside its main checkout, the `.mcp.json` servers above the main checkout as a `--mcp-config`
+   * file (`<dataDir>/terminal-mcp/<chat>.json`, 0600: not on the command line, whose length is capped on Windows and which
+   * other processes can read). Skipped: names the CLI loads by itself (user and local scope, its own walk), names settings
+   * reject (`disabledMcpjsonServers`), names turned off in ReviewGate and ReviewGate's session-scope servers. `${VAR}` stays
+   * for the CLI to expand. Null (and no file) when there is nothing to add or the files could not be read.
+   */
+  private async terminalMcpConfigFile(meta: SessionMeta): Promise<string | null> {
+    const file = join(this.dataDir, "terminal-mcp", `${meta.id.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+    const main = this.outsideMainCheckout();
+    let json: string | null = null;
+    if (main) {
+      try {
+        const cwd = this.project!.path;
+        const env = this.childEnv();
+        const dirs = this.terminalConfigDirs(meta);
+        const skip = await rejectedMcpjsonServers([
+          ...dirs.map((d) => join(d, "settings.json")),
+          join(cwd, ".claude", "settings.json"),
+          join(cwd, ".claude", "settings.local.json"),
+        ]);
+        for (const d of dirs) for (const n of await knownMcpNames({ cwd, claudeJson: claudeJsonPath({ ...env, CLAUDE_CONFIG_DIR: d }) })) skip.add(n);
+        for (const n of mcpOffNames(this.mcpToggles)) skip.add(n);
+        for (const n of this.mcpSessionServers.keys()) skip.add(n);
+        const found = await inheritedMcpServers(cwd, main, { skip, env, expand: false });
+        json = terminalMcpConfig(found);
+        if (json) this.log("info", `terminal chat ${meta.id}: ${found.size} MCP server(s) from .mcp.json files above ${main}`);
+      } catch (e) {
+        this.log("warn", `terminal: reading the .mcp.json files above the main checkout failed: ${errorMessage(e)}`);
+      }
+    }
+    if (!json) {
+      rmSync(file, { force: true });
+      return null;
+    }
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    writeFileSync(file, json, { mode: 0o600 });
+    chmodSync(file, 0o600); // an existing file keeps its mode through writeFileSync
+    return file;
   }
 
   /** §57.16: the config dirs a terminal chat's CLI may use — the engine's, then the one its hooks showed (when another). */

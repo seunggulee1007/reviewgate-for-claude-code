@@ -93,11 +93,16 @@ export function isCliSessionId(v: unknown): v is string {
 }
 
 /**
- * `claude --session-id=<id>|--resume=<id> --settings <json> --append-system-prompt <…>` — the user's own claude otherwise.
- * The id is joined to its flag, so whatever it holds it is that flag's value, never an option of its own.
+ * `claude --session-id=<id>|--resume=<id> [--mcp-config <file>] --settings <json> --append-system-prompt <…>` — the user's
+ * own claude otherwise. The id is joined to its flag, so whatever it holds it is that flag's value, never an option of its
+ * own. §57.11: `--mcp-config` takes several values (variadic), so a flag follows its file.
  */
-export function terminalArgv(a: { claude: string; id: string; resume: boolean; settingsJson: string }): string[] {
-  return [a.claude, `${a.resume ? "--resume" : "--session-id"}=${a.id}`, "--settings", a.settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND];
+export function terminalArgv(a: { claude: string; id: string; resume: boolean; settingsJson: string; mcpConfigFile?: string | null }): string[] {
+  return [
+    a.claude, `${a.resume ? "--resume" : "--session-id"}=${a.id}`,
+    ...(a.mcpConfigFile ? ["--mcp-config", a.mcpConfigFile] : []),
+    "--settings", a.settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND,
+  ];
 }
 
 /** The env the PTY adds: only `RG_*` / `CLAUDE_CODE_*` keys pass. */

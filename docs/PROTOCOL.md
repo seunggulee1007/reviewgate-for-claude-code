@@ -8826,7 +8826,8 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
 
 **What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id=<id>" | "--resume=<id>"` (`<id>` = `cliSessionId ?? id`, joined to its flag so it can
-never be an option of its own)`, "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
+never be an option of its own)`, ["--mcp-config", <file>,] "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]`
+(`--mcp-config` only in a worktree outside its main checkout, §57.11) — no `--setting-sources`, `--model` or
 `--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
 ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
 "already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
@@ -9183,6 +9184,24 @@ makes the same object current again: no `terminal_spec`, no new token, no respaw
 - **pids.** A background terminal's claude pid is never "another Claude in this worktree" (§31).
 - **Risk.** A background task or an MCP tool of the background terminal can still write files: those are tree changes,
   shown in the current window's review as external changes (§31) — not hidden, but not reviewed under that chat.
+
+### 57.11 MCP servers from above a workbench
+
+A terminal chat in a worktree outside its main checkout (a managed workbench, §42.3) gets the `.mcp.json` servers of the
+folders above the main checkout, as the terminal there has them: `terminal_spec` adds `--mcp-config <file>` right
+before `--settings` (the option takes several values, so a flag follows it).
+
+- **The file** is `<dataDir>/terminal-mcp/<chat id>.json` (folder 0700, file 0600), `{"mcpServers":{…}}`, rewritten at
+  each spec and removed when there is nothing to add. Not inline JSON: Windows caps a command line at 32,767 characters,
+  and other processes can read a command line.
+- **No `--strict-mcp-config`**: the user's own servers (user, local, project scope, plugins) stay.
+- **Skipped names** — the CLI's own server wins, as for a chat: user scope (`.claude.json` `mcpServers`), local scope
+  (`projects[<cwd>].mcpServers`), the `.mcp.json` files along the worktree's own walk, `disabledMcpjsonServers` of the
+  user's and the project's settings, names turned off in ReviewGate, ReviewGate's session-scope servers. Both config dirs
+  of §57.16 are read. Between the inherited files the nearer one wins.
+- **`${VAR}` is not expanded by the engine**: the CLI expands it from the PTY's environment (the user's login shell), and
+  secrets stay out of the file. (Unverified against the CLI: if it does not expand there, the engine will expand only
+  variables of its own environment into this 0600 file.)
 
 ### 57.16 Hook coverage, proxy and config dir
 

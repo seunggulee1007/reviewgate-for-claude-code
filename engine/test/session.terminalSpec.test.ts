@@ -77,6 +77,12 @@ describe("terminalArgv / terminalEnv", () => {
     expect(TERMINAL_SYSTEM_APPEND).toContain("[Review gate]");
   });
 
+  it("§57.11 --mcp-config <file> goes right before --settings (its option takes several values)", () => {
+    const argv = terminalArgv({ claude: "claude", id: "c", resume: false, settingsJson, mcpConfigFile: "/data/terminal-mcp/c.json" });
+    expect(argv).toEqual(["claude", "--session-id=c", "--mcp-config", "/data/terminal-mcp/c.json", "--settings", settingsJson, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]);
+    expect(terminalArgv({ claude: "claude", id: "c", resume: false, settingsJson, mcpConfigFile: null })).not.toContain("--mcp-config");
+  });
+
   it("isCliSessionId: a UUID only", () => {
     expect(isCliSessionId("0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a")).toBe(true);
     expect(isCliSessionId("0B7E3C1A-5D2F-4E8B-9A6C-1F2E3D4C5B6A")).toBe(true);

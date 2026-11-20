@@ -76,10 +76,14 @@ function expandDeep(v: unknown, env: Record<string, string | undefined>): unknow
   return v;
 }
 
-/** One `.mcp.json` entry as an SDK server config (`type` filled in: stdio when it has a command); null when it is neither. */
-function sdkConfigOf(raw: unknown, env: Record<string, string | undefined>): Record<string, unknown> | null {
+/**
+ * One `.mcp.json` entry as an SDK server config (`type` filled in: stdio when it has a command); null when it is neither.
+ * `expand: false` (§57.11, a terminal chat's `--mcp-config`) leaves `${VAR}` as written: the CLI expands it from the PTY's
+ * environment, the user's real one.
+ */
+function sdkConfigOf(raw: unknown, env: Record<string, string | undefined>, expand = true): Record<string, unknown> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const c = expandDeep(raw, env) as Record<string, unknown>;
+  const c = (expand ? expandDeep(raw, env) : raw) as Record<string, unknown>;
   const type = typeof c.type === "string" ? c.type : typeof c.command === "string" ? "stdio" : null;
   if (type === "stdio" && typeof c.command === "string") return { ...c, type };
   if ((type === "http" || type === "sse") && typeof c.url === "string") return { ...c, type };
@@ -94,7 +98,7 @@ function sdkConfigOf(raw: unknown, env: Record<string, string | undefined>): Rec
 export async function inheritedMcpServers(
   cwd: string,
   mainRoot: string,
-  opts: { skip: ReadonlySet<string>; env: Record<string, string | undefined> },
+  opts: { skip: ReadonlySet<string>; env: Record<string, string | undefined>; expand?: boolean },
 ): Promise<Map<string, InheritedMcpServer>> {
   const out = new Map<string, InheritedMcpServer>();
   for (const file of inheritedMcpFiles(cwd, mainRoot)) {
@@ -102,7 +106,7 @@ export async function inheritedMcpServers(
     if (!servers) continue;
     for (const [name, raw] of Object.entries(servers)) {
       if (opts.skip.has(name)) continue;
-      const config = sdkConfigOf(raw, opts.env);
+      const config = sdkConfigOf(raw, opts.env, opts.expand ?? true);
       if (config) out.set(name, { file, config });
     }
   }
@@ -122,4 +126,43 @@ export async function rejectedMcpjsonServers(files: string[]): Promise<Set<strin
     }
   }
   return out;
+}
+
+async function readJsonObject(file: string): Promise<Record<string, unknown> | null> {
+  try {
+    const st = await stat(file);
+    if (!st.isFile() || st.size > MAX_CLAUDE_JSON_BYTES) return null;
+    const o = JSON.parse(await readFile(file, "utf8")) as unknown;
+    return o && typeof o === "object" && !Array.isArray(o) ? (o as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `.claude.json` grows with the CLI's history; larger than this it is not read for names (§57.11). */
+const MAX_CLAUDE_JSON_BYTES = 64 * 1024 * 1024;
+
+const namesOf = (v: unknown): string[] => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v) : []);
+
+/**
+ * §57.11: the MCP server names a terminal's CLI in `cwd` loads by itself — user scope (`.claude.json` `mcpServers`), local
+ * scope (`projects[<cwd>].mcpServers`) and the `.mcp.json` files along `cwd`'s own walk. Read-only; unreadable = none.
+ */
+export async function knownMcpNames(o: { cwd: string; claudeJson: string }): Promise<Set<string>> {
+  const out = new Set<string>();
+  const cfg = await readJsonObject(o.claudeJson);
+  for (const n of namesOf(cfg?.mcpServers)) out.add(n);
+  const projects = cfg?.projects && typeof cfg.projects === "object" ? (cfg.projects as Record<string, unknown>) : {};
+  for (const [key, p] of Object.entries(projects)) {
+    if (!samePath(key, o.cwd) || !p || typeof p !== "object") continue;
+    for (const n of namesOf((p as { mcpServers?: unknown }).mcpServers)) out.add(n);
+  }
+  for (const dir of foldersUp(o.cwd)) for (const n of namesOf(await readServers(join(dir, ".mcp.json")))) out.add(n);
+  return out;
+}
+
+/** §57.11: the `--mcp-config` JSON (`{"mcpServers":{…}}`) of the inherited servers; null when there are none. */
+export function terminalMcpConfig(servers: ReadonlyMap<string, InheritedMcpServer>): string | null {
+  if (servers.size === 0) return null;
+  return JSON.stringify({ mcpServers: Object.fromEntries([...servers].map(([n, s]) => [n, s.config])) });
 }
