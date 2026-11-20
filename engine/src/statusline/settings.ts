@@ -120,8 +120,8 @@ export function resolveStatusLine(opts: {
   /** The flag layer's `disableAllHooks` (ReviewGate's `disableUserHooks`): as the user's own. */
   disableAllHooks?: boolean;
   /**
-   * §57.13: the project's own statusLine runs whatever its command — a terminal chat's CLI runs it itself once the folder is
-   * trusted, so `allowedProjectSha` does not apply.
+   * §57.13: the project's own statusLine runs whatever its command — the caller found the folder trusted by Claude Code
+   * (`.claude.json`), whose terminal CLI runs it itself then; otherwise only `allowedProjectSha` lets it run.
    */
   trustProject?: boolean;
   read?: (path: string) => string | null;

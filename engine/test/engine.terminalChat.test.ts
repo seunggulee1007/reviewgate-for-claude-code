@@ -9,6 +9,7 @@ import { TERMINAL_GIT_ASK_REASON, TERMINAL_GIT_DENY_REASON, TERMINAL_GIT_NO_ASK_
 import { BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, movingReason, STOP_FEEDBACK_PREFIX } from "../src/session/terminalSession.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { NO_MANAGED_POLICY, type ManagedPolicy } from "../src/statusline/managed.js";
+import { commandSha256 } from "../src/statusline/settings.js";
 import { fakePlatform, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeFakeClaude } from "./helpers/fakeClaude.js";
 import { fileExists, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -724,6 +725,30 @@ describe("terminal chats (§57)", () => {
     const done = await r.h.waitFor((x) => x.gate.phase !== "running" && x.gate.phase !== "collecting", "turn over");
     expect(done.hud.sessionCostUSD).toBeCloseTo(0.0123);
     expect(done.sessions.list.find((m) => m.id === id)?.costUSD).toBeCloseTo(0.0123);
+  });
+
+  it("§57.13 a repository's own statusLine is wrapped only in a folder Claude Code trusts or with the user's allowance (§44.2)", async () => {
+    const config = temp("rg-term-config");
+    writeFileSync(join(config, "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "acme-user-status" } }));
+    const r = await rig({ config });
+    const repo = realpathSync(r.dir);
+    mkdirSync(join(repo, ".claude"), { recursive: true });
+    writeFileSync(join(repo, ".claude", "settings.json"), JSON.stringify({ statusLine: { type: "command", command: "acme-repo-status" } }));
+    const id = await newTerminal(r);
+    const line = async (): Promise<string> => {
+      const s = await spec(r, id);
+      return (JSON.parse(s.argv[s.argv.indexOf("--settings") + 1]!) as { statusLine: { command: string } }).statusLine.command;
+    };
+    // Not trusted: only the user's own runs.
+    expect(await line()).toContain(`/bin/sh -c 'acme-user-status'`);
+    // Claude Code trusts the folder (a folder above it counts, as for the CLI).
+    writeFileSync(join(config, ".claude.json"), JSON.stringify({ projects: { [dirname(repo)]: { hasTrustDialogAccepted: true } } }));
+    expect(await line()).toContain(`/bin/sh -c 'acme-repo-status'`);
+    writeFileSync(join(config, ".claude.json"), JSON.stringify({ projects: { [repo]: { hasTrustDialogAccepted: false } } }));
+    expect(await line()).toContain(`/bin/sh -c 'acme-user-status'`);
+    // The user allowed that very command for this project (§44.2).
+    await r.h.engine.handle({ type: "set_settings", settings: { allowedProjectStatusLine: commandSha256("acme-repo-status") } });
+    expect(await line()).toContain(`/bin/sh -c 'acme-repo-status'`);
   });
 
   describe("§57.14 Request changes", () => {

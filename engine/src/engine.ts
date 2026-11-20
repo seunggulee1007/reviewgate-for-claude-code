@@ -244,7 +244,7 @@ import type { ModelCost } from "./protocol.js"; // MARK: wave4d w4d-agents2 (§4
 import { McpFileIndex, mcpOriginOf } from "./mcp/mcpOrigin.js";
 import { inheritedMcpFiles, inheritedMcpServers, knownMcpNames, mainCheckoutOf, rejectedMcpjsonServers, terminalMcpConfig, type InheritedMcpServer } from "./mcp/mcpInherit.js";
 import { applyMcpToggle, loadRepoToggles, loadWorktreeToggles, mcpOffBy, mcpOffNames, repoTogglesStamp, saveRepoToggle, saveWorktreeToggles, type McpToggles } from "./mcp/mcpScopes.js";
-import { claudeJsonPath } from "./session/localSettings.js";
+import { claudeJsonPath, folderTrusted } from "./session/localSettings.js";
 import { describeMemoryFile, instructionTarget, projectInstructionFiles, readInstruction, subagentList, writeInstruction } from "./instructions/claudeMd.js";
 import type { ClaudeMdEvent, McpToggleScope, SubagentInfo } from "./protocol.js";
 // MARK: wave5 w5-model — §43.4 auto model
@@ -2792,7 +2792,7 @@ export class ReviewEngine {
     }
     const settings = hookSettings(server.url, {
       permissionRequest: this.terminalFeature("permissionBridge"),
-      statusLine: this.terminalFeature("statusLine") ? this.terminalStatusLine(meta, server.statusUrl, managedPolicy) : null,
+      statusLine: this.terminalFeature("statusLine") ? this.terminalStatusLine(server.statusUrl, managedPolicy) : null,
     });
     const mcpConfigFile = await this.terminalMcpConfigFile(meta);
     const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings), mcpConfigFile });
@@ -2889,12 +2889,20 @@ export class ReviewEngine {
   }
 
   /**
-   * §57.13: the statusLine tee of a spawn — the user's own status line as their claude resolves it (the project's too: the
-   * TUI runs it once the folder is trusted; the learned config dir's user settings), its padding and refresh copied.
+   * §57.13: the statusLine tee of a spawn — the user's own status line, its padding and refresh copied. Resolved from the
+   * engine's own config dir, never one a hook named (§57.16); the project's own command only in a folder Claude Code
+   * trusts (`.claude.json`) or when the user allowed that very command (§44.2), else the user's and the managed one.
    */
-  private terminalStatusLine(meta: SessionMeta, statusUrl: string, managed: ManagedPolicy): NonNullable<HookSettingsOptions["statusLine"]> {
-    const dirs = this.terminalConfigDirs(meta);
-    const own = resolveStatusLine({ configDir: dirs[dirs.length - 1]!, cwd: this.project?.path ?? null, managed, trustProject: true }).config;
+  private terminalStatusLine(statusUrl: string, managed: ManagedPolicy): NonNullable<HookSettingsOptions["statusLine"]> {
+    const env = this.childEnv();
+    const cwd = this.project?.path ?? null;
+    const own = resolveStatusLine({
+      configDir: claudeConfigDir(env),
+      cwd,
+      managed,
+      allowedProjectSha: this.settings.allowedProjectStatusLine || null,
+      trustProject: cwd !== null && folderTrusted({ projectPath: cwd, env }),
+    }).config;
     return {
       statusUrl,
       userCommand: own?.command ?? null,

@@ -9349,9 +9349,11 @@ printf '%s' "$j" | /bin/sh -c '<the user's command, POSIX-quoted>'      # only w
 - The token goes in through `-H @-` (never argv); `--noproxy '*'` keeps the post off any proxy. The user's command gets
   the same stdin, cwd and env; its output and exit status pass through, so their status line looks the same. With none
   configured the tee prints nothing (the TUI may keep an empty row).
-- **Which command.** The user's resolved status line (§44.2) with the project's own trusted (`trustProject`: the TUI runs
-  it itself once the folder is trusted, so `allowedProjectStatusLine` does not apply), read from the learned config dir
-  (§57.16); its `padding` and `refreshInterval` are copied. A managed statusLine outranks the flag settings, so with one
+- **Which command.** The user's resolved status line (§44.2), read from the engine's own config dir — never the one a
+  hook named (§57.16). The project's own (`.claude/settings(.local).json`) only when Claude Code trusts the folder
+  (`<configDir>/.claude.json` › `projects[<the folder or one above it>].hasTrustDialogAccepted === true`, read-only) or the
+  user allowed that very command (`allowedProjectStatusLine`, §44.2); otherwise the user's and the managed one. Its
+  `padding` and `refreshInterval` are copied. A managed statusLine outranks the flag settings, so with one
   the tee does not run and no cost shows. A statusLine edited mid-session is picked up at the next Restart.
 - **`POST /status`** (same token, limits and statuses as `/hook`) → `TerminalSession.handleStatus`. It reads
   `cost.total_cost_usd`, `model.id` / `model.display_name` and `context_window` (`context_window_size`, the

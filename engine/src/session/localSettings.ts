@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { ExtensionHook, NotAppliedLocalSettings } from "../protocol.js";
 import { LOCAL_SETTINGS } from "../git/mods.js";
 
@@ -89,6 +89,28 @@ function claudeJsonProjects(path: string): Record<string, unknown> | null {
  */
 export function chromeEnabledByDefault(env: Record<string, string | undefined>): boolean {
   return claudeJson(claudeJsonPath(env))?.chromeByDefault === true;
+}
+
+/**
+ * §57.13: whether Claude Code trusts `projectPath` — `projects[<it or a folder above it>].hasTrustDialogAccepted === true`
+ * in `.claude.json` (each path as given and symlink-resolved), as the CLI's own trust check. Read-only; unknown = false.
+ */
+export function folderTrusted(opts: { projectPath: string; env: Record<string, string | undefined> }): boolean {
+  const projects = claudeJsonProjects(claudeJsonPath(opts.env));
+  if (!projects) return false;
+  const starts = new Set<string>([resolve(opts.projectPath)]);
+  try {
+    starts.add(realpathSync(opts.projectPath));
+  } catch {
+    // a path that does not resolve is looked up as given
+  }
+  for (const start of starts) {
+    for (let dir = start; ; dir = dirname(dir)) {
+      if (obj(projects[dir])?.hasTrustDialogAccepted === true) return true;
+      if (dirname(dir) === dir) break;
+    }
+  }
+  return false;
 }
 
 /** Names of the local-scope MCP servers of the project (keyed by its path as given or symlink-resolved, and its root). */
