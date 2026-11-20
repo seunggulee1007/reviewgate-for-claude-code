@@ -7,6 +7,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useDiffPrefs } from "../../diffPrefs";
 import { t } from "../../i18n";
 import { isComposing, isEnter } from "../../ime";
+import { tKey } from "../../shortcutKeys";
+import type { DiffLayout } from "../../diffSplit";
 
 /** "줄바꿈": wrap long lines (default) or scroll every row together. Shared by every diff view, the full-file one included. */
 export function WrapToggle() {
@@ -19,10 +21,40 @@ export function WrapToggle() {
   );
 }
 
-export function DiffToolsRow(props: { children?: ReactNode; onFind?: () => void }) {
+/**
+ * §34.11 "합쳐 보기 | 나란히 보기" (remembered, Ctrl+Alt+L / ⌥⌘L): off with the reason while the pane is too narrow for two
+ * columns — it shows unified then and goes back to split by itself once wide enough.
+ */
+export function LayoutToggle(props: { fits: boolean; shown: DiffLayout }) {
+  const setLayout = useDiffPrefs((s) => s.setLayout);
+  const { shown } = props;
+  const title = props.fits ? tKey("Unified: one column · Split: the old version on the left, the new on the right", "Split Diff") : t("Too narrow for split — widen the pane or hide the sidebar");
+  return (
+    <div className="diff-layout" role="radiogroup" aria-label={t("Diff layout")} title={title} data-testid="Diff layout">
+      {(["unified", "split"] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={shown === value}
+          className={`small diff-tool ${shown === value ? "active" : ""}`}
+          disabled={!props.fits}
+          onClick={() => setLayout(value)}
+          data-testid={`Diff layout ${value}`}
+        >
+          {t(value === "unified" ? "Unified" : "Split")}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** `layout`: the unified / split toggle and what the lines show (the line diffs; not the full-file view, which has its own). */
+export function DiffToolsRow(props: { children?: ReactNode; onFind?: () => void; layout?: { fits: boolean; shown: DiffLayout } }) {
   return (
     <div className="diff-tools" data-testid="Diff tools">
       <div className="diff-tools-start">{props.children}</div>
+      {props.layout && <LayoutToggle fits={props.layout.fits} shown={props.layout.shown} />}
       {props.onFind && (
         <button type="button" className="small diff-tool" onClick={props.onFind} title={`${t("Find in diff")} (${t("⌘F")})`} aria-label={t("Find in diff")} data-testid="Find in diff">
           <span aria-hidden="true">⌕</span> {t("Find in diff")}

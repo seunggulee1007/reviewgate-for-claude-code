@@ -246,6 +246,8 @@ export type MenuAction =
   | { type: "stop" }
   | { type: "find_chat" }
   | { type: "find_diff" }
+  // §34.11: View › Split Diff (Ctrl+Alt+L)
+  | { type: "diff_layout" }
   // P1-chrome-20: View › the sidebar's tabs (Ctrl+Alt+1–3)
   | { type: "sidebar_tab"; tab: "changes" | "history" | "prs" }
   // P1-chrome-28: File › Go to File… (Ctrl+P) / Find in Project… (Ctrl+Shift+F) — handled by lane p-window

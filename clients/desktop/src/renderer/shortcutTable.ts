@@ -24,6 +24,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Refresh", mac: "⌘R", win: "Ctrl+R" },
       { action: "Toggle Sidebar", mac: "⌃⌘S", win: "Ctrl+B" },
       { action: "Toggle Diff Pane", mac: "⌘⇧D", win: "Ctrl+Shift+D" },
+      { action: "Split Diff", mac: "⌥⌘L", win: "Ctrl+Alt+L", note: "A diff pane too narrow for two columns stays unified" }, // §34.11
       { action: "Toggle Agent Panel", mac: "⌥⌘A", win: "Ctrl+Alt+A" },
       { action: "Toggle Side Questions", mac: "⌥⌘S", win: "Ctrl+Alt+S" },
       { action: "Agent Board", mac: "⌥⌘B", win: "Ctrl+Alt+B" }, // MARK: wave5 w5-board (§43.1)

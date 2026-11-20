@@ -120,6 +120,8 @@ export function buildMenu(opts: MenuHandlers): void {
       // MARK: wave4d w4d-windows (polish-08): the Mac's View menu. The renderer owns these keys (src/renderer/shortcuts.ts):
       // the menu shows them without taking them (`registerAccelerator: false`).
       { label: t("Toggle Diff Pane"), ...shownKey("CmdOrCtrl+Shift+D"), click: () => dispatch({ type: "toggle_diff_pane" }, () => undefined) },
+      // §34.11: every diff unified or split (the key is the renderer's, src/renderer/shortcuts.ts).
+      { label: t("Split Diff"), ...shownKey("CmdOrCtrl+Alt+L"), click: () => dispatch({ type: "diff_layout" }, () => undefined) },
       { label: t("Toggle Agent Panel"), ...shownKey("CmdOrCtrl+Alt+A"), click: () => dispatch({ type: "toggle_agent_panel" }, () => undefined) },
       { label: t("Toggle Side Questions"), ...shownKey("CmdOrCtrl+Alt+S"), click: () => dispatch({ type: "toggle_side_panel" }, () => undefined) },
       // MARK: wave5 w5-board — §43.1: the agent board (the Mac's Window › Agent Board).

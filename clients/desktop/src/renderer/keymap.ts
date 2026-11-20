@@ -37,7 +37,7 @@ export function sideThreadKey(e: ShortcutKey & ImeKeyLike): "message" | "note" |
 }
 
 // MARK: wave4d w4d-windows — audit polish-08: the Mac's View menu keys and its Stop, the same here (docs/SHORTCUTS.md).
-export type WindowKey = "agentPanel" | "sidePanel" | "findInDiff" | "stop" | "board"; // MARK: wave5 w5-board: ⌥⌘B the agent board
+export type WindowKey = "agentPanel" | "sidePanel" | "findInDiff" | "stop" | "board" | "diffLayout"; // MARK: wave5 w5-board: ⌥⌘B the agent board; §34.11 ⌥⌘L unified / split
 
 /**
  * ⌥⌘A agent panel (was ⌘⇧E here), ⌥⌘S side questions, ⌥⌘F find in the diff, ⌘. stop — Ctrl+Alt+… / Ctrl+. on Windows.
@@ -51,6 +51,7 @@ export function windowKey(e: ShortcutKey): WindowKey | null {
     if (is("KeyS", "s")) return "sidePanel";
     if (is("KeyF", "f")) return "findInDiff";
     if (is("KeyB", "b")) return "board"; // MARK: wave5 w5-board (§43.1)
+    if (is("KeyL", "l")) return "diffLayout"; // §34.11
     return null;
   }
   return is("Period", ".") ? "stop" : null;

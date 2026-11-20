@@ -3180,6 +3180,10 @@ as git tools and GitHub do). The choice is remembered per user, for every diff.
   narrow header, the "⋯" menu's "Split Diff" in the narrowest), View › Split Diff (⌥⌘L) and Settings › General › Diff;
   `UserDefaults` `diffLayout`. Each pane measures itself (`diffSplitWidth()`); split rows are built only while split shows,
   from the rows the List already has (`DiffSplitCache`), one List row per split row.
+- **Windows.** "Unified | Split" in the row above every line diff (`UnifiedDiff`: the review diff and its whitespace view,
+  live, history and PR diffs), View › Split Diff and Ctrl+Alt+L; `localStorage` `rg.diff.layout`. The pane measures
+  itself (`ResizeObserver`; unified until measured); folds keep the DOM of a 20 000-line diff bounded in both layouts. The
+  full-file (Monaco) view keeps its own side-by-side toggle.
 
 ## 35. 0.2.2 engine follow-ups
 

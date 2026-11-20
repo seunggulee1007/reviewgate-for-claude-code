@@ -34,6 +34,14 @@ describe("window keys shared with the Mac (polish-08)", () => {
     expect(windowKey(key("b", { code: "KeyB", ctrlKey: true }))).toBeNull();
   });
 
+  // §34.11
+  it("⌥⌘L / Ctrl+Alt+L switches every diff between unified and split — the physical key decides (⌥L reads ¬, a Korean layout ㅣ)", () => {
+    expect(windowKey(key("¬", { code: "KeyL", metaKey: true, altKey: true }))).toBe("diffLayout");
+    expect(windowKey(key("l", { code: "KeyL", ctrlKey: true, altKey: true }))).toBe("diffLayout");
+    expect(windowKey(key("ㅣ", { code: "KeyL", ctrlKey: true, altKey: true }))).toBe("diffLayout");
+    expect(windowKey(key("l", { code: "KeyL", ctrlKey: true }))).toBeNull();
+  });
+
   it("⌘. / Ctrl+. stops the turn", () => {
     expect(windowKey(key(".", { code: "Period", metaKey: true }))).toBe("stop");
     expect(windowKey(key(".", { code: "Period", ctrlKey: true }))).toBe("stop");
