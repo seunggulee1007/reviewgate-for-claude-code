@@ -3152,6 +3152,31 @@ Engine behavior (`session/testCommands.ts`, `session/toolOutput.ts`, `review/tes
   (`not_a_live_file:<path>`). Reused: `stale_diff` (`expectedBaseTree`), `session_running` (`reject*` / `finish_review`
   while a turn runs, `accept*` while collecting), `not_a_changed_file`, `no_project`.
 
+### 34.11 Unified and split diffs ("합쳐 보기 | 나란히 보기")
+
+Client-only (no protocol change): every line diff — the review's, its whitespace-ignoring view, a running turn's, a past
+round's and a PR's — shows unified (one column, the default) or split (the old version on the left, the new on the right,
+as git tools and GitHub do). The choice is remembered per user, for every diff.
+
+- **Rows.** Split rows are built from the unified rows, so folds, "Show 20 more lines", find in diff and line keys are the
+  same in both. A run of changed lines — `del` / `add` lines with nothing between them, never across a hunk header, an
+  unchanged line or a fold — pairs its i-th removed line with its i-th added line, the shorter side padded with an empty
+  cell; a removed line after added ones starts another run. An unchanged line (one revealed from the full file too) is on
+  both sides with its old and new number; hunk headers (with their "Revert this part" controls), expanders and folds stay
+  full width. Each side has one line-number gutter and its own §34.7 changed-part marks. A row is as tall as its taller
+  side; with "Wrap lines" off both sides scroll sideways together. Core `DiffSplit` (`DiffSplitTests`), Windows
+  `diffSplit.ts`.
+- **Anchors.** A line's notes, PR comments, AI pre-review findings and the note composer sit under it on its anchor side —
+  a removed line's on the left (its old number), an added or unchanged line's on the right (its new number) — the
+  anchors the unified layout already uses. An unchanged line's left copy takes the same "+" / "?" / menu, all for its
+  new-side anchor.
+- **Width.** Split needs two readable columns: per side a gutter plus 38 characters of the diff font (Mac ≈ 730 pt for
+  the diff pane). A narrower pane shows unified, with the toggle off and its reason ("Too narrow for split — widen the
+  pane or hide the sidebar"), and goes back to split by itself once wide enough — a terminal chat's review drawer is
+  unified.
+- Binary files, image previews and the "no textual diff" / truncated placeholders are the same in both; the full-file view
+  keeps its own layout.
+
 ## 35. 0.2.2 engine follow-ups
 
 An adversarial pass over the §29–§33 engine code that shipped in 0.2.1, and the engine follow-ups of the first
