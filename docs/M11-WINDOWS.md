@@ -287,6 +287,43 @@ Needs a real Windows machine (2026-10-20 hardening — verified on macOS only by
 - [ ] The installer no longer contains `resources\app.asar.unpacked\node_modules\@anthropic-ai\claude-agent-sdk-*` and is ~200 MB smaller; the app still starts sessions.
 - [ ] Sandboxed renderer on Windows: Monaco diff renders, Ctrl+C/V in the composer, drag-resizing panes, links in chat open the browser.
 
+Terminal chat (preview) and the shell panel — PROTOCOL §57.10 (Stage 3). What CI already proves on windows-latest: node-pty's
+prebuild loads under Electron 44 and in the installed app (`--rg-pty-selftest`, ConPTY with its bundled `conpty.dll`); the
+installer ships node-pty unpacked with only what it needs; a fake claude (npm's `claude.cmd` + `cli.js`, run under node.exe,
+never through cmd.exe) drives a review turn through ConPTY in vitest (`terminalChat.pty.test.ts`: banner, Write → review,
+the git guard, a rejected file's context, resize, 한글 bytes, ESC CR, /exit, resume, no orphans) and in a hidden Electron
+window over the real IPC (`npm run e2e:terminal`: the page cannot get `terminal_spec`, a shell tab starts in the project,
+no child left — OpenConsole counted; IME composition through CDP and Ctrl+` once the page has its terminal). Turn on
+Settings › Session › "Terminal chat (preview)" for the items below.
+- [ ] Korean IME (Microsoft 한국어 IME / TSF) in a terminal chat: composing mid-line; Enter, Esc, Ctrl+C, arrows and
+      Backspace while composing; Hanja conversion and where the candidate window sits; a composition committed when the
+      terminal loses focus. (CI's CDP composition proves the xterm → PTY UTF-8 path, not TSF.)
+- [ ] Real `claude.exe` (native installer) and an npm install (`claude.cmd` + `cli.js`, node.exe on PATH; without node the
+      chat says "Terminal chat needs the native Claude Code (claude.exe) or Node on PATH"): the trust dialog, a permission
+      wait → the strip, the notification and the taskbar; Esc → "Review now"; `/clear` and `/resume` followed; Alt+V image
+      paste; Shift+Enter is a newline; the mouse in fullscreen mode; OSC 52 copy on select; rendering with and without
+      "Repaint the whole screen each frame"; WebGL on a real GPU and over Remote Desktop (and Off).
+- [ ] Menu shortcuts stay out of the TUI while the terminal has the keyboard: Ctrl+B, R, O, P, N, T reach Claude Code;
+      Alt+letter does not open a menu; Ctrl+` on Korean, US and European layouts; AltGr characters.
+- [ ] No orphans with real children (MCP servers, Bash through Git Bash): Task Manager shows no `claude.exe`, `node.exe`,
+      `bash.exe` or `OpenConsole.exe` left after switching chats, closing the window and quitting.
+- [ ] The shell panel: PowerShell 7 (`pwsh`) and Windows PowerShell 5.1 with the user's profiles, Command Prompt; tabs keep
+      running while hidden; display scaling at 125 % / 150 %; High Contrast.
+- [ ] The first PTY spawn under SmartScreen and Defender; no firewall prompt (the hook server binds 127.0.0.1).
+- [ ] Windows 10 1903–22H2 and Windows 11; Windows 10 1809 shows the switch disabled with "Terminal chat needs Windows 10
+      1903 or later".
+- [ ] A long `--settings` / `--mcp-config` once Stage 2 adds flags: the 30,000-character guard refuses with "The command
+      line for Claude Code is too long for Windows" rather than failing in CreateProcess.
+
+Release notes (the preview's known limits, for the release that ships it)
+- Terminal chat on Windows is a **preview**, off by default (Settings › Session); it has not been verified on a real Windows
+  machine yet. The shell panel (PowerShell / Command Prompt, Ctrl+`) is on wherever the terminal can run.
+- Needs Windows 10 1903 or later, and Claude Code as `claude.exe` (or npm's `cli.js` with Node on PATH).
+- Switching to another chat ends the terminal chat's Claude Code (what was typed but not sent is lost); it resumes the same
+  conversation when you come back.
+- Korean IME inside the terminal follows xterm.js's behaviour; if it misbehaves, keep using the classic chat.
+- Request Changes, Find in Chat and the other chat-only items are off in a terminal chat: Claude Code's own TUI does them.
+
 Logs
 - `%APPDATA%\ReviewGate\logs\engine-YYYY-MM-DD.log` — every engine `log` event (`[w<id>:level]`) plus main-process lines.
   Help → Logs Folder opens it. `REVIEWGATE_VERBOSE=1` also echoes everything to the console.

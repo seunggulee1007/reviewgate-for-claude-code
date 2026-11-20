@@ -82,6 +82,12 @@ jobs:
           Write-Host "pty self-test: $json"
           $r = $json | ConvertFrom-Json
           if ($code -ne 0 -or -not $r.ok -or -not $r.conptyDll -or -not $r.openConsole) { throw "the PTY self-test failed (exit $code)" }
+      # PROTOCOL §57.10: hidden windows, scratch userData / data folder / CLAUDE_CONFIG_DIR, the node fake as claude — a
+      # terminal chat's PTY over real IPC, one review turn, a shell tab in the project, no child process left (OpenConsole
+      # counted). The IME and Ctrl+` steps run once the page has its terminal (renderer lane), skipped before.
+      - name: hidden terminal e2e (Windows)
+        if: runner.os == 'Windows'
+        run: npm run e2e:terminal -w clients/desktop
 
   mac:
     name: Core + Mac app (macos-latest)

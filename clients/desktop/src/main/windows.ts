@@ -55,7 +55,8 @@ export type Workbench = {
   /** MARK: terminal-win — §57.10: this window's PTYs. */
   pty: PtyHub;
 };
-type Config = { e2e: E2EMode | null; rebuildMenu: () => void };
+/** `hidden`: MARK: terminal-win — the `--e2e-terminal` run (src/main/e2eTerminal.ts): windows are never shown. */
+type Config = { e2e: E2EMode | null; rebuildMenu: () => void; hidden?: boolean };
 
 const windows = new Map<number, Workbench>();
 let config: Config = { e2e: null, rebuildMenu: () => undefined };
@@ -289,7 +290,9 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
   };
   void engine.handle(hello);
 
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    if (!config.hidden) win.show();
+  });
   // Close = persist the frame, dispose first (≤ 3 s: stops `claude`, releases the lock), then destroy (§3.7).
   win.on("close", (e) => {
     if (wb.closing) return;
