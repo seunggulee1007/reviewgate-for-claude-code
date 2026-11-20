@@ -9028,6 +9028,22 @@ chat's id);
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
   changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
+  - *Cost* (§57.13, once `terminal.status` came): "$0.01 · 25%" right of the status — Claude Code's own cost so far in
+    the conversation and the context used, from its status line; a click shows the model, the numbers and "리뷰한 턴"
+    (`hud.sessionCostUSD`, which grows with each `turn_end`). VoiceOver reads both numbers.
+  - *Request changes* (§57.14). Unsent notes the gate can send: "아직 Claude에게 보내지 않은 리뷰 메모 n개" with
+    [변경 요청 (n)] (⌘⇧C, Review › Request Changes and a note's "send only this note" do the same — `request_changes` as in
+    a chat; nothing is typed into the TUI). Once staged (`terminal.requestQueued`): `next_prompt` — "변경 요청이 대기 중 —
+    다음 프롬프트와 함께 Claude에게 가요" with [붙여넣기] (the fixed prompt "Please make the changes requested in the review
+    notes." as a bracketed paste, no Enter) and [취소] (`terminal_request_cancel`); `stop` — "변경 요청이 이 턴이 끝나기 전에
+    Claude에게 전달돼요" with [취소]. A stale cancel (`no_request_queued`) is only logged.
+  - *Another worktree* (§57.12, `terminal.elsewhere`): "Claude Code가 이 저장소의 다른 워크트리 <name>에서 작업해요 …"
+    (after a `cd`: "…(으)로 이동했어요") with [이 채팅을 <name>(으)로 옮기기] → `chat_move` (asks first while Claude works,
+    as in a chat; off with the reason while a move cannot run). A refused move's reason shows as in a chat.
+  - *Moving* (`terminal.moving`): the column says "이 채팅을 <name>(으)로 옮기는 중…"; the app ends the PTY (no
+    restart) and sends `terminal_exited`. Moved, the chat is a record here: "옮김 → <name>" with [그 창 열기] instead
+    of a terminal (no spec is asked for). In the target window, until the first hook, "<from>에서 옮겨왔어요 — 터미널에서
+    이어서 입력하세요".
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
   restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter).
@@ -9038,8 +9054,8 @@ chat's id);
   Restart takes a new spec (its hooks fail closed meanwhile).
 - **Stop and the menus.** Chat › Stop Claude (⌘.) writes Esc into the PTY instead of `interrupt` — not while a shell of
   the terminal panel has the keyboard (then it does nothing). Commands…, Attach
-  Images…, the permission mode, Find in Chat and Review › Request Changes are off for a terminal chat (the TUI has its
-  own). Continue in Terminal is not offered for a terminal chat.
+  Images…, the permission mode and Find in Chat are off for a terminal chat (the TUI has its
+  own); Review › Request Changes works (§57.14). Continue in Terminal is not offered for a terminal chat.
 - **Attention.** `waiting` turning on is a permission / question attention event once per wait (`term:<chat>:<since>`):
   a notification while the window is behind, the Dock's "!". A click shows the live chat and gives its terminal the
   keyboard.

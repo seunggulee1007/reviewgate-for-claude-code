@@ -152,6 +152,7 @@ final class TerminalHub {
             _ = store.errorBanner
             _ = store.sessionsInfo?.backgroundTerminals   // §57.10
             _ = store.sessionsInfo?.openTabIds
+            _ = store.currentChatMovedTo   // §57.12
         } onChange: {
             Task { @MainActor [weak self] in
                 self?.sync()
@@ -194,6 +195,12 @@ final class TerminalHub {
         specErrors = specErrors.filter { $0.key == current }
         lostInBackground = lostInBackground.filter { chatHosts[$0] != nil }
         guard let current, store.isTerminalChat else { return }
+        // MARK: terminal-stage2 (§57.12): the chat moves to another worktree — its PTY ends now and is not restarted (the
+        // engine waits for `terminal_exited`); once moved it is a record here and never starts a terminal again.
+        if store.sessionInfo.terminal?.moving != nil || store.currentChatMovedTo != nil {
+            stopHost(current)
+            return
+        }
         if let host = chatHosts[current] {
             lastShown[current] = Date()
             if host.state.isRunning, let spawned = enginePIDAtSpawn[current], let now = store.enginePID, now != spawned {

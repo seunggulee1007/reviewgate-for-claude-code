@@ -10,13 +10,32 @@ struct TerminalChatView: View {
     @Environment(WindowModel.self) private var model
 
     var body: some View {
+        column
+            // MARK: terminal-stage2 (§57.14): Review › Request Changes (⌘⇧C) sends the notes here too — the engine stages
+            // them for this turn's end or the next prompt; nothing is typed into the TUI.
+            .onChange(of: model.requestChangesTick) { _, _ in
+                if store.viewingChat == nil, !store.unsentNotes.isEmpty, store.canRequestChanges {
+                    store.requestChanges(extraMessage: nil)
+                } else {
+                    model.terminals.focus(chatId: store.currentSessionId)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var column: some View {
         let hub = model.terminals
         let live = store.currentSessionId
         if store.viewingChat != nil {
             ViewedTerminalChatPlaceholder()
+        } else if let moved = store.currentChatMovedTo {
+            MovedTerminalChatPlaceholder(moved: moved)   // §57.12: a record here; it goes on in that worktree
+        } else if let moving = store.terminalInfo?.moving {
+            MovingTerminalChat(place: moving)
         } else if let id = live, let host = hub.host(for: id) {
             VStack(spacing: 0) {
                 TerminalStatusStrip(chatId: id, host: host)
+                TerminalStage2Rows()
                 Divider()
                 TerminalContainer(host: host)
                     .overlay { TerminalEndedOverlay(chatId: id, host: host) }
@@ -71,6 +90,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
+            if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
                 Task { await model.terminals.restart(chatId: chatId) }
             } label: {
@@ -241,5 +261,213 @@ private struct ViewedTerminalChatPlaceholder: View {
             ViewingChatBar()
                 .padding(.horizontal, 10).padding(.vertical, 8)
         }
+    }
+}
+
+// MARK: terminal-stage2 (§57.12–57.14)
+
+/// §57.13: the TUI's status line as ReviewGate hears it (the statusLine tee): Claude Code's cost so far in this
+/// conversation and the context used; a click shows the model, the numbers and ReviewGate's own session cost.
+private struct TerminalCostButton: View {
+    @Environment(AppState.self) private var store
+    let status: TerminalStatus
+    @State private var open = false
+
+    var body: some View {
+        if status.costUsd != nil || status.contextPercent != nil {
+            Button { open.toggle() } label: {
+                HStack(spacing: 6) {
+                    if let cost = status.costUsd { Text(verbatim: HUDStrip.usd(cost)) }
+                    if let percent = status.contextPercent { Text(verbatim: "\(percent)%") }
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(String(localized: "Claude Code's cost so far in this conversation and how much of its context is used, from its status line — click for details"))
+            .accessibilityLabel(Text(verbatim: accessibilityText))
+            .accessibilityIdentifier("Terminal chat cost")
+            .popover(isPresented: $open, arrowEdge: .bottom) { details }
+        }
+    }
+
+    private var accessibilityText: String {
+        var parts: [String] = []
+        if let cost = status.costUsd { parts.append(String(localized: "Cost so far \(HUDStrip.usd(cost))")) }
+        if let percent = status.contextPercent { parts.append(String(localized: "\(percent) percent of the context used")) }
+        return parts.joined(separator: ", ")
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Claude Code's status line").font(.headline)
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                if let model = status.modelName ?? status.model {
+                    GridRow { Text("Model").foregroundStyle(.secondary); Text(verbatim: model) }
+                }
+                if let cost = status.costUsd {
+                    GridRow {
+                        Text("This conversation").foregroundStyle(.secondary)
+                        Text(verbatim: String(format: "$%.4f", cost)).monospacedDigit()
+                    }
+                }
+                if let used = status.contextTokens, let window = status.contextWindow {
+                    GridRow {
+                        Text("Context").foregroundStyle(.secondary)
+                        Text("\(used.formatted()) of \(window.formatted()) tokens").monospacedDigit()
+                    }
+                }
+                GridRow {
+                    Text("Reviewed turns").foregroundStyle(.secondary)
+                    Text(verbatim: String(format: "$%.4f", store.hud.sessionCostUSD)).monospacedDigit()
+                }
+            }
+            .font(.callout)
+            Text("Claude Code's own estimates, not a bill. Reviewed turns: what the turns ReviewGate reviewed in this chat cost.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 300, alignment: .leading)
+        }
+        .padding(14)
+        .accessibilityIdentifier("Terminal chat cost details")
+    }
+}
+
+/// Rows under the strip: a move's notice, a queued Request changes (§57.14) or unsent notes, another worktree Claude Code
+/// works in (§57.12), and a chat that just moved here.
+private struct TerminalStage2Rows: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var store
+
+    var body: some View {
+        let info = store.terminalInfo
+        VStack(spacing: 0) {
+            ChatMoveBar()   // §39.4: why the last move was refused
+            if let queued = info?.requestQueued {
+                queuedRow(queued)
+            } else if !store.unsentNotes.isEmpty, store.canRequestChanges {
+                notesRow(count: store.unsentNotes.count)
+            }
+            if let elsewhere = info?.elsewhere { elsewhereRow(elsewhere) }
+            if let from = movedFrom, info?.hooksSeen != true {
+                row(icon: "arrow.down.right.square", tint: .blue,
+                    text: String(localized: "Moved here from \(from.name) — continue typing in the terminal"), id: "Terminal chat moved in") {}
+                    .help(SessionNotices.abbreviatingHome(from.path))
+            }
+        }
+    }
+
+    private var movedFrom: ChatMoveRef? {
+        store.sessions.first { $0.id == store.currentSessionId }?.movedFrom
+    }
+
+    private func queuedRow(_ queued: TerminalRequestQueued) -> some View {
+        let text = queued.via == .stop
+            ? String(localized: "Changes requested — they reach Claude before this turn ends")
+            : String(localized: "Changes requested — they go to Claude with your next prompt")
+        return row(icon: "exclamationmark.bubble", tint: .orange, text: text, id: "Terminal chat request queued") {
+            if queued.via == .nextPrompt {
+                Button("Paste a Prompt") {
+                    if let why = store.pasteRequestChangesPrompt() { Toast.show(why, systemImage: "exclamationmark.triangle.fill") }
+                    else { Toast.show(NewChatKindText.pasted, systemImage: "doc.on.clipboard") }
+                }
+                .controlSize(.small)
+                .help(String(localized: "Puts “\(TerminalStage2Text.requestChangesPrompt)” into Claude Code's prompt — press Return there to send it, or type your own prompt"))
+                .accessibilityIdentifier("Terminal chat request paste")
+            }
+            Button("Cancel") { store.terminalRequestCancel() }
+                .controlSize(.small)
+                .help(String(localized: "Take the request back — the review notes stay unsent"))
+                .accessibilityIdentifier("Terminal chat request cancel")
+        }
+    }
+
+    private func notesRow(count: Int) -> some View {
+        row(icon: "text.bubble", tint: .accentColor, text: String(localized: "\(count) review note(s) not sent to Claude yet"),
+            id: "Terminal chat unsent notes") {
+            Button("Request changes (\(count))") { store.requestChanges(extraMessage: nil) }
+                .controlSize(.small)
+                .help(String(localized: "Send the review notes to Claude (⌘⇧C) — while it works they reach it before the turn ends, else with your next prompt; nothing is typed into the terminal"))
+                .accessibilityIdentifier("Terminal chat request changes")
+        }
+    }
+
+    private func elsewhereRow(_ elsewhere: TerminalElsewhere) -> some View {
+        let text = elsewhere.toolName == "CwdChanged"
+            ? String(localized: "Claude Code changed into \(elsewhere.name), another worktree of this repository — its changes there are not reviewed here")
+            : String(localized: "Claude Code works in \(elsewhere.name), another worktree of this repository — its changes there are not reviewed here")
+        let blocker = elsewhere.canMove ? store.chatMoveBlocker : String(localized: "That folder cannot take this chat")
+        return row(icon: "arrow.triangle.branch", tint: .blue, text: text, id: "Terminal chat elsewhere") {
+            Button(String(localized: "Move This Chat to \(elsewhere.name)")) { ChatMoveActions.move(store: store, to: elsewhere.path) }
+                .controlSize(.small)
+                .disabled(blocker != nil)
+                .help(blocker ?? String(localized: "This chat continues in that worktree's window and its changes there are reviewed — Claude Code restarts there and resumes the conversation"))
+                .accessibilityIdentifier("Terminal chat move")
+        }
+    }
+
+    private func row(icon: String, tint: Color, text: String, id: String, @ViewBuilder actions: () -> some View) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
+            Text(verbatim: text)
+                .font(.caption)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("\(id) text")
+            Spacer(minLength: 4)
+            actions()
+        }
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(tint.wash(colorScheme, light: 0.08, dark: 0.16))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// §57.12: the chat is moving to another worktree — its Claude Code stops here, the review of this folder stays.
+private struct MovingTerminalChat: View {
+    let place: TerminalPlace
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Moving this chat to \(place.name)…").font(.headline)
+            Text("Claude Code stops here and continues in that worktree's window; the review of this folder stays here.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("Terminal chat moving")
+    }
+}
+
+/// §57.12: a terminal chat that moved to another worktree is a record here — no terminal; it goes on in that window.
+private struct MovedTerminalChatPlaceholder: View {
+    @Environment(\.openWindow) private var openWindow
+    let moved: ChatMoveRef
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "arrow.right.square").font(.largeTitle).foregroundStyle(.blue).accessibilityHidden(true)
+            Text(verbatim: ChatMoveText.movedBanner(name: moved.name))
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+            Text("Its Claude Code runs in that window's terminal now.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Button(ChatMoveText.openThatWindow) {
+                ProjectOpener.openInNewWindow(URL(fileURLWithPath: moved.path), openWindow: openWindow)
+            }
+            .help(SessionNotices.abbreviatingHome(moved.path))
+            .accessibilityIdentifier("Open moved chat window")
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Moved terminal chat")
     }
 }
