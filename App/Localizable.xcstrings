@@ -35283,6 +35283,22 @@
           }
         }
       }
+    },
+    "More: Wrap lines, Find in diff (⌥⌘F)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Wrap lines, Find in diff (⌥⌘F)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 줄바꿈, diff에서 찾기 (⌥⌘F)"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

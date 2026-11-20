@@ -89,23 +89,6 @@ struct MoreLinesExpanderRow: View {
 
 // MARK: - The whitespace-ignoring view ("공백 무시")
 
-/// The header's "Ignore whitespace" switch; a binary file has none.
-struct WhitespaceToggle: View {
-    @Binding var isOn: Bool
-    let file: ChangedFile
-
-    var body: some View {
-        if !file.isBinary {
-            Toggle("Ignore whitespace", systemImage: "space", isOn: $isOn)
-                .toggleStyle(.button)
-                .fixedSize()
-                .help(isOn ? ReviewLeftovers.whitespaceViewNote : String(localized: "Hide changes that only touch whitespace (indentation, tabs ↔ spaces)"))
-                .accessibilityLabel("Ignore whitespace")
-                .accessibilityIdentifier("Ignore whitespace")
-        }
-    }
-}
-
 /// The review diff's range with whitespace ignored (`select_file {ignoreWhitespace}`): read-only rows — copy and find stay;
 /// part revert, notes and line side questions wait for the normal view (the row above the lines says so).
 struct WhitespaceDiffBody: View {
