@@ -47,6 +47,7 @@ import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal 
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
 import { QueueBar } from "./QueueBar";
+import { isShadowProject, notGitRepoReason } from "../../noGit"; // §59
 import { BtwOverlay } from "./BtwOverlay"; // §56.1
 import { btwNothingYet, btwQuestion, useBtw } from "../../btw";
 import { ExternalEditBar } from "./ExternalEditBar"; // §56.3
@@ -1196,9 +1197,10 @@ export function Composer() {
           <button
             type="button"
             className="attach-btn plain"
-            disabled={state.project === null || viewing !== null}
+            disabled={state.project === null || viewing !== null || isShadowProject(state)}
             onClick={() => openDialog({ kind: "newWorkbench", task: composerTaskText(draft, mentions) })}
             title={state.project === null ? t("Open a project first (⌘O)")
+              : isShadowProject(state) ? notGitRepoReason()
               : viewing !== null ? t("Go back to the running chat to run this as a task")
               : t("Run as Task — start this message in a new workbench (its own branch, window and chat); this chat is left as it is")}
             aria-label={t("Run as Task")}

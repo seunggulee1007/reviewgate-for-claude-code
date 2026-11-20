@@ -17,6 +17,7 @@ import "./session.css";
 import { errorCopyText } from "../errorCopy"; // polish P1-chrome-29
 import { CopyButton } from "./common/CopyButton";
 import { Icon } from "../icons";
+import { isShadowProject, notGitRepoReason } from "../noGit"; // §59
 
 const TONE_CLASS = { fatal: "red", error: "orange", warning: "orange", info: "blue" } as const;
 const TONE_ICON = { fatal: "⊗", error: "⚠", warning: "⚠", info: "ⓘ" } as const;
@@ -33,6 +34,7 @@ export function SessionErrorBanner({ banner }: { banner: Banner }) {
   const canRestart = useStore((s) => s.state.session.canRestart);
   const starting = useStore((s) => s.state.session.starting);
   const workbenches = useStore((s) => s.state.workbenches.list);
+  const noRepo = useStore((s) => (isShadowProject(s.state) ? notGitRepoReason() : null)); // §59
   const switchRefusal = useStore((s) => newChatRefusal(s.state)); // r2-chats-cards M31 (§9): while Claude works it waits
   const [copied, setCopied] = useState(false);
   const chatMove = useChatMove(); // MARK: wave4b w4b-follow (§39.4)
@@ -78,7 +80,7 @@ export function SessionErrorBanner({ banner }: { banner: Banner }) {
         );
       case "createWorkbench":
         return (
-          <button key={a} type="button" className={cls} title={t("Creates a git worktree on a new branch and opens it in its own window with its own Claude session.")} onClick={() => openDialog(createWorkbenchDialog(facts))} data-testid="Session create workbench">
+          <button key={a} type="button" className={cls} disabled={noRepo !== null} title={noRepo ?? t("Creates a git worktree on a new branch and opens it in its own window with its own Claude session.")} onClick={() => openDialog(createWorkbenchDialog(facts))} data-testid="Session create workbench">
             {t("Open as a workbench")}
           </button>
         );
