@@ -1651,6 +1651,33 @@ export class ReviewGate {
     return { message, checkpointTree: start, endTree: end };
   }
 
+  /**
+   * §57.14: a terminal chat's Request changes delivered at the running turn's Stop — the message of the unsent notes
+   * (`noteIds`: just those), the notes marked sent with that turn. Nothing else changes: the turn is still open, so there is
+   * no collected review to mark. Null when no such note is unsent.
+   */
+  takeNotesForStop(turn: number, noteIds: readonly string[] | null, extra: string | null): { message: string; noteIds: string[] } | null {
+    const unsent = this.reviewNotes.filter((n) => !n.sent && (!noteIds || noteIds.includes(n.id)));
+    if (unsent.length === 0) return null;
+    const message = requestChangesMessage(unsent, extra);
+    const at = new Date().toISOString();
+    const ids = new Set(unsent.map((n) => n.id));
+    this.reviewNotes = this.reviewNotes.map((n) => (ids.has(n.id) ? { ...n, sent: { at, turn } } : n));
+    this.onChange();
+    return { message, noteIds: [...ids] };
+  }
+
+  /** §57.14: the Stop answer that carried `takeNotesForStop`'s message never reached Claude — those notes are unsent again. */
+  untakeNotesForStop(noteIds: readonly string[]): void {
+    const ids = new Set(noteIds);
+    this.reviewNotes = this.reviewNotes.map((n) => {
+      if (!ids.has(n.id) || !n.sent) return n;
+      const { sent: _sent, ...rest } = n;
+      return rest;
+    });
+    this.onChange();
+  }
+
   /** Undoes `prepareRequestChanges` after the session refused the message (notes are kept). */
   undoRequestChanges(endTree: string): void {
     for (const f of this.changedFiles) if (f.state === "changesRequested") f.state = "pending";

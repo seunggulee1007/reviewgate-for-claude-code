@@ -2,7 +2,7 @@ import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { McpServerStatus, McpSetServersResult } from "@anthropic-ai/claude-agent-sdk";
-import { expandMcpVars, inheritedMcpFiles, inheritedMcpServers, mainCheckoutOf } from "../src/mcp/mcpInherit.js";
+import { expandMcpVars, inheritedMcpFiles, inheritedMcpServers, knownMcpNames, mainCheckoutOf, terminalMcpConfig } from "../src/mcp/mcpInherit.js";
 import type { ClaudeSessionOptions } from "../src/session/claude.js";
 import { FakeClaudeSession, makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -121,5 +121,18 @@ describe("§42.3 .mcp.json files above the main checkout", () => {
     await h.open(app);
     await h.engine.request({ type: "mcp_status" });
     expect(mcp[0]!.setCalls).toEqual([]);
+  });
+
+  it("§57.11 terminal: expand:false keeps ${VAR}; knownMcpNames = user, local scope and the cwd's own walk", async () => {
+    const { home, app, wt } = layout();
+    const raw = await inheritedMcpServers(wt, app, { skip: new Set(), env: { RG_TEST_TOKEN: "t0k" }, expand: false });
+    expect(raw.get("db")?.config).toEqual({ type: "stdio", command: "node", args: ["db.js", "${RG_TEST_DB:-local}"], env: { TOKEN: "${RG_TEST_TOKEN}" } });
+    expect(JSON.parse(terminalMcpConfig(raw)!).mcpServers.db.env).toEqual({ TOKEN: "${RG_TEST_TOKEN}" });
+    expect(terminalMcpConfig(new Map())).toBeNull();
+    const claudeJson = join(home, "cfg", ".claude.json");
+    mkdirSync(join(home, "cfg"), { recursive: true });
+    writeFileSync(claudeJson, JSON.stringify({ mcpServers: { gh: {} }, projects: { [wt]: { mcpServers: { local1: {} } }, "/elsewhere": { mcpServers: { nope: {} } } } }));
+    expect([...(await knownMcpNames({ cwd: wt, claudeJson }))].sort()).toEqual(["ctx", "gh", "local1"]); // ctx: home's .mcp.json
+    expect([...(await knownMcpNames({ cwd: wt, claudeJson: join(home, "missing.json") }))]).toEqual(["ctx"]);
   });
 });

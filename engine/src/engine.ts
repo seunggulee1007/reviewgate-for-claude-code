@@ -17,7 +17,7 @@ import {
   type CheckpointRecord,
   type ForkPoint,
 } from "./review/checkpoints.js";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -242,7 +242,7 @@ import { agentHistoryFromRows } from "./session/agentHistoryRows.js"; // MARK: w
 import type { ModelCost } from "./protocol.js"; // MARK: wave4d w4d-agents2 (§42.4)
 // MARK: wave4d w4d-config — §42.3
 import { McpFileIndex, mcpOriginOf } from "./mcp/mcpOrigin.js";
-import { inheritedMcpFiles, inheritedMcpServers, mainCheckoutOf, rejectedMcpjsonServers, type InheritedMcpServer } from "./mcp/mcpInherit.js";
+import { inheritedMcpFiles, inheritedMcpServers, knownMcpNames, mainCheckoutOf, rejectedMcpjsonServers, terminalMcpConfig, type InheritedMcpServer } from "./mcp/mcpInherit.js";
 import { applyMcpToggle, loadRepoToggles, loadWorktreeToggles, mcpOffBy, mcpOffNames, repoTogglesStamp, saveRepoToggle, saveWorktreeToggles, type McpToggles } from "./mcp/mcpScopes.js";
 import { claudeJsonPath } from "./session/localSettings.js";
 import { describeMemoryFile, instructionTarget, projectInstructionFiles, readInstruction, subagentList, writeInstruction } from "./instructions/claudeMd.js";
@@ -262,10 +262,10 @@ import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffor
 // MARK: terminal-chat (§57)
 import { HookServer, RETIRED_REASON } from "./session/hookServer.js";
 import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js";
-import { HOOK_TOKEN_ENV, hookSettings, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
+import { HOOK_TOKEN_ENV, hookSettings, type HookSettingsOptions, hooksDisabled, isCliSessionId, MIN_TERMINAL_CLI, terminalArgv, terminalEnv } from "./session/terminalSpec.js";
 import { defaultScratchDirs } from "./session/reviewScope.js";
 import { compareVersions } from "./platform/toolchain.js";
-import type { SessionKind, TerminalSpecEvent } from "./protocol.js";
+import type { SessionKind, TerminalElsewhere, TerminalRequestQueued, TerminalSpecEvent } from "./protocol.js";
 export { ENGINE_VERSION };
 export { CommandRefused } from "./errors.js";
 
@@ -333,10 +333,13 @@ export const TERMINAL_PROMPT_WAIT_MS = 100_000;
  * the app restarts the chat's PTY instead (a new spec, the conversation resumed).
  */
 const TERMINAL_REFUSED: ReadonlySet<string> = new Set([
-  "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "request_changes", "permission_response", "set_permission_mode",
+  "restart_session", "send", "steer", "steer_take_back", "btw_ask", "interrupt", "permission_response", "set_permission_mode",
   "set_model", "plan_response", "plan_follow", "rewind", "compact", "peer_accept", "task_stop", "task_background", "stop_agent",
-  "retry_extensions", "mcp_reconnect", "mcp_toggle", "chat_move",
+  "retry_extensions", "mcp_reconnect", "mcp_toggle",
 ]);
+
+/** §57.15: how long "Allow and follow" waits for the EnterWorktree it allowed. */
+const TERMINAL_FOLLOW_ARM_MS = 120_000;
 
 /** §57.10–57.15: a Stage 2 terminal feature the client must run itself (`terminalFeature`). */
 type TerminalFeature = "background" | "permissionBridge" | "statusLine" | "worktreeMove";
@@ -491,6 +494,8 @@ export class ReviewEngine {
   /** The hook server of the terminal chats (created at the first `terminal_spec`, closed with the engine). */
   private hookServer: HookServer | null = null;
   private readonly terminalPromptWaitMs: number;
+  /** §57.15: "Allow and follow" on a bridged EnterWorktree — the chat's next main-agent EnterWorktree before `until` is followed. */
+  private terminalFollowArm: { chatId: string; until: number } | null = null;
   /** §57.10: terminal chats of this window whose Claude Code keeps running while another chat is current (by chat id). */
   private readonly backgroundTerminals = new Map<string, TerminalSession>();
   /** §57.4: the terminal prompts being adopted, one after another (settles once every one queued so far is done). */
@@ -2719,6 +2724,14 @@ export class ReviewEngine {
       ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
+      // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
+      stopFeedback: (q) => (this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null),
+      // §57.15: the setting (default on) and a client that answers the dialogs.
+      permissionBridge: () => this.settings.terminalPermissionBridge !== false && this.terminalFeature("permissionBridge"),
+      stopFeedbackLost: (ids) => {
+        this.gate.untakeNotesForStop(ids);
+        this.touch();
+      },
       emit: (ev) => this.onSessionEvent(ts, ev),
       log: (level, msg) => this.log(level, msg),
     });
@@ -2736,6 +2749,9 @@ export class ReviewEngine {
     const project = this.project;
     if (!project || this.gitInit !== null || !this.sessions) throw new CommandRefused("no_project");
     const ts = this.requireTerminal(sessionId);
+    // §57.12: a terminal chat moved / continued elsewhere is a record here — no claude for it.
+    const rec = this.requireSession(sessionId);
+    if (rec.movedTo !== undefined || rec.continuedIn !== undefined) throw new CommandRefused(`chat_is_record:${sessionId}`, { code: "chat_is_record" });
     const tc = await this.locate();
     if (!tc.claude) throw new CommandRefused("cli_not_found", { code: "cli_not_found" });
     const version = parseCliVersion(tc.claudeVersion);
@@ -2743,7 +2759,8 @@ export class ReviewEngine {
       throw new CommandRefused(`terminal_cli_too_old:${version ?? "unknown"} (needs ${MIN_TERMINAL_CLI})`, { code: "terminal_cli_too_old" });
     }
     const configDir = claudeConfigDir(this.childEnv());
-    const managed = (this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir })).settings;
+    const managedPolicy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const managed = managedPolicy.settings;
     const known = this.requireSession(sessionId);
     // §57.16: the engine's config dir and the one the terminal was seen using — refused when either says hooks are off.
     let off: ReturnType<typeof hooksDisabled> = null;
@@ -2766,23 +2783,117 @@ export class ReviewEngine {
       meta.cliSessionId = cliId;
       this.persistSessions();
     }
-    const settings = hookSettings(server.url, { permissionRequest: this.terminalFeature("permissionBridge") });
-    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings) });
+    const settings = hookSettings(server.url, {
+      permissionRequest: this.terminalFeature("permissionBridge"),
+      statusLine: this.terminalFeature("statusLine") ? this.terminalStatusLine(meta, server.statusUrl, managedPolicy) : null,
+    });
+    const mcpConfigFile = await this.terminalMcpConfigFile(meta);
+    const argv = terminalArgv({ claude: tc.claude, id: cliId, resume, settingsJson: JSON.stringify(settings), mcpConfigFile });
     this.log("info", `terminal chat ${sessionId}: ${resume ? "resume" : "new"} spec issued (hooks on ${server.url})`);
     this.touch();
     return { type: "terminal_spec", sessionId, argv, env: terminalEnv({ [HOOK_TOKEN_ENV]: token }), cwd: project.path, resume };
   }
 
-  /** §57.14 `terminal_request_cancel`: unstages the chat's Request changes; refused `no_request_queued` when none is staged. */
-  private terminalRequestCancel(sessionId: string): void {
-    this.requireTerminal(sessionId);
-    throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+  /**
+   * §57.14 `request_changes` in a terminal chat: staged, never typed into the TUI — `via: "stop"` while a review turn runs
+   * (it reaches Claude as that turn's Stop block reason), else `via: "next_prompt"` once the review can take a request (it
+   * goes with the next prompt the user sends, as a chat's request would). A later request replaces a staged one.
+   */
+  private terminalRequestChanges(ts: TerminalSession, extra: string | null, noteIds?: readonly string[]): void {
+    if (noteIds && !this.gate.hasUnsentNote(noteIds)) throw new CommandRefused("request_changes_unavailable:no_notes");
+    if (this.gate.unsentNoteCount === 0) throw new CommandRefused("request_changes_unavailable:no_notes");
+    const slices = this.slices();
+    const via = ts.isTurnActive && this.gate.running ? "stop" : canRequestChanges(slices) ? "next_prompt" : null;
+    if (!via) {
+      const why = blockedReason(slices) ?? (this.gate.collectError !== null ? "collect_failed" : "no_review");
+      throw new CommandRefused(`request_changes_unavailable:${why}`);
+    }
+    ts.stageRequest({ via, noteIds: noteIds ? [...noteIds] : null, extra: extra && extra.trim() ? extra : null, at: new Date().toISOString() });
+    this.log("info", `terminal chat ${ts.chatId}: Request changes staged (${via})`);
+    this.touch();
   }
 
-  /** §57.15 `terminal_permission_response`: answers one bridged dialog; refused `permission_gone` when it is no longer open. */
-  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string }): void {
-    this.requireTerminal(cmd.sessionId);
-    throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+  /** §57.14 `terminal_request_cancel`: unstages the chat's Request changes; refused `no_request_queued` when none is staged. */
+  private terminalRequestCancel(sessionId: string): void {
+    const ts = this.requireTerminal(sessionId);
+    if (!ts.requestQueued) throw new CommandRefused("no_request_queued", { code: "no_request_queued" });
+    ts.stageRequest(null);
+    this.touch();
+  }
+
+  /**
+   * §57.15 `terminal_permission_response`: answers one bridged dialog (allow once / deny); refused `permission_gone` when it
+   * is no longer open (the TUI answered first, the CLI gave up), `follow_not_allowed` for `follow` on anything but
+   * EnterWorktree. `follow` with an allow: the main agent's next EnterWorktree of this chat within 120 s moves the chat there.
+   */
+  private terminalPermissionResponse(cmd: { sessionId: string; requestId: string; allow: boolean; message?: string; follow?: boolean }): void {
+    const ts = this.requireTerminal(cmd.sessionId);
+    const entry = typeof cmd.requestId === "string" ? ts.permission(cmd.requestId) : undefined;
+    if (!entry) throw new CommandRefused(`permission_gone:${String(cmd.requestId)}`, { code: "permission_gone" });
+    const follow = cmd.follow === true && cmd.allow === true;
+    if (follow && entry.toolName !== "EnterWorktree") throw new CommandRefused(`follow_not_allowed:${entry.toolName}`, { code: "follow_not_allowed" });
+    if (!ts.answerPermission(cmd.requestId, cmd.allow === true, typeof cmd.message === "string" ? cmd.message : undefined)) {
+      throw new CommandRefused(`permission_gone:${cmd.requestId}`, { code: "permission_gone" });
+    }
+    if (follow) this.terminalFollowArm = { chatId: ts.chatId, until: Date.now() + TERMINAL_FOLLOW_ARM_MS };
+    this.log("info", `terminal chat ${ts.chatId}: ${entry.toolName} ${cmd.allow ? "allowed" : "denied"} from the app${follow ? " (and followed)" : ""}`);
+    this.touch();
+  }
+
+  /**
+   * §57.11: in a worktree outside its main checkout, the `.mcp.json` servers above the main checkout as a `--mcp-config`
+   * file (`<dataDir>/terminal-mcp/<chat>.json`, 0600: not on the command line, whose length is capped on Windows and which
+   * other processes can read). Skipped: names the CLI loads by itself (user and local scope, its own walk), names settings
+   * reject (`disabledMcpjsonServers`), names turned off in ReviewGate and ReviewGate's session-scope servers. `${VAR}` stays
+   * for the CLI to expand. Null (and no file) when there is nothing to add or the files could not be read.
+   */
+  private async terminalMcpConfigFile(meta: SessionMeta): Promise<string | null> {
+    const file = join(this.dataDir, "terminal-mcp", `${meta.id.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+    const main = this.outsideMainCheckout();
+    let json: string | null = null;
+    if (main) {
+      try {
+        const cwd = this.project!.path;
+        const env = this.childEnv();
+        const dirs = this.terminalConfigDirs(meta);
+        const skip = await rejectedMcpjsonServers([
+          ...dirs.map((d) => join(d, "settings.json")),
+          join(cwd, ".claude", "settings.json"),
+          join(cwd, ".claude", "settings.local.json"),
+        ]);
+        for (const d of dirs) for (const n of await knownMcpNames({ cwd, claudeJson: claudeJsonPath({ ...env, CLAUDE_CONFIG_DIR: d }) })) skip.add(n);
+        for (const n of mcpOffNames(this.mcpToggles)) skip.add(n);
+        for (const n of this.mcpSessionServers.keys()) skip.add(n);
+        const found = await inheritedMcpServers(cwd, main, { skip, env, expand: false });
+        json = terminalMcpConfig(found);
+        if (json) this.log("info", `terminal chat ${meta.id}: ${found.size} MCP server(s) from .mcp.json files above ${main}`);
+      } catch (e) {
+        this.log("warn", `terminal: reading the .mcp.json files above the main checkout failed: ${errorMessage(e)}`);
+      }
+    }
+    if (!json) {
+      rmSync(file, { force: true });
+      return null;
+    }
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    writeFileSync(file, json, { mode: 0o600 });
+    chmodSync(file, 0o600); // an existing file keeps its mode through writeFileSync
+    return file;
+  }
+
+  /**
+   * §57.13: the statusLine tee of a spawn — the user's own status line as their claude resolves it (the project's too: the
+   * TUI runs it once the folder is trusted; the learned config dir's user settings), its padding and refresh copied.
+   */
+  private terminalStatusLine(meta: SessionMeta, statusUrl: string, managed: ManagedPolicy): NonNullable<HookSettingsOptions["statusLine"]> {
+    const dirs = this.terminalConfigDirs(meta);
+    const own = resolveStatusLine({ configDir: dirs[dirs.length - 1]!, cwd: this.project?.path ?? null, managed, trustProject: true }).config;
+    return {
+      statusUrl,
+      userCommand: own?.command ?? null,
+      ...(own ? { padding: own.padding } : {}),
+      ...(own?.refreshIntervalMs ? { refreshInterval: Math.max(1, Math.round(own.refreshIntervalMs / 1000)) } : {}),
+    };
   }
 
   /** §57.16: the config dirs a terminal chat's CLI may use — the engine's, then the one its hooks showed (when another). */
@@ -2796,10 +2907,11 @@ export class ReviewEngine {
    * each of them says gone (its projects folder for the project exists without the record). Unknown is never gone.
    */
   private terminalCliGone(meta: SessionMeta, cliId: string): boolean {
-    const cwd = this.project!.path;
+    // §57.12: a moved chat's conversation is recorded under the folder it ran in before the move.
+    const cwds = [this.project!.path, ...(meta.movedFrom?.path ? [meta.movedFrom.path] : [])];
     const envs = this.terminalConfigDirs(meta).map((dir) => ({ ...this.childEnv(), CLAUDE_CONFIG_DIR: dir }));
-    if (envs.some((env) => cliSessionExists(cwd, cliId, env))) return false;
-    return envs.every((env) => cliSessionGone(cwd, cliId, env));
+    if (envs.some((env) => cwds.some((cwd) => cliSessionExists(cwd, cliId, env)))) return false;
+    return envs.every((env) => cwds.every((cwd) => cliSessionGone(cwd, cliId, env)));
   }
 
   /** §57.10: what a background terminal reports — ids and config dir go to its own chat; waits and state touch; nothing else. */
@@ -2892,6 +3004,8 @@ export class ReviewEngine {
     const trimmed = ev.prompt.trim();
     let started = false;
     let taken: SummaryPaths | null = null;
+    let requested: Awaited<ReturnType<ReviewGate["prepareRequestChanges"]>> = null;
+    let staged: TerminalRequestQueued | null = null;
     try {
       await this.terminalGateSettled(ts, deadline);
       if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
@@ -2905,27 +3019,43 @@ export class ReviewEngine {
       const slices = this.slices();
       if (!this.gate.checkpoint || !canSend(slices)) return void answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
       await this.followHeadMove();
-      await this.gate.prepareAnswer(this.takeBgCarry());
-      const keptA = this.gate.keepsTurnStart;
+      // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
+      const command = trimmed.startsWith("/");
+      // §57.14: a staged Request changes goes with this prompt (a slash command keeps it staged): A kept, the noted files
+      // `changesRequested`, the notes sent with this turn — the user's prompt is the turn's prompt.
+      const queued = ts.requestQueued;
+      if (queued && !command) {
+        staged = queued;
+        ts.stageRequest(null);
+        requested = await this.gate.prepareRequestChanges(queued.extra, this.turn + 1, queued.noteIds ?? undefined);
+        if (!requested) this.log("info", "terminal prompt: the staged Request changes has no notes left; the prompt goes alone");
+      }
+      if (!requested) await this.gate.prepareAnswer(this.takeBgCarry());
+      const keptA = requested !== null || this.gate.keepsTurnStart;
       this.gate.running = true;
       let tree: string;
-      try {
-        tree = await this.gate.snapshotStart();
-      } catch (e) {
-        this.gate.abortTurn();
-        this.touch();
-        this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
-        return void answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+      if (requested) tree = requested.checkpointTree;
+      else {
+        try {
+          tree = await this.gate.snapshotStart();
+        } catch (e) {
+          this.gate.abortTurn();
+          this.touch();
+          this.log("warn", `terminal prompt refused: snapshot A failed: ${errorMessage(e)}`);
+          return void answer({ ok: false, reason: `ReviewGate could not snapshot the project: ${firstLineOf(errorMessage(e))}` });
+        }
       }
       const skippedAtStart = this.gate.snapshotSkipped;
       this.sessionState.pendingPlan = null;
       this.proposedPlanKeys.clear();
-      // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
-      const command = trimmed.startsWith("/");
-      const sendParts = this.gate.beginSendParts(command);
-      const { summary, notes } = sendParts;
-      taken = sendParts.taken;
-      const parts = [summary, notes].filter((p): p is string => p !== null);
+      let parts: string[];
+      if (requested) parts = [requested.message];
+      else {
+        const sendParts = this.gate.beginSendParts(command);
+        const { summary, notes } = sendParts;
+        taken = sendParts.taken;
+        parts = [summary, notes].filter((p): p is string => p !== null);
+      }
       const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
       if (!command) {
         this.commitSlice.lastUserText = trimmed;
@@ -2957,6 +3087,15 @@ export class ReviewEngine {
     } catch (e) {
       this.log("warn", `terminal prompt could not start a review turn: ${errorMessage(e)}`);
       if (!started && taken) this.gate.restoreSummary(taken);
+      if (!started && requested) {
+        // §57.14: the request never reached Claude — its notes are unsent again and it is staged as it was.
+        this.gate.undoRequestChanges(requested.endTree);
+        this.dropRecord();
+        this.hud.turnStartedAt = null;
+        this.setIdle();
+        this.touch();
+        if (staged && this.session === ts && !ts.requestQueued) ts.stageRequest(staged);
+      }
       if (!started && this.gate.running) {
         this.gate.abortTurn();
         this.dropRecord();
@@ -4131,6 +4270,8 @@ export class ReviewEngine {
   }
 
   private async requestChanges(extra: string | null, noteIds?: readonly string[]): Promise<void> {
+    const ts = this.terminal; // MARK: terminal-chat — §57.14: staged, never typed into the TUI
+    if (ts) return this.terminalRequestChanges(ts, extra, noteIds);
     if (!canRequestChanges(this.slices())) {
       // M30 (§3): a failed collection leaves the input open but not a change request (retry first, or send).
       const why = blockedReason(this.slices()) ?? (this.gate.collectError !== null ? "collect_failed" : "no_notes");
@@ -7380,7 +7521,14 @@ export class ReviewEngine {
         if (ev.code === "worktree_outside_review" && ev.reasonCode === "worktree_command") {
           // M05b: EnterWorktree moved the CLI into that worktree — in auto mode the chat follows at once, as "허용하고 따라가기".
           const entered = ev.toolName === "EnterWorktree";
-          if (entered && ev.toolUseId && !this.followAfterTool.has(ev.toolUseId) && this.sessionState.permissionMode === "auto") {
+          // §57.15: "Allow and follow" answered in the app for this chat's EnterWorktree.
+          const arm = this.terminalFollowArm;
+          if (entered && ev.toolUseId && arm && this.terminal?.chatId === arm.chatId && Date.now() <= arm.until && this.canMoveChat()) {
+            this.terminalFollowArm = null;
+            this.followAfterTool.set(ev.toolUseId, { path: ev.path ?? null, followUp: this.chatMoveFollowUp(ev.path ?? null) });
+          }
+          // §57.12: a terminal chat follows by the TUI's own mode, and only for a client that moves terminal chats.
+          if (entered && ev.toolUseId && !this.followAfterTool.has(ev.toolUseId) && this.chatPermissionMode() === "auto" && this.canMoveChat()) {
             this.followAfterTool.set(ev.toolUseId, { path: ev.path ?? null, followUp: this.chatMoveFollowUp(ev.path ?? null) });
           }
           const followed = ev.toolUseId !== undefined && this.followAfterTool.has(ev.toolUseId);
@@ -7388,6 +7536,9 @@ export class ReviewEngine {
           if (ev.worktreesBefore && ev.toolUseId) this.noteWorktreesBefore(ev.toolUseId, ev.path ?? null, ev.worktreesBefore);
           const made = this.afterWorktreeCommand(ev.path ?? null, ev.toolUseId ?? null);
           if (followed) return; // the chat follows: no "outside the review" warning for it
+          // §57.12: the terminal's strip offers the move.
+          const ts = this.terminal;
+          if (entered && ts) void made.then((root) => this.noteTerminalElsewhere(ts, root ?? ev.path ?? null, "EnterWorktree"));
           if (ev.worktreesBefore) {
             // Said once it is there and listed (its row offers to move this chat into it); nothing when it was not made —
             // except for EnterWorktree, which entered it either way (an existing worktree too).
@@ -7525,6 +7676,15 @@ export class ReviewEngine {
         return;
       case "terminal_config_dir": // §57.16
         if (source instanceof TerminalSession) this.onTerminalConfigDir(source.chatId, ev.dir);
+        return;
+      case "terminal_cwd": // §57.12: a `cd` of the TUI's shell — offered as a move, never followed
+        if (source instanceof TerminalSession) void this.noteTerminalElsewhere(source, ev.cwd, "CwdChanged");
+        return;
+      case "terminal_status": // §57.13: the strip's cost / context; the session's cost comes with turn_end
+        if (ev.status.contextTokens !== null) this.hud.contextTokens = ev.status.contextTokens;
+        if (ev.status.contextWindow !== null) this.hud.contextWindow = ev.status.contextWindow;
+        if (ev.status.model) this.sessionState.model = ev.status.model;
+        this.touchChurn();
         return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
@@ -8113,6 +8273,8 @@ export class ReviewEngine {
    * as a record (`movedTo`) and `chat_moved` tells the client to open the target's window. The review stays here.
    */
   private async chatMove(path: unknown, interrupt: boolean, followUp: unknown): Promise<void> {
+    const ts = this.terminal; // MARK: terminal-chat — §57.12: the app ends its PTY; the engine waits for that
+    if (ts) return this.terminalChatMove(ts, path, interrupt, followUp);
     const project = this.project;
     const cp = this.gate.checkpoint;
     const idx = this.sessions;
@@ -8183,6 +8345,126 @@ export class ReviewEngine {
     this.approvedPlan = null;
     this.emit({ type: "chat_moved", sessionId: meta.id, path: target.root, name: target.name, baseline, interrupted });
     this.touch();
+    await this.startSession(project.path, null, this.recordOnlyId());
+  }
+
+  /** §57.12: the mode that decides whether a worktree move is followed at once — a terminal chat's is its TUI's. */
+  private chatPermissionMode(): PermissionMode {
+    return this.terminal?.permissionMode ?? this.sessionState.permissionMode;
+  }
+
+  /** §57.12: the current chat can move between worktrees (a terminal chat only for a client that ends its PTY for it). */
+  private canMoveChat(): boolean {
+    return this.terminal === null || this.terminalFeature("worktreeMove");
+  }
+
+  private elsewhereOf(target: { root: string; name: string }, toolName: TerminalElsewhere["toolName"]): TerminalElsewhere {
+    return { path: target.root, name: target.name, toolName, canMove: this.canMoveChat() };
+  }
+
+  /**
+   * §57.12: the terminal's TUI works in `path` now (EnterWorktree, a `cd`): another worktree of this repository is offered as
+   * a move (`terminal.elsewhere`); this window's own folder, or anything else, clears the offer. A `cd` never moves the chat.
+   */
+  private async noteTerminalElsewhere(ts: TerminalSession, path: string | null, toolName: TerminalElsewhere["toolName"]): Promise<void> {
+    const cp = this.gate.checkpoint;
+    if (!cp || !path) return;
+    let target: ReturnType<typeof moveTarget> = { refused: "path_not_found" };
+    try {
+      target = moveTarget(path, cp.root, await listWorktrees(cp.root));
+    } catch (e) {
+      this.log("debug", `terminal: worktree list: ${errorMessage(e)}`);
+    }
+    if (this.closed || this.session !== ts) return;
+    ts.setElsewhere("refused" in target ? null : this.elsewhereOf(target, toolName));
+  }
+
+  /**
+   * §57.12 `chat_move` of a terminal chat: refused as a chat's is (`chat_is_record`, the target's, `collect_failed`,
+   * `session_busy` without `interrupt`). The chat is marked `moving` (its hooks fail closed), the app ends its PTY (that ends
+   * an open turn: collected and reviewed here), the engine waits for the exit (`cli_still_running` after
+   * CHAT_MOVE_EXIT_WAIT_MS: the chat stays), then hands the chat over as a chat move does — kind, `cliSessionId` and
+   * `cliKnown` with it, and the follow-up as `terminalFollowUp` (never typed). This window keeps it as a terminal record.
+   */
+  private async terminalChatMove(ts: TerminalSession, path: unknown, interrupt: boolean, followUp: unknown): Promise<void> {
+    const project = this.project;
+    const cp = this.gate.checkpoint;
+    const idx = this.sessions;
+    const dir = this.projectGitDir;
+    const chatId = this.currentSessionId;
+    if (!project || !cp || this.gitInit !== null || !idx || !dir || !chatId) throw new CommandRefused("no_project");
+    if (!this.terminalFeature("worktreeMove")) throw new CommandRefused("terminal_chat:chat_move", { code: "terminal_chat" });
+    const meta = idx.get(chatId);
+    if (!meta) throw new CommandRefused("no_project");
+    if (meta.movedTo !== undefined || meta.continuedIn !== undefined || meta.resumeFailed === true) throw new CommandRefused(`chat_is_record:${meta.id}`, { code: "chat_is_record" });
+    const target = moveTarget(path, cp.root, await listWorktrees(cp.root));
+    if ("refused" in target) throw new CommandRefused(await moveRefusal(target.refused, path, cp.root));
+    const targetGitDir = await resolveGitDir(target.root).catch(() => null);
+    if (!targetGitDir) throw new CommandRefused("not_a_worktree");
+    this.guardMoveReview();
+    if (this.gate.collecting || this.gate.reverting) await this.settleForMove();
+    const interrupted = ts.isTurnActive || this.gate.running;
+    if (interrupted && !interrupt) throw new CommandRefused("session_busy");
+    this.cancelAutoRestart();
+    // The app sees `moving`, ends the PTY (no restart) and sends terminal_exited; the pid's exit is enough here (that
+    // command waits behind this one on the main lane).
+    ts.beginMove({ path: target.root, name: target.name });
+    this.touch();
+    const pid = ts.pid;
+    const exited = !ts.state.running || (await Promise.race([
+      ts.waitExit(CHAT_MOVE_EXIT_WAIT_MS),
+      pid !== undefined ? waitForExit(pid, CHAT_MOVE_EXIT_WAIT_MS) : new Promise<boolean>(() => undefined),
+    ]));
+    if (!exited || this.session !== ts) {
+      ts.endMove();
+      this.touch();
+      this.log("warn", `chat_move: the terminal of chat ${meta.id} has not ended; the chat stays here`);
+      throw new CommandRefused("cli_still_running");
+    }
+    if (ts.state.running) ts.ptyExited(); // its open turn ends: collected (and reviewed) here
+    await this.settleForMove();
+    this.guardMoveReview();
+    await this.side.stopAll();
+    await this.stopSession();
+    await this.persistChain.catch(() => undefined);
+    const at = new Date().toISOString();
+    const from = { path: project.root, name: basename(project.root), at };
+    const baseline: ChatMoveBaseline = this.createdWorktrees.get(meta.id)?.has(canonicalPath(target.root)) ? "head" : "disk";
+    const { movedFrom: _was, movedTo: _never, ...rest } = meta;
+    const handoff: ChatHandoff = {
+      version: 1,
+      meta: { ...structuredClone(rest), ...(this.isResumable(meta) || meta.cliSessionId !== undefined ? { cliKnown: true as const } : {}), movedFrom: from },
+      from,
+      to: target.root,
+      baseline,
+      followUp: null,
+      terminalFollowUp: interrupted && typeof followUp === "string" && followUp.trim() ? followUp.trim() : null,
+      permissionMode: this.userMode(),
+      at,
+    };
+    try {
+      await writeHandoff(targetGitDir, handoff, sessionTranscriptPath(dir, meta.id));
+    } catch (e) {
+      this.log("warn", `chat_move: the handoff could not be written (${errorMessage(e)}); the chat stays here`);
+      await this.startSession(project.path, meta.id);
+      throw e;
+    }
+    meta.movedTo = { path: target.root, name: target.name, at };
+    this.persistSessions();
+    this.log("info", `terminal chat ${meta.id} moved to ${target.root} (review from ${baseline}${interrupted ? ", turn stopped" : ""})`);
+    this.sessionState = this.freshSessionState();
+    this.sessionState.rememberedAllows = [...this.rememberedAllows];
+    this.applyCachedCapabilities();
+    this.hud = initialHud();
+    this.chatLines = { added: 0, removed: 0 };
+    this.contextWarned = false;
+    this.agents.reset();
+    this.budgetUsage = { ...ZERO_USAGE };
+    this.autoRestartsThisTurn = 0;
+    this.approvedPlan = null;
+    this.emit({ type: "chat_moved", sessionId: meta.id, path: target.root, name: target.name, baseline, interrupted });
+    this.touch();
+    // A terminal record: its session waits for hooks as any terminal chat's, but terminal_spec refuses it (chat_is_record).
     await this.startSession(project.path, null, this.recordOnlyId());
   }
 
@@ -8281,6 +8563,12 @@ export class ReviewEngine {
       { code: head ? "chat_moved_in" : "chat_moved_in_disk", path: from, sessionId: got.meta.id },
     );
     this.touch();
+    // §57.12: a terminal chat's follow-up is never sent or typed — its first prompt here carries it.
+    if (got.meta.kind === "terminal") {
+      const ts = this.terminal;
+      if (ts && ts.chatId === got.meta.id) ts.setFirstPromptContext(got.handoff.terminalFollowUp ?? null);
+      return;
+    }
     const text = got.handoff.followUp;
     if (text) void this.handle({ type: "send", text });
   }
@@ -8420,11 +8708,13 @@ export class ReviewEngine {
   private afterWorktreeExit(path: string | null, toolUseId: string | null): void {
     const cp = this.gate.checkpoint;
     if (!cp || !path) return;
+    const ts = this.terminal;
     void listWorktrees(cp.root)
       .then((list) => {
         const target = moveTarget(path, cp.root, list);
+        if (ts && !this.closed) ts.setElsewhere("refused" in target ? null : this.elsewhereOf(target, "ExitWorktree")); // §57.12
         if ("refused" in target || this.closed) return;
-        if (this.sessionState.permissionMode !== "auto") {
+        if (this.chatPermissionMode() !== "auto" || !this.canMoveChat()) {
           this.scopeNotice({ type: "scope_notice", code: "worktree_outside_review", toolName: "ExitWorktree", ...(toolUseId ? { toolUseId } : {}), path: target.root });
           return;
         }

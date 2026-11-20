@@ -1089,7 +1089,7 @@ export type TerminalPermission = {
 };
 /** §57.12: a worktree of this repository. */
 export type TerminalPlace = { path: string; name: string };
-export type TerminalElsewhere = TerminalPlace & { toolName: "EnterWorktree" | "CwdChanged"; canMove: boolean };
+export type TerminalElsewhere = TerminalPlace & { toolName: "EnterWorktree" | "ExitWorktree" | "CwdChanged"; canMove: boolean };
 /** §57.10: a terminal chat of this window whose Claude Code keeps running while another chat is current. */
 export type BackgroundTerminalState = { chatId: string; running: boolean; hooksSeen: boolean; waiting: TerminalWaiting | null };
 

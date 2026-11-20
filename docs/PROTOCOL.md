@@ -8780,10 +8780,10 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
   `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
-  (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `request_changes`, `permission_response`,
+  (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
-  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `chat_move`, `side_promote
-  {as:"message"}`); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
+  `task_background`, `stop_agent`, `retry_extensions`, `mcp_reconnect`, `mcp_toggle`, `side_promote
+  {as:"message"}`; `request_changes` and `chat_move` work there since Stage 2, §57.14 / §57.12); `terminal_unsupported` — `session_new {kind:"terminal"}` from a client other than mac or test;
   `terminal_not_current` — the sessionId is not the current chat or not a terminal chat; `terminal_cli_too_old` — the CLI
   is older than 2.1.295 (http hook `onFailure`); `terminal_hooks_disabled` — `disableAllHooks: true` in user, project,
   local or managed settings, or `allowManagedHooksOnly` in managed settings; `no_turn` — `terminal_end_turn` with no open
@@ -8826,7 +8826,8 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   matters (`onFailure: "block"`): prompts and write tools are blocked until the tab is restarted.
 
 **What `claude` runs** (`session/terminalSpec.ts`). `argv` is `[claude, "--session-id=<id>" | "--resume=<id>"` (`<id>` = `cliSessionId ?? id`, joined to its flag so it can
-never be an option of its own)`, "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]` — no `--setting-sources`, `--model` or
+never be an option of its own)`, ["--mcp-config", <file>,] "--settings", <json>, "--append-system-prompt", TERMINAL_SYSTEM_APPEND]`
+(`--mcp-config` only in a worktree outside its main checkout, §57.11) — no `--setting-sources`, `--model` or
 `--permission-mode`: it is the user's own claude, with their settings, plugins and hooks (hooks of every level merge with
 ours). `--resume` when the chat is resumable (it ran a turn, or the CLI has a record of it), so a fresh chat never trips
 "already in use". The system-prompt append says the changes are reviewed after each turn and that rejected files were
@@ -8842,7 +8843,8 @@ and hold no token:
  "PostToolUseFailure":[{"hooks":[H(120)]}],
  "CwdChanged":[{"hooks":[H(10)]}],
  "Stop":[{"hooks":[H(30)]}], "StopFailure":[{"hooks":[H(30)]}],
- "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]}}
+ "Notification":[{"hooks":[H(10)]}], "SessionEnd":[{"hooks":[H(5)]}]},
+ "statusLine":{"type":"command","command":"<tee>"[,"padding":n][,"refreshInterval":s]}}   // §57.13, the Mac app only
 H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-ReviewGate-Token":"${RG_HOOK_TOKEN}"},
             "allowedEnvVars":["RG_HOOK_TOKEN"],"timeout":t[,"onFailure":"block"]}
 ```
@@ -8869,6 +8871,7 @@ H(t, f?) = {"type":"http","url":"http://127.0.0.1:<port>/hook","headers":{"X-Rev
 | Invalid JSON, or not an object | 400 | `{}` |
 | The chat's handler failed | 500 | `{}` (fails closed on UserPromptSubmit / PreToolUse) |
 | Valid request | 200 | the decision JSON (§57.4) |
+| `POST /status` (§57.13): valid, or a retired token (dropped) | 200 | `{}` — the same token check, 405 / 413 / 400 as `/hook` |
 
 - **One token per spawn.** Each `terminal_spec` issues a fresh token (32 random bytes, hex) routed to the current
   terminal chat and retires the chat's previous one; switching chats or closing the project retires it too.
@@ -9229,6 +9232,126 @@ makes the same object current again: no `terminal_spec`, no new token, no respaw
 - **pids.** A background terminal's claude pid is never "another Claude in this worktree" (§31).
 - **Risk.** A background task or an MCP tool of the background terminal can still write files: those are tree changes,
   shown in the current window's review as external changes (§31) — not hidden, but not reviewed under that chat.
+
+### 57.11 MCP servers from above a workbench
+
+A terminal chat in a worktree outside its main checkout (a managed workbench, §42.3) gets the `.mcp.json` servers of the
+folders above the main checkout, as the terminal there has them: `terminal_spec` adds `--mcp-config <file>` right
+before `--settings` (the option takes several values, so a flag follows it).
+
+- **The file** is `<dataDir>/terminal-mcp/<chat id>.json` (folder 0700, file 0600), `{"mcpServers":{…}}`, rewritten at
+  each spec and removed when there is nothing to add. Not inline JSON: Windows caps a command line at 32,767 characters,
+  and other processes can read a command line.
+- **No `--strict-mcp-config`**: the user's own servers (user, local, project scope, plugins) stay.
+- **Skipped names** — the CLI's own server wins, as for a chat: user scope (`.claude.json` `mcpServers`), local scope
+  (`projects[<cwd>].mcpServers`), the `.mcp.json` files along the worktree's own walk, `disabledMcpjsonServers` of the
+  user's and the project's settings, names turned off in ReviewGate, ReviewGate's session-scope servers. Both config dirs
+  of §57.16 are read. Between the inherited files the nearer one wins.
+- **`${VAR}` is not expanded by the engine**: the CLI expands it from the PTY's environment (the user's login shell), and
+  secrets stay out of the file. (Unverified against the CLI: if it does not expand there, the engine will expand only
+  variables of its own environment into this 0600 file.)
+
+### 57.12 Worktrees: follow and move
+
+- **Detection.** PostToolUse now covers every tool (§57.16), so the main agent's `EnterWorktree` / `ExitWorktree` (no
+  `agent_id`) give the same `scope_notice` a chat's hooks give (`worktreeToolNotice`). `CwdChanged` gives the TUI's new
+  folder (`terminal_cwd`).
+- **Following.** The mode that decides is the TUI's last `permission_mode` (from its hooks), not the chat's. In auto mode
+  — and only for a client that moves terminal chats (`terminalFeature("worktreeMove")`: the Mac app) — EnterWorktree moves
+  the chat at once (as a chat's "허용하고 따라가기"), ExitWorktree back to another worktree likewise. Otherwise
+  `state.session.terminal.elsewhere {path, name, toolName: "EnterWorktree" | "ExitWorktree" | "CwdChanged", canMove}`
+  offers the move; this window's own folder (or a folder that is no worktree of this repository) clears it. A `cd`
+  (CwdChanged) is only ever offered, never followed.
+- **`chat_move {path, interrupt?, followUp?}` of a terminal chat.** Refused as a chat's (`chat_is_record` — also for a
+  terminal chat continued elsewhere —, the target's refusals, `collect_failed`, `session_busy` while a turn runs without
+  `interrupt`; `terminal_chat` for a client that does not move terminal chats). Then:
+  1. `state.session.terminal.moving {path, name}`: from now on UserPromptSubmit is blocked and PreToolUse denied with
+     "This chat is moving to <name> in ReviewGate; it continues there."; an open turn stays open.
+  2. The app sees `moving`, ends the PTY (no restart) and sends `terminal_exited`. The engine waits for the claude pid's
+     exit (or `terminal_exited`) up to 5 s; on timeout `moving` clears, the chat stays, refused `cli_still_running`.
+  3. The PTY's end closes an open turn (`terminal_exited`): it is collected and its review stays **here**.
+  4. The handoff is a chat move's (§39.4): the meta keeps `kind: "terminal"`, `cliSessionId`, `cliKnown`, `cliConfigDir`;
+     `followUp` is null and `terminalFollowUp` holds the follow-up when a turn was stopped (auto-follow: the
+     `chatMoveFollowUp` text). `movedTo`, `chat_moved` as for a chat.
+  5. This window's current chat is now a terminal **record**: its session waits for nothing, `terminal_spec` is refused
+     `chat_is_record`; the app shows the moved placeholder.
+- **The target window** takes the chat as any moved chat and makes it current: a terminal chat. `terminal_spec` resumes
+  it: the conversation counts as gone only when the CLI has no record under the target's folder nor under `movedFrom`'s
+  (in each config dir, §57.16) — so a move never silently starts a fresh conversation. `terminalFollowUp` goes into the
+  first real prompt's `additionalContext` (prepended), then is dropped; nothing is typed into the PTY. The trust question
+  of the new folder is the TUI's own (the engine never writes trust into `.claude.json`).
+
+### 57.13 Cost and the status line
+
+A terminal chat's cost, model and context come from the TUI's own status line: `--settings` gains a top-level
+`statusLine` (only for a client that shows it: `terminalFeature("statusLine")`, the Mac app) whose command is a tee —
+pure POSIX sh (the CLI runs statusLine commands with `/bin/sh -c` on macOS):
+
+```sh
+j=$(cat); printf 'X-ReviewGate-Token: %s\n' "$RG_HOOK_TOKEN" | /usr/bin/curl -sS -m 1 --noproxy '*' -H @- -H 'Content-Type: application/json' --data-binary "$j" 'http://127.0.0.1:<port>/status' >/dev/null 2>&1 &
+printf '%s' "$j" | /bin/sh -c '<the user's command, POSIX-quoted>'      # only when the user has one
+```
+
+- The token goes in through `-H @-` (never argv); `--noproxy '*'` keeps the post off any proxy. The user's command gets
+  the same stdin, cwd and env; its output and exit status pass through, so their status line looks the same. With none
+  configured the tee prints nothing (the TUI may keep an empty row).
+- **Which command.** The user's resolved status line (§44.2) with the project's own trusted (`trustProject`: the TUI runs
+  it itself once the folder is trusted, so `allowedProjectStatusLine` does not apply), read from the learned config dir
+  (§57.16); its `padding` and `refreshInterval` are copied. A managed statusLine outranks the flag settings, so with one
+  the tee does not run and no cost shows. A statusLine edited mid-session is picked up at the next Restart.
+- **`POST /status`** (same token, limits and statuses as `/hook`) → `TerminalSession.handleStatus`. It reads
+  `cost.total_cost_usd`, `model.id` / `model.display_name` and `context_window` (`context_window_size`, the
+  `current_usage` input + cache tokens) into `state.session.terminal.status`. The cost is the CLI session's total: the
+  first sample after each spawn is the baseline, growth since the last sample is added to the turn's cost, and a total
+  that went down (a resume, `/clear`) is a new baseline. `turn_end.usage.costUsd` carries that cost (spent between turns:
+  with the next turn) and `contextTokens` / `contextWindow` the last sample — so `meta.costUSD` and `hud.sessionCostUSD`
+  follow the existing path. The current chat's status also sets `hud.contextTokens` / `contextWindow` and
+  `state.session.model` (HUD churn, §45.2). A background terminal's status feeds nothing.
+- **Risk.** A forged `/status` (anything holding the token) can only inflate the displayed cost.
+
+### 57.14 Request changes
+
+`request_changes {extra?, noteIds?}` works in a terminal chat (it left the `terminal_chat` refusals). Nothing is typed into
+the TUI (no auto-Enter): the engine stages the request — `state.session.terminal.requestQueued {via, noteIds, extra, at}`
+— and the reply is `result ok`. A later request replaces a staged one. Refused as in a chat
+(`request_changes_unavailable:no_notes` / `<blocked reason>` / `collect_failed` / `no_review`).
+
+- **`via: "stop"`** — a review turn runs (the session has a turn open). At that turn's Stop (not one with
+  `stop_hook_active: true`, so one block per staged request and the CLI's 8-continuation cap is never in play) the
+  engine takes the unsent notes (`gate.takeNotesForStop`: the request message, the notes marked sent with this turn; file
+  states unchanged — the turn is still open) and the Stop answers `{decision:"block", reason:"Review notes from the user
+  in ReviewGate — address them before you finish:\n\n" + message}`. The turn stays open and ends at the next Stop. The
+  TUI shows block reasons as "Stop hook error". If the Stop request was aborted, the notes are unsent again
+  (`untakeNotesForStop`). A turn that ends without that Stop (Esc, the PTY's exit) turns the request into `next_prompt`.
+- **`via: "next_prompt"`** — the review can take a request (`canRequestChanges`). The next UserPromptSubmit adoption takes
+  it instead of `prepareAnswer`: `gate.prepareRequestChanges(extra, turn, noteIds)` keeps A, marks the noted files
+  `changesRequested` and the notes sent; `additionalContext` is the request message; the user's typed prompt is the
+  turn's prompt (its `user_message`). A slash prompt (`/…`) keeps the request staged. A prompt that cannot start undoes it
+  (`undoRequestChanges`) and stages it again.
+- **`terminal_request_cancel {sessionId}`** unstages it; refused `no_request_queued` when nothing is staged.
+
+### 57.15 Answering Claude Code's permission dialogs
+
+A `PermissionRequest` http hook (no matcher, `H(600)`, no `onFailure`: a failure leaves the TUI's dialog in charge) is
+registered for a client that answers dialogs (`terminalFeature("permissionBridge")`: the Mac app). The engine decides at
+hook time: with `settings.terminalPermissionBridge === false` (default true), in the background (§57.10), or when the
+request is already aborted, it answers `{}` at once (the TUI's dialog) after raising `waiting`.
+
+- **Bridged.** Otherwise `state.session.terminal.permissions` gains `{requestId, toolName, summary, reason, since,
+  canFollow?}` and `waiting {kind:"permission"}` is set at once (not after the Notification's 6 s). `summary`: `Bash:
+  <command>`, the edit's path, or the tool with its input (≤ 300 characters). `reason`: the §57.8 guard's reason when the
+  guard asked for the same call (`tool_name` + stable JSON of `tool_input`) within 60 s. `canFollow`: EnterWorktree.
+- **First answer wins.** The hook request stays open until one of: the app's `terminal_permission_response`, the CLI gave
+  up (abort), any later PreToolUse / PostToolUse / PostToolUseFailure / Stop / UserPromptSubmit of the session (the TUI
+  answered), the PTY's end, the chat going to the background. All but the first answer `{}`. The input has no
+  `tool_use_id`: the open HTTP request is the correlation, and `requestId` is the only handle the app gets.
+- **`terminal_permission_response {sessionId, requestId, allow, message?, follow?}`.** allow →
+  `{hookSpecificOutput:{hookEventName:"PermissionRequest", decision:{behavior:"allow"}}}`; deny → `decision:{behavior:"deny",
+  message: message ?? "The user denied this in ReviewGate."}`. Never `updatedInput`, `updatedPermissions` ("always allow"
+  stays in the TUI) or `interrupt`. Refused `permission_gone` (no longer open), `follow_not_allowed` (`follow` on anything
+  but EnterWorktree), `terminal_not_current`.
+- **Allow and follow** (`follow: true` with `allow`): the chat's next main-agent EnterWorktree PostToolUse within 120 s is
+  followed whatever the TUI's mode (§57.12; the follow-up is the `chatMoveFollowUp` text).
 
 ### 57.16 Hook coverage, proxy and config dir
 
