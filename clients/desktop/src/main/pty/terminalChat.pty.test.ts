@@ -116,7 +116,11 @@ describe("a fake claude through a real PTY drives one review turn (§57.17)", ()
       settings: { budget: { maxFiles: 0, maxLines: 0 }, ignorePatterns: [], autoAllowTools: [], loadUserSettings: false, systemPromptAppend: "", claudePath: claude, ghHost: "github.com" },
     });
     await engine.handle({ type: "open_project", path: repo });
-    await until("the project", () => state().project !== null && state().session.open);
+    await until("the project", () => state().project !== null && state().session.open).catch((e: Error) => {
+      // CI on Windows: say why the session never opened (the engine's own error, the session's state).
+      const st = state() as unknown as Record<string, unknown>;
+      throw new Error(`${e.message}: ${JSON.stringify({ project: st.project !== null, session: st.session, lastError: st.lastError })}`);
+    });
     await engine.handle({ type: "session_new", kind: "terminal" });
     sessionId = (await until("the terminal chat", () => state().session.terminal && state().session.open && state().sessions.currentId))!;
 
