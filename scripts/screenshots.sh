@@ -13,7 +13,7 @@
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
 # - a layout on the fake claude (SHOTS_LAYOUT=terminal) never reads ~/.claude at all: the app and its engine get
 #   CLAUDE_CONFIG_DIR=SHOTS_DIR/claude-config, a fresh folder whose settings.json holds only a harmless status line
-#   (`echo acme-status`) for the terminal chat's status line tee (§57.13) to wrap;
+#   (`printf TOUR`) for the terminal chat's status line tee (§57.13) to wrap — the fake runs it only when it is exactly that;
 # - the layouts on the real claude (the README run and every other SHOTS_LAYOUT, composer among them) keep the user's
 #   config dir — the CLI needs its login — and never run the user's status line: the build's showStatusLine is off (no
 #   status line under the chat, §44.2) and the tour opens chats only (newChatKind chat), never a terminal chat whose TUI
@@ -349,9 +349,10 @@ const post = async (body) => {
     body: JSON.stringify({ session_id: session, cwd: process.cwd(), ...body }) });
   return res.json().catch(() => ({}));
 };
-// §57.10–57.15 lines (no turn): `status` runs the tee of the settings' statusLine command as the CLI does (/bin/sh -c,
-// the status input on stdin) — only its first line, the post to ReviewGate: the second line runs the user's own status
-// line, which a tour never runs; `perm` asks a PermissionRequest (Bash `echo hi`) and prints the decision; `bgwrite` asks
+// §57.10–57.15 lines (no turn): `status` runs the settings' statusLine command (the tee) as the CLI does (/bin/sh -c, the
+// status input on stdin) and prints what it printed (`status: … printed "TOUR"`) — the whole command only when its own
+// part is the tour's fixture (`printf TOUR`, from the tour's own CLAUDE_CONFIG_DIR), else only the tee's post, so no
+// status line of the user's can ever run here; `perm` asks a PermissionRequest (Bash `echo hi`) and prints the decision; `bgwrite` asks
 // a PreToolUse Write and prints allow / deny and the reason; `wait` posts a permission Notification and `webfetch` a
 // WebFetch PostToolUse (the wait clears).
 const extra = {
@@ -359,11 +360,13 @@ const extra = {
     const command = settings.statusLine?.command;
     if (!command) return "status: no statusLine";
     const [tee, ...own] = command.split("\n");
+    const fixture = own.length === 1 && own[0].endsWith("| /bin/sh -c 'printf TOUR'");
     const input = JSON.stringify({ session_id: session, cwd: process.cwd(), cost: { total_cost_usd: 0.0123 },
       model: { id: "claude-acme-test", display_name: "Acme" },
       context_window: { context_window_size: 200000, current_usage: { input_tokens: 40000, cache_creation_input_tokens: 0, cache_read_input_tokens: 10000 } } });
-    const out = require("node:child_process").spawnSync("/bin/sh", ["-c", tee], { input, encoding: "utf8", timeout: 10000 });
-    return `status: ran the tee (exit ${out.status})${own.length ? ", the user's own status line not run" : ""}`;
+    const out = require("node:child_process").spawnSync("/bin/sh", ["-c", fixture ? command : tee], { input, encoding: "utf8", timeout: 10000 });
+    if (fixture) return `status: ran the tee (exit ${out.status}), printed ${JSON.stringify((out.stdout ?? "").trim())}`;
+    return `status: ran the tee's post only (exit ${out.status})${own.length ? ", a status line that is not the tour's not run" : ""}`;
   },
   perm: async () => {
     const answer = await post({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "echo hi" } });
@@ -416,13 +419,14 @@ EOF
 fi
 # A layout on the fake claude: the app and its engine get a Claude Code config dir of their own (CLAUDE_CONFIG_DIR), so
 # nothing reads the user's ~/.claude — no user settings, hooks, status line, skills, plugins, plans, MCP servers or
-# conversations. Its settings.json has a harmless status line for §57.13's tee to wrap.
+# conversations. Its settings.json has a harmless status line (`printf TOUR`) for §57.13's tee to wrap; the tour checks
+# that its output passes through the tee.
 TOUR_CLAUDE_CONFIG=""
 if [ "$CLAUDE_BIN" != claude ]; then
   TOUR_CLAUDE_CONFIG="$SHOTS_DIR/claude-config"
   rm -rf "$TOUR_CLAUDE_CONFIG"
   mkdir -p "$TOUR_CLAUDE_CONFIG"
-  printf '%s\n' '{"statusLine":{"type":"command","command":"echo acme-status"}}' > "$TOUR_CLAUDE_CONFIG/settings.json"
+  printf '%s\n' '{"statusLine":{"type":"command","command":"printf TOUR"}}' > "$TOUR_CLAUDE_CONFIG/settings.json"
 fi
 CLI_VERSION="$("$CLAUDE_BIN" --version | awk '{print $1}')"
 ENGINE_VERSION="$(sed -n 's/.*ENGINE_VERSION = "\(.*\)".*/\1/p' "$ROOT/engine/src/version.ts")"

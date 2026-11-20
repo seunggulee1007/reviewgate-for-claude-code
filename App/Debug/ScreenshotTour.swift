@@ -3164,9 +3164,10 @@ private final class Tour {
         let hub = entry.model.terminals
         let window = entry.window
 
-        // 3. §57.13: the statusLine tee — the fake runs the settings' command; the strip shows its cost.
+        // 3. §57.13: the statusLine tee — the fake runs the settings' command (the tour's own `printf TOUR`, from its own
+        // CLAUDE_CONFIG_DIR); its output passes through the tee and the strip shows the cost.
         host.send(text: "status\r")
-        let ran = await waitFor(seconds: 15) { host.screenText().contains("status: ") }
+        let ran = await waitFor(seconds: 15) { host.screenText().contains(#"status: ran the tee (exit 0), printed "TOUR""#) }
         let costCame = await waitFor(seconds: 10) { [store] in store.terminalInfo?.status?.costUsd == 0.0123 }
         let status = store.terminalInfo?.status
         let shown = status?.costUsd.map { HUDStrip.usd($0) }
