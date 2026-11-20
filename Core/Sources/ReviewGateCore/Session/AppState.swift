@@ -567,7 +567,8 @@ public final class AppState {
     /// A project is open but its Claude session is gone: the composer offers "Session ended — Restart".
     public var isSessionEnded: Bool { projectInfo != nil && !sessionInfo.open && !sessionInfo.starting }
     /// Pending files whose current content has not been shown (audit 1.9; §34.5 — "본 뒤 바뀜" files included).
-    public var unviewedPendingFiles: [ChangedFile] { pendingFiles.filter { !viewedPaths.contains($0.path) } }
+    /// `viewedPaths` is computed once: it walks every changed file, so reading it per file made this quadratic.
+    public var unviewedPendingFiles: [ChangedFile] { let viewed = viewedPaths; return pendingFiles.filter { !viewed.contains($0.path) } }
     public var needsGitInit: Bool { gitInitInfo != nil }
     public var gitCandidates: [URL] { (gitInitInfo?.candidates ?? []).map { URL(fileURLWithPath: $0) } }
     public var gitInitLooksUnsafe: Bool { gitInitInfo?.looksUnsafe ?? false }
@@ -1380,7 +1381,9 @@ public final class AppState {
     // MARK: - Review comprehension (docs/PROTOCOL.md §12–13)
 
     /// Changed files that were shown in this review (`viewedPaths` ∩ `changedFiles`).
-    public var viewedChangedCount: Int { changedFiles.filter { viewedPaths.contains($0.path) }.count }
+    /// `viewedPaths` is computed once — per file it made the list's "n/N viewed" quadratic, and with thousands of changed
+    /// files it held the main thread at 100% on every redraw.
+    public var viewedChangedCount: Int { let viewed = viewedPaths; return changedFiles.reduce(0) { $0 + (viewed.contains($1.path) ? 1 : 0) } }
 
     /// The changed file at `path` (repo-relative, or absolute inside the project — as plans and agents name files); nil when
     /// it is not in the review.
