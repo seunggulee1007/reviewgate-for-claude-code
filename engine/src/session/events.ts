@@ -11,6 +11,7 @@ import type { RateLimitWindow } from "../protocol.js"; // MARK: wave4 w4-longwor
 import type { PermissionMode } from "../protocol.js"; // MARK: wave6 w6-terminal
 import type { AutoTurnInfo, BackgroundTask } from "../protocol.js"; // §52
 import type { HeadInfo } from "../protocol.js"; // MARK: r1-git
+import type { TerminalStatus } from "../protocol.js"; // §57.13
 
 /**
  * A file the turn's tools touched: tool names plus the tool_use ids that touched it (edit tools by their
@@ -177,6 +178,12 @@ export type SessionEvent =
   | { type: "terminal_session_id"; sessionId: string }
   /** `TerminalSession.state` changed (a touch only). */
   | { type: "terminal_state" }
+  /** §57.13: the TUI's status line ran (the statusLine tee posted its input). */
+  | { type: "terminal_status"; status: TerminalStatus }
+  /** §57.16: the CLI config dir the terminal really uses (from a hook's `transcript_path`), when it changed. */
+  | { type: "terminal_config_dir"; dir: string }
+  /** §57.12: CwdChanged — the TUI's shell went to `cwd`; the engine resolves `elsewhere`. */
+  | { type: "terminal_cwd"; cwd: string }
   | { type: "closed"; code: number };
 
 export type SessionLog = (level: LogLevel, message: string) => void;

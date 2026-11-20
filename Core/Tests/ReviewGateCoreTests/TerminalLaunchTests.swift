@@ -55,10 +55,92 @@ import Testing
         #expect(launch.cwd == "/work/acme")
         #expect(launch.args.count == 4)
         #expect(Array(launch.args.prefix(3)) == ["-l", "-i", "-c"])
-        #expect(launch.args[3] == #"exec /usr/local/bin/claude --session-id s1 --settings '{"hooks":{"H":"${RG_HOOK_TOKEN}"}}'"#)
+        #expect(launch.args[3] == "exec /bin/sh -c " + TerminalLaunch.posixQuote(TerminalLaunch.noProxyWrapper)
+            + #" rg-claude /usr/local/bin/claude --session-id s1 --settings '{"hooks":{"H":"${RG_HOOK_TOKEN}"}}'"#)
         // The token is only in the env, never on the command line.
         #expect(!launch.args.joined().contains("abc123"))
         #expect(TerminalLaunch.claude(spec: spec(), parentEnv: parent, loginShell: "/usr/local/bin/fish", appVersion: "1").execName == "-fish")
+    }
+
+    /// Runs `line` the way `shell` would after the user's rc (no rc here), with the rc's `NO_PROXY` already exported.
+    private func run(_ shell: [String], _ line: String, noProxy: String?) throws -> [String] {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: shell[0])
+        p.arguments = Array(shell.dropFirst()) + ["-c", line]
+        var env = ["RG_HOOK_TOKEN": "SECRET", "HOME": "/nonexistent", "PATH": "/usr/bin:/bin"]
+        if let noProxy { env["NO_PROXY"] = noProxy; env["no_proxy"] = noProxy }
+        p.environment = env
+        p.standardInput = FileHandle.nullDevice
+        let out = Pipe()
+        p.standardOutput = out
+        try p.run()
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return String(decoding: data, as: UTF8.self).split(separator: "\0", omittingEmptySubsequences: false).dropLast().map(String.init)
+    }
+
+    /// §57.16: after the rc, `NO_PROXY` / `no_proxy` gain 127.0.0.1 (appended to the rc's value) and claude gets its argv
+    /// word for word — through POSIX shells and csh/tcsh.
+    @Test func theNoProxyWrapperKeepsTheArgv() throws {
+        let words = ["a b", "it's", "$HOME", "${RG_HOOK_TOKEN}", "`id`", "한글 폴더", "\"q\"", #"back\slash"#, #"{"a":"x\"y\\n"}"#,
+                     "", "*", "line one\n\nline two"]
+        let probe = ["/bin/sh", "-c", #"printf '%s\0' "$NO_PROXY" "$no_proxy" "$@""#, "probe"] + words
+        let local = "127.0.0.1,localhost,::1"
+        for (login, runner) in [("/bin/zsh", ["/bin/zsh", "-f"]), ("/bin/bash", ["/bin/bash", "--norc", "--noprofile"]),
+                                ("/bin/tcsh", ["/bin/tcsh", "-f"]), ("/bin/csh", ["/bin/csh", "-f"])] {
+            let launch = TerminalLaunch.claude(spec: spec(argv: probe), parentEnv: parent, loginShell: login, appVersion: "1")
+            #expect(launch.executable == login)
+            let line = try #require(launch.args.last)
+            #expect(try run(runner, line, noProxy: "example.com") == ["example.com,\(local)", "example.com,\(local)"] + words,
+                    "\(login)")
+            #expect(try run(runner, line, noProxy: nil) == [local, local] + words, "\(login)")
+        }
+        // The debug shell (the quiet tour) gets the same wrapper.
+        let debug = TerminalLaunch.claude(spec: spec(argv: probe), parentEnv: parent, loginShell: "/bin/zsh", appVersion: "1",
+                                          debugShell: "/bin/sh")
+        #expect(try run(["/bin/sh"], debug.args[1], noProxy: nil) == [local, local] + words)
+    }
+
+    @Test func shellFamilies() {
+        #expect(TerminalLaunch.shellFamily("/bin/zsh") == .posix)
+        #expect(TerminalLaunch.shellFamily("/bin/bash") == .posix)
+        #expect(TerminalLaunch.shellFamily("/opt/acme/bin/fish") == .fish)
+        #expect(TerminalLaunch.shellFamily("/bin/tcsh") == .csh)
+        #expect(TerminalLaunch.shellFamily("/opt/acme/bin/nu") == .other)
+        // The wrapper word reads the same in every family: no backslash, `!`, `'` or newline.
+        #expect(!TerminalLaunch.noProxyWrapper.contains { "\\!'\n".contains($0) })
+
+        let fish = TerminalLaunch.claude(spec: spec(), parentEnv: parent, loginShell: "/opt/acme/bin/fish", appVersion: "1")
+        #expect(fish.executable == "/opt/acme/bin/fish")
+        #expect(Array(fish.args.prefix(3)) == ["-l", "-i", "-c"])
+        #expect(TerminalLaunch.fishQuote(#"a\b'c"#) == #"'a\\b\'c'"#)
+        #expect(TerminalLaunch.fishQuote("plain") == "plain")
+
+        // csh takes -l only alone; argv[0]'s dash makes the login shell.
+        let csh = TerminalLaunch.claude(spec: spec(), parentEnv: parent, loginShell: "/bin/tcsh", appVersion: "1")
+        #expect(csh.executable == "/bin/tcsh")
+        #expect(csh.execName == "-tcsh")
+        #expect(Array(csh.args.prefix(2)) == ["-i", "-c"])
+
+        // nu and friends cannot read POSIX quoting: zsh runs the line.
+        let nu = TerminalLaunch.claude(spec: spec(), parentEnv: parent, loginShell: "/opt/acme/bin/nu", appVersion: "1")
+        #expect(nu.executable == "/bin/zsh")
+        #expect(nu.execName == "-zsh")
+        #expect(Array(nu.args.prefix(3)) == ["-l", "-i", "-c"])
+
+        // csh history expands `!` even inside quotes: such an argv falls back to zsh.
+        let bang = TerminalLaunch.claude(spec: spec(argv: ["/usr/local/bin/claude", "hi!"]), parentEnv: parent,
+                                         loginShell: "/bin/tcsh", appVersion: "1")
+        #expect(bang.executable == "/bin/zsh")
+    }
+
+    /// The engine's real argv (§57.3) never holds a `!`, so csh users keep their own login shell.
+    @Test func noBangInTheEngineArgv() throws {
+        let src = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../engine/src/session/terminalSpec.ts")
+        guard let text = try? String(contentsOf: src, encoding: .utf8) else { return }
+        let start = try #require(text.range(of: "export const TERMINAL_GIT_INSTRUCTION"))
+        let end = try #require(text.range(of: "export const TERMINAL_WRITE_TOOLS_MATCHER"))
+        #expect(!text[start.upperBound..<end.lowerBound].contains("!"))
     }
 
     @Test func theEnvironmentIsLayered() {
@@ -107,7 +189,8 @@ import Testing
         #expect(claude.executable == "/bin/sh")
         #expect(claude.args.count == 2)
         #expect(claude.args[0] == "-c")
-        #expect(claude.args[1].hasPrefix("exec /usr/local/bin/claude "))
+        #expect(claude.args[1].hasPrefix("exec /bin/sh -c "))
+        #expect(claude.args[1].contains(" rg-claude /usr/local/bin/claude "))
         #expect(claude.execName == nil)
         let shell = TerminalLaunch.shell(cwd: "/work/acme", parentEnv: parent, loginShell: "/bin/zsh", appVersion: "1", debugShell: "/bin/sh")
         #expect(shell.executable == "/bin/sh")

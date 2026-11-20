@@ -154,6 +154,22 @@
         }
       }
     },
+    "%@ of %@ tokens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of %@ tokens"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@ 토큰"
+          }
+        }
+      }
+    },
     "%@ report:": {
       "localizations": {
         "en": {
@@ -1167,6 +1183,22 @@
         }
       }
     },
+    "%lld percent of the context used": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld percent of the context used"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "컨텍스트 %lld퍼센트 사용"
+          }
+        }
+      }
+    },
     "%lld permission requests waiting": {
       "localizations": {
         "en": {
@@ -1211,6 +1243,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대기 %lld개 — Claude가 한가해지면 순서대로 보냅니다"
+          }
+        }
+      }
+    },
+    "%lld review note(s) not sent to Claude yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld review note(s) not sent to Claude yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 Claude에게 보내지 않은 리뷰 메모 %lld개"
           }
         }
       }
@@ -3249,6 +3297,22 @@
         }
       }
     },
+    "Allow it; once Claude Code is in the new worktree, this chat moves to that worktree's window and is reviewed there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow it; once Claude Code is in the new worktree, this chat moves to that worktree's window and is reviewed there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "허용해요. Claude Code가 새 워크트리로 들어가면 이 채팅이 그 워크트리 창으로 옮겨가 거기서 리뷰돼요"
+          }
+        }
+      }
+    },
     "Allow messages to this session for the session": {
       "localizations": {
         "en": {
@@ -3421,6 +3485,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이번 호출만 허용합니다 (입력창이 비어 있을 때 ⌘↩)"
+          }
+        }
+      }
+    },
+    "Allow this one call — to always allow it, answer in the terminal instead": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow this one call — to always allow it, answer in the terminal instead"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 호출만 허용해요 — 항상 허용하려면 터미널에서 답하세요"
           }
         }
       }
@@ -3709,6 +3789,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "질문에 답변"
+          }
+        }
+      }
+    },
+    "Answer terminal chats' permission prompts in ReviewGate too": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer terminal chats' permission prompts in ReviewGate too"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅의 허용 요청에 ReviewGate에서도 답하기"
           }
         }
       }
@@ -4641,6 +4737,38 @@
         }
       }
     },
+    "Changes requested — they go to Claude with your next prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes requested — they go to Claude with your next prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 요청이 대기 중 — 다음 프롬프트와 함께 Claude에게 가요"
+          }
+        }
+      }
+    },
+    "Changes requested — they reach Claude before this turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes requested — they reach Claude before this turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 요청이 이 턴이 끝나기 전에 Claude에게 전달돼요"
+          }
+        }
+      }
+    },
     "Chat menu — new terminal chat, history, continue in terminal, import a CLI session": {
       "localizations": {
         "en": {
@@ -4669,6 +4797,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code가 터미널에서 질문했어요"
+          }
+        }
+      }
+    },
+    "Claude Code asks to use %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code asks to use %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 %@ 사용을 요청해요"
+          }
+        }
+      }
+    },
+    "Claude Code changed into %@, another worktree of this repository — its changes there are not reviewed here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code changed into %@, another worktree of this repository — its changes there are not reviewed here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 저장소의 다른 워크트리 %@(으)로 이동했어요 — 거기서 바꾼 내용은 여기서 리뷰되지 않아요"
           }
         }
       }
@@ -4753,6 +4913,22 @@
         }
       }
     },
+    "Claude Code keeps running in the background — continue in this chat to type in it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code keeps running in the background — continue in this chat to type in it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 백그라운드에서 계속 실행 중이에요 — 입력하려면 이 채팅으로 이어가세요"
+          }
+        }
+      }
+    },
     "Claude Code reports each prompt and edit to ReviewGate; accept or reject the changes as in a chat": {
       "localizations": {
         "en": {
@@ -4769,6 +4945,22 @@
         }
       }
     },
+    "Claude Code running in the background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code running in the background"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행 중인 Claude Code"
+          }
+        }
+      }
+    },
     "Claude Code stopped": {
       "localizations": {
         "en": {
@@ -4781,6 +4973,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code 중지됨"
+          }
+        }
+      }
+    },
+    "Claude Code stops here and continues in that worktree's window; the review of this folder stays here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code stops here and continues in that worktree's window; the review of this folder stays here."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code는 여기서 멈추고 그 워크트리 창에서 이어가요. 이 폴더의 리뷰는 여기 남아요."
+          }
+        }
+      }
+    },
+    "Claude Code waits for you in this terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code waits for you in this terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 터미널에서 기다려요"
+          }
+        }
+      }
+    },
+    "Claude Code waits for you in this terminal — continue in this chat to answer it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code waits for you in this terminal — continue in this chat to answer it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 터미널에서 기다려요 — 답하려면 이 채팅으로 이어가세요"
           }
         }
       }
@@ -4817,6 +5057,86 @@
         }
       }
     },
+    "Claude Code works in %@, another worktree of this repository — its changes there are not reviewed here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code works in %@, another worktree of this repository — its changes there are not reviewed here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 저장소의 다른 워크트리 %@에서 작업해요 — 거기서 바꾼 내용은 여기서 리뷰되지 않아요"
+          }
+        }
+      }
+    },
+    "Claude Code's cost so far in this conversation and how much of its context is used, from its status line — click for details": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's cost so far in this conversation and how much of its context is used, from its status line — click for details"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code의 상태 표시줄에서 온 이 대화의 지금까지 비용과 컨텍스트 사용량이에요 — 클릭하면 자세히 보여요"
+          }
+        }
+      }
+    },
+    "Claude Code's own estimates, not a bill. Reviewed turns: what the turns ReviewGate reviewed in this chat cost.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's own estimates, not a bill. Reviewed turns: what the turns ReviewGate reviewed in this chat cost."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 추정한 값이라 청구 금액이 아니에요. 리뷰한 턴: 이 채팅에서 ReviewGate가 리뷰한 턴들의 비용이에요."
+          }
+        }
+      }
+    },
+    "Claude Code's permission dialog in a terminal chat also shows as a card over the terminal, with Allow once and Deny, and notifies you at once; whichever you answer first counts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's permission dialog in a terminal chat also shows as a card over the terminal, with Allow once and Deny, and notifies you at once; whichever you answer first counts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서 Claude Code의 허용 대화상자가 터미널 위에 한 번 허용 / 거부 카드로도 나오고 바로 알려줘요. 먼저 답한 쪽이 적용돼요"
+          }
+        }
+      }
+    },
+    "Claude Code's status line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's status line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 상태 표시줄"
+          }
+        }
+      }
+    },
     "Claude is working — the review opens when it stops": {
       "localizations": {
         "en": {
@@ -4845,6 +5165,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "닫기 (esc · ↩ · space) — /btw만 입력하면 다시 보여요"
+          }
+        }
+      }
+    },
+    "Close tab (⌘⇧W) — its Claude Code running in the background stops; the chat stays in History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close tab (⌘⇧W) — its Claude Code running in the background stops; the chat stays in History"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "탭 닫기 (⌘⇧W) — 백그라운드에서 실행 중인 Claude Code가 종료되고, 채팅은 채팅 기록에 남아요"
           }
         }
       }
@@ -9463,6 +9799,22 @@
         }
       }
     },
+    "Cost so far %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cost so far %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금까지 비용 %@"
+          }
+        }
+      }
+    },
     "Cost this turn (estimate)": {
       "localizations": {
         "en": {
@@ -11367,6 +11719,118 @@
         }
       }
     },
+    "Its Claude Code asked you a question — continue in this chat to answer it in the terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its Claude Code asked you a question — continue in this chat to answer it in the terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 Claude Code가 질문했어요 — 이 채팅으로 이어가서 터미널에서 답하세요."
+          }
+        }
+      }
+    },
+    "Its Claude Code keeps running in the background — continue in this chat to type in it. What you typed and did not send is still there.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its Claude Code keeps running in the background — continue in this chat to type in it. What you typed and did not send is still there."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 Claude Code는 백그라운드에서 계속 실행 중이에요 — 입력하려면 이 채팅으로 이어가세요. 입력만 하고 보내지 않은 글도 그대로 있어요."
+          }
+        }
+      }
+    },
+    "Its Claude Code runs in that window's terminal now.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its Claude Code runs in that window's terminal now."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이제 이 채팅의 Claude Code는 그 창의 터미널에서 실행돼요."
+          }
+        }
+      }
+    },
+    "Its Claude Code waits for your permission — continue in this chat to answer it in the terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Its Claude Code waits for your permission — continue in this chat to answer it in the terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 Claude Code가 허용을 기다려요 — 이 채팅으로 이어가서 터미널에서 답하세요."
+          }
+        }
+      }
+    },
+    "Move This Chat to %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move This Chat to %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅을 %@(으)로 옮기기"
+          }
+        }
+      }
+    },
+    "Moved here from %@ — continue typing in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moved here from %@ — continue typing in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 옮겨왔어요 — 터미널에서 이어서 입력하세요"
+          }
+        }
+      }
+    },
+    "Moving this chat to %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moving this chat to %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅을 %@(으)로 옮기는 중…"
+          }
+        }
+      }
+    },
     "None is picked — nothing to play": {
       "localizations": {
         "en": {
@@ -11379,6 +11843,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "없음을 골랐어요 — 들려줄 소리가 없어요"
+          }
+        }
+      }
+    },
+    "Or answer in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or answer in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "또는 터미널에서 답하기"
+          }
+        }
+      }
+    },
+    "Paste a Prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a Prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "붙여넣기"
+          }
+        }
+      }
+    },
+    "Permission request from Claude Code: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission request from Claude Code: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code의 허용 요청: %@"
           }
         }
       }
@@ -11415,6 +11927,22 @@
         }
       }
     },
+    "Puts “%@” into Claude Code's prompt — press Return there to send it, or type your own prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puts “%@” into Claude Code's prompt — press Return there to send it, or type your own prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 입력창에 “%@”를 붙여넣어요 — 거기서 Return을 눌러 보내거나 직접 프롬프트를 입력하세요"
+          }
+        }
+      }
+    },
     "Questions": {
       "localizations": {
         "en": {
@@ -11427,6 +11955,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "질문"
+          }
+        }
+      }
+    },
+    "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거부해요 — Claude Code는 ReviewGate에서 거부됐다는 말을 듣고 그것 없이 계속해요"
+          }
+        }
+      }
+    },
+    "Reviewed turns": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reviewed turns"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰한 턴"
+          }
+        }
+      }
+    },
+    "ReviewGate lost this terminal while it was in the background. Restart it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate lost this terminal while it was in the background. Restart it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에 있는 동안 ReviewGate가 이 터미널을 놓쳤어요. 다시 시작하세요"
+          }
+        }
+      }
+    },
+    "Send the review notes to Claude (⌘⇧C) — while it works they reach it before the turn ends, else with your next prompt; nothing is typed into the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send the review notes to Claude (⌘⇧C) — while it works they reach it before the turn ends, else with your next prompt; nothing is typed into the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 메모를 Claude에게 보내요 (⌘⇧C) — 작업 중이면 턴이 끝나기 전에, 아니면 다음 프롬프트와 함께 전달돼요. 터미널에 아무것도 입력하지 않아요"
           }
         }
       }
@@ -11491,6 +12083,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "오류·사용량 한도·로그인으로 멈췄을 때"
+          }
+        }
+      }
+    },
+    "Take the request back — the review notes stay unsent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take the request back — the review notes stay unsent"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "요청을 취소해요 — 리뷰 메모는 보내지 않은 채로 남아요"
+          }
+        }
+      }
+    },
+    "That folder cannot take this chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That folder cannot take this chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그 폴더로는 이 채팅을 옮길 수 없어요"
           }
         }
       }
@@ -28390,6 +29014,38 @@
         }
       }
     },
+    "The terminal's own dialog is still open — whichever you answer first counts. “Always allow” is only in the terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal's own dialog is still open — whichever you answer first counts. “Always allow” is only in the terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 대화상자도 열려 있어요 — 먼저 답한 쪽이 적용돼요. “항상 허용”은 터미널에서만 할 수 있어요."
+          }
+        }
+      }
+    },
+    "The terminal's own dialog stays open either way, and \"always allow\" is only there. Off: answer in the terminal only. Applies to the next permission prompt.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal's own dialog stays open either way, and \"always allow\" is only there. Off: answer in the terminal only. Applies to the next permission prompt."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어느 쪽이든 터미널의 대화상자는 열려 있고, \"항상 허용\"은 거기서만 할 수 있어요. 끄면 터미널에서만 답해요. 다음 허용 요청부터 적용돼요."
+          }
+        }
+      }
+    },
     "The thread and its answers are removed. Nothing in the main conversation changes.": {
       "localizations": {
         "en": {
@@ -28614,6 +29270,22 @@
         }
       }
     },
+    "This chat continues in that worktree's window and its changes there are reviewed — Claude Code restarts there and resumes the conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat continues in that worktree's window and its changes there are reviewed — Claude Code restarts there and resumes the conversation"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 그 워크트리 창에서 이어지고 거기서 바꾼 내용이 리뷰돼요 — Claude Code는 거기서 다시 시작해 대화를 이어가요"
+          }
+        }
+      }
+    },
     "This chat runs Claude Code in a terminal": {
       "localizations": {
         "en": {
@@ -28626,6 +29298,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 채팅은 터미널에서 Claude Code를 실행해요"
+          }
+        }
+      }
+    },
+    "This conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This conversation"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 대화"
           }
         }
       }
@@ -30706,6 +31394,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "카드가 기다리는 동안 메시지를 입력했을 때 — 보내기 키"
+          }
+        }
+      }
+    },
+    "While another chat was the live one, ReviewGate stopped reviewing this terminal, so Claude Code's prompts and edits are refused until you restart it (the conversation is resumed; text typed and not sent is lost)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While another chat was the live one, ReviewGate stopped reviewing this terminal, so Claude Code's prompts and edits are refused until you restart it (the conversation is resumed; text typed and not sent is lost)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 채팅이 실행 중인 동안 ReviewGate가 이 터미널을 리뷰하지 못하게 됐어요. 다시 시작할 때까지 Claude Code의 프롬프트와 수정은 거부돼요 (대화는 이어지고, 입력만 하고 보내지 않은 글은 사라져요)"
           }
         }
       }

@@ -1,11 +1,11 @@
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import type { SessionEvent } from "../src/session/events.js";
 import { RETIRED_REASON } from "../src/session/hookServer.js";
 import { UNPROMPTED_REASON } from "../src/session/hooks.js";
-import { ADOPT_BUSY_REASON, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
+import { ADOPT_BUSY_REASON, BRIDGE_DENY_MESSAGE, permissionSummary, BACKGROUND_PROMPT_REASON, BACKGROUND_TOOL_REASON, configDirOfTranscript, movingReason, STOP_FEEDBACK_PREFIX, PROMPT_TIMEOUT_REASON, TerminalSession, type PromptAnswer } from "../src/session/terminalSession.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
 // docs/PROTOCOL.md §57.4: how a terminal chat's hooks become review-turn events.
@@ -32,7 +32,7 @@ function makeRepo(): string {
 type Rig = { ts: TerminalSession; events: SessionEvent[]; dir: string; of: <T extends SessionEvent["type"]>(t: T) => Extract<SessionEvent, { type: T }>[]; hook: (input: Record<string, unknown>) => Promise<Record<string, unknown>>; tree: () => Promise<string> };
 
 /** `answer`: how the fake engine answers `terminal_prompt` (null: it does not — the test answers). */
-function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number } = {}): Rig {
+function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prompt" }>, tree: string) => PromptAnswer) | null; promptWaitMs?: number; adoptWaitMs?: number; bridge?: boolean; budget?: { maxFiles: number; maxLines: number } } = {}): Rig {
   const dir = makeRepo();
   const events: SessionEvent[] = [];
   let ts!: TerminalSession;
@@ -47,6 +47,8 @@ function rig(opts: { answer?: ((ev: Extract<SessionEvent, { type: "terminal_prom
     adoptWaitMs: opts.adoptWaitMs ?? 5000,
     plansDir: join(dir, ".no-plans"),
     windowMarginMs: 60_000,
+    ...(opts.bridge ? { permissionBridge: () => true } : {}),
+    ...(opts.budget ? { budget: opts.budget } : {}),
     emit: (ev) => {
       events.push(ev);
       if (ev.type === "terminal_prompt" && answer) void tree().then((t) => ts.answerPrompt(ev.seq, answer(ev, t)));
@@ -337,5 +339,231 @@ describe("TerminalSession", () => {
     r.ts.setToken("b");
     expect(retired).toEqual(["a"]);
     expect(r.ts.state).toMatchObject({ running: false, hooksSeen: false });
+  });
+
+  it("§57.16 any tool's PostToolUse clears waiting (a WebFetch dialog); PermissionRequest waits at once; CwdChanged → terminal_cwd", async () => {
+    const r = rig();
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "WebFetch", tool_input: { url: "https://example.com" } })).toEqual({});
+    expect(r.ts.state.waiting).toMatchObject({ kind: "permission", message: "Claude needs your permission to use WebFetch" });
+    expect(r.of("terminal_attention").at(-1)).toMatchObject({ notificationType: "permission_request" });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "WebFetch", tool_input: { url: "https://example.com" }, tool_use_id: "f1", tool_response: "ok" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(r.of("tool_use")).toHaveLength(0); // neither an edit tool nor Bash: nothing of the turn
+    await r.hook({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use mcp__acme__fetch" });
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    await r.hook({ hook_event_name: "PostToolUseFailure", tool_name: "mcp__acme__fetch", tool_input: {}, tool_use_id: "m1", error: "denied" });
+    expect(r.ts.state.waiting).toBeNull();
+    expect(await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "/work/acme/feature" })).toEqual({});
+    await r.hook({ hook_event_name: "CwdChanged", old_cwd: r.dir, new_cwd: "relative/dir" });
+    expect(r.of("terminal_cwd")).toEqual([{ type: "terminal_cwd", cwd: "/work/acme/feature" }]);
+  });
+
+  it("§57.16 transcript_path → terminal_config_dir (once per dir); a malformed path is ignored", async () => {
+    const r = rig();
+    const config = realpathSync(makeTempDir("rg-term-cfg"));
+    dirs.push(config);
+    mkdirSync(join(config, "projects", "-work-acme"), { recursive: true });
+    const file = join(config, "projects", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl");
+    for (const bad of ["/dev/null", "relative/projects/x/0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl", join(config, "other", "-work-acme", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl"), join(config, "projects", "-work-acme", "notes.jsonl"), join("/nonexistent", "projects", "k", "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a.jsonl")]) {
+      expect(configDirOfTranscript(bad), bad).toBeNull();
+      await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: bad });
+    }
+    expect(r.of("terminal_config_dir")).toHaveLength(0);
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    await r.hook({ hook_event_name: "Notification", notification_type: "auth_success", message: "", transcript_path: file });
+    expect(r.of("terminal_config_dir")).toEqual([{ type: "terminal_config_dir", dir: config }]);
+  });
+
+  it("§57.10 background: prompts blocked, write tools denied (the guard's deny first), waits still raised; back again keeps the token", async () => {
+    const r = rig();
+    const retired: string[] = [];
+    r.ts.setToken("tok-1", (t) => retired.push(t));
+    r.ts.started(77);
+    r.ts.setBackground(true);
+    expect(r.ts.isBackground).toBe(true);
+    expect(await r.hook(ups("p1"))).toEqual({ decision: "block", reason: BACKGROUND_PROMPT_REASON });
+    expect(r.of("terminal_prompt")).toHaveLength(0);
+    const deny = (reason: string) => ({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } });
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "a.txt"), content: "x" }, "w1"))).toEqual(deny(BACKGROUND_TOOL_REASON));
+    write(r.dir, "README.md", "dirty\n");
+    const reset = await r.hook(pre("Bash", { command: "git reset --hard" }, "b1"));
+    expect((reset.hookSpecificOutput as { permissionDecisionReason: string }).permissionDecisionReason).not.toBe(BACKGROUND_TOOL_REASON);
+    expect(reset).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect(r.of("auto_turn_start")).toHaveLength(0);
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    await r.hook({ hook_event_name: "Notification", notification_type: "elicitation_dialog", message: "Which one?" });
+    expect(r.ts.state.waiting?.kind).toBe("question");
+    expect(r.of("terminal_attention").length).toBeGreaterThanOrEqual(2);
+    await r.hook({ ...ups("p2"), session_id: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" });
+    expect(r.of("terminal_session_id")).toEqual([{ type: "terminal_session_id", sessionId: "0b7e3c1a-5d2f-4e8b-9a6c-1f2e3d4c5b6a" }]);
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: false })).toEqual({});
+    expect(r.of("turn_end")).toHaveLength(0);
+    // Foreground again: the same token (never retired), prompts reviewed as before.
+    r.ts.setBackground(false);
+    expect(retired).toEqual([]);
+    expect(r.ts.state.running).toBe(true);
+    expect(await r.hook(ups("p3"))).toEqual({});
+    expect(r.ts.state.promptId).toBe("p3");
+  });
+
+  it("§57.13 status: the first sample is the baseline, growth goes into the next turn_end, a drop is a new baseline", async () => {
+    const r = rig();
+    const status = (cost: number, ctx = 1000) => r.ts.handleStatus({ cost: { total_cost_usd: cost }, model: { id: "claude-acme-test", display_name: "Acme" }, context_window: { context_window_size: 200_000, current_usage: { input_tokens: ctx, cache_creation_input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 7 } } });
+    r.ts.setToken("t1");
+    status(0.5); // a resumed conversation's earlier cost: not this chat's new spend
+    expect(r.ts.state.status).toMatchObject({ costUsd: 0.5, model: "claude-acme-test", modelName: "Acme", contextTokens: 1015, contextWindow: 200_000 });
+    expect(r.of("terminal_status")).toHaveLength(1);
+    await r.hook(ups("p1"));
+    status(0.75, 2000);
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    let end = r.of("turn_end").at(-1)!;
+    expect(end.usage.costUsd).toBeCloseTo(0.25);
+    expect(end.usage).toMatchObject({ contextTokens: 2015, contextWindow: 200_000 });
+    status(0.1); // /clear: the total starts again — a new baseline, nothing negative
+    status(0.3);
+    await r.hook(ups("p2"));
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    end = r.of("turn_end").at(-1)!;
+    expect(end.usage.costUsd).toBeCloseTo(0.2);
+    // A new spawn: its first sample is a baseline again.
+    r.ts.setToken("t2");
+    status(5);
+    await r.hook(ups("p3"));
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(r.of("turn_end").at(-1)!.usage.costUsd).toBe(0);
+    r.ts.handleStatus({ nonsense: true });
+    expect(r.ts.state.status).toMatchObject({ costUsd: null, model: null, contextTokens: null });
+  });
+
+  it("§57.14 Stop feedback: one block per staged request, never on stop_hook_active; an aborted Stop puts the notes back", async () => {
+    const lost: string[][] = [];
+    let takes = 0;
+    const r = rig();
+    const opts = (r.ts as unknown as { opts: { stopFeedback?: unknown; stopFeedbackLost?: unknown } }).opts;
+    opts.stopFeedback = () => (++takes, { message: "[Review gate] Requested changes on this turn's diff.", noteIds: ["n1"] });
+    opts.stopFeedbackLost = (ids: string[]) => void lost.push(ids);
+    await r.hook(ups("p1"));
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: false })).toEqual({}); // nothing staged
+    await r.hook(ups("p2"));
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    expect(r.ts.state.requestQueued?.via).toBe("stop");
+    const blocked = await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(blocked).toEqual({ decision: "block", reason: STOP_FEEDBACK_PREFIX + "[Review gate] Requested changes on this turn's diff." });
+    expect(r.ts.isTurnActive).toBe(true);
+    expect(r.ts.state.requestQueued).toBeUndefined();
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    expect(await r.hook({ hook_event_name: "Stop", stop_hook_active: true })).toEqual({}); // a continued Stop: no second block
+    expect(r.ts.isTurnActive).toBe(false);
+    expect(r.ts.state.requestQueued?.via).toBe("next_prompt"); // its turn ended without it: it goes with the next prompt
+    expect(takes).toBe(1);
+    // Aborted after the answer was made: the notes come back.
+    await r.hook(ups("p3"));
+    r.ts.stageRequest({ via: "stop", noteIds: null, extra: null, at: "2026-01-01T00:00:00Z" });
+    const ac = new AbortController();
+    await r.ts.handleHook({ hook_event_name: "Stop", stop_hook_active: false, session_id: "chat-1", cwd: r.dir }, ac.signal);
+    ac.abort();
+    expect(lost).toEqual([["n1"]]);
+  });
+
+  it("§57.12 EnterWorktree / ExitWorktree → scope_notice (main agent only); moving blocks prompts and write tools; waitExit", async () => {
+    const r = rig();
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: { name: "x" }, tool_use_id: "e1", tool_response: { worktreePath: "/work/acme/x", worktreeBranch: "x" } });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "EnterWorktree", tool_input: {}, tool_use_id: "e2", agent_id: "a1", tool_response: { worktreePath: "/work/acme/y" } });
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "ExitWorktree", tool_input: {}, tool_use_id: "x1", tool_response: { originalCwd: r.dir } });
+    expect(r.of("scope_notice").map((n) => [n.code, n.toolName, n.path])).toEqual([["worktree_outside_review", "EnterWorktree", "/work/acme/x"], ["worktree_exited", "ExitWorktree", r.dir]]);
+    r.ts.started(99);
+    r.ts.beginMove({ path: "/work/acme/x", name: "x" });
+    expect(r.ts.state.moving).toEqual({ path: "/work/acme/x", name: "x" });
+    expect(await r.hook(ups("p1"))).toEqual({ decision: "block", reason: movingReason("x") });
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "a.txt") }, "w1"))).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason: movingReason("x") } });
+    expect(await r.ts.waitExit(20)).toBe(false);
+    const waiting = r.ts.waitExit(5000);
+    r.ts.ptyExited();
+    expect(await waiting).toBe(true);
+    r.ts.endMove();
+    expect(r.ts.state.moving).toBeUndefined();
+  });
+
+  it("§57.15 the permission bridge: first answer wins — the app, an abort, or a later hook; guard reasons; never in the background", async () => {
+    const r = rig({ bridge: true });
+    const permReq = (command: string, signal?: AbortSignal) =>
+      r.ts.handleHook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command }, session_id: "chat-1", cwd: r.dir }, signal);
+    // The app allows.
+    const a = permReq("echo hi");
+    await new Promise((res) => setTimeout(res, 10));
+    const [entry] = r.ts.state.permissions ?? [];
+    expect(entry).toMatchObject({ toolName: "Bash", summary: "Bash: echo hi", reason: null });
+    expect(entry?.canFollow).toBeUndefined();
+    expect(r.ts.state.waiting?.kind).toBe("permission");
+    expect(r.ts.answerPermission(entry!.requestId, true)).toBe(true);
+    expect(await a).toEqual({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "allow" } } });
+    expect(r.ts.state.permissions).toBeUndefined();
+    expect(r.ts.answerPermission(entry!.requestId, true)).toBe(false); // permission_gone
+    // Denied, with and without a message.
+    const d = permReq("rm -rf build");
+    await new Promise((res) => setTimeout(res, 10));
+    r.ts.answerPermission(r.ts.state.permissions![0]!.requestId, false);
+    expect(await d).toEqual({ hookSpecificOutput: { hookEventName: "PermissionRequest", decision: { behavior: "deny", message: BRIDGE_DENY_MESSAGE } } });
+    // The CLI gave up (abort) → {}.
+    const ac = new AbortController();
+    const g = permReq("make", ac.signal);
+    await new Promise((res) => setTimeout(res, 10));
+    ac.abort();
+    expect(await g).toEqual({});
+    // A later hook of the session: the TUI answered → {}.
+    const t = permReq("ls");
+    await new Promise((res) => setTimeout(res, 10));
+    await r.hook({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_use_id: "b1", tool_response: "" });
+    expect(await t).toEqual({});
+    // The guard's ask names the dialog that follows for the same call.
+    await r.hook(ups("p1"));
+    const ask = await r.hook(pre("Bash", { command: "git commit -m x" }, "g1"));
+    expect(ask).toMatchObject({ hookSpecificOutput: { permissionDecision: "ask" } });
+    const c = permReq("git commit -m x");
+    await new Promise((res) => setTimeout(res, 10));
+    expect(r.ts.state.permissions![0]!.reason).toBe((ask.hookSpecificOutput as { permissionDecisionReason: string }).permissionDecisionReason);
+    // Going to the background leaves open dialogs to the TUI, and none is bridged there.
+    r.ts.setBackground(true);
+    expect(await c).toEqual({});
+    expect(await permReq("echo bg")).toEqual({});
+    expect(r.ts.state.permissions).toBeUndefined();
+    // EnterWorktree offers "Allow and follow".
+    r.ts.setBackground(false);
+    const w = r.ts.handleHook({ hook_event_name: "PermissionRequest", tool_name: "EnterWorktree", tool_input: { name: "feat" }, session_id: "chat-1", cwd: r.dir });
+    await new Promise((res) => setTimeout(res, 10));
+    expect(r.ts.state.permissions![0]).toMatchObject({ toolName: "EnterWorktree", canFollow: true });
+    await r.ts.dispose();
+    expect(await w).toEqual({});
+    expect(permissionSummary("Write", { file_path: "notes.txt" }, "/work/acme")).toBe(join("/work/acme", "notes.txt"));
+    expect(permissionSummary("mcp__acme__q", { q: "x".repeat(400) }, "/").length).toBe(300);
+  });
+
+  it("§57.15 bridge off: PermissionRequest is answered {} at once (the TUI's dialog)", async () => {
+    const r = rig();
+    expect(await r.hook({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "ls" } })).toEqual({});
+    expect(r.ts.state.permissions).toBeUndefined();
+  });
+
+  it("§54 budget in a terminal chat: the soft note after an edit, a deny past the hard limit, then only writing Bash is denied", async () => {
+    const r = rig({ budget: { maxFiles: 1, maxLines: 0 } });
+    await r.hook(ups("p1"));
+    const a = join(r.dir, "a.txt");
+    expect(await r.hook(pre("Write", { file_path: a, content: "a\n" }, "w1"))).toEqual({});
+    write(r.dir, "a.txt", "a\n");
+    const soft = await r.hook(post("Write", { file_path: a, content: "a\n" }, "w1"));
+    expect(String((soft.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext)).toMatch(/budget|Review gate/i);
+    expect(r.of("budget_event").map((e) => e.kind)).toEqual(["warn"]);
+    const denied = await r.hook(pre("Write", { file_path: join(r.dir, "b.txt"), content: "b\n" }, "w2"));
+    expect(denied).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect(r.of("budget_event").map((e) => e.kind)).toEqual(["warn", "deny"]);
+    expect(await r.hook(pre("Bash", { command: "echo x > c.txt" }, "b1"))).toMatchObject({ hookSpecificOutput: { permissionDecision: "deny" } });
+    expect((await r.hook(pre("Bash", { command: "git status" }, "b2"))).hookSpecificOutput).toBeUndefined();
+    await r.hook({ hook_event_name: "Stop", stop_hook_active: false });
+    expect(r.of("turn_end").at(-1)!.budget).toEqual({ files: 1, lines: 1, denied: true });
+    // A new turn counts from zero; without a budget nothing is counted.
+    r.ts.setBudget({ maxFiles: 0, maxLines: 0 });
+    await r.hook(ups("p2"));
+    expect(await r.hook(pre("Write", { file_path: join(r.dir, "d.txt"), content: "d\n" }, "w3"))).toEqual({});
   });
 });

@@ -1585,6 +1585,22 @@
         }
       }
     },
+    "Allow Once": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Once"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 번 허용"
+          }
+        }
+      }
+    },
     "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)": {
       "localizations": {
         "en": {
@@ -5783,6 +5799,22 @@
         }
       }
     },
+    "Deny": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거부"
+          }
+        }
+      }
+    },
     "Description: %@": {
       "localizations": {
         "en": {
@@ -6403,6 +6435,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "MCP 서버를 관리해요 — 재연결, 로그인, 켜기·끄기"
+          }
+        }
+      }
+    },
+    "No change request is waiting for Claude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No change request is waiting for Claude"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 갈 변경 요청이 없어요"
           }
         }
       }
@@ -8899,6 +8947,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "디스크 여유가 %@뿐이에요 — 리뷰와 기록을 저장하지 못할 수 있어요."
+          }
+        }
+      }
+    },
+    "Only a request to enter a worktree can be followed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only a request to enter a worktree can be followed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "따라가기는 워크트리로 들어가는 요청에만 쓸 수 있어요"
           }
         }
       }
@@ -12387,6 +12451,22 @@
         }
       }
     },
+    "That permission request was already answered in the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That permission request was already answered in the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그 허용 요청은 이미 터미널에서 답했어요"
+          }
+        }
+      }
+    },
     "That plan file cannot be read any more — choose another one": {
       "localizations": {
         "en": {
@@ -13935,6 +14015,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "생각하는 중…"
+          }
+        }
+      }
+    },
+    "This chat is read-only here — it moved or goes on in another chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat is read-only here — it moved or goes on in another chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 여기서 읽기 전용이에요 — 다른 곳으로 옮겼거나 다른 채팅에서 이어져요"
           }
         }
       }

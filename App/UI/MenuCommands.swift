@@ -223,7 +223,7 @@ struct ReviewCommands: Commands {
                 .accessibilityIdentifier("Review menu Ask about selection")
             Button("Request Changes") { model?.requestChangesTick += 1 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(!menu.hasProject || model?.tab.showsReview != true || menu.isTerminalChat)   // §57.5: tell Claude Code in its terminal
+                .disabled(!menu.hasProject || model?.tab.showsReview != true)   // §57.14: a terminal chat stages it for Claude
                 .accessibilityIdentifier("Review menu Request changes")
             Button("Commit Accepted…") { model?.showCommit = true }
                 .keyboardShortcut("k", modifiers: [.command, .shift])

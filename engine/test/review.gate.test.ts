@@ -957,3 +957,48 @@ describe("ReviewGate.beginSendParts (§57)", () => {
     }
   }
 });
+
+describe("ReviewGate.restoreSummary (§57.4)", () => {
+  type Lists = { acceptedPaths: string[]; rejectedPaths: string[]; partiallyRejectedPaths: string[] };
+  it("puts a taken summary back; the newer decision wins, so a path is never in Accepted and Rejected", () => {
+    const g = new ReviewGateClass();
+    const raw = g as unknown as Lists;
+    raw.acceptedPaths = ["b.txt"]; // accepted in the taken summary, rejected since
+    raw.rejectedPaths = [];
+    raw.partiallyRejectedPaths = [];
+    const { taken } = g.beginSendParts();
+    expect(taken).toEqual({ accepted: ["b.txt"], rejected: [], partial: [] });
+    raw.acceptedPaths = ["c.txt"];
+    raw.rejectedPaths = ["b.txt"];
+    g.restoreSummary({ accepted: ["a.txt", "b.txt"], rejected: ["c.txt", "d.txt"], partial: ["b.txt", "e.txt"] });
+    expect(raw.acceptedPaths).toEqual(["a.txt", "c.txt"]);
+    expect(raw.rejectedPaths).toEqual(["d.txt", "b.txt"]);
+    expect(raw.partiallyRejectedPaths).toEqual(["e.txt"]);
+    expect(g.lastReviewSummary).toContain("Accepted: a.txt, c.txt.");
+    const all = [...raw.acceptedPaths, ...raw.rejectedPaths];
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe("ReviewGate.takeNotesForStop / untakeNotesForStop (§57.14)", () => {
+  it("takes the unsent notes (or just noteIds) as the request message, marked sent with the turn; untake puts them back", () => {
+    const g = new ReviewGateClass();
+    g.reviewNotes = [
+      { id: "a", path: "a.txt", line: 1, side: "new", excerpt: "x", body: "first" },
+      { id: "b", path: "a.txt", line: 2, side: "new", excerpt: "y", body: "second" },
+      { id: "c", path: "a.txt", line: 3, side: "new", excerpt: "z", body: "old", sent: { turn: 1, at: "2026-01-01T00:00:00Z" } },
+    ];
+    const one = g.takeNotesForStop(4, ["b"], null)!;
+    expect(one.noteIds).toEqual(["b"]);
+    expect(one.message).toBe(requestChangesMessage([{ id: "b", path: "a.txt", line: 2, side: "new", excerpt: "y", body: "second" }], null));
+    expect(g.reviewNotes.find((n) => n.id === "b")?.sent?.turn).toBe(4);
+    expect(g.reviewNotes.find((n) => n.id === "a")?.sent).toBeUndefined();
+    const rest = g.takeNotesForStop(4, null, "be quick")!;
+    expect(rest.noteIds).toEqual(["a"]);
+    expect(rest.message).toContain("be quick");
+    expect(g.takeNotesForStop(4, null, null)).toBeNull();
+    g.untakeNotesForStop(["a", "b"]);
+    expect(g.unsentNoteCount).toBe(2);
+    expect(g.reviewNotes.find((n) => n.id === "c")?.sent?.turn).toBe(1);
+  });
+});

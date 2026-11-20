@@ -91,7 +91,7 @@ describe("isSafeExternalURL / validateCommand", () => {
   });
 
   it("rejects the terminal chat commands (§57: Mac only in Stage 1 — Windows has no PTY for them; §57.9 continuing a chat in one)", () => {
-    for (const type of ["terminal_spec", "terminal_started", "terminal_exited", "terminal_end_turn", "session_continue_terminal"]) {
+    for (const type of ["terminal_spec", "terminal_started", "terminal_exited", "terminal_end_turn", "session_continue_terminal", "terminal_request_cancel", "terminal_permission_response"]) {
       expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(false);
     }
   });

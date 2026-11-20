@@ -20,7 +20,7 @@ const managed = (settings: Record<string, unknown> | null, failed: ManagedPolicy
   failed,
 });
 
-type Opts = { allowedProjectSha?: string | null; cwd?: string | null; disableAllHooks?: boolean; loadLocal?: boolean; managed?: ManagedPolicy };
+type Opts = { allowedProjectSha?: string | null; cwd?: string | null; disableAllHooks?: boolean; loadLocal?: boolean; managed?: ManagedPolicy; trustProject?: boolean };
 
 function resolveWith(files: Record<string, unknown>, opts: Opts = {}) {
   const read = (p: string) => (p in files ? (typeof files[p] === "string" ? (files[p] as string) : JSON.stringify(files[p])) : null);
@@ -31,6 +31,7 @@ function resolveWith(files: Record<string, unknown>, opts: Opts = {}) {
     allowedProjectSha: opts.allowedProjectSha ?? null,
     loadLocal: opts.loadLocal,
     disableAllHooks: opts.disableAllHooks,
+    ...(opts.trustProject ? { trustProject: true } : {}),
     read,
   });
 }
@@ -162,5 +163,16 @@ describe("statusLine settings (§44.2)", () => {
     const r = resolveStatusLine({ configDir: cfg, cwd: repo, managed: NO_MANAGED_POLICY });
     expect(r.config).toMatchObject({ command: "u.sh", source: "user" });
     expect(r.project).toBeNull();
+  });
+});
+
+describe("§57.13 trustProject (a terminal chat's own claude runs the project's line)", () => {
+  it("the project's statusLine runs without an allowed sha; managed rules still apply", () => {
+    const files = { [USER]: { statusLine: { type: "command", command: "user.sh" } }, [PROJECT]: { statusLine: { type: "command", command: "project.sh", padding: 3 } } };
+    expect(resolveWith(files).config?.command).toBe("user.sh");
+    const trusted = resolveWith(files, { trustProject: true });
+    expect(trusted.config).toMatchObject({ command: "project.sh", padding: 3, source: "project" });
+    expect(trusted.project?.allowed).toBe(true);
+    expect(resolveWith(files, { trustProject: true, managed: managed({ allowManagedHooksOnly: true }) }).config).toBeNull();
   });
 });

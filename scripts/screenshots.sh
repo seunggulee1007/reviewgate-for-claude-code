@@ -62,7 +62,10 @@
 #                  keyboard kept — for each review and closing, side by side at 1440 × 900 with the split moved and never
 #                  under 80 columns, the window resized), the first chat and ⌘T's being terminal chats by default (§57.7) with the PTY's winsize following each time (the fake's `size` /
 #                  `winsize` lines, `stty size` in the shell), Settings' Restart now restarting the PTY (a new
-#                  pid, the same conversation, its hooks still reviewed), and no claude starting again once the window's
+#                  pid, the same conversation, its hooks still reviewed), Stage 2 (§57.10–57.15: the status line's cost in
+#                  the strip, a WebFetch wait cleared by its PostToolUse, a permission card answered from the app, Request
+#                  changes in the next prompt's context, a switch away and back keeping the same PTY with its unsent text
+#                  while a write from the background is denied), and no claude starting again once the window's
 #                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
@@ -327,14 +330,55 @@ const value = (flag) => { const i = argv.indexOf(flag); if (i >= 0) return argv[
 const resume = argv.some((a) => a === "--resume" || a.startsWith("--resume="));
 const session = value(resume ? "--resume" : "--session-id");
 let url;
-try { url = JSON.parse(value("--settings") ?? "{}").hooks.Stop[0].hooks[0].url; } catch { url = undefined; }
+let settings = {};
+try { settings = JSON.parse(value("--settings") ?? "{}"); url = settings.hooks.Stop[0].hooks[0].url; } catch { url = undefined; }
 const token = process.env.RG_HOOK_TOKEN ?? "";
 if (!session || !url) { console.error("fake-claude: no session or hook url"); process.exit(2); }
 console.log(`fake-claude session=${session} resume=${resume}`);
+// §57.11: the MCP servers ReviewGate passed on (`--mcp-config <file>`; inline JSON too), by name.
+try { const mcp = value("--mcp-config"); if (mcp) console.log(`mcp=${Object.keys(JSON.parse(mcp.trim().startsWith("{") ? mcp : require("node:fs").readFileSync(mcp, "utf8")).mcpServers ?? {}).join(",")}`); } catch { console.log("mcp=unreadable"); }
 const post = async (body) => {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "X-ReviewGate-Token": token },
     body: JSON.stringify({ session_id: session, cwd: process.cwd(), ...body }) });
   return res.json().catch(() => ({}));
+};
+// §57.10–57.15 lines (no turn): `status` runs the tee of the settings' statusLine command as the CLI does (/bin/sh -c,
+// the status input on stdin) — only its first line, the post to ReviewGate: the second line runs the user's own status
+// line, which a tour never runs; `perm` asks a PermissionRequest (Bash `echo hi`) and prints the decision; `bgwrite` asks
+// a PreToolUse Write and prints allow / deny and the reason; `wait` posts a permission Notification and `webfetch` a
+// WebFetch PostToolUse (the wait clears).
+const extra = {
+  status: async () => {
+    const command = settings.statusLine?.command;
+    if (!command) return "status: no statusLine";
+    const [tee, ...own] = command.split("\n");
+    const input = JSON.stringify({ session_id: session, cwd: process.cwd(), cost: { total_cost_usd: 0.0123 },
+      model: { id: "claude-acme-test", display_name: "Acme" },
+      context_window: { context_window_size: 200000, current_usage: { input_tokens: 40000, cache_creation_input_tokens: 0, cache_read_input_tokens: 10000 } } });
+    const out = require("node:child_process").spawnSync("/bin/sh", ["-c", tee], { input, encoding: "utf8", timeout: 10000 });
+    return `status: ran the tee (exit ${out.status})${own.length ? ", the user's own status line not run" : ""}`;
+  },
+  perm: async () => {
+    const answer = await post({ hook_event_name: "PermissionRequest", tool_name: "Bash", tool_input: { command: "echo hi" } });
+    const decision = answer.hookSpecificOutput?.decision;
+    return `perm: ${decision?.behavior ?? "none"}${decision?.message ? ` ${decision.message}` : ""}`;
+  },
+  bgwrite: async () => {
+    const file = join(process.cwd(), "background.txt");
+    const answer = await post({ hook_event_name: "PreToolUse", tool_name: "Write", tool_input: { file_path: file, content: "x" },
+      tool_use_id: `toolu_bg_${randomUUID()}` });
+    const out = answer.hookSpecificOutput ?? {};
+    return `bgwrite: ${out.permissionDecision ?? "allow"} ${out.permissionDecisionReason ?? ""}`;
+  },
+  wait: async () => {
+    await post({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "Claude needs your permission to use WebFetch" });
+    return "wait: posted";
+  },
+  webfetch: async () => {
+    await post({ hook_event_name: "PostToolUse", tool_name: "WebFetch", tool_input: { url: "https://example.com" },
+      tool_response: { code: 200 }, tool_use_id: `toolu_web_${randomUUID()}` });
+    return "webfetch: posted";
+  },
 };
 let n = 0;
 const winsize = () => `${process.stdout.columns}x${process.stdout.rows}`;
@@ -344,11 +388,12 @@ rl.on("line", async (line) => {
   rl.pause();
   if (line.trim() === "/exit") process.exit(0);
   if (line.trim() === "size") { console.log(`size ${winsize()} COLUMNS=${process.env.COLUMNS ?? "-"}`); rl.resume(); return; }
+  if (extra[line.trim()]) { console.log(await extra[line.trim()]().catch((e) => `${line.trim()}: failed ${e}`)); rl.resume(); return; }
   const promptId = randomUUID();
   const answer = await post({ hook_event_name: "UserPromptSubmit", prompt: line, prompt_id: promptId });
   if (answer.decision === "block") { console.log(`blocked: ${answer.reason}`); rl.resume(); return; }
   const context = (answer.hookSpecificOutput?.additionalContext ?? "").replace(/\s+/g, " ");
-  console.log(context ? `context: ${context.slice(0, 200)}` : "context: none");
+  console.log(context ? `context: ${context.slice(0, 400)}` : "context: none");
   const file = join(process.cwd(), "notes.txt");
   n += 1;
   appendFileSync(file, `note ${n}: ${line}\n`);

@@ -28,20 +28,72 @@ public struct TerminalLaunch: Sendable, Equatable {
     /// The parent's keys a child keeps; every other one (any `CLAUDE*` among them) is dropped.
     static let inheritedKeys = ["HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "PATH"]
 
-    /// The terminal chat: `<shell> -l -i -c 'exec <argv…>'`, so the user's login PATH finds node and the CLI's own needs.
+    /// The terminal chat: `<shell> -l -i -c 'exec /bin/sh -c <wrapper> rg-claude <argv…>'`, so the user's login PATH finds
+    /// node and the CLI's own needs. The wrapper runs after the user's rc files and appends `127.0.0.1,localhost,::1` to
+    /// their `NO_PROXY` / `no_proxy`, so a proxy their rc exports never takes the hook posts (§57.16). Both `exec`s keep the
+    /// pid, so `terminal_started` stays the claude's own.
     public static func claude(spec: TerminalSpec, parentEnv: [String: String], loginShell: String, appVersion: String,
                               debugShell: String? = nil) -> TerminalLaunch {
-        let line = "exec " + spec.argv.map(posixQuote).joined(separator: " ")
         var env = baseEnv(parentEnv: parentEnv, appVersion: appVersion)
         // The IME overlay and the candidate window anchor to the terminal cursor; Claude Code keeps a native cursor at its
         // input caret only with this.
         env["CLAUDE_CODE_NATIVE_CURSOR"] = "1"
         for (key, value) in spec.env where key.hasPrefix("RG_") || key.hasPrefix("CLAUDE_CODE_") { env[key] = value }
+        let words = ["/bin/sh", "-c", noProxyWrapper, "rg-claude"] + spec.argv
         if let debugShell {
-            return TerminalLaunch(executable: debugShell, args: ["-c", line], env: flatten(env), execName: nil, cwd: spec.cwd)
+            return TerminalLaunch(executable: debugShell, args: ["-c", execLine(words, family: .posix)], env: flatten(env),
+                                  execName: nil, cwd: spec.cwd)
         }
-        return TerminalLaunch(executable: loginShell, args: ["-l", "-i", "-c", line], env: flatten(env),
-                              execName: "-" + (loginShell as NSString).lastPathComponent, cwd: spec.cwd)
+        var shell = loginShell
+        var family = shellFamily(loginShell)
+        // csh history expands `!` even inside single quotes: a word with one runs through zsh instead.
+        if family == .csh, words.contains(where: { $0.contains("!") }) { family = .other }
+        if family == .other { shell = "/bin/zsh"; family = .posix }
+        let line = execLine(words, family: family)
+        // csh takes `-l` only as its sole flag; the `-` of argv[0] makes it a login shell anyway.
+        let args = family == .csh ? ["-i", "-c", line] : ["-l", "-i", "-c", line]
+        return TerminalLaunch(executable: shell, args: args, env: flatten(env),
+                              execName: "-" + (shell as NSString).lastPathComponent, cwd: spec.cwd)
+    }
+
+    /// The POSIX script between the login shell and claude: one single-quoted word with no backslash, `!`, `'` or newline,
+    /// so every family reads it the same.
+    static let noProxyWrapper = #"NO_PROXY="${NO_PROXY:+$NO_PROXY,}127.0.0.1,localhost,::1"; "#
+        + #"no_proxy="${no_proxy:+$no_proxy,}127.0.0.1,localhost,::1"; export NO_PROXY no_proxy; exec "$@""#
+
+    /// How a login shell quotes a word: POSIX (sh, bash, zsh, ksh, dash), fish, csh/tcsh, or anything else (nu, pwsh,
+    /// elvish, xonsh: `/bin/zsh -l` runs the line instead, so their own PATH setup does not load).
+    public enum ShellFamily: Sendable, Equatable { case posix, fish, csh, other }
+
+    public static func shellFamily(_ loginShell: String) -> ShellFamily {
+        switch (loginShell as NSString).lastPathComponent {
+        case "sh", "bash", "zsh", "dash", "ksh", "ksh93", "mksh", "oksh", "pdksh", "ash", "yash": return .posix
+        case "fish": return .fish
+        case "csh", "tcsh": return .csh
+        default: return .other
+        }
+    }
+
+    static func execLine(_ words: [String], family: ShellFamily) -> String {
+        let quote: (String) -> String
+        switch family {
+        case .fish: quote = fishQuote
+        case .csh: quote = cshQuote
+        case .posix, .other: quote = posixQuote
+        }
+        return "exec " + words.map(quote).joined(separator: " ")
+    }
+
+    /// fish: inside single quotes only `\\` and `\'` are escapes, so a backslash is doubled and a quote escaped.
+    static func fishQuote(_ s: String) -> String {
+        let posix = posixQuote(s)
+        guard posix.hasPrefix("'") else { return posix }
+        return "'" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'") + "'"
+    }
+
+    /// csh/tcsh: a newline inside single quotes needs a backslash before it (a word with `!` never gets here).
+    static func cshQuote(_ s: String) -> String {
+        posixQuote(s).replacingOccurrences(of: "\n", with: "\\\n")
     }
 
     /// The bottom panel's shell: the user's login shell in `cwd`, without any hook token.

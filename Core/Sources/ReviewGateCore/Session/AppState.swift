@@ -184,8 +184,8 @@ public final class AppState {
     /// "Restart now" (Settings, a new CLI) / "Restart session" on a terminal chat: the App restarts its PTY — a new spec,
     /// the conversation resumed. The engine refuses `restart_session` there (`terminal_chat`).
     @ObservationIgnored public var onTerminalRestart: (@MainActor () -> Void)?
-    /// The terminal wait last raised as attention (`terminalSnapshotApplied`), so each wait is raised once.
-    @ObservationIgnored var lastTerminalWaitingKey: String?
+    /// The terminal waits and permission dialogs raised as attention (`terminalSnapshotApplied`), so each is raised once.
+    @ObservationIgnored var raisedTerminalWaitKeys: Set<String> = []
     /// MARK: terminal-default — §57.7 "Paste into the terminal": the App pastes the text into the live terminal chat's
     /// PTY (bracketed, never followed by Enter) and gives it the keyboard; returns why it could not (nil: pasted).
     @ObservationIgnored public var onTerminalPaste: (@MainActor (String) -> String?)?
@@ -505,7 +505,8 @@ public final class AppState {
     public var changesRequestedFiles: [ChangedFile] { changedFiles.filter { $0.state == .changesRequested } }
     public var hasPendingReview: Bool { !pendingFiles.isEmpty || !changesRequestedFiles.isEmpty }
     public var canSend: Bool { gate.canSend }
-    public var canRequestChanges: Bool { gate.canRequestChanges }
+    /// §57.14: a terminal chat also takes it while one of its turns runs (staged for that turn's Stop).
+    public var canRequestChanges: Bool { gate.canRequestChanges || terminalTurnTakesRequest }
     /// The explicit "Accept N & Send" action is offered: files are pending, none is changes-requested
     /// (those go through Request changes) and a message can be sent. Plain Send never accepts anything.
     public var canAcceptAndSend: Bool {

@@ -970,10 +970,12 @@ export class ReviewGate {
 
   /**
    * §57: the review summary `beginSendParts` consumed (`taken`) never reached Claude — the terminal prompt it was for was
-   * blocked meanwhile or the CLI gave up on it — so it goes out with the next prompt instead.
+   * blocked meanwhile or the CLI gave up on it — so it goes out with the next prompt instead. The newer decision wins: a
+   * path decided again since (in any current list) drops out of `taken`, so it is never both Accepted and Rejected.
    */
   restoreSummary(taken: SummaryPaths): void {
-    const merge = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
+    const newer = new Set([...this.acceptedPaths, ...this.rejectedPaths, ...this.partiallyRejectedPaths]);
+    const merge = (a: string[], b: string[]): string[] => [...new Set([...a.filter((p) => !newer.has(p)), ...b])];
     this.acceptedPaths = merge(taken.accepted, this.acceptedPaths);
     this.rejectedPaths = merge(taken.rejected, this.rejectedPaths);
     this.partiallyRejectedPaths = merge(taken.partial, this.partiallyRejectedPaths);
@@ -1647,6 +1649,33 @@ export class ReviewGate {
     this.running = true;
     this.onChange();
     return { message, checkpointTree: start, endTree: end };
+  }
+
+  /**
+   * §57.14: a terminal chat's Request changes delivered at the running turn's Stop — the message of the unsent notes
+   * (`noteIds`: just those), the notes marked sent with that turn. Nothing else changes: the turn is still open, so there is
+   * no collected review to mark. Null when no such note is unsent.
+   */
+  takeNotesForStop(turn: number, noteIds: readonly string[] | null, extra: string | null): { message: string; noteIds: string[] } | null {
+    const unsent = this.reviewNotes.filter((n) => !n.sent && (!noteIds || noteIds.includes(n.id)));
+    if (unsent.length === 0) return null;
+    const message = requestChangesMessage(unsent, extra);
+    const at = new Date().toISOString();
+    const ids = new Set(unsent.map((n) => n.id));
+    this.reviewNotes = this.reviewNotes.map((n) => (ids.has(n.id) ? { ...n, sent: { at, turn } } : n));
+    this.onChange();
+    return { message, noteIds: [...ids] };
+  }
+
+  /** §57.14: the Stop answer that carried `takeNotesForStop`'s message never reached Claude — those notes are unsent again. */
+  untakeNotesForStop(noteIds: readonly string[]): void {
+    const ids = new Set(noteIds);
+    this.reviewNotes = this.reviewNotes.map((n) => {
+      if (!ids.has(n.id) || !n.sent) return n;
+      const { sent: _sent, ...rest } = n;
+      return rest;
+    });
+    this.onChange();
   }
 
   /** Undoes `prepareRequestChanges` after the session refused the message (notes are kept). */

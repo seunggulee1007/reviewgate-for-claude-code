@@ -119,6 +119,11 @@ export function resolveStatusLine(opts: {
   loadLocal?: boolean;
   /** The flag layer's `disableAllHooks` (ReviewGate's `disableUserHooks`): as the user's own. */
   disableAllHooks?: boolean;
+  /**
+   * §57.13: the project's own statusLine runs whatever its command — a terminal chat's CLI runs it itself once the folder is
+   * trusted, so `allowedProjectSha` does not apply.
+   */
+  trustProject?: boolean;
   read?: (path: string) => string | null;
 }): StatusLineResolution {
   const read = opts.read ?? ((p: string) => safeReadOrNull(p));
@@ -139,7 +144,7 @@ export function resolveStatusLine(opts: {
   const ownLayers = [project, local].filter((l): l is Layer => l !== null && statusLineObject(l) !== null);
   const own = mergedConfig(ownLayers);
   const sha = own ? commandSha256(own.command) : null;
-  const ownAllowed = sha !== null && !!opts.allowedProjectSha && opts.allowedProjectSha === sha;
+  const ownAllowed = sha !== null && (opts.trustProject === true || (!!opts.allowedProjectSha && opts.allowedProjectSha === sha));
   const info = (allowed: boolean): StatusLineProject | null =>
     own && sha ? { path: own.path, command: wellFormed(own.command), sha256: sha, allowed } : null;
 

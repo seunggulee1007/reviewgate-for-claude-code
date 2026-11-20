@@ -200,6 +200,18 @@ extension WindowModel {
             DispatchQueue.main.async { terminals.focus(chatId: store.currentSessionId) }
             return
         }
+        // MARK: terminal-stage2 (§57.10): a background terminal chat waits — it becomes the live chat (`session_open`, held
+        // while Claude works elsewhere) and its terminal, still running, takes the keyboard.
+        if let id = target.chatId, id != store.currentSessionId, store.backgroundTerminal(chatId: id) != nil {
+            let terminals = self.terminals
+            Task {
+                await store.viewChat(id: id)
+                guard await store.continueInViewedChat(), store.currentSessionId == id else { return }
+                terminals.focus(chatId: id)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { terminals.focus(chatId: id) }
+            }
+            return
+        }
         let show = AttentionReveal.chatToShow(for: target, currentChatId: store.currentSessionId, openTabIds: store.openTabs.map(\.id))
         guard let show, show != store.shownChatId else { revealNotified(target); return }
         if show == store.currentSessionId {

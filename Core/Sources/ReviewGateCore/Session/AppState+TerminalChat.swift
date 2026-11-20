@@ -77,17 +77,111 @@ extension AppState {
         }
     }
 
-    /// After every snapshot: a wait that appeared in the live terminal chat is an attention event (once per wait).
+    /// After every snapshot: a wait that appeared in a terminal chat of this window — the live one, or one in the background
+    /// (§57.10) — and a permission dialog the app may answer (§57.15) are attention events, once each. While a dialog can
+    /// be answered from the app its own key (`termperm:`) stands for the chat's permission wait, so it is not raised twice.
     func terminalSnapshotApplied() {
-        guard let waiting = terminalWaiting, let chat = currentSessionId else {
-            lastTerminalWaitingKey = nil
-            return
+        var events: [AttentionEvent] = []
+        if isTerminalChat, let chat = currentSessionId {
+            let permissions = terminalPermissions
+            events += permissions.map { AttentionEvent.terminalPermission($0, chatId: chat) }
+            if let waiting = terminalWaiting, permissions.isEmpty || waiting.kind != .permission {
+                events.append(.terminalWaiting(waiting, chatId: chat))
+            }
         }
-        let event = AttentionEvent.terminalWaiting(waiting, chatId: chat)
-        guard event.key != lastTerminalWaitingKey else { return }
-        lastTerminalWaitingKey = event.key
-        onAttention?(event)
+        for background in sessionsInfo?.backgroundTerminals ?? [] where background.chatId != currentSessionId {
+            guard let waiting = background.waiting else { continue }
+            var event = AttentionEvent.terminalWaiting(waiting, chatId: background.chatId)
+            event.chatId = background.chatId
+            events.append(event)
+        }
+        let keys = Set(events.map(\.key))
+        for event in events where !raisedTerminalWaitKeys.contains(event.key) { onAttention?(event) }
+        raisedTerminalWaitKeys = keys
     }
+
+    // MARK: terminal-stage2 (§57.10–57.15)
+
+    /// §57.10: chat `id`'s Claude Code keeps running in the background of this window (nil: it does not).
+    public func backgroundTerminal(chatId id: String?) -> BackgroundTerminalInfo? {
+        guard let id else { return nil }
+        return sessionsInfo?.backgroundTerminal(id)
+    }
+
+    /// §57.10: background terminal chats that wait for the user in their TUI (the tabs' bell, the Dock's "!").
+    public var backgroundTerminalsWaiting: [BackgroundTerminalInfo] {
+        (sessionsInfo?.backgroundTerminals ?? []).filter { $0.waiting != nil && $0.chatId != currentSessionId }
+    }
+
+    /// §57.14: a turn of the live terminal chat runs and notes wait — Request changes is staged for that turn's
+    /// Stop (`via: "stop"`); the gate's own `canRequestChanges` is false while a turn runs.
+    var terminalTurnTakesRequest: Bool {
+        guard isTerminalChat, viewingChat == nil, gatePhase == .running, terminalInfo?.running == true else { return false }
+        return !unsentNotes.isEmpty && gate.collectError == nil
+    }
+
+    /// §57.15: the live terminal chat's permission dialogs the app may answer, oldest first.
+    public var terminalPermissions: [TerminalPermission] { terminalInfo?.permissions ?? [] }
+
+    /// §57.15: [허용] / [거부] / [허용하고 따라가기] on a terminal chat's permission card. The TUI may have answered first: then the
+    /// engine refuses `permission_gone` and the card is simply gone with the next snapshot (logged, no error row).
+    public func terminalPermissionResponse(requestId: String, allow: Bool, message: String? = nil, follow: Bool = false) {
+        guard let id = currentSessionId, isTerminalChat else { return }
+        sendTerminalAnswer(.terminalPermissionResponse(sessionId: id, requestId: requestId, allow: allow, message: message,
+                                                       follow: follow),
+                           quiet: ["permission_gone"])
+    }
+
+    /// §57.14: [취소] on a queued Request changes — the notes stay unsent. Nothing queued any more is only logged.
+    public func terminalRequestCancel() {
+        guard let id = currentSessionId, isTerminalChat else { return }
+        sendTerminalAnswer(.terminalRequestCancel(sessionId: id), quiet: ["no_request_queued"])
+    }
+
+    /// §57.14: [붙여넣기] on a queued Request changes — a fixed prompt goes into the TUI (bracketed paste, never Enter).
+    @discardableResult
+    public func pasteRequestChangesPrompt() -> String? {
+        pasteIntoTerminal(TerminalStage2Text.requestChangesPrompt)
+    }
+
+    /// `set_settings {terminalPermissionBridge}` after Settings changed it (live).
+    public func pushTerminalPermissionBridge() {
+        guard state.seq > 0 || commandSink != nil else { return }
+        var settings = EngineSettings()
+        settings.terminalPermissionBridge = AppSettings.terminalPermissionBridge(defaults: settingsDefaults)
+        fire(.setSettings(settings))
+    }
+
+    /// A click's command: a refusal in `quiet` (the state moved on meanwhile) is only logged, any other is a non-fatal row.
+    private func sendTerminalAnswer(_ command: EngineCommand, quiet: Set<String>) {
+        if let commandSink { commandSink(command); return }
+        Task {
+            do {
+                try await request(command)
+            } catch {
+                appendLog("[warn] \(command.type): \(error.localizedDescription)")
+                if let code = (error as? EngineClientError)?.refusalCode, quiet.contains(code) { return }
+                fail(FlowText.refusal(error), fatal: false)
+            }
+        }
+    }
+}
+
+extension AppSettings.Key {
+    /// §57.15: answer Claude Code's permission dialogs from the app too; unset → true.
+    public static let terminalPermissionBridge = "terminalPermissionBridge"
+}
+
+extension AppSettings {
+    public static func terminalPermissionBridge(defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: Key.terminalPermissionBridge) as? Bool ?? true
+    }
+}
+
+/// §57.10–57.15 in the user's words.
+public enum TerminalStage2Text {
+    /// §57.14: what [붙여넣기] pastes into the TUI (English: Claude Code reads it as the user's prompt).
+    public static let requestChangesPrompt = "Please make the changes requested in the review notes."
 }
 
 extension AttentionEvent {
@@ -101,6 +195,40 @@ extension AttentionEvent {
         return AttentionEvent(kind: waiting.kind == .permission ? .permission : .question, title: title,
                               body: clip(waiting.message, 160), key: "term:\(chatId):\(waiting.since)")
     }
+
+    /// §57.15: a permission dialog of a terminal chat the app may answer — "허용이 필요해요" over its summary (and ReviewGate's
+    /// own reason when it asked first).
+    public static func terminalPermission(_ permission: TerminalPermission, chatId: String) -> AttentionEvent {
+        let summary = clip(permission.summary, 160)
+        let body = permission.reason.map { "\(summary.isEmpty ? permission.toolName : summary) — \(clip($0, 120))" }
+            ?? (summary.isEmpty ? permission.toolName : summary)
+        var event = AttentionEvent(kind: .permission, title: String(localized: "Permission needed in the terminal", bundle: .module),
+                                   body: body, key: "termperm:\(chatId):\(permission.requestId)")
+        event.requestId = permission.requestId
+        return event
+    }
+
+    /// §57.15: a terminal chat's bridged permission dialog — its notification offers Allow / Deny.
+    public var isTerminalPermission: Bool { key.hasPrefix("termperm:") && requestId != nil }
+}
+
+/// §57.15: the Allow / Deny actions on a terminal permission's notification (`UNNotificationCategory`).
+public enum TerminalPermissionNotification {
+    public static let category = "terminalPermission"
+    public static let allowAction = "terminalPermission.allow"
+    public static let denyAction = "terminalPermission.deny"
+
+    /// `allow` for an action of this category (nil: the notification itself was clicked, or another action).
+    public static func answer(actionIdentifier: String) -> Bool? {
+        switch actionIdentifier {
+        case allowAction: true
+        case denyAction: false
+        default: nil
+        }
+    }
+
+    public static var allowTitle: String { String(localized: "Allow Once", bundle: .module) }
+    public static var denyTitle: String { String(localized: "Deny", bundle: .module) }
 }
 
 /// §57.1: the engine's refusals of a terminal chat, in the user's words.
@@ -119,6 +247,15 @@ public enum TerminalChatText {
             String(localized: "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat", bundle: .module)
         case "no_turn":
             String(localized: "No turn is open — there is nothing to review yet", bundle: .module)
+        // MARK: terminal-stage2
+        case "permission_gone":
+            String(localized: "That permission request was already answered in the terminal", bundle: .module)
+        case "no_request_queued":
+            String(localized: "No change request is waiting for Claude", bundle: .module)
+        case "follow_not_allowed":
+            String(localized: "Only a request to enter a worktree can be followed", bundle: .module)
+        case "chat_is_record":
+            String(localized: "This chat is read-only here — it moved or goes on in another chat", bundle: .module)
         default:
             nil
         }
