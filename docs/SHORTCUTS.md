@@ -6,6 +6,10 @@ Mac 앱과 Windows(Electron) 앱은 같은 키를 같은 뜻으로 써요. Windo
 표의 원본은 두 곳이고 이 문서와 행·키가 같아야 해요. 하나를 바꾸면 셋을 함께 바꿔요 — 두 앱의 테스트가 이 문서의
 Mac·Windows 열과 비교해요.
 
+> 코드 탐색의 §65 행(정의 미리 보기, 포인터 미리 보기, 다음·이전 참조, 이 파일의 심볼, 프로젝트 심볼)은 Windows 쪽이 먼저
+> 넣었어요. Mac 열은 PROTOCOL §65.8 의 키를 적어 둔 자리이고, Mac 앱이 고른 키로 합칠 때 맞춰요 (Core 의 `ShortcutTable.swift`
+> 도 그때 같이) — ⌘⇧O·⌘T 는 Mac 에서도 프로젝트 전환·새 채팅이라 겹쳐요.
+
 - Mac: `Core/Sources/ReviewGateCore/Session/ShortcutTable.swift` (검사: `ShortcutTableTests`)
 - Windows: `clients/desktop/src/renderer/shortcutTable.ts` (검사: `shortcutTable.test.ts`)
 
@@ -58,7 +62,7 @@ Mac·Windows 열과 비교해요.
 | diff에서 찾기… | ⌥⌘F | Ctrl+Alt+F | |
 | 다음 찾기 | ⌘G | — | Mac 앱에만 있어요 |
 | 이전 찾기 | ⌘⇧G | — | Mac 앱에만 있어요 |
-| 파일로 이동… | ⌘P | Ctrl+P | |
+| 파일로 이동… | ⌘P | Ctrl+P | 프로젝트의 아무 파일이나 이름으로 열어요. `경로:42` 는 그 줄에서 열어요 (PROTOCOL §65.8) |
 | 프로젝트에서 찾기… | ⌘⇧F | Ctrl+Shift+F | |
 
 ## 코드 탐색
@@ -76,6 +80,8 @@ diff·파일 보기에서 이름 위에 포인터를 둔 채로 써요 (PROTOCOL
 | 뒤로 | ⌃- | Alt+← | |
 | 앞으로 | ⌃⇧- | Alt+→ | |
 | IDE에서 열기 | ⌥⌘O | Ctrl+Alt+O | Mac 은 설정 › 리뷰 › Diff › 열 앱, Windows 는 에디터 열기 메뉴의 "IDE에서 열기"(VS Code · IntelliJ IDEA · 시스템 기본 앱) |
+| 이 파일의 심볼… | ⌘⇧O | Ctrl+F12 | 보고 있는 파일의 클래스·메서드 목록 (PROTOCOL §65.8). Windows 는 Ctrl+Shift+O 가 프로젝트 전환이라 IntelliJ IDEA 처럼 Ctrl+F12 예요 |
+| 프로젝트 심볼… | ⌘T | Ctrl+Alt+Shift+N | 프로젝트 전체의 심볼 찾기, 대문자 약자(UsrSvc)와 `Cart.tot` 도 돼요. Windows 는 Ctrl+T 가 새 채팅이라 IntelliJ IDEA 처럼 Ctrl+Alt+Shift+N 이에요 |
 
 ## 리뷰
 

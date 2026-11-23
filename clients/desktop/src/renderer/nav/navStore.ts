@@ -15,6 +15,7 @@ import { EMPTY_HISTORY, goBack, goForward, peekRows, pushHistory, referenceOrder
 import { sameAnchor, useBandSlot, type BandAnchor } from "./bandSlot"; // §65.8
 import { bandLines, bandRows, type BandLine, type BandRow } from "./peekModel";
 import { HoverDebounce } from "./hoverModel";
+import type { PaletteMode } from "./quickOpenModel";
 
 export type NavTarget = { path: string; line: number; column: number; symbol?: string };
 
@@ -80,6 +81,8 @@ type NavState = {
   peek: PeekState | null;
   band: BandState | null;
   hover: HoverState | null;
+  /** §65.8: the quick-open palette shown (Go to File, Symbols in This File, Symbols in Project). */
+  palette: { mode: PaletteMode; seq: number; path?: string } | null;
   refs: RefsState | null;
   file: FileViewState | null;
   reveal: RevealState | null;
@@ -99,6 +102,9 @@ type NavState = {
   /** §65.8 hover: `find_definition`, then `definition_preview {after: 8}` of the first candidate; nothing for none. */
   requestHover(q: HoverQuery): void;
   hideHover(): void;
+  /** Opens a palette (a toast says why it cannot: no project, no file shown for its symbols). */
+  openPalette(mode: PaletteMode): void;
+  closePalette(): void;
   findReferences(q: { symbol: string; fromPath?: string }): void;
   findInProject(symbol: string): void;
   /** §65.8: the References tab's row `index` — its context in the preview pane. */
@@ -202,6 +208,7 @@ export const useNav = create<NavState>((set, get) => {
     peek: null,
     band: null,
     hover: null,
+    palette: null,
     refs: null,
     file: null,
     reveal: null,
@@ -284,6 +291,22 @@ export const useNav = create<NavState>((set, get) => {
     hideHover() {
       hoverSeq++;
       if (get().hover) set({ hover: null });
+    },
+
+    openPalette(mode) {
+      const blocked = paletteBlocked(mode);
+      if (blocked) {
+        showToast(blocked);
+        return;
+      }
+      const path = mode === "fileSymbols" ? (currentFilePath() ?? undefined) : undefined;
+      set({ peek: null, palette: { mode, seq: (get().palette?.seq ?? 0) + 1, ...(path ? { path } : {}) } });
+      // §65.1: the first symbol search builds the index — warm it while the user types.
+      if (mode === "projectSymbols" && useStore.getState().state.nav?.index.status === "idle") void engineRequest({ type: "nav_index_build" }).catch(() => undefined);
+    },
+
+    closePalette() {
+      if (get().palette) set({ palette: null });
     },
 
     findReferences({ symbol, fromPath }) {
@@ -421,7 +444,7 @@ export const useNav = create<NavState>((set, get) => {
       refSeq++;
       hoverSeq++;
       dropBand();
-      set({ peek: null, hover: null, refs: null, file: null, reveal: null, history: EMPTY_HISTORY, here: null });
+      set({ peek: null, hover: null, palette: null, refs: null, file: null, reveal: null, history: EMPTY_HISTORY, here: null });
     },
   };
 });
@@ -437,6 +460,23 @@ export function currentLocation(): NavLocation | null {
   if (s.tab === "prs") return { kind: "pane", pane: "prs" };
   if (s.historyView) return { kind: "pane", pane: "history" };
   if (s.selectedPath) return { kind: "review", path: s.selectedPath, line: n.here?.path === s.selectedPath ? n.here.line : 1 };
+  return null;
+}
+
+/** The file in front: the project file view's, a past round's, else the review's selected one (null: none). */
+export function currentFilePath(): string | null {
+  const n = useNav.getState();
+  if (n.file) return n.file.path;
+  const s = useStore.getState();
+  if (s.tab === "prs") return null;
+  if (s.historyView) return s.historyView.path;
+  return s.selectedPath ?? null;
+}
+
+/** §65.8: why a palette cannot open now (null: it can). */
+export function paletteBlocked(mode: PaletteMode): string | null {
+  if (!useStore.getState().state.project) return t("Open a project first");
+  if (mode === "fileSymbols" && !currentFilePath()) return t("Show a file first — its diff or a file of the project");
   return null;
 }
 

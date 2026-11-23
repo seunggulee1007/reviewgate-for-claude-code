@@ -5,4 +5,7 @@
  */
 import type { MenuActionHandlers } from "./menuActions";
 
-export const windowMenuActions: MenuActionHandlers = {};
+export const windowMenuActions: MenuActionHandlers = {
+  // §65.8: File › Go to File… (Ctrl+P) — the palette (nav/QuickOpen.tsx); the store loads with the click.
+  quick_open: () => void import("./nav/navStore").then((m) => m.useNav.getState().openPalette("files")),
+};

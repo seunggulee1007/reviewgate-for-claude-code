@@ -17,6 +17,7 @@ import { NavHistoryButtons, Preview } from "./NavBits";
 import { openInIde } from "./openInIde";
 import { useBandSlot } from "./bandSlot"; // §65.8
 import { PeekBand } from "./PeekBand";
+import { QuickOpen } from "./QuickOpen";
 import { ctrlClickAction } from "./peekModel";
 import "./nav.css";
 
@@ -158,6 +159,12 @@ function useNavKeys(): void {
       const k = navKey(e);
       if (!k || e.defaultPrevented || useStore.getState().dialog || isTerminalTarget(e.target)) return;
       const inMonaco = e.target instanceof Element && e.target.closest(".monaco-editor") !== null;
+      // §65.8: the palettes open from anywhere but a terminal (a text field and Monaco too).
+      if (k === "goToFile" || k === "fileSymbols" || k === "projectSymbols") {
+        e.preventDefault();
+        useNav.getState().openPalette(k === "goToFile" ? "files" : k);
+        return;
+      }
       if (k === "nextReference" || k === "previousReference") {
         if (useNav.getState().stepReferences(k === "nextReference" ? 1 : -1)) e.preventDefault();
         return;
@@ -206,10 +213,12 @@ export function NavLayer() {
   const band = useNav((s) => s.band !== null);
   const slot = useBandSlot((s) => s.slot);
   const hover = useNav((s) => s.hover !== null);
+  const palette = useNav((s) => s.palette?.seq ?? null);
   return (
     <>
       {peek && createPortal(<PeekPopover />, document.body)}
       {hover && !peek && createPortal(<HoverCard />, document.body)}
+      {palette !== null && createPortal(<QuickOpen key={palette} />, document.body)}
       {band && slot && createPortal(<PeekBand />, slot)}
     </>
   );

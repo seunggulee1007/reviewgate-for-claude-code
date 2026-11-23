@@ -91,3 +91,23 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .nav-refs-preview-head .folder { color: var(--fg-3); min-width: 0; }
 .nav-refs-preview-code { flex: 1 1 auto; overflow: auto; font-family: var(--mono); font-size: 12px; background: var(--bg); }
 .nav-refs-preview-code mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 2px; }
+
+/* §65.8 The quick-open palettes (Go to File, Symbols in This File, Symbols in Project): at the top, over everything. */
+.nav-palette-backdrop { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; align-items: flex-start; padding-top: 56px; background: transparent; }
+.nav-palette {
+  width: min(640px, calc(100vw - 32px)); max-height: min(520px, calc(100vh - 80px)); display: flex; flex-direction: column;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); font-family: var(--font);
+}
+.nav-palette-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 2px; font-size: 12px; min-width: 0; }
+.nav-palette-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-palette-input { margin: 4px 10px 6px; font-size: 13px; }
+.nav-palette-status { display: flex; align-items: center; gap: 8px; padding: 0 10px 6px; }
+.nav-palette-list { overflow: auto; flex: 1 1 auto; padding: 2px 0 4px; border-top: 1px solid var(--border); }
+.nav-palette-row { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 3px 10px; text-align: left; background: transparent; border: 0; border-radius: 0; cursor: pointer; color: var(--fg); font-size: 12.5px; min-width: 0; }
+.nav-palette-row.selected { background: var(--accent-bg); }
+.nav-palette-row .name { flex: none; white-space: pre; }
+.nav-palette-row .name b { color: var(--accent); font-weight: 700; }
+.nav-palette-row .detail { color: var(--fg-3); font-size: 11.5px; min-width: 0; flex: 1 1 auto; }
+.nav-palette-row .nav-kind { flex: none; font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); min-width: 52px; text-align: center; }
+.nav-palette-note { padding: 10px; }
+.nav-palette-foot { display: flex; flex-direction: column; gap: 2px; padding: 5px 10px; border-top: 1px solid var(--border); }

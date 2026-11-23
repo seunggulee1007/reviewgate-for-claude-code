@@ -76,6 +76,9 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Back", mac: "⌃-", win: "Alt+←" },
       { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },
       { action: "Open in IDE", mac: "⌥⌘O", win: "Ctrl+Alt+O" },
+      // §65.8 palettes — Windows keeps Ctrl+Shift+O / Ctrl+T (Switch Project / New chat) and takes IntelliJ IDEA's keys
+      { action: "Symbols in This File…", mac: "⌘⇧O", win: "Ctrl+F12", note: "Windows: Ctrl+Shift+O is Switch Project" },
+      { action: "Symbols in Project…", mac: "⌘T", win: "Ctrl+Alt+Shift+N", note: "Windows: Ctrl+T is New chat" },
     ],
   },
   {

@@ -10821,6 +10821,22 @@ through).
   returns), F4 / Shift+F4 anywhere but a terminal open the next / previous (wrapping; from none selected the first / the
   last), ↻ sends the same search again, × clears it. Empty, it says what fills it. The §62 strip under the panes stays
   only on the PRs tab (it has no bottom panel).
+- **Palettes** (`nav/QuickOpen.tsx`, `nav/quickOpenModel.ts`; at the top of the window, Esc / a click outside closes, ↑ / ↓
+  / Enter / a click, the pick opened as §62 opens a result and Back returns): **Go to File** — Ctrl+P (File › Go to File…,
+  the menu's `quick_open`) — `list_files {query, filesOnly: true, limit: 50}` 50 ms after a keystroke, the newest reply
+  wins, `kind: "dir"` dropped (an older engine), `path:42` split here and opened at the line, the basename's letters bold
+  (camel humps of the stem, else the subsequence), a review file marked. **Symbols in This File** — **Ctrl+F12** —
+  `document_symbols {path}` once for the file in front (the project file view's, a past round's, else the review's
+  selected one; none: a toast says to show one), filtered here with §65.3's ranking (exact > prefix > humps > substring >
+  subsequence; empty: file order), indented by `depth`, `kind` and `container`. **Symbols in Project** —
+  **Ctrl+Alt+Shift+N** — `workspace_symbols {query, limit: 100}` 80 ms after a keystroke (an idle index is warmed with
+  `nav_index_build {}` when the palette opens), `name` bold at `matches`, `container · folder`; "Indexing… N / M files"
+  while `state.nav.index` builds and the query sent again when it turns `ready`, `failed` → its error and Try Again
+  (`nav_index_build {}`), "Showing the first 100" / "the project is larger than the index" in the footer. **Keys:**
+  Windows keeps Ctrl+Shift+O (Switch Project) and Ctrl+T (New chat), so the symbol palettes take IntelliJ IDEA's keys;
+  Ctrl+P was File › Go to File's accelerator already (it did nothing until now). `nav/navKeys.test.ts` holds every
+  navigation key against the window's other key maps and the shortcut table; docs/SHORTCUTS.md "코드 탐색" lists them —
+  its Mac column carries §65.8's keys until the Mac app picks its own (Core's `ShortcutTable.swift` is reconciled then).
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.
