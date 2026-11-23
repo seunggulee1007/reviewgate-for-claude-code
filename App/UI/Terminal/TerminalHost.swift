@@ -148,6 +148,25 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.send(data: [0x1b])
     }
 
+    // MARK: terminal-friction (§57.4)
+
+    /// §57.4: the user pressed Esc in this terminal (when); set for a terminal chat's host only.
+    @ObservationIgnored var onEscape: ((Date) -> Void)?
+    @ObservationIgnored private var escapeFilter = EscapeKeyFilter()
+
+    private func noteInput(_ data: ArraySlice<UInt8>) {
+        guard let onEscape else { return }
+        if let at = escapeFilter.input(data, at: Date()) { onEscape(at) }
+        guard data.count == 1, TerminalEscapeKey.isEscape(data) else { return }
+        // A lone ESC is the Esc key once nothing follows it (⌥Return and the like send ESC, then the key).
+        DispatchQueue.main.asyncAfter(deadline: .now() + EscapeKeyFilter.metaWindow + 0.02) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let at = self.escapeFilter.flush(now: Date()) else { return }
+                self.onEscape?(at)
+            }
+        }
+    }
+
     /// The keyboard goes to the terminal when its window shows it (`makeFirstResponder` only; the app is never activated).
     func focus() {
         guard let window = view.window, window.firstResponder !== view else { return }
@@ -196,6 +215,9 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         // the input method (Hanja) and ⌥-letters type their characters.
         v.optionAsMetaKey = false
         v.optionAsMetaKeyForFunctionalKeys = true
+        v.onInput = { [weak self] data in
+            MainActor.assumeIsolated { self?.noteInput(data) }
+        }
     }
 
     private func waitForExit(seconds: Double) async -> Bool {

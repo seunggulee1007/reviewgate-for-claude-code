@@ -9057,7 +9057,15 @@ chat's id);
   PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
 - **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
   `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
-  set, or when the gate has run a turn with no hook for 60 s.
+  set, when the gate has run a turn with no hook for 60 s, or — the client sees what goes into its PTY — 2 s after the
+  user pressed Esc there while the turn ran and no hook came since (`hookCount` unchanged).
+  - *The Esc rule on the client* (Mac: Core `TerminalReviewNowRules`, `EscapeKeyFilter`). The Esc key is a lone `ESC`
+    write, or its kitty form `CSI 27 u` (`27;1u`, `27;1:1u`); a lone `ESC` followed within 50 ms by another write is
+    ⌥ as Meta (⌥Return, ⌥←), not Esc. ⌘. (Stop), which writes Esc, counts too. It is recorded only while a turn of the
+    live chat runs (an Esc between turns closes a TUI menu: nothing), with the `hookCount` of that moment; any later
+    hook (Claude Code went on — the Esc closed a menu, or the tool call's interrupt sets `interruptSuspected`) drops it,
+    and the turn's end clears it. Nothing is settled by itself: the strip only offers Review now at once instead of
+    after 60 s.
 - **Waiting.** `state.session.terminal.waiting` is set by the Notification hook (`permission_prompt` /
   `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
   any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
@@ -9159,8 +9167,9 @@ chat's id);
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요"
   (hooks arrive),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
-  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
-  changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
+  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set, Esc was
+  pressed in the terminal 2 s ago with no hook since, or nothing changed for 60 s — Esc in the TUI sends no Stop, so the
+  turn stays open until then (§57.4).
   - *Cost* (§57.13, once `terminal.status` came): "$0.01 · 25%" right of the status — Claude Code's own cost so far in
     the conversation and the context used, from its status line; a click shows the model, the numbers and "리뷰한 턴"
     (`hud.sessionCostUSD`, which grows with each `turn_end`). VoiceOver reads both numbers.

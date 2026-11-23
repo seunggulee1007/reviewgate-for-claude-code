@@ -83,7 +83,8 @@ private struct TerminalStatusStrip: View {
             .help(help)
             .accessibilityIdentifier("Terminal chat status")
             Spacer(minLength: 4)
-            TimelineView(.periodic(from: .now, by: 5)) { context in
+            // MARK: terminal-friction (§57.4): ticks each second, so "Review now" shows 2 s after an Esc with no hook.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
                 if showsReviewNow(info, now: context.date) {
                     Button("Review now") { Task { await store.endTerminalTurn() } }
                         .controlSize(.small)
@@ -110,10 +111,11 @@ private struct TerminalStatusStrip: View {
         .background(host.disconnected ? Color.orange.opacity(0.12) : Color.clear)
     }
 
-    /// "Review now": a tool call ended by Esc, or the turn has run 60 s with nothing from Claude Code.
+    /// "Review now": a tool call ended by Esc, Esc pressed here with no hook after it for 2 s, or the turn has run 60 s with
+    /// nothing from Claude Code (`TerminalReviewNowRules`).
     private func showsReviewNow(_ info: TerminalSessionInfo?, now: Date) -> Bool {
-        guard store.isRunning, let info, info.running else { return false }
-        return info.interruptSuspected || now.timeIntervalSince(model.terminals.lastActivity) >= 60
+        TerminalReviewNowRules.shows(turnRunning: store.isRunning, info: info, chatId: chatId, escape: model.terminals.escape,
+                                     lastActivity: model.terminals.lastActivity, now: now)
     }
 
     private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the left") }

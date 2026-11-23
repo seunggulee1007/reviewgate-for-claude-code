@@ -20,6 +20,16 @@ final class ReviewTerminalView: LocalProcessTerminalView {
         tcsetattr(fd, TCSANOW, &t)
     }
 
+    // MARK: terminal-friction — what goes to the PTY (§57.4)
+
+    /// Every write to the PTY — the user's keys, a paste, the terminal's own replies — before it goes (the Esc rule).
+    var onInput: ((ArraySlice<UInt8>) -> Void)?
+
+    override func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        onInput?(data)
+        super.send(source: source, data: data)
+    }
+
     // MARK: Copy
 
     /// The terminal's own selection (not Claude Code's in-app selection, which it copies itself on select).
