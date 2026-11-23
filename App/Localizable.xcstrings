@@ -451,6 +451,22 @@
         }
       }
     },
+    "%lld definitions of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld definitions of %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ 정의 %1$lld개"
+          }
+        }
+      }
+    },
     "%lld MCP servers need attention — click for details": {
       "localizations": {
         "en": {
@@ -4929,6 +4945,70 @@
         }
       }
     },
+    "Automatic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동"
+          }
+        }
+      }
+    },
+    "Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동: Java·Kotlin·JSP 프로젝트는 IntelliJ IDEA가 설치돼 있으면 IntelliJ IDEA로, 아니면 VS Code로 열어요. 에디터에서 열기 메뉴에서 다른 앱을 고르면 이 설정도 바뀌어요."
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뒤로"
+          }
+        }
+      }
+    },
+    "Back to where you jumped from (⌃-)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to where you jumped from (⌃-)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이동하기 전 자리로 돌아가요 (⌃-)"
+          }
+        }
+      }
+    },
     "between the file list and the terminal": {
       "localizations": {
         "en": {
@@ -8487,6 +8567,22 @@
         }
       }
     },
+    "Code navigation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code navigation"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "코드 탐색"
+          }
+        }
+      }
+    },
     "Cohesion": {
       "localizations": {
         "en": {
@@ -10359,6 +10455,22 @@
         }
       }
     },
+    "Could not find references": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not find references"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조를 찾지 못했어요"
+          }
+        }
+      }
+    },
     "Could not list files: %@": {
       "localizations": {
         "en": {
@@ -10723,6 +10835,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "직접 지정한 경로"
+          }
+        }
+      }
+    },
+    "Default App": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default App"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 앱"
+          }
+        }
+      }
+    },
+    "definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의"
           }
         }
       }
@@ -12167,6 +12311,38 @@
         }
       }
     },
+    "Every line that holds %@ as a whole word": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line that holds %@ as a whole word"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 단어로 들어 있는 모든 줄을 찾아요"
+          }
+        }
+      }
+    },
+    "Every line that holds this name as a whole word": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line that holds this name as a whole word"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 이름이 단어로 들어 있는 모든 줄을 찾아요"
+          }
+        }
+      }
+    },
     "Every pending file is accepted, then your message is sent. Sending on its own never accepts anything.": {
       "localizations": {
         "en": {
@@ -12231,6 +12407,54 @@
         }
       }
     },
+    "Find References": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find References"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 찾기"
+          }
+        }
+      }
+    },
+    "Forward": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forward"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앞으로"
+          }
+        }
+      }
+    },
+    "Forward again (⌃⇧-)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forward again (⌃⇧-)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 앞으로 가요 (⌃⇧-)"
+          }
+        }
+      }
+    },
     "Free space on the project's disk. Settings › Review › Clean Up Old Review History frees what the app keeps.": {
       "localizations": {
         "en": {
@@ -12259,6 +12483,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Git·워크벤치"
+          }
+        }
+      }
+    },
+    "Go to Definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to Definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의로 이동"
           }
         }
       }
@@ -12439,6 +12679,38 @@
         }
       }
     },
+    "Looking for %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 찾는 중…"
+          }
+        }
+      }
+    },
+    "Looking for references…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for references…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 찾는 중…"
+          }
+        }
+      }
+    },
     "Mac app only · after a file’s last change, the next file": {
       "localizations": {
         "en": {
@@ -12519,6 +12791,22 @@
         }
       }
     },
+    "Navigate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "탐색"
+          }
+        }
+      }
+    },
     "New projects": {
       "localizations": {
         "en": {
@@ -12579,6 +12867,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "코드 댓글이 없어요"
+          }
+        }
+      }
+    },
+    "No definition found for %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No definition found for %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 정의를 찾지 못했어요"
           }
         }
       }
@@ -12727,6 +13031,22 @@
         }
       }
     },
+    "No references": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No references"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 없음"
+          }
+        }
+      }
+    },
     "No window remembers an \"Allow for session\" answer": {
       "localizations": {
         "en": {
@@ -12755,6 +13075,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "없음을 골랐어요 — 들려줄 소리가 없어요"
+          }
+        }
+      }
+    },
+    "Nothing to go back to — ⌘-click a name to jump to its definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to go back to — ⌘-click a name to jump to its definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "돌아갈 곳이 없어요 — 이름을 ⌘-클릭하면 정의로 이동해요"
+          }
+        }
+      }
+    },
+    "Nothing to go forward to — go Back first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to go forward to — go Back first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앞으로 갈 곳이 없어요 — 먼저 뒤로 가 주세요"
           }
         }
       }
@@ -12871,6 +13223,54 @@
         }
       }
     },
+    "Open at line %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open at line %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번째 줄을 열어요"
+          }
+        }
+      }
+    },
+    "Open in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열 앱"
+          }
+        }
+      }
+    },
+    "Open in IDE": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in IDE"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IDE에서 열기"
+          }
+        }
+      }
+    },
     "Open review panel": {
       "localizations": {
         "en": {
@@ -12903,6 +13303,38 @@
         }
       }
     },
+    "Open the definition at line %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the definition at line %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번째 줄의 정의를 열어요"
+          }
+        }
+      }
+    },
+    "Open this file at line %lld in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open this file at line %lld in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@에서 이 파일의 %1$lld번째 줄을 열어요"
+          }
+        }
+      }
+    },
     "Opens a terminal chat, where every / command works": {
       "localizations": {
         "en": {
@@ -12931,6 +13363,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "또는 터미널에서 답하기"
+          }
+        }
+      }
+    },
+    "Or ⌘-click a name (Ctrl+click on Windows)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or ⌘-click a name (Ctrl+click on Windows)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭)"
           }
         }
       }
@@ -13111,6 +13559,22 @@
         }
       }
     },
+    "References to %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "References to %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 참조"
+          }
+        }
+      }
+    },
     "Refuse it — Claude Code is told you denied it in ReviewGate and goes on without it": {
       "localizations": {
         "en": {
@@ -13187,6 +13651,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "설정 검색"
+          }
+        }
+      }
+    },
+    "Search the project for this word (⇧⌘F)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search the project for this word (⇧⌘F)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트에서 이 단어를 검색해요 (⇧⌘F)"
+          }
+        }
+      }
+    },
+    "Search-based: lines holding the name as a whole word — may list look-alikes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search-based: lines holding the name as a whole word — may list look-alikes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색으로 찾아요 — 이 이름이 단어로 들어 있는 줄이라 이름만 같은 것도 나올 수 있어요"
+          }
+        }
+      }
+    },
+    "Search-based: may list look-alikes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search-based: may list look-alikes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색으로 찾아서 이름만 같은 것도 나올 수 있어요"
           }
         }
       }
@@ -13859,6 +14371,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 세션이 메시지를 보내면"
+          }
+        }
+      }
+    },
+    "Where %@ is declared (⌘-click)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where %@ is declared (⌘-click)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 선언된 곳으로 가요 (⌘-클릭)"
           }
         }
       }

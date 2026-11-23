@@ -53,7 +53,7 @@ Mac·Windows 열과 비교해요.
 
 ## 코드 탐색
 
-diff나 프로젝트 파일에서 이름의 정의·참조로 가요(docs/PROTOCOL.md §62). 검색 기반이라 이름만 같은 것도 나올 수 있어요.
+diff·파일 보기에서 이름 위에 포인터를 둔 채로 써요 (PROTOCOL §62). 검색으로 찾기 때문에 이름이 같은 다른 것도 나올 수 있어요.
 
 | 동작 | Mac | Windows | 비고 |
 |---|---|---|---|
@@ -61,7 +61,7 @@ diff나 프로젝트 파일에서 이름의 정의·참조로 가요(docs/PROTOC
 | 참조 찾기 | ⇧F12 | Shift+F12 | |
 | 뒤로 | ⌃- | Alt+← | |
 | 앞으로 | ⌃⇧- | Alt+→ | |
-| IDE에서 열기 | — | Ctrl+Alt+O | Windows 앱에만 있어요 · 설정은 에디터 열기 메뉴의 "IDE에서 열기"(VS Code · IntelliJ IDEA · 시스템 기본 앱) |
+| IDE에서 열기 | ⌥⌘O | Ctrl+Alt+O | Mac 은 설정 › 리뷰 › Diff › 열 앱, Windows 는 에디터 열기 메뉴의 "IDE에서 열기"(VS Code · IntelliJ IDEA · 시스템 기본 앱) |
 
 ## 리뷰
 

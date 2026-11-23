@@ -421,6 +421,8 @@ public final class AppState {
     // MARK: code-browser
     /// §47: a project file open read-only in the diff pane, and the project search (CodeBrowser.swift).
     public let codeBrowser = CodeBrowserStore()
+    /// code-nav (§62): Go to Definition / Find References and Back / Forward.
+    public let codeNav = CodeNavStore()
     // MARK: wave4 w4-safety (AppState+Safety.swift)
     /// daily-14: why the running turn stopped (its `error` events); taken by the turn's "finished" notification.
     var turnStopReason: TurnStopReason?
@@ -963,6 +965,7 @@ public final class AppState {
         codeGraph.reset()   // MARK: wave5 w5-graph (§43.3)
         statusLine.reset()   // MARK: wave6 w6-statusline (§44.2)
         codeBrowser.reset()   // MARK: code-browser (§47)
+        codeNav.reset()   // MARK: code-nav (§62)
         sideLoadedKey = nil
         resetPermissionView()   // wave1 mac-perms
         resetSessionExtras()   // wave1 mac-session
@@ -2343,6 +2346,8 @@ public final class AppState {
             break
         case .projectFile, .projectSearch:   // MARK: code-browser — §47 replies, consumed by the request that asked
             break
+        case .definitions, .references:   // MARK: code-nav — §62 replies, consumed by the request that asked
+            break
         }
     }
 
@@ -2535,7 +2540,7 @@ public final class AppState {
         if snapshot.project?.path != previous.project?.path { mcp.reset() }
         if snapshot.project?.path != previous.project?.path { codeGraph.reset() }   // MARK: wave5 w5-graph (§43.3)
         if snapshot.project?.path != previous.project?.path { statusLine.reset() }   // MARK: wave6 w6-statusline (§44.2)
-        if snapshot.project?.path != previous.project?.path { codeBrowser.reset() }   // MARK: code-browser (§47)
+        if snapshot.project?.path != previous.project?.path { codeBrowser.reset(); codeNav.reset() }   // MARK: code-browser (§47), code-nav (§62)
         flowSnapshotApplied(previous: previous)   // wave3 mac-flow (§36.11–36.13)
         if contextWarning != nil {
             // §27: the warning re-arms below 80 % (after `compact`) and belongs to one chat.

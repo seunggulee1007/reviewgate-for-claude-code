@@ -57,7 +57,7 @@ struct DiffRow: View {
                     .font(Self.font)
                     .foregroundStyle(.secondary)
                     .frame(width: 16)
-                DiffCodeText(text: line.text, styled: styled, faint: line.wsOnly)
+                DiffCodeText(text: line.text, styled: styled, faint: line.wsOnly, navLine: CodeNavMenuItems.number(line, side: splitSide))
                     .font(Self.font)
             }
             .frame(maxWidth: .infinity, maxHeight: splitSide == nil ? nil : .infinity, alignment: .topLeading)

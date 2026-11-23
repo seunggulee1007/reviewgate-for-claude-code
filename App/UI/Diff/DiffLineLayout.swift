@@ -316,36 +316,57 @@ private struct HorizontalScrollBar: View {
 /// line cut at the render limit, and a tooltip when the line is cut or wider than the pane.
 struct DiffCodeText: View {
     @Environment(\.diffCodeLayout) private var layout
+    @Environment(\.codeNavContext) private var navContext   // MARK: code-nav (§62)
     /// The whole line (the tooltip's text).
     let text: String
     /// The drawn part, styled (`DiffLineText.styled`).
     let styled: AttributedString
     /// Whitespace-only change (`DiffLine.wsOnly`): drawn faint.
     var faint = false
+    /// code-nav (§62): the line's number in the file of `codeNavContext` (the new side's, else the old side's); nil = no
+    /// ⌘-click on this line.
+    var navLine: Int? = nil
 
     var body: some View {
-        let cut = DiffLineText.shown(text).cut
-        Group {
-            if layout.wrap {
-                Text(display(cut: cut))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                // minWidth 0: without it the frame never gets narrower than the one-line text, and a long line would
-                // widen its whole row (and in a stack every row) instead of being clipped to the pane.
-                Text(display(cut: cut))
-                    .lineLimit(1)
-                    .fixedSize()
-                    .offset(x: -layout.offset)
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    .clipped()
+        let shown = DiffLineText.shown(text)
+        let cut = shown.cut
+        let from = navContext.flatMap { context in navLine.map { CodeNavLocation(view: context.view, path: context.path, line: $0) } }
+        CodeNavHotspot(text: shown.text, from: from, wrap: layout.wrap, offset: layout.offset) { underline in
+            Group {
+                if layout.wrap {
+                    Text(display(cut: cut, underline: underline))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    // minWidth 0: without it the frame never gets narrower than the one-line text, and a long line would
+                    // widen its whole row (and in a stack every row) instead of being clipped to the pane.
+                    Text(display(cut: cut, underline: underline))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .offset(x: -layout.offset)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        .clipped()
+                }
             }
         }
         .opacity(faint ? 0.55 : 1)
         .helpIfPresent(tooltip(cut: cut))
     }
 
-    private func display(cut: Bool) -> AttributedString {
+    /// `styled`, the name under the pointer underlined while ⌘ is held (UTF-16 `underline`), "…" after a cut line.
+    private func display(cut: Bool, underline: Range<Int>? = nil) -> AttributedString {
+        var styled = styled
+        if let underline {
+            let chars = String(styled.characters)
+            let units = chars.utf16
+            if underline.upperBound <= units.count,
+               let lo = units.index(units.startIndex, offsetBy: underline.lowerBound).samePosition(in: chars),
+               let hi = units.index(units.startIndex, offsetBy: underline.upperBound).samePosition(in: chars),
+               let range = Range<AttributedString.Index>(lo..<hi, in: styled) {
+                styled[range].swiftUI.underlineStyle = .single
+                styled[range].swiftUI.foregroundColor = .accentColor
+            }
+        }
         guard cut else { return styled }
         var out = styled
         var ellipsis = AttributedString("…")
@@ -407,6 +428,7 @@ struct DiffLineOptions: View {
 struct DiffSettingsSection: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
+    @AppStorage(ExternalEditor.defaultsKey) private var editor = ""
 
     var body: some View {
         Section("Diff") {
@@ -420,6 +442,16 @@ struct DiffSettingsSection: View {
             } label: { SettingLabel("diffLayout") }
             .accessibilityIdentifier("Settings diff layout")
             .settingAnchor("diffLayout")
+            // MARK: code-nav (§62): the app Open in IDE (⌥⌘O) and the headers' Open in Editor hand a file and line to.
+            Picker("Open in", selection: $editor) {
+                Text("Automatic").tag("")
+                ForEach(ExternalEditor.allCases.filter { ($0.isInstalled && $0 != .finder) || editor == $0.rawValue }) { choice in
+                    Text(verbatim: choice.title).tag(choice.rawValue)
+                }
+            }
+            .accessibilityIdentifier("Settings open in")
+            Text("Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 }

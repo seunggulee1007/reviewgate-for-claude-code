@@ -70,6 +70,14 @@ public enum ShortcutTable {
             ShortcutRow("Go to File…", mac: "⌘P", windows: "Ctrl+P"),
             ShortcutRow("Find in Project…", mac: "⌘⇧F", windows: "Ctrl+Shift+F"),
         ]),
+        // MARK: code-nav (§62)
+        ShortcutSection("Code navigation", rows: [
+            ShortcutRow("Go to Definition", mac: "F12", windows: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows)"),
+            ShortcutRow("Find References", mac: "⇧F12", windows: "Shift+F12"),
+            ShortcutRow("Back", mac: "⌃-", windows: "Alt+←"),
+            ShortcutRow("Forward", mac: "⌃⇧-", windows: "Alt+→"),
+            ShortcutRow("Open in IDE", mac: "⌥⌘O", windows: "Ctrl+Alt+O"),
+        ]),
         ShortcutSection("Review", rows: [
             ShortcutRow("Accept", mac: "⌘⇧A", windows: "Ctrl+Shift+A"),
             ShortcutRow("Accept All…", mac: "⌥⌘⇧A", windows: "Ctrl+Alt+Shift+A", note: "Asks first only when a file was not looked at or is sensitive"),   // r2-review-flow M28

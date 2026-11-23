@@ -897,6 +897,22 @@
         }
       }
     },
+    "%lld references in %lld files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references in %lld files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 %lld개 · 파일 %lld개"
+          }
+        }
+      }
+    },
     "%lld retrying": {
       "localizations": {
         "en": {
@@ -6743,6 +6759,22 @@
         }
       }
     },
+    "No references": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No references"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 없음"
+          }
+        }
+      }
+    },
     "No side answer yet — type /btw and your question": {
       "localizations": {
         "en": {
@@ -6871,6 +6903,22 @@
         }
       }
     },
+    "Search stopped after 10 s": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search stopped after 10 s"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10초가 지나 검색을 멈췄어요"
+          }
+        }
+      }
+    },
     "Show CLAUDE.md and the memory files Claude reads": {
       "localizations": {
         "en": {
@@ -6967,6 +7015,38 @@
         }
       }
     },
+    "Showing the best %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the best %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "가장 알맞은 %lld개만 보여요"
+          }
+        }
+      }
+    },
+    "stopped after 15 s": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stopped after 15 s"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15초 뒤 멈춤"
+          }
+        }
+      }
+    },
     "Terminal chats only": {
       "localizations": {
         "en": {
@@ -7011,6 +7091,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 명령은 터미널 채팅에서 써요"
+          }
+        }
+      }
+    },
+    "This is not a name that can be looked up": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not a name that can be looked up"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "찾아볼 수 있는 이름이 아니에요"
           }
         }
       }

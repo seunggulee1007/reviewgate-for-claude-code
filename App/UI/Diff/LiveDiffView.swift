@@ -208,6 +208,7 @@ struct LiveDiffView: View {
                     .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
                               rowsKey: FindRowsKey(path: store.liveSelection ?? "", diff: diff), tick: model.diffFindTick,
                               changes: { DiffChangeNavigation.rows(lines: lines) })
+                    .codeNavigation(path: store.liveSelection, view: .other)   // MARK: code-nav (§62)
                 }
             }
         } else {
@@ -233,6 +234,7 @@ struct LiveDiffView: View {
                 lineSelection.select(key, extend: true)
             })
             .contextMenu {
+                CodeNavMenuItems(line, side: side)   // MARK: code-nav (§62)
                 if line.kind != .hunkHeader {
                     DiffLineCopyMenuItems(line: line, path: store.liveSelection,
                                           copySelected: isPicked && picked.count > 1 ? { copySelectedLines(lines) } : nil)

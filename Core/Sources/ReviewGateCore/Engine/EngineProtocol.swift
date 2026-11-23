@@ -705,6 +705,11 @@ public enum EngineCommand: Sendable, Equatable {
     case projectFile(path: String)
     /// §47: `git grep` over the project's files (a fixed string; case ignored unless `caseSensitive`) → `.projectSearch`.
     case projectSearch(query: String, caseSensitive: Bool = false, wholeWord: Bool = false, limit: Int? = nil)
+    // MARK: code-nav
+    /// §62: where `symbol` is declared (search-based), ranked for the file and line clicked in → `.definitions`.
+    case findDefinition(symbol: String, fromPath: String? = nil, line: Int? = nil)
+    /// §62: every line holding `symbol` as a whole word, the clicked file first → `.references`.
+    case findReferences(symbol: String, fromPath: String? = nil, limit: Int? = nil)
     case shutdown
 
     /// The wire `type` discriminator.
@@ -862,6 +867,8 @@ public enum EngineCommand: Sendable, Equatable {
         case .statusLine: "status_line"   // MARK: wave6 w6-statusline
         case .projectFile: "project_file"   // MARK: code-browser
         case .projectSearch: "project_search"
+        case .findDefinition: "find_definition"   // MARK: code-nav
+        case .findReferences: "find_references"
         case .shutdown: "shutdown"
         }
     }
@@ -904,6 +911,7 @@ extension EngineCommand: Encodable {
         case watch   // wave5 w5-brain
         case columns, visible   // wave6 w6-statusline
         case caseSensitive, wholeWord   // code-browser
+        case symbol, fromPath   // code-nav
         case confirm   // §59
     }
 
@@ -1168,6 +1176,15 @@ extension EngineCommand: Encodable {
             try c.encode(query, forKey: .query)
             if caseSensitive { try c.encode(true, forKey: .caseSensitive) }
             if wholeWord { try c.encode(true, forKey: .wholeWord) }
+            try c.encodeIfPresent(limit, forKey: .limit)
+        // MARK: code-nav (§62)
+        case let .findDefinition(symbol, fromPath, line):
+            try c.encode(symbol, forKey: .symbol)
+            try c.encodeIfPresent(fromPath, forKey: .fromPath)
+            try c.encodeIfPresent(line, forKey: .line)
+        case let .findReferences(symbol, fromPath, limit):
+            try c.encode(symbol, forKey: .symbol)
+            try c.encodeIfPresent(fromPath, forKey: .fromPath)
             try c.encodeIfPresent(limit, forKey: .limit)
         case let .requestChanges(extra, noteIds):
             try c.encodeIfPresent(extra, forKey: .extra)
@@ -3013,6 +3030,11 @@ public enum EngineEvent: Sendable, Equatable {
     case projectFile(ProjectFileReply)
     /// §47: reply to `project_search`.
     case projectSearch(ProjectSearchReply)
+    // MARK: code-nav
+    /// §62: reply to `find_definition`.
+    case definitions(DefinitionsReply)
+    /// §62: reply to `find_references`.
+    case references(ReferencesReply)
     // MARK: wave4d w4d-plan
     /// §42.1: `plan_approved` with `into` — the fresh chat, the plan handed to a workbench, or received from one.
     case planApprovedInto(PlanApprovedInfo)
@@ -3060,6 +3082,8 @@ public enum EngineEvent: Sendable, Equatable {
         case let .statusLine(reply): reply.id   // MARK: wave6 w6-statusline
         case let .projectFile(reply): reply.id   // MARK: code-browser
         case let .projectSearch(reply): reply.id
+        case let .definitions(reply): reply.id   // MARK: code-nav
+        case let .references(reply): reply.id
         default: nil
         }
     }
@@ -3301,6 +3325,10 @@ extension EngineEvent: Decodable {
             self = .projectFile(try ProjectFileReply(from: decoder))
         case "project_search":
             self = .projectSearch(try ProjectSearchReply(from: decoder))
+        case "definitions":   // MARK: code-nav (§62)
+            self = .definitions(try DefinitionsReply(from: decoder))
+        case "references":
+            self = .references(try ReferencesReply(from: decoder))
         case "plan_proposed":
             self = .planProposed(
                 path: try c.decodeIfPresent(String.self, forKey: .path),

@@ -8,6 +8,8 @@ struct DiffJump: Equatable {
     let path: String
     let line: Int?
     let tick: Int
+    /// code-nav (§62): a line outside the diff's hunks opens the file read-only at that line instead.
+    var orFile = false
 }
 
 /// Per-window view state that the menu bar needs to reach (`FocusedValues.workbenchWindow`).
@@ -72,9 +74,9 @@ final class WindowModel {
     var diffJump: DiffJump?
     private var diffJumpTick = 0
 
-    func showReviewDiff(path: String, line: Int?) {
+    func showReviewDiff(path: String, line: Int?, orFile: Bool = false) {
         diffJumpTick += 1
-        diffJump = DiffJump(path: path, line: line, tick: diffJumpTick)
+        diffJump = DiffJump(path: path, line: line, tick: diffJumpTick, orFile: orFile)
     }
     // The sidebar tabs rebuild their list when shown again: what the user opened there lives here, per window (`MainWindow`
     // empties it for another project).

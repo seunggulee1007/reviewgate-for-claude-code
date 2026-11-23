@@ -10262,7 +10262,40 @@ section.
   `project_file`'s checks (no `..`, no symlink out, nothing under `.git`, no FIFO / device). Nothing leaves the machine.
 - **Not in this pass.** Real type resolution (overloads by argument types, inheritance, `this.x` vs a local), cross-language
   bindings beyond the rules above (Spring bean names, MyBatis mapper XML ↔ interface), non-ASCII identifiers, a persisted
-  index, the Mac UI (Windows: above).
+  index.
+
+**Mac.** Every code row — the review's diff and its full file, the whitespace-ignoring view, a past round's, a PR's and the
+live diff, and the code browser's file — tracks the name under the pointer (`CodeNavText.symbol(in:at:path:)`: the
+character under the pointer comes from laying the row's text out as it is drawn; an identifier; `a.b.C` for a capitalised
+name after lower-case package parts; in `.vue .jsp .jspf .jspx .tag .tagx .html` a tag name after `<` / `</` — `my-widget`,
+`c:out`; a quoted path or kebab-case name — `"/WEB-INF/x.jsp"`, `'./Row.vue'`, `'my-widget'`; keywords, numbers and
+non-ASCII are not names). While ⌘ alone is held over one it is underlined with a pointing hand; ⌘-click (a local event
+monitor, so the row never picks the line) sends `find_definition {symbol, fromPath: the row's file, line: its new-side line,
+else old-side}`. One candidate opens at once; several → a popover at the click (`CodeNavPeekList`: name:line, kind,
+folder, the preview with the symbol bold, the first row picked, ↑ / ↓ / ↩ / Esc, a hover picks, "Find References" and
+"search-based: may list look-alikes" at the bottom, the `truncated` / `timedOut` lines); none or a refusal → a note with
+Find References / Find in Project (`project_search`, whole word, case-sensitive). A lookup still running after 0.35 s
+shows "Looking for X…" there. **Opening** (`CodeNavStore.openRequest`, `CodeNavObservers`): a changed file of the review,
+reached from the review or the code browser, shows its diff at the line (`WindowModel.showReviewDiff(path:line:orFile:)`);
+a line outside the diff's hunks — and every other file, and every jump from a past round's / PR / live diff — opens
+read-only in the code browser at the line. **Find References** (the row's menu, ⇧F12, a peek's or note's button): a sheet
+grouped by file in the order received, "N references in M files", a `kind` row labelled "definition"; a click opens as
+above. **Back / Forward** (Navigate menu ⌃- / ⌃⇧-, chevrons in the code browser's header and in the review header once
+there is history, each saying why it is off): `CodeNavHistory`, ≤ 50 places of `{view: review | projectFile | other, path,
+line}`; a jump pushes where it started, Back to `other` (a past round's / PR / live diff) closes the code browser in front
+of it. **Row menus**: "Go to Definition" / "Find References" for the name last pointed at on that row (else submenus of the
+line's names; the popover then hangs from the pane), "Open in IDE" at the row's line. **Navigate menu**: Go to Definition
+(F12) and Find References (⇧F12) act on the name under the pointer (a beep when there is none), Back, Forward, Open in IDE
+(⌥⌘O: the file in the diff pane at the line last clicked or jumped to). **Open in IDE** (`ExternalEditor`, `IDELink`):
+Settings › Review › Diff › Open in — Automatic (IntelliJ IDEA for a project with a Maven / Gradle build file at its root
+or Java / Kotlin / JSP files under review, when installed; else VS Code; else the system's app), VS Code
+(`vscode://file/<abs path>:<line>:<col>`, else `code -g`), IntelliJ IDEA (`idea://open?file=<abs path>&line=<line>`, else
+`open -na … --line`), Xcode (`/usr/bin/xed --line N <path>` when present), Default App (`NSWorkspace.open`); the path is
+the project's root (the shadow folder's own, §59) joined with the repo-relative path, percent-encoded. Picking an app in
+an Open in Editor menu remembers it as the choice (as before). Owner: code-nav (`Core/…/Engine/CodeNavProtocol.swift`,
+`Core/…/Session/CodeNav.swift`, `App/UI/Browse/CodeNavViews.swift`, `App/UI/Diff/ExternalEditor.swift`); tests:
+`CodeNavTests` (names in Java / Kotlin / JS / Vue / JSP lines, what a reply leads to, the wire, the history, the links,
+the store), `ShortcutTableTests`.
 - Owner: code-nav (engine `files/navigate.ts`, `engine.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`,
   `src/main/ideOpen.ts`, `src/renderer/nav/*`).
   Tests: `engine/test/engine.navigate.test.ts` (per-language fixtures, ranking, references, §59 shadow mode, refusals, the
