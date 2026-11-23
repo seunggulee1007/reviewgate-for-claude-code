@@ -8673,6 +8673,40 @@ styles. A screen that uses them gets these without a change of its own.
   under the whole text, or alone when it already holds that text. Fields, the code editor, an inline span (it cuts
   nothing) and `data-no-auto-title` get none.
 
+### 55.11 Settings: panes, search and when a change applies
+
+General used to be one long scroll of fifteen sections, nearly every switch under a paragraph, and four wordings for when
+a change counted ("Applies live", "the next Open Project", "when the session restarts", "after reopening the project")
+with a restart button on the Extensions tab only (lane b-settings).
+
+- **One index** (Core `SettingsCatalog`, Electron renderer/settingsIndex.ts): every setting's pane, section, title and
+  longer explanation (English keys of the string catalog) and when a change takes effect. The panes, in order: General
+  (appearance, typing and the chat, closing and quitting, notifications, updates), Permissions, Session (chats, the
+  session, limits, side questions, messages from other sessions, the status line, the system prompt), Review (diff,
+  checkpoint ignore patterns, test commands, disk space), Git & Workbenches, Extensions, Project, Accounts, Advanced
+  (toolchain, the pinned CLI, path overrides). The stored tab (`settingsTab`) keeps its values, so `general`,
+  `extensions`, `project` and `accounts` still open where they did; an unknown one opens General. Every key is unchanged.
+- **Search** (`SettingsCatalog.search`): every word of the query, in any order and case (full-width folded), in a
+  setting's title, section, explanation or pane name — the English key and the localized words, so "bash", "Bash 자동"
+  and "권한" all find their rows. An empty query finds nothing (the panes show instead). A result opens its pane, scrolls
+  to the row and tints it for two seconds.
+- **When a change applies** (`SettingApplies`). One model in both clients: a setting with no badge applies at once (the
+  open windows get it with `set_settings`, or read it where it is used). The others carry one badge — **다음 세션부터**
+  (what the engine reads when a Claude session starts: Bash auto-allow, loading user settings, the system prompt,
+  background work, subagents in the turn, the tool-call limit, isolated worktree agents, the claude path / pinned CLI,
+  plugins and hooks), **새 창부터** (the node path: a window's engine process starts with it) and **새 프로젝트부터**
+  (the starting mode, §39.5). The paragraphs no longer say it: "Takes effect on the next Open Project" was not what
+  happened — the open window's engine already had the new value and read it at its next session start; a new window was
+  the only way the Mac's Bash / user-settings / prompt changes reached an engine, since they went out with `hello` only.
+  The Mac now pushes them (`AppState.pushSessionStartSettings`: `autoAllowTools`, `loadUserSettings`, the rendered
+  `systemPromptAppend`) to every window when they change — the prompt also when the change limit is switched, as its
+  sentence depends on it — so a restart or a new chat takes them, as Electron's whole-settings push always did.
+- **What waits for a restart** (Core `SessionStartSettings`, `AppState.settingsAtSessionStart`): the client keeps what
+  the window's session read when it started — taken when `state.session.starting` rises (a restart, a new chat) or the
+  first time an open session is seen, dropped when none is open — and `settingsWaitingForRestart` names the settings
+  that differ now, in catalog order; changed back, they wait no more. Plugins, hooks and the project's local settings keep
+  their own comparison with what the session applied (§16, §36.6).
+
 ## 56. The message box as the terminal's
 
 What a terminal user reaches for in Claude Code's input that the message box lacked.

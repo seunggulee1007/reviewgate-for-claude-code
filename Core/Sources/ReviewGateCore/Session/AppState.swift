@@ -101,6 +101,9 @@ public final class AppState {
     public private(set) var projectURL: URL?
     /// `state.session` / `state.toolchain`.
     public private(set) var sessionInfo: SessionInfo = ReviewState.empty.session
+    /// §55.11: what the session read when it started (`SessionStartSettings`) — Settings' "다음 세션부터 적용돼요" compares
+    /// the settings now with it. Nil without an open session.
+    public internal(set) var settingsAtSessionStart: SessionStartSettings?
     public private(set) var engineToolchain: EngineToolchain = ReviewState.empty.toolchain
     /// `state.gate`, and its phase alone (what the locks read: a gate change inside a phase leaves them alone).
     public private(set) var gate: GateInfo = ReviewState.empty.gate
@@ -2408,6 +2411,7 @@ public final class AppState {
         put(\.gitInitInfo, s.gitInit)
         if s.gitInit == nil { put(\.gitInitProblem, nil) }   // §59: the prompt went away, and its problem with it
         put(\.projectURL, (s.project?.path ?? s.gitInit?.path).map { URL(fileURLWithPath: $0) })
+        noteSessionStart(from: sessionInfo, to: s.session)   // §55.11
         put(\.sessionInfo, s.session)
         put(\.engineToolchain, s.toolchain)
         put(\.gate, s.gate)
