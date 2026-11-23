@@ -25,12 +25,12 @@ struct SettingsView: View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 190, ideal: 205, max: 260)
+                .toolbar(removing: .sidebarToggle)   // the panes are the window: the sidebar never hides
         } detail: {
             detail
         }
         .searchable(text: $query, placement: .sidebar, prompt: Text("Search settings"))
         .onSubmit(of: .search) { if let first = results.first { navigation.show(first.id) } }
-        .toolbar(removing: .sidebarToggle)
         .frame(minWidth: 660, idealWidth: 740, minHeight: 380, idealHeight: 540)
     }
 
@@ -162,10 +162,11 @@ private struct SettingsSearchRow: View {
         Button(action: open) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
-                    Text(LocalizedStringKey(entry.title)).lineLimit(2)
+                    Text(LocalizedStringKey(entry.title)).lineLimit(2).foregroundStyle(.primary)
                     AppliesBadge(entry.applies)
                 }
-                if entry.section != entry.title {
+                // The section, unless it only repeats the title or the pane the result is listed under.
+                if entry.section != entry.title && entry.section != entry.pane.title {
                     Text(LocalizedStringKey(entry.section))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
