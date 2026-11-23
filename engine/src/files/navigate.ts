@@ -27,7 +27,7 @@ export const NAV_PREVIEW_MAX = 200;
 /** A longer line (a minified bundle) is never taken for a definition. */
 const LONG_LINE = 2_000;
 
-type Lang = "java" | "kotlin" | "js" | "vue" | "jsp" | "tld" | "swift" | "python" | "go";
+export type Lang = "java" | "kotlin" | "js" | "vue" | "jsp" | "tld" | "swift" | "python" | "go";
 const LANG_BY_EXT: Record<string, Lang> = {
   java: "java", kt: "kotlin", kts: "kotlin",
   js: "js", jsx: "js", mjs: "js", cjs: "js", ts: "js", tsx: "js", mts: "js", cts: "js",
@@ -72,7 +72,7 @@ export function parseSymbol(raw: unknown): Query {
 
 // ---------------------------------------------------------------- definition patterns
 
-type Rule = {
+export type Rule = {
   re: RegExp;
   kind: DefinitionKind | ((m: RegExpExecArray, line: string) => DefinitionKind);
   /** Keyword-backed (`class X`, `fun x`) vs a shape that can also be something else (a local, a call's line). */
@@ -91,12 +91,18 @@ const JTYPE = String.raw`[\w$][\w$.]*(?:\s*<[^()=;]*>)?(?:\s*\[\s*\])*`;
 const TSMOD = String.raw`(?:(?:static|async|get|set|public|private|protected|readonly|override|abstract|declare)\s+)*`;
 const JS_FN_VALUE = /^\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[\w$]+)\s*=>)/;
 
-/** The rules of each language for `word`, the symbol captured as group `s` (indices: flag `d`). */
-function rulesFor(word: string): Record<Lang, Rule[]> {
-  const S = String.raw`(?<![\w$])(?<s>${escapeRe(word)})(?![\w$])`;
+/** Any identifier: what the symbol index (§65) puts where a word would be. */
+const ANY_IDENT = String.raw`[A-Za-z_$][\w$]*`;
+
+/**
+ * The rules of each language for `word`, the symbol captured as group `s` (indices: flag `d`). `null`: any identifier — the
+ * same patterns read every declaration of a line for the symbol index (§65); `jspTags` are the JSP-only tag rules.
+ */
+export function rulesFor(word: string | null): Record<Lang, Rule[]> & { jspTags: Rule[] } {
+  const S = String.raw`(?<![\w$])(?<s>${word === null ? ANY_IDENT : escapeRe(word)})(?![\w$])`;
   const rx = (src: string): RegExp => new RegExp(src, "d");
-  const upper = /^[A-Z]/.test(word);
-  const allCaps = /^[A-Z][A-Z0-9_]*$/.test(word);
+  const upper = (m: RegExpExecArray): boolean => /^[A-Z]/.test(m.groups?.s ?? "");
+  const allCaps = (m: RegExpExecArray): boolean => /^[A-Z][A-Z0-9_]*$/.test(m.groups?.s ?? "");
   const typeOk = (m: RegExpExecArray): boolean => !NOT_A_TYPE.has((m.groups?.t ?? "").trim());
   const hasMods = (m: RegExpExecArray): boolean => (m.groups?.mods ?? "").trim() !== "";
 
@@ -106,10 +112,10 @@ function rulesFor(word: string): Record<Lang, Rule[]> {
     { re: rx(String.raw`^\s*${JMOD}(?:<[^>]*>\s+)?(?<t>${JTYPE})\s+${S}\s*\(`), kind: "method", strong: true, ok: typeOk },
     {
       re: rx(String.raw`^\s*${JMOD}${S}\s*\([^;]*$`), kind: "constructor",
-      strong: (m, line) => hasMods(m) || /\{\s*$/.test(line), ok: () => upper,
+      strong: (m, line) => hasMods(m) || /\{\s*$/.test(line), ok: upper,
     },
     { re: rx(String.raw`^\s*${JMOD}(?<t>${JTYPE})\s+${S}\s*(?:=(?!=)|;|,|$)`), kind: "field", strong: hasMods, ok: typeOk },
-    { re: rx(String.raw`^\s*${S}\s*(?:\(.*\))?\s*(?:[,;{]\s*)?(?:\/\/.*)?$`), kind: "constant", strong: false, ok: () => allCaps },
+    { re: rx(String.raw`^\s*${S}\s*(?:\(.*\))?\s*(?:[,;{]\s*)?(?:\/\/.*)?$`), kind: "constant", strong: false, ok: allCaps },
   ];
   const kotlin: Rule[] = [
     {
@@ -179,7 +185,7 @@ function rulesFor(word: string): Record<Lang, Rule[]> {
     { re: rx(String.raw`^\s*${S}(?:\s*,\s*[\w$]+)*\s*:=`), kind: "variable", strong: false },
   ];
   const tld: Rule[] = [{ re: rx(String.raw`<name>\s*${S}\s*</name>`), kind: "tag", strong: true }];
-  return { java, kotlin, js, vue: js, jsp: [...jspOwn, ...java, ...js], tld, swift, python, go };
+  return { java, kotlin, js, vue: js, jsp: [...jspOwn, ...java, ...js], tld, swift, python, go, jspTags: jspOwn };
 }
 
 /** A line that is only a comment (per language) is never a definition. */
@@ -191,10 +197,10 @@ function isCommentLine(lang: Lang, line: string): boolean {
   return t.startsWith("//") || t.startsWith("/*") || t.startsWith("* ") || t === "*";
 }
 
-type Classified = { kind: DefinitionKind; strong: boolean; column: number };
+type Classified = { kind: DefinitionKind; strong: boolean; column: number; name: string };
 
 /** The first rule of the file's language that takes `text` for a definition of the word, with the word's 1-based column. */
-function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
+export function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
   if (text.length > LONG_LINE || isCommentLine(lang, text)) return null;
   // A JSP scriptlet / declaration opener reads as indentation (the same width, so columns stay the line's own).
   const line = lang === "jsp" ? text.replace(/<%(?![@-])[!=]?/g, (o) => " ".repeat(o.length)).replace(/%>/g, "  ") : text;
@@ -208,6 +214,7 @@ function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
       kind: typeof rule.kind === "function" ? rule.kind(m, line) : rule.kind,
       strong: typeof rule.strong === "function" ? rule.strong(m, line) : rule.strong,
       column: at + 1,
+      name: m.groups?.s ?? "",
     };
   }
   return null;
@@ -220,7 +227,7 @@ const extOf = (p: string): string => {
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : "";
 };
-const langOf = (p: string): Lang | null => LANG_BY_EXT[extOf(p)] ?? null;
+export const langOf = (p: string): Lang | null => LANG_BY_EXT[extOf(p)] ?? null;
 const dirOf = (p: string): string => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 const withoutExt = (p: string): string => p.replace(/\.d\.ts$/, "").replace(/\.[^./]+$/, "");
 
@@ -396,10 +403,10 @@ function readContext(root: string, fromPath: unknown, line: unknown, q: Query): 
 
 // ---------------------------------------------------------------- ranking
 
-const VENDOR = /(?:^|\/)(?:node_modules|bower_components|vendor|third_party|dist|build|out|target|generated|\.gradle|Pods|DerivedData)\//;
-const MINIFIED = /\.min\.(?:js|css)$/;
-const TESTISH = /(?:^|\/)(?:test|tests|__tests__|spec|androidTest|testFixtures)\/|\.(?:test|spec)\.[^/]+$|(?:Test|Tests|Spec|IT)\.(?:java|kt|swift)$|_test\.go$|(?:^|\/)test_[^/]+\.py$/;
-const TYPE_KINDS = new Set<DefinitionKind>(["class", "interface", "enum", "record", "annotation", "object", "type", "module", "component", "tag", "file"]);
+export const VENDOR = /(?:^|\/)(?:node_modules|bower_components|vendor|third_party|dist|build|out|target|generated|\.gradle|Pods|DerivedData)\//;
+export const MINIFIED = /\.min\.(?:js|css)$/;
+export const TESTISH = /(?:^|\/)(?:test|tests|__tests__|spec|androidTest|testFixtures)\/|\.(?:test|spec)\.[^/]+$|(?:Test|Tests|Spec|IT)\.(?:java|kt|swift)$|_test\.go$|(?:^|\/)test_[^/]+\.py$/;
+export const TYPE_KINDS = new Set<DefinitionKind>(["class", "interface", "enum", "record", "annotation", "object", "type", "module", "component", "tag", "file"]);
 
 type Scored = DefinitionCandidate & { strong: boolean };
 
