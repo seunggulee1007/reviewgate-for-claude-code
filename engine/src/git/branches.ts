@@ -117,6 +117,19 @@ export async function worktreeStatus(cp: Pick<GitCheckpoint, "git">, ignore: str
   return { dirty, blocksSwitch };
 }
 
+/**
+ * MARK: a-gitflow — §61: the branch pull requests usually go to: `origin/HEAD`'s target, else `main` / `master` (remote,
+ * then local); null when none is known.
+ */
+export async function defaultBranch(cp: Pick<GitCheckpoint, "git">, local: BranchInfo[], remotes: RemoteBranch[]): Promise<string | null> {
+  const head = await cp.git(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], { allowFailure: true }).catch(() => null);
+  const target = head && head.status === 0 ? head.text.trim() : "";
+  if (target.startsWith("origin/") && target.length > "origin/".length) return target.slice("origin/".length);
+  for (const name of ["main", "master"]) if (remotes.some((r) => r.name === `origin/${name}`)) return name;
+  for (const name of ["main", "master"]) if (local.some((b) => b.name === name)) return name;
+  return null;
+}
+
 /** `git switch <name>`. */
 export async function switchBranch(cp: GitCheckpoint, name: string): Promise<void> {
   await cp.git(["switch", "--", name], { timeoutMs: 0 }); // wave4 w4-safety: never killed half-way (it moves the real index / HEAD)

@@ -21,7 +21,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, s
 import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { branches as listBranches, createBranch, switchBranch, worktreeStatus } from "./git/branches.js";
+import { branches as listBranches, createBranch, defaultBranch, switchBranch, worktreeStatus } from "./git/branches.js";
 import { GitCheckpoint, initRepository, LfsMissingError, openCheckpoint, OpenSupersededError } from "./git/checkpoint.js";
 import { commit as gitCommit, gitIdentity, push as gitPush, stagePaths } from "./git/commit.js";
 import { CommandRefused, refusalFields } from "./errors.js";
@@ -4935,8 +4935,9 @@ export class ReviewEngine {
       // MARK: wave3 engine-flow — §36.12: the remote-tracking branches ride along (bases for workbench_create).
       // MARK: a-gitflow — §61: one status for both the raw dirty flag and the switch guard (ignore patterns applied).
       const [list, status, name, remotes] = await Promise.all([listBranches(cp), worktreeStatus(cp, this.settings.ignorePatterns), cp.branchName(), remoteBranches(cp).catch(() => [])]);
+      const base = await defaultBranch(cp, list, remotes).catch(() => null);
       if (this.gate.checkpoint !== cp) return;
-      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch };
+      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base };
       if (this.project) this.project = { ...this.project, branch: name };
     } catch (e) {
       this.log("warn", `refreshBranches: ${errorMessage(e)}`);
@@ -5215,6 +5216,13 @@ export class ReviewEngine {
     if (!remoteURL) throw new CommandRefused("no_remote");
     const remote = parseRemoteURL(remoteURL);
     if (!remote) throw new CommandRefused(`unsupported_remote:${remoteURL}`);
+    // MARK: a-gitflow — §61: a PR from the base itself (main → main), or with nothing on the branch since the base.
+    if ((baseName.startsWith("origin/") ? baseName.slice("origin/".length) : baseName) === branch) throw new CommandRefused(`pr_same_branch:${branch}`);
+    const { baseRef } = await this.branchCommits(cp, baseName);
+    if (baseRef !== null) {
+      const ahead = await cp.git(["rev-list", "--count", `${baseRef}..HEAD`, "--"], { allowFailure: true }).catch(() => null);
+      if (ahead?.status === 0 && ahead.text.trim() === "0") throw new CommandRefused(`pr_no_commits:${baseRef}`);
+    }
     // §41.1: no title — the one `pr_draft` gives (the branch's commits since the base), else the branch; no body then — the
     // commits' list. `gh --fill` is never used: it reads git where gh runs and fails outside the repository.
     let prTitle = title?.trim() ?? "";

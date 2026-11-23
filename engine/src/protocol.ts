@@ -1379,6 +1379,8 @@ export type BranchesState = {
   switchBlocker: BranchSwitchBlocker | null;
   /** MARK: a-gitflow — §61: why `create_branch` from HEAD is refused (only `running`: changes come along, as in git). */
   createBlocker: BranchSwitchBlocker | null;
+  /** §61: the branch PRs usually go to (`origin/HEAD`'s, else main / master); a PR from it is refused `pr_same_branch`. */
+  defaultBranch: string | null;
   /** §36.12: remote-tracking branches (`origin/develop`) as bases for `workbench_create`; never in `list` (no switching to them). */
   remotes?: RemoteBranchInfo[];
 };

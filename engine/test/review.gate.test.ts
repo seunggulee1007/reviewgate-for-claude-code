@@ -846,6 +846,22 @@ describe("ReviewEngine review gate", () => {
     expect(s.branches.switchBlocker).toEqual({ kind: "dirtyWorktree" });
   });
 
+  it("pr_create refuses a PR from the base branch itself and one with no commits since the base", async () => {
+    const dir = track(realpathSync(makeBranchRepo()));
+    sh(dir, "remote", "add", "origin", "https://github.com/acme/demo.git");
+    const h = harness();
+    await h.hello();
+    await h.open(dir);
+    expect(h.engine.state.branches.defaultBranch).toBe("main");
+    await h.engine.handle({ type: "pr_create", base: "main", id: "same" });
+    expect(h.ofType("result").find((r) => r.id === "same")).toMatchObject({ ok: false, error: "pr_same_branch:main", code: "pr_same_branch" });
+    await h.engine.handle({ type: "pr_create", base: "origin/main", id: "same2" });
+    expect(h.ofType("result").find((r) => r.id === "same2")).toMatchObject({ ok: false, code: "pr_same_branch" });
+    await h.engine.handle({ type: "create_branch", name: "feature" });
+    await h.engine.handle({ type: "pr_create", base: "main", id: "empty" });
+    expect(h.ofType("result").find((r) => r.id === "empty")).toMatchObject({ ok: false, error: "pr_no_commits:main", code: "pr_no_commits" });
+  });
+
   it("git-init flow: candidates + unsafe, cancel, init_repo starts the session", async () => {
     const dir = track(realpathSync(makeTempDir("rg-nogit")));
     mkdirSync(join(dir, "sub-repo/.git"), { recursive: true });

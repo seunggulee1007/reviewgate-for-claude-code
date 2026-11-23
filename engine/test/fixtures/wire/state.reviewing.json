@@ -362,7 +362,8 @@
       "count": 1
     },
     "remotes": [],
-    "createBlocker": null
+    "createBlocker": null,
+    "defaultBranch": "main"
   },
   "pr": {
     "host": "github.com",

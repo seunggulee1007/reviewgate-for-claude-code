@@ -236,7 +236,8 @@ type ReviewState = {
   branches: { list: BranchInfo[]; isWorktreeDirty: boolean;
               switchBlocker: null | { kind: "pendingReview"; count: number } | { kind: "dirtyWorktree" } | { kind: "running" };
               remotes?: (BranchInfo & { remote: true })[];     // §36.12: remote-tracking bases, never in list
-              createBlocker: null | { kind: "running" } };      // §61: create_branch from HEAD (changes come along)
+              createBlocker: null | { kind: "running" };        // §61: create_branch from HEAD (changes come along)
+              defaultBranch: string | null };                    // §61: origin/HEAD's branch, else main / master
   pr: {
     host: string;
     mine: PRSummary[]; reviewRequested: PRSummary[];
@@ -416,7 +417,7 @@ Golden samples of `state`, `file_diff` and `full_file_content` live in `engine/t
 - Projects: `open_project` stops the current session, clears all project-bound state, opens the checkpoint; a non-repository yields `state.gitInit = {path, candidates, looksUnsafe}` (`candidates`: immediate subfolders containing `.git`, sorted; `looksUnsafe`: `/`, `$HOME`, ~/Desktop/Documents/Downloads or > 200 entries) and `blockedReason = "git_init_needed"` until `init_repo` / `track_without_git` (§59) / `cancel_git_init` / another `open_project`. A folder tracked without git before (§59) opens straight on its hidden repository instead (`project.vcs = "shadow"`, no `gitInit`). The session starts once the toolchain is located (`state.toolchain`); a missing `claude` yields `error{fatal:true, scope:"engine"}` with the project open and `session.open = false`.
 - `error{fatal:true, scope:"session"}` = the Claude session died; the engine keeps running, `session.open = false`, a running turn is closed (`stopReason: "error"` / `"session closed"`) and collected so the review list (if any) is preserved. The engine restarts the session by itself once per turn (§8 auto-restart) — not when it died before initialize, and a refused start is recovered without an error (§30) — `restart_session` restarts it on demand, and `open_project` of the same path restores the persisted review (§8) — none of them loses the pending list. Non-fatal `error`s only set `lastError` (transcript row). Every `error` of scope session / git / engine is also kept as a `kind: "error"` row of the chat's transcript (§30).
 - `set_settings`: `budget`, `autoAllowReadOnlyBash`, `bashAllowPatterns`, `applyUserAllowRules` and `applyUserBashRules` (§33.5) reach the running session immediately (queued permission requests they now cover are answered, §33.1); `persistSessionAllows` saves / removes the repository's remembered allows at once (§33.7); `ignorePatterns` apply at the next collection; `ghHost` switches the PR store host; `claudePath`/`ghPath`/`gitPath` re-locate the toolchain lazily; `autoAllowTools`/`loadUserSettings`/`systemPromptAppend`/`model`/`allowWorktreeIsolation` apply on the next `open_project` (session start); `chatMoveFollowUp` (§39.4) is read when the engine moves a chat. Fields a client omits (or sends as `undefined`) keep the engine defaults — a `hello` without `budget` runs with `{maxFiles: 0, maxLines: 0, hardMultiplier: 2.0}`: no change budget (§54).
-- `pr_create` (PR lane): refused with `empty base` / `detached_head` / `no_remote` / `unsupported_remote:<url>` / `no_project`. The repository is derived from the `origin` fetch URL (`git@host:o/r.git`, `ssh://…`, `https://host/o/r`) → `--repo host/o/r`. When the current branch has no upstream the engine first runs `git push -u origin <branch>` (no confirmation; a push failure is `result{ok:false}` with git's message). Then `gh pr create --repo … --head <branch> --base <base> [--title T --body B | --fill] [--draft]`; the reply is `pr_created{url, branch}` and `state.pr.lastCreatedPR` mirrors it. A `gh` failure is `result{ok:false, error:<gh stderr>}` + `error{scope:"pr"}`.
+- `pr_create` (PR lane): refused with `empty base` / `detached_head` / `no_remote` / `unsupported_remote:<url>` / `no_project`, and (§61) `pr_same_branch:<branch>` when the base is the current branch (`main` → `main`, `origin/` stripped) / `pr_no_commits:<baseRef>` when the branch has no commit since the base (`origin/<base>`, else `<base>`; an unknown base is left to gh). The repository is derived from the `origin` fetch URL (`git@host:o/r.git`, `ssh://…`, `https://host/o/r`) → `--repo host/o/r`. When the current branch has no upstream the engine first runs `git push -u origin <branch>` (no confirmation; a push failure is `result{ok:false}` with git's message). Then `gh pr create --repo … --head <branch> --base <base> [--title T --body B | --fill] [--draft]`; the reply is `pr_created{url, branch}` and `state.pr.lastCreatedPR` mirrors it. A `gh` failure is `result{ok:false, error:<gh stderr>}` + `error{scope:"pr"}`.
 - `shutdown` (or stdin EOF in stdio mode): the engine replies (if `id`), disposes the session (abort → SIGKILL after 1 s if the CLI is still alive, ≤ 2.5 s total), emits one final `state` (`session.open = false`), then no more events; the sidecar process exits 0 once stdout is flushed. Parent-death watchdog (darwin/linux, `ppid == 1`) and EPIPE on stdout trigger the same path. Unknown commands → `result{ok:false, error:"unknown command: …"}`.
 
 ## 4. Settings and permissions (carried over from v1)
@@ -1434,7 +1435,7 @@ English): `binary_file`, `branch_in_use`, `cannot_remove_current`, `cannot_remov
 `track_failed` (§59), `history_trees_gone`, `invalid_branch_name`,
 `invalid_mode`, `locked_by_other_session`, `no_hunks`, `no_plan`, `no_project`, `no_remote`, `no_review`, `no_session`,
 `not_a_changed_file`, `not_in_history_entry`, `not_pending`, `notes_pending`, `nothing_to_commit`, `nothing_to_push`,
-`nothing_to_retry`, `partial_reject_unsupported`, `path_exists`, `plan_followup_failed`, `push_failed`,
+`nothing_to_retry`, `partial_reject_unsupported`, `path_exists`, `plan_followup_failed`, `pr_no_commits` / `pr_same_branch` (§61), `push_failed`,
 `request_changes_unavailable`, `refresh_failed`, `revert_failed`, `branch_failed`, `workbench_failed`, `reverting`,
 `review_pending`, `session_busy`, `session_current`, `session_running`, `stale_diff`, `starting`, `switch_blocked`,
 `unknown_command` ("unknown command: …"), `unknown_history_entry`, `unknown_hunk`, `unknown_pr_file` ("Unknown PR file: …"),
@@ -9832,3 +9833,8 @@ review" whatever the reason.
   switch by itself (a `branch_failed` with git's words) when the target branch tracks the same path. One
   `git status --porcelain -z` gives both this (`blocksSwitch`, internal) and the raw `isWorktreeDirty`, which the
   workbench list keeps using.
+- **`pr_create`** is no longer gated by the clients on a dirty worktree or a pending review: what goes up is the
+  branch's commits. The engine refuses `pr_same_branch:<branch>` (the base is the current branch — `main` → `main`) and
+  `pr_no_commits:<baseRef>` (nothing on the branch since the base). `state.branches.defaultBranch` — `origin/HEAD`'s
+  branch, else `main` / `master` (remote first, then local), else null — lets the clients say "create a branch first"
+  before the sheet opens.

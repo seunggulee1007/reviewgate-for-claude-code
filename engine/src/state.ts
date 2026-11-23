@@ -103,6 +103,8 @@ export type EngineSlices = {
     remotes?: RemoteBranchInfo[];
     /** MARK: a-gitflow — §61: a tracked change the ignore patterns do not hide (absent: `isWorktreeDirty` decides). */
     blocksSwitch?: boolean;
+    /** §61: `origin/HEAD`'s branch, else main / master (absent until the first refresh). */
+    defaultBranch?: string | null;
   };
   pr: PRStore;
   lastError: string | null;
@@ -329,7 +331,7 @@ export function buildState(s: EngineSlices): ReviewState {
     // wave3 engine-flow — §36.12: `remotes` always sent by this engine (an older one sends none: clients hide remote bases).
     branches: {
       list: s.branches.list, isWorktreeDirty: s.branches.isWorktreeDirty, switchBlocker: switchBlocker(s), remotes: (s.branches.remotes ?? []).map((r) => ({ ...r })),
-      createBlocker: createBlocker(s), // MARK: a-gitflow — §61
+      createBlocker: createBlocker(s), defaultBranch: s.branches.defaultBranch ?? null, // MARK: a-gitflow — §61
     },
     pr: prState(s.pr),
     lastError: s.lastError,
