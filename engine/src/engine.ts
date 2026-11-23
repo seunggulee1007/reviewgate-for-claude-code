@@ -21,7 +21,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, s
 import { readdir } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { branches as listBranches, createBranch, isWorktreeDirty, switchBranch } from "./git/branches.js";
+import { branches as listBranches, createBranch, defaultBranch, switchBranch, worktreeStatus } from "./git/branches.js";
 import { GitCheckpoint, initRepository, LfsMissingError, openCheckpoint, OpenSupersededError } from "./git/checkpoint.js";
 import { commit as gitCommit, gitIdentity, push as gitPush, stagePaths } from "./git/commit.js";
 import { CommandRefused, refusalFields } from "./errors.js";
@@ -154,7 +154,7 @@ import { SideThreads, type ForkSource, type SideQueryLike } from "./side/threads
 import { loadMcpPrefs, mcpAddArgs, mcpRemoveArgs, sdkMcpConfig, toServerInfo, validateMcpConfig, validateMcpName, validateMcpScope, validateServerRef, type RawMcpStatus } from "./mcp/mcp.js";
 import { resolveClaudeExecutable } from "./session/claude.js";
 import { claudeConfigDir, claudeMdStatus, discoverHooks, pluginIdFromPath, pluginList, resolveDisabledPlugins } from "./session/extensions.js";
-import { acceptedPaths, blockedReason, buildState, canRequestChanges, canSend, gatePhase, switchBlocker, type EngineSlices } from "./state.js";
+import { acceptedPaths, blockedReason, buildState, canRequestChanges, canSend, createBlocker, gatePhase, switchBlocker, type EngineSlices } from "./state.js";
 import type { RejectAllResultEvent, RewoundKeptEvent } from "./protocol.js"; // MARK: wave2 check-engine (§35.2, §35.11)
 import type { TranscriptPageEvent, TranscriptRestoreEvent, TranscriptSearchEvent, TranscriptSearchMatch } from "./protocol.js"; // MARK: wave4 w4-history (§38.3)
 import { errorRow } from "./review/errorRow.js"; // MARK: wave2 check-engine (§35.3)
@@ -210,7 +210,7 @@ import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT
 import { isAbsolute } from "node:path";
 import { PreReviewRunner } from "./review/prereview.js";
 import { copyFiles, copyLog, copyPatternsFor, fetchRef, filesToCopy, firstLogLine, matchingFiles, PREVIEW_MAX_ENTRIES, refExists, remoteNames, runSetupCommand, siblingPath, splitRemoteRef } from "./git/workbenchSetup.js";
-import { remoteBranches } from "./git/branches.js";
+import { remoteBranches, type BranchSwitchBlocker } from "./git/branches.js";
 import { runGit } from "./git/exec.js";
 import { readProjectFile, searchProject } from "./files/browse.js"; // MARK: code-browser (§47)
 import { cleanCommitDraft, COMMIT_DRAFT_DIFF_LINES, COMMIT_DRAFT_SUBJECTS, COMMIT_DRAFT_SYSTEM, commitDraftPrompt, renderCommitTemplate } from "./review/commitDraft.js";
@@ -1350,10 +1350,11 @@ export class ReviewEngine {
         await this.refreshBranches();
         return;
       case "switch_branch":
-        await this.withBranchGuard(cmd.name, "switch to", (cp) => switchBranch(cp, cmd.name));
+        await this.withBranchGuard(cmd.name, "switch to", switchBlocker, (cp) => switchBranch(cp, cmd.name));
         return;
       case "create_branch":
-        await this.withBranchGuard(cmd.name, "create", (cp) => createBranch(cp, cmd.name, cmd.from ?? null));
+        // MARK: a-gitflow — §61: from HEAD the changes come along (only a turn in flight blocks); `from` is a switch.
+        await this.withBranchGuard(cmd.name, "create", cmd.from ? switchBlocker : createBlocker, (cp) => createBranch(cp, cmd.name, cmd.from ?? null));
         return;
       case "pr_list":
         await this.pr.refresh();
@@ -4932,9 +4933,11 @@ export class ReviewEngine {
     if (!cp || this.shadow) return; // §59: a folder tracked without git has no branches
     try {
       // MARK: wave3 engine-flow — §36.12: the remote-tracking branches ride along (bases for workbench_create).
-      const [list, dirty, name, remotes] = await Promise.all([listBranches(cp), isWorktreeDirty(cp), cp.branchName(), remoteBranches(cp).catch(() => [])]);
+      // MARK: a-gitflow — §61: one status for both the raw dirty flag and the switch guard (ignore patterns applied).
+      const [list, status, name, remotes] = await Promise.all([listBranches(cp), worktreeStatus(cp, this.settings.ignorePatterns), cp.branchName(), remoteBranches(cp).catch(() => [])]);
+      const base = await defaultBranch(cp, list, remotes).catch(() => null);
       if (this.gate.checkpoint !== cp) return;
-      this.branches = { list, isWorktreeDirty: dirty, remotes };
+      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base };
       if (this.project) this.project = { ...this.project, branch: name };
     } catch (e) {
       this.log("warn", `refreshBranches: ${errorMessage(e)}`);
@@ -4942,10 +4945,10 @@ export class ReviewEngine {
     this.touch();
   }
 
-  private async withBranchGuard(name: string, verb: string, op: (cp: GitCheckpoint) => Promise<void>): Promise<void> {
+  private async withBranchGuard(name: string, verb: string, guard: (s: EngineSlices) => BranchSwitchBlocker | null, op: (cp: GitCheckpoint) => Promise<void>): Promise<void> {
     const cp = this.gate.checkpoint;
     if (!cp) throw new CommandRefused("no_project");
-    const blocker = switchBlocker(this.slices());
+    const blocker = guard(this.slices());
     if (blocker) throw new CommandRefused(`switch_blocked:${blocker.kind}`);
     try {
       await op(cp);
@@ -5213,6 +5216,13 @@ export class ReviewEngine {
     if (!remoteURL) throw new CommandRefused("no_remote");
     const remote = parseRemoteURL(remoteURL);
     if (!remote) throw new CommandRefused(`unsupported_remote:${remoteURL}`);
+    // MARK: a-gitflow — §61: a PR from the base itself (main → main), or with nothing on the branch since the base.
+    if ((baseName.startsWith("origin/") ? baseName.slice("origin/".length) : baseName) === branch) throw new CommandRefused(`pr_same_branch:${branch}`);
+    const { baseRef } = await this.branchCommits(cp, baseName);
+    if (baseRef !== null) {
+      const ahead = await cp.git(["rev-list", "--count", `${baseRef}..HEAD`, "--"], { allowFailure: true }).catch(() => null);
+      if (ahead?.status === 0 && ahead.text.trim() === "0") throw new CommandRefused(`pr_no_commits:${baseRef}`);
+    }
     // §41.1: no title — the one `pr_draft` gives (the branch's commits since the base), else the branch; no body then — the
     // commits' list. `gh --fill` is never used: it reads git where gh runs and fails outside the repository.
     let prTitle = title?.trim() ?? "";

@@ -384,4 +384,40 @@ describe("§36.11–36.14 screens (wave3 desktop-flow)", () => {
     expect(out).not.toContain('data-testid="PR fill progress"');
     expect(out).not.toContain('data-testid="Restore PR text"');
   });
+
+  // ---------------------------------------------------------------- §61 (a-gitflow)
+
+  it("§61 the PR sheet on the base branch: the reason and New Branch… beside it; Create off", async () => {
+    const { CreatePRDialog } = await import("./components/dialogs/CreatePRDialog");
+    useStore.setState((s) => ({
+      state: {
+        ...s.state,
+        project: { ...s.state.project!, branch: "main" },
+        branches: { list: [{ name: "main", isCurrent: true, upstream: "origin/main", ahead: 1, behind: 0, lastCommitDate: null }], isWorktreeDirty: true, switchBlocker: { kind: "dirtyWorktree" }, createBlocker: null, defaultBranch: "main" },
+      } as ReviewState,
+    }));
+    const out = html(createElement(CreatePRDialog, { onClose: () => undefined }));
+    expect(out).toContain('data-testid="Create PR base reason"');
+    expect(out).toContain("You&#x27;re on main, the base branch — create a branch for this work first");
+    expect(out).toMatch(/<button[^>]*title="Create a branch from HEAD and check it out — uncommitted changes come along"[^>]*data-testid="Create PR new branch"/);
+    expect(out).toMatch(/<button[^>]*disabled=""[^>]*data-testid="Create PR"/);
+  });
+
+  it("§61 the PR sheet starts on the default branch, even one only on the remote; no reason on a feature branch", async () => {
+    const { CreatePRDialog } = await import("./components/dialogs/CreatePRDialog");
+    useStore.setState((s) => ({ state: { ...s.state, branches: { ...s.state.branches, defaultBranch: "main" } } as ReviewState }));
+    const out = html(createElement(CreatePRDialog, { onClose: () => undefined }));
+    expect(out).toMatch(/<option value="main" selected="">main<\/option>/);
+    expect(out).not.toContain('data-testid="Create PR base reason"');
+  });
+
+  it("§61 New Branch with uncommitted changes: they come along, and Create stays on while a switch would wait", async () => {
+    const { NewBranchDialog } = await import("./components/dialogs/NewWorkbenchDialog");
+    useStore.setState((s) => ({ state: { ...s.state, branches: { ...s.state.branches, isWorktreeDirty: true, switchBlocker: { kind: "pendingReview", count: 2 }, createBlocker: null } } as ReviewState }));
+    const out = html(createElement(NewBranchDialog, { onClose: () => undefined }));
+    expect(out).toContain("Creates a branch from the current HEAD and checks it out — your uncommitted changes come along.");
+    useStore.setState((s) => ({ state: { ...s.state, branches: { ...s.state.branches, createBlocker: { kind: "running" } } } as ReviewState }));
+    const busy = html(createElement(NewBranchDialog, { onClose: () => undefined }));
+    expect(busy).toMatch(/<button[^>]*disabled=""[^>]*title="Claude is working"[^>]*data-testid="Create branch"/);
+  });
 });

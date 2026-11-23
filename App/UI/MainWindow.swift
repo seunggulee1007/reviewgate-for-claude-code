@@ -32,6 +32,8 @@ struct MainWindow: View {
     // M10 workbenches
     @Environment(\.openWindow) private var openWindow
     @State private var showCreatePR = false
+    /// §61: the PR sheet's "New Branch…" — the branch sheet opens once the PR sheet is gone.
+    @State private var newBranchAfterPR = false
     /// Workbench waiting for the "remove?" confirmation.
     @State private var removeCandidate: WorkbenchInfo?
     /// Removal refused (dirty / in use): offer `force`.
@@ -105,8 +107,13 @@ struct MainWindow: View {
                 model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil
             }
             .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil, !store.isShadowProject { showCreatePR = true } }   // polish P5-sheets-46
-            .sheet(isPresented: $showCreatePR) {
-                CreatePRSheet()
+            .sheet(isPresented: $showCreatePR, onDismiss: {
+                guard newBranchAfterPR else { return }
+                newBranchAfterPR = false
+                newBranchName = ""
+                showNewBranch = true
+            }) {
+                CreatePRSheet(onNewBranch: { newBranchAfterPR = true })   // §61: on the base branch, a branch comes first
             }
             .alert("Remove workbench?", isPresented: Binding(get: { removeCandidate != nil }, set: { if !$0 { removeCandidate = nil } }),
                    presenting: removeCandidate) { wb in
@@ -915,7 +922,8 @@ struct MainWindow: View {
             }
             Button("Create PR…") { showCreatePR = true }
                 .controlSize(.small)
-                .disabled(store.isRunning || store.projectInfo?.branch == nil)
+                .disabled(store.prCreateBlocker != nil)   // §61: also on the default branch (main → main)
+                .help(store.prCreateBlocker ?? String(localized: "Push this branch and open a pull request (gh pr create)"))
                 .accessibilityIdentifier("Create PR from commit")
             if let webURL {
                 Button("Open") { NSWorkspace.shared.open(webURL) }
@@ -939,9 +947,12 @@ struct MainWindow: View {
 
     /// The branch chip is a menu: current branch ✓, other local branches (with ↑ahead ↓behind),
     /// "New Branch…" and "Refresh". Switching is disabled — with the reason as a footer — while a
-    /// review is pending, the worktree is dirty, or Claude is working.
+    /// review is pending, a tracked file has uncommitted changes, or Claude is working (§61: then Commit… is offered).
+    /// A new branch takes uncommitted work along, so only Claude working disables it.
     private func branchSwitcher(_ info: ProjectInfo) -> some View {
         let blocker = store.branchSwitchBlocker()
+        let createBlocker = store.branchCreateBlocker()
+        let prBlocker = store.prCreateBlocker
         return Menu {
             ForEach(store.branches) { branch in
                 Button {
@@ -961,18 +972,26 @@ struct MainWindow: View {
             }
             Divider()
             Button("New Branch…") { newBranchName = ""; showNewBranch = true }
-                .disabled(blocker != nil)
+                .disabled(createBlocker != nil)
+                .help(createBlocker?.localizedDescription ?? String(localized: "Create a branch from HEAD and check it out — uncommitted changes come along"))
                 .accessibilityIdentifier("New Branch…")
             Button("Refresh") { Task { await store.refreshBranches() } }
                 .accessibilityIdentifier("Refresh branches")
             Divider()
             Button("Create PR from this branch…") { showCreatePR = true }
-                .disabled(store.hasPendingReview || store.isWorktreeDirty || store.isRunning || info.branch == nil)
-                .help(String(localized: "Push this branch and open a pull request (gh pr create)"))
+                .disabled(prBlocker != nil)   // §61: not a dirty tree or a pending review — what goes up is the commits
+                .help(prBlocker ?? String(localized: "Push this branch and open a pull request (gh pr create)"))
                 .accessibilityIdentifier("Create PR from this branch…")
             if let blocker {
                 Divider()
                 Text(verbatim: blockerReason(blocker))
+                if blocker == .dirtyWorktree {   // §61: the way forward where the block is shown
+                    Button("Commit…") { model.showCommit = true }
+                        .disabled(!store.canOpenCommitSheet)
+                        .help(store.canOpenCommitSheet ? String(localized: "Commit the changes, then switch branches")
+                              : store.commitLockReason ?? EngineMessages.refusal(error: "nothing_to_commit"))
+                        .accessibilityIdentifier("Commit before switching branch")
+                }
             }
         } label: {
             HStack(spacing: 4) {
@@ -1024,8 +1043,13 @@ struct MainWindow: View {
                 Text(hint).font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("New branch hint")
             } else {
-                Text("Branches from \(store.projectInfo?.branch ?? "HEAD") and checks it out.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if store.isWorktreeDirty {   // §61
+                    Text("Branches from \(store.projectInfo?.branch ?? "HEAD") and checks it out — your uncommitted changes come along.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Branches from \(store.projectInfo?.branch ?? "HEAD") and checks it out.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             HStack {
                 Spacer()
@@ -1034,7 +1058,8 @@ struct MainWindow: View {
                 Button("Create branch") { createBranch() }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(newBranchHint != nil)
+                    .disabled(newBranchHint != nil || store.branchCreateBlocker() != nil)
+                    .help(store.branchCreateBlocker()?.localizedDescription ?? newBranchHint ?? "")
                     .accessibilityIdentifier("Create branch")
             }
         }

@@ -2833,6 +2833,22 @@
         }
       }
     },
+    "Branches cannot be switched right now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branches cannot be switched right now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금은 브랜치를 바꿀 수 없어요"
+          }
+        }
+      }
+    },
     "Building… %@": {
       "localizations": {
         "en": {
@@ -3261,6 +3277,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 고른 모드는 다음 단계부터 적용돼요 (계획 모드는 이번 턴이 끝나면)"
+          }
+        }
+      }
+    },
+    "Claude is working — switch branches when the turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — switch branches when the turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 턴이 끝나면 브랜치를 바꾸세요"
           }
         }
       }
@@ -6551,6 +6583,54 @@
         }
       }
     },
+    "This branch has no commits since %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch has no commits since %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 이후 이 브랜치에 커밋이 없어요"
+          }
+        }
+      }
+    },
+    "This is the base branch — create a branch for this work first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the base branch — create a branch for this work first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기준 브랜치예요 — 먼저 이 작업용 브랜치를 만드세요"
+          }
+        }
+      }
+    },
+    "Working tree has uncommitted changes — commit them before switching branches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working tree has uncommitted changes — commit them before switching branches"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 트리에 커밋하지 않은 변경이 있어요 — 브랜치를 바꾸기 전에 커밋하세요"
+          }
+        }
+      }
+    },
     "Write the comment first": {
       "localizations": {
         "en": {
@@ -6563,6 +6643,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "댓글을 먼저 써 주세요"
+          }
+        }
+      }
+    },
+    "You're on %@, the base branch — create a branch for this work first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You're on %@, the base branch — create a branch for this work first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기준 브랜치(%@)에 있어요 — 먼저 이 작업용 브랜치를 만드세요"
           }
         }
       }

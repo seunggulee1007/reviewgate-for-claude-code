@@ -627,6 +627,21 @@ public final class AppState {
     /// nil => switching branches is allowed right now.
     public func branchSwitchBlocker() -> BranchSwitchBlocker? { branchesInfo.switchBlocker }
 
+    // MARK: a-gitflow — §61
+    /// nil => a new branch from HEAD can be made now (uncommitted work and a pending review come along).
+    public func branchCreateBlocker() -> BranchSwitchBlocker? { branchesInfo.createBlocker }
+
+    /// §61: why "Create PR from this branch…" cannot run now (nil: it can) — a folder without git, a detached HEAD, Claude
+    /// working, or the default branch itself (a PR from it would be main → main: a branch comes first).
+    public var prCreateBlocker: String? {
+        guard let info = projectInfo else { return nil }
+        if let reason = notGitRepositoryReason { return reason }
+        guard let branch = info.branch else { return EngineMessages.refusal(error: "detached_head") }
+        if isRunning { return BranchSwitchBlocker.running.localizedDescription }
+        if branch == branchesInfo.defaultBranch { return EngineMessages.refusal(error: "pr_same_branch:\(branch)") }
+        return nil
+    }
+
     // MARK: - Workbenches (docs/M10-WORKBENCHES.md)
 
     /// This engine's own worktree entry.
@@ -1568,7 +1583,7 @@ public final class AppState {
 
     /// `git switch -c <name>` from HEAD; errors go to the transcript.
     public func createBranch(_ name: String) async {
-        guard projectInfo != nil, branchSwitchBlocker() == nil else { return }
+        guard projectInfo != nil, branchCreateBlocker() == nil else { return }   // §61
         await run(.createBranch(name: name), reportFailure: false)
     }
 

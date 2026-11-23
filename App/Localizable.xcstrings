@@ -4769,6 +4769,22 @@
         }
       }
     },
+    "Branches from %@ and checks it out — your uncommitted changes come along.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branches from %@ and checks it out — your uncommitted changes come along."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 브랜치를 만들고 체크아웃해요 — 커밋하지 않은 변경도 함께 옮겨가요."
+          }
+        }
+      }
+    },
     "Changes requested — they go to Claude with your next prompt": {
       "localizations": {
         "en": {
@@ -8663,6 +8679,22 @@
         }
       }
     },
+    "Commit the changes, then switch branches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit the changes, then switch branches"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경을 커밋한 뒤 브랜치를 바꾸세요"
+          }
+        }
+      }
+    },
     "Commit the ticked files (⌘↩)": {
       "localizations": {
         "en": {
@@ -10195,6 +10227,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "PR 만들기…"
+          }
+        }
+      }
+    },
+    "Create a branch from HEAD and check it out — uncommitted changes come along": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a branch from HEAD and check it out — uncommitted changes come along"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD에서 브랜치를 만들고 체크아웃해요 — 커밋하지 않은 변경도 함께 옮겨가요"
           }
         }
       }

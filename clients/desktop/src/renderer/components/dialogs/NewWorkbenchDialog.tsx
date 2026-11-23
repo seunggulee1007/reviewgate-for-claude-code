@@ -19,6 +19,7 @@ import type { PermissionMode, WorkbenchLocation } from "@reviewgate/engine";
 import { t } from "../../i18n";
 import { branchNameHint, permissionMode, useStore, workbenchSlug } from "../../store";
 import { Modal } from "../Menu";
+import { blockerReason } from "../BranchSwitcher";
 import { displayPath } from "../Sidebar";
 // MARK: wave3 desktop-flow
 import { defaultWorkbenchBase, siblingWorkbenchPath } from "../../flowLogic";
@@ -267,7 +268,7 @@ export function NewWorkbenchDialog({ onClose, branch: initialBranch, fromPr, pla
   );
 }
 
-/** "New Branch…": `create_branch` in this worktree (allowed only while `switchBlocker` is null). */
+/** "New Branch…": `create_branch` in this worktree (§61: allowed unless `createBlocker` — uncommitted work comes along). */
 export function NewBranchDialog({ onClose }: { onClose: () => void }) {
   const branches = useStore((s) => s.state.branches);
   const createBranch = useStore((s) => s.createBranch);
@@ -276,7 +277,7 @@ export function NewBranchDialog({ onClose }: { onClose: () => void }) {
   const hint = branchNameHint(name, branches.list);
 
   const create = async () => {
-    if (hint !== null || creating || branches.switchBlocker) return;
+    if (hint !== null || creating || branches.createBlocker) return;
     setCreating(true);
     await createBranch(name.trim());
     setCreating(false);
@@ -285,7 +286,9 @@ export function NewBranchDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title={t("New Branch")} onClose={creating ? undefined : onClose} testId="New branch dialog">
-      <div className="muted">{t("Creates a branch from the current HEAD and checks it out.")}</div>
+      <div className="muted" data-testid="New branch note">
+        {branches.isWorktreeDirty ? t("Creates a branch from the current HEAD and checks it out — your uncommitted changes come along.") : t("Creates a branch from the current HEAD and checks it out.")}
+      </div>
       <label className="field">
         <span>{t("Branch name")}</span>
         <input type="text" className="mono" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => isEnter(e) && void create()} data-testid="New branch name" />
@@ -295,7 +298,14 @@ export function NewBranchDialog({ onClose }: { onClose: () => void }) {
         {creating && <span className="spinner" />}
         <span className="spacer" />
         <button type="button" disabled={creating} onClick={onClose}>{t("Cancel")}</button>
-        <button type="button" className="primary" disabled={hint !== null || creating} onClick={() => void create()} data-testid="Create branch">
+        <button
+          type="button"
+          className="primary"
+          disabled={hint !== null || creating || !!branches.createBlocker}
+          title={branches.createBlocker ? blockerReason(branches.createBlocker) : (hint ?? undefined)}
+          onClick={() => void create()}
+          data-testid="Create branch"
+        >
           {t("Create branch")}
         </button>
       </div>

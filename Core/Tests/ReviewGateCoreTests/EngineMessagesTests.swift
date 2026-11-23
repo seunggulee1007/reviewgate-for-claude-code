@@ -75,6 +75,7 @@ import Testing
         "invalid_branch_name:x y", "invalid_mode", "locked_by_other_session:12", "no_hunks", "no_plan", "no_project", "no_remote",
         "no_review", "no_session", "not_a_changed_file", "not_in_history_entry", "not_pending", "notes_pending", "nothing_to_commit",
         "nothing_to_push", "nothing_to_retry", "partial_reject_unsupported:A", "path_exists:/p", "plan_followup_failed:snapshot",
+        "pr_no_commits:origin/main", "pr_same_branch:main",   // §61
         "push_failed", "request_changes_unavailable:no_notes", "refresh_failed", "revert_failed", "branch_failed", "workbench_failed",
         "reverting", "review_pending", "session_busy", "session_current", "session_running", "stale_diff", "starting",
         "switch_blocked:pending", "unknown_command", "unknown_history_entry", "unknown_hunk", "unknown_pr_file", "unknown_worktree",

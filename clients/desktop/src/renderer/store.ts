@@ -388,7 +388,7 @@ export const EMPTY_STATE = {
   budget: { maxFiles: 0, maxLines: 0 }, // §54: no change budget until Settings turns the limit on
   budgetUsage: { files: 0, lines: 0, denied: false },
   hud: { contextTokens: 0, contextWindow: null, sessionCostUSD: 0, turnCount: 0, lastTurnMs: 0, activity: { kind: "idle" }, subagentDepth: 0, agents: [], turnStartedAt: null },
-  branches: { list: [], isWorktreeDirty: false, switchBlocker: null },
+  branches: { list: [], isWorktreeDirty: false, switchBlocker: null, createBlocker: null, defaultBranch: null },
   pr: {
     host: "",
     mine: [],
@@ -2216,7 +2216,7 @@ export const useStore = create<Store>((set, get, api) => {
 
     async createBranch(name) {
       const s = get().state;
-      if (!s.project || s.branches.switchBlocker || isShadowProject(s)) return;
+      if (!s.project || s.branches.createBlocker || isShadowProject(s)) return; // §61: uncommitted work comes along
       await get().run({ type: "create_branch", name }, { reportFailure: false });
     },
 

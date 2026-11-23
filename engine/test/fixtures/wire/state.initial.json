@@ -156,7 +156,9 @@
     "list": [],
     "isWorktreeDirty": false,
     "switchBlocker": null,
-    "remotes": []
+    "remotes": [],
+    "createBlocker": null,
+    "defaultBranch": null
   },
   "pr": {
     "host": "github.com",

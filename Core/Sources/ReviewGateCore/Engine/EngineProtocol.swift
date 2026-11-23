@@ -2115,7 +2115,13 @@ public struct BranchesInfo: Codable, Sendable, Equatable {
     public var list: [BranchInfo]
     /// `git status --porcelain` was non-empty at the last refresh.
     public var isWorktreeDirty: Bool
+    /// §61: why switching to another existing branch is refused (tracked changes the ignore patterns do not hide count).
     public var switchBlocker: BranchSwitchBlocker?
+    // MARK: a-gitflow — §61
+    /// Why a new branch from HEAD is refused — only `.running`: uncommitted work comes along. nil from older engines too.
+    public var createBlocker: BranchSwitchBlocker? = nil
+    /// The branch PRs usually go to (`origin/HEAD`'s, else main / master); nil when unknown or from older engines.
+    public var defaultBranch: String? = nil
     // MARK: wave3 mac-flow
     /// §36.12: remote-tracking branches (`origin/develop`) as workbench bases — never offered for switching; nil from
     /// engines before §36.12 (the workbench sheet then hides remote bases, fetch, copy and setup).

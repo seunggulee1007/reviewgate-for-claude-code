@@ -369,6 +369,8 @@ struct NewWorkbenchSheet: View {
 struct CreatePRSheet: View {
     @Environment(AppState.self) private var store
     @Environment(\.dismiss) private var dismiss
+    /// §61: "New Branch…" next to the reason when the base is this branch — the caller opens its branch sheet.
+    var onNewBranch: (() -> Void)? = nil
     @State private var base = ""
     @State private var title = ""
     @State private var body_ = ""
@@ -396,6 +398,13 @@ struct CreatePRSheet: View {
         }
         return nil
     }
+    /// MARK: a-gitflow — §61: why Create PR cannot go now — the base is this branch (main → main), or nothing is on the
+    /// branch since the base (the engine refuses both; the sheet says it before the push).
+    private var baseBlocker: String? {
+        if !base.isEmpty, base == head { return EngineMessages.refusal(error: "pr_same_branch:\(head)") }
+        if let prDraft, let ref = prDraft.baseRef, prDraft.commits.isEmpty { return EngineMessages.refusal(error: "pr_no_commits:\(ref)") }
+        return nil
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -403,7 +412,7 @@ struct CreatePRSheet: View {
             PRSheetRow("Base") {
                 Picker("Base", selection: $base) {
                     ForEach(bases) { Text(verbatim: $0.name).tag($0.name) }
-                    if bases.isEmpty { Text("main").tag("main") }
+                    if !bases.contains(where: { $0.name == base }) { Text(verbatim: base.isEmpty ? "main" : base).tag(base.isEmpty ? "main" : base) }
                 }
                 .labelsHidden()
                 .accessibilityIdentifier("PR base")
@@ -449,6 +458,22 @@ struct CreatePRSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("Create PR gh reason")
             }
+            if let baseBlocker {   // §61
+                HStack(spacing: 8) {
+                    Label(baseBlocker, systemImage: "exclamationmark.triangle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("Create PR base reason")
+                    if base == head, let onNewBranch {
+                        Button("New Branch…") { onNewBranch(); dismiss() }
+                            .controlSize(.small)
+                            .disabled(store.branchCreateBlocker() != nil)
+                            .help(store.branchCreateBlocker()?.localizedDescription
+                                  ?? String(localized: "Create a branch from HEAD and check it out — uncommitted changes come along"))
+                            .accessibilityIdentifier("Create PR new branch")
+                    }
+                }
+            }
             if let error {
                 Text(verbatim: error).font(.caption).foregroundStyle(.red)
                     .textSelection(.enabled)
@@ -463,8 +488,8 @@ struct CreatePRSheet: View {
                 Button("Create PR", action: create)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return, modifiers: .command)   // ⌘↩: Return is a new line in the body (or ends the title)
-                    .disabled(base.isEmpty || creating || writing || ghReason != nil)
-                    .help(ghReason ?? "⌘↩")
+                    .disabled(base.isEmpty || creating || writing || ghReason != nil || baseBlocker != nil)
+                    .help(ghReason ?? baseBlocker ?? "⌘↩")
                     .accessibilityIdentifier("Create PR")
             }
         }
@@ -473,7 +498,9 @@ struct CreatePRSheet: View {
         .onAppear {
             if base.isEmpty {
                 let names = bases.map(\.name)
-                base = ["main", "develop", "master"].first { names.contains($0) } ?? names.first ?? "main"
+                // §61: the repository's default branch first (it may exist only on the remote), then the usual names.
+                let preferred = [store.branchesInfo.defaultBranch].compactMap { $0 }.filter { $0 != head }
+                base = preferred.first ?? ["main", "develop", "master"].first { names.contains($0) } ?? names.first ?? "main"
             }
             meta = store.prMeta   // wave4c w4c-commit
         }
@@ -546,7 +573,7 @@ struct CreatePRSheet: View {
     }
 
     private func create() {
-        guard !base.isEmpty, !creating, ghReason == nil else { return }
+        guard !base.isEmpty, !creating, ghReason == nil, baseBlocker == nil else { return }
         creating = true
         error = nil
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)

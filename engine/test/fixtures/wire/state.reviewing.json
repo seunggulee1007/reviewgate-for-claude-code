@@ -361,7 +361,9 @@
       "kind": "pendingReview",
       "count": 1
     },
-    "remotes": []
+    "remotes": [],
+    "createBlocker": null,
+    "defaultBranch": "main"
   },
   "pr": {
     "host": "github.com",

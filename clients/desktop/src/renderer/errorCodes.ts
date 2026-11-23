@@ -125,6 +125,9 @@ export const REFUSAL_CODES = [
   "partial_reject_unsupported",
   "path_exists",
   "plan_followup_failed",
+  // MARK: a-gitflow — §61 pr_create
+  "pr_no_commits",
+  "pr_same_branch",
   "push_failed",
   "request_changes_unavailable",
   "refresh_failed",
@@ -512,6 +515,20 @@ function lfsMissingText(platform: string): string {
     : t("This repository uses Git LFS, but git-lfs is missing. Install it (git-lfs.com), run {0} in a terminal, then try again.", lfsInstallCommand("win32"));
 }
 
+/** MARK: a-gitflow — §61: `switch_blocked:<kind>` — why a branch switch (or a new branch) was refused, per kind (as on the Mac). */
+export function switchBlockedText(kind: string): string {
+  switch (kind) {
+    case "pendingReview":
+      return t("Finish the review before switching branches");
+    case "dirtyWorktree":
+      return t("Working tree has uncommitted changes — commit them before switching branches");
+    case "running":
+      return t("Claude is working — switch branches when the turn ends");
+    default:
+      return t("Switching is not possible right now.");
+  }
+}
+
 /** A refusal (`result{ok:false}`) in words, or null for a code this client does not know. */
 export function refusalCodeText(code: string, detail: string, paths?: string[]): string | null {
   const d = detail.trim();
@@ -646,7 +663,11 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
     case "starting":
       return t("The session is still starting…");
     case "switch_blocked":
-      return d ? t("Switching is not possible right now: {0}", d) : t("Switching is not possible right now.");
+      return switchBlockedText(d); // MARK: a-gitflow — §61
+    case "pr_same_branch":
+      return d ? t("You're on {0}, the base branch — create a branch for this work first", d) : t("This is the base branch — create a branch for this work first");
+    case "pr_no_commits":
+      return t("This branch has no commits since {0}", d);
     case "unknown_command":
       return t("This engine does not support the command — update ReviewGate.");
     case "unknown_history_entry":

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { branches, createBranch, isWorktreeDirty, parseTrack, switchBranch } from "../src/git/branches.js";
+import { branches, createBranch, defaultBranch, isWorktreeDirty, parseTrack, remoteBranches, switchBranch, worktreeStatus } from "../src/git/branches.js";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import { GitCommandError } from "../src/git/exec.js";
 import { makeBranchRepo, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -59,6 +59,40 @@ describe("git branches", () => {
     const tree = await cp.snapshot();
     expect((await cp.fileContent("a.txt", null)).toString("utf8")).toBe("a\n");
     expect((await cp.fileContent("untracked.txt", tree)).toString("utf8")).toBe("u\n");
+  });
+
+  // MARK: a-gitflow — §61
+  it("worktreeStatus: untracked and ignored-pattern paths never block a switch; renames count by either path", async () => {
+    const dir = track(makeBranchRepo());
+    const cp = await openCheckpoint(dir);
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: false, blocksSwitch: false });
+    write(dir, "u.txt", "u\n");
+    write(dir, ".omc/x.json", "{}\n");
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: false });
+    write(dir, "a.txt", "b\n");
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: false });
+    write(dir, "a.txt", "a\n");
+    sh(dir, "mv", "a.txt", "renamed with space.txt");
+    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt", "renamed"])).toEqual({ dirty: true, blocksSwitch: false });
+  });
+
+  it("defaultBranch: origin/HEAD, else main / master", async () => {
+    const remote = track(makeBranchRepo());
+    sh(remote, "branch", "develop");
+    sh(remote, "symbolic-ref", "HEAD", "refs/heads/develop");
+    const dir = track(makeTempDir("rg-clone"));
+    execFileSync("git", ["clone", "-q", remote, dir], { env: { ...process.env, LC_ALL: "C" } });
+    const cp = await openCheckpoint(dir);
+    expect(await defaultBranch(cp, await branches(cp), await remoteBranches(cp))).toBe("develop");
+    sh(dir, "remote", "set-head", "origin", "--delete");
+    expect(await defaultBranch(cp, await branches(cp), await remoteBranches(cp))).toBe("main");
+    const local = track(makeBranchRepo());
+    const lcp = await openCheckpoint(local);
+    expect(await defaultBranch(lcp, await branches(lcp), [])).toBe("main");
+    sh(local, "branch", "-m", "main", "trunk");
+    expect(await defaultBranch(lcp, await branches(lcp), [])).toBeNull();
   });
 
   it("ahead/behind parsing", () => {

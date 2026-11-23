@@ -208,6 +208,9 @@ describe("ReviewEngine workbenches (docs/M10-WORKBENCHES.md)", () => {
     sh(repo, "remote", "add", "origin", `git@github.example.com:acme/widgets.git`);
     sh(repo, "remote", "set-url", "--push", "origin", bare); // fetch URL names the GitHub repo, pushes land in a local bare repo
     sh(repo, "switch", "-q", "-c", "feature/pr");
+    writeFileSync(join(repo, "first.txt"), "1\n"); // §61: a branch with nothing since the base is refused `pr_no_commits`
+    sh(repo, "add", "first.txt");
+    sh(repo, "commit", "-q", "-m", "first");
 
     const tools = track(makeTempDir("rg-wb-gh"));
     const log = join(tools, "gh.log");
@@ -234,7 +237,7 @@ describe("ReviewEngine workbenches (docs/M10-WORKBENCHES.md)", () => {
     expect(realpathSync(readFileSync(`${log}.cwd`, "utf8"))).toBe(realpathSync(repo));
 
     // Without a title → the one pr_draft gives (no `--fill`: gh would read git); upstream already set → no second push.
-    sh(repo, "update-ref", "refs/remotes/origin/main", "main");
+    sh(repo, "update-ref", "refs/remotes/origin/main", "HEAD");
     writeFileSync(join(repo, "cart.txt"), "1\n");
     sh(repo, "add", "cart.txt");
     sh(repo, "commit", "-q", "-m", "PAY-42: fix the cart total");
