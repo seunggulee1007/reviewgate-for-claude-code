@@ -158,6 +158,8 @@ export type ClaudeSessionOptions = {
   resolvePeer?: (address: string) => Promise<PeerSessionInfo | null>;
   /** MARK: r1-git — §46: repo-relative paths still under review (the hooks' git card); owned by the engine. */
   reviewPaths?: () => ReadonlySet<string>;
+  /** §64: the paths the review-first rule waits on now (null: nothing holds Claude back); owned by the engine. */
+  reviewFirst?: () => readonly string[] | null;
   /** MARK: r2-skills-side — §33.5 (M20): a skill's `allowed-tools` by name (skillTools.ts); owned by the engine. */
   skillAllowedTools?: (name: string, since?: number) => Promise<readonly string[]>;
 };
@@ -576,6 +578,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       onBashFiles: (toolUseId, files) => this.attributeBashFiles(toolUseId, files),
       onBashSnapshot: (toolUseId, tree, root) => this.emit({ type: "bash_snapshot", toolUseId, tree, root }),
       ...(opts.reviewPaths ? { reviewPaths: opts.reviewPaths } : {}), // MARK: r1-git (§46)
+      ...(opts.reviewFirst ? { reviewFirst: opts.reviewFirst, onReviewFirst: (toolName: string) => this.emit({ type: "review_first_denied", toolName }) } : {}), // §64
       ...(opts.skillAllowedTools ? { skillAllowedTools: opts.skillAllowedTools } : {}), // MARK: r2-skills-side (§33.5, M20)
       turnWallStart: Date.now(), // release-2 review (§33.5): until the first message, the session's start
       onGitCommand: (result) => this.emit({ type: "git_result", ...result }), // MARK: r1-git (§46)

@@ -128,6 +128,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
+            if let rule = store.reviewFirst, rule.blocked > 0, store.hasPendingReview { ReviewFirstChip() }   // §64
             if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
@@ -194,6 +195,29 @@ private struct TerminalStatusStrip: View {
         }
         return (Self.trustText, "questionmark.folder", .accentColor,
                 String(localized: "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed."))
+    }
+}
+
+/// §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review.
+private struct ReviewFirstChip: View {
+    @Environment(AppState.self) private var store
+
+    var body: some View {
+        Button {
+            store.openReviewFirstWaiting()
+        } label: {
+            ViewThatFits(in: .horizontal) {
+                Text(verbatim: "\(ReviewFirstText.blockedText) · \(ReviewFirstText.openReviewTitle)")
+                Text(verbatim: ReviewFirstText.openReviewTitle)
+            }
+            .lineLimit(1)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(.orange)
+        .help(ReviewFirstText.blockedHelp)
+        .accessibilityLabel(Text(verbatim: ReviewFirstText.blockedText))
+        .accessibilityIdentifier("Terminal review-first chip")
     }
 }
 

@@ -1037,6 +1037,7 @@ public final class AppState {
         if pendingPermission != nil { return String(localized: "Waiting for your permission decision", bundle: .module) }
         if pendingPlan != nil { return String(localized: "Answer the plan first — the queue continues after it", bundle: .module) }
         if let external = externalTurnQueueHold { return external }   // wave1 mac-session (§29)
+        if reviewFirstHeldMessage != nil { return ReviewFirstText.queueHold }   // §64 `prompts`
         return nil
     }
 
@@ -1149,6 +1150,7 @@ public final class AppState {
             interruptFallback = false
         } else {
             guard queuePausedReason == nil, !queuedMessages.isEmpty else { return }
+            guard reviewFirstHeldMessage == nil else { return }   // §64 `prompts`: it goes once nothing waits
             next = queuedMessages.removeFirst()
         }
         queuedSendInFlight = true

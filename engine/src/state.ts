@@ -43,6 +43,7 @@ import { isModsGroup } from "./git/mods.js";
 import { fileRiskFields } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
 // MARK: wave4c w4c-trust (§41.2)
 import type { AutoAcceptRules } from "./protocol.js";
+import type { ReviewFirstState } from "./protocol.js"; // §64
 import { anyAutoAcceptRule, normalizeAutoAcceptRules } from "./review/trust.js";
 
 /** The engine's internal slices `buildState` derives the wire snapshot from. */
@@ -95,6 +96,8 @@ export type EngineSlices = {
   gate: ReviewGate;
   budget: Budget;
   budgetUsage: BudgetUsage;
+  /** §64: the review-first rule while it holds Claude back (absent: it does not). */
+  reviewFirst?: ReviewFirstState | null;
   hud: HudState;
   /** wave3 engine-flow — §36.12 `remotes`: the remote-tracking branches (absent until the first refresh). */
   branches: {
@@ -311,6 +314,7 @@ export function buildState(s: EngineSlices): ReviewState {
       // MARK: wave3 engine-flow (§36.13)
       prereviews: structuredClone(g.prereviews),
       ...rejectUndoField(g), // MARK: wave4c w4c-trust (§41.2)
+      reviewFirst: s.reviewFirst ? { ...s.reviewFirst } : null, // §64
     },
     changedFiles: g.changedFiles.map((f) => ({
       ...f,

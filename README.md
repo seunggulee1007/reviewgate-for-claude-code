@@ -37,7 +37,9 @@ why, you accept or revert each file, and only then does your next instruction go
 
 **A gate after every turn.** The changed files and their diffs, with Accept or Revert for each file — or for a single
 hunk. Accepting never touches your files. Reverting restores the file from a snapshot taken when the turn started, and
-leaves your index and commits alone.
+leaves your index and commits alone. Until you have decided, Claude may answer questions but not change files — its
+edits are denied through the hooks, in chats and in the terminal (Settings › Review can also hold new prompts, or turn
+this off).
 
 **Turn budgets that hold, when you want one.** Turn on a cap on how many files and changed lines one turn may touch
 (off by default). The cap is enforced through Claude Code's hooks: an edit over budget is denied, not merely discouraged.

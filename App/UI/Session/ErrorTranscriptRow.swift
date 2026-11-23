@@ -68,6 +68,7 @@ struct ErrorTranscriptRow: View {
                 }
                 if actionable { scopeActions }
                 if actionable { rejectAgainActions }   // r2-review-flow M32
+                if actionable { reviewFirstActions }   // §64
             }
             Spacer(minLength: 0)
         }
@@ -75,7 +76,8 @@ struct ErrorTranscriptRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(tint.wash(colorScheme, light: 0.08, dark: 0.16), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: actionable && (!ScopeText.rowActions(info, isWorkbench: { store.isWorkbenchPath($0) }).isEmpty
-                                                     || ReviewFlowText.askedPath(code: info.code, detail: info.detail) != nil) ? .contain : .combine)
+                                                     || ReviewFlowText.askedPath(code: info.code, detail: info.detail) != nil
+                                                     || ReviewFirstText.isRowOnly(info.code)) ? .contain : .combine)
         .accessibilityIdentifier(style == .info ? "Notice row" : "Error row")
     }
 
@@ -97,6 +99,18 @@ struct ErrorTranscriptRow: View {
             }
             .controlSize(.small)
             .padding(.top, 2)
+        }
+    }
+
+    /// §64: a call denied while files wait for the review — [리뷰 열기] while one still waits.
+    @ViewBuilder
+    private var reviewFirstActions: some View {
+        if ReviewFirstText.isRowOnly(info.code), store.hasPendingReview {
+            Button(ReviewFirstText.openReviewTitle) { store.openReviewFirstWaiting() }
+                .controlSize(.small)
+                .help(ReviewFirstText.openReviewHelp)
+                .accessibilityIdentifier("Open review from review-first row")
+                .padding(.top, 2)
         }
     }
 

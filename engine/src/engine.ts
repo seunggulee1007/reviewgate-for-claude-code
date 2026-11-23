@@ -114,6 +114,7 @@ import type {
   PlanInto,
   PlanSourceState,
   PlanVsActual,
+  ReviewFirstState, // §64
 } from "./protocol.js";
 import { isPeerInboundMode, isPermissionMode, MAX_PLAN_BYTES, PLAN_INTO, PROTOCOL_VERSION } from "./protocol.js";
 import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
@@ -137,6 +138,7 @@ import { cliSessionExists, cliSessionFile, cliSessionGone, codeOfStartFailure, S
 import { rememberKeys, type ReadOnlyContext } from "./session/bashClass.js";
 import { isExploreCall, markExplore } from "./session/explore.js"; // MARK: wave4b w4b-tabs (§39.2)
 import { autoAllowReason, EDIT_TOOLS_MATCHER } from "./session/hooks.js";
+import { reviewFirstContext, reviewFirstMode, reviewFirstPromptDecision, reviewFirstWaiting } from "./session/reviewFirst.js"; // §64
 import { readOnlyContext, scopeNoticeMessage } from "./session/reviewScope.js";
 import { skillAllowedTools, slashCommandName } from "./session/skillTools.js"; // MARK: r2-skills-side (§33.5, M20)
 import { classifyRules, loadPermissionRules, matchesToolPattern, rememberable, sessionUserRules, userRuleAllows, type LoadedRules, type UserRules } from "./session/permissionRules.js";
@@ -591,6 +593,10 @@ export class ReviewEngine {
   private turnTextUnprompted = false;
   /** The unprompted-turn notice was shown for the current episode (reset at its end and at the next send; §18). */
   private unpromptedNoticed = false;
+  /** §64: calls the review-first rule denied, and the turn they were denied in (its row once per turn). */
+  private reviewFirstBlocked: { turn: number; count: number } | null = null;
+  /** §64: the turn whose Request changes went to Claude at a terminal Stop (§57.14) — it may edit for the rest of it. */
+  private reviewFirstRequestTurn: number | null = null;
   /** What the running turn handed to `sessionUser` (message + snapshot A), for the init-timeout resend (§16). */
   private turnSent: TurnMessage | null = null;
   /** The CLI produced something for the running turn (session_info, text, a tool call…): it did receive the message. */
@@ -1155,6 +1161,11 @@ export class ReviewEngine {
         if (cmd.model !== undefined) opts.model = validateModel(cmd.model); // MARK: wave5 w5-model (§43.4, refused before anything)
         // MARK: wave3 engine-flow — one of the session's slash commands goes out as that command (§27 rule of /compact).
         if (this.isSessionSlashCommand(cmd.text)) opts.command = true;
+        // §64 `prompts`: a new message waits for the review ("Accept N & Send" accepts first; a slash command starts no work).
+        if (cmd.acceptPending !== true && reviewFirstPromptDecision(this.reviewFirstModeNow(), this.reviewFirstWaitingNow(), cmd.text)) {
+          // `gate_closed` as any closed gate: a client that sent it anyway (an older state) keeps the message and waits.
+          throw new CommandRefused("gate_closed:review_first");
+        }
         await this.syncForgottenAllows(); // release-2 review (§33.7): another worktree's window may have cleared the set
         await this.send(cmd.text, cmd.acceptPending === true, opts);
         return;
@@ -2851,8 +2862,14 @@ export class ReviewEngine {
       ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
+      reviewFirst: () => this.reviewFirstWaitingNow(), // §64
       // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
-      stopFeedback: (q) => (this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null),
+      // §64: that turn is a change request from then on — it may edit.
+      stopFeedback: (q) => {
+        const taken = this.session === ts && this.gate.running ? this.gate.takeNotesForStop(this.turn, q.noteIds, q.extra) : null;
+        if (taken) this.reviewFirstRequestTurn = this.turn;
+        return taken;
+      },
       budget: this.settings.budget, // §54
       // §57.15: the setting (default on) and a client that answers the dialogs.
       permissionBridge: () => this.settings.terminalPermissionBridge !== false && this.terminalFeature("permissionBridge"),
@@ -3175,6 +3192,13 @@ export class ReviewEngine {
       await this.followHeadMove();
       // A slash command keeps the review summary for the next real prompt (as `/compact` in a chat, §27).
       const command = trimmed.startsWith("/");
+      // §64 `prompts`: a new prompt waits for the review — not one that carries a staged Request changes (§57.14).
+      const reviewWaiting = this.reviewFirstWaitingNow();
+      const held = ts.requestQueued && !command ? null : reviewFirstPromptDecision(this.reviewFirstModeNow(), reviewWaiting, trimmed);
+      if (held) {
+        this.log("info", "terminal prompt blocked: files wait for the review (review first: prompts)");
+        return void answer({ ok: false, reason: held });
+      }
       // §57.14: a staged Request changes goes with this prompt (a slash command keeps it staged): A kept, the noted files
       // `changesRequested`, the notes sent with this turn — the user's prompt is the turn's prompt.
       const queued = ts.requestQueued;
@@ -3208,7 +3232,9 @@ export class ReviewEngine {
         const sendParts = this.gate.beginSendParts(command);
         const { summary, notes } = sendParts;
         taken = sendParts.taken;
-        parts = [summary, notes].filter((p): p is string => p !== null);
+        // §64: files still wait — Claude knows the rule before it tries.
+        const rule = reviewWaiting && !command ? reviewFirstContext(reviewWaiting) : null;
+        parts = [summary, rule, notes].filter((p): p is string => p !== null);
       }
       // §54: the budget Claude was told in this terminal changed (it was told none at first) — said with the prompt.
       const budgetNote = command ? null : budgetChangeNote(ts.toldBudget, this.settings.budget);
@@ -4018,6 +4044,7 @@ export class ReviewEngine {
         // MARK: wave4d w4d-peers — §42.2: whom a SendMessage address reaches (the registry, only read).
         resolvePeer: (address) => peerAtAddress({ configDir: claudeConfigDir(this.childEnv()), address }),
         reviewPaths: () => this.pathsUnderReview(), // MARK: r1-git (§46)
+        reviewFirst: () => this.reviewFirstWaitingNow(), // §64
         skillAllowedTools: (name, since) => this.skillAllowedTools(name, since), // MARK: r2-skills-side (§33.5, M20)
       });
       this.session = session;
@@ -4242,7 +4269,10 @@ export class ReviewEngine {
     this.sessionState.pendingPlan = null;
     this.proposedPlanKeys.clear();
     // A slash command (`/compact`, §27) keeps the review summary for the next real message and is no instruction.
+    // §64: files still wait (a question during a review) — Claude knows the rule before it tries; read before `beginSend`.
+    const waiting = opts.command === true ? null : this.reviewFirstWaitingNow();
     let outgoing = this.gate.beginSend(trimmed, opts.command === true);
+    if (waiting) outgoing = `${reviewFirstContext(waiting)}\n\n${outgoing}`;
     // MARK: wave4 w4-longwork — daily-18: a budget Claude was not told about yet goes in front of the message.
     const budgetNote = opts.command === true ? null : budgetChangeNote(this.toldBudget, this.settings.budget);
     if (budgetNote) outgoing = `${budgetNote}\n\n${outgoing}`;
@@ -4669,6 +4699,43 @@ export class ReviewEngine {
   /** MARK: r1-git — §46: repo-relative paths still under review (pending, changes requested) — the hooks' git card. */
   private pathsUnderReview(): ReadonlySet<string> {
     return new Set(this.gate.changedFiles.filter((f) => f.state === "pending" || f.state === "changesRequested").map((f) => f.path));
+  }
+
+  /** §64: the review-first setting (absent / unknown: `edits`). */
+  private reviewFirstModeNow(): ReturnType<typeof reviewFirstMode> {
+    return reviewFirstMode(this.settings.reviewFirst);
+  }
+
+  /**
+   * §64: the files the review-first rule waits on now, or null when nothing holds Claude back — read at every tool call,
+   * so an accept / reject lifts it at once. A change request's turn (a chat's, or a terminal's from the Stop that carried
+   * the notes) is meant to edit.
+   */
+  private reviewFirstWaitingNow(): string[] | null {
+    const requesting = this.gate.isRequestingChanges || (this.reviewFirstRequestTurn === this.turn && this.gate.running);
+    return reviewFirstWaiting(this.reviewFirstModeNow(), { files: this.gate.changedFiles, requestingChanges: requesting });
+  }
+
+  /** §64: `gate.reviewFirst` — while the rule holds Claude back. */
+  private reviewFirstSlice(): ReviewFirstState | null {
+    const mode = this.reviewFirstModeNow();
+    const waiting = this.reviewFirstWaitingNow();
+    if (mode === "off" || !waiting) return null;
+    const b = this.reviewFirstBlocked;
+    return { mode, waiting: waiting.length, blocked: b && b.turn === this.turn ? b.count : 0 };
+  }
+
+  /** §64: a call the rule denied — a quiet row once per turn ("리뷰 대기 중이라 수정을 막았어요"), the count in `gate.reviewFirst`. */
+  private onReviewFirstDenied(toolName: string): void {
+    const waiting = this.reviewFirstWaitingNow()?.length ?? 0;
+    this.log("info", `review first: denied ${toolName} while ${waiting} file(s) wait for the review`);
+    const b = this.reviewFirstBlocked && this.reviewFirstBlocked.turn === this.turn ? this.reviewFirstBlocked : { turn: this.turn, count: 0 };
+    b.count += 1;
+    this.reviewFirstBlocked = b;
+    if (b.count === 1) {
+      this.notice(`Claude's changes were blocked while ${waiting} file(s) wait for your review.`, "session", { code: "review_first_blocked", detail: String(waiting) });
+    }
+    this.touch();
   }
 
   /**
@@ -7894,6 +7961,9 @@ export class ReviewEngine {
         if (ev.status.model) this.sessionState.model = ev.status.model;
         this.touchChurn();
         return;
+      case "review_first_denied": // §64
+        this.onReviewFirstDenied(ev.toolName);
+        return;
       case "unprompted_denied":
         this.log("warn", `blocked ${ev.toolName}: Claude Code tried it without a request (unprompted turn)`);
         // §29 (audit peer-04): a peer message the CLI delivered by itself has its card — no banner, no paused queue.
@@ -9321,6 +9391,7 @@ export class ReviewEngine {
       gate: this.gate,
       budget: this.settings.budget,
       budgetUsage: this.budgetUsage,
+      reviewFirst: this.reviewFirstSlice(), // §64
       hud: this.rateLimits.length > 0 ? { ...this.hud, rateLimits: this.rateLimits.map((w) => ({ ...w })) } : this.hud, // MARK: wave4 w4-longwork (§38.2)
       branches: this.branches,
       pr: this.pr,

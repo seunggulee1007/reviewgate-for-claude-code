@@ -41,6 +41,7 @@ import { engineRequest, refusalOf } from "./engineRequest";
 import { isShadowProject, type TrackOutcome } from "./noGit"; // §59
 import { errorEventText, presentationOf, refusalMessage } from "./errorCodes";
 import { canAcceptAndSend, isDiffCollapsed } from "./friction";
+import { reviewFirstHolds } from "./reviewFirst"; // §64
 import { t } from "./i18n";
 import { adoptsRecord, EMPTY_SESSIONS, projectRootHash, sessionsOf } from "./sessions";
 import { createSessionSlice, type SessionSlice } from "./storeSessions";
@@ -1590,6 +1591,11 @@ export const useStore = create<Store>((set, get, api) => {
       const acceptPending = opts.acceptPending === true && canAcceptAndSend(s);
       if ((!s.gate.canSend && !acceptPending) || trimmed.length === 0) return;
       const extras = sendExtras(opts);
+      // §64 `prompts`: a plain message waits first in the queue until the review is done ([N개 수락 후 보내기] sends it now).
+      if (!acceptPending && reviewFirstHolds(s.gate, trimmed)) {
+        set((st) => ({ queue: { ...st.queue, items: enqueue(st.queue.items, trimmed, true, extras) } }));
+        return;
+      }
       for (const a of extras.attachments ?? []) void seedAttachment(a);
       // wave2 check-clients: remembered until its turn is over — a send_failed / lfs_missing puts it back (sendRecovery.ts).
       const attempt = (sendAttempt = beginSendAttempt({ text: trimmed, ...extras }, null, Date.now()));

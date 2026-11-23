@@ -96,6 +96,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   e("showStatusLine", "session", "Claude Code status line", "Show the Claude Code status line"),
   e("systemPromptAppend", "session", "System prompt append", "System prompt append", "Added to Claude's system prompt in every session. Placeholders {maxFiles} and {maxLines} are substituted.", "nextSession"),
   // Review
+  e("reviewFirst", "review", "Review first", "Claude waits for your review before its next work", "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before."),
   e("checkpointIgnorePatterns", "review", "Checkpoint ignore patterns", "Checkpoint ignore patterns"),
   e("testCommandPatterns", "review", "Test command patterns", "Test command patterns"),
   e("largeFileMB", "review", "Disk space", "Leave untracked files out of snapshots from", "Such a file (a heap dump, an archive) stays in the review list but its content is not stored: it cannot be reverted and the app does not commit it. Files git tracks are always stored."),

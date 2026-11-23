@@ -300,8 +300,10 @@ struct ChatComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ViewingChatBar()   // MARK: wave4b w4b-tabs — §39.2 "이 채팅을 보는 중이에요 — 보내면 이 채팅으로 이어가요"
-            if pendingReviewCount > 0 {
-                PendingReviewNotice(count: pendingReviewCount)   // r1-composer M11: one line, the why in its ⓘ
+            if let rule = store.reviewFirst, rule.mode == .prompts, rule.waiting > 0, store.viewingChat == nil {
+                ReviewFirstNotice(waiting: rule.waiting)   // §64: a new message waits for the review
+            } else if pendingReviewCount > 0 {
+                PendingReviewNotice(count: pendingReviewCount, editsBlocked: store.reviewFirst?.mode == .edits)   // r1-composer M11: one line, the why in its ⓘ
             }
             if let failure = store.reviewCollectFailed, store.viewingChat == nil {
                 CollectFailedNotice(detail: failure)   // r2-review-flow M30: the input stays open; Retry right here
@@ -1435,6 +1437,8 @@ struct ChatComposer: View {
 private struct PendingReviewNotice: View {
     @Environment(\.colorScheme) private var colorScheme
     let count: Int
+    /// §64 (`reviewFirst: edits`): the answer may not change files until the user decided.
+    var editsBlocked = false
     @State private var showsWhy = false
 
     var body: some View {
@@ -1460,9 +1464,15 @@ private struct PendingReviewNotice: View {
             .popover(isPresented: $showsWhy, arrowEdge: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("You can ask questions without accepting: sending never accepts or rejects a file.")
-                    Text("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.")
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("Pending banner merge note")
+                    if editsBlocked {
+                        Text("Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review).")
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("Pending banner merge note")
+                    } else {
+                        Text("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.")
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("Pending banner merge note")
+                    }
                 }
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1474,6 +1484,41 @@ private struct PendingReviewNotice: View {
         .background(Color.orange.wash(colorScheme, light: 0.12, dark: 0.20), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Pending banner")
+    }
+}
+
+/// §64 `prompts`: a new message waits until the review is done — "리뷰를 먼저 끝내세요 — 대기 N개", and while one waits
+/// [N개 수락 후 보내기] (every pending file accepted, then that message; off with the reason while it cannot go).
+private struct ReviewFirstNotice: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var store
+    let waiting: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label(ReviewFirstText.holdTitle(waiting), systemImage: "hand.raised")
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(ReviewFirstText.holdHelp)
+            Spacer(minLength: 0)
+            if store.reviewFirstHeldMessage != nil {
+                let blocker = store.reviewFirstAcceptBlocker
+                let count = store.pendingFiles.count
+                Button(ReviewFirstText.acceptAndSendTitle(count)) {
+                    if store.acceptAndSendHeld() { Toast.show(String(localized: "Accepted \(count) files and sent your message")) }
+                }
+                .controlSize(.small)
+                .disabled(blocker != nil)
+                .help(blocker ?? ReviewFirstText.acceptAndSendHelp)
+                .accessibilityIdentifier("Review first accept and send")
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(Color.orange.wash(colorScheme, light: 0.12, dark: 0.20), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Review first banner")
     }
 }
 
