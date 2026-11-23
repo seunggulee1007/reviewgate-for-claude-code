@@ -10789,8 +10789,10 @@ other builds running):
 allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
 through). The UI is the client team's follow-up.
 
-**Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
-UI work adds them.
+**Mac.** Core decodes the four replies (`DocumentSymbolsReply`, `WorkspaceSymbolsReply`, `SymbolPreviewReply`,
+`NavIndexReply`), `state.nav` (`ReviewState.nav`, nil from an older engine) and `candidates[].container`, leniently as
+§62's; `EngineCommand` sends the four commands, `find_definition`'s `column` / `receiver` and `list_files {filesOnly}`
+(`Core/…/Engine/CodeNavProtocol.swift`; tests `IdeNavTests`).
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

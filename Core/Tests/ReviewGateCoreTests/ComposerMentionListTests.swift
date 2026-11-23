@@ -20,7 +20,7 @@ import Testing
         let app = makeState()
         open(app)
         app.replySink = { command in
-            guard case let .listFiles(query, _) = command else { throw EngineClientError.refused("unexpected \(command.type)") }
+            guard case let .listFiles(query, _, _) = command else { throw EngineClientError.refused("unexpected \(command.type)") }
             return .files(id: nil, query: query, items: [FileItem(path: "src/App.swift"), FileItem(path: "src", kind: .dir)])
         }
         let result = await app.listFilesResult(query: "src")

@@ -159,7 +159,7 @@ import Testing
         var asked: [EngineCommand] = []
         app.replySink = { command in
             asked.append(command)
-            guard case let .findDefinition(symbol, _, _) = command else { throw EngineClientError.unexpectedReply("x") }
+            guard case let .findDefinition(symbol, _, _, _, _) = command else { throw EngineClientError.unexpectedReply("x") }
             let path = symbol == "Cart" ? "src/Cart.java" : "src/Other.java"
             return .definitions(DefinitionsReply(symbol: symbol, candidates: [DefinitionCandidate(path: path, line: 4, column: 14, kind: .class, preview: "class \(symbol)")]))
         }
@@ -188,7 +188,7 @@ import Testing
         let a = DefinitionCandidate(path: "a/A.kt", line: 2, kind: .class, preview: "class A")
         let b = DefinitionCandidate(path: "b/A.kt", line: 5, kind: .class, preview: "class A")
         app.replySink = { command in
-            guard case let .findDefinition(symbol, _, _) = command else { throw EngineClientError.unexpectedReply("x") }
+            guard case let .findDefinition(symbol, _, _, _, _) = command else { throw EngineClientError.unexpectedReply("x") }
             switch symbol {
             case "A": return .definitions(DefinitionsReply(symbol: symbol, candidates: [a, b], truncated: true))
             case "Z": return .definitions(DefinitionsReply(symbol: symbol, candidates: []))

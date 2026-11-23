@@ -2364,6 +2364,8 @@ public final class AppState {
             break
         case .definitions, .references:   // MARK: code-nav — §62 replies, consumed by the request that asked
             break
+        case .documentSymbols, .workspaceSymbols, .definitionPreview, .navIndex:   // MARK: ide-nav — §65 replies, consumed by the request that asked
+            break
         case .taskFetched:   // MARK: task-start — §63 reply, consumed by the request that asked
             break
         }
