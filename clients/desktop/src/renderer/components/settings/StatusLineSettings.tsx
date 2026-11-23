@@ -1,5 +1,5 @@
 /**
- * MARK: wave6 w6-statusline — Settings › General › "Claude Code 상태줄" (docs/PROTOCOL.md §44.2), as on the Mac
+ * MARK: wave6 w6-statusline — Settings › Session › "Claude Code 상태줄" (docs/PROTOCOL.md §44.2), as on the Mac
  * (StatusLineSettingsSection): show the user's own status line (on; nothing shows without a `statusLine` in their
  * Claude Code settings; every window at once) and, for this window's project, whether the project's own `statusLine` may
  * run — code that came with the repository, allowed per project and bound to that very command (a changed one asks
@@ -17,7 +17,7 @@ export function StatusLineSettingsSection({ settings }: { settings: AppSettings 
   const project = reply?.project;
   const choice = projectStatusLineChoice(settings.projectStatusLineAllowed, root, project);
   return (
-    <section data-testid="Claude Code status line section">
+    <section data-testid="Claude Code status line section" data-setting="showStatusLine">
       <h4>{t("Claude Code status line")}</h4>
       <label className="check">
         <input

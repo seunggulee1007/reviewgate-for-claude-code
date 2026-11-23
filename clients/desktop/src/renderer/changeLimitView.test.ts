@@ -14,10 +14,10 @@ async function load() {
     rg: { send: () => undefined, request: async () => ({}), requestDetailed: async () => ({ ok: true, reply: {} }), notify: async () => true, onEvent: () => () => undefined, platform: "darwin", toolchainInfo: async () => null },
   };
   const { useStore } = await import("./store");
-  const { GeneralTab } = await import("./components/settings/GeneralTab");
+  const { SessionPane } = await import("./components/settings/GeneralTab"); // §55.11: the limits and the prompt are on Session
   const { HUDStrip } = await import("./components/chat/HUDStrip");
   const { EmptyTranscript } = await import("./components/chat/Transcript");
-  return { useStore, GeneralTab, HUDStrip, EmptyTranscript };
+  return { useStore, SessionPane, HUDStrip, EmptyTranscript };
 }
 
 /** The opening tag of the element with `testId` (the attribute order is React's, not ours). */
@@ -39,13 +39,13 @@ describe("the change limit is an option, off by default (§54)", () => {
   afterAll(() => initI18n("en", "darwin"));
 
   it("Settings: the switch is off, the numbers greyed out, the note says what off means; the append box shows the built-in text", () => {
-    const off = renderToStaticMarkup(createElement(m.GeneralTab, { settings: settings() }));
+    const off = renderToStaticMarkup(createElement(m.SessionPane, { settings: settings() }));
     expect(tag(off, "Limit changes per reply")).not.toContain('checked=""');
     expect(tag(off, "Max files")).toContain('disabled=""');
     expect(tag(off, "Max changed lines")).toContain('disabled=""');
     expect(off).toContain("Off (the default): no limit on the files or lines one reply changes");
     expect(tag(off, "System prompt append")).toContain('placeholder="You are working inside a review gate. Run git commands');
-    const on = renderToStaticMarkup(createElement(m.GeneralTab, { settings: settings({ budgetEnabled: true }) }));
+    const on = renderToStaticMarkup(createElement(m.SessionPane, { settings: settings({ budgetEnabled: true }) }));
     expect(tag(on, "Limit changes per reply")).toContain('checked=""');
     expect(tag(on, "Max files")).not.toContain('disabled=""');
     expect(on).toContain("Hard stop at ×2.0");

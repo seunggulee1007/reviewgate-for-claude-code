@@ -69,7 +69,7 @@ export function UpdateSettingsView({ status, actions, checkNow }: { status: Upda
 export function UpdateSettingsSection({ settings, patch }: { settings: AppSettings; patch: (p: Partial<AppSettings>) => void }) {
   const status = useUpdateStatus();
   return (
-    <section data-testid="Updates settings">
+    <section data-testid="Updates settings" data-setting="autoCheckUpdates">
       <h4>{t("Updates")}</h4>
       <label className="check">
         <input type="checkbox" checked={settings.autoCheckUpdates !== false} onChange={(e) => patch({ autoCheckUpdates: e.target.checked })} data-testid="Check for updates automatically" />

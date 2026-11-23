@@ -54,7 +54,10 @@ describe("Settings › Permissions (§2.8)", () => {
     const out = renderToStaticMarkup(createElement(m.PermissionsTab, { settings: base }));
     // (In the UI language once ko.json is regenerated from the catalogs.)
     expect(out).toContain(t("Allow agents that work in another worktree (isolation)"));
-    expect(out).toContain(t("In auto mode they run without a card; otherwise each asks with a card. A row afterwards says where they worked · applies from the next session"));
+    expect(out).toContain(t("In auto mode they run without a card; otherwise each asks with a card. A row afterwards says where they worked."));
+    // §55.11: the timing is the badge's, not the note's.
+    expect(tag(out, "Allow worktree isolation")).toBeTruthy();
+    expect(out).toContain(`${t("Allow agents that work in another worktree (isolation)")}<span class="applies-badge"`);
     expect(out).toContain("터미널 허용 규칙 적용 (조회·읽기 도구)");
 
     expect(out).toContain('data-testid="Persist session allows"'); // r2 M21: kept per repository (the words follow with ko.json)

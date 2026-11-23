@@ -27,7 +27,7 @@ REVIEWGATE_PROJECT=/path/to/repo npm run dev -w clients/desktop   # open a proje
   `ReviewGate-Setup-<version>.exe`, installed silently and launched once (still running after 20 s; a screenshot is
   the run's `smoke-screenshot` artifact), then attached to the release with its `.sha256`. Still unsigned.
 - `dist:mac` uses `CSC_IDENTITY_AUTO_DISCOVERY=false` semantics (`mac.identity: null`) → unsigned, for local runs only.
-- Nothing external is bundled: the engine spawns `claude`, `gh` and `git` from `PATH` (or the paths in Settings → General).
+- Nothing external is bundled: the engine spawns `claude`, `gh` and `git` from `PATH` (or the paths in Settings → Advanced).
   `electron-builder.yml` excludes `node_modules/@anthropic-ai/claude-agent-sdk-*/**` for every target: those
   optional SDK packages hold a ~200 MB native claude per platform that ReviewGate never runs (the engine always
   passes `pathToClaudeCodeExecutable` = the located claude and fails with `cli_not_found` when there is none), and a
@@ -101,7 +101,7 @@ The renderer is treated as untrusted input to main:
   sandbox's `process.argv` / `process.platform` (`window.rg.sep` no longer comes from `node:path`).
 - **Settings** — `rg:setSettings` keeps only the keys a Settings control writes, each type- and range-checked
   (`settingsGuard.ts`); everything else (`openWindows`, `recentProjects`, `cachedCapabilities`, `ui`, unknown keys) is
-  dropped and logged. **`claudePath` / `ghPath` / `gitPath` are not renderer-writable**: Settings → General → Toolchain
+  dropped and logged. **`claudePath` / `ghPath` / `gitPath` are not renderer-writable**: Settings → Advanced → Toolchain
   overrides shows the path with **Choose…** (main's native file dialog → absolute, existing regular file, executable off
   Windows, named `claude` / `gh` / `git` — on Windows `claude.exe` / `claude.cmd`, `gh.exe`, `git.exe`) and
   **auto-detect** (clear). A stored override that fails the same check is ignored at load (logged).

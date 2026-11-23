@@ -1,5 +1,6 @@
 /**
- * Settings › Permissions (docs/PROTOCOL.md §33.4–33.8): the app's allow patterns (all projects / this project — Bash,
+ * Settings › Permissions (docs/PROTOCOL.md §33.4–33.8; §55.11 moved the Bash auto-allows here from General): the starting
+ * mode, Bash auto-allow, the app's allow patterns (all projects / this project — Bash,
  * MCP tools and servers, WebFetch domains, …), "Allow for session" — kept per worktree or not — with what is allowed
  * right now, the terminal's Claude Code allow rules (applied to lookup / read tools; importable as app patterns) and
  * isolated worktree agents. Every switch persists through `store.saveSettings` (→ `set_settings`).
@@ -12,6 +13,7 @@ import { projectRootHash } from "../../sessions";
 import { useStore } from "../../store";
 import { TerminalRules } from "./TerminalRules";
 import { DefaultModeSetting } from "./DefaultModeSetting"; // MARK: wave4b w4b-auto (§39.5)
+import { AppliesBadge } from "./SettingsBits"; // §55.11
 import "./permissionsTab.css";
 
 /** One pattern per line; saved on blur (typing does not round-trip through the main process). */
@@ -55,12 +57,26 @@ export function PermissionsTab({ settings }: { settings: AppSettings }) {
     <div className="body" data-testid="Settings permissions">
       <DefaultModeSetting settings={settings} />
       <section>
+        <h4>{t("Asking for permission")}</h4>
+        <label className="check" data-setting="autoAllowReadOnlyBash">
+          <input type="checkbox" checked={settings.autoAllowReadOnlyBash} onChange={(e) => patch({ autoAllowReadOnlyBash: e.target.checked })} data-testid="Auto-allow read-only Bash" />
+          {t("Auto-allow read-only Bash")}
+        </label>
+        <div className="note">{t("Commands that only read (git status, ls, cat, grep, …) with no redirection or chaining run without asking.")}</div>
+        <label className="check" data-setting="autoAllowBash">
+          <input type="checkbox" checked={settings.autoAllowBash} onChange={(e) => patch({ autoAllowBash: e.target.checked })} data-testid="Auto-allow Bash" />
+          {t("Auto-allow Bash")}
+          <AppliesBadge id="autoAllowBash" />
+        </label>
+        <div className="note">{t("Off: every shell command asks for permission in the chat. Edits are always auto-allowed (within the change limit, when it is on).")}</div>
+      </section>
+      <section>
         <h4>{t("Allow patterns")}</h4>
-        <div className="field-row">
+        <div className="field-row" data-setting="bashAllowPatterns">
           <span>{t("All projects")}</span>
           <PatternsField value={settings.bashAllowPatterns} onCommit={(v) => patch({ bashAllowPatterns: v })} label={`${t("Allow patterns")} — ${t("All projects")}`} testId="Allow patterns" />
         </div>
-        <div className="note">{t("One per line: Bash(npm test:*), Bash(git *), mcp__server__tool, mcp__server__*, WebFetch(domain:docs.spring.io), WebSearch. Matching calls never ask. Applies immediately.")}</div>
+        <div className="note">{t("One per line: Bash(npm test:*), Bash(git *), mcp__server__tool, mcp__server__*, WebFetch(domain:docs.spring.io), WebSearch. Matching calls never ask.")}</div>
         {projectHash && (
           <>
             <div className="field-row">
@@ -75,13 +91,13 @@ export function PermissionsTab({ settings }: { settings: AppSettings }) {
                 testId="Project allow patterns"
               />
             </div>
-            <div className="note">{t("For this repository and all its worktrees ({0}), added by \"Always allow in this project\" on a permission card. Applies immediately.", projectRoot ?? "")}</div>
+            <div className="note">{t("For this repository and all its worktrees ({0}), added by \"Always allow in this project\" on a permission card.", projectRoot ?? "")}</div>
           </>
         )}
       </section>
       <section>
         <h4>{t("Allowed for the session")}</h4>
-        <label className="check">
+        <label className="check" data-setting="persistSessionAllows">
           <input type="checkbox" checked={settings.persistSessionAllows !== false} onChange={(e) => patch({ persistSessionAllows: e.target.checked })} data-testid="Persist session allows" />
           {t("Keep \"Allow for session\" for this repository")}
         </label>
@@ -106,27 +122,28 @@ export function PermissionsTab({ settings }: { settings: AppSettings }) {
       </section>
       <section>
         <h4>{t("Claude Code allow rules (terminal)")}</h4>
-        <label className="check">
+        <label className="check" data-setting="applyUserAllowRules">
           <input type="checkbox" checked={applyRules} onChange={(e) => patch({ applyUserAllowRules: e.target.checked })} data-testid="Apply user allow rules" />
           {t("Apply terminal allow rules (lookup and read tools)")}
         </label>
-        <div className="note">{t("Tools you allowed in Claude Code that cannot change files (WebSearch, WebFetch, read-only MCP tools, …) run here without a card. Edits and commands still go through the review. Applies immediately.")}</div>
+        <div className="note">{t("Tools you allowed in Claude Code that cannot change files (WebSearch, WebFetch, read-only MCP tools, …) run here without a card. Edits and commands still go through the review.")}</div>
         {/* MARK: r2-skills-side — §33.5 (M20) */}
         {/* the reason it is off on the whole row, not only on the box (a disabled box is a 13-pixel target) */}
-        <label className={`check ${applyRules ? "" : "disabled"}`} title={applyRules ? undefined : t("Turn on the terminal allow rules first")} data-testid="Apply user Bash rules row">
+        <label className={`check ${applyRules ? "" : "disabled"}`} data-setting="applyUserBashRules" title={applyRules ? undefined : t("Turn on the terminal allow rules first")} data-testid="Apply user Bash rules row">
           <input type="checkbox" checked={settings.applyUserBashRules !== false} disabled={!applyRules} onChange={(e) => patch({ applyUserBashRules: e.target.checked })} title={applyRules ? undefined : t("Turn on the terminal allow rules first")} data-testid="Apply user Bash rules" />
           {t("Also apply the terminal's Bash allow rules")}
         </label>
-        <div className="note">{t("Commands your Bash(…) rules allow (e.g. Bash(mvn:*)) run without a card, as in the terminal; your deny and ask rules still win, and the files they change are reviewed. Applies immediately.")}</div>
+        <div className="note">{t("Commands your Bash(…) rules allow (e.g. Bash(mvn:*)) run without a card, as in the terminal; your deny and ask rules still win, and the files they change are reviewed.")}</div>
         <TerminalRules applyUserAllowRules={applyRules} />
       </section>
       <section>
         <h4>{t("Agents and worktrees")}</h4>
-        <label className="check">
+        <label className="check" data-setting="allowWorktreeIsolation">
           <input type="checkbox" checked={settings.allowWorktreeIsolation !== false} onChange={(e) => patch({ allowWorktreeIsolation: e.target.checked })} data-testid="Allow worktree isolation" />
           {t("Allow agents that work in another worktree (isolation)")}
+          <AppliesBadge id="allowWorktreeIsolation" />
         </label>
-        <div className="note">{t("In auto mode they run without a card; otherwise each asks with a card. A row afterwards says where they worked · applies from the next session")}</div>
+        <div className="note">{t("In auto mode they run without a card; otherwise each asks with a card. A row afterwards says where they worked.")}</div>
       </section>
     </div>
   );

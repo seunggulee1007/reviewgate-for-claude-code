@@ -7967,7 +7967,7 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   last result) — "에이전트 보고" with the report, or "사용자가 중지". The auto-turn row says "백그라운드 에이전트가 끝나
   Claude가 이어서 했어요" (실패해 / 멈춰) with the agent's description and report (`AutoTurnInfo.Task.kind` / `toolUseId`;
   an odd kind reads as `other`).
-- **Electron.** The same: Settings › General "서브에이전트가 턴 안에서 끝나게" (`settings.subagentsInTurn`, off, disabled
+- **Electron.** The same: Settings › Session "서브에이전트가 턴 안에서 끝나게" (`settings.subagentsInTurn`, off, disabled
   while background work is off), the group without the launch's report (`agentMeta.shownAgentResult`), the agent's
   titles on the auto-turn row (`background.autoTurnTitle`).
 - **Verified.** Engine `w52.agents.test.ts` (the session with CLI 2.1.318's frames: inputs kept / kept in the turn with
@@ -8154,7 +8154,7 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   (absent: off; the renderer may write a boolean), main's `budgetOf` / `systemPromptOf`, the texts in
   `src/shared/systemPrompt.ts`; the settings file now keeps "" for the built-in append (it kept a copy of every default, so
   nearly every file holds the old text) and an earlier built-in text reads as "". Test:
-  `clients/desktop/src/main/changeLimitSettings.test.ts`. Its renderer does what the Mac does — Settings › 한도 with the
+  `clients/desktop/src/main/changeLimitSettings.test.ts`. Its renderer does what the Mac does — Settings › Session › 한도 with the
   switch and greyed-out steppers, the append box showing the built-in text as its placeholder, no HUD chip and no limit in
   the empty chat while off, the rows' 변경 한도 words, the plan dialog's title without "in small units" (test:
   `clients/desktop/src/renderer/changeLimitView.test.ts`).
@@ -8723,6 +8723,14 @@ with a restart button on the Extensions tab only (lane b-settings).
   Bash 자동 허용 · 시스템 프롬프트 추가문") and has [지금 재시작]: the Extensions pane's action (`restart_session`; a
   terminal chat restarts its PTY, §57.5), shared (`SessionRestartButton`), off with its reason while Claude works or the
   session cannot restart. Settings' Extensions pane drops its own notice (the popover and the fallback sheet keep it).
+- **Windows** (components/settings/SettingsPanel.tsx, GeneralTab.tsx's panes, SettingsBits.tsx, settingsRestart.ts).
+  The same split as tabs inside the Settings dialog (720 px wide now): General, Permissions (the Bash auto-allows moved
+  there), Session (the terminal, the session, extensions — "Load user settings" and Applied extensions… —, limits, side
+  questions, other sessions, the status line, the prompt), Review, Git & Workbenches, Project, Accounts, Advanced. A
+  search field above the tabs lists the matches by tab (Return opens the first, Esc empties the field before it closes
+  the dialog); a match opens its tab, scrolls its row (`data-setting`) into view and tints it. Rows that wait carry the
+  badge and their notes lost "Takes effect on the next Open Project" / "Applies immediately". The dialog's
+  `{ kind: "settings", highlight }` opens on a row: the fatal-session banner's [설정] goes to Advanced › claude path.
 - **A cleared side-question model applies at once** (Mac). `updateSideSettings` sends `sideModel: ""` (the main
   session's model) when the field is emptied; it left the key out before, and the engine kept the last model until the
   window's engine restarted ("clearing the model applies after reopening the project").

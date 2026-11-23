@@ -5,6 +5,7 @@
  */
 import type { PermissionMode } from "@reviewgate/engine";
 import type { AppSettings } from "../../../shared/ipc";
+import { AppliesBadge } from "./SettingsBits"; // §55.11
 import { t } from "../../i18n";
 import { useStore } from "../../store";
 import { MODES, modeHelp, modeLabel } from "../chat/ModeMenu";
@@ -13,8 +14,8 @@ export function DefaultModeSetting({ settings }: { settings: AppSettings }) {
   const save = useStore((s) => s.saveSettings);
   const mode: PermissionMode = MODES.includes(settings.permissionMode as PermissionMode) ? (settings.permissionMode as PermissionMode) : "default";
   return (
-    <section>
-      <h4>{t("Starting mode")}</h4>
+    <section data-setting="permissionMode">
+      <h4 className="row" style={{ gap: 6 }}>{t("Starting mode")}<AppliesBadge id="permissionMode" /></h4>
       <div className="field-row">
         <select value={mode} onChange={(e) => void save({ permissionMode: e.target.value as PermissionMode })} aria-label={t("Starting mode")} data-testid="Default permission mode">
           {MODES.map((m) => (

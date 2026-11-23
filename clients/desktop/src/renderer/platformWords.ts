@@ -12,7 +12,7 @@ export function revealInFolderLabel(platform: string): string {
   return t("Show in Folder");
 }
 
-/** Settings › General › Toolchain: where the detected paths came from. */
+/** Settings › Advanced › Toolchain: where the detected paths came from. */
 export function toolchainDetectedNote(platform: string, hasProject: boolean): string {
   if (!hasProject) return t("Detected when a project is opened.");
   return platform === "win32" ? t("Detected on PATH for the current session.") : t("Detected via the login shell for the current session.");
@@ -25,9 +25,9 @@ export function workbenchSetupNote(platform: string): string {
     : t("Runs in the new workbench through your login shell when you create one (at most 10 minutes) — never when a window opens and never by Claude. A failure still opens the window with the log.");
 }
 
-/** Settings › General › Toolchain overrides: what "auto-detect" means here. */
+/** Settings › Advanced › Toolchain overrides: what "auto-detect" means here. */
 export function toolchainOverrideNote(platform: string): string {
   return platform === "win32"
-    ? t("Choose the program file, or leave it on auto-detect (PATH). Takes effect on the next Open Project.")
-    : t("Choose the program file, or leave it on auto-detect (login shell). Takes effect on the next Open Project.");
+    ? t("Choose the program file, or leave it on auto-detect (PATH).")
+    : t("Choose the program file, or leave it on auto-detect (login shell).");
 }

@@ -135,7 +135,7 @@ export function ErrorBanner() {
       {banner.code === "usage_limit" && <LimitResumeToggle />}
       {banner.code === "project_open_failed" && <ReopenLastButton />}
       {kind === "fatalSession" && (
-        <button type="button" className="small" onClick={() => openDialog({ kind: "settings", tab: "general" })} data-testid="Error settings">
+        <button type="button" className="small" onClick={() => openDialog({ kind: "settings", tab: "advanced", highlight: "claudePath" })} title={t("Settings › Advanced › claude path")} data-testid="Error settings">
           {t("Settings")}
         </button>
       )}

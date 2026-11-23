@@ -1,5 +1,5 @@
 /**
- * Settings › General › 다른 세션 메시지 (docs/PROTOCOL.md §29): what happens when another of the user's Claude sessions
+ * Settings › Session › 다른 세션 메시지 (docs/PROTOCOL.md §29): what happens when another of the user's Claude sessions
  * (a terminal, an IDE) sends this app a message — ask (a card, the default), run it when idle, or decline. The default of
  * every project; a project's own choice in its project menu (`peer_set`) wins.
  */
@@ -14,7 +14,7 @@ export function PeerInboundSection({ settings }: { settings: AppSettings }) {
   const save = useStore((s) => s.saveSettings);
   const mode: PeerInboundMode = PEER_MODES.find((m) => m === settings.peerInbound) ?? DEFAULT_PEER_MODE; // r2-peers
   return (
-    <section>
+    <section data-setting="peerInbound">
       <h4>{t("Messages from other sessions")}</h4>
       <div className="field-row">
         <span>{t("When another session sends a message")}</span>

@@ -1,5 +1,5 @@
 /**
- * Settings › General › Side questions (§40.3, wave4b w4b-side): the web (off by default — code a side question read could
+ * Settings › Session › Side questions (§40.3, wave4b w4b-side): the web (off by default — code a side question read could
  * leave in a page address) and the side model picked from the session's models (the Mac's `SideSettingsRows`).
  */
 import type { ReactNode } from "react";
@@ -12,7 +12,7 @@ export function SideWebSetting({ settings, patch }: { settings: AppSettings; pat
   const mode = sideWebModeOf(settings.sideWeb);
   return (
     <>
-      <div className="field-row">
+      <div className="field-row" data-setting="sideWeb">
         <span>{t("Web in side questions")}</span>
         <select value={mode} onChange={(e) => patch({ sideWeb: sideWebModeOf(e.target.value), sideAllowWeb: e.target.value === "on" })} data-testid="Side web">
           {SIDE_WEB_MODES.map((m) => (

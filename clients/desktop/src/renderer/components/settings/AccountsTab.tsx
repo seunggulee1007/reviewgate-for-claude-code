@@ -32,7 +32,7 @@ export function AccountsTab() {
     <div className="body">
       <section>
         <div className="row">
-          <h4 className="grow">{t("GitHub accounts")}</h4>
+          <h4 className="grow" data-setting="githubAccounts">{t("GitHub accounts")}</h4>
           {loading && <span className="spinner" />}
           <button type="button" className="small" disabled={loading} onClick={() => void prRefreshAccounts()} data-testid="Refresh accounts">↻ {t("Refresh")}</button>
         </div>
@@ -65,7 +65,7 @@ export function AccountsTab() {
         {firstFailure && <div className="detail">{firstFailure}</div>}
       </section>
       <section>
-        <h4>{t("Add a host")}</h4>
+        <h4 data-setting="addHost">{t("Add a host")}</h4>
         <div className="row">
           <input type="text" value={newHost} placeholder="github.example.com" onChange={(e) => setNewHost(e.target.value)} onKeyDown={(e) => isEnter(e) && login()} data-testid="New host" />
           <button type="button" disabled={!valid} onClick={login} data-testid="Log in new host">{t("Log in…")}</button>
