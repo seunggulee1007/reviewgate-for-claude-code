@@ -11975,6 +11975,22 @@
         }
       }
     },
+    "More: Diff range, Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Diff range, Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: diff 범위, 메모 추가 (⌥⌘N), 공백 무시, 줄바꿈, 나란히 보기 (⌥⌘L), diff에서 찾기 (⌥⌘F), 전체 파일, 에디터에서 열기 (⇧⌘E)"
+          }
+        }
+      }
+    },
     "No code comments": {
       "localizations": {
         "en": {

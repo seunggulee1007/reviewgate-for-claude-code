@@ -9127,6 +9127,13 @@ chat's id);
     the keyboard (accept / reject keys work there), and then Esc closes it (`onExitCommand`; Esc in the terminal stays the
     TUI's). The edge tab's tooltip says the drawer is over the terminal, next to the file list; VoiceOver: "터미널 위 리뷰 패널", with the hint that
     Esc or ⌘⇧D closes it.
+  - *The header in the panel.* Under 480 pt (the drawer, a narrow side-by-side panel; a laptop window's diff pane beside a
+    chat too) the diff header is one line: the file's status and path (cut in the middle), +n −m, "⋯", Reject as an icon
+    (its word in the tooltip and for VoiceOver) and Accept, prominent, with its word. "⋯" holds the rest — the range
+    (전체 / 이번 턴 / 요청 이후 / 수락 이후, when the file has more than one), Add note, the view switches, Find, Full file and
+    Open in Editor; the range's hints stay under the line, and a file's badges (notes, partial revert, whitespace only,
+    changed after accept) take a second line only when it has one. Wider, the header keeps its rows (the same `DiffViewHeader`,
+    the same "⋯").
   - *The keyboard.* The terminal is the split's trailing pane open or closed — one view: opening or closing the panel
     never moves the first responder; only the terminal's size changes. Beside a terminal the panel opens and closes
     without an animation: each animation frame resized the terminal and the TUI redrew at every width on the way (nine
