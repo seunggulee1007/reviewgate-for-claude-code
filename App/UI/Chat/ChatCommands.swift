@@ -85,7 +85,7 @@ struct ChatCommands: Commands {
                 .disabled(!menu.hasProject || menu.shownChatIsTerminal)   // §57.5: paste or drop images into the terminal
             if !menu.chatTabs.isEmpty { Divider() }
             ForEach(Array(menu.chatTabs.enumerated()), id: \.element.id) { index, tab in
-                Button(tab.title.isEmpty ? String(localized: "New chat") : tab.title) { focused?.model.chatTabRequest = tab.id }
+                Button(SessionMeta.displayTitle(tab.title)) { focused?.model.chatTabRequest = tab.id }
                     .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
                     .disabled(tab.isCurrent)   // §39.2: a tab only shows the chat (read-only) — never refused
             }

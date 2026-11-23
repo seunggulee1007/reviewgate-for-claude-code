@@ -135,11 +135,24 @@ struct DiffView: View {
                     content(file)
                 }
             } else {
-                ContentUnavailableView("Select a file", systemImage: "doc.text.magnifyingglass",
-                                       description: Text("Diffs appear here once a turn has changed files."))
+                // Small: the pane is empty only for a moment while files wait (the first pending one opens by itself), or
+                // because the user cleared the selection.
+                VStack(spacing: 4) {
+                    Text("Select a file").font(.callout).foregroundStyle(.secondary)
+                    Text("Diffs appear here once a turn has changed files.").font(.caption).foregroundStyle(.tertiary)
+                }
+                .multilineTextAlignment(.center)
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("Diff empty")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Files wait and none is selected: the first pending one on screen opens (never over the user's pick).
+        .onChange(of: file == nil ? store.pendingFiles.count : -1, initial: true) { _, waiting in
+            if waiting > 0 { store.selectFirstPendingIfNoneSelected() }
+        }
         .diffSplitWidth()   // §34.11: split only where two columns read (the header's picker says why not)
         // Review › Next / Previous Change: the diff, its full file or its -w view; then the next file of the list on screen.
         .diffChangeNavigation(find, file: file?.path, files: { store.displayOrderedFiles.map(\.path) },
@@ -879,6 +892,10 @@ struct DiffViewHeader: View {
                 .accessibilityIdentifier("Reject")
             Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
                 .buttonStyle(.borderedProminent)
+                // The primary action also in a window that is not in front: AppKit greys a prominent button there and Accept
+                // looked like Reject beside it. macOS 26's design takes this; the older design (macOS 15, the compatibility
+                // mode the quiet tour renders in) greys every bezel of an inactive window regardless.
+                .environment(\.controlActiveState, .key)
                 .controlSize(.regular)
                 .fixedSize()
                 .disabled(store.isAcceptLocked)

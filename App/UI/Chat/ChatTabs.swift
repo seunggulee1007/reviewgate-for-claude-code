@@ -201,7 +201,7 @@ struct ChatTabStrip: View {
 
     private var overflows: Bool { tabsWidth > roomWidth + 1 }
 
-    private func tabTitle(_ meta: SessionMeta) -> String { meta.title.isEmpty ? String(localized: "New chat") : meta.title }
+    private func tabTitle(_ meta: SessionMeta) -> String { meta.displayTitle }
 
     /// polish P4-composer-08: an unsent draft waits in this chat — typed in the composer now, kept in memory or saved.
     private func hasDraft(_ id: String) -> Bool {
@@ -520,7 +520,7 @@ private struct ChatTab: View {
         .onHover { hovering = $0 }
     }
 
-    private var title: String { meta.title.isEmpty ? String(localized: "New chat") : meta.title }
+    private var title: String { meta.displayTitle }
 
     /// §57.10: closing a background terminal's tab ends its Claude Code.
     private var closeHelp: String {
@@ -681,7 +681,7 @@ struct ChatHistorySheet: View {
         }
     }
 
-    private func title(_ meta: SessionMeta) -> String { meta.title.isEmpty ? String(localized: "New chat") : meta.title }
+    private func title(_ meta: SessionMeta) -> String { meta.displayTitle }
 
     private func row(_ meta: SessionMeta) -> some View {
         let isCurrent = meta.id == store.currentSessionId

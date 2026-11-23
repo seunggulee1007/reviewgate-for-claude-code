@@ -88,7 +88,7 @@ private struct BoardMainTile: View {
             } else if running {
                 HStack(spacing: 5) {
                     AgentToolGlyph(tool: store.hud.activeTool, tint: .blue)
-                    Text(verbatim: store.hud.activity)
+                    Text(verbatim: store.hud.statusText(isRunning: store.isRunning))
                         .font(.caption)
                         .foregroundStyle(Color.blue)
                         .lineLimit(1)

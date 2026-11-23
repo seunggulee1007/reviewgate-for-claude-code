@@ -12,6 +12,8 @@ public struct HUDState: Sendable, Equatable {
     public var lastTurnMs: Int = 0
     /// Localized short text, e.g. "Running Bash: npm test…", "Subagent working", "Thinking…", "Idle".
     public var activity: String = String(localized: "Idle", bundle: .module)
+    /// The engine reports no activity (`activity.kind == idle`) — also for a moment after a turn starts.
+    public var activityIsIdle = true
     public var activeTool: String?
     public var subagentDepth: Int = 0
     /// Set when a turn starts, cleared at turn end.
@@ -33,9 +35,20 @@ public struct HUDState: Sendable, Equatable {
         turnStartedAt = wire.turnStartedAt.map { Date(timeIntervalSince1970: $0 / 1000) }
         activeTool = wire.activity.toolName
         activity = Self.localizedActivity(wire.activity, subagentDepth: wire.subagentDepth)
+        activityIsIdle = wire.activity.kind == .idle
         rateLimits = wire.rateLimits   // wave4 w4-longwork (§38.2)
         // MARK: wave4b w4b-agents — §39.3: "서브에이전트 3개 실행 중 — executor: Edit CartService.java"
         if wire.activity.kind == .subagent, let line = AgentGlance.hudLine(wire.agents) { activity = line }
+    }
+
+    /// The activity as the status lines show it. While a turn runs the engine can still say idle (before its first event):
+    /// then "Working · 12s" from `turnStartedAt` (`now` given), else "Working…" — never "Idle"; "Idle" only with no turn.
+    public func statusText(isRunning: Bool, now: Date? = nil, language: String = ElapsedFormat.uiLanguage) -> String {
+        guard isRunning else { return activity.isEmpty ? String(localized: "Idle", bundle: .module) : activity }
+        guard activityIsIdle || activity.isEmpty else { return activity }
+        guard let started = turnStartedAt, let now else { return String(localized: "Working…", bundle: .module) }
+        let elapsed = ElapsedFormat.text(seconds: now.timeIntervalSince(started), language: language, tenths: false)
+        return String(localized: "Working · \(elapsed)", bundle: .module)
     }
 
     static func localizedActivity(_ a: HUDActivity, subagentDepth: Int) -> String {
@@ -436,6 +449,9 @@ public final class AppState {
     public let scriptPath: String
 
     private var selectedPathValue: String?
+    /// The user cleared the list's selection: the diff pane stays empty (`selectFirstPendingIfNoneSelected`) until a file is
+    /// selected again or a new review comes.
+    var selectionClearedByUser = false
     /// The file the last accept was for — ⌘⇧A has moved the selection on, so Review › Undo Accept finds it here. Cleared by
     /// undoing that accept and with a new review.
     public internal(set) var lastAcceptedPath: String?
@@ -600,6 +616,7 @@ public final class AppState {
         set {
             codeBrowser.close()   // MARK: code-browser (§47): a file picked in the list shows its diff, not the open project file
             selectFile(changedFiles.first { $0.path == newValue })
+            if newValue == nil { selectionClearedByUser = true }
         }
     }
 
@@ -1352,6 +1369,7 @@ public final class AppState {
         diffLoadTask = nil
         if hunkRefusal?.path != file?.path { hunkRefusal = nil }
         selectedPathValue = file?.path
+        if file != nil { selectionClearedByUser = false }
         selectedDiff = nil
         selectedDiffEndTree = nil
         selectedDiffTruncated = false

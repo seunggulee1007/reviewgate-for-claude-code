@@ -214,6 +214,17 @@ extension AppState {
         return files.first { $0.state == .pending } ?? files.first
     }
 
+    /// The diff pane is empty while files wait: the first pending file on screen opens by itself. Never over the user's own
+    /// pick — a selected file (pending or not), or a selection they cleared — and never while another file is read in the
+    /// pane (a project file, a past round's, the running turn's). False when it selected nothing.
+    @discardableResult
+    public func selectFirstPendingIfNoneSelected() -> Bool {
+        guard selectedFile == nil, !selectionClearedByUser, !codeBrowser.isOpen, historySelection == nil, liveSelection == nil,
+              let first = displayOrderedFiles.first(where: { $0.state == .pending }) else { return false }
+        selectFile(first)
+        return true
+    }
+
     // MARK: Notes (§34.4)
 
     /// The notes request_changes would send ("notes pending" guards count only these).
@@ -257,6 +268,7 @@ extension AppState {
             rangeChoices = [:]
             reviewDiffs = [:]
             lastAcceptedPath = nil   // Undo Accept is this review's
+            selectionClearedByUser = false   // a cleared selection was the last review's
             Task { await SyntaxHighlighter.shared.clear() }   // wave7 w7-state (§45.2): the last round's coloured lines go
         }
         let tree = reviewTree
@@ -273,6 +285,7 @@ extension AppState {
     }
 
     func resetReviewRound() {
+        selectionClearedByUser = false
         viewedContent = [:]
         rangeChoices = [:]
         reviewDiffs = [:]

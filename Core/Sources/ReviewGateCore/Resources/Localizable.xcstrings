@@ -16019,6 +16019,22 @@
         }
       }
     },
+    "Working · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working · %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "작업 중 · %@"
+          }
+        }
+      }
+    },
     "Working on “%@” — wait for it to finish": {
       "localizations": {
         "en": {

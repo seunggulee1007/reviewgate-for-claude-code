@@ -671,7 +671,9 @@ start; should the CLI report another id (`session_info` / `turn_end`) the meta, 
   `session_delete{sessionId}` (`session_current` for the running one; removes the meta, the transcript file and the tab),
   `tabs_set{openTabIds}` (unknown ids are dropped; `no_project` without a project), `session_list` (a `state` refresh).
 - Meta updates: `send` sets `lastUserText`, bumps `updatedAt` and replaces the title while it is still "New chat"
-  (first non-empty line, ≤ 60 chars, cut with `…`; a user-set title is never replaced); every turn end — normal or
+  (first non-empty line, ≤ 60 chars, cut with `…`; a user-set title is never replaced). The stored "New chat" is the
+  engine's English key: the clients show it (and an empty title) in the UI language (새 채팅), any other title as it is;
+  every turn end — normal or
   abnormal — adds `turns += 1`, `costUSD += usage.costUsd` and bumps `updatedAt`. Transcript rows continue the
   session's `turn` numbering across resumes; `hud` counts the turns of this engine's live session and resets on a switch.
 - `restart_session` restarts the *current* session (resume when the CLI knows it, §30, else fresh with the same id) and

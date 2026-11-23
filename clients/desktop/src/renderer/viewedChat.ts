@@ -9,7 +9,7 @@ import { create } from "zustand";
 import type { ReviewState } from "@reviewgate/engine";
 import { engineRequest, refusalOf } from "./engineRequest";
 import { t } from "./i18n";
-import { newChatRefusal, sessionsOf } from "./sessions";
+import { displayChatTitle, newChatRefusal, sessionsOf } from "./sessions";
 import { holdSwitch, switchWaits } from "./pendingSwitch"; // r2-chats-cards M31 / M33 (§9)
 import { chatItemsOfRows, useStore, type ChatItem } from "./store";
 import type { QueuedExtras } from "./sendQueue";
@@ -53,8 +53,7 @@ export function viewingOf(chat: ViewedChat | null, state: ReviewState): ViewedCh
 
 /** A chat's title for these lines ("New chat" when it has none). */
 export function chatTitleOf(state: ReviewState, id: string | null): string {
-  const title = sessionsOf(state).list.find((m) => m.id === id)?.title.trim() ?? "";
-  return title.length > 0 ? title : t("New chat");
+  return displayChatTitle(sessionsOf(state).list.find((m) => m.id === id)?.title.trim() ?? "");
 }
 
 /**

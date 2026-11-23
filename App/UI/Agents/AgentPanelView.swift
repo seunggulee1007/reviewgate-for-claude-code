@@ -98,7 +98,7 @@ private struct MainAgentCard: View {
                 .font(.callout.weight(.medium))
                 .lineLimit(1)
             if running {
-                Text(verbatim: hud.activity)
+                Text(verbatim: hud.statusText(isRunning: running))
                     .font(.caption)
                     .foregroundStyle(Color.blue)
                     .lineLimit(2)

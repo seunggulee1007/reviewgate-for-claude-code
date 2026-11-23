@@ -2481,6 +2481,19 @@ public struct SessionMeta: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+extension SessionMeta {
+    /// The title the engine gives a fresh chat until its first message (`NEW_CHAT_TITLE`); stored in English.
+    public static let newChatTitle = "New chat"
+
+    /// A chat's title as the UI shows it: the engine's default name (or none) in the UI language, any other title as it is.
+    /// Only the display is localized — the stored name stays the engine's, which it replaces with the first message.
+    public static func displayTitle(_ title: String) -> String {
+        title.isEmpty || title == newChatTitle ? String(localized: "New chat", bundle: .module) : title
+    }
+
+    public var displayTitle: String { Self.displayTitle(title) }
+}
+
 /// `state.sessions`: every chat session of the worktree (newest first), the live one and the client's open tabs.
 public struct SessionsInfo: Codable, Sendable, Equatable {
     public var list: [SessionMeta]

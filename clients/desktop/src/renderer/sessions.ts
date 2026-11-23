@@ -30,6 +30,16 @@ export function newChatRefusal(s: ReviewState): string | null {
 
 export const sessionTitle = (sessions: SessionsState, id: string): string => sessions.list.find((m) => m.id === id)?.title ?? id.slice(0, 8);
 
+/** The title the engine gives a fresh chat until its first message (`NEW_CHAT_TITLE`); stored in English. */
+export const NEW_CHAT_TITLE = "New chat";
+
+/** A chat's title as the UI shows it: the engine's default name (or none) in the UI language, any other title as it is. The
+ *  stored name stays the engine's (it replaces it with the first message); rename compares against `sessionTitle`. */
+export const displayChatTitle = (title: string): string => {
+  const trimmed = title.trim();
+  return trimmed.length === 0 || trimmed === NEW_CHAT_TITLE ? t("New chat") : title;
+};
+
 export { projectRootHash } from "../shared/hash";
 
 /**
