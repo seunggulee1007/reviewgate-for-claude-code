@@ -1111,5 +1111,8 @@
   "For this repository and all its worktrees ({0}), added by \"Always allow in this project\" on a permission card.": "이 저장소와 모든 워크트리에 적용돼요 ({0}). 권한 카드의 ‘이 프로젝트에서 항상 허용’으로 추가돼요.",
   "Claude Code redraws its whole screen instead of only what changed — no stale or doubled lines in Windows' console.": "Claude Code가 바뀐 곳만이 아니라 화면 전체를 다시 그려요 — Windows 콘솔에서 지난 줄이나 겹친 줄이 남지 않아요.",
   "Turn on Load user settings first": "먼저 ‘사용자 설정 불러오기’를 켜 주세요",
-  "No settings match “{0}”": "“{0}”에 맞는 설정이 없어요"
+  "No settings match “{0}”": "“{0}”에 맞는 설정이 없어요",
+  "Don't wait — open in a workbench: a new chat in a folder of its own (a new branch from HEAD, its own window and Claude) (Ctrl+Alt+W)": "기다리지 않고 워크벤치에서 열기: 따로 쓰는 폴더(HEAD에서 딴 새 브랜치, 자기 창과 Claude)에서 새 채팅을 열어요 (Ctrl+Alt+W)",
+  "Starts now in a folder of its own, without waiting (Ctrl+Alt+W)": "기다리지 않고 따로 쓰는 폴더에서 바로 시작해요 (Ctrl+Alt+W)",
+  "Right-click: New Chat in a Workbench… (Ctrl+Alt+W)": "오른쪽 클릭: 워크벤치에서 새 대화… (Ctrl+Alt+W)"
 }

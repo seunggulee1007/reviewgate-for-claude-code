@@ -26,6 +26,7 @@ import type {
 } from "@reviewgate/engine";
 import { insertIntoComposer, taskLeftComposer } from "./composerBridge";
 import { taskBranchPrefixOf } from "./runAsTask"; // MARK: §49
+import { handHeldSwitchToWorkbench } from "./workbenchChat"; // §9 New Chat in a Workbench
 import { EngineRefusal, engineRequest, refusalOf } from "./engineRequest";
 import { refusalMessage } from "./errorCodes";
 import { applyProgress, createdPathOf, flowRefusal, flowRefusalText, isUnknownCommand, prAiDraftCommand, setupReportOf, updateReason, type PRSheetText } from "./flowLogic";
@@ -55,7 +56,9 @@ export type WorkbenchCreateRequest = { branch: string; from?: string; fetch?: bo
   /** MARK: §49 "Run as Task": the first message of the new workbench's fresh chat (its window's engine sends it). */
   task?: WorkbenchTask;
   /** §49: the text the composer handed over — it leaves the composer once the task started (unless edited since). */
-  handedTask?: string };
+  handedTask?: string;
+  /** §9 New Chat in a Workbench: the held switch is called off once it exists, and a message held with it goes into the new window's composer. */
+  handHeldSwitch?: boolean };
 
 export type { PRSheetText };
 
@@ -237,6 +240,15 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
               if (report && get().state.project?.path === path) setFlow({ setupReport: report });
             })
             .catch(() => undefined);
+          // §9 New Chat in a Workbench: a message held for a new chat in the window that made this one waits in the composer.
+          if (typeof window.rg.takeWorkbenchDraft === "function") {
+            void window.rg
+              .takeWorkbenchDraft([...new Set(paths)])
+              .then((text) => {
+                if (text && get().state.project?.path === path) insertIntoComposer(text);
+              })
+              .catch(() => undefined);
+          }
         }
       }
       // §36.13: the engine's list wins when it changes (a finished round, a dismiss and a restart all show there).
@@ -390,7 +402,7 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         if (mine()) setFlow((f) => ({ create: { ...f.create!, running: false, error: words, inUsePath: r.code === "branch_in_use" && r.detail.trim() ? r.detail.trim() : null } }));
         // The sheet was closed meanwhile: the window's banner says it instead.
         const d = get().dialog?.kind;
-        if (d !== "newWorkbench" && d !== "newWorkbenchFromPr") set({ lastError: words, errorBanner: { message: words, scope: "git", fatal: false, code: r.code } });
+        if (d !== "newWorkbench" && d !== "newWorkbenchFromPr" && d !== "workbenchChat") set({ lastError: words, errorBanner: { message: words, scope: "git", fatal: false, code: r.code } });
         return null;
       }
       // MARK: §49: the next suggestion starts the way this branch did; the composer lets the task's text go.
@@ -413,9 +425,12 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
       // MARK: wave4d w4d-plan — §42.1: the plan's handoff is written before the window opens (its engine takes it on open);
       // a refusal stays on the plan card here, the workbench opens anyway.
       if (req.planMode) await get().approvePlanInto(req.planMode, "workbench", path);
-      if (hasWindow()) void window.rg.openWorkbenchWindow(path, report ?? undefined);
+      // §9 New Chat in a Workbench: what was held for a new chat goes with the window (before it opens: its first chat
+      // depends on it).
+      const draft = req.handHeldSwitch ? handHeldSwitchToWorkbench() : null;
+      if (hasWindow()) void (draft ? window.rg.openWorkbenchWindow(path, report ?? undefined, draft) : window.rg.openWorkbenchWindow(path, report ?? undefined));
       const d = get().dialog?.kind;
-      if (d === "newWorkbench" || d === "newWorkbenchFromPr") get().openDialog(null);
+      if (d === "newWorkbench" || d === "newWorkbenchFromPr" || d === "workbenchChat") get().openDialog(null);
       return path;
     },
 

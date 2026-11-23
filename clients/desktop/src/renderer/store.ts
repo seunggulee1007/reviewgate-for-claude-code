@@ -303,6 +303,8 @@ export type Dialog =
       /** MARK: §49 "Run as Task": the sheet starts the task in the new workbench (the composer's text; "" from the menus). */
       task?: string }
   | { kind: "newBranch" }
+  /** §9 "New Chat in a Workbench": one field (the branch) and [만들기] — components/dialogs/WorkbenchChatDialog.tsx. */
+  | { kind: "workbenchChat" }
   | { kind: "createPR" }
   /** §55.11: `highlight` — a setting's id (settingsIndex.ts): its tab opens at its row, tinted for a moment. */
   | { kind: "settings"; tab?: import("./settingsIndex").SettingsTab; highlight?: string }

@@ -11,6 +11,7 @@ import { acceptBlockedReason, rejectBlockedReason } from "./reviewRound";
 import { finishReviewBlocked } from "./reviewGate";
 import { rejectShortcutTarget } from "./rejectShortcut";
 import { sessionSwitchRefusal } from "./sessions";
+import { workbenchChatRefusal } from "./workbenchChat"; // §9
 import { NOTHING_ENABLED, sameMenuState, type MenuEnabled } from "../shared/menuState";
 import { showToast } from "./toast";
 
@@ -37,6 +38,7 @@ export function menuEnabledOf(s: Facts): MenuEnabled {
     stop: isRunning(st),
     // MARK: terminal-win — §57.17: the current chat is a terminal chat (its menu items are the TUI's own)
     terminalChat: st.sessions.list.some((m) => m.id === st.sessions.currentId && m.kind === "terminal"),
+    workbenchChat: workbenchChatRefusal(st) === null, // §9 New Chat in a Workbench
   };
 }
 

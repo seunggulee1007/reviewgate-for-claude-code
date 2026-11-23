@@ -712,7 +712,13 @@ start; should the CLI report another id (`session_info` / `turn_end`) the meta, 
   that open, the user's kind right after). Without git (§59) the chip has no button and says why in its tooltip; the menu
   items are disabled with the reason. Mac: Core `Session/WorkbenchChat.swift` (`WorkbenchChatBranch`,
   `WorkbenchComposerHandoff`, `handHeldSwitchToWorkbench`, `takeWorkbenchHandoff`), App `UI/Sidebar/WorkbenchChatSheet.swift`,
-  `PendingChatSwitchChip`; test `WorkbenchChatTests`.
+  `PendingChatSwitchChip`; test `WorkbenchChatTests`. Electron: the same — the + button's right-click menu (always, also
+  without the terminal preview), Chat › "워크벤치에서 새 대화…" and Ctrl+Alt+W (Ctrl+Alt+T is New Terminal Chat there), the
+  chip's [워크벤치에서 열기], `WorkbenchChatDialog.tsx`; `renderer/workbenchChat.ts`, `createWorkbenchWith {handHeldSwitch}`
+  (storeFlow.ts). The message travels through main (`rg:openWorkbenchWindow` draft → `rg:takeWorkbenchDraft`, main
+  `flowWindows.ts` `createComposerHandoffs`, which also makes that open's first chat a chat): text and @ mentions; images
+  cannot cross windows, so they come back to this composer (as with Run as Task, §49). Tests `workbenchChat.test.ts`,
+  `flowWindows.test.ts`, `flowStore.test.ts`, `menuBar.test.ts`.
 
 ### 9.1 The chat left keeps its Claude Code process a while (r2-chats-cards M33)
 

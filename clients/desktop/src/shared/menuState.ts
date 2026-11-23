@@ -26,9 +26,11 @@ export type MenuEnabled = {
    * itself, so those items are off (as on the Mac), and Continue as Terminal Chat is off.
    */
   terminalChat: boolean;
+  /** §9 Chat › New Chat in a Workbench… (Ctrl+Alt+W): a project with git (not a folder tracked without it, §59). */
+  workbenchChat: boolean;
 };
 
-export const MENU_ENABLED_KEYS: readonly (keyof MenuEnabled)[] = ["accept", "reject", "pending", "acceptAll", "rejectAll", "finishReview", "commit", "createPR", "chatSwitch", "stop", "terminalChat"];
+export const MENU_ENABLED_KEYS: readonly (keyof MenuEnabled)[] = ["accept", "reject", "pending", "acceptAll", "rejectAll", "finishReview", "commit", "createPR", "chatSwitch", "stop", "terminalChat", "workbenchChat"];
 
 /** Everything off — a window that has not said (or has no project). */
 export const NOTHING_ENABLED: MenuEnabled = Object.fromEntries(MENU_ENABLED_KEYS.map((k) => [k, false])) as MenuEnabled;

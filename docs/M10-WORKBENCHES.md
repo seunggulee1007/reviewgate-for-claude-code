@@ -34,6 +34,7 @@ Chat ›, ⌥⌘T; and [워크벤치에서 열기] on the "새 채팅 대기 중
 with the branch `wb/<yyMMdd-HHmm>` (editable; `-2`… when taken) and [만들기] (Return) → `workbench_create {branch}` from
 HEAD → its window, whose first chat is of the default kind. A message held for a chat switch moves to that window's
 composer (never sent; that first chat is then a chat). No engine command was added. Not offered without git (§59).
+Windows: the same from the + button's right-click, Chat › and Ctrl+Alt+W; the message goes through main with the window.
 
 ## Windows client
 Same commands; each workbench = one BrowserWindow with its own in-process `ReviewEngine`.

@@ -85,6 +85,22 @@ export function cancelPendingSwitch(): void {
   if (before?.kind === "open") giveBack(before.messages);
 }
 
+/**
+ * §9 New Chat in a Workbench: the held switch is called off because a workbench was opened instead — not given back here;
+ * returns the messages held with it (in order, none for a new chat) for that workbench's composer.
+ */
+export function takePendingSwitchForWorkbench(): HeldMessage[] {
+  const before = usePendingSwitch.getState().pending;
+  if (!before) return [];
+  usePendingSwitch.setState({ pending: null });
+  return before.kind === "open" ? before.messages : [];
+}
+
+/** Chips (images) of held messages that cannot go where their text went come back to this composer. */
+export function giveBackChips(chips: ComposerChips): void {
+  handBack("", chips);
+}
+
 export type SwitchDeps = {
   state(): ReviewState;
   queued(): boolean;
