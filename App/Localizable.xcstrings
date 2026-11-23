@@ -7159,6 +7159,22 @@
         }
       }
     },
+    "Claude Code starts in this mode in your terminal: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code starts in this mode in your terminal: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 Claude Code는 이 모드로 시작해요: %@"
+          }
+        }
+      }
+    },
     "Claude Code status line": {
       "localizations": {
         "en": {

@@ -8871,6 +8871,9 @@ controls — and the conversation got what was left. Clients only; no protocol c
   a quieter line (caption size). Decisions change a row in place, so the fold runs over the rows as drawn, not in
   `TranscriptModel`. Core `HandledCardFold` (`HandledCardFoldTests`), Mac `HandledCardsRow`; Electron `handledCards.ts`
   (`handledCards.test.ts`), `Transcript.tsx`.
+- **The mode offer (§2.8) is one line** — "터미널처럼 자동 모드로 시작할까요?" [예] [×]; × is the former [아니요] (not asked
+  again), and why it asks ("터미널의 Claude Code는 이 모드로 시작해요: …") is the question's tooltip, without the settings key
+  `permissions.defaultMode` it used to show.
 - Verified: `SHOTS_LAYOUT=composerbar` (quiet, on the fake claude, 1000 × 637, dark, `SHOTS_LANG=ko`) — a fresh chat, the
   box focused, text typed, Claude at work, a review pending, the mode offer, decided cards (`composerbar` lines give the
   transcript's height).
