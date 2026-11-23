@@ -122,9 +122,14 @@ extension AppState {
     /// Held messages that will not go out: back into the composer as a task's text is (`taskForComposer`) — their text
     /// (several one after another), mentions and images, nothing of them lost.
     private func handBackHeldMessages(_ messages: [QueuedMessage]) {
-        guard !messages.isEmpty else { return }
-        taskForComposer = TaskComposerText(text: messages.map(\.text).joined(separator: "\n\n"),
-                                           mentions: messages.flatMap(\.mentions), images: messages.flatMap(\.images))
+        if let text = Self.composerText(of: messages) { taskForComposer = text }
+    }
+
+    /// Held messages as one composer text — several one after another, their mentions and images (nil: none).
+    static func composerText(of messages: [QueuedMessage]) -> TaskComposerText? {
+        guard !messages.isEmpty else { return nil }
+        return TaskComposerText(text: messages.map(\.text).joined(separator: "\n\n"),
+                                mentions: messages.flatMap(\.mentions), images: messages.flatMap(\.images))
     }
 }
 

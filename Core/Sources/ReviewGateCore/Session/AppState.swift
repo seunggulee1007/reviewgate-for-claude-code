@@ -805,6 +805,9 @@ public final class AppState {
             nodeToolchain = await client.toolchain
             enginePID = await client.enginePID
             await settle()
+            // §9 New Chat in a Workbench: a held message handed to this workbench goes into its composer; the first chat was
+            // made a chat for it (`projectSessionSettings`), later ones are of the user's kind again.
+            if takeWorkbenchHandoff(for: url) { pushNewChatKind() }
         } catch EngineClientError.refused(let message, _, _, _) where message.hasPrefix("locked_by_other_session") {
             engineStarted = true
             nodeToolchain = await client.toolchain

@@ -7127,6 +7127,22 @@
         }
       }
     },
+    "Workbenches need a git repository — this folder is tracked without git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workbenches need a git repository — this folder is tracked without git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치는 git 저장소에서만 만들 수 있어요 — 이 폴더는 git 없이 추적 중이에요"
+          }
+        }
+      }
+    },
     "Working tree has uncommitted changes — commit them before switching branches": {
       "localizations": {
         "en": {

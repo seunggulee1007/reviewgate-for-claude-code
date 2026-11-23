@@ -65,6 +65,8 @@ public struct MenuState: Equatable, Sendable {
     /// r2-chats-cards M31 (§9): ⌘T cannot open a chat at all (`newChatBlocker`: a failed collection); while Claude works
     /// the new chat waits for the turn instead.
     public var newChatBlocked = false
+    /// §9 Chat › New Chat in a Workbench… (⌥⌘T): why it cannot run (nil: it can — no project, or no git, §59).
+    public var workbenchChatBlocker: String? = String(localized: "Open a project first (⌘O)", bundle: .module)
     /// The first nine open tabs.
     public var chatTabs: [ChatMenuTab] = []
     /// Chat › Close Chat Tab: the tab on screen can be closed (`AppState.canCloseTab`).
@@ -118,6 +120,7 @@ public struct MenuState: Equatable, Sendable {
         }
         chatSwitchBlocked = store.chatSwitchBlocker != nil
         newChatBlocked = store.newChatBlocker != nil
+        workbenchChatBlocker = store.workbenchChatBlocker
         let live = store.currentSessionId
         chatTabs = store.openTabs.prefix(9).map { ChatMenuTab(id: $0.id, title: $0.title, isCurrent: $0.id == live) }
         canCloseShownTab = store.shownChatId.map { store.canCloseTab(id: $0) } ?? false
