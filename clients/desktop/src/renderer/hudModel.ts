@@ -28,3 +28,12 @@ export function contextColor(fraction: number): string {
   const level = contextLevel(fraction);
   return level === "critical" ? "var(--red)" : level === "warn" ? "var(--orange)" : "var(--green)";
 }
+
+/**
+ * §56.5: what the HUD shows of its numbers — nothing that is still zero. The context meter once the session reported tokens,
+ * the cost once there is one, the turn and its time once a turn ran (or while one runs); a fresh chat's HUD is the model and
+ * "Idle" instead of "0 tokens · $0.00 session · turn 0 · 0.0s".
+ */
+export function hudShown(hud: { contextTokens: number; sessionCostUSD: number; turnCount: number }, running: boolean): { context: boolean; cost: boolean; turn: boolean } {
+  return { context: hud.contextTokens > 0, cost: hud.sessionCostUSD > 0, turn: running || hud.turnCount > 0 };
+}

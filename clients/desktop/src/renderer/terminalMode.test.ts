@@ -34,14 +34,14 @@ describe("the terminal's mode cycle (§44.1)", () => {
 
 describe("the mode line (§44.1)", () => {
   it("names the mode in the terminal's words; plan mode from auto says approving goes back", () => {
-    expect(modeLine("auto")).toEqual({ text: "⏵⏵ Auto mode (shift+tab to switch)", tone: "auto" });
-    expect(modeLine("acceptEdits")).toEqual({ text: "⏵⏵ Accept edits mode (shift+tab to switch)", tone: "acceptEdits" });
-    expect(modeLine("plan")).toEqual({ text: "⏸ Plan mode (shift+tab to switch)", tone: "plan" });
+    expect(modeLine("auto")).toEqual({ text: "⏵⏵ Auto mode (shift+tab to switch)", label: "⏵⏵ Auto mode", tone: "auto" });
+    expect(modeLine("acceptEdits")).toEqual({ text: "⏵⏵ Accept edits mode (shift+tab to switch)", label: "⏵⏵ Accept edits mode", tone: "acceptEdits" });
+    expect(modeLine("plan")).toEqual({ text: "⏸ Plan mode (shift+tab to switch)", label: "⏸ Plan mode", tone: "plan" });
     expect(modeLine("plan", { approvesIntoAuto: true }).text).toBe("⏸ Plan mode — approving goes back to auto mode (shift+tab to switch)");
-    expect(modeLine("default")).toEqual({ text: "Default mode (shift+tab to switch)", tone: "plain" });
+    expect(modeLine("default")).toEqual({ text: "Default mode (shift+tab to switch)", label: "Default mode", tone: "plain" });
     expect(modeLine("default", { scheduledLabel: "Plan" }).text).toBe("Default mode · From the next turn: Plan (shift+tab to switch)");
     // Auto mode the engine said cannot run here: the CLI runs the default mode, and the line says so.
-    expect(modeLine("auto", { autoUnavailable: true })).toEqual({ text: "Auto mode is not available here — running in default mode (shift+tab to switch)", tone: "plain" });
+    expect(modeLine("auto", { autoUnavailable: true })).toEqual({ text: "Auto mode is not available here — running in default mode (shift+tab to switch)", label: "Auto mode is not available here — running in default mode", tone: "plain" });
   });
 
   it("in Korean", () => {
@@ -51,6 +51,8 @@ describe("the mode line (§44.1)", () => {
       expect(modeLine("plan", { approvesIntoAuto: true }).text).toBe("⏸ 계획 모드 — 승인하면 자동 모드로 돌아가요 (shift+tab 전환)");
       expect(modeLine("acceptEdits").text).toBe("⏵⏵ 편집 바로 허용 모드 (shift+tab 전환)");
       expect(modeLine("default").text).toBe("기본 모드 (shift+tab 전환)");
+      // §56.5: the composer's mode menu reads it without the key.
+      expect(modeLine("plan", { approvesIntoAuto: true }).label).toBe("⏸ 계획 모드 — 승인하면 자동 모드로 돌아가요");
       expect(modeLine("auto", { autoUnavailable: true }).text).toBe("자동 모드를 쓸 수 없어 기본 모드로 동작해요 (shift+tab 전환)");
     } finally {
       initI18n("en", "darwin");

@@ -69,34 +69,17 @@ function useModeMenu() {
   return { mode, scheduled, label, title, items, open: state.session.open };
 }
 
+/**
+ * §56.5: the composer's mode menu is the terminal's mode line (§44.1) — "⏵⏵ 자동 모드", "⏸ 계획 모드 — 승인하면 자동 모드로
+ * 돌아가요" in its colour, first in the row under the box; a click picks a mode, Shift+Tab in the box cycles them (said in
+ * its tooltip). No line of its own, and no pill in the HUD: one place says which mode runs.
+ */
 export function ModeMenu() {
   const m = useModeMenu();
-  return <Menu className="mode-menu" label={<span className="truncate">◈ {m.label}</span>} align="right" disabled={!m.open} title={m.title} testId="Permission mode" items={m.items} />;
-}
-
-/**
- * MARK: wave6 w6-terminal — §44.1: the terminal's mode line under the composer ("⏵⏵ 자동 모드 (shift+tab 전환)", "⏸ 계획 모드 —
- * 승인하면 자동 모드로 돌아가요"); it follows the engine at once, plan mode Claude entered by itself included.
- */
-export function ComposerModeLine() {
   const state = useStore((s) => s.state);
-  const scheduled = useStore((s) => s.scheduledPermissionMode);
   const autoUnavailable = useStore((s) => s.autoModeUnavailable);
-  if (!state.session.open) return null;
-  const mode = permissionMode(state);
-  const approvesIntoAuto = mode === "plan" && planApproveMode(state, autoUnavailable) === "auto";
-  const line = modeLine(mode, { approvesIntoAuto, autoUnavailable, scheduledLabel: scheduled && scheduled !== mode ? modeLabel(scheduled) : null });
-  return (
-    <div className={`mode-line ${line.tone}`} title={t("Shift+Tab in the message box switches the permission mode")} data-testid="Composer mode line">
-      {line.text}
-    </div>
-  );
-}
-
-/** The HUD's mode pill (shown while the mode is not `default` or a pick waits): the same menu. */
-export function HudModeChip() {
-  const m = useModeMenu();
-  if (m.mode === "default" && !m.scheduled) return null;
-  const tone = (m.scheduled ?? m.mode) === "plan" ? "mode" : "orange";
-  return <Menu className={`hud-mode-chip pill ${tone}`} label={<span className="truncate">◈ {m.label}</span>} align="right" disabled={!m.open} title={m.title} testId="HUD mode" items={m.items} />;
+  const approvesIntoAuto = m.mode === "plan" && planApproveMode(state, autoUnavailable) === "auto";
+  const line = modeLine(m.mode, { approvesIntoAuto, autoUnavailable, scheduledLabel: m.scheduled && m.scheduled !== m.mode ? modeLabel(m.scheduled) : null });
+  const title = m.open ? `${m.title}\n${t("Shift+Tab in the message box switches the permission mode")}` : t("The permission mode can be picked once the session has started");
+  return <Menu className={`mode-menu mode-line ${line.tone}`} label={<span className="truncate">{line.label}</span>} align="left" disabled={!m.open} title={title} ariaLabel={`${t("Permission mode")}: ${line.label}`} testId="Permission mode" items={m.items} />;
 }

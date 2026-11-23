@@ -13,8 +13,7 @@ import { rememberedAllowsOf } from "../../friction";
 import { t } from "../../i18n";
 import { isRunning, useStore } from "../../store";
 import { BudgetBadge, budgetIsOn } from "./BudgetBadge";
-import { HudModeChip } from "./ModeMenu"; // MARK: wave4b w4b-auto — §39.5 the mode pill is the mode menu
-import { contextColor, contextLevel, currentModelOption } from "../../hudModel";
+import { contextColor, contextLevel, currentModelOption, hudShown } from "../../hudModel";
 import { formatElapsed } from "../../elapsed";
 import { effortLabel, HudMenu, ModelPicker } from "./HudPopovers";
 import { useModelMode } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
@@ -198,37 +197,49 @@ export function HUDStrip() {
   const fraction = ctxWindow && ctxWindow > 0 ? Math.min(hud.contextTokens / ctxWindow, 1) : null;
   const contextHelp = ctxWindow ? t("Context: {0} of {1} tokens", hud.contextTokens, ctxWindow) : t("Context: {0} tokens (window unknown)", hud.contextTokens);
   const activity = activityText(hud.activity, running, hud.agents, liveSince !== null ? elapsed : undefined); // MARK: wave4b w4b-agents
+  const shown = hudShown(hud, running);
 
   return (
     <div className="hud" data-testid="HUD">
       <ModelChip open={pickerOpen} setOpen={setPickerOpen} />
-      <span className={`item ctx-${fraction !== null ? contextLevel(fraction) : "ok"}`} title={contextHelp} data-testid="HUD context">
-        <span className="faint">▤</span>
-        {fraction !== null && ctxWindow ? (
-          <>
-            <span className="num">{formatTokens(hud.contextTokens)} / {formatTokens(ctxWindow)} ({Math.round(fraction * 100)}%)</span>
-            <span className="progress" aria-hidden="true">
-              <div style={{ width: `${Math.round(fraction * 100)}%`, background: contextColor(fraction) }} />
-            </span>
-          </>
-        ) : (
-          <span className="num">{t("{0} tokens", formatTokens(hud.contextTokens))}</span>
-        )}
-      </span>
+      {/* §56.5: nothing that is still zero — the meter, the cost and the turn come once there is something to count */}
+      {shown.context && (
+        <span className={`item ctx-${fraction !== null ? contextLevel(fraction) : "ok"}`} title={contextHelp} data-testid="HUD context">
+          <span className="faint">▤</span>
+          {fraction !== null && ctxWindow ? (
+            <>
+              <span className="num">{formatTokens(hud.contextTokens)} / {formatTokens(ctxWindow)} ({Math.round(fraction * 100)}%)</span>
+              <span className="progress" aria-hidden="true">
+                <div style={{ width: `${Math.round(fraction * 100)}%`, background: contextColor(fraction) }} />
+              </span>
+            </>
+          ) : (
+            <span className="num">{t("{0} tokens", formatTokens(hud.contextTokens))}</span>
+          )}
+        </span>
+      )}
       {/* Right after the meter: the HUD clips its overflow at narrow widths, the menu must stay reachable. */}
       <HudMenu onModel={() => setPickerOpen(true)} />
-      <span className="sep">·</span>
-      <HudCostButton />{/* MARK: wave4d w4d-agents2 — §42.4: the cost opens the split by model (was a plain text) */}
+      {shown.cost && (
+        <>
+          <span className="sep">·</span>
+          <HudCostButton />{/* MARK: wave4d w4d-agents2 — §42.4: the cost opens the split by model (was a plain text) */}
+        </>
+      )}
       <SideChip />
-      <span className="sep">·</span>
-      {liveSince !== null ? (
-        <span className="item num" title={t("Turn {0} running for {1} s", hud.turnCount + 1, Math.floor(elapsed))} data-testid="HUD turn">
-          {t("turn {0} · {1}", hud.turnCount + 1, formatSeconds(elapsed))}
-        </span>
-      ) : (
-        <span className="item num" title={t("{0} turns; last turn took {1} ms", hud.turnCount, hud.lastTurnMs)} data-testid="HUD turn">
-          {t("turn {0} · {1}", hud.turnCount, formatSeconds(hud.lastTurnMs / 1000))}
-        </span>
+      {shown.turn && (
+        <>
+          <span className="sep">·</span>
+          {liveSince !== null ? (
+            <span className="item num" title={t("Turn {0} running for {1} s", hud.turnCount + 1, Math.floor(elapsed))} data-testid="HUD turn">
+              {t("turn {0} · {1}", hud.turnCount + 1, formatSeconds(elapsed))}
+            </span>
+          ) : (
+            <span className="item num" title={t("{0} turns; last turn took {1} ms", hud.turnCount, hud.lastTurnMs)} data-testid="HUD turn">
+              {t("turn {0} · {1}", hud.turnCount, formatSeconds(hud.lastTurnMs / 1000))}
+            </span>
+          )}
+        </>
       )}
       <span className="sep">·</span>
       <span className={`activity ${running ? "live" : ""}`} title={activity} data-testid="HUD activity">
@@ -250,7 +261,6 @@ export function HUDStrip() {
       <RetryChip />
       <AgentsChip />
       <AgentListButton />
-      <HudModeChip />
       {/* wave1 desktop-perms: §29 peer turn senders, §33.1 "권한 요청 n개 대기" (jumps to the card that has waited longest) */}
       <PeerTurnBadge />
       <PermissionHudChip />
