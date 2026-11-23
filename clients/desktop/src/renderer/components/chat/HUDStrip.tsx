@@ -51,11 +51,16 @@ export function formatSeconds(s: number): string {
 
 export { contextColor, contextLevel } from "../../hudModel";
 
-/** Folds `hud.activity` into the localized one-liner the Mac app shows (AppState.localizedActivity). */
-export function activityText(a: HudActivity, running: boolean, agents?: readonly AgentNode[]): string {
+/**
+ * Folds `hud.activity` into the localized one-liner the Mac app shows (AppState.localizedActivity / HUDState.statusText).
+ * A turn the engine still reports idle (before its first event) is "Working · 12s" with `elapsed`, else "Working…" — never
+ * "Idle" while it runs.
+ */
+export function activityText(a: HudActivity, running: boolean, agents?: readonly AgentNode[], elapsed?: number): string {
   switch (a.kind) {
     case "idle":
-      return running ? t("Working…") : t("Idle");
+      if (!running) return t("Idle");
+      return elapsed !== undefined ? t("Working · {0}", formatElapsed(elapsed)) : t("Working…");
     case "working":
       return t("Claude is working…");
     case "thinking":
@@ -192,7 +197,7 @@ export function HUDStrip() {
   const ctxWindow = hud.contextWindow;
   const fraction = ctxWindow && ctxWindow > 0 ? Math.min(hud.contextTokens / ctxWindow, 1) : null;
   const contextHelp = ctxWindow ? t("Context: {0} of {1} tokens", hud.contextTokens, ctxWindow) : t("Context: {0} tokens (window unknown)", hud.contextTokens);
-  const activity = activityText(hud.activity, running, hud.agents); // MARK: wave4b w4b-agents
+  const activity = activityText(hud.activity, running, hud.agents, liveSince !== null ? elapsed : undefined); // MARK: wave4b w4b-agents
 
   return (
     <div className="hud" data-testid="HUD">
