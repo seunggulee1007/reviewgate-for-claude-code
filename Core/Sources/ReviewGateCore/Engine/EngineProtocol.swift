@@ -522,6 +522,8 @@ public enum EngineCommand: Sendable, Equatable {
     case prSubmit(event: ReviewEvent, body: String)
     case prReply(commentId: Int, body: String)
     case prReloadComments
+    /// §60: a general comment on the selected PR's conversation.
+    case prComment(body: String)
     case accounts
     case loginInTerminal(host: String)
     // M10 workbenches (docs/M10-WORKBENCHES.md)
@@ -769,6 +771,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .prSubmit: "pr_submit"
         case .prReply: "pr_reply"
         case .prReloadComments: "pr_reload_comments"
+        case .prComment: "pr_comment"
         case .accounts: "accounts"
         case .loginInTerminal: "login_in_terminal"
         case .workbenchList: "workbench_list"
@@ -1229,6 +1232,8 @@ extension EngineCommand: Encodable {
             try c.encode(body, forKey: .body)
         case let .prReply(commentId, body):
             try c.encode(commentId, forKey: .commentId)
+            try c.encode(body, forKey: .body)
+        case let .prComment(body):   // §60
             try c.encode(body, forKey: .body)
         case let .loginInTerminal(host):
             try c.encode(host, forKey: .host)
@@ -2135,6 +2140,10 @@ public struct PRState: Codable, Sendable, Equatable {
     public var lastSubmitResult: SubmitResult?
     /// Set after a successful `pr_create` (M10.1); absent on older engines.
     public var lastCreatedPR: CreatedPR?
+    /// §60: the PR's conversation (general comments, oldest first); nil from engines before §60 (`PRStore` reads it as []).
+    public var conversation: [PRIssueComment]? = nil
+    /// §60: a `pr_comment` is being posted (never sets `isSubmitting`); nil from engines before §60.
+    public var isCommenting: Bool? = nil
 
     static func empty(host: String) -> PRState {
         PRState(host: host, mine: [], reviewRequested: [], selectedSummary: nil, selected: nil, files: [], comments: [],

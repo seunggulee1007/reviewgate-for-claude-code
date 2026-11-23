@@ -141,6 +141,36 @@ public struct PRReview: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// §60: a general comment on the PR's conversation (`repos/O/R/issues/N/comments`), not tied to a line.
+public struct PRIssueComment: Codable, Sendable, Identifiable, Hashable {
+    public var id: Int
+    /// `user.login`; "ghost" for a deleted account.
+    public var author: String
+    /// Markdown; "" when GitHub sent none.
+    public var body: String
+    public var createdAt: Date
+    /// Equal to `createdAt` until the comment is edited; nil when the API omitted it.
+    public var updatedAt: Date?
+    /// `html_url` of the comment.
+    public var url: String
+    /// OWNER / MEMBER / COLLABORATOR / CONTRIBUTOR / NONE / …
+    public var authorAssociation: String?
+
+    public init(id: Int, author: String, body: String, createdAt: Date, updatedAt: Date? = nil, url: String,
+                authorAssociation: String? = nil) {
+        self.id = id
+        self.author = author
+        self.body = body
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.url = url
+        self.authorAssociation = authorAssociation
+    }
+
+    /// Edited after it was posted (`updatedAt` later than `createdAt`).
+    public var isEdited: Bool { updatedAt.map { $0 > createdAt } ?? false }
+}
+
 /// A not-yet-submitted inline comment, collected in the app and sent with `submitReview`.
 /// `id` is engine-generated on the wire; the composer's local default is discarded by `pr_add_draft`.
 public struct DraftComment: Codable, Sendable, Identifiable, Hashable {

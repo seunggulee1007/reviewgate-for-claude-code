@@ -6,7 +6,7 @@
 import type { ChangedFile, ChangeStatus, SkippedPath } from "./git/checkpoint.js";
 import type { BranchInfo, BranchSwitchBlocker } from "./git/branches.js";
 import type { FileDiff } from "./diff/parse.js";
-import type { DraftComment, GHAccount, PRComment, PRDetail, PRFileMeta, PRReview, PRSummary, ReviewEvent } from "./pr/models.js";
+import type { DraftComment, GHAccount, PRComment, PRDetail, PRFileMeta, PRIssueComment, PRReview, PRSummary, ReviewEvent } from "./pr/models.js";
 import type { DiffSide, NoteAnchor, ReviewNote } from "./review/notes.js";
 import type { FileOrigin } from "./session/provenance.js";
 import type { FileRiskKind } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
@@ -672,6 +672,8 @@ export type EngineCommand =
   | Cmd<"pr_submit", { event: ReviewEvent; body: string }>
   | Cmd<"pr_reply", { commentId: number; body: string }>
   | Cmd<"pr_reload_comments">
+  /** §60: a general comment on the selected PR's conversation; `no_pr_selected` / `empty_body` / `pr_comment_failed:<gh's first line>`. */
+  | Cmd<"pr_comment", { body: string }>
   | Cmd<"accounts">
   | Cmd<"login_in_terminal", { host: string }>
   /** §50: a message into the turn that runs (as typing while Claude works in the terminal); `steer_unavailable:<why>` otherwise. */
@@ -1414,10 +1416,14 @@ export type PRState = {
   files: PRFileMeta[];
   comments: PRComment[];
   reviews: PRReview[];
+  /** §60: the PR's Conversation tab (general comments, `issues/N/comments`), oldest first; [] without a selected PR. Always sent (optional for older engines). */
+  conversation?: PRIssueComment[];
   draftComments: DraftComment[];
   accounts: GHAccount[];
   isLoading: boolean;
   isSubmitting: boolean;
+  /** §60: a `pr_comment` is being posted (never sets `isSubmitting`). Always sent (optional for older engines). */
+  isCommenting?: boolean;
   errorText: string | null;
   lastSubmitResult: SubmitResultState | null;
   /** Last successful `pr_create` of this engine. */

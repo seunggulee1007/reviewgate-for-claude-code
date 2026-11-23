@@ -75,6 +75,7 @@ describe("track without git (§59)", () => {
     for (const type of ["branches", "workbench_list", "push", "pr_list", "commit_hunks"] as const) {
       await expect(h.engine.request({ type })).rejects.toThrow("not_a_git_repo");
     }
+    await expect(h.engine.request({ type: "pr_comment", body: "hi" })).rejects.toThrow("not_a_git_repo:pr_comment"); // §60
     const refusal = h.ofType("result").find((r) => r.ok === false && typeof r.error === "string" && r.error.startsWith("not_a_git_repo"));
     expect(refusal).toMatchObject({ code: "not_a_git_repo" });
 

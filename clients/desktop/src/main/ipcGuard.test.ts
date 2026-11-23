@@ -84,6 +84,10 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "track_without_git", confirm: true }).ok).toBe(true);
   });
 
+  it("allows pr_comment (§60: the PR conversation's composer)", () => {
+    expect(validateCommand({ type: "pr_comment", body: "Thanks!" }).ok).toBe(true);
+  });
+
   it("allows the composer commands (§23–27)", () => {
     for (const type of ["list_files", "attachment_get", "set_model", "rewind", "compact", "interrupt"]) {
       expect(validateCommand({ type }).ok).toBe(true);

@@ -1,0 +1,10 @@
+[[
+  {"id": 3001, "node_id": "n1", "url": "u", "html_url": "https://github.com/acme/widgets/pull/5#issuecomment-3001",
+   "issue_url": "i", "user": {"login": "alice"}, "body": "Could you split this?",
+   "created_at": "2026-01-02T03:04:05Z", "updated_at": "2026-01-02T03:04:05Z", "author_association": "MEMBER"},
+  {"id": 3002, "html_url": "https://github.com/acme/widgets/pull/5#issuecomment-3002", "user": {"login": "ci-bot[bot]"},
+   "body": "Build passed", "created_at": "2026-01-02T04:00:00Z", "updated_at": "2026-01-03T09:30:00Z", "author_association": "NONE"}
+], [
+  {"id": 3003, "html_url": "https://github.com/acme/widgets/pull/5#issuecomment-3003", "user": null,
+   "body": null, "created_at": "2026-01-04T00:00:00Z"}
+]]

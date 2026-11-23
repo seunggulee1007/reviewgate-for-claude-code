@@ -353,7 +353,7 @@ const SHADOW_REFUSED: ReadonlySet<string> = new Set([
   "workbench_list", "workbench_create", "workbench_preview", "workbench_remove", "workbench_prune", "chat_move",
   "commit", "commit_hunks", "commit_series", "commit_draft", "commit_split_draft", "commit_format", "push",
   "pr_list", "pr_open", "pr_select_file", "pr_add_draft", "pr_remove_draft", "pr_submit", "pr_reply", "pr_reload_comments",
-  "pr_file_lines", "pr_create", "pr_draft", "pr_ai_draft",
+  "pr_comment", "pr_file_lines", "pr_create", "pr_draft", "pr_ai_draft",
 ]);
 
 /** §57.15: how long "Allow and follow" waits for the EnterWorktree it allowed. */
@@ -1385,6 +1385,15 @@ export class ReviewEngine {
         return;
       case "pr_reload_comments":
         await this.pr.reloadComments();
+        return;
+      case "pr_comment": // §60
+        if (!this.pr.selectedSummary) throw new CommandRefused("no_pr_selected");
+        if (typeof cmd.body !== "string" || !cmd.body.trim()) throw new CommandRefused("empty_body");
+        try {
+          await this.pr.comment(cmd.body);
+        } catch (e) {
+          throw new CommandRefused(`pr_comment_failed:${firstLineOf(errorMessage(e))}`, { code: "pr_comment_failed" });
+        }
         return;
       case "accounts":
         await this.pr.refreshAccounts();

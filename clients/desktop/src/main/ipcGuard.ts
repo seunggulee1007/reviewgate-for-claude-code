@@ -62,6 +62,7 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "pr_submit",
   "pr_reply",
   "pr_reload_comments",
+  "pr_comment", // §60: a general comment on the PR's conversation
   "accounts",
   "login_in_terminal",
   "workbench_list",

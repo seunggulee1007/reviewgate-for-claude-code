@@ -5383,6 +5383,38 @@
         }
       }
     },
+    "Could not post the comment": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not post the comment"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "댓글을 남기지 못했어요"
+          }
+        }
+      }
+    },
+    "Could not post the comment: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not post the comment: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "댓글을 남기지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Could not push: %@": {
       "localizations": {
         "en": {
@@ -6499,6 +6531,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "아직 side question 답이 없어요 — /btw 뒤에 질문을 적어요"
+          }
+        }
+      }
+    },
+    "Open a pull request first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a pull request first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PR을 먼저 열어 주세요"
+          }
+        }
+      }
+    },
+    "Write the comment first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write the comment first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "댓글을 먼저 써 주세요"
           }
         }
       }

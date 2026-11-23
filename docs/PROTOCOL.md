@@ -101,7 +101,8 @@ type EngineCommand =
   | Cmd<"pr_remove_draft", { draftId: string }>
   | Cmd<"pr_submit", { event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES"; body: string }>
   | Cmd<"pr_reply", { commentId: number; body: string }>
-  | Cmd<"pr_reload_comments">
+  | Cmd<"pr_reload_comments">                             // inline comments + the conversation (§60)
+  | Cmd<"pr_comment", { body: string }>                  // a general comment on the selected PR's conversation (§60)
   | Cmd<"accounts">                                        // gh auth status → state.pr.accounts
   | Cmd<"login_in_terminal", { host: string }>
   | Cmd<"workbench_list">                                  // refresh (with per-worktree dirty) → state.workbenches (§6)
@@ -241,9 +242,11 @@ type ReviewState = {
     selectedSummary: PRSummary | null; selected: PRDetail | null;
     files: PRFileMeta[];         // PRFile WITHOUT `patch` (the engine keeps patches; see pr_select_file)
     comments: PRComment[]; reviews: PRReview[];
+    conversation?: PRIssueComment[];   // §60: the Conversation tab (issues/N/comments), oldest first; [] without a selected PR
     draftComments: DraftComment[];   // id: string
     accounts: GHAccount[];
     isLoading: boolean; isSubmitting: boolean; errorText: string | null;
+    isCommenting?: boolean;      // §60: a pr_comment is being posted (never sets isSubmitting)
     lastSubmitResult: { reviewURL: string; inlineCount: number; event: ReviewEvent; submittedAt: string } | null;
     lastCreatedPR: { url: string; branch: string } | null;   // last successful pr_create of this engine
   };
@@ -9643,8 +9646,8 @@ folder (a clone in a subfolder) is its own repository and is guarded as before.
 runs): `branches`, `switch_branch`, `create_branch`; `workbench_list`, `workbench_create`, `workbench_preview`,
 `workbench_remove`, `workbench_prune`, `chat_move`, `plan_response {into: "workbench"}`; `commit`, `commit_hunks`,
 `commit_series`, `commit_draft`, `commit_split_draft`, `commit_format`, `push`; every PR command (`pr_list`, `pr_open`,
-`pr_select_file`, `pr_add_draft`, `pr_remove_draft`, `pr_submit`, `pr_reply`, `pr_reload_comments`, `pr_file_lines`,
-`pr_create`, `pr_draft`, `pr_ai_draft`). `pr_close`, `accounts` and `login_in_terminal` are not about the repository and
+`pr_select_file`, `pr_add_draft`, `pr_remove_draft`, `pr_submit`, `pr_reply`, `pr_reload_comments`, `pr_comment` (§60),
+`pr_file_lines`, `pr_create`, `pr_draft`, `pr_ai_draft`). `pr_close`, `accounts` and `login_in_terminal` are not about the repository and
 stay. `refresh` skips its `branches` / `workbenches` / `pr` parts.
 
 **The hidden repository.** `<dataDir>/shadow-repos/<folder name>-<16 hex of sha256 of the folder's real path>/`
@@ -9730,3 +9733,66 @@ The store never sends `branches`, `switch_branch`, `create_branch`, `workbench_l
 `pr_open`, `commit`, `push` or `pr_create` for such a project, and never opens the dialogs that would (commit, new
 workbench / branch, create PR, submit review) — so none of the automatic refreshes (project header, window focus) is ever
 refused `not_a_git_repo`.
+
+## 60. The PR conversation
+
+The PR tab showed the files, the inline review comments (`pulls/N/comments`) and the reviews (`pulls/N/reviews`), but never
+the PR's **Conversation** tab: the general comments people write under the PR. GitHub serves those as issue comments
+(`repos/O/R/issues/N/comments`), apart from the other two, so nobody saw them.
+
+**State.** `state.pr.conversation: PRIssueComment[]` (additive; always sent by this engine, optional in the type for older
+ones):
+
+```ts
+type PRIssueComment = {
+  id: number;
+  author: string;                     // user.login; "ghost" when GitHub sent no user (a deleted account)
+  body: string;                       // markdown; "" when GitHub sent none
+  createdAt: string;                  // ISO-8601 as GitHub sent it
+  updatedAt: string | null;           // equal to createdAt until the comment is edited; null when the API omitted it
+  url: string;                        // html_url of the comment
+  authorAssociation?: string | null;  // OWNER / MEMBER / COLLABORATOR / CONTRIBUTOR / NONE / …
+};
+```
+
+It is fetched with the other PR data — `gh api --hostname <host> --paginate --slurp repos/O/R/issues/N/comments`, the same
+host, pagination and error handling as the inline comments — on `pr_open` (together with detail, files, comments and
+reviews: one failure fails the open as before), and again on `pr_reload_comments`, which reloads the inline comments and
+the conversation together (so does `refresh {scope: ["pr"]}` while a PR is open, and the reload after `pr_submit` /
+`pr_reply`). A failed reload keeps what was loaded and sets `errorText`. The list is GitHub's order (oldest first); it is
+`[]` while no PR is selected, cleared on `pr_open` of another PR and on `pr_close`. The PR description needs nothing new:
+it is `state.pr.selected.body` (`PRDetail.body`).
+
+**Command.** `pr_comment {body: string}` (PR lane) posts a general comment on the selected PR:
+`gh api --hostname <host> -X POST repos/O/R/issues/N/comments --input -` with `{"body": <body>}` on stdin (never in an
+argv), the same `gh`, host and account as `pr_reply`. The body goes as typed (only its emptiness is judged on the trimmed
+text). On success the posted comment is appended to `conversation` at once, the conversation is reloaded, and the reply is
+`result{ok:true}`; a failed reload after a successful post only sets `errorText` (the comment was posted). While it posts
+`state.pr.isCommenting` is true; it is a flag of its own — `isSubmitting` stays for `pr_submit` / `pr_reply`, so a
+comment never shows the review as submitting (a `pr_submit` sent meanwhile simply waits behind it on the PR lane).
+Refusals (`result{ok:false}` only, no `error` event; `errorText` untouched — the composer keeps the text and shows why):
+
+| code (`result.code`; `error`) | when |
+| --- | --- |
+| `no_pr_selected` | no PR is selected (`state.pr.selectedSummary == null`) |
+| `empty_body` | `body` is missing or only whitespace |
+| `pr_comment_failed` (`pr_comment_failed:<the first line of gh's message>`) | `gh` failed (not logged in to the host, no access, network, …) or is missing |
+| `not_a_git_repo` (`not_a_git_repo:pr_comment`) | the project is tracked without git (§59), like every PR command |
+
+**Clients.** Show the conversation as one time-ordered thread: the PR description first (`selected.body`, by
+`selected.author`), then the conversation comments (`createdAt`) and the reviews (`reviews[]` by `submittedAt`, with their
+`state` and `body`; a `PENDING` review has no `submittedAt` and stays out) merged by time. A review whose body is empty
+still marks its state (approved / changes requested). An edited comment (`updatedAt` later than `createdAt`) may say so.
+Inline comments stay on the diff as before. Under the thread a composer posts `pr_comment`: its send button is disabled
+while the text is blank or `isCommenting` is true, the text is cleared only on `ok:true`, and a refusal shows its words
+under the composer (the text stays). Clients send it only for a git project (§59 hides the PR tab otherwise).
+
+**Mac.** The PR detail opens on **Conversation**, a segment of `Conversation | Code comments (N) | Files (N)` under its
+header (another PR opens on Conversation again). Conversation is the thread above (`PRTimeline.items`; a `COMMENTED`
+review with an empty body stays out too — GitHub makes one for each batch of inline comments, which are listed under
+Code comments), each entry with its author, a relative time (the exact one on hover), "edited", the body as Markdown (a
+template's `<!-- … -->` hidden) and "Open on GitHub" (button and context menu), then "Leave a comment" (⌘↩ posts; the
+text is kept across the three views and goes with another PR). **Code comments** lists every inline comment by file (the
+PR's file order) and line, outdated ones last (`PRCodeComments.group`); a row switches to Files, selects the file and
+scrolls its diff to the line (an outdated row opens the file's outdated comments above the diff). The Reviews list that
+sat above the files is gone: the reviews are in the Conversation now.

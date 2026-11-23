@@ -85,6 +85,24 @@ export type PRReview = {
   url: string | null;
 };
 
+/**
+ * A general comment on the PR's Conversation tab — GitHub serves these as issue comments
+ * (`repos/O/R/issues/N/comments`), apart from inline review comments (`PRComment`) and review bodies (`PRReview`).
+ */
+export type PRIssueComment = {
+  id: number;
+  /** `user.login`; `ghost` when GitHub sent no user (a deleted account). */
+  author: string;
+  body: string;
+  createdAt: string;
+  /** As GitHub sent it (equal to `createdAt` until the comment is edited); null when the API omitted it. */
+  updatedAt: string | null;
+  /** `html_url` of the comment. */
+  url: string;
+  /** OWNER / MEMBER / COLLABORATOR / CONTRIBUTOR / NONE / …; null when the API omitted it. */
+  authorAssociation?: string | null;
+};
+
 /** A not-yet-submitted inline comment, collected by the client and sent with `submitReview`. */
 export type DraftComment = {
   id: string;
