@@ -247,6 +247,10 @@ public final class AppState {
     @ObservationIgnored var logDeduper = SidecarLogDeduper()
     @ObservationIgnored var logFlushScheduled = false
     public private(set) var logs: [String] = []
+    /// MARK: c-panel (§57.18): the bottom panel's 출력 — the log lines and Claude's Bash commands, ≤ 5 000 lines.
+    public internal(set) var output = OutputLog()
+    /// §57.18: the command of each Bash `tool_use` until its `tool_result` comes.
+    @ObservationIgnored var bashCommands: [String: String] = [:]
     public internal(set) var lastError: String?
     /// M13 (audit 4.2): the last engine `error` event with its scope, until the user dismisses it (`dismissErrorBanner()`).
     public internal(set) var errorBanner: ErrorBanner?
@@ -2206,8 +2210,13 @@ public final class AppState {
             if transientNotice != nil { transientNotice = nil }
             finishStreamingAssistant()
             transcript.append(.toolUse(id: UUID(), toolUseId: id, name: name, file: file, input: input, info: info))
+            if name == "Bash", let command = input["command"]?.stringValue {   // §57.18 (results that never came: dropped past 200)
+                if bashCommands.count >= 200 { bashCommands.removeAll() }
+                bashCommands[id] = command
+            }
         case let .toolResult(toolUseId, isError, preview, info):
             transcript.append(.toolResult(id: UUID(), toolUseId: toolUseId, isError: isError, preview: preview, info: info))
+            outputBashResult(toolUseId: toolUseId, isError: isError, preview: preview, truncated: info.truncated)   // §57.18
             liveCallFinished(toolUseId: toolUseId, isError: isError)   // §34.6: the same file edited again moves the HUD's +/−
         case let .permissionRequest(req):
             finishStreamingAssistant()
@@ -2627,6 +2636,7 @@ public final class AppState {
     func appendLog(_ line: String) {
         logs.append(line)
         if logs.count > 500 { logs.removeFirst(logs.count - 500) }
+        output.append(.reviewGate, line)   // MARK: c-panel (§57.18)
         writeLogFile(line)   // wave1 mac-session: ~/Library/Logs/ReviewGate (robustness-03)
     }
 

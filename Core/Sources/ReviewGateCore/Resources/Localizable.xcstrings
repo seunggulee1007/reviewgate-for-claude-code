@@ -17763,6 +17763,22 @@
         }
       }
     },
+    "… (the output was cut)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (the output was cut)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (출력이 잘렸어요)"
+          }
+        }
+      }
+    },
     "…and %lld more": {
       "localizations": {
         "en": {
@@ -18975,6 +18991,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 폴더는 너무 커서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "✗ The command failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✗ The command failed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✗ 명령이 실패했어요"
           }
         }
       }
