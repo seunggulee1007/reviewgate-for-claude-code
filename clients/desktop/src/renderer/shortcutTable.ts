@@ -59,7 +59,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Find References", mac: "⇧F12", win: "Shift+F12" },
       { action: "Back", mac: "⌃-", win: "Alt+←" },
       { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },
-      { action: "Open in IDE", mac: "—", win: "Ctrl+Alt+O", note: "Windows app only" },
+      { action: "Open in IDE", mac: "⌥⌘O", win: "Ctrl+Alt+O" },
     ],
   },
   {
