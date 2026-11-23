@@ -849,6 +849,22 @@
         }
       }
     },
+    "%lld references in %lld files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld references in %lld files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 %lld개 · 파일 %lld개"
+          }
+        }
+      }
+    },
     "%lld retrying": {
       "localizations": {
         "en": {
@@ -6599,6 +6615,22 @@
         }
       }
     },
+    "No references": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No references"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 없음"
+          }
+        }
+      }
+    },
     "No side answer yet — type /btw and your question": {
       "localizations": {
         "en": {
@@ -6631,6 +6663,38 @@
         }
       }
     },
+    "Search stopped after 10 s": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search stopped after 10 s"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10초가 지나 검색을 멈췄어요"
+          }
+        }
+      }
+    },
+    "Showing the best %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the best %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "가장 알맞은 %lld개만 보여요"
+          }
+        }
+      }
+    },
     "This branch has no commits since %@": {
       "localizations": {
         "en": {
@@ -6643,6 +6707,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 이후 이 브랜치에 커밋이 없어요"
+          }
+        }
+      }
+    },
+    "This is not a name that can be looked up": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not a name that can be looked up"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "찾아볼 수 있는 이름이 아니에요"
           }
         }
       }
@@ -14031,6 +14111,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "작업 폴더를 %@로 옮겼어요. 하던 일을 이어서 해 줘."
+          }
+        }
+      }
+    },
+    "stopped after 15 s": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stopped after 15 s"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "15초 뒤 멈춤"
           }
         }
       }
