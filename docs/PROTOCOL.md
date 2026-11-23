@@ -8843,6 +8843,51 @@ Extensions › MCP servers only (§22). No engine command is new: the list is `m
   the filter, ⇥ and Esc; "No server matches" once both were removed ("No MCP servers" when the account has none)
   (`composer /mcp` lines, `composer-mcp-*.png`). Core: `McpPaletteTests`.
 
+### 56.5 The terminal's built-ins in a classic chat
+
+A classic chat's CLI runs in stream-json, where the terminal's interactive built-ins (`/model`, `/resume`, `/config` …)
+do nothing visible — typed from terminal habit they used to go out and vanish. Now the client answers them with its own
+screens; nothing reaches the engine, and the engine and the wire are unchanged. Terminal chats are the real TUI and are
+not touched.
+
+| Typed | What happens (Mac · Windows) |
+|---|---|
+| `/model` | the HUD's model picker; `/model <name>` sets that model at once (a listed model by value or name, else the name as typed, e.g. `opus`) — as a pick in the picker, auto mode goes manual; a refusal in the notice line |
+| `/resume` (`/continue`) | the chat history (⌘Y · Ctrl+H) |
+| `/rewind` (`/checkpoint`) | the rewind sheet of the latest rewind point; none yet: a notice |
+| `/context` | Mac: the HUD's context popover (usage + Compact) · Windows: the Compact dialog (usage + Compact) |
+| `/cost` | the HUD's cost popover (Mac's narrow HUD has none: the context popover) |
+| `/permissions` (`/allowed-tools`) | Settings — Mac › General (its permission section) · Windows › Permissions |
+| `/config` (`/settings`) | Settings |
+| `/agents` | the agent panel opens (never toggles closed) |
+| `/memory` | Applied extensions (CLAUDE.md and memory, subagents) |
+| `/help` | Keyboard Shortcuts |
+| `/status` | a card over the box: model, effort, permission mode, chat, session id, MCP servers (and how many need attention) |
+| `/rename` | the chat tab's rename |
+| `/exit` (`/quit`) | closes the chat tab as ⌘⇧W / Ctrl+Shift+W (it stays in the history, ⌘⇧T / Ctrl+Shift+T reopens it); a tab that cannot close says why |
+
+- **Kept as before:** `/clear` (the app's new chat, §41.1), `/compact` (§27), `/btw` (§56.1), `/mcp` (§56.4), prompt
+  built-ins that work in stream-json (`/init`, `/review`, `/security-review`, `/pr-comments` …) and every command or skill of
+  the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
+  project's `/status` still goes to Claude).
+- **Only the terminal has it** (`/hooks`, `/vim`, `/add-dir`, `/doctor`, `/login`, `/theme`, `/usage` … the list is
+  `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
+  "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
+  its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
+  to Claude as before.
+- **When:** the draft is one line `/name [args]`, on ↩ / ⌘↩ (send, queue, steer, stop-and-send) — and on ↩ with the
+  palette open once the name is typed out (a part of a name still picks from the palette). Names match without case;
+  the terminal's other names (in brackets above) too.
+- **The palette** (classic chats) lists all of them under Built-in with a Korean line of what they do here, `/model`
+  with `[model]`; a built-in the CLI lists that only the terminal has reads "터미널 채팅에서만 돼요 — …".
+- **Mac:** Core `SlashAppCommand.parse` / `SlashCommandCatalog.entries(offersAppCommands:)`; App
+  `ComposerSlashCommands.swift` (`ComposerModel.takeSlashCommand`, `ComposerSlashSlot`, `ComposerSlashHooks`); the HUD's
+  chips open on `WindowModel.hudPopoverTick`, the agent panel on `showAgentPanelTick`. Core: `SlashAppCommandsTests`.
+- **Windows:** `slashAppCommands.ts` (`parseSlashAppCommand`; the palette's entries through `slashEntries(caps, true)` /
+  `withAppMeanings`), `slashAppRun.ts` (`runSlashAppCommand`), taken in `Composer.tsx` (`takeAppCommand`), the card in
+  `SlashCard.tsx`; the HUD's model picker and cost popover and the tab strip's rename take `useSlashUi` requests. Vitest:
+  `slashAppCommands.test.ts`.
+
 ## 57. Terminal chat
 
 A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The

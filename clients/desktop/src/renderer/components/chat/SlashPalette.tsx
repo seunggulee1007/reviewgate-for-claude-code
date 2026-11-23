@@ -40,7 +40,7 @@ export function useSlashPalette(caps: SessionCapabilities | null, token: string 
   const loadUserSettings = useStore((s) => s.settings?.loadUserSettings !== false);
   const [recents, setRecents] = useState<string[]>(() => loadSlashRecents(projectHash));
   useEffect(() => setRecents(loadSlashRecents(projectHash)), [projectHash]);
-  const all = useMemo(() => slashEntries(caps), [caps]);
+  const all = useMemo(() => slashEntries(caps, true), [caps]); // §56.5: the composer is a classic chat's
   const sections = useMemo(() => slashSections(all, token ?? "", recents), [all, token, recents]);
   const entries = useMemo(() => flattenSections(sections), [sections]);
   const emptyState = paletteEmptyState({ caps, entries: all, shown: entries, starting, loadUserSettings });

@@ -333,6 +333,10 @@ struct MainWindow: View {
         .onChange(of: model.toggleAgentPanelTick) { _, _ in
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
         }
+        .onChange(of: model.showAgentPanelTick) { _, _ in   // §56.5: `/agents`
+            if !tab.showsReview { tab = .changes }
+            showAgentPanel = true
+        }
         .sheet(isPresented: $showGitInit, onDismiss: { if store.needsGitInit { store.cancelGitInit() } }) {
             GitInitSheet()
         }

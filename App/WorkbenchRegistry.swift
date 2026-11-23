@@ -179,6 +179,12 @@ final class WindowModel {
     var renameChatTick = 0
     /// Chat › "이미지 첨부…": the composer opens its image picker.
     var attachImagesTick = 0
+    // MARK: b-slash (§56.5)
+    /// A HUD popover a typed built-in opens (`/model`, `/context`, `/cost`): the HUD's chip shows `hudPopover` on the tick.
+    var hudPopover: HUDPopoverRequest = .model
+    var hudPopoverTick = 0
+    /// `/agents`: the agent panel opens (never closes, as View › Toggle Agent Panel may).
+    var showAgentPanelTick = 0
     /// PX-19: chats whose tabs were closed in this window, the latest last — Chat › "닫은 채팅 탭 다시 열기" (⌘⇧T).
     var closedChatTabs: [String] = []
     /// P2-review-09: where the user last clicked — ⌘F finds in the diff after a click in it. Read when a command runs; not

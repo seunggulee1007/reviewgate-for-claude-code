@@ -132,3 +132,9 @@
 .context-banner > button { flex: none; }
 .composer > .draft-chips { max-height: 96px; overflow-y: auto; }
 .transcript .user-row:first-child { margin-top: 12px; }
+
+/* ---- §56.5 the card over the box: /status, or a built-in only the terminal has (SlashCard.tsx) */
+.slash-card { display: flex; align-items: flex-start; gap: 6px; background: var(--bg-3); color: var(--fg); border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; }
+.slash-status { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; }
+.slash-status-row { display: contents; }
+.slash-terminal-only { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }

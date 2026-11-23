@@ -54,9 +54,12 @@ import { ExternalEditBar } from "./ExternalEditBar"; // §56.3
 import { isExternalEditKey, useExternalEdit } from "../../externalEdit";
 import { SlashPalette, slashPaletteShows, slashToken, useSlashPalette, type SlashEntry } from "./SlashPalette";
 import { McpPalette } from "./McpPalette"; // §56.4
+import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
+import { parseSlashAppCommand } from "../../slashAppCommands";
+import { runSlashAppCommand } from "../../slashAppRun";
 import { actionDoneAll, actionProgress, actionProgressAll, commandFilter, completing, disabledReason, isAll, mcpRows, mcpTarget, noServerText, parseMcpCommand, primaryAction, rowStatus, toggleAction, unavailableReason, type McpAction, type McpCommand } from "../../mcpPalette";
 import type { McpServerInfo } from "@reviewgate/engine";
-import { capabilitiesCaption } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
+import { capabilitiesCaption, slashEntries } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
 // MARK: wave3 desktop-agents — §36.4 the "main is waiting" line, §36.1 a report handed over from the agent details sheet
 import { WaitingLine } from "../agents/AgentBits";
 // MARK: wave3 desktop-flow — §36.14 PR comments handed to the composer (desktop-agents' bridge, the same file)
@@ -114,6 +117,7 @@ export function Composer() {
   const saidResized = useRef(new Set<number>()); // r2-chats-cards M34
   imagesRef.current = images;
   const [attachErrors, setAttachErrors] = useState<string[]>([]);
+  const [slashCard, setSlashCard] = useState<SlashCardKind | null>(null); // §56.5: /status, or a built-in only the terminal has
   const [dropping, setDropping] = useState(false);
   const [caret, setCaret] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -647,9 +651,33 @@ export function Composer() {
     return true;
   };
 
+  /**
+   * §56.5: a built-in the app answers (/model, /resume, /status …) opens its screen and leaves the box; one only the
+   * terminal has (/hooks …) stays in the box, never sent — the card offers a terminal chat. False for anything else.
+   */
+  const takeAppCommand = (): boolean => {
+    if (state.project === null) return false;
+    const cmd = parseSlashAppCommand(draft, slashEntries(caps, true)); // the session's every command: the user's own of the name wins
+    if (!cmd) return false;
+    setSplitOpen(false);
+    closePalette();
+    setSlashCard(null);
+    if (cmd.kind !== "terminalOnly") {
+      palette.record(cmd.kind);
+      setDraft("");
+      setNav(IDLE_NAV);
+    }
+    const outcome = runSlashAppCommand(cmd, (text) => setAttachErrors([text]));
+    if (outcome && "card" in outcome) setSlashCard(outcome.card);
+    else if (outcome) setAttachErrors([outcome.notice]);
+    inputRef.current?.focus();
+    return true;
+  };
+  useEffect(() => setSlashCard(null), [liveChatId]); // the card was the other chat's
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!canSend || draft.trim().length === 0) return;
     if (viewing) {
       // wave4b w4b-tabs (§39.2): move the session to this chat first; a refused switch gives the text back.
@@ -680,7 +708,7 @@ export function Composer() {
 
   /** "Add to queue": sent in order once a plain Send is allowed again. */
   const doQueue = () => {
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!queueMode || !hasText) return;
     setDraft("");
     closePalette();
@@ -696,7 +724,7 @@ export function Composer() {
    */
   const doSteer = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!canSteer || !hasText) return;
     const text = draft;
     const sentMentions = mentions;
@@ -717,7 +745,7 @@ export function Composer() {
    */
   const doAnswer = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!question) return;
     if (!hasText) {
       if (!questionReady) return;
@@ -744,7 +772,7 @@ export function Composer() {
   /** r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as its instruction; the text leaves the box. */
   const doDenyWithText = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     const text = draft.trim();
     if (!cardForText || text.length === 0) return;
     useStore.getState().respondPermission(cardForText, false, text);
@@ -764,7 +792,7 @@ export function Composer() {
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!running || !hasText) return;
     setDraft("");
     closePalette();
@@ -781,7 +809,7 @@ export function Composer() {
   };
 
   const sendAccepting = () => {
-    if (takeBtw() || takeMcp()) return; // §56.1 / §56.4
+    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
     if (!acceptAndSend || draft.trim().length === 0) return;
     const count = pending;
     setDraft("");
@@ -1011,6 +1039,7 @@ export function Composer() {
         e.preventDefault();
         if (isEnter(e) && token?.toLowerCase() === "btw" && takeBtw()) break; // §56.1: `/btw` typed out runs at once
         if (isEnter(e) && token?.toLowerCase() === "mcp" && takeMcp()) break; // §56.4: `/mcp` typed out opens the list
+        if (isEnter(e) && takeAppCommand()) break; // §56.5: a built-in the app answers, typed out, runs at once
         if (entries.length === 0) closePalette();
         else pick(entries[Math.min(paletteIndex, entries.length - 1)]!);
         break;
@@ -1104,6 +1133,7 @@ export function Composer() {
       )}
       {dropping && <div className="drop-hint" aria-hidden="true">{t("Drop files to mention them, or images to attach")}</div>}
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
+      {slashCard !== null && <SlashCard card={slashCard} onClose={() => setSlashCard(null)} /* §56.5 */ />}
       <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
       <textarea
         ref={inputRef}

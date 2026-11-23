@@ -1339,6 +1339,22 @@
         }
       }
     },
+    "%lld servers · %lld need attention": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld servers · %lld need attention"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "서버 %lld개 · 확인 필요 %lld개"
+          }
+        }
+      }
+    },
     "%lld side questions here — click to open the newest": {
       "localizations": {
         "en": {
@@ -11266,7 +11282,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "임시"
+            "value": "초안"
           }
         }
       }
@@ -12151,6 +12167,22 @@
         }
       }
     },
+    "Nothing to rewind yet — no message has a rewind point": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to rewind yet — no message has a rewind point"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 되돌릴 수 없어요 — 되돌리기 지점이 있는 메시지가 없어요"
+          }
+        }
+      }
+    },
     "Old line %lld": {
       "localizations": {
         "en": {
@@ -12163,6 +12195,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이전 %lld번 줄"
+          }
+        }
+      }
+    },
+    "Opens a terminal chat, where every / command works": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens a terminal chat, where every / command works"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅을 열어요 — 거기서는 모든 / 명령이 돼요"
           }
         }
       }
@@ -12647,6 +12695,22 @@
         }
       }
     },
+    "This chat's conversation goes on in a terminal chat, where every / command works": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat's conversation goes on in a terminal chat, where every / command works"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 대화를 터미널 채팅에서 이어가요 — 거기서는 모든 / 명령이 돼요"
+          }
+        }
+      }
+    },
     "This file is not in the PR's file list, so there is no diff to show": {
       "localizations": {
         "en": {
@@ -12659,6 +12723,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 파일은 PR의 파일 목록에 없어서 보여 줄 diff가 없어요"
+          }
+        }
+      }
+    },
+    "This tab can't be closed — it is the only chat tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This tab can't be closed — it is the only chat tab"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 탭은 닫을 수 없어요 — 하나뿐인 채팅 탭이에요"
           }
         }
       }

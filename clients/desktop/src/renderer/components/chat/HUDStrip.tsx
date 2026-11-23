@@ -29,6 +29,7 @@ import { UsageLimitChip } from "./LongWorkChips"; // MARK: wave4 w4-longwork
 import { DiskSpaceChip } from "../StorageNotices"; // MARK: wave4b w4b-bigturn
 import { agentsHudLine, toolTitle } from "../../agentGlance"; // MARK: wave4b w4b-agents
 import { HudCostButton } from "./CostPopover"; // MARK: wave4d w4d-agents2 (§42.4)
+import { useSlashUi } from "../../slashAppRun"; // MARK: b-slash (§56.5)
 
 /** `950` → `950`, `12_345` → `12.3k`, `1_000_000` → `1M`, `1_500_000` → `1.5M`. */
 export function formatTokens(n: number): string {
@@ -187,6 +188,10 @@ function ModelChip({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => 
 export function HUDStrip() {
   const state = useStore((s) => s.state);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const slashHud = useSlashUi((s) => s.hud); // §56.5: `/model` typed in the composer
+  useEffect(() => {
+    if (slashHud?.kind === "model") setPickerOpen(true);
+  }, [slashHud]);
   const hud = state.hud;
   const running = isRunning(state);
   const remembered = rememberedAllowsOf(state);
