@@ -2975,8 +2975,15 @@ private final class Tour {
             ? "the file list back, chat view \(size(host)), SIGWINCH ×\(closeSignals)" : "— LOST (open \(model.reviewPanelOpen), file list \(sidebarBack), \(size(host)), SIGWINCH ×\(closeSignals))"))
         await ptyFollows(host, "drawer closed")
         try write(try render(window), "terminal-chat-panel-closed-dark")
+        // §57.5: opened by the user (⌘⇧D, the edge tab) the drawer takes the keyboard — ↑ / ↓ / ⌘↩ work at once.
+        host.focus()
         entry.model.toggleDiffTick += 1
         _ = await waitFor(seconds: 5) { model.reviewPanelOpen }
+        let tookKeys = await waitFor(seconds: 3) { !host.isFocused }
+        log("terminal: drawer keyboard — " + (tookKeys ? "the drawer the user opened took it (\(String(describing: window.firstResponder.map { type(of: $0) })))"
+                                                      : "INFO the terminal kept it (a quiet window may hold no focus)"))
+        try await Task.sleep(for: .milliseconds(600))
+        try write(try render(window), "terminal-chat-drawer-opened-dark")
         // A wide window: side by side, the terminal at 80 columns or more, the divider moving it within that.
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1440, height: 900)), display: true)
         _ = await waitFor(seconds: 5) { model.terminalReviewLayout == .sideBySide }

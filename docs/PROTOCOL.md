@@ -9135,10 +9135,12 @@ chat's id);
     and once when it closes (one SIGWINCH each, the tour checks); off, the drawer keeps the old rule (nothing under it
     resizes). The agent panel's own hiding of the sidebar (narrow windows) is left to it.
   - *The drawer and the keyboard.* It opens and closes as the panel does (the edge tab, ⌘⇧D, by itself on each new review,
-    closed when the review empties) and takes no keyboard by itself — the terminal keeps it; a click in the drawer gives it
-    the keyboard (accept / reject keys work there), and then Esc closes it (`onExitCommand`; Esc in the terminal stays the
-    TUI's). The edge tab's tooltip says the drawer is over the terminal, next to the file list; VoiceOver: "터미널 위 리뷰 패널", with the hint that
-    Esc or ⌘⇧D closes it.
+    closed when the review empties). Opened by the user (the edge tab, ⌘⇧D) it takes the keyboard at once: ↓ / ↑ the next /
+    previous change (Review › Next / Previous Change), ⌘↩ accepts the file on screen and goes on to the next pending one (as
+    ⌘⇧A), Esc closes it (`onExitCommand`). Opened by itself for a new review it takes nothing — the terminal keeps the
+    keyboard (Esc there stays the TUI's); a click in it gives it the keyboard. Closing the drawer that holds the keyboard (Esc,
+    ⌘⇧D, the last file accepted) gives it back to the terminal, and so does the window widening into side by side under it.
+    VoiceOver: "터미널 위 리뷰 패널", with the hint "↑ / ↓로 변경을 오가고, ⌘↩로 파일을 수락하고, Esc나 ⌘⇧D로 닫아요".
   - *The header in the panel.* Under 480 pt (the drawer, a narrow side-by-side panel; a laptop window's diff pane beside a
     chat too) the diff header is one line: the file's status and path (cut in the middle), +n −m, "⋯", Reject as an icon
     (its word in the tooltip and for VoiceOver) and Accept, prominent, with its word. "⋯" holds the rest — the range

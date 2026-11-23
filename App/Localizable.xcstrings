@@ -33525,6 +33525,22 @@
         }
       }
     },
+    "↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ / ↓로 변경을 오가고, ⌘↩로 파일을 수락하고, Esc나 ⌘⇧D로 닫아요"
+          }
+        }
+      }
+    },
     "↑ ↓ to move · ↩ to open · Esc to close · Name.java:120 opens at a line": {
       "localizations": {
         "en": {

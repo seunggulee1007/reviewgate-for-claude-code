@@ -96,6 +96,8 @@ struct MainWindow: View {
     @State private var sidebarHiddenForReview = false
     /// The user brought the sidebar back while the panel was open: it stays until the panel closes.
     @State private var sidebarKeptForReview = false
+    /// §57.5: the drawer holds the keyboard (the user opened it): ↑ / ↓ go through the changes, ⌘↩ accepts, Esc closes.
+    @FocusState private var drawerFocused: Bool
     /// §16: the applied-extensions sheet (from the fallback banner).
     @State private var showExtensions = false
     // MARK: wave4 w4-install
@@ -541,7 +543,11 @@ struct MainWindow: View {
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { terminalAreaWidth = $0 }
         }
-        .onChange(of: terminalLayout, initial: true) { _, layout in model.terminalReviewLayout = layout }
+        .onChange(of: terminalLayout, initial: true) { _, layout in
+            model.terminalReviewLayout = layout
+            // The window widened under a drawer that held the keyboard: the drawer is gone, the terminal has it again.
+            if layout == .sideBySide, drawerFocused { model.terminals.focus(chatId: store.currentSessionId) }
+        }
         .onChange(of: diffCollapsed, initial: true) { _, collapsed in model.reviewPanelOpen = !collapsed }
     }
 
@@ -552,8 +558,9 @@ struct MainWindow: View {
     }
 
     /// §57.5: the review panel over the terminal in a narrow window — on its left, next to the file list, from under the
-    /// chat tabs to the bottom, a shadow on its edge, a strip of the terminal left visible. It takes no keyboard by itself (the terminal keeps it); a click in it does, and then
-    /// Esc closes it (Esc in the terminal stays the TUI's).
+    /// chat tabs to the bottom, a shadow on its edge, a strip of the terminal left visible. Opened by the user (the edge tab,
+    /// ⌘⇧D) it takes the keyboard — ↑ / ↓ the next / previous change, ⌘↩ accept, Esc closes it and the terminal has the
+    /// keyboard again; opened by itself for a new review it leaves the keyboard in the terminal (Esc there stays the TUI's).
     private var reviewDrawer: some View {
         reviewPane
             .frame(width: CGFloat(PaneSplit.reviewDrawerWidth(total: Double(terminalAreaWidth), reviewFloor: Self.reviewFloorWidth)))
@@ -562,10 +569,21 @@ struct MainWindow: View {
             .overlay(alignment: .trailing) { Divider() }
             .compositingGroup()
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.55 : 0.22), radius: 14, x: 4)
+            .focusable()
+            .focusEffectDisabled()
+            .focused($drawerFocused)
+            .onKeyPress(.downArrow) { model.nextChangeTick += 1; return .handled }
+            .onKeyPress(.upArrow) { model.previousChangeTick += 1; return .handled }
+            .onKeyPress(.return, phases: .down) { press in
+                // ⌘↩: accept the file on screen (as ⌘⇧A) and go on to the next pending one.
+                guard press.modifiers == .command, let file = store.selectedFile, file.state == .pending, !store.isAcceptLocked else { return .ignored }
+                ReviewUndo.accept(file, store: store)
+                return .handled
+            }
             .onExitCommand { setDiffCollapsed(true) }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("Review panel over the terminal"))
-            .accessibilityHint(Text("Esc or ⌘⇧D closes it; the terminal behind it keeps its width"))
+            .accessibilityHint(Text("↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it"))
             .accessibilityIdentifier("Review drawer")
             #if DEBUG
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugReviewFrame = $0 }
@@ -626,13 +644,27 @@ struct MainWindow: View {
     private func setDiffCollapsed(_ collapsed: Bool, remember: Bool = true) {
         guard collapsed != diffCollapsed else { return }
         if store.shownChatIsTerminal {
+            // §57.5: the drawer the user opens takes the keyboard (not one that opens by itself for a review); closing the
+            // drawer that held it gives it back to the terminal.
+            let handBack = collapsed && drawerFocused
+            let focusDrawer = !collapsed && remember && openedLayout == .overlay
             // §57.5: no animation beside a terminal — each of its frames resized the terminal, and the TUI redrew at every
             // width on the way (nine SIGWINCHs for one open); now one resize, one redraw.
             diffCollapsed = collapsed
+            if focusDrawer { Task { @MainActor in drawerFocused = true } }   // once the drawer is in the window
+            if handBack { model.terminals.focus(chatId: store.currentSessionId) }
         } else {
             withAnimation(.easeInOut(duration: 0.15)) { diffCollapsed = collapsed }
         }
         if remember { updateUIState { $0.diffCollapsed = collapsed } }
+    }
+
+    /// §57.5: the layout the review panel opens in — side by side where moving the file list away makes room for it.
+    private var openedLayout: TerminalReviewLayout {
+        let minTerminal = Double(TerminalHost.width(columns: Self.terminalColumns))
+        guard reviewHidesSidebar, columnVisibility != .detailOnly, !sidebarKeptForReview, terminalAreaWidth > 0 else { return terminalLayout }
+        return PaneSplit.terminalReviewLayout(total: Double(terminalAreaWidth + sidebarWidth), minTerminal: minTerminal,
+                                              reviewFloor: Self.reviewFloorWidth)
     }
 
     // MARK: Per-project UI state (M15)
