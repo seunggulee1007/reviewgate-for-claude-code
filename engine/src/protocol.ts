@@ -672,6 +672,8 @@ export type EngineCommand =
   | Cmd<"pr_submit", { event: ReviewEvent; body: string }>
   | Cmd<"pr_reply", { commentId: number; body: string }>
   | Cmd<"pr_reload_comments">
+  /** §60: a general comment on the selected PR's conversation; `no_pr_selected` / `empty_body` / `pr_comment_failed:<gh's first line>`. */
+  | Cmd<"pr_comment", { body: string }>
   | Cmd<"accounts">
   | Cmd<"login_in_terminal", { host: string }>
   /** §50: a message into the turn that runs (as typing while Claude works in the terminal); `steer_unavailable:<why>` otherwise. */
@@ -1420,6 +1422,8 @@ export type PRState = {
   accounts: GHAccount[];
   isLoading: boolean;
   isSubmitting: boolean;
+  /** §60: a `pr_comment` is being posted (never sets `isSubmitting`). Always sent (optional for older engines). */
+  isCommenting?: boolean;
   errorText: string | null;
   lastSubmitResult: SubmitResultState | null;
   /** Last successful `pr_create` of this engine. */

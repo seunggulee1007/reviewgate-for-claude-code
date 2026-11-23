@@ -21,7 +21,7 @@ import {
 /** The subset of `GHClient` the store drives; tests substitute a fake. */
 export type GHClientLike = Pick<
   GHClient,
-  "myOpenPRs" | "reviewRequestedPRs" | "detail" | "files" | "comments" | "conversation" | "reviews" | "submitReview" | "reply"
+  "myOpenPRs" | "reviewRequestedPRs" | "detail" | "files" | "comments" | "conversation" | "reviews" | "submitReview" | "reply" | "comment"
 >;
 
 export type ResolvedGH = { path: string; env: Record<string, string | undefined> };
@@ -61,6 +61,8 @@ export class PRStore {
   selectedDiff: FileDiff | null = null;
   isLoading = false;
   isSubmitting = false;
+  /** §60: a `pr_comment` is being posted. Apart from `isSubmitting`: a review's state is not the conversation composer's. */
+  isCommenting = false;
   /** `gh` stderr verbatim (or a decoding error) from the last failed call; null after a success. */
   errorText: string | null = null;
   draftComments: DraftComment[] = [];
@@ -299,6 +301,41 @@ export class PRStore {
     } finally {
       this.isSubmitting = false;
       this.changed();
+    }
+  }
+
+  /**
+   * §60: posts `body` on the selected PR's conversation (`issues/N/comments`), shows it at once and reloads the conversation.
+   * A `gh` failure is thrown (the engine refuses `pr_comment_failed`), `errorText` untouched; a failed reload after a
+   * successful post only sets `errorText`.
+   */
+  async comment(body: string): Promise<void> {
+    const summary = this.selectedSummary;
+    if (!summary) throw new Error("no PR selected");
+    this.isCommenting = true;
+    this.changed();
+    try {
+      const client = await this.makeClient();
+      const posted = await client.comment(summary.repo, summary.number, body);
+      if (this.selectedSummary !== summary) return;
+      if (!this.conversation.some((c) => c.id === posted.id)) this.conversation = [...this.conversation, posted];
+      this.changed();
+      await this.reloadConversation(summary);
+    } finally {
+      this.isCommenting = false;
+      this.changed();
+    }
+  }
+
+  private async reloadConversation(summary: PRSummary): Promise<void> {
+    try {
+      const client = await this.makeClient();
+      const list = await client.conversation(summary.repo, summary.number);
+      if (this.selectedSummary !== summary) return;
+      this.conversation = list;
+      this.errorText = null;
+    } catch (e) {
+      this.errorText = message(e);
     }
   }
 

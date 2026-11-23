@@ -82,6 +82,9 @@ class FakeClient implements GHClientLike {
   submitResult: PRReview = { ...reviewOf(99), url: "https://github.com/acme/widgets/pull/1#pullrequestreview-99" };
   lastSubmit: Parameters<GHClientLike["submitReview"]>[2] | null = null;
   lastReply: { commentId: number; body: string } | null = null;
+  lastComment: { n: number; body: string } | null = null;
+  /** Fails only `conversation` (the reload after a post). */
+  failConversation: Error | null = null;
 
   private guard() {
     if (this.failWith) throw this.failWith;
@@ -115,6 +118,7 @@ class FakeClient implements GHClientLike {
   async conversation(_repo: string, n: number) {
     this.calls.push(`conversation:${n}`);
     this.guard();
+    if (this.failConversation) throw this.failConversation;
     return this.conversationResult;
   }
   async reviews(_repo: string, n: number) {
@@ -133,6 +137,12 @@ class FakeClient implements GHClientLike {
     this.guard();
     this.lastReply = { commentId, body };
     return commentOf(12, commentId);
+  }
+  async comment(_repo: string, n: number, body: string) {
+    this.calls.push(`comment:${n}`);
+    this.guard();
+    this.lastComment = { n, body };
+    return { ...issueCommentOf(40), body };
   }
 }
 
@@ -290,6 +300,47 @@ describe("PRStore", () => {
     expect(client.lastReply?.commentId).toBe(555);
     expect(store.isSubmitting).toBe(false);
     expect(store.errorText).toBeNull();
+  });
+
+  test("comment posts on the selected PR, shows the comment at once and reloads the conversation; isSubmitting stays false", async () => {
+    const seen: [boolean, boolean][] = [];
+    let watched: PRStore | null = null;
+    const { store, client } = makeStore({ onChange: () => void (watched && seen.push([watched.isCommenting, watched.isSubmitting])) });
+    await store.refresh();
+    await store.open("github.com/acme/widgets#1");
+    client.calls = [];
+    watched = store;
+    client.conversationResult = [issueCommentOf(30), { ...issueCommentOf(40), body: "  Looks good\n" }];
+    await store.comment("  Looks good\n");
+    expect(client.lastComment).toEqual({ n: 1, body: "  Looks good\n" }); // sent as typed
+    expect(client.calls).toEqual(["comment:1", "conversation:1"]);
+    expect(store.conversation.map((c) => c.id)).toEqual([30, 40]);
+    expect(store.isCommenting).toBe(false);
+    expect(seen[0]).toEqual([true, false]);
+    expect(seen.every(([, submitting]) => !submitting)).toBe(true);
+
+    // The post worked but the reload failed: the posted comment shows, errorText says why.
+    client.conversationResult = [issueCommentOf(30)];
+    store.conversation = [issueCommentOf(30)];
+    client.failConversation = new GHError(1, "HTTP 502\n", ["api"]);
+    await store.comment("again");
+    expect(store.conversation.map((c) => c.id)).toEqual([30, 40]);
+    expect(store.errorText).toBe("HTTP 502");
+    expect(store.isCommenting).toBe(false);
+  });
+
+  test("a failed comment throws gh's error and leaves errorText and the conversation alone", async () => {
+    const { store, client } = makeStore();
+    await store.refresh();
+    await store.open("github.com/acme/widgets#1");
+    client.failWith = new GHError(1, "HTTP 403: Resource not accessible by integration\n", ["api"]);
+    await expect(store.comment("hi")).rejects.toThrow("HTTP 403: Resource not accessible by integration");
+    expect(store.errorText).toBeNull();
+    expect(store.conversation.map((c) => c.id)).toEqual([30]);
+    expect(store.isCommenting).toBe(false);
+
+    store.close();
+    await expect(store.comment("hi")).rejects.toThrow("no PR selected");
   });
 
   test("gh failure surfaces stderr verbatim in errorText; drafts survive", async () => {

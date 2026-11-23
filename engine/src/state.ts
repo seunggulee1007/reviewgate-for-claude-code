@@ -225,6 +225,7 @@ export function prState(pr: PRStore): PRState {
     accounts: pr.accounts,
     isLoading: pr.isLoading,
     isSubmitting: pr.isSubmitting,
+    isCommenting: pr.isCommenting,
     errorText: pr.errorText,
     lastSubmitResult: pr.lastSubmitResult,
     lastCreatedPR: pr.lastCreatedPR,

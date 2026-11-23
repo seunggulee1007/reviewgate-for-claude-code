@@ -119,6 +119,15 @@ export class GHClient {
     return decodeComment(parseJSON(data));
   }
 
+  /** §60: a general comment on the PR's Conversation tab (`POST issues/N/comments`). */
+  async comment(repo: string, number: number, body: string): Promise<PRIssueComment> {
+    const data = await this.run(
+      ["api", "--hostname", this.host, "-X", "POST", `repos/${repo}/issues/${number}/comments`, "--input", "-"],
+      Buffer.from(JSON.stringify({ body }), "utf8"),
+    );
+    return decodeIssueComment(parseJSON(data));
+  }
+
   // MARK: wave4c w4c-review — §41.3 "20줄 더 보기" in a PR's diff
 
   /** The raw bytes of `path` at commit `ref` (`repos/O/R/contents/<path>?ref=…`, raw media type). */

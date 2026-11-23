@@ -134,4 +134,57 @@ describe("§60 the PR conversation", () => {
     expect(h.engine.state.pr.conversation).toEqual([]);
     expect(h.engine.state.pr.selected).toBeNull();
   });
+
+  it("pr_comment posts the body to issues/N/comments through stdin, then the conversation has it; isCommenting while it posts", async () => {
+    const { h, calls, conversationIds } = await setup();
+    await h.engine.request({ type: "pr_list" });
+    await h.engine.request({ type: "pr_open", summaryId: "github.com/acme/widgets#7" });
+    expect(h.engine.state.pr.isCommenting).toBe(false);
+    const before = calls().length;
+    const states = h.states.length;
+
+    const body = "Thanks — merging after CI.\n\n```ts\nconst a = 1;\n```";
+    await h.engine.request({ type: "pr_comment", body });
+    const made = calls().slice(before);
+    expect(made[0]).toEqual({
+      args: ["api", "--hostname", "github.com", "-X", "POST", "repos/acme/widgets/issues/7/comments", "--input", "-"],
+      input: JSON.stringify({ body }),
+    });
+    expect(made.slice(1).map((c) => c.args.at(-1))).toEqual(["repos/acme/widgets/issues/7/comments"]); // the reload
+    expect(conversationIds()).toEqual([3001, 3002, 3003, 4003]);
+    expect(h.engine.state.pr.conversation?.at(-1)).toMatchObject({ id: 4003, author: "me", body, authorAssociation: "OWNER" });
+    await h.settle();
+    const seen = h.states.slice(states).map((s) => [s.pr.isCommenting, s.pr.isSubmitting]);
+    expect(seen).toContainEqual([true, false]);
+    expect(seen.at(-1)).toEqual([false, false]);
+    expect(h.engine.state.pr.errorText).toBeNull();
+  });
+
+  it("pr_comment refusals: no selected PR, an empty body, a gh failure (its first line); nothing is posted", async () => {
+    const { dir, h, calls, conversationIds } = await setup();
+    await h.engine.request({ type: "pr_list" });
+    await expect(h.engine.request({ type: "pr_comment", body: "hi" })).rejects.toThrow("no_pr_selected");
+
+    await h.engine.request({ type: "pr_open", summaryId: "github.com/acme/widgets#7" });
+    await expect(h.engine.request({ type: "pr_comment", body: "  \n\t" })).rejects.toThrow("empty_body");
+    expect(calls().some((c) => c.args.includes("POST"))).toBe(false);
+
+    writeFileSync(join(dir, "fail"), "");
+    await expect(h.engine.request({ type: "pr_comment", body: "hi" })).rejects.toThrow(
+      "pr_comment_failed:HTTP 403: Resource not accessible by integration",
+    );
+    const refusals = h.ofType("result").filter((r) => r.ok === false).map((r) => [r.code, r.error]);
+    expect(refusals).toEqual([
+      ["no_pr_selected", "no_pr_selected"],
+      ["empty_body", "empty_body"],
+      ["pr_comment_failed", "pr_comment_failed:HTTP 403: Resource not accessible by integration"],
+    ]);
+    expect(h.ofType("error")).toEqual([]); // a refusal, no error event
+    expect(h.engine.state.pr.errorText).toBeNull();
+    expect(h.engine.state.pr.isCommenting).toBe(false);
+    expect(conversationIds()).toEqual([3001, 3002, 3003]);
+
+    await h.engine.request({ type: "pr_close" });
+    await expect(h.engine.request({ type: "pr_comment", body: "hi" })).rejects.toThrow("no_pr_selected");
+  });
 });

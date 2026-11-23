@@ -101,7 +101,8 @@ type EngineCommand =
   | Cmd<"pr_remove_draft", { draftId: string }>
   | Cmd<"pr_submit", { event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES"; body: string }>
   | Cmd<"pr_reply", { commentId: number; body: string }>
-  | Cmd<"pr_reload_comments">
+  | Cmd<"pr_reload_comments">                             // inline comments + the conversation (§60)
+  | Cmd<"pr_comment", { body: string }>                  // a general comment on the selected PR's conversation (§60)
   | Cmd<"accounts">                                        // gh auth status → state.pr.accounts
   | Cmd<"login_in_terminal", { host: string }>
   | Cmd<"workbench_list">                                  // refresh (with per-worktree dirty) → state.workbenches (§6)
@@ -245,6 +246,7 @@ type ReviewState = {
     draftComments: DraftComment[];   // id: string
     accounts: GHAccount[];
     isLoading: boolean; isSubmitting: boolean; errorText: string | null;
+    isCommenting?: boolean;      // §60: a pr_comment is being posted (never sets isSubmitting)
     lastSubmitResult: { reviewURL: string; inlineCount: number; event: ReviewEvent; submittedAt: string } | null;
     lastCreatedPR: { url: string; branch: string } | null;   // last successful pr_create of this engine
   };
@@ -9644,8 +9646,8 @@ folder (a clone in a subfolder) is its own repository and is guarded as before.
 runs): `branches`, `switch_branch`, `create_branch`; `workbench_list`, `workbench_create`, `workbench_preview`,
 `workbench_remove`, `workbench_prune`, `chat_move`, `plan_response {into: "workbench"}`; `commit`, `commit_hunks`,
 `commit_series`, `commit_draft`, `commit_split_draft`, `commit_format`, `push`; every PR command (`pr_list`, `pr_open`,
-`pr_select_file`, `pr_add_draft`, `pr_remove_draft`, `pr_submit`, `pr_reply`, `pr_reload_comments`, `pr_file_lines`,
-`pr_create`, `pr_draft`, `pr_ai_draft`). `pr_close`, `accounts` and `login_in_terminal` are not about the repository and
+`pr_select_file`, `pr_add_draft`, `pr_remove_draft`, `pr_submit`, `pr_reply`, `pr_reload_comments`, `pr_comment` (§60),
+`pr_file_lines`, `pr_create`, `pr_draft`, `pr_ai_draft`). `pr_close`, `accounts` and `login_in_terminal` are not about the repository and
 stay. `refresh` skips its `branches` / `workbenches` / `pr` parts.
 
 **The hidden repository.** `<dataDir>/shadow-repos/<folder name>-<16 hex of sha256 of the folder's real path>/`
@@ -9761,8 +9763,26 @@ the conversation together (so does `refresh {scope: ["pr"]}` while a PR is open,
 `[]` while no PR is selected, cleared on `pr_open` of another PR and on `pr_close`. The PR description needs nothing new:
 it is `state.pr.selected.body` (`PRDetail.body`).
 
+**Command.** `pr_comment {body: string}` (PR lane) posts a general comment on the selected PR:
+`gh api --hostname <host> -X POST repos/O/R/issues/N/comments --input -` with `{"body": <body>}` on stdin (never in an
+argv), the same `gh`, host and account as `pr_reply`. The body goes as typed (only its emptiness is judged on the trimmed
+text). On success the posted comment is appended to `conversation` at once, the conversation is reloaded, and the reply is
+`result{ok:true}`; a failed reload after a successful post only sets `errorText` (the comment was posted). While it posts
+`state.pr.isCommenting` is true; it is a flag of its own — `isSubmitting` stays for `pr_submit` / `pr_reply`, so a
+comment never shows the review as submitting (a `pr_submit` sent meanwhile simply waits behind it on the PR lane).
+Refusals (`result{ok:false}` only, no `error` event; `errorText` untouched — the composer keeps the text and shows why):
+
+| code (`result.code`; `error`) | when |
+| --- | --- |
+| `no_pr_selected` | no PR is selected (`state.pr.selectedSummary == null`) |
+| `empty_body` | `body` is missing or only whitespace |
+| `pr_comment_failed` (`pr_comment_failed:<the first line of gh's message>`) | `gh` failed (not logged in to the host, no access, network, …) or is missing |
+| `not_a_git_repo` (`not_a_git_repo:pr_comment`) | the project is tracked without git (§59), like every PR command |
+
 **Clients.** Show the conversation as one time-ordered thread: the PR description first (`selected.body`, by
 `selected.author`), then the conversation comments (`createdAt`) and the reviews (`reviews[]` by `submittedAt`, with their
 `state` and `body`; a `PENDING` review has no `submittedAt` and stays out) merged by time. A review whose body is empty
 still marks its state (approved / changes requested). An edited comment (`updatedAt` later than `createdAt`) may say so.
-Inline comments stay on the diff as before.
+Inline comments stay on the diff as before. Under the thread a composer posts `pr_comment`: its send button is disabled
+while the text is blank or `isCommenting` is true, the text is cleared only on `ok:true`, and a refusal shows its words
+under the composer (the text stays). Clients send it only for a git project (§59 hides the PR tab otherwise).
