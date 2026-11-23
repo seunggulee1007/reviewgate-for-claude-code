@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Ke
 import { t, usesMacKeys } from "../../i18n";
 import { tKey } from "../../shortcutKeys";
 import { chatTabKey } from "../../keymap";
-import { newChatRefusal, projectRootHash, sessionsOf, sessionSwitchRefusal, sessionTitle } from "../../sessions";
+import { displayChatTitle, newChatRefusal, projectRootHash, sessionsOf, sessionSwitchRefusal, sessionTitle } from "../../sessions";
 import { isRunning, useStore } from "../../store";
 import { stopViewing, useViewedChat, useViewing, viewChat, viewingOf } from "../../viewedChat";
 import { cancelPendingSwitch, pendingSwitchLabel, pendingSwitchText, switchWaits, usePendingSwitch } from "../../pendingSwitch";
@@ -280,7 +280,7 @@ export function ChatTabs() {
         {ids.map((id, index) => {
           const current = id === sessions.currentId;
           const selected = id === shown;
-          const title = sessionTitle(sessions, id);
+          const title = displayChatTitle(sessionTitle(sessions, id));
           const recordOnly = sessions.list.find((m) => m.id === id)?.resumeFailed === true;
           const live = current && viewing !== null;
           const moved = sessions.list.find((m) => m.id === id)?.movedTo; // MARK: wave4b w4b-follow (§39.4)

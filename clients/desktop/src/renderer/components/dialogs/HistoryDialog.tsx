@@ -9,7 +9,7 @@ import { RelTime } from "../common/RelTime"; // polish PX-21 / P4-composer-35: "
 import { copyWithToast } from "../common/CopyButton";
 import { viewChat } from "../../viewedChat"; // r2-chats-cards M31
 import type { SessionMeta } from "@reviewgate/engine";
-import { sessionsOf, sessionSwitchRefusal } from "../../sessions";
+import { displayChatTitle, sessionsOf, sessionSwitchRefusal } from "../../sessions";
 import { useStore } from "../../store";
 import { RecordOnlyBadge, recordOnlyNote, recordOnlyQuestion } from "../chat/RecordOnly";
 import { Modal } from "../Menu";
@@ -224,7 +224,7 @@ function HistoryRow(props: {
           />
         ) : (
           <div className="row" style={{ gap: 6 }}>
-            <span className="bold truncate" title={m.lastUserText ?? undefined}>{m.title}</span>
+            <span className="bold truncate" title={m.lastUserText ?? undefined}>{displayChatTitle(m.title)}</span>
             {current && <span className="pill">{t("current")}</span>}
             {m.archived && <span className="pill gray">{t("archived")}</span>}
             {m.resumeFailed && <RecordOnlyBadge />}

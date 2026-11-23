@@ -9,7 +9,7 @@
 import { create } from "zustand";
 import type { ReviewState, SessionKind } from "@reviewgate/engine";
 import { t } from "./i18n";
-import { newChatRefusal, sessionsOf } from "./sessions";
+import { displayChatTitle, newChatRefusal, sessionsOf } from "./sessions";
 import type { QueuedExtras } from "./sendQueue";
 import type { ComposerChips } from "./composerBridge";
 
@@ -29,8 +29,7 @@ export function switchWaits(s: ReviewState, queued: boolean): boolean {
 }
 
 function titleOf(s: ReviewState, id: string | null): string {
-  const title = sessionsOf(s).list.find((m) => m.id === id)?.title.trim() ?? "";
-  return title.length > 0 ? title : t("New chat");
+  return displayChatTitle(sessionsOf(s).list.find((m) => m.id === id)?.title.trim() ?? "");
 }
 
 /** What a held switch waits for, in one line (the chip's tooltip, the viewing bar). */
