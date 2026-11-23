@@ -13,6 +13,7 @@ import { isPeerInboundMode, isPermissionMode } from "@reviewgate/engine";
 import type { AppSettings } from "../shared/ipc.js";
 import { isCommitTemplate, isPrRespondCommand, isProjectMap, isWorkbenchSetup } from "../shared/flowSettings.js"; // MARK: wave3 desktop-flow
 import { isProjectRuns } from "../shared/runConfigs.js"; // MARK: c-panel (§57.18)
+import { isTaskStartSettings } from "../shared/taskStartSettings.js"; // MARK: task-start (§63)
 import { PROJECT_HASH } from "./projectPatterns.js";
 import { claudeHome, isClaudeVersionPath } from "./cliPin.js"; // MARK: wave3 desktop-session — §36.8
 import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows
@@ -89,6 +90,10 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   // MARK: §49 Run as Task — the switch, and the prefix the last task branch used ("" or path parts ending in `/`)
   runAsTaskEnabled: bool,
   taskBranchPrefix: (v) => text(200, { singleLine: true })(v) && /^(?:[A-Za-z0-9._-]+\/)*$/.test(v as string),
+  // MARK: task-start — §63: the start screen's switch and Settings › Tasks (the default, and per repository hash)
+  skipStartScreen: bool,
+  taskStartSettings: isTaskStartSettings,
+  projectTaskStartSettings: (v) => isProjectMap(v, isTaskStartSettings),
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),
   openInIde: oneOf("vscode", "idea", "system"), // §62
   commitPushByDefault: bool,

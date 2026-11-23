@@ -11,6 +11,7 @@ import type { WorkbenchSetupReport } from "./flowSettings.js";
 import type { CloseGuardExtras } from "./closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
 import type { MenuEnabled } from "./menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
 import type { ProjectRuns, RunConfig } from "./runConfigs.js"; // MARK: c-panel (§57.18)
+import type { TaskStartSettings } from "./taskStartSettings.js"; // MARK: task-start (§63)
 
 /** M18: UI theme. "system" follows the OS (`nativeTheme` in main, `prefers-color-scheme` in the renderer). */
 export type Appearance = "system" | "light" | "dark";
@@ -78,6 +79,13 @@ export type AppSettings = {
   runAsTaskEnabled?: boolean;
   /** The branch prefix "Run as Task" suggests — the one the last task branch used (absent: `task/`). */
   taskBranchPrefix?: string;
+  // MARK: task-start — §63 (src/shared/taskStartSettings.ts)
+  /** "다음부터 바로 시작": a project window opens straight into its chat, no start screen (absent = the start screen shows). */
+  skipStartScreen?: boolean;
+  /** Settings › Tasks: the default every repository without its own uses (absent = the built-in default). */
+  taskStartSettings?: TaskStartSettings;
+  /** Settings › Tasks of a repository, keyed by `projectRootHash` of its main worktree. */
+  projectTaskStartSettings?: Record<string, TaskStartSettings>;
   claudePath: string;
   ghPath: string;
   gitPath: string;
@@ -401,8 +409,9 @@ export type RGBridge = {
    * Opens `path` in a new workbench window (or focuses the window that has it). wave3 desktop-flow (§36.12): `setupReport` —
    * the new workbench's setup failed; that window shows the exit and the log (`takeWorkbenchSetupReport`). §9 New Chat in a
    * Workbench: `draft` — a message held for a new chat, which that window puts into its composer (`takeWorkbenchDraft`).
+   * §63.4: `created` — the app just created it, so the window opens without the start screen.
    */
-  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport, draft?: string): Promise<void>;
+  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport, draft?: string, created?: boolean): Promise<void>;
   // MARK: wave3 desktop-flow
   /** §36.12: the failed setup's report of this window's new workbench (any of `paths` = its folder), once; null when none. */
   takeWorkbenchSetupReport?(paths: string[]): Promise<WorkbenchSetupReport | null>;

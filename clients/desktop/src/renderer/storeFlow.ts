@@ -402,11 +402,12 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
         if (mine()) setFlow((f) => ({ create: { ...f.create!, running: false, error: words, inUsePath: r.code === "branch_in_use" && r.detail.trim() ? r.detail.trim() : null } }));
         // The sheet was closed meanwhile: the window's banner says it instead.
         const d = get().dialog?.kind;
-        if (d !== "newWorkbench" && d !== "newWorkbenchFromPr" && d !== "workbenchChat") set({ lastError: words, errorBanner: { message: words, scope: "git", fatal: false, code: r.code } });
+        if (d !== "newWorkbench" && d !== "newWorkbenchFromPr" && d !== "workbenchChat" && d !== "taskStart") set({ lastError: words, errorBanner: { message: words, scope: "git", fatal: false, code: r.code } });
         return null;
       }
       // MARK: §49: the next suggestion starts the way this branch did; the composer lets the task's text go.
-      if (req.task) {
+      if (req.task && !req.task.draft) {
+        // §63.2: a task started from the start screen (a draft) has its own prefix (Settings › Tasks) — not Run as Task's.
         const prefix = taskBranchPrefixOf(req.branch);
         if (get().settings?.taskBranchPrefix !== prefix) void get().saveSettings({ taskBranchPrefix: prefix }).catch((e) => log(`[warn] taskBranchPrefix: ${e instanceof Error ? e.message : String(e)}`));
         if (req.handedTask) taskLeftComposer(req.handedTask);
@@ -428,7 +429,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
       // §9 New Chat in a Workbench: what was held for a new chat goes with the window (before it opens: its first chat
       // depends on it).
       const draft = req.handHeldSwitch ? handHeldSwitchToWorkbench() : null;
-      if (hasWindow()) void (draft ? window.rg.openWorkbenchWindow(path, report ?? undefined, draft) : window.rg.openWorkbenchWindow(path, report ?? undefined));
+      // §63.4: a workbench the app just made opens without the start screen.
+      if (hasWindow()) void (draft ? window.rg.openWorkbenchWindow(path, report ?? undefined, draft, true) : window.rg.openWorkbenchWindow(path, report ?? undefined, undefined, true));
       const d = get().dialog?.kind;
       if (d === "newWorkbench" || d === "newWorkbenchFromPr" || d === "workbenchChat") get().openDialog(null);
       return path;

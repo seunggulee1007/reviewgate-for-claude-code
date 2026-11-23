@@ -23,6 +23,7 @@ import { LockConflictDialog } from "./LockConflictDialog";
 import { CompactDialog, RewindDialog } from "./RewindDialog";
 import { NewBranchDialog, NewWorkbenchDialog } from "./NewWorkbenchDialog";
 import { WorkbenchChatDialog } from "./WorkbenchChatDialog"; // §9
+import { TaskStartDialog } from "../start/TaskStartDialog"; // MARK: task-start (§63.3)
 // MARK: wave1 desktop-review
 import { planRejectAll } from "../../reviewGate";
 import { FinishReviewDialog, RejectExternalDialog, StaleReviewDialog } from "./ReviewGateDialogs";
@@ -51,6 +52,8 @@ export function Dialogs() {
       return <NewBranchDialog onClose={close} />;
     case "workbenchChat": // §9 New Chat in a Workbench
       return <WorkbenchChatDialog onClose={close} />;
+    case "taskStart": // MARK: task-start — §63.3: Cancel goes back to the start screen
+      return <TaskStartDialog onClose={close} />;
     case "createPR":
       return <CreatePRDialog onClose={close} />;
     case "submitReview":

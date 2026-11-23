@@ -184,11 +184,16 @@ export function persistWindows(): void {
   persistOpenWindows(open, boundsKeys);
 }
 
-export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2eRole?: "primary" | "secondary" } = {}): Workbench {
+/**
+ * `noStartScreen` (§63.4): the window's first project opens without the start screen — a window the app opens with work of
+ * its own (the launch restore, `REVIEWGATE_PROJECT`, a workbench it just created, a moved chat's worktree, the e2e runs).
+ */
+export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2eRole?: "primary" | "secondary"; noStartScreen?: boolean } = {}): Workbench {
   const settings = loadSettings();
   const args = [`--rg-locale=${app.getLocale()}`];
   if (opts.e2eRole && config.e2e) args.push(`--rg-e2e=${opts.e2eRole}`, `--rg-project=${config.e2e.project}`);
   else if (opts.project) args.push(`--rg-project=${opts.project}`);
+  if (opts.e2eRole || (opts.project && opts.noStartScreen)) args.push("--rg-no-start-screen"); // MARK: task-start (§63.4)
   const saved = opts.bounds ?? (opts.project ? savedBoundsFor(opts.project) : undefined);
   const bounds = saved ? clampToDisplay(saved) : null;
   const win = new BrowserWindow({
@@ -286,7 +291,7 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
       }
     }
     // MARK: wave4b w4b-follow — §39.4: the chat went to another worktree; that worktree's window takes it (or opens).
-    if (ev.type === "chat_moved" && !shuttingDown) routeMovedChat(wb, ev, { findWindowFor, focusWindow, openWindow: (path) => createWindow({ project: path }) });
+    if (ev.type === "chat_moved" && !shuttingDown) routeMovedChat(wb, ev, { findWindowFor, focusWindow, openWindow: (path) => createWindow({ project: path, noStartScreen: true }) });
     if (!forwardsToRenderer(ev)) return; // §57.17: the hook token stays in main
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send("rg:evt", ev);
   });
@@ -398,7 +403,7 @@ export async function restoreWindows(): Promise<boolean> {
   logLine("main", "main", `restore: reopening ${entries.length} window(s): ${entries.map((e) => e.path).join(", ")}`);
   const opened: Workbench[] = [];
   for (const entry of entries) {
-    const wb = createWindow({ project: entry.path, bounds: entry.bounds });
+    const wb = createWindow({ project: entry.path, bounds: entry.bounds, noStartScreen: true }); // §63.4: a restored window
     opened.push(wb);
     for (const deadline = Date.now() + RESTORE_STEP_MS; wb.projectPath === null && Date.now() < deadline; ) await new Promise((r) => setTimeout(r, 50));
   }

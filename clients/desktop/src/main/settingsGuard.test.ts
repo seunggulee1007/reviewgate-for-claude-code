@@ -42,6 +42,19 @@ describe("sanitizeSettingsPatch", () => {
     expect(sanitizeSettingsPatch({ terminalFontSize: 12.5 }).rejected).toEqual(["terminalFontSize"]);
   });
 
+  it("§63: the start screen's switch and Settings › Tasks — the default and per repository hash, known fields only", () => {
+    const tasks = { platform: "jira", branchPrefix: "feature/", location: "workbench", mcpServer: "acme-tracker", promptTemplate: "Work on {id}" };
+    const good = { skipStartScreen: true, taskStartSettings: tasks, projectTaskStartSettings: { "0a1b2c3d": { ...tasks, platform: "github" } } };
+    expect(sanitizeSettingsPatch(good)).toEqual({ patch: good, rejected: [] });
+    const bad = sanitizeSettingsPatch({
+      skipStartScreen: "yes",
+      taskStartSettings: { ...tasks, platform: "someday" },
+      projectTaskStartSettings: { "not-a-hash": tasks },
+    });
+    expect(bad.patch).toEqual({});
+    expect(bad.rejected).toHaveLength(3);
+  });
+
   it("keeps the §33 permission switches only as booleans", () => {
     const ok = sanitizeSettingsPatch({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });
     expect(ok.patch).toEqual({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });

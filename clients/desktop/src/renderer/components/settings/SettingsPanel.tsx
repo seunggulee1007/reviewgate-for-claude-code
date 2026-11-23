@@ -1,6 +1,6 @@
 /**
  * Settings (the Mac app's `SettingsView`, docs/PROTOCOL.md §55.11): a search field over every setting, the tabs General |
- * Permissions | Session | Review | Git & Workbenches | Project | Accounts | Advanced (General used to hold them all), and
+ * Permissions | Session | Review | Git & Workbenches | Tasks (§63) | Project | Accounts | Advanced (General used to hold them all), and
  * one "다음 세션부터 적용돼요 — [지금 재시작]" banner on every tab. Loads `window.rg.getSettings()` on mount when the store
  * has none yet; rendered inside the "settings" dialog by `Dialogs`. A result (or `highlight`) opens its tab and tints its
  * row (`data-setting`).
@@ -14,6 +14,7 @@ import { AccountsTab } from "./AccountsTab";
 import { AdvancedPane, GeneralPane, GitPane, ReviewPane, SessionPane } from "./GeneralTab";
 import { PermissionsTab } from "./PermissionsTab";
 import { ProjectTab } from "./ProjectTab"; // MARK: wave3 desktop-flow
+import { TasksTab } from "./TasksTab"; // MARK: task-start (§63)
 import { AppliesBadge, SettingsRestartBanner } from "./SettingsBits";
 import "./settings.css";
 
@@ -108,6 +109,7 @@ function TabBody({ tab }: { tab: SettingsTab }) {
     case "session": return <SessionPane settings={settings} />;
     case "review": return <ReviewPane settings={settings} />;
     case "git": return <GitPane settings={settings} />;
+    case "tasks": return <TasksTab settings={settings} />;
     case "project": return <ProjectTab />;
     case "advanced": return <AdvancedPane settings={settings} />;
   }

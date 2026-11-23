@@ -34,6 +34,9 @@ export function insertIntoComposer(text: string, chips?: ComposerChips, at: Inse
   return false;
 }
 
+/** MARK: task-start (§63.4): text waits for a composer that is not mounted yet (the start screen then stays away). */
+export const composerTextWaiting = (): boolean => pending !== null;
+
 /** The composer's side: `onInsert` receives what `insertIntoComposer` hands over (and anything that waited). */
 export function useComposerInsert(onInsert: Listener): void {
   const ref = useRef(onInsert);
