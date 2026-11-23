@@ -145,6 +145,11 @@ private final class Tour {
             do { try await composerOnly(); finish(nil) } catch { finish(error) }
             return
         }
+        // `SHOTS_LAYOUT=composerbar`: the rows around the classic chat's message box, on the fake claude.
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "composerbar" {
+            do { try await composerBarShots(); finish(nil) } catch { finish(error) }
+            return
+        }
         // MARK: terminal-chat (§57): `SHOTS_LAYOUT=terminal` — the terminal chat and the shell panel on a fake claude.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
             do { try await terminalOnly(); finish(nil) } catch { finish(error) }
@@ -914,6 +919,67 @@ private final class Tour {
         AppSettings.setAppearance(.dark)
         try await composerTerminalChecks(window)
         try await diffHeaderChecks(window)
+    }
+
+    /// `SHOTS_LAYOUT=composerbar` (on the fake claude: a session that starts and never runs a turn): the rows around the
+    /// classic chat's message box at the laptop's 1000 × 637, dark — a fresh chat (nothing to count yet), the box focused,
+    /// text typed, Claude at work after a few turns, a review pending, the mode offer, and decided permission cards and a
+    /// question in the transcript. `composerbar-<step>.png`; `composerbar <step>:` lines give the transcript's height.
+    private func composerBarShots() async throws {
+        try await wait("session ready", timeout: 180) { $0.isSessionOpen && !$0.isStarting && $0.canSend }
+        guard let window = entry.window else { throw TourError("no window") }
+        try place()
+        window.level = .floating
+        window.orderFrontRegardless()
+        defer { window.level = .normal }
+        AppSettings.setAppearance(.dark)
+        window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1000, height: 637)), display: true)
+        let files = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false),
+                     ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        func shoot(_ step: String) async throws {
+            try await Task.sleep(for: .milliseconds(1500))
+            let image = try render(window)
+            try write(image, "composerbar-\(step)")
+            let room = (try? views(NSScrollView.self, in: window, minSize: 0))?
+                .filter { $0.documentView?.accessibilityIdentifier() != "Composer" && $0.frame.width > 300 }
+                .map(\.frame.height).max() ?? 0
+            log("composerbar \(step): the tallest scroll view (the transcript) \(Int(room)) pt of \(Int(window.contentView?.bounds.height ?? 0))")
+        }
+        window.makeFirstResponder(nil)
+        try await shoot("idle")
+        if let box = composerView(window) { window.makeFirstResponder(box) }
+        try await shoot("focused")
+        setComposerText("Rename SAVE10 to WELCOME10 and keep the tests green", in: window)
+        try await shoot("typed")
+        setComposerText("", in: window)
+        window.makeFirstResponder(nil)
+        // A few turns in, Claude at work.
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        store.debugHandle((1...2).flatMap { Self.turnEvents($0, root: root) })
+        store.debugShowHUDNumbers(contextTokens: 48_200, contextWindow: 200_000, costUSD: 0.42, turns: 2, lastTurnMs: 41_000)
+        store.debugShowComposerState(working: true, files: [])
+        store.debugShowHUD(turnStartedAt: Date().addingTimeInterval(-12), agents: [])
+        try await shoot("working")
+        // The turn ended into a review: the pending notice above the box.
+        store.debugShowHUD(turnStartedAt: nil, agents: [])
+        store.debugShowComposerState(working: false, files: files)
+        try await shoot("review")
+        store.debugShowGate(.idle)
+        // The mode offer above the composer.
+        store.debugShowDefaultModeOffer(.auto)
+        try await shoot("offer")
+        store.debugShowDefaultModeOffer(nil)
+        // Decided cards one after another: three permissions and a question.
+        let commands = ["npm test", "git status --short", "npm run lint -- --fix"]
+        for (i, command) in commands.enumerated() {
+            let card = PermissionRequest(requestId: "tour-bar-\(i)", toolName: "Bash", input: .object(["command": .string(command)]))
+            store.debugHandle([.permissionRequest(card)])
+            store.respondPermission(requestId: card.requestId, allow: i != 1, message: i == 1 ? "tour" : nil)
+        }
+        let question = Self.question(id: "tour-bar-question")
+        store.debugHandle([.permissionRequest(question)])
+        store.skipQuestions(requestId: question.requestId)
+        try await shoot("handled")
     }
 
     /// A regular chat's review at the laptop's 1000 × 637 and the smallest window: the diff pane beside the chat is ~300 pt,

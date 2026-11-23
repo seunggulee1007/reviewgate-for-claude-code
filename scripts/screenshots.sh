@@ -14,7 +14,7 @@
 #   the home folder's path fails the run (HOME PATH);
 # - the session loads no user settings (no ~/.claude skills, plugins, hooks, MCP servers or CLAUDE.md); the app starts
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
-# - a layout on the fake claude (SHOTS_LAYOUT=terminal) never reads ~/.claude at all: the app and its engine get
+# - a layout on the fake claude (SHOTS_LAYOUT=terminal, composerbar) never reads ~/.claude at all: the app and its engine get
 #   CLAUDE_CONFIG_DIR=SHOTS_DIR/claude-config, a fresh folder whose settings.json holds only a harmless status line
 #   (`printf TOUR`) for the terminal chat's status line tee (§57.13) to wrap — the fake runs it only when it is exactly that;
 # - the layouts on the real claude (the README run and every other SHOTS_LAYOUT, composer among them) keep the user's
@@ -77,6 +77,10 @@
 #                  changes in the next prompt's context, a switch away and back keeping the same PTY with its unsent text
 #                  while a write from the background is denied), and no claude starting again once the window's
 #                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).
+#                  composerbar: the rows around the classic chat's message box at 1000 × 637, dark, on the fake claude (its
+#                  chat session starts — initialize answered — and never runs a turn): a fresh chat, the box focused, text
+#                  typed, Claude at work after two turns, a review pending, the mode offer, decided permission cards and a
+#                  question in the transcript (`composerbar` lines: the transcript's height; composerbar-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
@@ -112,7 +116,7 @@ case "$(cd "$SHOTS_DIR" 2>/dev/null && pwd -P || echo "$SHOTS_DIR")/" in
   "$HOME/"|"$HOME/.reviewgate/"*|//) die "SHOTS_DIR must be a scratch folder of its own (not \$HOME, not ~/.reviewgate)";;
 esac
 command -v xcodegen >/dev/null || die "xcodegen missing (brew install xcodegen)"
-[ "${SHOTS_LAYOUT:-}" = terminal ] || command -v claude >/dev/null || die "the Claude Code CLI is missing"
+case "${SHOTS_LAYOUT:-}" in terminal|composerbar) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
 NODE_DIR="$("$ROOT/scripts/find-node.sh")" || die "Node.js >= 24 not found"
 PATH="$NODE_DIR:$PATH"
 
@@ -318,12 +322,12 @@ commit "2026-10-21T09:05:00+0000" "Free shipping from \$50"
 rm -rf "$DATA" "$RAW"
 mkdir -p "$DATA" "$RAW"
 CLAUDE_BIN=claude
-if [ "${SHOTS_LAYOUT:-}" = terminal ]; then
-  # §57 terminal tour: a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
+if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = composerbar ]; then
+  # §57 terminal tour (and the composer bar check): a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
   # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
   # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It prints its terminal's size (the PTY's winsize)
   # on each SIGWINCH (`winsize CxR`) and when a line is `size` (`size CxR COLUMNS=…`, no turn). It never reads or writes
-  # ~/.claude. Run as the app's chat CLI (stream-json) it fails at once: this tour has no chat-kind turn.
+  # ~/.claude. Run as the app's chat CLI (stream-json) it fails at once — but for composerbar, below.
   mkdir -p "$SHOTS_DIR/fakebin"
   CLAUDE_BIN="$SHOTS_DIR/fakebin/claude"
   cat > "$CLAUDE_BIN" <<'EOF'
@@ -334,7 +338,22 @@ const { randomUUID } = require("node:crypto");
 const readline = require("node:readline");
 const argv = process.argv.slice(2);
 if (argv.includes("--version")) { console.log("2.1.325 (Claude Code)"); process.exit(0); }
-if (argv.some((a) => a.includes("stream-json"))) { console.error("fake-claude: only the terminal chat is faked"); process.exit(1); }
+if (argv.some((a) => a.includes("stream-json"))) {
+  // SHOTS_LAYOUT=composerbar (a `fake-chat` file next to the fake): the chat session starts — initialize answered, the
+  // permission mode and the model switched — and never runs a turn; every other request is refused. Else it fails at once.
+  if (!require("node:fs").existsSync(join(__dirname, "fake-chat"))) { console.error("fake-claude: only the terminal chat is faked"); process.exit(1); }
+  const reply = (id, ok, response = {}) => process.stdout.write(JSON.stringify({ type: "control_response",
+    response: ok ? { subtype: "success", request_id: id, response } : { subtype: "error", request_id: id, error: "fake-claude: not faked" } }) + "\n");
+  readline.createInterface({ input: process.stdin, terminal: false }).on("line", (line) => {
+    let msg;
+    try { msg = JSON.parse(line); } catch { return; }
+    if (msg.type !== "control_request") return;
+    const kind = msg.request?.subtype;
+    if (kind === "initialize") reply(msg.request_id, true, { commands: [], agents: [], models: [], output_style: "default", available_output_styles: ["default"], account: {} });
+    else reply(msg.request_id, ["set_permission_mode", "set_model", "interrupt"].includes(kind));
+  });
+  return;
+}
 // `--flag value` or `--flag=value` (the engine joins the session id to its flag).
 const value = (flag) => { const i = argv.indexOf(flag); if (i >= 0) return argv[i + 1]; return argv.find((a) => a.startsWith(`${flag}=`))?.slice(flag.length + 1); };
 const resume = argv.some((a) => a === "--resume" || a.startsWith("--resume="));
@@ -419,6 +438,7 @@ rl.on("line", async (line) => {
 });
 EOF
   chmod +x "$CLAUDE_BIN"
+  [ "${SHOTS_LAYOUT:-}" != composerbar ] || touch "$SHOTS_DIR/fakebin/fake-chat"   # its chat session starts (no turn)
 fi
 # A layout on the fake claude: the app and its engine get a Claude Code config dir of their own (CLAUDE_CONFIG_DIR), so
 # nothing reads the user's ~/.claude — no user settings, hooks, status line, skills, plugins, plans, MCP servers or

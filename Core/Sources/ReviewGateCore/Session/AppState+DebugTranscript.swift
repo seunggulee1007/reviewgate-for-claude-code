@@ -25,5 +25,16 @@ public extension AppState {
         snapshot.hud.agents = agents
         state = snapshot
     }
+
+    /// The HUD's numbers as a snapshot reports them after `turns` turns (the composer bar check, `SHOTS_LAYOUT=composerbar`).
+    func debugShowHUDNumbers(contextTokens: Int, contextWindow: Int?, costUSD: Double, turns: Int, lastTurnMs: Int) {
+        var snapshot = state
+        snapshot.hud.contextTokens = contextTokens
+        snapshot.hud.contextWindow = contextWindow
+        snapshot.hud.sessionCostUSD = costUSD
+        snapshot.hud.turnCount = turns
+        snapshot.hud.lastTurnMs = lastTurnMs
+        state = snapshot
+    }
 }
 #endif
