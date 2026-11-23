@@ -271,7 +271,7 @@ describe("review round 2 on screen (wave2 desktop-flow)", () => {
     show([file("a.ts")], { turnEndTree: "B1", reviewEndTree: "B1", pendingCount: 1 });
     const { PendingBanner } = await import("./components/chat/PendingBanner");
     const html = render(PendingBanner);
-    expect(html).toContain("리뷰 대기 파일 1개 — 수락하지 않고도 질문할 수 있습니다");
+    expect(html).toContain("리뷰 대기 파일 1개 — 수락하지 않고도 질문할 수 있어요");
     expect(html).toContain("지금 보내면 Claude의 새 변경이 이 리뷰에 합쳐져요(같은 시작점 기준). 따로 보려면 먼저 수락하거나 거절하세요.");
   });
 });

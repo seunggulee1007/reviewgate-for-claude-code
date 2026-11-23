@@ -440,7 +440,7 @@ describe("review round 2 in the store (wave2 desktop-flow)", () => {
     reset(useStore);
     snapshot(useStore, [file("b.ts"), file("c.ts")], { phase: "collect_failed", canSend: false, blockedReason: "collect_failed", collectError: "boom", turnEndTree: null });
     useStore.getState().selectFile("c.ts");
-    expect(useStore.getState().diffUnavailable).toBe("이번 턴의 변경사항을 수집하지 못했습니다");
+    expect(useStore.getState().diffUnavailable).toBe("이번 턴의 변경사항을 수집하지 못했어요");
   });
 
   it("§34.6: live changes are read only while the list is on screen — coming into view reads them at once", async () => {

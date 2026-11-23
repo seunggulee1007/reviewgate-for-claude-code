@@ -49,7 +49,7 @@ button.perm-waiting { cursor: pointer; }
 button.perm-waiting.compact { padding: 0 3px; margin-right: 4px; font-size: 9.5px; line-height: 12px; vertical-align: 1px; }
 button.perm-waiting:hover:not(:disabled) { background: var(--orange-bg); border-color: var(--orange-border); }
 
-/* "이미 처리된 권한 요청입니다": anchored to the chat pane (its container query makes it the containing block) */
+/* "이미 처리된 권한 요청이에요": anchored to the chat pane (its container query makes it the containing block) */
 
 /* §2.8 first open: "터미널처럼 {mode} 모드로 시작할까요?" above the composer */
 .mode-suggestion { display: flex; align-items: center; gap: 8px; flex: none; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--accent-bg); color: var(--fg); font-size: 12.5px; }

@@ -1,6 +1,6 @@
 /**
  * A render error stays inside the pane it happened in (docs/M11-WINDOWS.md): the pane shows
- * "화면 오류가 발생했습니다" with Redraw (remounts the pane) and Copy log (error + component stack to
+ * "화면 오류가 발생했어요" with Redraw (remounts the pane) and Copy log (error + component stack to
  * the clipboard); the error also goes to the main process log (`rg:logError`). The rest of the
  * window — and the engine — keep running.
  */

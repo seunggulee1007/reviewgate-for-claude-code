@@ -162,7 +162,7 @@ describe("session / peer / worktree words (Korean)", () => {
     expect(errorEventText({ code: "worktree_blocked", message: "x", toolName: "Task" })).toContain("격리(worktree)");
     // A restored row has no tool: still a sentence, not the English fallback.
     expect(errorEventText({ code: "worktree_blocked", message: "Claude tried to work in …" })).toMatch(/막았어요/);
-    expect(errorEventText({ code: "worktree_outside_review", message: "x", path: "/r/.claude/worktrees/a" })).toBe("리뷰에 잡히지 않는 위치에서 작업했습니다: /r/.claude/worktrees/a");
+    expect(errorEventText({ code: "worktree_outside_review", message: "x", path: "/r/.claude/worktrees/a" })).toBe("리뷰에 잡히지 않는 위치에서 작업했어요: /r/.claude/worktrees/a");
   });
 
   it("lfs_missing gives this platform's install command", () => {
@@ -175,7 +175,7 @@ describe("session / peer / worktree words (Korean)", () => {
     const words = (error: string, code?: string) => refusalMessage(refusalOf(new EngineRefusal(error, code)));
     expect(words("gate_closed:external_turn")).toBe("다른 작업이 끝나면 보낼게요");
     // wave4d w4d-windows (polish-07): the Mac's words for the gate state, never the raw "running" in brackets.
-    expect(words("gate_closed:running")).toBe("Claude가 작업 중입니다 — 턴이 끝날 때까지 기다리세요");
+    expect(words("gate_closed:running")).toBe("Claude가 작업 중이에요 — 턴이 끝날 때까지 기다리세요");
     expect(words("peer_inbox_changed:a,b", "peer_inbox_changed")).toBe("새 메시지가 도착해 목록이 바뀌었어요. 다시 확인해 주세요");
     expect(words("peer_none")).toContain("없어요");
     expect(words("peer_release_failed:timeout")).toContain("timeout");

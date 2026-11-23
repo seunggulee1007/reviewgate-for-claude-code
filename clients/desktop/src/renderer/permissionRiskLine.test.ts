@@ -5,7 +5,7 @@ import type { PermissionRequest } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
 import type { ChatItem } from "./store";
 
-// wave2 check-clients — a §33.3 reason card ("…안입니다 — 리뷰에 잡히지 않습니다", red) also drew the calm line
+// wave2 check-clients — a §33.3 reason card ("…안이에요 — 리뷰에 잡히지 않아요", red) also drew the calm line
 // "✓ 위험 신호 없음 — 프로젝트 안에서 실행, 네트워크·삭제 없음" right below it: the card said both "outside this window's
 // review" and "all clear, inside the project". The calm line is left out there; real risk flags still show.
 

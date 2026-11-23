@@ -1,5 +1,5 @@
 /**
- * wave1 desktop-review — the review-provenance dialogs (docs/PROTOCOL.md §31): the stale-review sheet ("오래된 리뷰입니다" →
+ * wave1 desktop-review — the review-provenance dialogs (docs/PROTOCOL.md §31): the stale-review sheet ("오래된 리뷰예요" →
  * 정리 = `finish_review` / 이어서 리뷰 = `keep_review`), the "리뷰 끝내기" confirm, and the second confirm before files
  * changed outside the app are reverted (answered through the store's `answerRejectExternal`).
  */

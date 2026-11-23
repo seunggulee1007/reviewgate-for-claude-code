@@ -47,7 +47,7 @@ struct ChatView: View {
             }
             TranscriptPane(view: transcript, composer: composer)
                 .overlay(alignment: .bottomLeading) { ComposerPalettes(composer: composer) }
-                .overlay(alignment: .top) { PermissionToast() }   // wave1 mac-perms: "이미 처리된 권한 요청입니다"
+                .overlay(alignment: .top) { PermissionToast() }   // wave1 mac-perms: "이미 처리된 권한 요청이에요"
             VStack(spacing: 0) {
                 Divider()
                 HUDStrip()

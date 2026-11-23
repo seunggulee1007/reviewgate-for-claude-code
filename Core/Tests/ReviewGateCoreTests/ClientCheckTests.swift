@@ -112,7 +112,7 @@ import Testing
 
     // MARK: §33.3 reason card
 
-    /// A reason card ("…리뷰에 잡히지 않습니다", red) also drew "No risky patterns found" right below it — "outside this
+    /// A reason card ("…리뷰에 잡히지 않아요", red) also drew "No risky patterns found" right below it — "outside this
     /// window's review" and "all clear" on one card. The all-clear line is left out there; real risks still show.
     @Test func reasonCardHasNoAllClearRiskLine() {
         let file = "/repo/.claude/worktrees/wt1/src/A.java"

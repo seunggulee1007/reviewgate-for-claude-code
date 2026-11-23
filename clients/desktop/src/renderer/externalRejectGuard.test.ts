@@ -53,7 +53,7 @@ const file = (path: string, p: Partial<ChangedFileState> = {}): ChangedFileState
 const ext = (path: string, p: Partial<ChangedFileState> = {}) => file(path, { tools: [], toolUseIds: [], origin: "external", ...p });
 
 const rejects = () => sent.filter((c) => c.type.startsWith("reject"));
-const CHANGED = "그사이 파일 목록이 바뀌어 아무것도 되돌리지 않았습니다 — 목록을 다시 확인해 주세요";
+const CHANGED = "그사이 파일 목록이 바뀌어 아무것도 되돌리지 않았어요 — 목록을 다시 확인해 주세요";
 
 describe("reverting outside changes needs the list the user confirmed", () => {
   let useStore: Awaited<ReturnType<typeof loadStore>>;

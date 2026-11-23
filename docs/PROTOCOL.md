@@ -1236,7 +1236,7 @@ path re-used).
   paths:[<p1>, <p2>]}` (no `error` event, **nothing reverted** — also for the files that were not edited). `paths` lists
   every such file in batch order.
 - Re-sending the same command with **`force: true`** reverts them anyway (the client confirms first: "직접 수정한 내용이
-  사라집니다").
+  사라져요").
 
 ### 19.2 Commit holds only the accepted paths
 
@@ -2074,7 +2074,7 @@ type StaleReview = {
   carries the windows (`name: "Skill"`). Both clients name it: "Why it changed" lists a `skill:<name>` cause as `/<name>`
   — "명령을 불러오는 동안 실행된 !`…` 줄이 바꿨어요", a row to read (no tool call, so no chat row to open; the Mac's "왜?" on
   it asks about the file), where any other cause missing from the rows reads "이 채팅 기록에 없음" / "불러온 대화에 이 호출이
-  없습니다" — and a Skill call with its skill; the review list's "원인별" sections read `/<name>` and `Skill · <name>`, and
+  없어요" — and a Skill call with its skill; the review list's "원인별" sections read `/<name>` and `Skill · <name>`, and
   the Windows client counts `skill` as Claude's (never "앱 밖 변경"). Clients that do not know `skill` show the file as an
   ordinary Claude change.
 - **`external`** — nothing of Claude's explains it: an IDE save, another Claude session, a `git pull` / checkout, a file
@@ -2751,8 +2751,8 @@ keys?: string[];   // M22, new, optional: what an edit tool's change to settings
   raises no `worktree_outside_review`. `.claude/settings.json` / `.mcp.json` are in the review's mods group with their risks
   (§32); `.claude/settings.local.json` is reported by `local_settings_changed` when the turn ends. A denied card leaves the
   file as it was (the CLI gets the deny).
-- Clients show a warning line on the card — "Claude Code 설정 파일({path})을 바꿉니다 — 훅·권한·MCP 설정이 바뀌며,
-  settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없습니다"; M22, with `keys`: "Claude Code 설정을 바꿔요 ({path}:
+- Clients show a warning line on the card — "Claude Code 설정 파일({path})을 바꿔요 — 훅·권한·MCP 설정이 바뀌며,
+  settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없어요"; M22, with `keys`: "Claude Code 설정을 바꿔요 ({path}:
   {keys}) — 리뷰보다 먼저 적용돼서 리뷰로 되돌릴 수 없어요" (the keys as the engine sends them, comma-separated) — and
   `message` for a reason code they do not know.
 - Verified with the real CLI 2.1.308 (haiku, driver-perms step K, each attempt in a new chat): asked to add an allow rule to
@@ -7549,7 +7549,7 @@ Electron the same); nothing changes on the wire, and a queued message passes the
   `stopReason: "error_max_turns"`).
 - **Stop.** After the user's Stop the Mac's queue goes on as before; Electron's keeps its pause, now worded "멈춤 — 다음 메시지
   대기 중" with [보내기] (sends the next one), and still pauses after a turn that ended with another error (`stopReason`
-  `error_…`, "턴이 오류로 끝났습니다"). A pause already set in the turn (an error above) keeps its reason and time.
+  `error_…`, "턴이 오류로 끝났어요"). A pause already set in the turn (an error above) keeps its reason and time.
 - Code: Core `QueueStop` (`Session/SessionNotices.swift`), `AppState+QueueStop.swift`, `AppState.swift` `handleError` /
   `pauseQueue`; App `UI/Chat/ComposerQueueBar.swift`; Electron `sessionErrors.ts` `queueStopOf`, `sendQueue.ts`
   (`resumeAt`, `retries`, `afterStop`), the queue part of `store.ts`, `components/chat/QueueBar.tsx`. Tests: Core
@@ -8148,7 +8148,7 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`. Mac UI: Settings › 한도 has "응답당 변경 한도 두기" (off) above
   the two steppers, which are greyed out while it is off, and a note on what off means; a change goes to every open
   window's engine. While off the HUD shows no change-limit chip and the chat's empty state names no limit ("Claude가 바꾼
-  내용은 계속하기 전에 리뷰하게 됩니다."). With it on a warn row reads "변경 한도 도달: …" and a deny row "변경 한도 초과 — 편집
+  내용은 계속하기 전에 리뷰하게 돼요."). With it on a warn row reads "변경 한도 도달: …" and a deny row "변경 한도 초과 — 편집
   거부됨 (…)". The append's "Reset to default" removes the stored text, and the app drops a stored earlier built-in text at
   launch. The plan sheet's approve button no longer says "in small units" in its help. Electron: `settings.budgetEnabled`
   (absent: off; the renderer may write a boolean), main's `budgetOf` / `systemPromptOf`, the texts in
@@ -8406,7 +8406,7 @@ bar of a chat shown read-only. Both clients unless a bullet says otherwise; the 
   reads with two decimals ("<$0.01" for a cent's fraction). Electron: ↑ / ↓ move through the list, and esc in a title being
   renamed ends the edit only, never the dialog. Mac: also ⌘⌫ asks to delete the selected chat, the row's ⋯ says what it
   holds, "삭제… (현재 채팅은 안 돼요)" says why in the item, "보관된 채팅 보기" is remembered, the list says it is loading
-  instead of "아직 채팅이 없습니다", an archived chat reads dimmer with "보관됨" (no faded row), and the sheet fits a 1000 × 637
+  instead of "아직 채팅이 없어요", an archived chat reads dimmer with "보관됨" (no faded row), and the sheet fits a 1000 × 637
   window and keeps the size it was dragged to.
 - **The error banner** (polish P1-chrome-29 / 34). "오류 복사" copies what a bug report needs — the message with its ×N, the
   CLI's words and the code — and says "복사됨"; the scope chip says what it means (앱 엔진, Claude Code 세션, git 명령,

@@ -256,7 +256,7 @@ public final class AppState {
     /// MARK: r2-peers — M26: subagents whose requests "이 에이전트의 요청은 이번 턴 동안 허용" answers as they come (agent ids,
     /// `PermissionAgent.agentId`); emptied when the turn ends.
     var turnAllowedAgents: Set<String> = []
-    /// A short notice about a permission card (`unknown_permission_request` → "이미 처리된 권한 요청입니다"); the chat
+    /// A short notice about a permission card (`unknown_permission_request` → "이미 처리된 권한 요청이에요"); the chat
     /// shows it as a toast that goes away by itself.
     public internal(set) var permissionNotice: PermissionNotice?
     /// §33.8: the last `permission_rules` reply (Settings › 터미널 허용 규칙), its refusal, and the request in flight.

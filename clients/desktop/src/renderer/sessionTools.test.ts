@@ -94,7 +94,7 @@ describe("MCP scope local (§36.6)", () => {
   });
 
   it("explains where scope local writes", () => {
-    expect(scopeHelp("local")).toBe("이 프로젝트용으로 ~/.claude.json에 기록됩니다 — git으로 공유되지 않으며 터미널의 claude도 함께 씁니다. 세션을 다시 시작하면 적용됩니다.");
+    expect(scopeHelp("local")).toBe("이 프로젝트용으로 ~/.claude.json에 기록돼요 — git으로 공유되지 않으며 터미널의 claude도 함께 써요. 세션을 다시 시작하면 적용돼요.");
   });
 });
 
@@ -126,8 +126,8 @@ describe("extensions start (§36.7, robustness-05)", () => {
   it("'Retry with extensions' waits for a start, a turn or a retry in flight — with the reason", () => {
     const idle = { phase: "idle", starting: false, retrying: false };
     expect(extensionsRetryBlockedReason(idle)).toBeNull();
-    expect(extensionsRetryBlockedReason({ ...idle, starting: true })).toBe("세션을 시작하는 중입니다…");
-    expect(extensionsRetryBlockedReason({ ...idle, retrying: true })).toBe("세션을 시작하는 중입니다…");
+    expect(extensionsRetryBlockedReason({ ...idle, starting: true })).toBe("세션을 시작하는 중이에요…");
+    expect(extensionsRetryBlockedReason({ ...idle, retrying: true })).toBe("세션을 시작하는 중이에요…");
     expect(extensionsRetryBlockedReason({ ...idle, phase: "running" })).toBe("Claude가 턴을 마칠 때까지 기다리세요");
     expect(extensionsRetryBlockedReason({ ...idle, phase: "collecting" })).toBe("Claude가 턴을 마칠 때까지 기다리세요");
   });

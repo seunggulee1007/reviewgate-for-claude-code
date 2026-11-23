@@ -24,7 +24,7 @@ describe("Settings › 테스트 명령 패턴", () => {
     expect(out).toContain("테스트 명령 패턴");
     expect(out).toContain(">./run-tests.sh*</textarea>");
     expect(out).toContain("패턴 없이도 알아보는 명령: mvn · mvnw · *mvn*.sh · gradle · gradlew");
-    expect(out).toContain("Maven·Gradle은 테스트를 실행하는 goal·task일 때만 셉니다");
+    expect(out).toContain("Maven·Gradle은 테스트를 실행하는 goal·task일 때만 세어요");
   });
 
   it("an older settings file without the key shows an empty box", () => {

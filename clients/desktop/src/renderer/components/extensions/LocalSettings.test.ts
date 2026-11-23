@@ -68,7 +68,7 @@ describe("Load local settings (§36.6)", () => {
     expect(tag(html, "Load local settings")).not.toContain("checked");
     expect(html).toContain("꺼짐");
     expect(html).toContain("앱에서 적용 안 된 설정");
-    expect(html).toContain("이 프로젝트는 로컬 설정이 꺼져 있습니다.");
+    expect(html).toContain("이 프로젝트는 로컬 설정이 꺼져 있어요.");
     expect(html).toContain("~/bin/on-stop.sh");
     expect(html).toContain("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
     expect(html).toContain("notes, serena");
@@ -86,7 +86,7 @@ describe("Load local settings (§36.6)", () => {
   it("an engine before §36: the switch is off with the one-line reason", () => {
     const html = show(ext());
     expect(tag(html, "Load local settings")).toContain('disabled=""');
-    expect(html).toContain("이 엔진은 아직 지원하지 않습니다 — ReviewGate를 업데이트하세요");
+    expect(html).toContain("이 엔진은 아직 지원하지 않아요 — ReviewGate를 업데이트하세요");
     expect(html).not.toContain('data-testid="Local settings applied"');
   });
 });

@@ -549,7 +549,7 @@ struct ChatHistorySheet: View {
     @State private var query = ""
     /// polish P4-composer-35: kept between openings.
     @AppStorage("chatHistoryShowArchived") private var showArchived = false
-    /// polish P4-composer-35: the list is being read (no "아직 채팅이 없습니다" before it came).
+    /// polish P4-composer-35: the list is being read (no "아직 채팅이 없어요" before it came).
     @State private var loading = true
     @State private var selection: String?
     @State private var renameTarget: SessionMeta?

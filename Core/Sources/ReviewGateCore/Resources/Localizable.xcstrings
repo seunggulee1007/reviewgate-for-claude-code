@@ -92,7 +92,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ 이 바뀌었습니다 (%2$@) — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없습니다."
+            "value": "%1$@ 이 바뀌었어요 (%2$@) — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없어요."
           }
         }
       }
@@ -108,7 +108,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 이 바뀌었습니다 — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없습니다."
+            "value": "%@ 이 바뀌었어요 — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없어요."
           }
         }
       }
@@ -476,7 +476,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "앱 밖 변경 %lld개가 섞였습니다"
+            "value": "앱 밖 변경 %lld개가 섞였어요"
           }
         }
       }
@@ -588,7 +588,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "내용을 수집하지 못한 파일 %lld개는 되돌릴 수 없어 그대로 둡니다."
+            "value": "내용을 수집하지 못한 파일 %lld개는 되돌릴 수 없어 그대로 둬요."
           }
         }
       }
@@ -780,7 +780,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "메모 %lld개도 함께 지워집니다."
+            "value": "메모 %lld개도 함께 지워져요."
           }
         }
       }
@@ -1228,7 +1228,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "삭제된 파일은 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "삭제된 파일은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -1324,7 +1324,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "멘션한 경로가 저장소 밖에 있습니다"
+            "value": "멘션한 경로가 저장소 밖에 있어요"
           }
         }
       }
@@ -1388,7 +1388,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사전 리뷰가 이미 실행 중입니다"
+            "value": "사전 리뷰가 이미 실행 중이에요"
           }
         }
       }
@@ -1404,7 +1404,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이름이 바뀌거나 복사된 파일은 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "이름이 바뀌거나 복사된 파일은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -1436,7 +1436,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "같은 이름의 서버가 이미 있습니다"
+            "value": "같은 이름의 서버가 이미 있어요"
           }
         }
       }
@@ -1468,7 +1468,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "격리(worktree) 모드 서브에이전트를 막았습니다."
+            "value": "격리(worktree) 모드 서브에이전트를 막았어요."
           }
         }
       }
@@ -1484,7 +1484,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "서브모듈은 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "서브모듈은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -1500,7 +1500,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "심볼릭 링크는 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "심볼릭 링크는 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -1948,7 +1948,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MCP 서버에 로그인이 필요합니다"
+            "value": "MCP 서버에 로그인이 필요해요"
           }
         }
       }
@@ -1964,7 +1964,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새로 추가된 파일은 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "새로 추가된 파일은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -1996,7 +1996,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 worktree 에서 다른 Claude 세션이 실행 중입니다: %@ — 그 세션의 수정은 '앱 밖 변경'으로 섞입니다. 워크벤치로 분리하세요."
+            "value": "이 worktree 에서 다른 Claude 세션이 실행 중이에요: %@ — 그 세션의 수정은 '앱 밖 변경'으로 섞여요. 워크벤치로 분리하세요."
           }
         }
       }
@@ -2012,7 +2012,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다른 되돌리기가 진행 중입니다 — 잠시 후 다시 시도하세요"
+            "value": "다른 되돌리기가 진행 중이에요 — 잠시 후 다시 시도하세요"
           }
         }
       }
@@ -2044,7 +2044,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "계획에 먼저 응답하세요 — 그 다음 대기열을 이어서 보냅니다"
+            "value": "계획에 먼저 응답하세요 — 그 다음 대기열을 이어서 보내요"
           }
         }
       }
@@ -2300,7 +2300,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "읽기 전용이 아닌 모든 도구에 대해 확인을 요청합니다"
+            "value": "읽기 전용이 아닌 모든 도구에 대해 확인을 요청해요"
           }
         }
       }
@@ -2332,7 +2332,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "인자는 최대 100개입니다"
+            "value": "인자는 최대 100개예요"
           }
         }
       }
@@ -2348,7 +2348,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "한 메시지에 파일은 최대 20개까지 멘션할 수 있습니다"
+            "value": "한 메시지에 파일은 최대 20개까지 멘션할 수 있어요"
           }
         }
       }
@@ -2364,7 +2364,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "한 메시지에 이미지는 최대 5개까지 첨부할 수 있습니다"
+            "value": "한 메시지에 이미지는 최대 5개까지 첨부할 수 있어요"
           }
         }
       }
@@ -2748,7 +2748,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "바이너리 파일은 부분만 되돌릴 수 없습니다 — 파일 전체를 거절하세요"
+            "value": "바이너리 파일은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
           }
         }
       }
@@ -3522,7 +3522,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "바뀐 허용 규칙은 다음 세션부터 조회·읽기 도구에 적용될 수 있습니다 (설정 › 일반 › 권한 › 터미널(Claude Code) 허용 규칙에서 확인)."
+            "value": "바뀐 허용 규칙은 다음 세션부터 조회·읽기 도구에 적용될 수 있어요 (설정 › 일반 › 권한 › 터미널(Claude Code) 허용 규칙에서 확인)."
           }
         }
       }
@@ -3554,7 +3554,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude의 편집 도구·MCP 도구·Bash 명령이 만든 변경입니다"
+            "value": "Claude의 편집 도구·MCP 도구·Bash 명령이 만든 변경이에요"
           }
         }
       }
@@ -3570,7 +3570,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code 설정 파일(%@)을 바꿉니다 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없습니다"
+            "value": "Claude Code 설정 파일(%@)을 바꿔요 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없어요"
           }
         }
       }
@@ -3586,7 +3586,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code 설정 파일을 바꿉니다 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없습니다"
+            "value": "Claude Code 설정 파일을 바꿔요 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없어요"
           }
         }
       }
@@ -3778,7 +3778,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude CLI를 찾을 수 없습니다 — Claude Code를 설치하거나 설정에서 경로를 지정하세요"
+            "value": "Claude CLI를 찾을 수 없어요 — Claude Code를 설치하거나 설정에서 경로를 지정하세요"
           }
         }
       }
@@ -4034,7 +4034,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code 자체 설정(.claude, .mcp.json, CLAUDE.md)입니다 — 훅과 설정은 다음 프롬프트부터 모든 세션에 적용됩니다"
+            "value": "Claude Code 자체 설정(.claude, .mcp.json, CLAUDE.md)이에요 — 훅과 설정은 다음 프롬프트부터 모든 세션에 적용돼요"
           }
         }
       }
@@ -4050,7 +4050,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 권한 요청에 직접 답합니다. 거부된 도구는 계속 거부됩니다"
+            "value": "Claude가 권한 요청에 직접 답해요. 거부된 도구는 계속 거부돼요"
           }
         }
       }
@@ -4114,7 +4114,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 메시지를 작성하지 못했습니다"
+            "value": "Claude가 메시지를 작성하지 못했어요"
           }
         }
       }
@@ -4130,7 +4130,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 메시지를 작성하지 못했습니다: %@"
+            "value": "Claude가 메시지를 작성하지 못했어요: %@"
           }
         }
       }
@@ -4146,7 +4146,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 제때 시작하지 않아 플러그인과 훅 없이 다시 시작했습니다"
+            "value": "Claude가 제때 시작하지 않아 플러그인과 훅 없이 다시 시작했어요"
           }
         }
       }
@@ -4162,7 +4162,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 시작이 지연되고 있습니다 — VPN/플러그인 마켓플레이스 확인"
+            "value": "Claude 시작이 지연되고 있어요 — VPN/플러그인 마켓플레이스 확인"
           }
         }
       }
@@ -4178,7 +4178,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 아직 시작 중입니다 — 잠시 기다리세요"
+            "value": "Claude가 아직 시작 중이에요 — 잠시 기다리세요"
           }
         }
       }
@@ -4242,7 +4242,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 작업 중입니다"
+            "value": "Claude가 작업 중이에요"
           }
         }
       }
@@ -4370,7 +4370,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 작업 중입니다 — 턴이 끝날 때까지 기다리세요"
+            "value": "Claude가 작업 중이에요 — 턴이 끝날 때까지 기다리세요"
           }
         }
       }
@@ -4402,7 +4402,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 로그인이 필요합니다"
+            "value": "Claude 로그인이 필요해요"
           }
         }
       }
@@ -4418,7 +4418,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일들은 Claude가 바꾸지 않았을 수 있습니다. 되돌리면 그 수정이 사라집니다:"
+            "value": "이 파일들은 Claude가 바꾸지 않았을 수 있어요. 되돌리면 그 수정이 사라져요:"
           }
         }
       }
@@ -4530,7 +4530,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 별도 worktree('%@')에서 작업하려 해서 막았습니다. 이 창의 리뷰에 잡히지 않기 때문입니다."
+            "value": "Claude가 별도 worktree('%@')에서 작업하려 해서 막았어요. 이 창의 리뷰에 잡히지 않기 때문이에요."
           }
         }
       }
@@ -4546,7 +4546,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 별도 worktree에서 작업하려 해서 막았습니다. 이 창의 리뷰에 잡히지 않기 때문입니다."
+            "value": "Claude가 별도 worktree에서 작업하려 해서 막았어요. 이 창의 리뷰에 잡히지 않기 때문이에요."
           }
         }
       }
@@ -4562,7 +4562,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 이 창의 폴더 밖에서 작업하려 해서 막았습니다. 이 창의 리뷰에 잡히지 않기 때문입니다."
+            "value": "Claude가 이 창의 폴더 밖에서 작업하려 해서 막았어요. 이 창의 리뷰에 잡히지 않기 때문이에요."
           }
         }
       }
@@ -4578,7 +4578,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 요청 없이 작업을 시도해 차단했습니다. 변경된 것은 없습니다."
+            "value": "Claude가 요청 없이 작업을 시도해 차단했어요. 변경된 것은 없어요."
           }
         }
       }
@@ -4610,7 +4610,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰에 잡히지 않는 위치에서 작업했습니다."
+            "value": "리뷰에 잡히지 않는 위치에서 작업했어요."
           }
         }
       }
@@ -4626,7 +4626,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰에 잡히지 않는 위치에서 작업했습니다: %@"
+            "value": "리뷰에 잡히지 않는 위치에서 작업했어요: %@"
           }
         }
       }
@@ -4850,7 +4850,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "변경 사항을 수집하는 중입니다 — 잠시 기다리세요"
+            "value": "변경 사항을 수집하는 중이에요 — 잠시 기다리세요"
           }
         }
       }
@@ -5202,7 +5202,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "대화를 압축했습니다"
+            "value": "대화를 압축했어요"
           }
         }
       }
@@ -5234,7 +5234,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "변경사항을 수집하지 못했습니다: %@ — 다시 시도"
+            "value": "변경사항을 수집하지 못했어요: %@ — 다시 시도"
           }
         }
       }
@@ -5250,7 +5250,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "변경 사항을 수집하지 못했습니다: %@"
+            "value": "변경 사항을 수집하지 못했어요: %@"
           }
         }
       }
@@ -5282,7 +5282,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "커밋하지 못했습니다: %@"
+            "value": "커밋하지 못했어요: %@"
           }
         }
       }
@@ -5298,7 +5298,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "원격 저장소에서 fetch하지 못했습니다"
+            "value": "원격 저장소에서 fetch하지 못했어요"
           }
         }
       }
@@ -5314,7 +5314,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "원격 저장소에서 fetch하지 못했습니다: %@"
+            "value": "원격 저장소에서 fetch하지 못했어요: %@"
           }
         }
       }
@@ -5330,7 +5330,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Git 저장소를 초기화하지 못했습니다: %@"
+            "value": "Git 저장소를 초기화하지 못했어요: %@"
           }
         }
       }
@@ -5346,7 +5346,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "저장소 파일 목록을 가져오지 못했습니다"
+            "value": "저장소 파일 목록을 가져오지 못했어요"
           }
         }
       }
@@ -5410,7 +5410,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "터미널을 열 수 없습니다"
+            "value": "터미널을 열 수 없어요"
           }
         }
       }
@@ -5426,7 +5426,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "터미널을 열 수 없습니다: %@"
+            "value": "터미널을 열 수 없어요: %@"
           }
         }
       }
@@ -5442,7 +5442,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "프로젝트를 열지 못했습니다: %@"
+            "value": "프로젝트를 열지 못했어요: %@"
           }
         }
       }
@@ -5490,7 +5490,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "푸시하지 못했습니다: %@"
+            "value": "푸시하지 못했어요: %@"
           }
         }
       }
@@ -5506,7 +5506,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새로 고치지 못했습니다: %@"
+            "value": "새로 고치지 못했어요: %@"
           }
         }
       }
@@ -5522,7 +5522,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "되돌리지 못했습니다: %@"
+            "value": "되돌리지 못했어요: %@"
           }
         }
       }
@@ -5554,7 +5554,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude에게 메시지를 보내지 못했습니다"
+            "value": "Claude에게 메시지를 보내지 못했어요"
           }
         }
       }
@@ -5570,7 +5570,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude에 메시지를 보내지 못했습니다: %@"
+            "value": "Claude에 메시지를 보내지 못했어요: %@"
           }
         }
       }
@@ -5602,7 +5602,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "모델을 바꾸지 못했습니다"
+            "value": "모델을 바꾸지 못했어요"
           }
         }
       }
@@ -5618,7 +5618,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "모델을 바꾸지 못했습니다: %@"
+            "value": "모델을 바꾸지 못했어요: %@"
           }
         }
       }
@@ -5634,7 +5634,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "요약을 만들지 못했습니다 — 다시 시도하세요"
+            "value": "요약을 만들지 못했어요 — 다시 시도하세요"
           }
         }
       }
@@ -5650,7 +5650,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "요약을 만들지 못했습니다: %@"
+            "value": "요약을 만들지 못했어요: %@"
           }
         }
       }
@@ -5698,7 +5698,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 git worktree를 만듭니다(%@) — 그 안의 작업은 이 창의 리뷰 밖입니다"
+            "value": "새 git worktree를 만들어요(%@) — 그 안의 작업은 이 창의 리뷰 밖이에요"
           }
         }
       }
@@ -5714,7 +5714,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 git worktree를 만듭니다 — 그 안의 작업은 이 창의 리뷰 밖입니다"
+            "value": "새 git worktree를 만들어요 — 그 안의 작업은 이 창의 리뷰 밖이에요"
           }
         }
       }
@@ -6066,7 +6066,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "편집은 묻지 않고 허용하고(리뷰는 그대로) Bash 등은 계속 묻습니다"
+            "value": "편집은 묻지 않고 허용하고(리뷰는 그대로) Bash 등은 계속 물어요"
           }
         }
       }
@@ -6306,7 +6306,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@의 diff를 불러오지 못했습니다: %2$@"
+            "value": "%1$@의 diff를 불러오지 못했어요: %2$@"
           }
         }
       }
@@ -6818,7 +6818,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "그 뒤 HEAD 가 바뀌었습니다: %1$@ → %2$@"
+            "value": "그 뒤 HEAD 가 바뀌었어요: %1$@ → %2$@"
           }
         }
       }
@@ -6994,7 +6994,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이미지는 최대 5MB까지 첨부할 수 있습니다"
+            "value": "이미지는 최대 5MB까지 첨부할 수 있어요"
           }
         }
       }
@@ -7090,7 +7090,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "중첩 저장소(서브모듈·worktree·clone) 안입니다 — 리뷰에 잡히지 않습니다"
+            "value": "중첩 저장소(서브모듈·worktree·clone) 안이에요 — 리뷰에 잡히지 않아요"
           }
         }
       }
@@ -7106,7 +7106,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "중첩 저장소(서브모듈·worktree·clone) 안입니다 — 리뷰에 잡히지 않습니다 (%@)"
+            "value": "중첩 저장소(서브모듈·worktree·clone) 안이에요 — 리뷰에 잡히지 않아요 (%@)"
           }
         }
       }
@@ -7138,7 +7138,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "중단됨 — ReviewGate가 닫혔거나 대화가 바뀌었습니다"
+            "value": "중단됨 — ReviewGate가 닫혔거나 대화가 바뀌었어요"
           }
         }
       }
@@ -7442,7 +7442,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "읽을 수 없는 파일 %1$lld개를 이번 리뷰에서 제외했습니다: %2$@"
+            "value": "읽을 수 없는 파일 %1$lld개를 이번 리뷰에서 제외했어요: %2$@"
           }
         }
       }
@@ -7490,7 +7490,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "줄바꿈과 제어 문자는 쓸 수 없습니다"
+            "value": "줄바꿈과 제어 문자는 쓸 수 없어요"
           }
         }
       }
@@ -8178,7 +8178,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "12시간 이상 지났습니다"
+            "value": "12시간 이상 지났어요"
           }
         }
       }
@@ -8434,7 +8434,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 세션이 열려 있지 않습니다 — 세션을 다시 시작하세요"
+            "value": "Claude 세션이 열려 있지 않아요 — 세션을 다시 시작하세요"
           }
         }
       }
@@ -8770,7 +8770,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "표시할 턴 변경 사항이 없습니다"
+            "value": "표시할 턴 변경 사항이 없어요"
           }
         }
       }
@@ -8802,7 +8802,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Node.js(node)를 찾을 수 없습니다. Node.js를 설치하거나 설정 › 일반 › 툴체인 경로 지정 › node 경로에 경로를 지정한 뒤 프로젝트를 다시 여세요."
+            "value": "Node.js(node)를 찾을 수 없어요. Node.js를 설치하거나 설정 › 일반 › 툴체인 경로 지정 › node 경로에 경로를 지정한 뒤 프로젝트를 다시 여세요."
           }
         }
       }
@@ -8818,7 +8818,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이번 리뷰에서 바뀐 파일이 아닙니다: %@"
+            "value": "이번 리뷰에서 바뀐 파일이 아니에요: %@"
           }
         }
       }
@@ -8850,7 +8850,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "올바른 브랜치 이름이 아닙니다: %@"
+            "value": "올바른 브랜치 이름이 아니에요: %@"
           }
         }
       }
@@ -8866,7 +8866,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "올바른 헤더 이름이 아닙니다: %@"
+            "value": "올바른 헤더 이름이 아니에요: %@"
           }
         }
       }
@@ -8898,7 +8898,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "올바른 변수 이름이 아닙니다: %@"
+            "value": "올바른 변수 이름이 아니에요: %@"
           }
         }
       }
@@ -8946,7 +8946,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 도구가 바꾸지 않은 변경입니다 — IDE·다른 세션·git pull 일 수 있습니다"
+            "value": "Claude 도구가 바꾸지 않은 변경이에요 — IDE·다른 세션·git pull 일 수 있어요"
           }
         }
       }
@@ -9026,7 +9026,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "커밋할 내용이 없습니다 — 먼저 파일을 수락하세요"
+            "value": "커밋할 내용이 없어요 — 먼저 파일을 수락하세요"
           }
         }
       }
@@ -9042,7 +9042,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "푸시할 커밋이 없습니다"
+            "value": "푸시할 커밋이 없어요"
           }
         }
       }
@@ -9058,7 +9058,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다시 시도할 작업이 없습니다"
+            "value": "다시 시도할 작업이 없어요"
           }
         }
       }
@@ -9186,7 +9186,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "PNG, JPEG, GIF, WebP 이미지만 첨부할 수 있습니다"
+            "value": "PNG, JPEG, GIF, WebP 이미지만 첨부할 수 있어요"
           }
         }
       }
@@ -9218,7 +9218,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "저장소 안의 파일만 멘션할 수 있습니다: %@"
+            "value": "저장소 안의 파일만 멘션할 수 있어요: %@"
           }
         }
       }
@@ -9234,7 +9234,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰 대기 중인 파일만 부분 되돌리기를 할 수 있습니다"
+            "value": "리뷰 대기 중인 파일만 부분 되돌리기를 할 수 있어요"
           }
         }
       }
@@ -9282,7 +9282,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "파일 모드만 바뀌었습니다 — 되돌리려면 파일 전체를 거절하세요"
+            "value": "파일 모드만 바뀌었어요 — 되돌리려면 파일 전체를 거절하세요"
           }
         }
       }
@@ -9314,7 +9314,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰 목록만 비웁니다. 파일은 디스크에 그대로 남고 다음 메시지부터 기준선이 됩니다."
+            "value": "리뷰 목록만 비워요. 파일은 디스크에 그대로 남고 다음 메시지부터 기준선이 돼요."
           }
         }
       }
@@ -9618,7 +9618,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "프로젝트 밖 파일입니다 — 리뷰에 잡히지 않습니다"
+            "value": "프로젝트 밖 파일이에요 — 리뷰에 잡히지 않아요"
           }
         }
       }
@@ -9650,7 +9650,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰 밖 변경 — %1$@ (%2$@): 이 창에서 리뷰되지 않습니다"
+            "value": "리뷰 밖 변경 — %1$@ (%2$@): 이 창에서 리뷰되지 않아요"
           }
         }
       }
@@ -9666,7 +9666,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰 밖 변경 — %1$@ (%2$@, 파일 %3$lld개): 이 창에서 리뷰되지 않습니다"
+            "value": "리뷰 밖 변경 — %1$@ (%2$@, 파일 %3$lld개): 이 창에서 리뷰되지 않아요"
           }
         }
       }
@@ -10306,7 +10306,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "읽기 전용으로 Claude가 계획을 작성하고 승인을 기다립니다"
+            "value": "읽기 전용으로 Claude가 계획을 작성하고 승인을 기다려요"
           }
         }
       }
@@ -10674,7 +10674,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "프로젝트의 .mcp.json에서 “%@”을(를) 삭제합니다 — git으로 모두에게 반영되는 변경입니다."
+            "value": "프로젝트의 .mcp.json에서 “%@”을(를) 삭제해요 — git으로 모두에게 반영되는 변경이에요."
           }
         }
       }
@@ -10690,7 +10690,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "~/.claude.json의 이 프로젝트 항목에서 “%@”을(를) 삭제합니다 — 나에게만 적용됩니다."
+            "value": "~/.claude.json의 이 프로젝트 항목에서 “%@”을(를) 삭제해요 — 나에게만 적용돼요."
           }
         }
       }
@@ -10706,7 +10706,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 세션에서 “%@”을(를) 삭제합니다."
+            "value": "이 세션에서 “%@”을(를) 삭제해요."
           }
         }
       }
@@ -10722,7 +10722,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "~/.claude.json에서 “%@”을(를) 삭제합니다 — 모든 프로젝트에 적용됩니다."
+            "value": "~/.claude.json에서 “%@”을(를) 삭제해요 — 모든 프로젝트에 적용돼요."
           }
         }
       }
@@ -11026,7 +11026,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 변경 %lld개를 되돌립니다."
+            "value": "Claude 변경 %lld개를 되돌려요."
           }
         }
       }
@@ -11118,7 +11118,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이전 세션의 리뷰 목록을 복원했습니다"
+            "value": "이전 세션의 리뷰 목록을 복원했어요"
           }
         }
       }
@@ -11454,7 +11454,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "수락된 파일을 먼저 선택하세요 — 수락된 파일만 커밋할 수 있습니다"
+            "value": "수락된 파일을 먼저 선택하세요 — 수락된 파일만 커밋할 수 있어요"
           }
         }
       }
@@ -11678,7 +11678,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "서버 이름은 영문자·숫자·“-”·“_”·“.”만 쓸 수 있습니다 (최대 64자, 영문자나 숫자로 시작)"
+            "value": "서버 이름은 영문자·숫자·“-”·“_”·“.”만 쓸 수 있어요 (최대 64자, 영문자나 숫자로 시작)"
           }
         }
       }
@@ -12014,7 +12014,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ReviewGate의 이 프로젝트 세션에서 바로 시작합니다. 디스크에는 아무것도 쓰지 않습니다."
+            "value": "ReviewGate의 이 프로젝트 세션에서 바로 시작해요. 디스크에는 아무것도 쓰지 않아요."
           }
         }
       }
@@ -12606,7 +12606,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "그 지적은 이미 없습니다"
+            "value": "그 지적은 이미 없어요"
           }
         }
       }
@@ -12702,7 +12702,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "그 사전 리뷰는 이미 없습니다"
+            "value": "그 사전 리뷰는 이미 없어요"
           }
         }
       }
@@ -12718,7 +12718,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사전 리뷰 요청이 올바르지 않습니다"
+            "value": "사전 리뷰 요청이 올바르지 않아요"
           }
         }
       }
@@ -12750,7 +12750,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "앱 밖 변경 %lld개는 그대로 둡니다."
+            "value": "앱 밖 변경 %lld개는 그대로 둬요."
           }
         }
       }
@@ -12798,7 +12798,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude API 요청 한도를 초과했습니다 — %@ 이후 다시 시도하세요"
+            "value": "Claude API 요청 한도를 초과했어요 — %@ 이후 다시 시도하세요"
           }
         }
       }
@@ -12814,7 +12814,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude API 요청 한도를 초과했습니다 — 잠시 후 다시 시도하세요"
+            "value": "Claude API 요청 한도를 초과했어요 — 잠시 후 다시 시도하세요"
           }
         }
       }
@@ -12830,7 +12830,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude CLI가 알지 못하는 모델입니다"
+            "value": "Claude CLI가 알지 못하는 모델이에요"
           }
         }
       }
@@ -12846,7 +12846,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 세션을 시작하지 못했습니다: %@"
+            "value": "Claude 세션을 시작하지 못했어요: %@"
           }
         }
       }
@@ -12862,7 +12862,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude 세션이 비정상 종료되었습니다 — 세션을 다시 시작하세요"
+            "value": "Claude 세션이 비정상 종료됐어요 — 세션을 다시 시작하세요"
           }
         }
       }
@@ -12910,7 +12910,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MCP 서버 작업이 실패했습니다"
+            "value": "MCP 서버 작업이 실패했어요"
           }
         }
       }
@@ -12926,7 +12926,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MCP 서버 작업에 실패했습니다: %@"
+            "value": "MCP 서버 작업에 실패했어요: %@"
           }
         }
       }
@@ -12958,7 +12958,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "MCP 서버 “%@”에 로그인이 필요합니다"
+            "value": "MCP 서버 “%@”에 로그인이 필요해요"
           }
         }
       }
@@ -12974,7 +12974,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이번 턴 동안 브랜치/커밋이 바뀌었습니다 (%1$@ → %2$@). 그 차이는 '앱 밖 변경'으로 표시됩니다."
+            "value": "이번 턴 동안 브랜치/커밋이 바뀌었어요 (%1$@ → %2$@). 그 차이는 '앱 밖 변경'으로 표시돼요."
           }
         }
       }
@@ -12990,7 +12990,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "브랜치 작업에 실패했습니다: %@"
+            "value": "브랜치 작업에 실패했어요: %@"
           }
         }
       }
@@ -13038,7 +13038,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "claude 실행 파일을 실행할 수 없습니다 — 설정 › 툴체인 경로에서 claude를 지정하세요"
+            "value": "claude 실행 파일을 실행할 수 없어요 — 설정 › 툴체인 경로에서 claude를 지정하세요"
           }
         }
       }
@@ -13054,7 +13054,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "명령은 “-”로 시작할 수 없습니다"
+            "value": "명령은 “-”로 시작할 수 없어요"
           }
         }
       }
@@ -13070,7 +13070,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "명령을 실행하지 못했습니다: %@"
+            "value": "명령을 실행하지 못했어요: %@"
           }
         }
       }
@@ -13102,7 +13102,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "압축 초점이 너무 깁니다(최대 2,000자)"
+            "value": "압축 초점이 너무 길어요(최대 2,000자)"
           }
         }
       }
@@ -13118,7 +13118,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "컨텍스트가 %@%% 찼습니다"
+            "value": "컨텍스트가 %@%% 찼어요"
           }
         }
       }
@@ -13134,7 +13134,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "대화를 이 시점으로 되돌릴 수 없습니다"
+            "value": "대화를 이 시점으로 되돌릴 수 없어요"
           }
         }
       }
@@ -13166,7 +13166,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "현재 채팅은 삭제할 수 없습니다"
+            "value": "현재 채팅은 삭제할 수 없어요"
           }
         }
       }
@@ -13182,7 +13182,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "본 뒤로 diff가 바뀌었습니다 — 새로고침한 뒤 부분을 다시 선택하세요"
+            "value": "본 뒤로 diff가 바뀌었어요 — 새로고침한 뒤 부분을 다시 선택하세요"
           }
         }
       }
@@ -13262,7 +13262,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 이 명령을 알지 못합니다 — ReviewGate를 업데이트하세요"
+            "value": "엔진이 이 명령을 알지 못해요 — ReviewGate를 업데이트하세요"
           }
         }
       }
@@ -13278,7 +13278,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 종료되었습니다."
+            "value": "엔진이 종료됐어요."
           }
         }
       }
@@ -13294,7 +13294,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 종료되는 중입니다"
+            "value": "엔진이 종료되는 중이에요"
           }
         }
       }
@@ -13390,7 +13390,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 시점의 파일 스냅샷이 없어 파일을 되돌릴 수 없습니다"
+            "value": "이 시점의 파일 스냅샷이 없어 파일을 되돌릴 수 없어요"
           }
         }
       }
@@ -13406,7 +13406,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰가 시작된 뒤 파일이 수정되어 아무것도 되돌리지 않았습니다(수정 내용은 그대로 둡니다). 새로고침해서 현재 내용을 리뷰하세요."
+            "value": "리뷰가 시작된 뒤 파일이 수정되어 아무것도 되돌리지 않았어요(수정 내용은 그대로 둬요). 새로고침해서 현재 내용을 리뷰하세요."
           }
         }
       }
@@ -13422,7 +13422,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "그사이 파일 목록이 바뀌어 아무것도 되돌리지 않았습니다 — 목록을 다시 확인해 주세요"
+            "value": "그사이 파일 목록이 바뀌어 아무것도 되돌리지 않았어요 — 목록을 다시 확인해 주세요"
           }
         }
       }
@@ -13438,7 +13438,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "폴더가 이미 있습니다: %@"
+            "value": "폴더가 이미 있어요: %@"
           }
         }
       }
@@ -13454,7 +13454,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이미지를 읽을 수 없습니다"
+            "value": "이미지를 읽을 수 없어요"
           }
         }
       }
@@ -13502,7 +13502,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "메인 워크트리는 제거할 수 없습니다"
+            "value": "메인 워크트리는 제거할 수 없어요"
           }
         }
       }
@@ -13614,7 +13614,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "origin 원격 저장소가 GitHub URL이 아닙니다: %@"
+            "value": "origin 원격 저장소가 GitHub URL이 아니에요: %@"
           }
         }
       }
@@ -13646,7 +13646,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "계획 응답을 Claude에 보내지 못했습니다 — 계획은 그대로 대기 중입니다"
+            "value": "계획 응답을 Claude에 보내지 못했어요 — 계획은 그대로 대기 중이에요"
           }
         }
       }
@@ -13662,7 +13662,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "계획 응답을 Claude에 보내지 못했습니다 — 계획은 그대로 대기 중입니다 (%@)"
+            "value": "계획 응답을 Claude에 보내지 못했어요 — 계획은 그대로 대기 중이에요 (%@)"
           }
         }
       }
@@ -13694,7 +13694,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사전 리뷰에 실패했습니다"
+            "value": "사전 리뷰에 실패했어요"
           }
         }
       }
@@ -13710,7 +13710,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사전 리뷰가 이미 끝났습니다"
+            "value": "사전 리뷰가 이미 끝났어요"
           }
         }
       }
@@ -13726,7 +13726,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "질문이 너무 깁니다 (최대 20,000자)"
+            "value": "질문이 너무 길어요 (최대 20,000자)"
           }
         }
       }
@@ -13742,7 +13742,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "저장소에 원격(remote)이 없습니다"
+            "value": "저장소에 원격(remote)이 없어요"
           }
         }
       }
@@ -13774,7 +13774,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "선택한 부분이 파일과 더 이상 맞지 않습니다 — 새로고침한 뒤 다시 시도하세요"
+            "value": "선택한 부분이 파일과 더 이상 맞지 않아요 — 새로고침한 뒤 다시 시도하세요"
           }
         }
       }
@@ -13790,7 +13790,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "서버 설정이 올바르지 않습니다"
+            "value": "서버 설정이 올바르지 않아요"
           }
         }
       }
@@ -13806,7 +13806,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "서버 설정이 올바르지 않습니다: %@"
+            "value": "서버 설정이 올바르지 않아요: %@"
           }
         }
       }
@@ -13854,7 +13854,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Side question이 실패했습니다: %@"
+            "value": "Side question이 실패했어요: %@"
           }
         }
       }
@@ -13870,7 +13870,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 리뷰의 스냅샷이 정리되어 diff를 보여줄 수 없습니다"
+            "value": "이 리뷰의 스냅샷이 정리되어 diff를 보여줄 수 없어요"
           }
         }
       }
@@ -13950,7 +13950,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크벤치에 커밋하지 않은 변경 사항이 있습니다"
+            "value": "워크벤치에 커밋하지 않은 변경 사항이 있어요"
           }
         }
       }
@@ -13966,7 +13966,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크벤치가 다른 세션에서 열려 있습니다"
+            "value": "워크벤치가 다른 세션에서 열려 있어요"
           }
         }
       }
@@ -13982,7 +13982,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크벤치 작업에 실패했습니다: %@"
+            "value": "워크벤치 작업에 실패했어요: %@"
           }
         }
       }
@@ -13998,7 +13998,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 창에서 열려 있는 워크벤치는 제거할 수 없습니다"
+            "value": "이 창에서 열려 있는 워크벤치는 제거할 수 없어요"
           }
         }
       }
@@ -14014,7 +14014,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크플로 도구는 이 창 밖에서 에이전트를 돌려 막았습니다."
+            "value": "워크플로 도구는 이 창 밖에서 에이전트를 돌려 막았어요."
           }
         }
       }
@@ -14062,7 +14062,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "되돌릴 Claude 변경이 없습니다."
+            "value": "되돌릴 Claude 변경이 없어요."
           }
         }
       }
@@ -14094,7 +14094,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아직 보낼 답변이 없습니다"
+            "value": "아직 보낼 답변이 없어요"
           }
         }
       }
@@ -14126,7 +14126,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "응답을 기다리는 계획이 없습니다"
+            "value": "응답을 기다리는 계획이 없어요"
           }
         }
       }
@@ -14142,7 +14142,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "끝낼 리뷰가 없습니다"
+            "value": "끝낼 리뷰가 없어요"
           }
         }
       }
@@ -14158,7 +14158,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아직 사전 리뷰할 변경이 없습니다"
+            "value": "아직 사전 리뷰할 변경이 없어요"
           }
         }
       }
@@ -14174,7 +14174,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "변경을 요청할 리뷰가 없습니다"
+            "value": "변경을 요청할 리뷰가 없어요"
           }
         }
       }
@@ -14190,7 +14190,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "되돌릴 리뷰가 없습니다"
+            "value": "되돌릴 리뷰가 없어요"
           }
         }
       }
@@ -14206,7 +14206,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "내용을 수집하지 못한 파일이라 되돌릴 수 없습니다: %@"
+            "value": "내용을 수집하지 못한 파일이라 되돌릴 수 없어요: %@"
           }
         }
       }
@@ -14286,7 +14286,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 Claude 세션은 MCP 서버를 관리할 수 없습니다 — Claude Code를 업데이트하세요"
+            "value": "이 Claude 세션은 MCP 서버를 관리할 수 없어요 — Claude Code를 업데이트하세요"
           }
         }
       }
@@ -14318,7 +14318,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "(더 이상) 알 수 없는 MCP 서버입니다"
+            "value": "(더 이상) 알 수 없는 MCP 서버예요"
           }
         }
       }
@@ -14366,7 +14366,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 에이전트는 이 폴더 밖(격리 worktree 등)에서 작업합니다 — 변경이 이 창의 리뷰에 없습니다"
+            "value": "이 에이전트는 이 폴더 밖(격리 worktree 등)에서 작업해요 — 변경이 이 창의 리뷰에 없어요"
           }
         }
       }
@@ -14398,7 +14398,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "지금은 보낼 수 없습니다"
+            "value": "지금은 보낼 수 없어요"
           }
         }
       }
@@ -14542,7 +14542,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 채팅은 더 이상 존재하지 않습니다"
+            "value": "이 채팅은 더 이상 존재하지 않아요"
           }
         }
       }
@@ -14638,7 +14638,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 엔진은 아직 지원하지 않습니다 — ReviewGate를 업데이트하세요"
+            "value": "이 엔진은 아직 지원하지 않아요 — ReviewGate를 업데이트하세요"
           }
         }
       }
@@ -14670,7 +14670,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일은 더 이상 리뷰 목록에 없습니다"
+            "value": "이 파일은 더 이상 리뷰 목록에 없어요"
           }
         }
       }
@@ -14686,7 +14686,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일은 더 이상 리뷰 대기 중이 아닙니다"
+            "value": "이 파일은 더 이상 리뷰 대기 중이 아니에요"
           }
         }
       }
@@ -14702,7 +14702,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일은 해당 리뷰에 포함되어 있지 않습니다"
+            "value": "이 파일은 해당 리뷰에 포함되어 있지 않아요"
           }
         }
       }
@@ -14718,7 +14718,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일은 풀 리퀘스트에 포함되어 있지 않습니다"
+            "value": "이 파일은 풀 리퀘스트에 포함되어 있지 않아요"
           }
         }
       }
@@ -14734,7 +14734,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 폴더는 이미 Git 저장소입니다"
+            "value": "이 폴더는 이미 Git 저장소예요"
           }
         }
       }
@@ -14750,7 +14750,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 이미지는 더 이상 저장되어 있지 않습니다"
+            "value": "이 이미지는 더 이상 저장되어 있지 않아요"
           }
         }
       }
@@ -14782,7 +14782,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 메시지는 더 이상 채팅에 없습니다"
+            "value": "이 메시지는 더 이상 채팅에 없어요"
           }
         }
       }
@@ -14814,7 +14814,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이미 처리된 권한 요청입니다"
+            "value": "이미 처리된 권한 요청이에요"
           }
         }
       }
@@ -14830,7 +14830,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 시점으로 되돌릴 수 없습니다"
+            "value": "이 시점으로 되돌릴 수 없어요"
           }
         }
       }
@@ -14846,7 +14846,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 저장소는 Git LFS를 쓰는데 git-lfs가 없습니다. 터미널에서 brew install git-lfs && git lfs install 을 실행한 뒤 다시 시도하세요."
+            "value": "이 저장소는 Git LFS를 쓰는데 git-lfs가 없어요. 터미널에서 brew install git-lfs && git lfs install 을 실행한 뒤 다시 시도하세요."
           }
         }
       }
@@ -14862,7 +14862,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 리뷰는 더 이상 기록에 없습니다"
+            "value": "이 리뷰는 더 이상 기록에 없어요"
           }
         }
       }
@@ -14910,7 +14910,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 서버는 %@에서 왔기 때문에 여기서 삭제할 수 없습니다."
+            "value": "이 서버는 %@에서 왔기 때문에 여기서 삭제할 수 없어요."
           }
         }
       }
@@ -14958,7 +14958,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 side question은 파일에 대한 것이 아니라 리뷰 메모로 추가할 수 없습니다"
+            "value": "이 side question은 파일에 대한 것이 아니라 리뷰 메모로 추가할 수 없어요"
           }
         }
       }
@@ -14974,7 +14974,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 side question은 아직 답변 중입니다 — 기다리거나 먼저 중지하세요"
+            "value": "이 side question은 아직 답변 중이에요 — 기다리거나 먼저 중지하세요"
           }
         }
       }
@@ -14990,7 +14990,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 side question은 더 이상 없습니다"
+            "value": "이 side question은 더 이상 없어요"
           }
         }
       }
@@ -15086,7 +15086,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 워크벤치는 다른 창이나 세션에서 열려 있습니다"
+            "value": "이 워크벤치는 다른 창이나 세션에서 열려 있어요"
           }
         }
       }
@@ -15102,7 +15102,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 워크벤치는 더 이상 존재하지 않습니다"
+            "value": "이 워크벤치는 더 이상 존재하지 않아요"
           }
         }
       }
@@ -15118,7 +15118,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Side question 3개가 이미 답변 중입니다 — 하나가 끝날 때까지 기다리세요"
+            "value": "Side question 3개가 이미 답변 중이에요 — 하나가 끝날 때까지 기다리세요"
           }
         }
       }
@@ -15134,7 +15134,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Side question 세션이 너무 많이 실행 중입니다 — 하나가 끝나면 다시 시도하세요"
+            "value": "Side question 세션이 너무 많이 실행 중이에요 — 하나가 끝나면 다시 시도하세요"
           }
         }
       }
@@ -15406,7 +15406,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "알 수 없는 effort 단계입니다"
+            "value": "알 수 없는 effort 단계예요"
           }
         }
       }
@@ -15422,7 +15422,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "알 수 없는 권한 모드입니다"
+            "value": "알 수 없는 권한 모드예요"
           }
         }
       }
@@ -15438,7 +15438,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "알 수 없는 다른 세션 메시지 설정입니다"
+            "value": "알 수 없는 다른 세션 메시지 설정이에요"
           }
         }
       }
@@ -15566,7 +15566,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용량 한도에 도달했습니다"
+            "value": "사용량 한도에 도달했어요"
           }
         }
       }
@@ -15582,7 +15582,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용량 한도에 도달했습니다 — %@에 재설정"
+            "value": "사용량 한도에 도달했어요 — %@에 재설정"
           }
         }
       }
@@ -15614,7 +15614,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "영문자·숫자·“-”·“_”·“.”만 쓸 수 있습니다 (최대 64자, 영문자나 숫자로 시작)"
+            "value": "영문자·숫자·“-”·“_”·“.”만 쓸 수 있어요 (최대 64자, 영문자나 숫자로 시작)"
           }
         }
       }
@@ -16094,7 +16094,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다른 worktree(%@)에서 작업합니다 — 이 창의 리뷰에 잡히지 않습니다"
+            "value": "다른 worktree(%@)에서 작업해요 — 이 창의 리뷰에 잡히지 않아요"
           }
         }
       }
@@ -16110,7 +16110,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "다른 worktree에서 작업합니다 — 이 창의 리뷰에 잡히지 않습니다"
+            "value": "다른 worktree에서 작업해요 — 이 창의 리뷰에 잡히지 않아요"
           }
         }
       }
@@ -16126,7 +16126,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 창의 리뷰에 잡히지 않는 위치에서 작업합니다"
+            "value": "이 창의 리뷰에 잡히지 않는 위치에서 작업해요"
           }
         }
       }
@@ -16158,7 +16158,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "프로젝트의 .mcp.json에 기록됩니다 — git으로 모두와 공유됩니다. 작업 트리 변경으로 보이며, 세션을 다시 시작하면 적용됩니다."
+            "value": "프로젝트의 .mcp.json에 기록돼요 — git으로 모두와 공유돼요. 작업 트리 변경으로 보이며, 세션을 다시 시작하면 적용돼요."
           }
         }
       }
@@ -16174,7 +16174,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 프로젝트용으로 ~/.claude.json에 기록됩니다 — git으로 공유되지 않으며 터미널의 claude도 함께 씁니다. 세션을 다시 시작하면 적용됩니다."
+            "value": "이 프로젝트용으로 ~/.claude.json에 기록돼요 — git으로 공유되지 않으며 터미널의 claude도 함께 써요. 세션을 다시 시작하면 적용돼요."
           }
         }
       }
@@ -16190,7 +16190,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "~/.claude.json에 기록됩니다 — 모든 프로젝트에서 쓸 수 있습니다. 세션을 다시 시작하면 적용됩니다."
+            "value": "~/.claude.json에 기록돼요 — 모든 프로젝트에서 쓸 수 있어요. 세션을 다시 시작하면 적용돼요."
           }
         }
       }
@@ -16206,7 +16206,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰 후 직접 수정한 파일이 있어 아무것도 되돌리지 않았습니다: %@"
+            "value": "리뷰 후 직접 수정한 파일이 있어 아무것도 되돌리지 않았어요: %@"
           }
         }
       }
@@ -16510,7 +16510,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 응답하기 전에 종료되었습니다"
+            "value": "엔진이 응답하기 전에 종료됐어요"
           }
         }
       }
@@ -16526,7 +16526,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 중지되었습니다"
+            "value": "엔진이 중지됐어요"
           }
         }
       }
@@ -17038,7 +17038,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진이 실행 중이 아닙니다"
+            "value": "엔진이 실행 중이 아니에요"
           }
         }
       }
@@ -17054,7 +17054,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "엔진 스크립트를 찾을 수 없습니다: %@"
+            "value": "엔진 스크립트를 찾을 수 없어요: %@"
           }
         }
       }
@@ -17294,7 +17294,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "저장소를 바꾸는 git 명령입니다(commit · merge · checkout · reset 등) — 이 명령이 가져오는 변경은 Claude 의 수정으로 세지 않으며, 커밋은 리뷰에서 되돌릴 수 없습니다"
+            "value": "저장소를 바꾸는 git 명령이에요(commit · merge · checkout · reset 등) — 이 명령이 가져오는 변경은 Claude 의 수정으로 세지 않으며, 커밋은 리뷰에서 되돌릴 수 없어요"
           }
         }
       }

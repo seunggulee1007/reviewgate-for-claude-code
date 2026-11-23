@@ -149,7 +149,7 @@ describe("§33.1 permission queue in the store (M1)", () => {
     await flush();
     await flush();
     // The window's one toast (toast.ts) — the same one the other short notices use, not a second permission toast.
-    expect(useToast.getState().text).toBe("이미 처리된 권한 요청입니다");
+    expect(useToast.getState().text).toBe("이미 처리된 권한 요청이에요");
     expect(statusOf(useStore, "a")).toBe("handled");
     expect(useStore.getState().errorBanner).toBeNull();
     expect(useStore.getState().queue.paused).toBeNull();

@@ -127,14 +127,14 @@ describe("permission card words (§2.1)", () => {
     expect(shortPath("a")).toBe("a");
     expect(reasonView(undefined)).toBeNull();
     const outside = reasonView({ code: "outside_project", message: "m" });
-    expect(outside).toMatchObject({ tone: "orange", text: "프로젝트 밖 파일입니다 — 리뷰에 잡히지 않습니다" });
-    expect(reasonView({ code: "nested_repository", message: "m", path: "/r/.claude/worktrees/x" })!.text).toBe("중첩 저장소(서브모듈·worktree·clone) 안입니다 — 리뷰에 잡히지 않습니다 (worktrees/x)");
-    expect(reasonView({ code: "other_worktree", message: "m", path: "/w/acme-1800" })!.text).toBe("다른 worktree(w/acme-1800)의 위치입니다 — 이 창의 리뷰에 잡히지 않습니다");
+    expect(outside).toMatchObject({ tone: "orange", text: "프로젝트 밖 파일이에요 — 리뷰에 잡히지 않아요" });
+    expect(reasonView({ code: "nested_repository", message: "m", path: "/r/.claude/worktrees/x" })!.text).toBe("중첩 저장소(서브모듈·worktree·clone) 안이에요 — 리뷰에 잡히지 않아요 (worktrees/x)");
+    expect(reasonView({ code: "other_worktree", message: "m", path: "/w/acme-1800" })!.text).toBe("다른 worktree(w/acme-1800)의 위치예요 — 이 창의 리뷰에 잡히지 않아요");
     expect(reasonView({ code: "worktree_command", message: "m", path: "/r/../wt" })).toMatchObject({ tone: "red" });
     expect(reasonView({ code: "worktree_isolation", message: "m" })!.text).toContain("격리 worktree");
     // engine-followup adds claude_config: the path comes from the reason, else the edit's file
     const config = reasonView({ code: "claude_config", message: "m" }, "/repo/.claude/settings.local.json")!;
-    expect(config.text).toBe("Claude Code 설정 파일(.claude/settings.local.json)을 바꿉니다 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없습니다");
+    expect(config.text).toBe("Claude Code 설정 파일(.claude/settings.local.json)을 바꿔요 — 훅·권한·MCP 설정이 바뀌며, settings.local.json 은 리뷰에 남지 않아 되돌릴 수 없어요");
     expect(config.tone).toBe("red");
     expect(reasonView({ code: "brand_new", message: "ReviewGate: something new" })).toMatchObject({ text: "ReviewGate: something new", tone: "orange" });
   });
@@ -173,7 +173,7 @@ describe("permission card words (§2.1)", () => {
   });
 
   it("words the unknown_permission_request refusal (shown as a toast, never a red banner)", () => {
-    expect(refusalMessage(refusalOf(new EngineRefusal("unknown_permission_request", "unknown_permission_request")))).toBe("이미 처리된 권한 요청입니다");
+    expect(refusalMessage(refusalOf(new EngineRefusal("unknown_permission_request", "unknown_permission_request")))).toBe("이미 처리된 권한 요청이에요");
   });
 
   it("finds the workbench a reason path opens as (never this window's)", () => {

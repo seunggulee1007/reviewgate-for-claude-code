@@ -54,7 +54,7 @@ describe("permission cards as on the Mac (wave3 check-clients)", () => {
     const chained = req("c", { input: { command: "npm test && git push" } });
     scene(m, [chained]);
     const out = html(createElement(m.PermissionCard, { request: chained, decision: null }));
-    expect(out).toMatch(/<button type="button" disabled="" title="이 명령에는 안전한 패턴을 만들 수 없습니다 \(체인, 리디렉션, sudo·sh -c 같은 래퍼, 따옴표\)"[^>]*data-testid="Always allow"/);
+    expect(out).toMatch(/<button type="button" disabled="" title="이 명령에는 안전한 패턴을 만들 수 없어요 \(체인, 리디렉션, sudo·sh -c 같은 래퍼, 따옴표\)"[^>]*data-testid="Always allow"/);
     const simple = req("s");
     scene(m, [simple]);
     const ok = html(createElement(m.PermissionCard, { request: simple, decision: null }));

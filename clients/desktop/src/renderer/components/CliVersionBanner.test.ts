@@ -73,7 +73,7 @@ describe("Settings › CLI 버전 고정 (§36.8)", () => {
   it("an engine without cli_versions: off with the reason", () => {
     const html = list({ supported: false });
     expect(html).toContain('data-testid="CLI versions unavailable"');
-    expect(html).toContain("이 엔진은 아직 지원하지 않습니다");
+    expect(html).toContain("이 엔진은 아직 지원하지 않아요");
   });
 
   it("no native installer versions: says so", () => {

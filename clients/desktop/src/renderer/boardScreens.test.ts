@@ -147,7 +147,7 @@ describe("the agent board (§43.1)", () => {
 
   it("is a quiet board without agents, and still shows agents from an engine before §39.3 (no steps, no history)", async () => {
     let html = await render("./components/board/AgentBoard");
-    expect(html).toContain("이번 턴에는 서브에이전트가 없습니다");
+    expect(html).toContain("이번 턴에는 서브에이전트가 없어요");
     expect(html).not.toContain("이전 턴");
     setHud({ agents: [node("a1", { lastTool: "Read" })] });
     html = await render("./components/board/AgentBoard");

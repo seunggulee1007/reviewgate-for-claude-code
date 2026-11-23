@@ -187,7 +187,7 @@ export function AwaitingPermissionBadge({ agentToolUseId, compact = false }: { a
 
 /**
  * Permission notices above the composer (ChatPane): the first-open "start in the terminal's mode?" question. "이미 처리된
- * 권한 요청입니다" is the window's one toast (toast.ts, components/Toast.tsx), shared with the other short notices.
+ * 권한 요청이에요" is the window's one toast (toast.ts, components/Toast.tsx), shared with the other short notices.
  */
 export function PermissionNotices() {
   return <ModeSuggestion />;

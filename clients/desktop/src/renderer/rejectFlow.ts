@@ -1,6 +1,6 @@
 /**
  * Whole-file reject with the §19.1 safety net (docs/PROTOCOL.md): `reject` / `reject_all` refused with
- * `file_changed_since_review` (+ `paths`) asks the user first — "직접 수정한 내용이 사라집니다 — 그래도 되돌릴까요?" —
+ * `file_changed_since_review` (+ `paths`) asks the user first — "직접 수정한 내용이 사라져요 — 그래도 되돌릴까요?" —
  * and only a confirmed answer re-sends the same command with `force: true`. Cancel sends nothing.
  * §31.2: a command that reverts files changed outside the app (`origin: "external"` — the IDE, another session, a pull)
  * is sent only after a second confirm listing them ("앱 밖 변경도 되돌리기"); declining sends nothing.

@@ -29,8 +29,8 @@ describe("확장 꺼짐 (§36.7)", () => {
   it("says why, that ReviewGate retries once by itself, and offers the retry", () => {
     const html = render({});
     expect(html).toContain("확장 꺼짐");
-    expect(html).toContain("확장 로딩이 45초를 넘어 확장 없이 시작했습니다");
-    expect(html).toContain("Claude가 한가해지면 ReviewGate가 한 번 더 스스로 다시 시도합니다.");
+    expect(html).toContain("확장 로딩이 45초를 넘어 확장 없이 시작했어요");
+    expect(html).toContain("Claude가 한가해지면 ReviewGate가 한 번 더 스스로 다시 시도해요.");
     expect(html).toContain("확장 켜고 다시 시도");
     expect(button(html)).not.toContain("disabled");
   });

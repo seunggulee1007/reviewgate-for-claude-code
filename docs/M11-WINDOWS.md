@@ -125,7 +125,7 @@ Windows-specific:
   quoted and `^`-escaped twice (cross-spawn's scheme, `winCmd.ts`), so spaces, `&`, `^`, `%VAR%`, `( )`, `!` and Korean
   in a path arrive unchanged (unit tests model cmd.exe's two parses + CommandLineToArgvW).
 - **ErrorBoundary** — around the root and the sidebar, banners, diff / history / PR / start panes, chat, agent panel and
-  dialogs: one pane crashing shows "화면 오류가 발생했습니다" with **다시 그리기** (remount) / **로그 복사**; the error, plus
+  dialogs: one pane crashing shows "화면 오류가 발생했어요" with **다시 그리기** (remount) / **로그 복사**; the error, plus
   `window.onerror` / unhandled rejections, goes to the main log (`[w<id>:error] renderer: …`).
 - **e2e orphans on Windows** — `tasklist` has no parent-pid column, so children of main are listed with
   `Get-CimInstance Win32_Process -Filter "ParentProcessId=<pid>"` (wmic fallback); Electron / ReviewGate helpers and

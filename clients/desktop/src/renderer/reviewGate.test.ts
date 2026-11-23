@@ -212,7 +212,7 @@ describe("review provenance (§31)", () => {
     const n = notificationFor({ type: "turn_end", stopReason: "end_turn", usage, files: 4, added: 1, deleted: 0, changedOutside: [], external: 3 } as EngineEvent, { project: null })!;
     expect(n.body).toBe("작업이 끝났어요 — 리뷰할 파일 1개 · 앱 밖 변경 3개 포함");
     const stopped = notificationFor({ type: "turn_end", stopReason: "interrupted", usage, files: 2, added: 1, deleted: 0, changedOutside: [], external: 1 } as EngineEvent, { project: null })!;
-    expect(stopped.body).toBe("턴이 중단되었습니다 — 리뷰할 파일 1개 · 앱 밖 변경 1개 포함");
+    expect(stopped.body).toBe("턴이 중단됐어요 — 리뷰할 파일 1개 · 앱 밖 변경 1개 포함");
   });
 });
 
@@ -232,8 +232,8 @@ describe("stale review and finish_review (§31.5)", () => {
       { reasons: ["head_moved", "old", "brand_new" as never], savedAt: "2026-10-01T00:00:00Z", savedHead: { branch: "main", sha: "aaaaaaa1" }, head: { branch: "main", sha: "bbbbbbb2" }, externalFiles: 13 },
       () => "3주 전",
     );
-    expect(lines).toEqual(["저장: 3주 전", "그 뒤 HEAD 가 바뀌었습니다: main@aaaaaaa → main@bbbbbbb", "12시간 이상 지났습니다", "앱 밖 변경 13개가 섞였습니다"]);
-    expect(staleLines({ reasons: ["old"], savedAt: "x", savedHead: null, head: null, externalFiles: 0 }, () => "어제")).toEqual(["저장: 어제", "12시간 이상 지났습니다"]);
+    expect(lines).toEqual(["저장: 3주 전", "그 뒤 HEAD 가 바뀌었어요: main@aaaaaaa → main@bbbbbbb", "12시간 이상 지났어요", "앱 밖 변경 13개가 섞였어요"]);
+    expect(staleLines({ reasons: ["old"], savedAt: "x", savedHead: null, head: null, externalFiles: 0 }, () => "어제")).toEqual(["저장: 어제", "12시간 이상 지났어요"]);
   });
 
   it("the sheet opens once per stale review (project + savedAt)", () => {
@@ -265,13 +265,13 @@ describe("gate banners (§31.3–§32.3)", () => {
 
   it("head_moved in words (also after a peer turn, test point 30)", () => {
     expect(headMovedText({ from: { branch: "feature/a", sha: "1111111aaa" }, to: { branch: "main", sha: "2222222bbb" } })).toBe(
-      "이번 턴 동안 브랜치/커밋이 바뀌었습니다 (feature/a@1111111 → main@2222222). 그 차이는 '앱 밖 변경'으로 표시됩니다.",
+      "이번 턴 동안 브랜치/커밋이 바뀌었어요 (feature/a@1111111 → main@2222222). 그 차이는 '앱 밖 변경'으로 표시돼요.",
     );
   });
 
   it("another Claude: name or pid, terminal or app; the same sessions never show again (test point 10)", () => {
     expect(concurrentText([claude(4242, { name: "acme-b4" })])).toBe(
-      "이 worktree 에서 다른 Claude 세션이 실행 중입니다: acme-b4 (터미널) — 그 세션의 수정은 '앱 밖 변경'으로 섞입니다. 워크벤치로 분리하세요.",
+      "이 worktree 에서 다른 Claude 세션이 실행 중이에요: acme-b4 (터미널) — 그 세션의 수정은 '앱 밖 변경'으로 섞여요. 워크벤치로 분리하세요.",
     );
     expect(concurrentText([claude(7, { entrypoint: "sdk-ts" }), claude(8, { entrypoint: null })])).toContain("pid 7 (앱/SDK), pid 8 (앱/SDK)");
     expect(concurrentText([1, 2, 3, 4, 5].map((n) => claude(n)))).toContain("외 2개");
@@ -295,26 +295,26 @@ describe("gate banners (§31.3–§32.3)", () => {
 
   it("settings.local.json: which parts, the permissions hint, never the content", () => {
     const c = { path: ".claude/settings.local.json", hooks: true, permissions: true, env: false, mcp: true };
-    expect(localSettingsText(c)).toBe(".claude/settings.local.json 이 바뀌었습니다 (훅 · 권한 · MCP) — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없습니다.");
+    expect(localSettingsText(c)).toBe(".claude/settings.local.json 이 바뀌었어요 (훅 · 권한 · MCP) — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없어요.");
     expect(localSettingsHint(c)).toContain("다음 세션부터 조회·읽기 도구");
     expect(localSettingsHint({ ...c, permissions: false })).toBeNull();
-    expect(localSettingsText({ ...c, hooks: false, permissions: false, mcp: false })).toBe(".claude/settings.local.json 이 바뀌었습니다 — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없습니다.");
+    expect(localSettingsText({ ...c, hooks: false, permissions: false, mcp: false })).toBe(".claude/settings.local.json 이 바뀌었어요 — 비밀값이 있을 수 있어 내용은 보관하지 않으며 되돌릴 수 없어요.");
   });
 
   it("nested repositories: kind, branch, file count, HEAD move, timeout (test point 14)", () => {
     const wt: NestedChange = { path: ".claude/worktrees/x", kind: "worktree", branch: "wf-x", head: { from: "aaaaaaaaaa", to: "bbbbbbbbbb" }, dirtyFiles: 4, touchedFiles: ["a", "b"], via: ["edit"] };
-    expect(nestedText(wt)).toBe("리뷰 밖 변경 — .claude/worktrees/x (워크트리 · wf-x, 파일 2개): 이 창에서 리뷰되지 않습니다");
+    expect(nestedText(wt)).toBe("리뷰 밖 변경 — .claude/worktrees/x (워크트리 · wf-x, 파일 2개): 이 창에서 리뷰되지 않아요");
     expect(nestedDetails(wt)).toEqual(["HEAD aaaaaaa → bbbbbbb"]);
     const slow: NestedChange = { path: "libs/core", kind: "submodule", branch: null, head: null, dirtyFiles: null, touchedFiles: [], via: ["bash"] };
-    expect(nestedText(slow)).toBe("리뷰 밖 변경 — libs/core (서브모듈): 이 창에서 리뷰되지 않습니다");
+    expect(nestedText(slow)).toBe("리뷰 밖 변경 — libs/core (서브모듈): 이 창에서 리뷰되지 않아요");
     expect(nestedDetails(slow)).toEqual(["상태 확인 시간 초과"]);
-    expect(nestedText({ ...slow, kind: "repo", dirtyFiles: 3 })).toBe("리뷰 밖 변경 — libs/core (중첩 저장소, 파일 3개): 이 창에서 리뷰되지 않습니다");
+    expect(nestedText({ ...slow, kind: "repo", dirtyFiles: 3 })).toBe("리뷰 밖 변경 — libs/core (중첩 저장소, 파일 3개): 이 창에서 리뷰되지 않아요");
     expect(nestedKindLabel("from_the_future")).toBe("중첩 저장소");
   });
 
   it("unreadable files: the notice and “무시 패턴에 추가” without duplicates (test point 15)", () => {
-    expect(skippedText([{ path: "logs/a.log", reason: "unreadable" }, { path: "logs/b.log", reason: "other" as never }])).toBe("읽을 수 없는 파일 2개를 이번 리뷰에서 제외했습니다: logs/a.log, logs/b.log");
-    expect(skippedText(["1", "2", "3", "4", "5"].map((p) => ({ path: p, reason: "unreadable" as const })))).toBe("읽을 수 없는 파일 5개를 이번 리뷰에서 제외했습니다: 1, 2, 3 외 2개");
+    expect(skippedText([{ path: "logs/a.log", reason: "unreadable" }, { path: "logs/b.log", reason: "other" as never }])).toBe("읽을 수 없는 파일 2개를 이번 리뷰에서 제외했어요: logs/a.log, logs/b.log");
+    expect(skippedText(["1", "2", "3", "4", "5"].map((p) => ({ path: p, reason: "unreadable" as const })))).toBe("읽을 수 없는 파일 5개를 이번 리뷰에서 제외했어요: 1, 2, 3 외 2개");
     expect(addIgnorePatternLines(".omc/\r\n/logs/a.log\n", ["logs/a.log", "logs/b.log", "logs/b.log", "", "bad\nline"])).toEqual({ text: ".omc/\n/logs/a.log\nlogs/b.log", added: ["logs/b.log"] });
     expect(addIgnorePatternLines("", ["x.log"])).toEqual({ text: "x.log", added: ["x.log"] });
   });
@@ -346,8 +346,8 @@ describe("gate banners (§31.3–§32.3)", () => {
   });
 
   it("not_captured / uncaptured refusals in words with the way out", () => {
-    expect(refusalText("not_captured:.claude/big.bin")).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없습니다: .claude/big.bin — 직접 고치거나 수락하세요");
-    expect(refusalText("partial_reject_unsupported:uncaptured")).toBe("내용을 수집하지 못한 파일이라 부분 되돌리기도 할 수 없습니다");
+    expect(refusalText("not_captured:.claude/big.bin")).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없어요: .claude/big.bin — 직접 고치거나 수락하세요");
+    expect(refusalText("partial_reject_unsupported:uncaptured")).toBe("내용을 수집하지 못한 파일이라 부분 되돌리기도 할 수 없어요");
   });
 });
 
@@ -464,7 +464,7 @@ describe("review store flows (wave1 desktop-review)", () => {
     useStore.getState().reject(".claude/big.bin");
     await flush();
     expect(sent).toEqual([]);
-    expect(useStore.getState().errorBanner?.message).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없습니다: .claude/big.bin — 직접 고치거나 수락하세요");
+    expect(useStore.getState().errorBanner?.message).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없어요: .claude/big.bin — 직접 고치거나 수락하세요");
     expect(useStore.getState().errorBanner?.code).toBe("not_captured");
   });
 
@@ -474,7 +474,7 @@ describe("review store flows (wave1 desktop-review)", () => {
     respond = (c) => (c.type === "reject_all" ? { ok: false, error: "not_captured:a.ts", code: "not_captured", paths: ["a.ts"] } : { ok: true, reply: {} });
     useStore.getState().rejectAll();
     await flush();
-    expect(useStore.getState().errorBanner?.message).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없습니다: a.ts — 직접 고치거나 수락하세요");
+    expect(useStore.getState().errorBanner?.message).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없어요: a.ts — 직접 고치거나 수락하세요");
   });
 
   it("a stale review never opens a sheet by itself (r2-review-flow M29: the banner decides); 이어서 리뷰 = keep_review, 정리 = finish_review; a sheet still up closes with the flag (test point 11)", async () => {
@@ -560,7 +560,7 @@ describe("review store flows (wave1 desktop-review)", () => {
     const order = ["설정·훅 (Claude 동작 변경)", "Claude 변경", "앱 밖 변경"].map((label) => html.indexOf(label));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(html).toContain("모두 거절은 이 파일들을 그대로 둡니다");
+    expect(html).toContain("모두 거절은 이 파일들을 그대로 둬요");
     expect(html).toContain("훅 — 다음 프롬프트부터 자동 실행");
     expect(html).toContain("gitignore 됨");
     expect(html).toContain("내용 미수집");
@@ -639,7 +639,7 @@ describe("review store flows (wave1 desktop-review)", () => {
     useStore.setState({ dialog: { kind: "rejectAll" } });
     const { Dialogs } = await import("./components/dialogs/Dialogs");
     const html = render(useStore, Dialogs);
-    expect(html).toContain("Claude 변경 2개를 되돌립니다. 앱 밖 변경 1개는 그대로 둡니다.");
+    expect(html).toContain("Claude 변경 2개를 되돌려요. 앱 밖 변경 1개는 그대로 둬요.");
     expect(html).toContain("앱 밖 변경도 되돌리기");
     // no outside change: the second choice is not offered
     snapshot(useStore, [file("a.ts")]);
@@ -647,7 +647,7 @@ describe("review store flows (wave1 desktop-review)", () => {
     // the second confirm lists the outside files
     useStore.setState({ dialog: { kind: "rejectExternal", paths: ["ide/Mine.java"], all: true } });
     const second = render(useStore, Dialogs);
-    expect(second).toContain("이 파일들은 Claude가 바꾸지 않았을 수 있습니다. 되돌리면 그 수정이 사라집니다:");
+    expect(second).toContain("이 파일들은 Claude가 바꾸지 않았을 수 있어요. 되돌리면 그 수정이 사라져요:");
     expect(second).toContain("ide/Mine.java");
     useStore.setState({ dialog: null });
   });
@@ -659,11 +659,11 @@ describe("review store flows (wave1 desktop-review)", () => {
     useStore.setState({ dialog: { kind: "staleReview" } });
     const { Dialogs } = await import("./components/dialogs/Dialogs");
     const sheet = render(useStore, Dialogs);
-    expect(sheet).toContain("오래된 리뷰입니다");
-    expect(sheet).toContain("그 뒤 HEAD 가 바뀌었습니다: main@aaaaaaa → main@bbbbbbb");
-    expect(sheet).toContain("12시간 이상 지났습니다");
-    expect(sheet).toContain("앱 밖 변경 13개가 섞였습니다");
-    expect(sheet).toContain("메모 1개도 함께 지워집니다");
+    expect(sheet).toContain("오래된 리뷰예요");
+    expect(sheet).toContain("그 뒤 HEAD 가 바뀌었어요: main@aaaaaaa → main@bbbbbbb");
+    expect(sheet).toContain("12시간 이상 지났어요");
+    expect(sheet).toContain("앱 밖 변경 13개가 섞였어요");
+    expect(sheet).toContain("메모 1개도 함께 지워져요");
     expect(sheet).toContain("정리");
     expect(sheet).toContain("이어서 리뷰");
     useStore.setState({ dialog: null });

@@ -56,7 +56,7 @@ describe("permission cards (§2.1)", () => {
     const newer = html(createElement(m.PermissionCard, { request: req("b"), decision: null }));
     expect(older).toContain('class="perm target"');
     expect(older).toContain("<kbd>⌘↩</kbd>");
-    expect(older).toContain("단축키는 가장 오래 기다린 이 카드에 적용됩니다");
+    expect(older).toContain("단축키는 가장 오래 기다린 이 카드에 적용돼요");
     expect(newer).not.toContain("target");
     expect(newer).not.toContain("<kbd>");
     expect(newer).toContain('data-testid="Allow"');
@@ -73,7 +73,7 @@ describe("permission cards (§2.1)", () => {
     const nested = req("n", { reason: { code: "other_worktree", message: "m", path: "/wt/acme-1800" } });
     scene(m, [nested]);
     const out = html(createElement(m.PermissionCard, { request: nested, decision: null }));
-    expect(out).toContain("다른 worktree(wt/acme-1800)의 위치입니다 — 이 창의 리뷰에 잡히지 않습니다");
+    expect(out).toContain("다른 worktree(wt/acme-1800)의 위치예요 — 이 창의 리뷰에 잡히지 않아요");
     expect(out).toContain('data-testid="Open as workbench"');
     expect(out).not.toContain('data-testid="Always allow"');
     expect(out).not.toContain('data-testid="Allow for session"');
@@ -82,7 +82,7 @@ describe("permission cards (§2.1)", () => {
     const config = { requestId: "c", toolName: "Edit", input: { file_path: "/repo/.claude/settings.local.json" }, file: "/repo/.claude/settings.local.json", reason: { code: "claude_config", message: "m" } } as unknown as PermissionRequest;
     scene(m, [config]);
     const cfg = html(createElement(m.PermissionCard, { request: config, decision: null }));
-    expect(cfg).toContain("Claude Code 설정 파일(.claude/settings.local.json)을 바꿉니다");
+    expect(cfg).toContain("Claude Code 설정 파일(.claude/settings.local.json)을 바꿔요");
     expect(cfg).not.toContain('data-testid="Allow for session"');
     const odd = req("u", { reason: { code: "future_code", message: "ReviewGate: somewhere new" } as unknown as PermissionRequest["reason"] });
     scene(m, [odd]);

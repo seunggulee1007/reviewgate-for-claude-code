@@ -137,7 +137,7 @@ extension AppState {
         }
     }
 
-    /// The stale restored review the sheet asks about ("오래된 리뷰입니다"); nil once the user chose "이어서 리뷰" for it
+    /// The stale restored review the sheet asks about ("오래된 리뷰예요"); nil once the user chose "이어서 리뷰" for it
     /// (a snapshot still carrying the flag before the engine processed `keep_review` does not bring the sheet back).
     public var staleReview: StaleReview? {
         guard projectInfo != nil, let stale = gate.stale, !dismissedReviewNotices.contains(staleKey(stale)) else { return nil }

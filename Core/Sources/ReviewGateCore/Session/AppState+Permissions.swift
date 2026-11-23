@@ -9,7 +9,7 @@ public struct PermissionNotice: Sendable, Equatable, Identifiable {
         self.text = text
     }
 
-    /// `unknown_permission_request`, or a card whose request left the queue before the answer: "이미 처리된 권한 요청입니다".
+    /// `unknown_permission_request`, or a card whose request left the queue before the answer: "이미 처리된 권한 요청이에요".
     public static var alreadyHandled: PermissionNotice {
         PermissionNotice(text: String(localized: "This permission request was already handled", bundle: .module))
     }
@@ -197,7 +197,7 @@ extension AppState {
     }
 
     /// The card turns decided right away and leaves the queue; the answer goes out as a request so a refusal is seen:
-    /// `unknown_permission_request` ("이미 처리된 권한 요청입니다") leaves the card handled, any other refusal puts it back.
+    /// `unknown_permission_request` ("이미 처리된 권한 요청이에요") leaves the card handled, any other refusal puts it back.
     func answerPermission(_ request: PermissionRequest, allow: Bool, updatedInput: JSONValue?, command: EngineCommand) {
         let queue = openPermissions
         let position = queue.firstIndex { $0.requestId == request.requestId } ?? queue.count

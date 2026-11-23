@@ -28,7 +28,7 @@ extension CardShortcutKey {
     }
 }
 
-/// A notice about a permission card ("이미 처리된 권한 요청입니다"): informational, never red; goes away after 4 s or on click.
+/// A notice about a permission card ("이미 처리된 권한 요청이에요"): informational, never red; goes away after 4 s or on click.
 struct PermissionToast: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store

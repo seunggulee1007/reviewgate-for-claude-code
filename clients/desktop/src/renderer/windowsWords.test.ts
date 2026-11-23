@@ -23,7 +23,7 @@ describe("Windows in Korean (polish-07)", () => {
       expect(s).not.toMatch(/로그인 셸|login shell/);
     }
     expect(toolchainDetectedNote("win32", false)).toBe(t("Detected when a project is opened."));
-    expect(toolchainDetectedNote("darwin", true)).toBe("현재 세션의 로그인 셸로 감지했습니다.");
+    expect(toolchainDetectedNote("darwin", true)).toBe("현재 세션의 로그인 셸로 감지했어요.");
     expect(toolchainOverrideNote("darwin")).toContain("로그인 셸");
     // The workbench setup command runs through cmd.exe there (engine git/workbenchSetup.ts).
     expect(workbenchSetupNote("win32")).toContain("cmd.exe");
@@ -41,14 +41,14 @@ describe("Windows in Korean (polish-07)", () => {
   it("a closed gate says why in the Mac's words (EngineMessages.gateText), never the raw state", () => {
     initI18n("ko", "win32");
     expect(refusalCodeText("gate_closed", "awaiting_permission")).toBe("대기 중인 권한 요청에 먼저 답하세요");
-    expect(refusalCodeText("gate_closed", "running")).toBe("Claude가 작업 중입니다 — 턴이 끝날 때까지 기다리세요");
-    expect(refusalCodeText("gate_closed", "brand_new_state")).toBe("지금은 보낼 수 없습니다");
-    expect(refusalCodeText("gate_closed", "")).toBe("지금은 보낼 수 없습니다");
+    expect(refusalCodeText("gate_closed", "running")).toBe("Claude가 작업 중이에요 — 턴이 끝날 때까지 기다리세요");
+    expect(refusalCodeText("gate_closed", "brand_new_state")).toBe("지금은 보낼 수 없어요");
+    expect(refusalCodeText("gate_closed", "")).toBe("지금은 보낼 수 없어요");
     // §29: another session's turn — unchanged.
     expect(refusalCodeText("gate_closed", "external_turn")).toBe(t("It goes out once the other work is done."));
     expect(refusalCodeText("request_changes_unavailable", "no_notes")).toBe("먼저 리뷰 메모를 추가하세요");
-    expect(refusalCodeText("request_changes_unavailable", "")).toBe("변경을 요청할 리뷰가 없습니다");
-    expect(refusalCodeText("request_changes_unavailable", "collecting")).toBe("변경 사항을 수집하는 중입니다 — 잠시 기다리세요");
+    expect(refusalCodeText("request_changes_unavailable", "")).toBe("변경을 요청할 리뷰가 없어요");
+    expect(refusalCodeText("request_changes_unavailable", "collecting")).toBe("변경 사항을 수집하는 중이에요 — 잠시 기다리세요");
     const states = ["running", "awaiting_permission", "collecting", "reverting", "collect_failed", "pending_review", "changes_requested", "no_session", "starting", "git_init_needed"];
     for (const d of states) {
       expect(gateText(d)).not.toContain(d);

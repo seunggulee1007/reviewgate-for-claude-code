@@ -21,12 +21,12 @@ describe("error / refusal codes → Korean (docs/PROTOCOL.md §19.6)", () => {
   });
 
   it("formats the specific codes", () => {
-    expect(errorEventText({ code: "auth_required", message: "Invalid API key · Please run /login" })).toBe("Claude 로그인이 필요합니다");
+    expect(errorEventText({ code: "auth_required", message: "Invalid API key · Please run /login" })).toBe("Claude 로그인이 필요해요");
     expect(errorEventText({ code: "api_retrying", message: "retry", attempt: 2, maxRetries: 10 })).toBe("재시도 중 (2/10)…");
     expect(retryChipText(3, undefined)).toBe("재시도 중 (3)…");
     expect(errorEventText({ code: "api_error", message: "overloaded", status: 529 })).toContain("(HTTP 529)");
     expect(errorEventText({ code: "api_error", message: "overloaded", status: null })).not.toContain("HTTP");
-    expect(errorEventText({ code: "send_failed", message: "snapshot failed" })).toBe("메시지를 Claude에 보내지 못했습니다: snapshot failed");
+    expect(errorEventText({ code: "send_failed", message: "snapshot failed" })).toBe("메시지를 Claude에 보내지 못했어요: snapshot failed");
   });
 
   it("shows usage_limit's reset in local time", () => {
@@ -58,18 +58,18 @@ describe("error / refusal codes → Korean (docs/PROTOCOL.md §19.6)", () => {
     expect(refusalMessage(refusalOf(new EngineRefusal("ENOENT: no such file", "command_failed")))).toContain("ENOENT: no such file");
     const changed = refusalMessage(refusalOf(new EngineRefusal("file_changed_since_review:a.txt, b.txt", "file_changed_since_review", ["a.txt", "b.txt"])));
     expect(changed).toContain("a.txt, b.txt");
-    expect(changed).toContain("사라집니다");
+    expect(changed).toContain("사라져요");
   });
 
   // MARK: wave1 desktop-review
   it("not_captured lists the files that cannot be reverted (§32) and says what to do", () => {
     const text = refusalMessage(refusalOf(new EngineRefusal("not_captured:.claude/big.bin, logs/root.log", "not_captured", [".claude/big.bin", "logs/root.log"])));
-    expect(text).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없습니다: .claude/big.bin, logs/root.log — 직접 고치거나 수락하세요");
+    expect(text).toBe("내용을 수집하지 못한 파일이라 되돌릴 수 없어요: .claude/big.bin, logs/root.log — 직접 고치거나 수락하세요");
     // an older bridge without `paths`: the list comes from the error text
     expect(refusalMessage(refusalOf(new Error("not_captured:a.bin")))).toContain("a.bin");
     // a partial revert of such a file never suggests a whole-file reject (that is refused too)
-    expect(refusalMessage(refusalOf(new Error("partial_reject_unsupported:uncaptured")))).toBe("내용을 수집하지 못한 파일이라 부분 되돌리기도 할 수 없습니다");
-    expect(refusalMessage(refusalOf(new Error("partial_reject_unsupported:A")))).toBe("이 파일은 부분적으로 되돌릴 수 없습니다 — 파일 전체를 거절하세요.");
+    expect(refusalMessage(refusalOf(new Error("partial_reject_unsupported:uncaptured")))).toBe("내용을 수집하지 못한 파일이라 부분 되돌리기도 할 수 없어요");
+    expect(refusalMessage(refusalOf(new Error("partial_reject_unsupported:A")))).toBe("이 파일은 부분적으로 되돌릴 수 없어요 — 파일 전체를 거절하세요.");
   });
 
   it("routes codes to their presentation", () => {
@@ -80,7 +80,7 @@ describe("error / refusal codes → Korean (docs/PROTOCOL.md §19.6)", () => {
     expect(presentationOf("session_crashed")).toBe("fatalSession");
     expect(presentationOf("cli_not_found")).toBe("fatalSession");
     expect(presentationOf("cli_not_executable")).toBe("fatalSession");
-    expect(errorEventText({ code: "cli_not_executable", message: "claude.cmd has no target" })).toBe("claude 실행 파일을 찾을 수 없습니다 — 설정에서 claude.exe를 직접 선택하세요");
+    expect(errorEventText({ code: "cli_not_executable", message: "claude.cmd has no target" })).toBe("claude 실행 파일을 찾을 수 없어요 — 설정에서 claude.exe를 직접 선택하세요");
     expect(presentationOf("rate_limited")).toBe("banner");
     expect(presentationOf(undefined)).toBe("banner");
   });

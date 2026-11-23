@@ -125,7 +125,7 @@ public struct RejectAllPlan: Equatable, Sendable {
 
     private var externalCountOverride: Int?
 
-    /// M in "앱 밖 변경 M개는 그대로 둡니다".
+    /// M in "앱 밖 변경 M개는 그대로 둬요".
     public var externalCount: Int { max(external.count, externalCountOverride ?? 0) }
 
     /// The dialog's body.

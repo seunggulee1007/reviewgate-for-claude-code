@@ -62,7 +62,7 @@ describe("Settings › Permissions (§2.8)", () => {
     expect(checked(out, "Allow worktree isolation")).toBe(true);
     expect(checked(out, "Persist session allows")).toBe(true); // MARK: r2-skills-side (§33.7, M21): on by default
     expect(checked(out, "Apply user Bash rules")).toBe(true); // MARK: r2-skills-side (§33.5, M20)
-    expect(out).toContain("세션 동안 허용한 항목이 없습니다.");
+    expect(out).toContain("세션 동안 허용한 항목이 없어요.");
     expect(disabled(out, "Forget session allows")).toBe(true);
     // the allow patterns now speak of MCP / WebFetch too, and apply at once
     expect(out).toContain("mcp__서버__도구");

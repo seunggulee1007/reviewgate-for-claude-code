@@ -16,8 +16,8 @@ describe("why the commit waits", () => {
     // A collection error left on another phase still says Retry first.
     expect(commitLockReason(gate("running", "git status failed"))).toBe("변경 수집을 먼저 다시 시도하세요");
     expect(commitLockReason(gate("reverting"))).toBe("되돌리는 중…");
-    expect(commitLockReason(gate("running"))).toBe("Claude가 작업 중입니다 — 턴이 끝날 때까지 기다리세요");
-    expect(commitLockReason(gate("collecting"))).toBe("Claude가 작업 중입니다 — 턴이 끝날 때까지 기다리세요");
+    expect(commitLockReason(gate("running"))).toBe("Claude가 작업 중이에요 — 턴이 끝날 때까지 기다리세요");
+    expect(commitLockReason(gate("collecting"))).toBe("Claude가 작업 중이에요 — 턴이 끝날 때까지 기다리세요");
     expect(commitLockReason(gate("idle"))).toBeNull();
     expect(commitLockReason(gate("reviewing"))).toBeNull();
   });
