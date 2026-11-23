@@ -524,6 +524,7 @@ private struct WorkbenchWindow: View {
             .onChange(of: entry.store.projectURL) { _, new in
                 // Keep the window's value in sync so `openWindow(value:)` for this folder focuses this window.
                 url = new?.standardizedFileURL
+                if new == nil { entry.model.startScreenCheckedRoot = nil }   // MARK: task-start (§63): reopened, it is decided again
                 // M19: a window that opened / changed / closed its project rewrites the restore list.
                 if let new { entry.applySavedFrame(root: AppSettings.projectKey(new)) } else { entry.frameRoot = nil }
                 // MARK: polish p-lifecycle (P1-chrome-07): the Dock's right click lists it among the recent projects too.
@@ -560,6 +561,7 @@ private struct WorkbenchWindow: View {
         guard let path = ProcessInfo.processInfo.environment["REVIEWGATE_PROJECT"], !path.isEmpty else { return false }
         guard Self.isDirectory(path) else { return false }
         registry.restoreAttempted = true
+        entry.model.suppressNextStartScreen = true   // MARK: task-start (§63): a headless run opens into its chat
         entry.applySavedFrame(root: AppSettings.projectKey(URL(fileURLWithPath: path)))
         #if DEBUG
         ScreenshotTour.startIfRequested(entry)   // REVIEWGATE_SCREENSHOT_TOUR (App/Debug/ScreenshotTour.swift)
@@ -584,11 +586,13 @@ private struct WorkbenchWindow: View {
         guard let first = restore.first else { return }
 
         entry.applySavedFrame(root: first.path, preferred: first.frame)
+        entry.model.suppressNextStartScreen = true   // MARK: task-start (§63): restored windows open into their chat
         await entry.store.openProject(URL(fileURLWithPath: first.path))
 
         for item in restore.dropFirst() {
             let target = URL(fileURLWithPath: item.path).standardizedFileURL
             guard registry.entry(for: target) == nil else { continue }
+            registry.suppressStartScreen(for: target)
             openWindow(id: "workbench", value: ProjectOpener.newWindowValue(target))
             // Sequentially: two windows must never race for one worktree lock.
             await Self.waitForProject(at: target)

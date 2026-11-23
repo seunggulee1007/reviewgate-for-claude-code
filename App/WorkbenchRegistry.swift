@@ -17,6 +17,13 @@ struct DiffJump: Equatable {
 @Observable
 final class WindowModel {
     var tab: MainTab = .changes
+    // MARK: task-start (§63)
+    /// The start screen covers the chat area (바로 시작 · 업무로 시작 · 대화로 열기).
+    var showStartScreen = false
+    /// The project the start screen was last decided for (a tab switch never brings it back).
+    var startScreenCheckedRoot: String?
+    /// The next project this window opens shows no start screen (a launch restore, a headless run).
+    var suppressNextStartScreen = false
     // M13: sheets / dialogs the Review and Workbenches menus open (the views bind to these).
     /// Accept-all summary sheet (audit 1.9).
     var showAcceptAll = false
@@ -340,6 +347,13 @@ final class WorkbenchRegistry {
     /// Quit do not overwrite it with a shorter list.
     var isTerminating = false
     private var fallbackStore: AppState?
+    /// MARK: task-start — §63: folders whose next open in a new window shows no start screen (a launch restore's other
+    /// windows, a workbench the app made); taken by that open.
+    private var startScreenSuppressed: Set<String> = []
+
+    func suppressStartScreen(for url: URL) { startScreenSuppressed.insert(AppSettings.projectKey(url)) }
+
+    func takeStartScreenSuppression(for url: URL) -> Bool { startScreenSuppressed.remove(AppSettings.projectKey(url)) != nil }
 
     var stores: [AppState] { entries.map(\.store) }
 

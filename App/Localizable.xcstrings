@@ -285,6 +285,22 @@
         }
       }
     },
+    "%@ — Claude reads it with the %@ MCP server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — Claude reads it with the %@ MCP server"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — Claude가 %2$@ MCP 서버로 읽어요"
+          }
+        }
+      }
+    },
     "%@ — Claude's session is on this chat": {
       "localizations": {
         "en": {
@@ -313,6 +329,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ — Claude 세션이 이 채팅에 있어요 (⌘%lld)"
+          }
+        }
+      }
+    },
+    "%@ — choose its MCP server in Settings › Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — choose its MCP server in Settings › Tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — 설정 › 업무에서 MCP 서버를 골라 주세요"
           }
         }
       }
@@ -1729,6 +1761,22 @@
         }
       }
     },
+    "1 · 2 · 3, ↑ ↓ ↩ — Esc starts now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 · 2 · 3, ↑ ↓ ↩ — Esc starts now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 · 2 · 3, ↑ ↓ ↩ — Esc는 바로 시작"
+          }
+        }
+      }
+    },
     "@Changed files": {
       "localizations": {
         "en": {
@@ -2145,6 +2193,22 @@
         }
       }
     },
+    "A task id or link — set the platform in Settings › Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A task id or link — set the platform in Settings › Tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 ID나 링크 — 플랫폼은 설정 › 업무에서 정해요"
+          }
+        }
+      }
+    },
     "A task link, a key such as ABC-123, or what to do — sent as the first message there.": {
       "localizations": {
         "en": {
@@ -2365,6 +2429,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "에이전트와 워크트리"
+          }
+        }
+      }
+    },
+    "A task's branch and first prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A task's branch and first prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무의 브랜치와 첫 프롬프트"
           }
         }
       }
@@ -5089,6 +5169,70 @@
         }
       }
     },
+    "How do you want to start?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How do you want to start?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어떻게 시작할까요?"
+          }
+        }
+      }
+    },
+    "Task %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 %@"
+          }
+        }
+      }
+    },
+    "Task Settings…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task Settings…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 설정…"
+          }
+        }
+      }
+    },
+    "Task id or link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task id or link"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 ID 또는 링크"
+          }
+        }
+      }
+    },
     "Task platform": {
       "localizations": {
         "en": {
@@ -5117,6 +5261,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "업무"
+          }
+        }
+      }
+    },
+    "When a project window opens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a project window opens"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 창이 열릴 때"
           }
         }
       }
@@ -6365,6 +6525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "둘 다"
+          }
+        }
+      }
+    },
+    "Branch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치"
           }
         }
       }
@@ -10775,6 +10951,22 @@
         }
       }
     },
+    "Create Branch and Start": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Branch and Start"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치 만들고 시작"
+          }
+        }
+      }
+    },
     "Create PR": {
       "localizations": {
         "en": {
@@ -10835,6 +11027,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "PR 만들기…"
+          }
+        }
+      }
+    },
+    "Create Workbench": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Workbench"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치 만들기"
           }
         }
       }
@@ -15671,6 +15879,22 @@
         }
       }
     },
+    "From a task, in this folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From a task, in this folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무로, 이 폴더에서"
+          }
+        }
+      }
+    },
     "From an earlier session — replaced once this session reports": {
       "localizations": {
         "en": {
@@ -15898,6 +16122,22 @@
         }
       }
     },
+    "GitHub Issues — read with the GitHub CLI (gh)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues — read with the GitHub CLI (gh)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues — GitHub CLI(gh)로 읽어요"
+          }
+        }
+      }
+    },
     "GitHub accounts": {
       "localizations": {
         "en": {
@@ -16102,6 +16342,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "파일로 이동"
+          }
+        }
+      }
+    },
+    "Goes into the message box — you send it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Goes into the message box — you send it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력창에 들어가요 — 보내는 건 직접 해요"
           }
         }
       }
@@ -19264,6 +19520,22 @@
         }
       }
     },
+    "Move through the choices and the recent chats, then open the marked one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move through the choices and the recent chats, then open the marked one"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택지와 최근 대화 사이 이동, 표시된 것 열기"
+          }
+        }
+      }
+    },
     "Move to Applications Folder": {
       "localizations": {
         "en": {
@@ -20562,6 +20834,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "워크벤치가 없어요: %@"
+          }
+        }
+      }
+    },
+    "No task id in this — use a key (ACME-123), a number or a link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No task id in this — use a key (ACME-123), a number or a link"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 ID를 찾지 못했어요 — 키(ACME-123), 번호 또는 링크를 넣어 주세요"
           }
         }
       }
@@ -21996,6 +22284,22 @@
         }
       }
     },
+    "Open a chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화로 열기"
+          }
+        }
+      }
+    },
     "Open a folder (⌘O) to start a Claude session.": {
       "localizations": {
         "en": {
@@ -22008,6 +22312,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "폴더를 열어(⌘O) Claude 세션을 시작하세요."
+          }
+        }
+      }
+    },
+    "Open a new chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a new chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 채팅을 열어요"
           }
         }
       }
@@ -22363,6 +22683,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "그 worktree를 워크벤치로 열기"
+          }
+        }
+      }
+    },
+    "Open now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 열려 있어요"
           }
         }
       }
@@ -24306,6 +24642,22 @@
         }
       }
     },
+    "Reading the issue…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the issue…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이슈를 읽는 중…"
+          }
+        }
+      }
+    },
     "Ready": {
       "localizations": {
         "en": {
@@ -24366,6 +24718,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "최근 항목"
+          }
+        }
+      }
+    },
+    "Recent chats": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent chats"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 대화"
           }
         }
       }
@@ -28470,6 +28838,22 @@
         }
       }
     },
+    "Settings › Tasks: platform, branch prefix, MCP server, first prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings › Tasks: platform, branch prefix, MCP server, first prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 › 업무: 플랫폼, 브랜치 접두어, MCP 서버, 첫 프롬프트"
+          }
+        }
+      }
+    },
     "Settings…": {
       "localizations": {
         "en": {
@@ -29542,6 +29926,22 @@
         }
       }
     },
+    "Skips this screen when a project opens — Settings › Tasks › Start screen turns it back on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skips this screen when a project opens — Settings › Tasks › Start screen turns it back on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열 때 이 화면을 건너뛰어요 — 설정 › 업무 › 시작 화면에서 다시 켤 수 있어요"
+          }
+        }
+      }
+    },
     "Some parts were reverted on disk; the rest is still under review": {
       "localizations": {
         "en": {
@@ -29686,6 +30086,54 @@
         }
       }
     },
+    "Start in This Folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start in This Folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더에서 시작"
+          }
+        }
+      }
+    },
+    "Start now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바로 시작"
+          }
+        }
+      }
+    },
+    "Start now · Start from a task · Open a chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start now · Start from a task · Open a chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바로 시작 · 업무로 시작 · 대화로 열기"
+          }
+        }
+      }
+    },
     "Start screen": {
       "localizations": {
         "en": {
@@ -29698,6 +30146,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "시작 화면"
+          }
+        }
+      }
+    },
+    "Start straight away next time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start straight away next time"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음부터 바로 시작"
           }
         }
       }
@@ -31094,6 +31558,22 @@
         }
       }
     },
+    "The first prompt is empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first prompt is empty"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "첫 프롬프트가 비어 있어요"
+          }
+        }
+      }
+    },
     "The folder already exists: %@": {
       "localizations": {
         "en": {
@@ -31478,6 +31958,22 @@
         }
       }
     },
+    "The prompt goes into the message box; nothing is sent until you press Return": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The prompt goes into the message box; nothing is sent until you press Return"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트는 메시지 입력창에 들어가요. Return을 누르기 전에는 아무것도 보내지 않아요"
+          }
+        }
+      }
+    },
     "The report comes when the agent finishes": {
       "localizations": {
         "en": {
@@ -31794,6 +32290,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "서브브레인을 읽지 못했어요"
+          }
+        }
+      }
+    },
+    "The task starts without its title — Claude reads it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The task starts without its title — Claude reads it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제목 없이 시작해요 — Claude가 업무를 읽어요"
           }
         }
       }
@@ -32306,6 +32818,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 폴더는 git 저장소가 아니에요"
+          }
+        }
+      }
+    },
+    "This folder is not a git repository — the task starts in this folder, without a branch.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This folder is not a git repository — the task starts in this folder, without a branch."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 폴더는 git 저장소가 아니에요 — 브랜치 없이 이 폴더에서 시작해요."
           }
         }
       }
@@ -36772,6 +37300,22 @@
         }
       }
     },
+    "Enter a task id or link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a task id or link"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 ID나 링크를 넣어 주세요"
+          }
+        }
+      }
+    },
     "Enter a valid host (letters, digits, `.`, `-`, optional `:port`).": {
       "localizations": {
         "en": {
@@ -36880,6 +37424,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "머지를 마무리하는 커밋이에요. 충돌이 남았거나 리뷰하지 않은 채 스테이지된 파일을 먼저 수락하세요: %@"
+          }
+        }
+      }
+    },
+    "This project has no earlier chats": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project has no earlier chats"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에는 이전 대화가 없어요"
           }
         }
       }
@@ -37936,6 +38496,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 패널 숨기기 (⌘⇧D, 패널 안에서는 Esc)"
+          }
+        }
+      }
+    },
+    "Continue a recent chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue a recent chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 대화를 이어가요"
+          }
+        }
+      }
+    },
+    "Continue a recent chat (3)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue a recent chat (3)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 대화 이어가기 (3)"
           }
         }
       }

@@ -55,6 +55,11 @@ IntelliJ IDEA, VS Code or Xcode. Search-based, no language server to set up.
 **Workbenches.** Run several Claude sessions on one project at once — each in its own git worktree and branch, each
 with its own gate.
 
+**Start from a task.** A project window opens on a start screen: start straight away, start from a task, or continue a
+recent chat. Give a task's id or link — a GitHub issue is read with `gh`, Jira, Linear and other trackers by Claude
+through the MCP server you pick — and ReviewGate makes its branch (or workbench) and puts a first prompt in the message
+box for you to send.
+
 **Pull requests in the same viewer.** Open your GitHub or GitHub Enterprise PRs in the same diff viewer, leave line
 comments, or hand a comment thread to Claude.
 

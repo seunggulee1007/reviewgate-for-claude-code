@@ -10388,3 +10388,25 @@ Everything but the GitHub read is the client's (Mac: Core `TaskStart.swift`; tes
   was last used and its kind (chat / terminal); ↩ or a click opens it (`session_open`). ↑ / ↓ move through the choices and
   the chats, ↩ takes the marked one, **Esc is 바로 시작** — the screen never blocks. 대화로 열기 is off (its reason as the
   tooltip) when the project has no earlier chat.
+
+### 63.5 Mac, and what Windows still needs
+
+- **Mac.** `StartScreenOverlay` (App `UI/Start/StartScreenView.swift`) sits over the diff and chat area of a project
+  window (the sidebar, toolbar and menus stay usable) and decides once per project open (`WindowModel.showStartScreen`,
+  `startScreenCheckedRoot`, so a tab switch never brings it back) after the window's chats are known (≤ 5 s). The windows
+  that skip it are marked in `WorkbenchRegistry.suppressStartScreen(for:)` — the launch restore, `REVIEWGATE_PROJECT`
+  (headless runs and the tours; `WindowModel.suppressNextStartScreen` for the window itself), and every workbench window the app opens after creating it. Three cards (1 / 2 / 3 badges),
+  the recent chats (kind icon, title, "지금 열려 있어요" for the window's chat, relative time, the last message as the
+  tooltip) and a "다음부터 바로 시작" checkbox. `TaskStartSheet` (`UI/Start/TaskStartSheet.swift`): the id / link field
+  (a GitHub issue is read 0.5 s after typing stops, at once for a pasted link; the title shows, or why it could not be
+  read — the task then starts with its id and link), the branch (editable; `branchNameHint`), "이 창에서 새 브랜치 /
+  새 워크벤치에서" (default from Settings), the first prompt (editable), "업무 설정…" (Settings › Tasks), and Start —
+  "브랜치 만들고 시작", "워크벤치 만들기", or "이 폴더에서 시작" (§59), off with its reason as the tooltip. Settings ›
+  Tasks: `App/UI/Settings/TaskSettingsPane.swift` (a "<project>에만 / 모든 프로젝트 (기본값)" switch, "기본값 쓰기"). The
+  quiet tour `SHOTS_LAYOUT=settings` also writes `start-screen-*` and `start-task-sheet-*`.
+- **Windows (follow-up).** The engine side is shared; the client needs: `task_fetch` on the renderer's allow list
+  (`src/main/ipcGuard.ts`), the same model as Core `TaskStart.swift` (reference parsing, `TaskBranch`, `TaskPrompt`,
+  `StartScreen` / `StartScreenCursor`, settings per project with a default) with its tests, a start screen over the chat
+  area after `open_project` (skipped for restored windows and the workbench windows it opens; Esc = 바로 시작), the task
+  dialog, Settings › Tasks in `settingsIndex.ts`, and `task_started {draft: true}` into the composer — or, for a terminal
+  chat, its prompt as a bracketed paste. The shortcut rows of "시작 화면" are listed there as Mac only until then.
