@@ -173,4 +173,65 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().file).toBeNull();
     expect(m.useStore.getState().tab).toBe("prs");
   });
+
+  it("§65.8 peek: the band under the line, the first preview asked; another candidate asks once, a stale preview is dropped", async () => {
+    const { useBandSlot } = await import("./bandSlot");
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "find", candidates: [cand("a/Repo.kt", 10, "method"), cand("b/Other.kt", 20, "method")], truncated: false }));
+    const asked: number[] = [];
+    let release: (() => void) | null = null;
+    replies.set("definition_preview", (cmd) => {
+      const line = (cmd as { line: number }).line;
+      asked.push(line);
+      const reply = { type: "definition_preview", path: (cmd as { path: string }).path, line, startLine: line - 1, lines: ["/** doc */", "fun find()"], totalLines: 99, language: "kotlin", truncated: false };
+      return asked.length === 1 ? new Promise((r) => (release = () => r(reply))) : reply;
+    });
+    const anchor = { kind: "dom" as const, path: "src/A.kt", rowId: 7 };
+    m.useNav.getState().peekDefinition({ symbol: "find", fromPath: "src/A.kt", line: 3, column: 12, receiver: "repo", anchor, from: { kind: "review", path: "src/A.kt", line: 3 } });
+    expect(useBandSlot.getState().anchor).toEqual(anchor);
+    expect(m.useNav.getState().band).toMatchObject({ loading: true, symbol: "find" });
+    await flush();
+    expect(sent[0]).toEqual({ type: "find_definition", symbol: "find", fromPath: "src/A.kt", line: 3, column: 12, receiver: "repo" });
+    expect(m.useNav.getState().band).toMatchObject({ loading: false, selected: 0 });
+    expect(m.useNav.getState().band!.rows.map((r) => r.path)).toEqual(["a/Repo.kt", "b/Other.kt"]);
+    // the second candidate while the first preview is still on its way
+    m.useNav.getState().setBandSelected(1);
+    await flush();
+    expect(asked).toEqual([10, 20]);
+    expect(m.useNav.getState().band!.previews[1]).toMatchObject({ line: 20 });
+    // a newer peek drops the first band's late preview
+    m.useNav.getState().peekDefinition({ symbol: "find", anchor: { kind: "dom", path: "src/A.kt", rowId: 9 }, from: null });
+    release!();
+    await flush();
+    const b = m.useNav.getState().band!;
+    expect(b.anchor).toEqual({ kind: "dom", path: "src/A.kt", rowId: 9 });
+    expect(b.previews[1]).toBeUndefined();
+    // back to the first: asked again only because it never arrived for this band; then cached
+    m.useNav.getState().setBandSelected(1);
+    m.useNav.getState().setBandSelected(0);
+    await flush();
+    const before = asked.length;
+    m.useNav.getState().setBandSelected(1);
+    m.useNav.getState().setBandSelected(0);
+    expect(asked.length).toBe(before);
+  });
+
+  it("§65.8 peek: Open goes to the candidate (the band closes and Back returns); another file closes the band", async () => {
+    const { useBandSlot } = await import("./bandSlot");
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "C", candidates: [cand("lib/C.java", 3)], truncated: false }));
+    replies.set("definition_preview", () => ({ type: "definition_preview", path: "lib/C.java", line: 3, startLine: 3, lines: ["class C {}"], totalLines: 3, language: "java", truncated: false }));
+    m.useNav.getState().peekDefinition({ symbol: "C", anchor: { kind: "dom", path: "src/A.java", rowId: 1 }, from: { kind: "review", path: "src/A.java", line: 2 } });
+    await flush();
+    expect(m.useNav.getState().band?.rows).toHaveLength(1); // one candidate stays in the band — peek never jumps by itself
+    m.useNav.getState().openBandSelected();
+    expect(m.useNav.getState().band).toBeNull();
+    expect(useBandSlot.getState().anchor).toBeNull();
+    expect(m.useNav.getState().file).toMatchObject({ path: "lib/C.java", line: 3 });
+    expect(m.useNav.getState().history.back).toEqual([{ kind: "review", path: "src/A.java", line: 2 }]);
+
+    m.useNav.getState().closeFile();
+    m.useNav.getState().peekDefinition({ symbol: "C", anchor: { kind: "dom", path: "src/A.java", rowId: 1 }, from: null });
+    await flush();
+    m.useStore.getState().selectFile("src/B.java");
+    expect(m.useNav.getState().band).toBeNull();
+  });
 });

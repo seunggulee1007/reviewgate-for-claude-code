@@ -71,11 +71,15 @@ export function windowKey(e: ShortcutKey): WindowKey | null {
   return is("Period", ".") ? "stop" : null;
 }
 
-/** §62 code navigation: F12, Shift+F12, Alt+← / Alt+→ (Back / Forward), Ctrl+Alt+O (Open in IDE — the physical O). */
-export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde";
+/**
+ * §62 code navigation: F12, Shift+F12, Alt+← / Alt+→ (Back / Forward), Ctrl+Alt+O (Open in IDE — the physical O);
+ * §65.8 Alt+F12 (Peek Definition).
+ */
+export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde" | "peek";
 
 export function navKey(e: ShortcutKey): NavKey | null {
   if (e.key === "F12" && !mod(e) && !e.altKey) return e.shiftKey ? "references" : "definition";
+  if (e.key === "F12" && !mod(e) && e.altKey && !e.shiftKey) return "peek";
   if (e.altKey && !mod(e) && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return e.key === "ArrowLeft" ? "back" : "forward";
   if (mod(e) && e.altKey && !e.shiftKey && (e.code === "KeyO" || e.key.toLowerCase() === "o")) return "openInIde";
   return null;

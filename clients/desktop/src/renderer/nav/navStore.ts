@@ -4,7 +4,7 @@
  * Requests are numbered: a newer request's reply replaces an older one's (a stale reply is dropped).
  */
 import { create } from "zustand";
-import type { ProjectFileEvent } from "@reviewgate/engine";
+import type { ProjectFileEvent, SymbolPreviewEvent } from "@reviewgate/engine";
 import { engineRequest, refusalOf } from "../engineRequest";
 import { refusalMessage } from "../errorCodes";
 import { t } from "../i18n";
@@ -12,6 +12,8 @@ import { useStore } from "../store";
 import { showToast } from "../toast";
 import { isSendableSymbol } from "./identifier";
 import { EMPTY_HISTORY, goBack, goForward, peekRows, pushHistory, referenceRows, searchRows, type NavHistory, type NavLocation, type PeekRow, type RefRow } from "./navModel";
+import { sameAnchor, useBandSlot, type BandAnchor } from "./bandSlot"; // §65.8
+import { bandRows, type BandRow } from "./peekModel";
 
 export type NavTarget = { path: string; line: number; column: number; symbol?: string };
 
@@ -41,11 +43,29 @@ export type RefsState = {
   error: string | null;
 };
 
+/** §65.8: the peek band — the definition's lines inline under the clicked line, the candidates beside them. */
+export type BandState = {
+  seq: number;
+  anchor: BandAnchor;
+  symbol: string;
+  fromPath?: string;
+  from: NavLocation | null;
+  loading: boolean;
+  error: string | null;
+  rows: BandRow[];
+  selected: number;
+  truncated: boolean;
+  timedOut: boolean;
+  /** `definition_preview` per candidate (its index): the reply, or the refusal said. Absent: on its way. */
+  previews: Record<number, SymbolPreviewEvent | string>;
+};
+
 export type FileViewState = NavTarget & { seq: number; data: ProjectFileEvent | null; error: string | null };
 export type RevealState = NavTarget & { seq: number };
 
 type NavState = {
   peek: PeekState | null;
+  band: BandState | null;
   refs: RefsState | null;
   file: FileViewState | null;
   reveal: RevealState | null;
@@ -55,6 +75,13 @@ type NavState = {
 
   /** §65.6: `column` (1-based) and `receiver` of the click make members of the receiver's type win. */
   goToDefinition(q: { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string; x: number; y: number; from: NavLocation | null }): void;
+  /** §65.8 Peek Definition (Alt+F12; Ctrl+click while Settings says "Peek"): the band under `anchor`. */
+  peekDefinition(q: { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string; anchor: BandAnchor; from: NavLocation | null }): void;
+  /** Another candidate of the band (its preview is asked once). */
+  setBandSelected(index: number): void;
+  /** The band's candidate in the diff / the project file view (as §62 opens one); the band closes. */
+  openBandSelected(): void;
+  closeBand(): void;
   findReferences(q: { symbol: string; fromPath?: string }): void;
   findInProject(symbol: string): void;
   /** Opens a result: a changed file of the review in its diff at that line, any other file in the project file view. */
@@ -82,6 +109,7 @@ export function definitionHints(q: { fromPath?: string | undefined; line?: numbe
 }
 
 let defSeq = 0;
+let bandSeq = 0;
 let refSeq = 0;
 let fileSeq = 0;
 let revealSeq = 0;
@@ -89,6 +117,26 @@ let revealSeq = 0;
 const messageOf = (e: unknown) => refusalMessage(refusalOf(e));
 
 export const useNav = create<NavState>((set, get) => {
+  const dropBand = () => {
+    bandSeq++;
+    if (get().band) set({ band: null });
+    if (useBandSlot.getState().anchor) useBandSlot.setState({ anchor: null, slot: null });
+  };
+
+  const loadPreview = (seq: number, index: number) => {
+    const row = get().band?.rows[index];
+    if (!row) return;
+    engineRequest({ type: "definition_preview", path: row.path, line: row.line })
+      .then((reply) => {
+        const b = get().band;
+        if (b && b.seq === seq) set({ band: { ...b, previews: { ...b.previews, [index]: reply } } });
+      })
+      .catch((e: unknown) => {
+        const b = get().band;
+        if (b && b.seq === seq) set({ band: { ...b, previews: { ...b.previews, [index]: messageOf(e) } } });
+      });
+  };
+
   const openFile = (target: NavTarget) => {
     const s = useStore.getState();
     if (s.tab === "prs") s.setTab("changes");
@@ -126,6 +174,7 @@ export const useNav = create<NavState>((set, get) => {
 
   return {
     peek: null,
+    band: null,
     refs: null,
     file: null,
     reveal: null,
@@ -154,6 +203,40 @@ export const useNav = create<NavState>((set, get) => {
           set({ peek: { ...base, loading: false, error: messageOf(e) } });
         });
     },
+
+    peekDefinition({ symbol, fromPath, line, column, receiver, anchor, from }) {
+      if (!isSendableSymbol(symbol)) return;
+      defSeq++;
+      const seq = ++bandSeq;
+      const base = { seq, anchor, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, previews: {}, ...(fromPath ? { fromPath } : {}) };
+      set({ peek: null, band: { ...base, loading: true } });
+      if (!sameAnchor(useBandSlot.getState().anchor, anchor)) useBandSlot.setState({ anchor, slot: null });
+      engineRequest({ type: "find_definition", symbol, ...definitionHints({ fromPath, line, column, receiver }) })
+        .then((reply) => {
+          if (seq !== bandSeq || !get().band) return;
+          set({ band: { ...base, loading: false, rows: bandRows(reply.candidates), truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          loadPreview(seq, 0);
+        })
+        .catch((e: unknown) => {
+          if (seq === bandSeq && get().band) set({ band: { ...base, loading: false, error: messageOf(e) } });
+        });
+    },
+
+    setBandSelected(index) {
+      const b = get().band;
+      if (!b || index < 0 || index >= b.rows.length || index === b.selected) return;
+      set({ band: { ...b, selected: index } });
+      if (!(index in b.previews)) loadPreview(b.seq, index);
+    },
+
+    openBandSelected() {
+      const b = get().band;
+      const row = b?.rows[b.selected];
+      if (!b || !row) return;
+      get().openTarget({ path: row.path, line: row.line, column: row.column, symbol: b.symbol }, b.from);
+    },
+
+    closeBand: dropBand,
 
     findReferences({ symbol, fromPath }) {
       if (!isSendableSymbol(symbol)) return;
@@ -188,6 +271,7 @@ export const useNav = create<NavState>((set, get) => {
     openTarget(target, from) {
       if (from) set((st) => ({ history: pushHistory(st.history, from) }));
       set({ peek: null });
+      dropBand();
       const s = useStore.getState();
       const changed = s.state.changedFiles.some((f) => f.path === target.path && f.status !== "D");
       if (changed) showReview(target);
@@ -199,6 +283,7 @@ export const useNav = create<NavState>((set, get) => {
       const step = here && goBack(get().history, here);
       if (!step) return;
       set({ history: step.history, peek: null });
+      dropBand();
       show(step.to);
     },
 
@@ -207,6 +292,7 @@ export const useNav = create<NavState>((set, get) => {
       const step = here && goForward(get().history, here);
       if (!step) return;
       set({ history: step.history, peek: null });
+      dropBand();
       show(step.to);
     },
 
@@ -222,7 +308,10 @@ export const useNav = create<NavState>((set, get) => {
       refSeq++;
       set({ refs: null });
     },
-    closeFile: () => set({ file: null }),
+    closeFile: () => {
+      dropBand();
+      set({ file: null });
+    },
 
     revealDone(seq, found) {
       const r = get().reveal;
@@ -239,6 +328,7 @@ export const useNav = create<NavState>((set, get) => {
     reset() {
       defSeq++;
       refSeq++;
+      dropBand();
       set({ peek: null, refs: null, file: null, reveal: null, history: EMPTY_HISTORY, here: null });
     },
   };
@@ -273,8 +363,12 @@ useStore.subscribe((s, prev) => {
   const root = s.state.project?.root ?? null;
   if (lastRoot !== undefined && root !== lastRoot) useNav.getState().reset();
   lastRoot = root;
-  if (!useNav.getState().file) return;
+  const nav = useNav.getState();
+  if (!nav.file && !nav.band) return;
   const picked = s.selectedPath !== prev.selectedPath;
   const opened = (s.historyView !== null && s.historyView !== prev.historyView) || (s.liveView !== null && s.liveView !== prev.liveView);
-  if (picked || opened) useNav.getState().closeFile();
+  if (!picked && !opened && s.tab === prev.tab) return;
+  // §65.8: the band belongs to the line it was opened under — another file or pane closes it.
+  if (nav.band) nav.closeBand();
+  if (nav.file && (picked || opened)) nav.closeFile();
 });

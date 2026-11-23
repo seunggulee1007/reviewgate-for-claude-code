@@ -10793,6 +10793,19 @@ through).
   character, 1-based UTF-16) and, when the line has `x.` / `x?.` / `x!!.` (spaces allowed) or `x::` / `x->` right in front
   of a plain identifier, `receiver: "x"` (`nav/identifier.ts` `receiverBefore`; nothing after `)` / `]`, none for a
   `pkg.Type` chain, none for a selected name other than the word).
+- **Peek** (`nav/PeekBand.tsx`, `nav/peekModel.ts`, `nav/bandSlot.ts`): Alt+F12, "Peek Definition" in the line menu and
+  Monaco's context menu, and Ctrl+click — Settings › Review › Code navigation "Ctrl+click a name": Peek (default) / Go to
+  (`AppSettings.navCtrlClick: "peek" | "jump"`); F12 always goes. `find_definition` (column, receiver), then
+  `definition_preview {path, line}` for the selected candidate (each asked once per band; a newer band drops older replies).
+  The band sits under the clicked row — in a DOM diff a sticky, pane-wide block after the row (a split row: under both
+  sides), in Monaco (the project file view, the full-file view) a view zone after the line; nothing above it moves, and a
+  band past the bottom edge scrolls in by the least amount. Header "File.kt:42 — Container.member" (the preview's
+  `symbol`, else the candidate's `container`), the kind, the folder, [Open] [References] [×]; Monaco-coloured lines
+  (`monaco.editor.colorize`), the definition line marked, 15 visible then scrolling (the wheel stays in the band). Several
+  candidates: the list on the right (name:line, kind, container · folder); ↑ / ↓ switch the preview, Enter or a double
+  click opens (§62's opening, Back returns), Esc closes (also from the diff; a text field or a terminal keeps its Esc).
+  One candidate stays in the band (peek never jumps by itself); none → "No definition found" with Find References / Find
+  in Project. Another file, pane or jump closes it.
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.

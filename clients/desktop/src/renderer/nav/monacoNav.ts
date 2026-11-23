@@ -2,6 +2,8 @@
  * §62 in a Monaco editor (the review's full-file view, the project file view): Ctrl+click a name (⌘-click on a Mac
  * development build) goes to its definition, the name is underlined while Ctrl is held over it; the editor's context menu
  * and keys carry Go to Definition (F12), Find References (Shift+F12) and Open in IDE (Ctrl+Alt+O).
+ * §65.8: Peek Definition (Alt+F12, and Ctrl+click while Settings says "Peek") shows the peek band in a view zone under
+ * the line (nav/bandSlot.ts).
  */
 import { t } from "../i18n";
 import { monaco } from "../monaco";
@@ -9,6 +11,9 @@ import { navModifier } from "./domTarget";
 import { identifierAt, isSendableSymbol } from "./identifier";
 import type { NavLocation } from "./navModel";
 import { useNav } from "./navStore";
+import { setBandSlot, useBandSlot, type BandAnchor } from "./bandSlot";
+import { ctrlClickAction } from "./peekModel";
+import { useStore } from "../store";
 import { openInIde } from "./openInIde";
 
 type Opts = {
@@ -62,9 +67,71 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
       e.event.stopPropagation();
       link.clear();
       const b = e.event.browserEvent;
-      useNav.getState().goToDefinition({ symbol: found.symbol, fromPath: opts.path, line: found.line, column: found.start, receiver: found.receiver, x: b.clientX, y: b.clientY, from: opts.from(found.line) });
+      if (ctrlClickAction(useStore.getState().settings?.navCtrlClick) === "peek") peek(found);
+      else useNav.getState().goToDefinition({ symbol: found.symbol, fromPath: opts.path, line: found.line, column: found.start, receiver: found.receiver, x: b.clientX, y: b.clientY, from: opts.from(found.line) });
     }),
   );
+
+  // ---- §65.8 the peek band: a view zone under the line while the band's anchor is this editor's
+  function peek(found: { symbol: string; line: number; start: number; receiver?: string }) {
+    useNav.getState().peekDefinition({
+      symbol: found.symbol,
+      fromPath: opts.path,
+      line: found.line,
+      column: found.start,
+      ...(found.receiver ? { receiver: found.receiver } : {}),
+      anchor: { kind: "monaco", editorId: ed.getId(), line: found.line },
+      from: opts.from(found.line),
+    });
+  }
+  let zone: { id: string; anchor: BandAnchor & { kind: "monaco" }; outer: HTMLElement; observer: ResizeObserver } | null = null;
+  const zoneWidth = () => {
+    const info = ed.getLayoutInfo();
+    return `${Math.max(200, info.contentWidth - info.verticalScrollbarWidth)}px`;
+  };
+  const removeZone = () => {
+    if (!zone) return;
+    const z = zone;
+    zone = null;
+    z.observer.disconnect();
+    ed.changeViewZones((acc) => acc.removeZone(z.id));
+    setBandSlot(null, z.anchor);
+  };
+  const syncZone = () => {
+    const a = useBandSlot.getState().anchor;
+    const mine = a?.kind === "monaco" && a.editorId === ed.getId() ? a : null;
+    if (zone && mine && zone.anchor.line === mine.line) return;
+    removeZone();
+    const model = ed.getModel();
+    if (!mine || !model || mine.line < 1 || mine.line > model.getLineCount()) return;
+    const outer = document.createElement("div");
+    outer.className = "nav-band-zone";
+    outer.style.width = zoneWidth();
+    const node = document.createElement("div");
+    outer.appendChild(node);
+    const def: monaco.editor.IViewZone = { afterLineNumber: mine.line, heightInPx: 34, domNode: outer, suppressMouseDown: true };
+    let id = "";
+    ed.changeViewZones((acc) => (id = acc.addZone(def)));
+    let shown = false;
+    const observer = new ResizeObserver(() => {
+      const h = node.offsetHeight;
+      if (h <= 0 || h === def.heightInPx) return;
+      def.heightInPx = h;
+      ed.changeViewZones((acc) => acc.layoutZone(id));
+      if (shown) return;
+      shown = true;
+      // The band comes into view by the least scroll; the clicked line stays on screen.
+      const lineTop = ed.getTopForLineNumber(mine.line);
+      const bottom = ed.getTopForLineNumber(mine.line + 1) + h;
+      const view = ed.getScrollTop() + ed.getLayoutInfo().height;
+      if (bottom > view) ed.setScrollTop(Math.min(lineTop, ed.getScrollTop() + bottom - view));
+    });
+    observer.observe(node);
+    zone = { id, anchor: mine, outer, observer };
+    setBandSlot(node, mine);
+  };
+  disposables.push({ dispose: useBandSlot.subscribe(syncZone) }, ed.onDidLayoutChange(() => zone && (zone.outer.style.width = zoneWidth())));
+  syncZone();
 
   /** The caret's name, the popover placed at it. */
   const atCaret = () => {
@@ -86,6 +153,17 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
       run: () => {
         const at = atCaret();
         if (at) useNav.getState().goToDefinition({ symbol: at.symbol, fromPath: opts.path, line: at.line, column: at.start, receiver: at.receiver, x: at.x, y: at.y, from: opts.from(at.line) });
+      },
+    }),
+    ed.addAction({
+      id: "rg.nav.peek",
+      label: t("Peek Definition"),
+      keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.F12],
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.5,
+      run: () => {
+        const at = atCaret();
+        if (at) peek(at);
       },
     }),
     ed.addAction({
@@ -115,6 +193,7 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
   return {
     dispose: () => {
       for (const d of disposables) d.dispose();
+      removeZone();
       link.clear();
     },
   };

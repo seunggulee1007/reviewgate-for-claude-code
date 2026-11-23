@@ -47,3 +47,24 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .project-file-head .folder { color: var(--fg-3); }
 .nav-history { display: inline-flex; gap: 2px; flex: none; }
 .nav-history button { padding: 0 6px; }
+
+/* §65.8 The peek band: inline under the clicked line (a DOM diff row or a Monaco view zone), the pane's width. */
+.nav-band-slot { position: sticky; left: 0; max-width: 100%; }
+.nav-band-zone { z-index: 5; }
+.nav-band {
+  margin: 2px 0 4px; display: flex; flex-direction: column; background: var(--elevated); font-family: var(--font); white-space: normal;
+  border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); box-shadow: var(--shadow); outline: none; cursor: auto;
+}
+.nav-band-head { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 12px; min-width: 0; }
+.nav-band-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-band-head .nav-kind { flex: none; font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); }
+.nav-band-body { display: flex; min-height: 0; }
+.nav-band-code { flex: 1 1 auto; overflow: auto; min-width: 0; font-family: var(--mono); font-size: 12px; background: var(--bg); }
+.nav-band-line { display: flex; height: 18px; line-height: 18px; white-space: pre; }
+.nav-band-line .no { flex: none; width: 48px; padding-right: 10px; text-align: right; color: var(--fg-3); font-variant-numeric: tabular-nums; user-select: none; }
+.nav-band-line .code { flex: 1 1 auto; }
+.nav-band-line.target { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.nav-band-line.target .no { color: var(--accent); font-weight: 600; }
+.nav-band-note { padding: 8px 10px; }
+.nav-band-list { flex: none; width: 260px; max-height: 270px; overflow: auto; border-left: 1px solid var(--border); padding: 2px 0; }
+.nav-band-list .nav-row .folder { font-size: 11px; color: var(--fg-3); }

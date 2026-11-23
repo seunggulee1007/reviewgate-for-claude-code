@@ -94,6 +94,8 @@ export type AppSettings = {
   preferredEditor: "auto" | "vscode" | "idea" | "explorer";
   /** §62 "Open in" — where Open in IDE (Ctrl+Alt+O) opens a file: VS Code, IntelliJ IDEA or the system's default app (absent: VS Code). */
   openInIde?: IdeKind;
+  /** §65.8 Settings › Review › Code navigation: Ctrl+click a name peeks its definition in place, or goes to it (absent: peek). */
+  navCtrlClick?: "peek" | "jump";
   /** M12: "Push to origin" default in the commit dialog. */
   commitPushByDefault: boolean;
   /** M12: trailer line appended to every commit message ("" → none). */

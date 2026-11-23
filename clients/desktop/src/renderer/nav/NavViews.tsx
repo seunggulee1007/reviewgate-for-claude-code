@@ -14,6 +14,9 @@ import { domTargetAt, domTargetAtSelection, navModifier, type DomNavTarget } fro
 import { groupByFile, markSymbol, peekKey, type NavLocation, type RefRow } from "./navModel";
 import { backBlocked, currentLocation, forwardBlocked, useNav } from "./navStore";
 import { openInIde } from "./openInIde";
+import { useBandSlot } from "./bandSlot"; // §65.8
+import { PeekBand } from "./PeekBand";
+import { ctrlClickAction } from "./peekModel";
 import "./nav.css";
 
 const APPROXIMATE = () => t("Search-based: may list look-alikes");
@@ -30,6 +33,26 @@ export function goFromDom(target: DomNavTarget, x: number, y: number): void {
   const from = fromDom(target);
   if (from?.kind === "review") useNav.getState().setHere(from.path, from.line);
   useNav.getState().goToDefinition({ symbol: target.symbol, fromPath: target.path, ...(target.line ? { line: target.line } : {}), column: target.column, ...(target.receiver ? { receiver: target.receiver } : {}), x, y, from });
+}
+
+/** §65.8 Peek Definition from a DOM diff: the band under the name's row. */
+export function peekFromDom(target: DomNavTarget): void {
+  const from = fromDom(target);
+  if (from?.kind === "review") useNav.getState().setHere(from.path, from.line);
+  useNav.getState().peekDefinition({
+    symbol: target.symbol,
+    fromPath: target.path,
+    ...(target.line ? { line: target.line } : {}),
+    column: target.column,
+    ...(target.receiver ? { receiver: target.receiver } : {}),
+    anchor: { kind: "dom", path: target.path, rowId: target.rowId },
+    from,
+  });
+}
+
+/** Ctrl+click: Settings › Review › Code navigation says peek (the default) or jump. */
+export function ctrlClickPeeks(): boolean {
+  return ctrlClickAction(useStore.getState().settings?.navCtrlClick) === "peek";
 }
 
 const editable = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
@@ -74,7 +97,8 @@ function useDomNav(): void {
       e.preventDefault();
       e.stopPropagation();
       clear();
-      goFromDom(target, e.clientX, e.clientY);
+      if (ctrlClickPeeks()) peekFromDom(target);
+      else goFromDom(target, e.clientX, e.clientY);
     };
     document.addEventListener("mousemove", onMove, { passive: true });
     document.addEventListener("keydown", onKeyDown);
@@ -110,6 +134,12 @@ function ideTargetNow(): { path: string; line: number } | null {
 function useNavKeys(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // §65.8: Esc closes the peek band wherever the keyboard is — but a text field or a terminal keeps its own Esc.
+      if (e.key === "Escape" && useNav.getState().band && !e.defaultPrevented && !editable(e.target) && !isTerminalTarget(e.target) && !useStore.getState().dialog) {
+        e.preventDefault();
+        useNav.getState().closeBand();
+        return;
+      }
       const k = navKey(e);
       if (!k || e.defaultPrevented || useStore.getState().dialog || isTerminalTarget(e.target)) return;
       const inMonaco = e.target instanceof Element && e.target.closest(".monaco-editor") !== null;
@@ -138,6 +168,7 @@ function useNavKeys(): void {
       }
       e.preventDefault();
       if (k === "references") useNav.getState().findReferences({ symbol: target.symbol, fromPath: target.path });
+      else if (k === "peek") peekFromDom(target);
       else {
         const box = target.range.getBoundingClientRect();
         goFromDom(target, box.left, box.bottom);
@@ -157,12 +188,19 @@ export function Preview(props: { text: string; symbol: string }) {
   );
 }
 
-/** Mounted once: the listeners and the peek list. */
+/** Mounted once: the listeners, the peek list and the peek band (portalled into the slot under its line). */
 export function NavLayer() {
   useDomNav();
   useNavKeys();
   const peek = useNav((s) => s.peek);
-  return peek ? createPortal(<PeekPopover />, document.body) : null;
+  const band = useNav((s) => s.band !== null);
+  const slot = useBandSlot((s) => s.slot);
+  return (
+    <>
+      {peek && createPortal(<PeekPopover />, document.body)}
+      {band && slot && createPortal(<PeekBand />, slot)}
+    </>
+  );
 }
 
 function PeekPopover() {

@@ -239,6 +239,18 @@ export function ReviewPane({ settings }: PaneProps) {
         <div><button type="button" className="small" onClick={() => patch({ checkpointIgnorePatterns: DEFAULT_IGNORE_PATTERNS })}>{t("Reset to default")}</button></div>
       </section>
       <TestCommandPatternsSection settings={settings} />{/* wave3 check-clients — §34.9 */}
+      {/* §65.8: what Ctrl+click on a name does in a diff or a file */}
+      <section data-setting="navCtrlClick">
+        <h4>{t("Code navigation")}</h4>
+        <div className="field-row">
+          <span>{t("Ctrl+click a name")}</span>
+          <select value={settings.navCtrlClick === "jump" ? "jump" : "peek"} onChange={(e) => patch({ navCtrlClick: e.target.value === "jump" ? "jump" : "peek" })} data-testid="Ctrl+click a name" aria-label={t("Ctrl+click a name")}>
+            <option value="peek">{t("Peek")}</option>
+            <option value="jump">{t("Go to")}</option>
+          </select>
+        </div>
+        <div className="note">{t("Peek shows the definition under the line, without leaving the diff (Alt+F12 does it too); Go to opens it. F12 always goes to it.")}</div>
+      </section>
       <StorageSettingsSection settings={settings} />{/* MARK: wave4b w4b-bigturn — §39.1 large-file limit, [오래된 리뷰 기록 정리] */}
     </div>
   );
