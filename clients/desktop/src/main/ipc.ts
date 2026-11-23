@@ -7,10 +7,11 @@ import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeIm
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
-import type { AppSettings, EditorKind, McpConfigFileResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
+import type { AppSettings, EditorKind, McpConfigFileResult, OpenInIdeResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
 import { createMcpJson, isMcpConfigPath, mcpConfigMtime } from "./mcpConfigFile.js";
 import { openInEditor, vscodePath } from "./editor.js";
+import { checkOnDisk, ideTarget, isIdeUrl } from "./ideOpen.js"; // §62
 import { finishDraftEdit, startDraftEdit } from "./draftEditor.js"; // §56.3
 import { isOpenableMarkdown } from "./markdownOpen.js"; // MARK: wave4d w4d-config (§42.3)
 import { isOpenableGraphHtml } from "./graphOpen.js"; // MARK: wave5 w5-graph (§43.3)
@@ -98,6 +99,25 @@ export function installIPC(deps: Deps): void {
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
   });
   ipcMain.handle("rg:openInEditor", (_e, path: string, line: number | null, editor?: EditorKind) => openInEditor(path, line, editor ?? loadSettings().preferredEditor));
+  // §62 Open in IDE: the renderer names the IDE and a repo-relative path; main builds the URL from this window's project root
+  // (src/main/ideOpen.ts) — only `vscode://file/…` / `idea://open?file=…` or the file itself ever reach the shell.
+  ipcMain.handle("rg:openInIde", async (evt, ide: unknown, relPath: unknown, line: unknown, column: unknown): Promise<OpenInIdeResult> => {
+    const root = deps.engineFor(evt.sender)?.state.project?.root ?? null;
+    const target = ideTarget(root, ide, relPath, line, column);
+    const refused = "refused" in target ? target.refused : checkOnDisk(root!, target.absolutePath);
+    if (refused !== null || "refused" in target) {
+      logLine(`w${evt.sender.id}`, "warn", `blocked openInIde: ${refused}`);
+      return refused ?? "bad_request";
+    }
+    try {
+      if (target.kind === "path") return (await shell.openPath(target.absolutePath)) === "" ? "opened" : "failed";
+      if (!isIdeUrl(target.url)) return "bad_request";
+      await shell.openExternal(target.url);
+      return "opened";
+    } catch {
+      return "failed";
+    }
+  });
   ipcMain.handle("rg:openExternal", (evt, url: unknown) => {
     if (isSafeExternalURL(url)) return shell.openExternal(url);
     logLine(`w${evt.sender.id}`, "warn", `blocked openExternal to ${String(url)}`);

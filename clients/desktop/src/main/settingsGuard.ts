@@ -88,6 +88,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   runAsTaskEnabled: bool,
   taskBranchPrefix: (v) => text(200, { singleLine: true })(v) && /^(?:[A-Za-z0-9._-]+\/)*$/.test(v as string),
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),
+  openInIde: oneOf("vscode", "idea", "system"), // §62
   commitPushByDefault: bool,
   commitTrailer: text(1000, { singleLine: true }),
   autoRestartSession: bool,

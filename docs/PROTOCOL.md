@@ -10033,12 +10033,23 @@ section.
 - **Approximate by design.** Name the feature's limits in the UI's tooltip or empty state ("search-based: may list
   look-alikes"); a newer request's reply replaces an older one's (match on `id`).
 
+- **Windows** (main `src/main/ideOpen.ts`; the renderer's side follows):
+  - **Open in IDE** (Ctrl+Alt+O, the line menu, the Open in Editor menu of the diff header and the project file view):
+    VS Code `vscode://file/<abs>:<line>:<col>`, IntelliJ IDEA `idea://open?file=<abs>&line=<line>` or the system's default
+    app (`shell.openPath`). The Open in Editor menu's "Open in IDE" choices are the setting "Open in" (`AppSettings.openInIde`,
+    default VS Code; a pick opens there and is remembered). The renderer sends `rg:openInIde(ide, repoRelativePath, line,
+    column)` only; main takes the window's project root, refuses an absolute path, `..`, a backslash or control character, a
+    real path outside the root's real path (a symlink out) or anything but a regular file, then builds the URL itself — each
+    path part percent-encoded (spaces, `#`, `%`, Korean), backslashes as `/`, a drive letter kept (`vscode://file/C:/Users/dev/My%20Project/…`);
+    for IntelliJ the whole path one encoded parameter. Nothing but those two schemes or the file reaches the shell.
+  - Tests: `main/ideOpen.test.ts` (URLs with Windows paths, the main-side checks).
 - **Security.** Reads only, inside the repository: git runs without a shell, the symbol as one `-e` argument (a fixed
   string), pathspecs built from validated characters only; `fromPath` goes through `repoRelativeInside` (§23) and
   `project_file`'s checks (no `..`, no symlink out, nothing under `.git`, no FIFO / device). Nothing leaves the machine.
 - **Not in this pass.** Real type resolution (overloads by argument types, inheritance, `this.x` vs a local), cross-language
   bindings beyond the rules above (Spring bean names, MyBatis mapper XML ↔ interface), non-ASCII identifiers, a persisted
   index, the Mac and Windows UI.
-- Owner: code-nav (engine `files/navigate.ts`, `engine.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`).
+- Owner: code-nav (engine `files/navigate.ts`, `engine.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`,
+  `src/main/ideOpen.ts`).
   Tests: `engine/test/engine.navigate.test.ts` (per-language fixtures, ranking, references, §59 shadow mode, refusals, the
   lane), `clients/desktop/src/main/ipcGuard.test.ts`.
