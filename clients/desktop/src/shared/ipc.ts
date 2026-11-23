@@ -407,8 +407,9 @@ export type RGBridge = {
    * Opens `path` in a new workbench window (or focuses the window that has it). wave3 desktop-flow (§36.12): `setupReport` —
    * the new workbench's setup failed; that window shows the exit and the log (`takeWorkbenchSetupReport`). §9 New Chat in a
    * Workbench: `draft` — a message held for a new chat, which that window puts into its composer (`takeWorkbenchDraft`).
+   * §63.4: `created` — the app just created it, so the window opens without the start screen.
    */
-  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport, draft?: string): Promise<void>;
+  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport, draft?: string, created?: boolean): Promise<void>;
   // MARK: wave3 desktop-flow
   /** §36.12: the failed setup's report of this window's new workbench (any of `paths` = its folder), once; null when none. */
   takeWorkbenchSetupReport?(paths: string[]): Promise<WorkbenchSetupReport | null>;

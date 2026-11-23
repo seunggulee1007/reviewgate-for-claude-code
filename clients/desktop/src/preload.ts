@@ -74,7 +74,8 @@ const bridge: RGBridge = {
   // MARK: wave3 desktop-session — §36.8
   pinClaudeVersion: (version: string) => unwrap(ipcRenderer.invoke("rg:pinClaudeVersion", version)),
   setUI: (hash: string, patch: ProjectUI) => ipcRenderer.invoke("rg:setUI", hash, patch),
-  openWorkbenchWindow: (path: string, setupReport?: WorkbenchSetupReport, draft?: string) => ipcRenderer.invoke("rg:openWorkbenchWindow", path, setupReport ?? null, draft ?? null),
+  openWorkbenchWindow: (path: string, setupReport?: WorkbenchSetupReport, draft?: string, created?: boolean) =>
+    ipcRenderer.invoke("rg:openWorkbenchWindow", path, setupReport ?? null, draft ?? null, created === true),
   // MARK: wave3 desktop-flow — §36.12 a new workbench's failed setup, §36.14 PR comments into another window's composer
   takeWorkbenchSetupReport: (paths: string[]) => ipcRenderer.invoke("rg:takeWorkbenchSetupReport", paths),
   composeInWindow: (path: string, text: string) => ipcRenderer.invoke("rg:composeInWindow", path, text),
@@ -195,3 +196,5 @@ const bridge: RGBridge = {
 
 contextBridge.exposeInMainWorld("rg", bridge);
 contextBridge.exposeInMainWorld("rgInitialProject", arg("rg-project") ?? null);
+// MARK: task-start — §63.4: the app opened this window with work of its own; its first project skips the start screen.
+contextBridge.exposeInMainWorld("rgNoStartScreen", process.argv.includes("--rg-no-start-screen"));

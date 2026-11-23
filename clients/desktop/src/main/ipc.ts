@@ -39,7 +39,7 @@ type Deps = {
   /** Every window's engine with the project root it has open (per-project allow patterns, `engineSettings`). */
   allEngines: () => { engine: ReviewEngine; projectRoot: string | null; projectRepo?: string | null }[];
   findWindowFor: (path: string) => { win: BrowserWindow; engine: ReviewEngine } | undefined;
-  createWindow: (opts: { project?: string }) => unknown;
+  createWindow: (opts: { project?: string; noStartScreen?: boolean }) => unknown;
   /** M19: open `path` (or a folder the user picks) in a new window — focuses the window that has it. */
   openInNewWindow: (path: string | undefined, parent: BrowserWindow | null) => Promise<void>;
   /** M19: focus another window that already has `path` open. */
@@ -244,7 +244,7 @@ export function installIPC(deps: Deps): void {
   ipcMain.handle("rg:setUI", (_e, hash: unknown, patch: unknown) => {
     if (typeof hash === "string" && /^[0-9a-f]{8}$/.test(hash) && typeof patch === "object" && patch !== null) saveProjectUI(hash, patch as ProjectUI);
   });
-  ipcMain.handle("rg:openWorkbenchWindow", (_e, path: string, setupReport?: unknown, draft?: unknown) => {
+  ipcMain.handle("rg:openWorkbenchWindow", (_e, path: string, setupReport?: unknown, draft?: unknown, created?: unknown) => {
     // MARK: wave3 desktop-flow — §36.12: a failed setup's log goes with the window that opens the new workbench.
     if (setupReport !== undefined && setupReport !== null) setupReports.remember(path, setupReport);
     // §9 New Chat in a Workbench: the message held for a new chat goes into that window's composer (never sent).
@@ -254,7 +254,8 @@ export function installIPC(deps: Deps): void {
       existing.win.focus();
       return;
     }
-    deps.createWindow({ project: path });
+    // §63.4: a workbench the app just created opens without the start screen; one the user opens (the sidebar) shows it.
+    deps.createWindow({ project: path, noStartScreen: created === true });
   });
   ipcMain.handle("rg:openInNewWindow", (evt, path: unknown) =>
     deps.openInNewWindow(typeof path === "string" && path.length > 0 ? path : undefined, BrowserWindow.fromWebContents(evt.sender)),

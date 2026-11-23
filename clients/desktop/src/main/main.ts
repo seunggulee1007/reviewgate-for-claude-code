@@ -240,7 +240,7 @@ void app.whenReady().then(async () => {
     });
 
   if (E2E_TERMINAL) {
-    installTerminalE2E(process.env.REVIEWGATE_PROJECT ?? "", { createWindow: (o) => createWindow(o), disposeAll, claudePath: () => loadSettings().claudePath }, e2eOutArg(process.argv));
+    installTerminalE2E(process.env.REVIEWGATE_PROJECT ?? "", { createWindow: (o) => createWindow({ ...o, noStartScreen: true }), disposeAll, claudePath: () => loadSettings().claudePath }, e2eOutArg(process.argv));
     return;
   }
 
@@ -250,7 +250,7 @@ void app.whenReady().then(async () => {
     return;
   }
   if (process.env.REVIEWGATE_PROJECT) {
-    createWindow({ project: process.env.REVIEWGATE_PROJECT });
+    createWindow({ project: process.env.REVIEWGATE_PROJECT, noStartScreen: true }); // §63.4: headless runs and the tours
     return;
   }
   // M19: no explicit project — reopen the last session's windows, else the empty state as before.

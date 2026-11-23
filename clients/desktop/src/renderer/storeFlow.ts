@@ -428,7 +428,8 @@ export const createFlowSlice: StateCreator<Store, [], [], FlowSlice> = (set, get
       // §9 New Chat in a Workbench: what was held for a new chat goes with the window (before it opens: its first chat
       // depends on it).
       const draft = req.handHeldSwitch ? handHeldSwitchToWorkbench() : null;
-      if (hasWindow()) void (draft ? window.rg.openWorkbenchWindow(path, report ?? undefined, draft) : window.rg.openWorkbenchWindow(path, report ?? undefined));
+      // §63.4: a workbench the app just made opens without the start screen.
+      if (hasWindow()) void (draft ? window.rg.openWorkbenchWindow(path, report ?? undefined, draft, true) : window.rg.openWorkbenchWindow(path, report ?? undefined, undefined, true));
       const d = get().dialog?.kind;
       if (d === "newWorkbench" || d === "newWorkbenchFromPr" || d === "workbenchChat") get().openDialog(null);
       return path;
