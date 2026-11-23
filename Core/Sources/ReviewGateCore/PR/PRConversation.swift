@@ -45,6 +45,12 @@ public enum PRTimeline {
         items.append(contentsOf: dated.map(\.item))
         return items
     }
+
+    /// A body as the thread shows it: without HTML comments (a PR template's `<!-- … -->` hints, which GitHub hides too) and
+    /// the blank lines around it.
+    public static func displayBody(_ markdown: String) -> String {
+        markdown.replacing(/<!--[\s\S]*?-->/, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 /// §60 (Mac): the inline review comments on one line of one file (or a file's outdated ones), oldest first.

@@ -46,6 +46,13 @@ import Testing
         #expect(PRTimeline.items(selected: detail(), conversation: [], reviews: []).map(\.id) == ["description"])
     }
 
+    @Test func aBodyShowsWithoutTheTemplatesHTMLComments() {
+        let body = "<!-- Describe the change -->\n## Summary\nAdds search.\n<!--\n- [ ] tests\n-->\n"
+        #expect(PRTimeline.displayBody(body) == "## Summary\nAdds search.")
+        #expect(PRTimeline.displayBody("  <!-- only a hint -->  ").isEmpty)
+        #expect(PRTimeline.displayBody("a <b>bold</b> word") == "a <b>bold</b> word")
+    }
+
     // MARK: Code comments
 
     @Test func inlineCommentsGroupByFileInTheFilesOrderThenByLine() {
