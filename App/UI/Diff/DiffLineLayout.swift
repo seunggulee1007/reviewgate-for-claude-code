@@ -407,6 +407,7 @@ struct DiffLineOptions: View {
 struct DiffSettingsSection: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
+    @AppStorage(ExternalEditor.defaultsKey) private var editor = ""
 
     var body: some View {
         Section("Diff") {
@@ -421,6 +422,16 @@ struct DiffSettingsSection: View {
             }
             .accessibilityIdentifier("Settings diff layout")
             Text("Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough.")
+                .font(.caption).foregroundStyle(.secondary)
+            // MARK: code-nav (§62): the app Open in IDE (⌥⌘O) and the headers' Open in Editor hand a file and line to.
+            Picker("Open in", selection: $editor) {
+                Text("Automatic").tag("")
+                ForEach(ExternalEditor.allCases.filter { ($0.isInstalled && $0 != .finder) || editor == $0.rawValue }) { choice in
+                    Text(verbatim: choice.title).tag(choice.rawValue)
+                }
+            }
+            .accessibilityIdentifier("Settings open in")
+            Text("Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

@@ -4785,6 +4785,38 @@
         }
       }
     },
+    "Automatic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동"
+          }
+        }
+      }
+    },
+    "Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동: Java·Kotlin·JSP 프로젝트는 IntelliJ IDEA가 설치돼 있으면 IntelliJ IDEA로, 아니면 VS Code로 열어요. 에디터에서 열기 메뉴에서 다른 앱을 고르면 이 설정도 바뀌어요."
+          }
+        }
+      }
+    },
     "Branches from %@ and checks it out — your uncommitted changes come along.": {
       "localizations": {
         "en": {
@@ -10407,6 +10439,22 @@
         }
       }
     },
+    "Default App": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default App"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 앱"
+          }
+        }
+      }
+    },
     "Delete this commit": {
       "localizations": {
         "en": {
@@ -12163,6 +12211,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이전 %lld번 줄"
+          }
+        }
+      }
+    },
+    "Open in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열 앱"
           }
         }
       }

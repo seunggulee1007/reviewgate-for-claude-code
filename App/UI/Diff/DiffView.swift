@@ -946,14 +946,14 @@ struct DiffEditorButton: View {
 
     var body: some View {
         let editors = ExternalEditor.installed
-        let preferred = ExternalEditor.preferred ?? editors.first ?? .finder
+        let preferred = ExternalEditor.preferred(for: store)   // MARK: code-nav (§62): the project's IDE when none was picked
         Menu {
             ForEach(editors) { editor in
                 Button(editor.title, systemImage: editor.systemImage) { open(in: editor) }
                     .accessibilityIdentifier("Open in \(editor.rawValue)")
             }
         } label: {
-            Label(preferred == .finder ? String(localized: "Open in Editor") : preferred.title,
+            Label(preferred == .finder || preferred == .systemDefault ? String(localized: "Open in Editor") : preferred.title,
                   systemImage: "arrow.up.forward.app")
         } primaryAction: {
             open(in: preferred)
@@ -984,7 +984,7 @@ struct DiffEditorMenuItems: View {
 
     var body: some View {
         let installed = ExternalEditor.installed
-        let preferred = ExternalEditor.preferred ?? installed.first ?? .finder
+        let preferred = ExternalEditor.preferred(for: store)   // MARK: code-nav (§62)
         let editors = [preferred] + installed.filter { $0 != preferred }
         Menu("Open in Editor", systemImage: "arrow.up.forward.app") {
             ForEach(editors) { editor in

@@ -178,13 +178,13 @@ struct ProjectFileView: View {
     /// Split button: the remembered editor as the primary action, every installed editor in the menu (as the diff's).
     private func openInEditor(_ path: String) -> some View {
         let editors = ExternalEditor.installed
-        let preferred = ExternalEditor.preferred ?? editors.first ?? .finder
+        let preferred = ExternalEditor.preferred(for: store)   // MARK: code-nav (§62)
         return Menu {
             ForEach(editors) { editor in
                 Button(editor.title, systemImage: editor.systemImage) { open(path, line: editorLine, in: editor) }
             }
         } label: {
-            Label(preferred == .finder ? String(localized: "Open in Editor") : preferred.title, systemImage: "arrow.up.forward.app")
+            Label(preferred == .finder || preferred == .systemDefault ? String(localized: "Open in Editor") : preferred.title, systemImage: "arrow.up.forward.app")
         } primaryAction: {
             open(path, line: editorLine, in: preferred)
         }
@@ -238,7 +238,7 @@ struct ProjectFileView: View {
 
     private func lines(_ file: ProjectFileReply, target: Int?) -> some View {
         // Looked up once here, not per row (each asks Launch Services).
-        let editor = ExternalEditor.preferred ?? ExternalEditor.installed.first ?? .finder
+        let editor = ExternalEditor.preferred(for: store)
         return DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: DiffCodeMetrics.fileGutter, resetKey: AnyHashable(file.path),
                              scrollTarget: scrollKey, scrollTick: scrollTick, scrollColumn: scrollColumn) {
             // The rows' ids are the ForEach's own (the line keys find and the scroll go to): a `.id()` on each row would make
