@@ -29,6 +29,7 @@ import { FileMetaRow } from "./FileMetaRow"; // MARK: wave4b w4b-files
 import { isPreviewImage, useIgnoreWhitespace } from "../../reviewLeftovers";
 import { ImagePreview } from "./ImagePreview";
 import { WhitespaceDiffBody, WhitespaceToggle } from "./WhitespaceDiff";
+import { useNav } from "../../nav/navStore"; // §62
 
 /** A boolean view preference remembered in localStorage (default true). */
 function usePersistedBool(key: string): [boolean, () => void] {
@@ -137,6 +138,23 @@ export default function DiffPane() {
     return () => document.removeEventListener("keydown", onKey);
   }, [file, showFullFile, diffLoading, selectedDiff, diffUnavailable, diffSince, ignoreWhitespace]);
 
+  // §62: a Go to Definition landing on this file — the unified rows and the full-file view bring the line into view; a
+  // view that cannot (the whitespace-ignoring one, a range without changes, a binary, no diff to read) hands it to the
+  // project file view.
+  const reveal = useNav((s) => (s.reveal && file && s.reveal.path === file.path ? s.reveal : null));
+  useEffect(() => {
+    if (!reveal || !file || diffLoading) return;
+    if (showFullFile && file.status !== "D") {
+      const d = content?.path === file.path ? content : null;
+      if (d?.error || (d?.data && (d.data.isBinary || d.data.isTooLarge || d.data.newText === null))) useNav.getState().revealDone(reveal.seq, false);
+      return;
+    }
+    if (!selectedDiff && !diffUnavailable) return;
+    const rangeIsEmpty = diffSince !== "review" && selectedDiff !== null && !selectedDiff.isBinary && selectedDiff.hunks.length === 0;
+    const rowsShow = selectedDiff !== null && !diffUnavailable && !rangeIsEmpty && !selectedDiff.isBinary && !ignoreWhitespace;
+    if (!rowsShow) useNav.getState().revealDone(reveal.seq, false);
+  }, [reveal, file, diffLoading, showFullFile, selectedDiff, diffUnavailable, diffSince, ignoreWhitespace, content]);
+
   const onAddNote = useCallback(
     (target: NoteTarget, body: string) => {
       if (!file) return;
@@ -220,6 +238,7 @@ export default function DiffPane() {
           onCloseComposer={closeComposer}
           onAddNote={onAddNote}
           onRemoveNote={removeNote}
+          reveal={reveal}
         />
       ) : diffUnavailable ? (
         <div className="empty" data-testid="Diff unavailable">
@@ -279,6 +298,7 @@ function FullFileBody(props: {
   onCloseComposer: () => void;
   onAddNote: (target: NoteTarget, body: string) => void;
   onRemoveNote: (id: string) => void;
+  reveal: { line: number; symbol?: string; seq: number } | null;
 }) {
   const { content } = props;
   if (!content || (!content.data && !content.error)) return <Loading label={t("Loading file…")} />;
@@ -305,6 +325,7 @@ function FullFileBody(props: {
       onCloseComposer={props.onCloseComposer}
       onAddNote={props.onAddNote}
       onRemoveNote={props.onRemoveNote}
+      reveal={props.reveal}
     />
   );
 }

@@ -51,6 +51,17 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Find in Project…", mac: "⌘⇧F", win: "Ctrl+Shift+F" },
     ],
   },
+  // §62: go to definition / find references on a name in a diff or a file of the project; Back / Forward between the jumps
+  {
+    title: "Code navigation",
+    rows: [
+      { action: "Go to Definition", mac: "F12", win: "F12", note: "Or ⌘-click the name (Ctrl+click on Windows)" },
+      { action: "Find References", mac: "⇧F12", win: "Shift+F12" },
+      { action: "Back", mac: "⌃-", win: "Alt+←" },
+      { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },
+      { action: "Open in IDE", mac: "—", win: "Ctrl+Alt+O", note: "Windows app only" },
+    ],
+  },
   {
     title: "Review",
     rows: [

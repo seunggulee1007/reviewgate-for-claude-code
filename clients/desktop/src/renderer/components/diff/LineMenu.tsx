@@ -9,10 +9,11 @@ import type { DiffLine } from "@reviewgate/engine";
 import { pathLineOf } from "../../diffTools";
 import { t } from "../../i18n";
 import { showToast } from "../../toast";
+import type { DomNavTarget } from "../../nav/domTarget";
 
-export type LineMenuAt = { x: number; y: number; line: DiffLine; selection: string };
+export type LineMenuAt = { x: number; y: number; line: DiffLine; selection: string; /** §62: the name under the pointer (Go to Definition / Find References). */ nav?: DomNavTarget | null };
 /** MARK: wave3 desktop-flow — §36.14: a pane's own entries at the top of the menu (the PR diff's "Ask in a side thread"). */
-export type LineMenuItem = { label: string; onClick: () => void; title?: string; disabled?: boolean; testId?: string };
+export type LineMenuItem = { label: string; onClick: () => void; title?: string; disabled?: boolean; testId?: string; /** §62: the item's key, at the row's right end. */ keys?: string };
 
 async function copy(text: string): Promise<void> {
   try {
@@ -82,6 +83,7 @@ export function LineMenu(props: { at: LineMenuAt; path: string | undefined; oldP
               data-testid={it.testId}
             >
               <span className="truncate">{it.label}</span>
+              {it.keys && <span className="tiny faint">{it.keys}</span>}
             </div>
           ))}
           <div className="sep" />

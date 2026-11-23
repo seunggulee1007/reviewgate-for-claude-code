@@ -27,6 +27,9 @@ import { Toast } from "./components/Toast";
 import { useRejectShortcut } from "./rejectShortcut";
 import { showToast } from "./toast";
 import { LiveDiffPane } from "./components/diff/LiveDiffPane"; // MARK: wave2 desktop-flow
+import { useNav } from "./nav/navStore"; // §62 code navigation
+import { NavLayer, NavRefsPanel } from "./nav/NavViews";
+import { ProjectFilePane } from "./nav/ProjectFilePane";
 import { useNotificationNotices } from "./components/NotificationNotices"; // MARK: wave4b w4-notify
 import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
@@ -55,6 +58,7 @@ export function App() {
   // wave2 desktop-flow — §34.6: a file of the running turn's changes so far, read-only in place of the review diff.
   const liveOpen = useStore((s) => s.liveView !== null && s.historyView === null);
   const sideOpen = useStore((s) => s.sidePanelOpen);
+  const fileOpen = useNav((s) => s.file !== null); // §62: a project file opened by Go to Definition, in the diff pane's place
   const boardOpen = useStore((s) => s.boardOpen); // MARK: wave5 w5-board
   // §57.5: a terminal chat on screen lays the window out terminal-first (components/terminal/TerminalSplit.tsx).
   const viewingId = useViewing()?.id ?? null;
@@ -168,11 +172,13 @@ export function App() {
               </>
             ) : hasProject ? (
               <>
-                {diffCollapsed && !historyOpen && !liveOpen ? (
+                {diffCollapsed && !historyOpen && !liveOpen && !fileOpen ? (
                   <ErrorBoundary name="Diff"><DiffEdgeTab /></ErrorBoundary>
                 ) : (
                   <>
-                    {historyOpen ? (
+                    {fileOpen ? (
+                      <ErrorBoundary key="project-file" name="Project file" className="pane diff"><ProjectFilePane /></ErrorBoundary>
+                    ) : historyOpen ? (
                       <ErrorBoundary key="history" name="History" className="pane diff"><HistoryDiffPane /></ErrorBoundary>
                     ) : liveOpen ? (
                       <ErrorBoundary key="live" name="Live diff" className="pane diff"><LiveDiffPane /></ErrorBoundary>
@@ -189,12 +195,15 @@ export function App() {
               <ErrorBoundary name="Start" className="pane diff"><NoProject /></ErrorBoundary>
             )}
           </div>
+          {/* §62: Find References / Find in Project results under the panes */}
+          {hasProject && <ErrorBoundary name="References"><NavRefsPanel /></ErrorBoundary>}
           {/* §57.17: the bottom terminal panel (PowerShell / Command Prompt) — no Claude, no preview needed */}
           {tab !== "prs" && hasProject && <ErrorBoundary name="Terminal panel"><ShellPanel /></ErrorBoundary>}
           {agentPanelOpen && tab !== "prs" && hasProject && <ErrorBoundary name="Agents" className="agent-panel"><AgentPanel /></ErrorBoundary>}
         </div>
         {boardOpen && hasProject && <ErrorBoundary name="Agent board"><BoardDialog /></ErrorBoundary>}{/* MARK: wave5 w5-board */}
         <ErrorBoundary name="Dialogs"><Dialogs /></ErrorBoundary>
+        <ErrorBoundary name="Code navigation"><NavLayer /></ErrorBoundary>
         <Toast />
       </div>
     </div>

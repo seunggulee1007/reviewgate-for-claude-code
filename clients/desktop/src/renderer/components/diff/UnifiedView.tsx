@@ -16,6 +16,7 @@ import { refusalOf } from "../../engineRequest";
 import { refusalMessage } from "../../errorCodes";
 import { newLineNear } from "../../diffTools";
 import { PreReviewCards, usePreReviewFile } from "../flow/PreReview"; // MARK: wave3 desktop-flow
+import { useNav } from "../../nav/navStore"; // §62
 
 export type NoteTarget = LineKey & { excerpt: string };
 
@@ -72,6 +73,9 @@ export function UnifiedView(props: {
   const composerId = props.composer ? keyId(props.composer) : null;
   // MARK: wave3 desktop-flow — §36.13: the AI pre-review's findings on new-side lines (a mark and a card under the line).
   const findings = usePreReviewFile(props.path);
+  // §62: a Go to Definition landing on this file's line (else the project file view shows it).
+  const reveal = useNav((s) => (s.reveal && s.reveal.path === props.path ? s.reveal : null));
+  const revealDone = useNav((s) => s.revealDone);
 
   const extra = (line: DiffLine, key: LineKey | null) => {
     if (!key) return null;
@@ -119,6 +123,8 @@ export function UnifiedView(props: {
       onOpenLine={onOpenLine}
       markedLines={findings?.marked}
       markTitle={t("AI pre-review finding on this line")}
+      reveal={reveal}
+      onRevealed={revealDone}
     />
   );
 }

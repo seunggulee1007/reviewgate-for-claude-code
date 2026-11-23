@@ -8,6 +8,7 @@ import { t } from "../../i18n";
 import { isExternalChange } from "../../reviewGate";
 import { statusColor } from "../ChangedFiles";
 import { OpenInEditor } from "./OpenInEditor";
+import { NavHistoryButtons } from "../../nav/NavViews"; // §62
 
 export type DiffHeaderProps = {
   file: ChangedFileState;
@@ -99,7 +100,8 @@ export function DiffHeader(props: DiffHeaderProps) {
             {t("Collapse unchanged")}
           </button>
         )}
-        <OpenInEditor absolutePath={props.absolutePath} line={props.editorLine} />
+        <NavHistoryButtons /* §62: after a Go to Definition */ />
+        <OpenInEditor absolutePath={props.absolutePath} line={props.editorLine} ide={{ path: file.path, line: props.editorLine }} />
         <StateControls
           file={file}
           acceptBlocked={props.acceptBlocked !== undefined ? props.acceptBlocked : props.reviewLocked ? t("Claude is working…") : null}

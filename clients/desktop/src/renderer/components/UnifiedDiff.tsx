@@ -29,6 +29,10 @@ import { diffLinePrefix } from "../a11yText"; // MARK: wave4d w4d-speed
 import "./a11y.css";
 import { windowKey } from "../keymap"; // MARK: wave4d w4d-windows
 import { isTerminalTarget } from "../terminal/terminalKeys"; // §57.17
+import { domTargetAt } from "../nav/domTarget"; // §62
+import { navLineMenuItems } from "../nav/navMenu";
+import { searchedWord } from "../nav/navModel";
+import { newLineNear } from "../diffTools";
 
 export type LineKey = { side: "old" | "new"; line: number };
 
@@ -108,6 +112,10 @@ export function UnifiedDiff(props: {
   revealedActions?: boolean;
   /** §34.11: this layout whatever the choice and the width (unset: the remembered choice, split only where it fits). */
   forceLayout?: DiffLayout;
+  /** §62: bring this new-side line into view and mark it (the review's diff after a Go to Definition). */
+  reveal?: { line: number; symbol?: string; seq: number } | null;
+  /** §62: whether the line was in the diff (false: it is not — the caller shows the file instead). */
+  onRevealed?: (seq: number, found: boolean) => void;
 }) {
   const { diff } = props;
   const wrap = useDiffPrefs((s) => s.wrap);
@@ -179,6 +187,41 @@ export function UnifiedDiff(props: {
     if (matchLine === undefined) return;
     setFolds((f) => revealLine(f, diff, matchLine));
   }, [matchLine, diff, setFolds]);
+
+  // ---- §62: a Go to Definition that lands here — the line unfolded, brought to the middle and marked for a moment
+  const revealAsk = props.reveal ?? null;
+  const pendingReveal = useRef<{ id: number; seq: number; symbol?: string } | null>(null);
+  useEffect(() => {
+    if (!revealAsk) return;
+    const hit = diff.hunks.flatMap((h) => h.lines).find((l) => l.newNo === revealAsk.line && l.kind !== "del" && l.kind !== "hunkHeader");
+    if (!hit) {
+      latest.current.onRevealed?.(revealAsk.seq, false);
+      return;
+    }
+    setFolds((f) => revealLine(f, diff, hit.id));
+    pendingReveal.current = { id: hit.id, seq: revealAsk.seq, ...(revealAsk.symbol ? { symbol: revealAsk.symbol } : {}) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealAsk?.seq, diff]);
+  useEffect(() => {
+    const p = pendingReveal.current;
+    const rows = p ? scrollRef.current?.querySelectorAll<HTMLElement>(`.line[data-id="${p.id}"]`) : undefined;
+    const row = rows && rows.length > 0 ? rows[rows.length - 1]! : null; // a split row's new side is the last
+    if (!p || !row) return;
+    pendingReveal.current = null;
+    row.scrollIntoView({ block: "center" });
+    row.classList.add("rg-nav-target");
+    const reg = highlights();
+    const text = row.querySelector(".text");
+    const word = p.symbol ? searchedWord(p.symbol) : "";
+    const at = word && text ? (text.textContent ?? "").indexOf(word) : -1;
+    const range = at >= 0 && text ? rangeIn(text, at, at + word.length) : null;
+    if (reg && range) reg.set("rg-nav-target", makeHighlight([range]));
+    window.setTimeout(() => {
+      row.classList.remove("rg-nav-target");
+      reg?.delete("rg-nav-target");
+    }, 2500);
+    latest.current.onRevealed?.(p.seq, true);
+  });
 
   // ---- "20줄 더 보기"
   const src = props.context;
@@ -254,7 +297,7 @@ export function UnifiedDiff(props: {
     e.preventDefault();
     const sel = window.getSelection();
     const selection = sel && !sel.isCollapsed && scrollRef.current?.contains(sel.anchorNode) ? sel.toString() : "";
-    setMenu({ x: e.clientX, y: e.clientY, line, selection });
+    setMenu({ x: e.clientX, y: e.clientY, line, selection, nav: latest.current.path ? domTargetAt(e.clientX, e.clientY) : null });
   }, []);
   const closeMenu = useCallback(() => setMenu(null), []);
 
@@ -406,7 +449,7 @@ export function UnifiedDiff(props: {
   }
 
   return (
-    <div className="unified-pane" ref={paneRef}>
+    <div className="unified-pane" ref={paneRef} data-nav-path={props.path /* §62: Ctrl+click a name (src/renderer/nav/domTarget.ts) */}>
       <DiffToolsRow onFind={openFind} layout={{ fits: splitFits, shown: layout }}>{props.toolbar}</DiffToolsRow>
       {find.open && (
         <DiffFindBar
@@ -430,7 +473,19 @@ export function UnifiedDiff(props: {
       >
         <div className="unified-rows">{drawRows()}</div>
       </div>
-      {menu && createPortal(<LineMenu at={menu} path={props.path} oldPath={diff.oldPath} onClose={closeMenu} onOpen={props.onOpenLine} items={props.lineMenuItems?.(menu.line)} />, document.body)}
+      {menu &&
+        createPortal(
+          <LineMenu
+            at={menu}
+            path={props.path}
+            oldPath={diff.oldPath}
+            onClose={closeMenu}
+            onOpen={props.onOpenLine}
+            // §62: Go to Definition / Find References on the name under the pointer, Open in IDE at the line (its new side)
+            items={[...navLineMenuItems(menu.nav ?? null, menu, props.path ? { path: props.path, line: newLineNear(diff, menu.line) ?? 1 } : null), ...(props.lineMenuItems?.(menu.line) ?? [])]}
+          />,
+          document.body,
+        )}
     </div>
   );
 }

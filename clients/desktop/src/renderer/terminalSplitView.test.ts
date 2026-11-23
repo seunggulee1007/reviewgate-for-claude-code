@@ -9,6 +9,7 @@ import { createElement } from "react";
 vi.mock("./components/diff/DiffPane", () => ({ default: () => null }));
 vi.mock("./components/diff/LiveDiffPane", () => ({ LiveDiffPane: () => null }));
 vi.mock("./components/history/HistoryDiffPane", () => ({ HistoryDiffPane: () => null }));
+vi.mock("./nav/ProjectFilePane", () => ({ ProjectFilePane: () => null })); // §62 (Monaco)
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReviewState } from "@reviewgate/engine";
 import { initI18n } from "./i18n";

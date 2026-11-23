@@ -10033,7 +10033,35 @@ section.
 - **Approximate by design.** Name the feature's limits in the UI's tooltip or empty state ("search-based: may list
   look-alikes"); a newer request's reply replaces an older one's (match on `id`).
 
-- **Windows** (main `src/main/ideOpen.ts`; the renderer's side follows):
+- **Windows** (`clients/desktop/src/renderer/nav/*`, main `src/main/ideOpen.ts`):
+  - **Where.** The DOM diffs (the review's rows, a past round's and a PR's — `UnifiedDiff` carries `data-nav-path`), the
+    review's full-file view and the project file view (Monaco). Ctrl+click a name (⌘-click in the Mac development build);
+    while Ctrl is held over a name it is underlined and the pointer is a hand. The name (`nav/identifier.ts`): the word;
+    `a.b.C` in an `import` / `package` line or a lower-case chain ending in the capitalised clicked part (`com.acme.Money`;
+    `this.total` / `user.name` send the word only); `<my-widget` / `</my-widget` (kebab-case tag); `<ui:panel` (a JSP tag —
+    `jsp: c: fn: fmt: spring: form: sec: tiles:` left alone outside tag files); a quoted string that reads as a path (a `/`
+    or one of the extensions above). Keywords and numbers send nothing. F12 / Shift+F12 use the caret or the selected name.
+  - **Results.** One candidate opens: a changed file of the review (not deleted) in its diff — the new-side row unfolded,
+    centred and marked for 2.5 s (the full-file view: the line revealed); a line the shown diff does not hold (an unchanged
+    stretch, another range, the whitespace-ignoring view, a binary) and every other file open in the **project file view**:
+    `project_file`, read-only Monaco in the diff pane's place (also in the terminal-first review panel), the line centred with
+    the name marked; its header has ← / →, the name, folder and line count, "Read-only", Open in Editor / Open in IDE and
+    "Back to review". A file picked in the Changes list, a past round's or the running turn's diff close it. Several → the
+    peek list at the click (name, folder, `:line`, `kind`, `preview` with the name marked; the first selected; ↑ ↓ Home
+    End ↩ Esc; a click outside, a scroll or a resize closes it; a spinner only after 300 ms). None → "No definition found ·
+    X" with Find References / Find in Project (`project_search {query, wholeWord, caseSensitive}` — on the allow list with
+    this section), the results shown in the references panel. `truncated` "Showing the best 50", `timedOut` "Search stopped
+    after 10 s" (a single candidate still opens, the toast says so). A refusal is said in the peek. A newer request drops an
+    older one's reply (the client numbers them).
+  - **Find References** (Shift+F12, the line menu, the peek's footer): a panel under the panes, "N references in M files"
+    (`Only the first 500`, `Search stopped after 15 s`), grouped by file in the order received; a row opens as above; a
+    `kind` hit is labelled "Looks like the definition".
+  - **Back / Forward**: Alt+← / Alt+→ (not in a text field; inside Monaco too), ← / → in the diff header (once there is a
+    step), the project file view's header and the references panel — each disabled with its reason. A jump pushes where
+    the user was: the review's file and line, the project file's caret line, or the History / PRs pane. At most 50 steps; a
+    project switch clears them.
+  - **The line menu / Monaco's context menu**: Go to Definition (F12) and Find References (Shift+F12) on the name under the
+    pointer, Open in IDE (Ctrl+Alt+O) at the line (a deleted line: the nearest new-side line).
   - **Open in IDE** (Ctrl+Alt+O, the line menu, the Open in Editor menu of the diff header and the project file view):
     VS Code `vscode://file/<abs>:<line>:<col>`, IntelliJ IDEA `idea://open?file=<abs>&line=<line>` or the system's default
     app (`shell.openPath`). The Open in Editor menu's "Open in IDE" choices are the setting "Open in" (`AppSettings.openInIde`,
@@ -10042,14 +10070,16 @@ section.
     real path outside the root's real path (a symlink out) or anything but a regular file, then builds the URL itself — each
     path part percent-encoded (spaces, `#`, `%`, Korean), backslashes as `/`, a drive letter kept (`vscode://file/C:/Users/dev/My%20Project/…`);
     for IntelliJ the whole path one encoded parameter. Nothing but those two schemes or the file reaches the shell.
-  - Tests: `main/ideOpen.test.ts` (URLs with Windows paths, the main-side checks).
+  - Tests: `nav/identifier.test.ts` (per language), `nav/navModel.test.ts` (history, peek keys, grouping, marking),
+    `nav/navKeys.test.ts` (no key of another map), `main/ideOpen.test.ts` (URLs with Windows paths, the main-side checks),
+    `shortcutTable.test.ts` (docs/SHORTCUTS.md "코드 탐색").
 - **Security.** Reads only, inside the repository: git runs without a shell, the symbol as one `-e` argument (a fixed
   string), pathspecs built from validated characters only; `fromPath` goes through `repoRelativeInside` (§23) and
   `project_file`'s checks (no `..`, no symlink out, nothing under `.git`, no FIFO / device). Nothing leaves the machine.
 - **Not in this pass.** Real type resolution (overloads by argument types, inheritance, `this.x` vs a local), cross-language
   bindings beyond the rules above (Spring bean names, MyBatis mapper XML ↔ interface), non-ASCII identifiers, a persisted
-  index, the Mac and Windows UI.
+  index, the Mac UI (Windows: above).
 - Owner: code-nav (engine `files/navigate.ts`, `engine.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`,
-  `src/main/ideOpen.ts`).
+  `src/main/ideOpen.ts`, `src/renderer/nav/*`).
   Tests: `engine/test/engine.navigate.test.ts` (per-language fixtures, ranking, references, §59 shadow mode, refusals, the
   lane), `clients/desktop/src/main/ipcGuard.test.ts`.
