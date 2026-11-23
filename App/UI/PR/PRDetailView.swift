@@ -1,16 +1,20 @@
 import SwiftUI
 import ReviewGateCore
 
-/// The opened PR: header, changed-files list on the left and the selected file's diff on the right.
+/// The opened PR: header, then the Conversation (§60, where it opens) or the changed-files list with the selected file's
+/// diff ("Files").
 /// Expects a `PRStore` in the environment.
 struct PRDetailView: View {
+    /// §60: what the PR detail shows under its header.
+    enum Page: Hashable { case conversation, files }
+
     @Environment(\.colorScheme) private var colorScheme
     @Environment(PRStore.self) private var store
     @Environment(\.openURL) private var openURL
     @State private var showSubmitSheet = false
     /// `submittedAt` of the banner the user dismissed; a newer submit shows a fresh banner.
     @State private var dismissedBannerAt: Date?
-    @State private var reviewsExpanded = true
+    @State private var page: Page = .conversation
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,12 +25,17 @@ struct PRDetailView: View {
                     submitBanner(result)
                     Divider()
                 }
-                HSplitView {
-                    filesList
-                        .frame(minWidth: 200, idealWidth: 260, maxWidth: 420)
-                    PRDiffPane(file: store.selectedFile, diff: store.selectedDiff, truncated: store.selectedDiffTruncated,
-                               comments: store.comments.filter { $0.path == store.selectedFile?.filename })
-                        .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
+                switch page {
+                case .conversation:
+                    PRConversationView()
+                case .files:
+                    HSplitView {
+                        filesList
+                            .frame(minWidth: 200, idealWidth: 260, maxWidth: 420)
+                        PRDiffPane(file: store.selectedFile, diff: store.selectedDiff, truncated: store.selectedDiffTruncated,
+                                   comments: store.comments.filter { $0.path == store.selectedFile?.filename })
+                            .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             } else if store.isLoading, let summary = store.selectedSummary {
                 VStack(spacing: 8) {
@@ -41,6 +50,22 @@ struct PRDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showSubmitSheet) { SubmitReviewSheet() }
+        .onChange(of: store.selectedSummary?.id) { _, _ in   // another PR opens on its Conversation
+            page = .conversation
+        }
+    }
+
+    /// §60: Conversation | Files (N).
+    private var pagePicker: some View {
+        Picker("Show", selection: $page) {
+            Text("Conversation").tag(Page.conversation)
+            Text("Files (\(store.files.count))").tag(Page.files)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("The PR's conversation, or its files and diff")
+        .accessibilityIdentifier("PR detail page")
     }
 
     // MARK: Header
@@ -80,6 +105,7 @@ struct PRDetailView: View {
                 Text("\(pr.changedFiles) files").font(.caption).foregroundStyle(.secondary)
             }
             .font(.callout)
+            pagePicker.padding(.top, 4)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
@@ -144,75 +170,6 @@ struct PRDetailView: View {
         }
     }
 
-    // MARK: Reviews
-
-    /// Login of the account for the selected PR's host, so the user's own reviews stand out.
-    private var currentLogin: String? {
-        let host = store.selectedSummary?.host ?? store.host
-        return store.accounts.first { $0.host == host }?.login
-    }
-
-    @ViewBuilder
-    private var reviewsSection: some View {
-        Section(isExpanded: $reviewsExpanded) {
-            if store.reviews.isEmpty {
-                Text("No reviews yet").foregroundStyle(.secondary).font(.callout).selectionDisabled()
-            } else {
-                ForEach(store.reviews) { review in
-                    reviewRow(review).selectionDisabled()
-                }
-            }
-        } header: {
-            Text("Reviews (\(store.reviews.count))")
-        }
-    }
-
-    private func reviewRow(_ review: PRReview) -> some View {
-        let mine = currentLogin != nil && review.author == currentLogin
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                Text(review.author).font(.callout.weight(mine ? .semibold : .regular))
-                if mine {
-                    Text("you").font(.caption2).foregroundStyle(.secondary)
-                }
-                reviewStateBadge(review.state)
-                Spacer(minLength: 4)
-                if let at = review.submittedAt {
-                    Text(at, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            if !review.body.isEmpty {
-                Text(verbatim: review.body)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(4)
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(.vertical, 2)
-        .padding(.leading, 4)
-        .overlay(alignment: .leading) {
-            if mine { RoundedRectangle(cornerRadius: 1).fill(Color.accentColor).frame(width: 2) }
-        }
-        .accessibilityIdentifier("Review \(review.id)")
-    }
-
-    private func reviewStateBadge(_ state: String) -> some View {
-        let (label, color): (String, Color) = switch state {
-        case "APPROVED": (String(localized: "Approved"), .green)
-        case "CHANGES_REQUESTED": (String(localized: "Changes requested"), .red)
-        case "COMMENTED": (String(localized: "Commented"), .secondary)
-        case "PENDING": (String(localized: "Pending"), .orange)
-        case "DISMISSED": (String(localized: "Dismissed"), .secondary)
-        default: (state, .secondary)
-        }
-        return Text(label)
-            .font(.caption2.weight(.medium))
-            .padding(.horizontal, 5).padding(.vertical, 1)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
-    }
-
     // MARK: Files
 
     private var filesList: some View {
@@ -223,7 +180,6 @@ struct PRDetailView: View {
             }
         )
         return List(selection: selectedID) {
-            reviewsSection
             Section("Files (\(store.files.count))") {
                 ForEach(store.files) { file in
                     fileRow(file).tag(file.id)
