@@ -8,6 +8,7 @@ import {
   decodeComments,
   decodeDetail,
   decodeFiles,
+  decodeIssueComments,
   decodeReviews,
   decodeSearch,
   encodeReviewRequest,
@@ -95,6 +96,20 @@ describe("GHClient decoders", () => {
     expect(list[1].inReplyTo).toBe(1001);
     expect(list[2].line).toBeNull();
     expect([list[3].side, list[3].startLine, list[3].line]).toEqual(["LEFT", 18, 20]);
+  });
+
+  // issues/N/comments (the PR's conversation), two slurped pages
+  test("decodeIssueCommentsSlurpedPages", () => {
+    const list = decodeIssueComments(fixture("issue-comments-slurped.json"));
+    expect(list).toEqual([
+      { id: 3001, author: "alice", body: "Could you split this?", createdAt: "2026-01-02T03:04:05Z", updatedAt: "2026-01-02T03:04:05Z", url: "https://github.com/acme/widgets/pull/5#issuecomment-3001", authorAssociation: "MEMBER" },
+      { id: 3002, author: "ci-bot[bot]", body: "Build passed", createdAt: "2026-01-02T04:00:00Z", updatedAt: "2026-01-03T09:30:00Z", url: "https://github.com/acme/widgets/pull/5#issuecomment-3002", authorAssociation: "NONE" },
+      // a deleted account (no user), no body, no updated_at / author_association
+      { id: 3003, author: "ghost", body: "", createdAt: "2026-01-04T00:00:00Z", updatedAt: null, url: "https://github.com/acme/widgets/pull/5#issuecomment-3003", authorAssociation: null },
+    ]);
+    // a single (non-slurped) page decodes the same; a bad date is rejected like everywhere else
+    expect(decodeIssueComments(JSON.stringify([{ id: 1, user: { login: "a" }, body: "x", created_at: "2026-01-01T00:00:00Z", html_url: "h" }])).map((c) => c.id)).toEqual([1]);
+    expect(() => decodeIssueComments(JSON.stringify([{ id: 1, user: { login: "a" }, body: "x", created_at: "soon", html_url: "h" }]))).toThrow("not an ISO-8601 date");
   });
 
   // pulls/N/reviews

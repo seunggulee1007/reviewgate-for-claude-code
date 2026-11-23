@@ -220,6 +220,7 @@ export function prState(pr: PRStore): PRState {
     files: pr.files,
     comments: pr.comments,
     reviews: pr.reviews,
+    conversation: pr.conversation,
     draftComments: pr.draftComments,
     accounts: pr.accounts,
     isLoading: pr.isLoading,

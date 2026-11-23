@@ -241,6 +241,7 @@ type ReviewState = {
     selectedSummary: PRSummary | null; selected: PRDetail | null;
     files: PRFileMeta[];         // PRFile WITHOUT `patch` (the engine keeps patches; see pr_select_file)
     comments: PRComment[]; reviews: PRReview[];
+    conversation?: PRIssueComment[];   // §60: the Conversation tab (issues/N/comments), oldest first; [] without a selected PR
     draftComments: DraftComment[];   // id: string
     accounts: GHAccount[];
     isLoading: boolean; isSubmitting: boolean; errorText: string | null;
@@ -9730,3 +9731,38 @@ The store never sends `branches`, `switch_branch`, `create_branch`, `workbench_l
 `pr_open`, `commit`, `push` or `pr_create` for such a project, and never opens the dialogs that would (commit, new
 workbench / branch, create PR, submit review) — so none of the automatic refreshes (project header, window focus) is ever
 refused `not_a_git_repo`.
+
+## 60. The PR conversation
+
+The PR tab showed the files, the inline review comments (`pulls/N/comments`) and the reviews (`pulls/N/reviews`), but never
+the PR's **Conversation** tab: the general comments people write under the PR. GitHub serves those as issue comments
+(`repos/O/R/issues/N/comments`), apart from the other two, so nobody saw them.
+
+**State.** `state.pr.conversation: PRIssueComment[]` (additive; always sent by this engine, optional in the type for older
+ones):
+
+```ts
+type PRIssueComment = {
+  id: number;
+  author: string;                     // user.login; "ghost" when GitHub sent no user (a deleted account)
+  body: string;                       // markdown; "" when GitHub sent none
+  createdAt: string;                  // ISO-8601 as GitHub sent it
+  updatedAt: string | null;           // equal to createdAt until the comment is edited; null when the API omitted it
+  url: string;                        // html_url of the comment
+  authorAssociation?: string | null;  // OWNER / MEMBER / COLLABORATOR / CONTRIBUTOR / NONE / …
+};
+```
+
+It is fetched with the other PR data — `gh api --hostname <host> --paginate --slurp repos/O/R/issues/N/comments`, the same
+host, pagination and error handling as the inline comments — on `pr_open` (together with detail, files, comments and
+reviews: one failure fails the open as before), and again on `pr_reload_comments`, which reloads the inline comments and
+the conversation together (so does `refresh {scope: ["pr"]}` while a PR is open, and the reload after `pr_submit` /
+`pr_reply`). A failed reload keeps what was loaded and sets `errorText`. The list is GitHub's order (oldest first); it is
+`[]` while no PR is selected, cleared on `pr_open` of another PR and on `pr_close`. The PR description needs nothing new:
+it is `state.pr.selected.body` (`PRDetail.body`).
+
+**Clients.** Show the conversation as one time-ordered thread: the PR description first (`selected.body`, by
+`selected.author`), then the conversation comments (`createdAt`) and the reviews (`reviews[]` by `submittedAt`, with their
+`state` and `body`; a `PENDING` review has no `submittedAt` and stays out) merged by time. A review whose body is empty
+still marks its state (approved / changes requested). An edited comment (`updatedAt` later than `createdAt`) may say so.
+Inline comments stay on the diff as before.

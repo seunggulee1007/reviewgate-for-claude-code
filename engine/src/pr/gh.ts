@@ -1,5 +1,5 @@
 import { exec } from "../util/exec.js";
-import type { DraftComment, PRComment, PRDetail, PRFile, PRReview, PRSummary, ReviewEvent } from "./models.js";
+import type { DraftComment, PRComment, PRDetail, PRFile, PRIssueComment, PRReview, PRSummary, ReviewEvent } from "./models.js";
 
 /**
  * Thin wrapper over the `gh` CLI (port of Core `PR/GHClient.swift`). Every call names the host
@@ -93,6 +93,12 @@ export class GHClient {
   async reviews(repo: string, number: number): Promise<PRReview[]> {
     const data = await this.run(["api", "--hostname", this.host, "--paginate", "--slurp", `repos/${repo}/pulls/${number}/reviews`]);
     return decodeReviews(data);
+  }
+
+  /** The PR's Conversation tab: general comments, which GitHub serves as issue comments. */
+  async conversation(repo: string, number: number): Promise<PRIssueComment[]> {
+    const data = await this.run(["api", "--hostname", this.host, "--paginate", "--slurp", `repos/${repo}/issues/${number}/comments`]);
+    return decodeIssueComments(data);
   }
 
   // MARK: - Writes
@@ -314,6 +320,23 @@ function decodeComment(raw: unknown): PRComment {
     createdAt: date(o, "created_at", "comment"),
     inReplyTo: optNum(o, "in_reply_to_id", "comment"),
     diffHunk: optStr(o, "diff_hunk", "comment") ?? "",
+  };
+}
+
+export function decodeIssueComments(data: Buffer | string): PRIssueComment[] {
+  return decodePages(data, "issue comments").map(decodeIssueComment);
+}
+
+function decodeIssueComment(raw: unknown): PRIssueComment {
+  const o = obj(raw, "issue comment");
+  return {
+    id: num(o, "id", "issue comment"),
+    author: o.user === undefined || o.user === null ? "ghost" : login(o, "user", "issue comment"),
+    body: optStr(o, "body", "issue comment") ?? "",
+    createdAt: date(o, "created_at", "issue comment"),
+    updatedAt: optDate(o, "updated_at", "issue comment"),
+    url: str(o, "html_url", "issue comment"),
+    authorAssociation: optStr(o, "author_association", "issue comment"),
   };
 }
 

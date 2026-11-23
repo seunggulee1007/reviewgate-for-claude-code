@@ -11,6 +11,7 @@ import {
   type PRDetail,
   type PRFile,
   type PRFileMeta,
+  type PRIssueComment,
   type PRReview,
   type PRSummary,
   type ReviewEvent,
@@ -20,7 +21,7 @@ import {
 /** The subset of `GHClient` the store drives; tests substitute a fake. */
 export type GHClientLike = Pick<
   GHClient,
-  "myOpenPRs" | "reviewRequestedPRs" | "detail" | "files" | "comments" | "reviews" | "submitReview" | "reply"
+  "myOpenPRs" | "reviewRequestedPRs" | "detail" | "files" | "comments" | "conversation" | "reviews" | "submitReview" | "reply"
 >;
 
 export type ResolvedGH = { path: string; env: Record<string, string | undefined> };
@@ -54,6 +55,8 @@ export class PRStore {
   comments: PRComment[] = [];
   /** Reviews of the opened PR (`pulls/N/reviews`); loaded with detail/files/comments, refreshed after submit. */
   reviews: PRReview[] = [];
+  /** The PR's Conversation tab (`issues/N/comments`), oldest first as GitHub lists them; loaded and reloaded with `comments`. */
+  conversation: PRIssueComment[] = [];
   selectedFile: PRFileMeta | null = null;
   selectedDiff: FileDiff | null = null;
   isLoading = false;
@@ -123,6 +126,7 @@ export class PRStore {
     this.allFiles = [];
     this.comments = [];
     this.reviews = [];
+    this.conversation = [];
     this.selectedFile = null;
     this.selectedDiff = null;
     this.draftComments = [];
@@ -131,17 +135,19 @@ export class PRStore {
     this.changed();
     try {
       const client = await this.makeClient();
-      const [detail, fileList, commentList, reviewList] = await Promise.all([
+      const [detail, fileList, commentList, reviewList, conversation] = await Promise.all([
         client.detail(summary.repo, summary.number),
         client.files(summary.repo, summary.number),
         client.comments(summary.repo, summary.number),
         client.reviews(summary.repo, summary.number),
+        client.conversation(summary.repo, summary.number),
       ]);
       if (generation !== this.openGeneration) return; // user moved on meanwhile
       this.selected = detail;
       this.allFiles = fileList;
       this.comments = commentList;
       this.reviews = reviewList;
+      this.conversation = conversation;
       this.errorText = null;
       if (fileList.length > 0) this.selectFile(fileList[0].filename);
     } catch (e) {
@@ -162,6 +168,7 @@ export class PRStore {
     this.allFiles = [];
     this.comments = [];
     this.reviews = [];
+    this.conversation = [];
     this.selectedFile = null;
     this.selectedDiff = null;
     this.draftComments = [];
@@ -182,14 +189,19 @@ export class PRStore {
     this.changed();
   }
 
+  /** Inline comments and the conversation (`pr_reload_comments`, `refresh {pr}`, after a submit / reply). */
   async reloadComments(): Promise<void> {
     const summary = this.selectedSummary;
     if (!summary) return;
     try {
       const client = await this.makeClient();
-      const list = await client.comments(summary.repo, summary.number);
+      const [list, conversation] = await Promise.all([
+        client.comments(summary.repo, summary.number),
+        client.conversation(summary.repo, summary.number),
+      ]);
       if (this.selectedSummary !== summary) return;
       this.comments = list;
+      this.conversation = conversation;
       this.errorText = null;
     } catch (e) {
       this.errorText = message(e);

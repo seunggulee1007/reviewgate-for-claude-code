@@ -6,7 +6,7 @@
 import type { ChangedFile, ChangeStatus, SkippedPath } from "./git/checkpoint.js";
 import type { BranchInfo, BranchSwitchBlocker } from "./git/branches.js";
 import type { FileDiff } from "./diff/parse.js";
-import type { DraftComment, GHAccount, PRComment, PRDetail, PRFileMeta, PRReview, PRSummary, ReviewEvent } from "./pr/models.js";
+import type { DraftComment, GHAccount, PRComment, PRDetail, PRFileMeta, PRIssueComment, PRReview, PRSummary, ReviewEvent } from "./pr/models.js";
 import type { DiffSide, NoteAnchor, ReviewNote } from "./review/notes.js";
 import type { FileOrigin } from "./session/provenance.js";
 import type { FileRiskKind } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
@@ -1414,6 +1414,8 @@ export type PRState = {
   files: PRFileMeta[];
   comments: PRComment[];
   reviews: PRReview[];
+  /** §60: the PR's Conversation tab (general comments, `issues/N/comments`), oldest first; [] without a selected PR. Always sent (optional for older engines). */
+  conversation?: PRIssueComment[];
   draftComments: DraftComment[];
   accounts: GHAccount[];
   isLoading: boolean;
