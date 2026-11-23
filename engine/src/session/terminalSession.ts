@@ -176,6 +176,8 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   private cliSessionId: string;
   private running = false;
   private hooksSeen = false;
+  /** §57.4: hooks of the current spawn so far — the app tells from it whether a hook followed an Esc it saw. */
+  private hookCount = 0;
   private waiting: TerminalWaiting | null = null;
   private interruptSuspected = false;
   private open: OpenTurn | null = null;
@@ -244,6 +246,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
       promptId: this.open?.promptId ?? null,
       waiting: this.waiting ? { ...this.waiting } : null,
       interruptSuspected: this.interruptSuspected,
+      ...(this.hookCount > 0 ? { hookCount: this.hookCount } : {}),
       ...(this.status ? { status: { ...this.status } } : {}),
       ...(this.queued ? { requestQueued: { ...this.queued, noteIds: this.queued.noteIds ? [...this.queued.noteIds] : null } } : {}),
       ...(this.moving ? { moving: { ...this.moving } } : {}),
@@ -399,6 +402,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     this.transcriptNoted = false; // §57.16: its first hook names the config dir
     this.running = false;
     this.hooksSeen = false;
+    this.hookCount = 0;
     this.waiting = null;
   }
 
@@ -494,6 +498,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
   async handleHook(input: Record<string, unknown>, signal?: AbortSignal): Promise<HookOutput> {
     const event = input.hook_event_name;
     if (this.disposed) return retiredAnswer(event);
+    this.hookCount += 1;
     if (this.background) return this.backgroundHook(input);
     if (this.moving && (event === "UserPromptSubmit" || event === "PreToolUse")) {
       // §57.12: the chat continues in the other worktree; nothing more starts here.

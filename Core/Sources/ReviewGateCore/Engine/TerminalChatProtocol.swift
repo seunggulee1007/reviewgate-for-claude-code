@@ -76,6 +76,8 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
     public let waiting: TerminalWaiting?
     /// A tool call ended by Esc and no Stop came: the turn stays open until the next prompt, idle, Review now or exit.
     public let interruptSuspected: Bool
+    /// §57.4: hooks the current spawn sent so far (0: none, or an older engine) — whether a hook followed an Esc.
+    public let hookCount: Int
     // MARK: terminal-stage2
     /// §57.13: the TUI's last status line input (the statusLine tee); nil before the first.
     public let status: TerminalStatus?
@@ -89,13 +91,14 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
     public let elsewhere: TerminalElsewhere?
 
     public init(running: Bool, hooksSeen: Bool, promptId: String? = nil, waiting: TerminalWaiting? = nil, interruptSuspected: Bool = false,
-                status: TerminalStatus? = nil, requestQueued: TerminalRequestQueued? = nil, permissions: [TerminalPermission] = [],
+                hookCount: Int = 0, status: TerminalStatus? = nil, requestQueued: TerminalRequestQueued? = nil, permissions: [TerminalPermission] = [],
                 moving: TerminalPlace? = nil, elsewhere: TerminalElsewhere? = nil) {
         self.running = running
         self.hooksSeen = hooksSeen
         self.promptId = promptId
         self.waiting = waiting
         self.interruptSuspected = interruptSuspected
+        self.hookCount = hookCount
         self.status = status
         self.requestQueued = requestQueued
         self.permissions = permissions
@@ -104,7 +107,7 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case running, hooksSeen, promptId, waiting, interruptSuspected, status, requestQueued, permissions, moving, elsewhere
+        case running, hooksSeen, promptId, waiting, interruptSuspected, hookCount, status, requestQueued, permissions, moving, elsewhere
     }
 
     public init(from decoder: Decoder) throws {
@@ -114,6 +117,7 @@ public struct TerminalSessionInfo: Codable, Sendable, Equatable {
         promptId = (try? c.decodeIfPresent(String.self, forKey: .promptId)) ?? nil
         waiting = (try? c.decodeIfPresent(TerminalWaiting.self, forKey: .waiting)) ?? nil
         interruptSuspected = (try? c.decodeIfPresent(Bool.self, forKey: .interruptSuspected)) ?? false
+        hookCount = (try? c.decodeIfPresent(Int.self, forKey: .hookCount)) ?? 0
         status = lenientValue(TerminalStatus.self, c, .status)
         requestQueued = lenientValue(TerminalRequestQueued.self, c, .requestQueued)
         permissions = lenientElements(TerminalPermission.self, c, .permissions)

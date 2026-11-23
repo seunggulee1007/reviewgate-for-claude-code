@@ -1076,6 +1076,9 @@ export type TerminalSessionState = {
   waiting: TerminalWaiting | null;
   /** A tool call ended `is_interrupt` (Esc) and no Stop came: the turn stays open until the next prompt, idle_prompt, End turn or exit. */
   interruptSuspected: boolean;
+  /** §57.4: how many hooks the current spawn sent so far (absent: none) — a client that saw Esc in the PTY tells from it
+   * whether a hook followed. */
+  hookCount?: number;
   /** §57.13: the TUI's last status line input (statusLine tee), null before the first. */
   status?: TerminalStatus | null;
   /** §57.14: a Request changes waiting to reach Claude. */

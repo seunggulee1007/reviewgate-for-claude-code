@@ -8869,6 +8869,7 @@ type TerminalWaiting = { kind: "permission" | "question"; message: string; since
 type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
   waiting: TerminalWaiting | null; interruptSuspected: boolean;
   // Stage 2 — all optional, absent = none:
+  hookCount?: number;                          // §57.4: hooks of the current spawn so far (absent: none yet)
   status?: TerminalStatus | null;              // §57.13: the TUI's last status line input (the statusLine tee)
   requestQueued?: TerminalRequestQueued | null; // §57.14: a Request changes waiting to reach Claude
   permissions?: TerminalPermission[];          // §57.15: dialogs the app may answer, oldest first
@@ -8897,7 +8898,9 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   `hooksSeen`: a hook with the current spawn's token arrived. `promptId`: the open review turn's `prompt_id` (null: none
   open, or a turn Claude started itself). `waiting`: Claude Code waits for the user in the TUI (Notification
   `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
-  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
+  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4). `hookCount`: the hooks the
+  current spawn sent so far, every event counted (the status line tee is no hook; a new spawn starts at none) — a client
+  that saw Esc in its PTY tells from it whether a hook followed (§57.4).
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
   (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
