@@ -38,7 +38,7 @@ import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-
 import { useTermHost } from "./terminal/useTermHost"; // §57.17
 import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.17
 import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
-import { ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.17
+import { PanelStatusBar, ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.17, §57.18
 import { useViewing } from "./viewedChat"; // §57.5
 
 declare global {
@@ -199,6 +199,7 @@ export function App() {
           {hasProject && <ErrorBoundary name="References"><NavRefsPanel /></ErrorBoundary>}
           {/* §57.17: the bottom terminal panel (PowerShell / Command Prompt) — no Claude, no preview needed */}
           {tab !== "prs" && hasProject && <ErrorBoundary name="Terminal panel"><ShellPanel /></ErrorBoundary>}
+          {tab !== "prs" && hasProject && <ErrorBoundary name="Panel status bar"><PanelStatusBar /></ErrorBoundary>}{/* MARK: c-panel (§57.18) */}
           {agentPanelOpen && tab !== "prs" && hasProject && <ErrorBoundary name="Agents" className="agent-panel"><AgentPanel /></ErrorBoundary>}
         </div>
         {boardOpen && hasProject && <ErrorBoundary name="Agent board"><BoardDialog /></ErrorBoundary>}{/* MARK: wave5 w5-board */}

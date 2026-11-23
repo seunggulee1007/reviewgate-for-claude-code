@@ -4,6 +4,7 @@
  * diff cache, logs (≤ 500), cached capabilities, the lock-conflict / dialogs UI state.
  */
 import { create } from "zustand";
+import { outputLogLine, outputToolResult, outputToolUse } from "./outputLog"; // MARK: c-panel (§57.18)
 import { planHandoffLine, planReviewSupported } from "./planReview"; // MARK: wave4d w4d-plan
 import { applyCodeGraphEvent } from "./codeGraph"; // MARK: wave5 w5-graph (§43.3)
 import { applyStatusLineEvent } from "./statusLine"; // MARK: wave6 w6-statusline (§44.2)
@@ -795,6 +796,7 @@ export const useStore = create<Store>((set, get, api) => {
     const logs = [...get().logs, line];
     if (logs.length > 500) logs.splice(0, logs.length - 500);
     set({ logs });
+    outputLogLine(line); // MARK: c-panel (§57.18): the bottom panel's Output
   };
 
   /**
@@ -1276,10 +1278,12 @@ export const useStore = create<Store>((set, get, api) => {
           set((s) => ({ transcript: appendAssistant(s.transcript, ev.text, ev.unprompted === true) }));
           break;
         case "tool_use":
+          outputToolUse(ev.id, ev.name, ev.input); // MARK: c-panel (§57.18)
           set((s) => ({ transcript: [...finishStreaming(s.transcript), { kind: "toolUse", id: uid(), toolUseId: ev.id, name: ev.name, file: ev.file, input: ev.input, parentToolUseId: ev.parentToolUseId, rationale: ev.rationale, ...rationaleMetaOf(ev), ...agentUseMetaOf(ev), ...exploreMetaOf(ev) }] }));
           break;
         case "tool_result":
           set((s) => ({ transcript: [...s.transcript, { kind: "toolResult", id: uid(), toolUseId: ev.toolUseId, isError: ev.isError, preview: ev.preview, parentToolUseId: ev.parentToolUseId, truncated: ev.truncated, testOutcome: ev.testOutcome, ...agentResultMetaOf(ev), ...hookDeniedField(ev) }] }));
+          outputToolResult(ev, (id) => get().toolOutput(id)); // MARK: c-panel (§57.18)
           break;
         case "permission_request": {
           const { type: _t, ...request } = ev;

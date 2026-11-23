@@ -9,7 +9,7 @@
 import type { ReactElement } from "react";
 import "./components/common/common.css";
 
-export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check" | "terminal" | "search";
+export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check" | "terminal" | "search" | "play" | "stop" | "lines" | "trash";
 
 const PATHS: Record<IconName, ReactElement> = {
   refresh: (
@@ -56,6 +56,16 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <circle cx="7" cy="7" r="4" />
       <path d="M10 10l3.5 3.5" />
+    </>
+  ),
+  // MARK: c-panel — §57.18: the bottom panel's Run and Output
+  play: <path d="M5 3.5v9l7-4.5z" />,
+  stop: <rect x="4" y="4" width="8" height="8" rx="1" />,
+  lines: <path d="M3 4.5h10M3 8h10M3 11.5h6" />,
+  trash: (
+    <>
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5" />
+      <path d="M4.5 4.5l.6 8.5h5.8l.6-8.5" />
     </>
   ),
 };

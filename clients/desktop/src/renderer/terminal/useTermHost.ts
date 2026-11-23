@@ -48,7 +48,7 @@ export function useTermHost(): void {
           if (!alive || hasTerminal(p.ptyId)) continue;
           const a = await pty.attach(p.ptyId).catch(() => null);
           if (!alive || !a) continue;
-          adoptTerminal(p.ptyId, p.kind, { ...(p.sessionId ? { sessionId: p.sessionId } : {}), ...(p.shell ? { shell: p.shell } : {}), replay: a.replay, status: { running: a.running, exit: a.exit } });
+          adoptTerminal(p.ptyId, p.kind, { ...(p.sessionId ? { sessionId: p.sessionId } : {}), ...(p.shell ? { shell: p.shell } : {}), ...(p.runId ? { runId: p.runId } : {}), replay: a.replay, status: { running: a.running, exit: a.exit } });
         }
       })
       .catch(() => undefined);

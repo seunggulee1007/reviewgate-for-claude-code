@@ -10,10 +10,13 @@ import { Icon } from "../../icons";
 import { isEnter } from "../../ime";
 import { useStore } from "../../store";
 import { usePtyInfo } from "../../terminal/ptyInfo";
-import { clampPanelHeight, closeShell, forgetShell, openShell, restartShell, shellExitKeepsTab, shellTabTitle, toggleShellPanel, useShellPanel } from "../../terminal/shellPanel";
+import { clampPanelHeight, closeShell, forgetShell, openShell, PANEL_TABS, panelTabHelp, panelTabTitle, restartShell, shellExitKeepsTab, shellTabTitle, toggleShellPanel, useShellPanel, type PanelTab } from "../../terminal/shellPanel";
+import type { OutputFilter } from "../../outputLog";
+import { OutputControls, OutputPanel } from "./OutputPanel"; // MARK: c-panel (§57.18)
+import { RunPanel } from "./RunPanel";
 import { isTerminalPanelKey } from "../../terminal/terminalKeys";
 import { focusLiveTerminal } from "../../terminal/terminalChat";
-import { shellTerminals, subscribeTerminals, terminalsVersion, terminalStatus } from "../../terminal/termHost";
+import { focusTerminal, runningRuns, shellTerminals, subscribeTerminals, terminalsVersion, terminalStatus } from "../../terminal/termHost";
 import { PointerMenu, type AgentMenuItem } from "../agents/AgentBits";
 import { TerminalView } from "./TerminalView";
 import "./terminal.css";
@@ -28,22 +31,44 @@ function defaultShell(): "powershell" | "cmd" {
   return useStore.getState().settings?.terminalShell === "cmd" ? "cmd" : "powershell";
 }
 
+/** MARK: c-panel — §57.18: the panel's tab, remembered per project (`ui.terminalPanelTab`). */
+function currentTab(): PanelTab {
+  return useStore.getState().ui.terminalPanelTab ?? "terminal";
+}
+
+/** The status bar's buttons and the panel's tabs: the panel on `tab` (a first shell for the terminal tab). */
+export function showPanelTab(tab: PanelTab): void {
+  if (currentTab() !== tab) useStore.getState().setUI({ terminalPanelTab: tab });
+  useShellPanel.setState({ shown: true, failed: null });
+  if (tab !== "terminal" || (usePtyInfo.getState().info?.shells.length ?? 0) === 0) return;
+  const tabs = shellTerminals();
+  const s = useShellPanel.getState();
+  const active = s.active && tabs.includes(s.active) ? s.active : (tabs[0] ?? null);
+  if (active) {
+    useShellPanel.setState({ active });
+    setTimeout(() => focusTerminal(active), 0);
+  } else void openShell(defaultShell());
+}
+
 /** App-wide (mounted once): Ctrl+`, the menu's Toggle Terminal Panel, and tabs whose shell ended for good. */
 export function useShellPanelHost(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isTerminalPanelKey(e)) return;
       const s = useStore.getState();
-      if ((usePtyInfo.getState().info?.shells.length ?? 0) === 0 || !s.state.project || s.dialog) return;
+      if (!s.state.project || s.dialog) return;
+      // §57.18: without a PTY the panel still opens (Output works); its terminal tab says why it cannot.
+      const noPty = (usePtyInfo.getState().info?.shells.length ?? 0) === 0;
+      if (noPty && currentTab() === "terminal" && !useShellPanel.getState().shown) return showPanelTab("output"), e.preventDefault();
       e.preventDefault();
-      toggleShellPanel(defaultShell(), backToChat);
+      toggleShellPanel(defaultShell(), backToChat, currentTab());
     };
     document.addEventListener("keydown", onKey);
     // A shell that exited 0, or ended with the project: its tab goes.
     const offTerms = subscribeTerminals(() => {
       for (const id of shellTerminals()) {
         const exit = terminalStatus(id).exit;
-        if (exit && !shellExitKeepsTab(exit)) forgetShell(id);
+        if (exit && !shellExitKeepsTab(exit)) forgetShell(id, currentTab() === "terminal");
       }
     });
     return () => {
@@ -53,10 +78,52 @@ export function useShellPanelHost(): void {
   }, []);
 }
 
+/** §57.18: the Output tab's source, per user (`localStorage` `rg.outputFilter`). */
+function readOutputFilter(): OutputFilter {
+  try {
+    const v = localStorage.getItem("rg.outputFilter");
+    return v === "reviewGate" || v === "claude" ? v : "all";
+  } catch {
+    return "all";
+  }
+}
+
+function writeOutputFilter(f: OutputFilter): void {
+  try {
+    localStorage.setItem("rg.outputFilter", f);
+  } catch {
+    /* private mode etc. */
+  }
+}
+
 /** View › Toggle Terminal Panel (menuActions.terminal.ts). */
 export function toggleShellPanelFromMenu(): void {
-  if ((usePtyInfo.getState().info?.shells.length ?? 0) === 0 || !useStore.getState().state.project) return;
-  toggleShellPanel(defaultShell(), backToChat);
+  if (!useStore.getState().state.project) return;
+  if ((usePtyInfo.getState().info?.shells.length ?? 0) === 0 && currentTab() === "terminal" && !useShellPanel.getState().shown) return showPanelTab("output");
+  toggleShellPanel(defaultShell(), backToChat, currentTab());
+}
+
+/**
+ * MARK: c-panel — §57.18: the bar under the window while the panel is hidden — the way to it for anyone who does not
+ * know Ctrl+`: Terminal · Output · Run (with how many commands run).
+ */
+export function PanelStatusBar() {
+  const { shown } = useShellPanel();
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
+  if (shown) return null;
+  const running = runningRuns().length;
+  return (
+    <div className="panel-status-bar" role="toolbar" aria-label={t("Terminal")} data-testid="Panel status bar">
+      <span className="grow" />
+      {PANEL_TABS.map((tab) => (
+        <button key={tab} type="button" className="plain small" title={panelTabHelp(tab)} onClick={() => showPanelTab(tab)} data-testid={`Panel status ${tab}`}>
+          <Icon name={tab === "terminal" ? "terminal" : tab === "output" ? "lines" : "play"} size={11} />
+          <span>{panelTabTitle(tab)}</span>
+          {tab === "run" && running > 0 && <span className="run-count">{running}</span>}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function ShellPanel() {
@@ -64,11 +131,15 @@ export function ShellPanel() {
   const shells = usePtyInfo((s) => s.info?.shells ?? []);
   const project = useStore((s) => s.state.project?.path ?? "");
   const wanted = useStore((s) => s.ui.terminalPanelHeight);
+  const tab = useStore((s) => s.ui.terminalPanelTab ?? "terminal"); // MARK: c-panel (§57.18)
   const setUI = useStore((s) => s.setUI);
   useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const [outputFilter, setOutputFilter] = useState<OutputFilter>(() => readOutputFilter());
+  const [outputQuery, setOutputQuery] = useState("");
   const drag = useRef<{ y: number; h: number } | null>(null);
-  if (!shown || shells.length === 0) return null;
+  if (!shown) return null;
+  const running = runningRuns().length;
   const tabs = shellTerminals();
   const current = active && tabs.includes(active) ? active : (tabs[0] ?? null);
   const height = clampPanelHeight(wanted, typeof window !== "undefined" ? window.innerHeight : 0);
@@ -106,7 +177,23 @@ export function ShellPanel() {
     <div className="shell-panel" style={{ height }} role="region" aria-label={t("Terminal")} data-testid="Shell panel">
       <div className="shell-drag" role="separator" aria-orientation="horizontal" aria-label={t("Drag to resize the terminal panel")} title={t("Drag to resize the terminal panel")} onMouseDown={onDragStart} data-testid="Shell panel drag" />
       <div className="shell-tabs" role="tablist" aria-label={t("Terminal")}>
-        {tabs.map((id) => {
+        {PANEL_TABS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            role="tab"
+            aria-selected={p === tab}
+            className={`panel-tab ${p === tab ? "active" : ""}`}
+            title={panelTabHelp(p)}
+            onClick={() => showPanelTab(p)}
+            data-testid={`Panel tab ${p}`}
+          >
+            {panelTabTitle(p)}
+            {p === "run" && running > 0 && <span className="run-count">{running}</span>}
+          </button>
+        ))}
+        <span className="panel-tab-sep" aria-hidden="true" />
+        {tab === "terminal" && tabs.map((id) => {
           const title = shellTabTitle(id, tabs);
           const st = terminalStatus(id);
           const state = st.running ? null : st.exit?.exitCode != null ? t("exited ({0})", st.exit.exitCode) : t("stopped");
@@ -146,10 +233,10 @@ export function ShellPanel() {
             </div>
           );
         })}
-        <button
+        {tab === "terminal" && <button
           type="button"
           className="plain small"
-          disabled={opening}
+          disabled={opening || shells.length === 0}
           aria-label={t("New terminal")}
           aria-haspopup="menu"
           title={t("New terminal in the project folder")}
@@ -157,9 +244,20 @@ export function ShellPanel() {
           data-testid="New shell"
         >
           <Icon name="plus" size={12} />
-        </button>
+        </button>}
         <span className="grow" />
-        {failed && current && (
+        {tab === "output" && (
+          <OutputControls
+            filter={outputFilter}
+            onFilter={(f) => {
+              setOutputFilter(f);
+              writeOutputFilter(f);
+            }}
+            query={outputQuery}
+            onQuery={setOutputQuery}
+          />
+        )}
+        {tab === "terminal" && failed && current && (
           <span className="caption orange truncate" role="status" title={failed} data-testid="Shell failed">
             {failed}
           </span>
@@ -168,7 +266,22 @@ export function ShellPanel() {
           <Icon name="chevronDown" size={12} />
         </button>
       </div>
-      <div className="shell-body">
+      {tab === "output" && (
+        <div className="shell-body">
+          <OutputPanel filter={outputFilter} query={outputQuery} />
+        </div>
+      )}
+      {tab === "run" && (
+        <div className="shell-body">
+          <RunPanel />
+        </div>
+      )}
+      {tab === "terminal" && <div className="shell-body">
+        {shells.length === 0 && (
+          <div className="terminal-starting terminal-chat" role="status" data-testid="Shell unavailable">
+            <span className="muted">{t("Terminals need Windows 10 1903 or later")}</span>
+          </div>
+        )}
         {current && <TerminalView key={current} ptyId={current} label={shellTabTitle(current, tabs)} testId="Shell terminal" />}
         {exited && current && (
           <div className="terminal-overlay" data-testid="Shell exited">
@@ -204,7 +317,7 @@ export function ShellPanel() {
             )}
           </div>
         )}
-      </div>
+      </div>}
       {menuAt && <PointerMenu at={menuAt} items={newItems} onClose={() => setMenuAt(null)} />}
     </div>
   );

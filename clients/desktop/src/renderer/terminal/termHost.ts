@@ -35,10 +35,12 @@ export type XtermModules = {
 
 type Entry = {
   ptyId: string;
-  kind: "chat" | "shell";
+  kind: "chat" | "shell" | "run";
   sessionId?: string;
   /** A shell tab's shell. */
   shell?: ShellKind;
+  /** MARK: c-panel — §57.18: a Run tab command's config id. */
+  runId?: string;
   /** The persistent element the terminal is opened in; views re-parent it. */
   host: HTMLDivElement;
   term: Terminal | null;
@@ -189,7 +191,7 @@ function onExit(ev: PtyExit): void {
 }
 
 /** Registers `ptyId` (a PTY main just opened or still runs) and starts its terminal. Idempotent. */
-export function adoptTerminal(ptyId: string, kind: "chat" | "shell", opts: { sessionId?: string; shell?: ShellKind; replay?: string; status?: TerminalStatus } = {}): void {
+export function adoptTerminal(ptyId: string, kind: "chat" | "shell" | "run", opts: { sessionId?: string; shell?: ShellKind; runId?: string; replay?: string; status?: TerminalStatus } = {}): void {
   if (entries.has(ptyId)) return;
   const host = document.createElement("div");
   host.className = "term-host";
@@ -198,6 +200,7 @@ export function adoptTerminal(ptyId: string, kind: "chat" | "shell", opts: { ses
     kind,
     ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
     ...(opts.shell ? { shell: opts.shell } : {}),
+    ...(opts.runId ? { runId: opts.runId } : {}),
     host,
     term: null,
     fit: null,
@@ -447,6 +450,18 @@ export function terminalShellOf(ptyId: string): ShellKind | null {
 /** The shell PTYs, in the order they were opened. */
 export function shellTerminals(): string[] {
   return [...entries.values()].filter((e) => e.kind === "shell").map((e) => e.ptyId);
+}
+
+/** MARK: c-panel — §57.18: the PTY of a Run tab command (the newest, when one was restarted). */
+export function runTerminalOf(runId: string): string | null {
+  let found: string | null = null;
+  for (const e of entries.values()) if (e.kind === "run" && e.runId === runId) found = e.ptyId;
+  return found;
+}
+
+/** §57.18: the Run tab commands that are running now. */
+export function runningRuns(): string[] {
+  return [...entries.values()].filter((e) => e.kind === "run" && e.status.running && e.runId).map((e) => e.runId!);
 }
 
 const NO_STATUS: TerminalStatus = { running: false, exit: null };
