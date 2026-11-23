@@ -9611,7 +9611,10 @@ type ClientCapabilities = {
   `showsReviewNow`; xterm sends Alt+key in one write, so a lone `ESC` is always the key; Ctrl+.'s Esc is not counted).
   *Accept N & Continue* (§58, `terminalAcceptContinue.ts`): the strip's button, same rule, same order (`accept_all`
   awaited, `Continue.` pasted, Enter 150 ms later), at once — no summary dialog and no Ctrl+Shift+Enter (the classic
-  composer has no Accept & Continue on Windows either).
+  composer has no Accept & Continue on Windows either). *A drop on the terminal* (`terminalDrop.ts`): files from Explorer
+  as their paths (`webUtils.getPathForFile`), each in double quotes when it holds a space or a cmd character, as Windows
+  Terminal writes them (POSIX backslashes on macOS / Linux); review-list rows (`application/x-reviewgate-paths`) as
+  `@path` — one bracketed paste, never Enter, the refusal as the paste's toast.
 
 ## 58. Accept N & Continue
 

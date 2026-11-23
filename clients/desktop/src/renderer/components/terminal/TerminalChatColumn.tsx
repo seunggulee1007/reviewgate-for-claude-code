@@ -14,6 +14,9 @@ import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/term
 import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
 import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
 import { showToast } from "../../toast";
+import { droppedMentionPaths, MENTION_DRAG_TYPE } from "../../mentions";
+import { pasteRefusal } from "../../terminalPaste";
+import { dropText, mentionText } from "../../terminalDrop";
 import { useViewing } from "../../viewedChat";
 import { ViewingChatBar } from "../chat/ViewingChat";
 import { engineRequest, refusalOf } from "../../engineRequest";
@@ -129,7 +132,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
         </button>
       </div>
       {finding && <TerminalFind ptyId={props.ptyId} onClose={() => setFinding(false)} />}
-      <div className="terminal-body">
+      <div className="terminal-body" onDragOver={(e) => acceptTerminalDrop(e)} onDrop={(e) => dropOnTerminal(e, props.ptyId, status.running && !disconnected)}>
         <TerminalView ptyId={props.ptyId} label={t("Terminal chat — Claude Code itself runs in this chat")} testId="Terminal chat terminal" />
         {overlay && (
           <div className="terminal-overlay" data-testid="Terminal chat overlay">
@@ -198,6 +201,33 @@ function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
       {t("Accept {0} & Continue", count)}
     </button>
   );
+}
+
+/** §57.5: files (Explorer / Finder) or review-list rows dragged over the terminal: taken as a copy. */
+function acceptTerminalDrop(e: React.DragEvent<HTMLDivElement>): boolean {
+  const types = e.dataTransfer.types;
+  if (!types.includes("Files") && !types.includes(MENTION_DRAG_TYPE)) return false;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  return true;
+}
+
+/**
+ * §57.5: a drop on the terminal — review-list rows as `@path`, files as their paths (quoted as the platform's terminal
+ * writes them) — one bracketed paste, never Enter; the terminal takes the keyboard. Why not, as a toast.
+ */
+function dropOnTerminal(e: React.DragEvent<HTMLDivElement>, ptyId: string, running: boolean): void {
+  if (!acceptTerminalDrop(e)) return;
+  const mentions = droppedMentionPaths(e.dataTransfer);
+  const files = Array.from(e.dataTransfer.files ?? []).map((f) => window.rg.pathForFile?.(f) ?? "");
+  const text = mentions.length > 0 ? mentionText(mentions) : dropText(files, window.rg.platform ?? "win32");
+  if (!text) return;
+  const why = pasteRefusal({ liveTerminalChat: true, running, bracketed: acceptsPaste(ptyId) }, text);
+  if (why !== null || !pasteIntoTerminal(ptyId, text)) {
+    showToast(why ?? pasteRefusal({ liveTerminalChat: true, running: true, bracketed: false }, text) ?? "");
+    return;
+  }
+  focusTerminal(ptyId);
 }
 
 /** "Review now": `terminal_end_turn` — a refusal other than `no_turn` (it closed meanwhile) says why. */
