@@ -801,6 +801,38 @@
         }
       }
     },
+    "%lld permission(s) handled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld permission(s) handled"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "권한 %lld건 처리됨"
+          }
+        }
+      }
+    },
+    "%lld permission(s) · %lld question(s) handled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld permission(s) · %lld question(s) handled"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "권한 %1$lld건 · 질문 %2$lld건 처리됨"
+          }
+        }
+      }
+    },
     "%lld PR review comments not submitted yet are lost": {
       "localizations": {
         "en": {
@@ -829,6 +861,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다음에 실행하면 프로젝트 %lld개가 다시 열려요"
+          }
+        }
+      }
+    },
+    "%lld question(s) handled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld question(s) handled"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "질문 %lld건 처리됨"
           }
         }
       }
@@ -1601,6 +1649,22 @@
         }
       }
     },
+    "Allowed %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allowed %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "허용 %lld"
+          }
+        }
+      }
+    },
     "Allowed one call at a time — this call works where the review cannot follow, so it is never remembered (⌘↩)": {
       "localizations": {
         "en": {
@@ -2045,6 +2109,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "계획에 먼저 응답하세요 — 그 다음 대기열을 이어서 보내요"
+          }
+        }
+      }
+    },
+    "Answered %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answered %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "답함 %lld"
           }
         }
       }
@@ -5879,6 +5959,22 @@
         }
       }
     },
+    "Denied %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denied %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거부 %lld"
+          }
+        }
+      }
+    },
     "Denied · %@": {
       "localizations": {
         "en": {
@@ -6899,6 +6995,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "쉴 때 자동 처리"
+          }
+        }
+      }
+    },
+    "Handled elsewhere %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Handled elsewhere %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 곳에서 처리 %lld"
           }
         }
       }
@@ -11919,6 +12031,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "스킬: %@"
+          }
+        }
+      }
+    },
+    "Skipped %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skipped %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "건너뜀 %lld"
           }
         }
       }

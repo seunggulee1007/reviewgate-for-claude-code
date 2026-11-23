@@ -980,6 +980,11 @@ private final class Tour {
         store.debugHandle([.permissionRequest(question)])
         store.skipQuestions(requestId: question.requestId)
         try await shoot("handled")
+        // §56.5: the folded line opened (the run's id is its first card's row).
+        let firstCard = store.transcript.first { if case let .permission(_, request, _) = $0 { request.requestId == "tour-bar-0" } else { false } }
+        if let firstCard { entry.model.chatTranscript.handledExpansion[firstCard.id] = true }
+        log("composerbar handled-open: " + (firstCard == nil ? "no card row LOST" : "the run opened"))
+        try await shoot("handled-open")
     }
 
     /// A regular chat's review at the laptop's 1000 × 637 and the smallest window: the diff pane beside the chat is ~300 pt,

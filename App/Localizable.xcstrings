@@ -13527,6 +13527,22 @@
         }
       }
     },
+    "Fold the decided cards into one line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold the decided cards into one line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리된 카드를 한 줄로 접기"
+          }
+        }
+      }
+    },
     "Fold the reads and searches into one line": {
       "localizations": {
         "en": {
@@ -26514,6 +26530,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diff 패널 표시"
+          }
+        }
+      }
+    },
+    "Show each decided card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show each decided card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리된 카드 하나씩 보기"
           }
         }
       }

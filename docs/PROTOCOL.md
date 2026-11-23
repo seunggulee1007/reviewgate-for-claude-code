@@ -8864,6 +8864,13 @@ controls — and the conversation got what was left. Clients only; no protocol c
   `ComposerBarFit`); Electron's row still wraps as the last resort.
 - **The placeholder** is short — "Claude에게 메시지 · @ 파일 · ⌘V 이미지" — and the Mac draws it in one line cut with "…" at the
   box's visible edge (it ran on under the clip, mid-word, next to the tools in the box).
+- **Decided cards fold.** Permission cards and Claude's questions that are decided — allowed, denied, answered, skipped or
+  handled elsewhere — and come one after another (two or more) are one quiet line, "권한 3건 처리됨 · 허용 2 · 거부 1" (or "권한 2건
+  · 질문 1건 처리됨"), that opens to their lines, each still opening to its card; it opens by itself while it holds the ⌘F
+  match or the card a reveal flashes. A card still waiting never folds; any other row ends a run. A single decided card is
+  a quieter line (caption size). Decisions change a row in place, so the fold runs over the rows as drawn, not in
+  `TranscriptModel`. Core `HandledCardFold` (`HandledCardFoldTests`), Mac `HandledCardsRow`; Electron `handledCards.ts`
+  (`handledCards.test.ts`), `Transcript.tsx`.
 - Verified: `SHOTS_LAYOUT=composerbar` (quiet, on the fake claude, 1000 × 637, dark, `SHOTS_LANG=ko`) — a fresh chat, the
   box focused, text typed, Claude at work, a review pending, the mode offer, decided cards (`composerbar` lines give the
   transcript's height).

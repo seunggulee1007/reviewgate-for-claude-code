@@ -80,7 +80,7 @@
 #                  composerbar: the rows around the classic chat's message box at 1000 × 637, dark, on the fake claude (its
 #                  chat session starts — initialize answered — and never runs a turn): a fresh chat, the box focused, text
 #                  typed, Claude at work after two turns, a review pending, the mode offer, decided permission cards and a
-#                  question in the transcript (`composerbar` lines: the transcript's height; composerbar-*.png).
+#                  question in the transcript, folded and opened (`composerbar` lines: the transcript's height; composerbar-*.png).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
