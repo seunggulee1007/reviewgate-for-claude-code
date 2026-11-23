@@ -326,6 +326,7 @@ struct ReviewGateApp: App {
             ViewMenuCommands(focused: focusedWindow)
             EditMenuFindCommands(focused: focusedWindow)
             ReviewCommands(focused: focusedWindow)
+            CodeNavCommands(focused: focusedWindow)   // MARK: code-nav (§62): Navigate — Go to Definition, Back / Forward, Open in IDE
             WorkbenchCommands(focused: focusedWindow, openWindow: openWindow)
             // wave1 mac-session: 로그 폴더 열기 / 진단 정보 복사 (robustness-03); polish p-lifecycle (P1-chrome-08): the whole Help menu,
             // Keyboard Shortcuts (wave4d w4d-windows, polish-08) included.

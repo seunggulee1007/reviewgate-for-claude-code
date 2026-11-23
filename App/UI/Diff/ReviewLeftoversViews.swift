@@ -234,6 +234,7 @@ struct WhitespaceDiffBody: View {
             .diffFind(find, rows: { lines.map { DiffFind.Row(key: DiffDisplayItem.key($0), text: $0.text) } },
                       rowsKey: AnyHashable([AnyHashable(key), AnyHashable(lines.count)]), tick: model.diffFindTick,
                       changes: { DiffChangeNavigation.rows(lines: lines) })
+            .codeNavigation(path: file.path, view: .review)   // MARK: code-nav (§62)
         }
         .accessibilityIdentifier("Whitespace diff")
     }
@@ -243,6 +244,7 @@ struct WhitespaceDiffBody: View {
         DiffRow(line: line, highlighted: highlighted.flatMap { $0.indices.contains(line.id) ? $0[line.id] : nil },
                 findQuery: find.activeQuery, isCurrentMatch: find.isCurrent(DiffDisplayItem.key(line)), splitSide: side)
             .contextMenu {
+                CodeNavMenuItems(line, side: side)   // MARK: code-nav (§62)
                 if line.kind != .hunkHeader {
                     Button("Ask Why This Line Changed", systemImage: "questionmark.bubble") {}
                         .disabled(true)

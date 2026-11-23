@@ -368,6 +368,8 @@ struct DiffView: View {
                 clickedLine = line
                 store.side.selectionAnchor = lineAnchor(line)
                 lineSelection.select(DiffDisplayItem.key(line), extend: extend)
+                // code-nav (§62): where Open in IDE (⌥⌘O) goes and Back's Forward starts.
+                store.codeNav.caret = CodeNavLocation(view: .review, path: file.path, line: line.newNo ?? line.oldNo)
             },
             dragTo: { index in
                 let items = displayPlan(diff, file: file).items
@@ -490,7 +492,11 @@ extension DiffView {
         ignoreWhitespace = false
         Task {
             try? await Task.sleep(for: .milliseconds(150))   // the pane may just have opened (0.15 s) with its list
-            guard let diff, store.selectedPath == jump.path, let target = diff.allLines.first(where: { $0.newNo == line }) else { return }
+            guard let diff, store.selectedPath == jump.path, let target = diff.allLines.first(where: { $0.newNo == line }) else {
+                // code-nav (§62): a definition outside the diff's hunks — the file itself, read-only, at that line.
+                if jump.orFile, store.selectedPath == jump.path { store.openProjectFile(path: jump.path, line: line) }
+                return
+            }
             if unfold(lineId: target.id) { try? await Task.sleep(for: .milliseconds(60)) }
             let key = DiffDisplayItem.key(target)
             clickedLine = target
@@ -728,6 +734,8 @@ struct DiffViewHeader: View {
         let noteCount = store.unsentNotes.filter { $0.path == file.path }.count
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
+                // MARK: code-nav (§62): Back / Forward once a jump was made.
+                if store.codeNav.history.canGoBack || store.codeNav.history.canGoForward { CodeNavHistoryButtons() }
                 Text(file.status.rawValue)
                     .font(.caption.weight(.bold).monospaced())
                     .foregroundStyle(statusColor(file.status))

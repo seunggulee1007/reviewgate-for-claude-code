@@ -148,6 +148,7 @@ struct FullFilePane: View {
                 }
             }
             .diffLineCopying(revision: lineSelection.revision) { selectedLinesText(content) }
+            .codeNavigation(path: file.status == .deleted ? nil : file.path, view: .review)   // MARK: code-nav (§62)
             .onAppear { scrollToFirstChange(content, proxy: proxy) }
         }
     }
@@ -190,13 +191,16 @@ struct FullFilePane: View {
                 .font(Self.font)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
-            DiffCodeText(text: text, styled: styled(line, base: highlight(number - 1), key: key), faint: line.wsOnly)
+            DiffCodeText(text: text, styled: styled(line, base: highlight(number - 1), key: key), faint: line.wsOnly, navLine: number)
                 .font(Self.font)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(changed ? Color.green.wash(colorScheme, light: 0.15, dark: 0.14) : Color.clear)
         .contentShape(Rectangle())
-        .contextMenu { DiffLineCopyMenuItems(line: line, path: file.path, copySelected: copySelected) }
+        .contextMenu {
+            CodeNavMenuItems(line: number, text: text)   // MARK: code-nav (§62)
+            DiffLineCopyMenuItems(line: line, path: file.path, copySelected: copySelected)
+        }
     }
 
     /// One deleted old line, after new line `anchor` (0: before line 1).

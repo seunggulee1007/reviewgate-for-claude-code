@@ -237,6 +237,7 @@ struct HistoryDiffView: View {
                     .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                               rowsKey: AnyHashable([AnyHashable(selection), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
                               tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
+                    .codeNavigation(path: selection.path, view: .other)   // MARK: code-nav (§62)
                 }
             }
         } else {
@@ -294,6 +295,7 @@ struct HistoryDiffView: View {
                 lineSelection.select(key, extend: true)
             })
             .contextMenu {
+                CodeNavMenuItems(line, side: side)   // MARK: code-nav (§62)
                 if line.kind != .hunkHeader {
                     SideQuestionMenuItems(anchor: SideAnchor(path: selection.path, line: line.kind == .del ? line.oldNo : line.newNo,
                                                              side: line.kind == .del ? .old : .new, entryId: selection.entryId),

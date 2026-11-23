@@ -115,6 +115,7 @@ struct DiffPlanList: View, Equatable {
             }
         }
         .diffLineCopying(revision: selection.revision, copy: actions.copySelection)
+        .codeNavigation(path: file.status == .deleted ? nil : file.path, view: .review)   // MARK: code-nav (§62)
     }
 
     /// The rows' actions in a split list: a drag picks by the split row under the pointer (the List's rows are those).
@@ -457,6 +458,7 @@ private struct DiffLineStack: View {
                 // A click picks the line (the "Add note" target too), ⇧-click / a drag the lines up to it, for ⌘C.
                 .diffLinePicking(select: pick, dragTo: row.actions.dragTo)
                 .contextMenu {
+                    CodeNavMenuItems(line, side: row.splitSide)   // MARK: code-nav (§62)
                     if let anchor {
                         AddNoteMenuItem { row.actions.openComposer(line) }
                         Divider()

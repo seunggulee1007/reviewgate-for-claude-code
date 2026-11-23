@@ -298,6 +298,7 @@ struct PRDiffPane: View {
                 .diffFind(find, rows: { DiffMoreLines.findRows(items) },
                           rowsKey: AnyHashable([AnyHashable(file.filename), AnyHashable(diff.hunks.count), AnyHashable(diff.hunks.last?.lines.last?.id), AnyHashable(items.count)]),
                           tick: model.diffFindTick, changes: { DiffChangeNavigation.rows(items: items) })
+                .codeNavigation(path: file.filename, view: .other)   // MARK: code-nav (§62)
             }
         } else {
             VStack(spacing: 8) {
@@ -398,6 +399,7 @@ struct PRDiffPane: View {
                     }
                 }
                 .contextMenu {
+                    CodeNavMenuItems(line, side: side)   // MARK: code-nav (§62)
                     // wave3 mac-flow (§36.14): a side question on this PR line with its hunk.
                     if line.kind != .hunkHeader, line.id >= 0, let path = file?.filename, let diff {   // wave4c w4c-review: not a revealed line
                         PRSideQuestionMenuItem(line: line, path: path, diff: diff)

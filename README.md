@@ -48,6 +48,10 @@ compares the plan with what was actually done, marks risky changes and shows the
 **Guard rails.** Edits outside the project ask first, writes into `.git/` are refused, and permission requests become
 cards in the app instead of terminal prompts. Throwaway files in temporary folders pass quietly.
 
+**Code navigation while you review.** ⌘-click a name in any diff or file to jump to its definition — Java, Kotlin,
+JavaScript / TypeScript, Vue and JSP above all — list its references, step Back and Forward, and open the line in
+IntelliJ IDEA, VS Code or Xcode. Search-based, no language server to set up.
+
 **Workbenches.** Run several Claude sessions on one project at once — each in its own git worktree and branch, each
 with its own gate.
 

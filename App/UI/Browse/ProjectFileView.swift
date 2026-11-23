@@ -103,6 +103,7 @@ struct ProjectFileView: View {
         let name = (path as NSString).lastPathComponent
         let folder = (path as NSString).deletingLastPathComponent
         return HStack(spacing: 8) {
+            CodeNavHistoryButtons()   // MARK: code-nav (§62): Back / Forward over the jumps
             Image(systemName: "doc.text").foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
                 Text(verbatim: name).font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle)
@@ -220,6 +221,7 @@ struct ProjectFileView: View {
                 lines(file, target: clickedLine ?? selection.line)
                     .diffFind(find, rows: { Self.findRows(file) }, rowsKey: AnyHashable(FindRowsKey(path: file.path, count: file.lines.count, size: file.size)),
                               tick: model.diffFindTick)
+                    .codeNavigation(path: file.path, view: .projectFile)   // MARK: code-nav (§62)
             }
         } else {
             VStack(spacing: 8) {
@@ -265,18 +267,22 @@ struct ProjectFileView: View {
                 .font(DiffRow.font)
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 16)
-            DiffCodeText(text: text, styled: styled(line, base: highlight(number - 1), key: key))
+            DiffCodeText(text: text, styled: styled(line, base: highlight(number - 1), key: key), navLine: number)
                 .font(DiffRow.font)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(target ? Color.accentColor.wash(colorScheme, light: 0.10, dark: 0.18) : Color.clear)
         .contentShape(Rectangle())
-        .onTapGesture { clickedLine = number }
+        .onTapGesture {
+            clickedLine = number
+            store.codeNav.caret = CodeNavLocation(view: .projectFile, path: path, line: number)   // MARK: code-nav (§62)
+        }
         .contextMenu { rowMenu(line, path: path, editor: editor) }
     }
 
     @ViewBuilder
     private func rowMenu(_ line: DiffLine, path: String, editor: ExternalEditor) -> some View {
+        CodeNavMenuItems(line: line.newNo, text: line.text)   // MARK: code-nav (§62)
         DiffLineCopyMenuItems(line: line, path: path)
         Divider()
         Button(editor == .finder ? String(localized: "Reveal in Finder") : String(localized: "Open in \(editor.title) at This Line"),

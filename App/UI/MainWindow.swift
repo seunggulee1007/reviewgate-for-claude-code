@@ -330,6 +330,7 @@ struct MainWindow: View {
         .modifier(InspectorObservers(showAgentPanel: $showAgentPanel, showSidePanel: $showSidePanel, tab: $tab,
                                      onFit: fitAgentPanel, onAskSelection: askAboutSelection))
         .modifier(CodeBrowserObservers(tab: $tab) { setDiffCollapsed(false, remember: false) })   // MARK: code-browser (§47)
+        .modifier(CodeNavObservers())   // MARK: code-nav (§62)
         .onChange(of: model.toggleAgentPanelTick) { _, _ in
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
         }
