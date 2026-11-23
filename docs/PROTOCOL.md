@@ -9609,6 +9609,9 @@ type ClientCapabilities = {
 - **The strip's terminal-friction rules** (as the Mac, `TerminalChatColumn.tsx`). *Review now* also 2 s after an Esc the
   user pressed in the terminal while the turn ran and no hook since (`terminalStrip.ts` `isEscapeKey` / `escapeMark` /
   `showsReviewNow`; xterm sends Alt+key in one write, so a lone `ESC` is always the key; Ctrl+.'s Esc is not counted).
+  *Accept N & Continue* (§58, `terminalAcceptContinue.ts`): the strip's button, same rule, same order (`accept_all`
+  awaited, `Continue.` pasted, Enter 150 ms later), at once — no summary dialog and no Ctrl+Shift+Enter (the classic
+  composer has no Accept & Continue on Windows either).
 
 ## 58. Accept N & Continue
 
@@ -9648,7 +9651,8 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
     nothing is typed then.
   - *Tooltips:* "대기 중인 파일 N개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)", with the
     sheet "…요약을 먼저 보여 준 뒤 수락하고, …"; AX "Accept and continue".
-- **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.
+- **Mac only** for chats for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before. Its terminal
+  chat has the strip's button (§57.17).
 
 ## 59. Folders that are not git repositories (track without git)
 

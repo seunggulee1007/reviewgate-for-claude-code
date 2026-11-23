@@ -11,7 +11,9 @@ import { isEnter } from "../../ime";
 import { useStore } from "../../store";
 import { escapeMark, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal, type EscapeMark } from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
-import { clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
+import { showToast } from "../../toast";
 import { useViewing } from "../../viewedChat";
 import { ViewingChatBar } from "../chat/ViewingChat";
 import { engineRequest, refusalOf } from "../../engineRequest";
@@ -102,6 +104,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
             {t("Review now")}
           </button>
         )}
+        {state.gate.pendingCount > 0 && <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />}
         <button
           type="button"
           className={`plain small ${finding ? "active" : ""}`}
@@ -156,6 +159,44 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * §58: "Accept N & Continue" in a terminal chat — the files accepted, then "Continue." pasted into Claude Code and Enter
+ * pressed (the user's click only). Off with its reason until Claude Code is idle at its prompt.
+ */
+function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
+  const state = useStore((s) => s.state);
+  const [busy, setBusy] = useState(false);
+  const count = state.gate.pendingCount;
+  const blocker = terminalAcceptContinueBlocker(state, { shown: true, running: props.running, bracketed: acceptsPaste(props.ptyId) });
+  const run = async (): Promise<void> => {
+    setBusy(true);
+    const why = await runTerminalAcceptContinue({
+      accept: async () => {
+        await engineRequest({ type: "accept_all" });
+      },
+      paste: (text) => pasteIntoTerminal(props.ptyId, text),
+      enter: () => sendToTerminal(props.ptyId, "\r"),
+      refusal: (e) => refusalOf(e).error,
+    });
+    setBusy(false);
+    focusTerminal(props.ptyId);
+    showToast(why ?? t("Accepted {0} files — Claude continues", count));
+  };
+  return (
+    <button
+      type="button"
+      className="small"
+      disabled={blocker !== null || busy}
+      title={blocker ?? t("Accepts the {0} pending file(s), then types “Continue.” into Claude Code with Enter", count)}
+      aria-label={t("Accept and continue")}
+      onClick={() => void run()}
+      data-testid="Terminal chat accept and continue"
+    >
+      {t("Accept {0} & Continue", count)}
+    </button>
   );
 }
 
