@@ -17,8 +17,9 @@ function time(iso: string): number {
 
 /**
  * The description first, then the comments and the submitted reviews merged by time (oldest first; equal times keep
- * comments before reviews). A `PENDING` review (no `submittedAt`) stays out; a review with an empty body still shows
- * its state.
+ * comments before reviews). A `PENDING` review (no `submittedAt`) stays out, and so does a COMMENTED review with no body —
+ * GitHub makes one for every batch of inline comments (as the Mac app does); an APPROVED / CHANGES_REQUESTED review with an
+ * empty body still shows its state.
  */
 export function prTimeline(pr: Pick<PRDetail, "author" | "body" | "url">, conversation: readonly PRIssueComment[], reviews: readonly PRReview[]): TimelineItem[] {
   const rest: (TimelineItem & { at: string })[] = [
@@ -32,7 +33,7 @@ export function prTimeline(pr: Pick<PRDetail, "author" | "body" | "url">, conver
       url: c.url,
     })),
     ...reviews
-      .filter((r): r is PRReview & { submittedAt: string } => r.state !== "PENDING" && r.submittedAt !== null)
+      .filter((r): r is PRReview & { submittedAt: string } => r.state !== "PENDING" && r.submittedAt !== null && !(r.state === "COMMENTED" && r.body.trim() === ""))
       .map((r) => ({ kind: "review" as const, key: `r${r.id}`, author: r.author, body: r.body, at: r.submittedAt, state: r.state, url: r.url })),
   ];
   rest.sort((a, b) => time(a.at) - time(b.at));

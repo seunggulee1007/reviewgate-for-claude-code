@@ -62,6 +62,11 @@ describe("prTimeline (§60)", () => {
     expect(items[0]).toMatchObject({ kind: "description", author: "octo", body: "This adds **the widget**.", url: "https://github.com/acme/app/pull/7" });
   });
 
+  it("leaves out a COMMENTED review with no body — one per batch of inline comments, as on the Mac", () => {
+    const items = prTimeline(detail(), [], [review(30, "COMMENTED", "2026-11-02T09:00:00Z"), review(31, "COMMENTED", "2026-11-02T10:00:00Z", { body: "see inline" })]);
+    expect(items.map((i) => i.key)).toEqual(["description", "r31"]);
+  });
+
   it("leaves a PENDING review out and keeps a review whose body is empty", () => {
     const items = prTimeline(detail(), [], [review(20, "PENDING", null, { body: "draft" }), review(21, "CHANGES_REQUESTED", "2026-11-02T09:00:00Z")]);
     expect(items.map((i) => i.key)).toEqual(["description", "r21"]);
