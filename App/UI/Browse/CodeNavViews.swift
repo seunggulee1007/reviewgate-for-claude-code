@@ -74,6 +74,10 @@ final class CodeNavPointer {
     private(set) var commandDown = false
     /// Where the peek popover hangs from in the clicked row (its coordinates).
     private(set) var anchorPoint: CGPoint = .zero
+    /// §65.8: where the hover card hangs from (the row's coordinates where the pointer came to rest on the name).
+    @ObservationIgnored private(set) var hoverPoint: CGPoint = .zero
+    /// The window the hover card was last asked for (told when the pointer leaves the name).
+    @ObservationIgnored private weak var hoverStore: AppState?
     @ObservationIgnored private var hoveringToken: Int?
     @ObservationIgnored private var lastPoint: CGPoint = .zero
     @ObservationIgnored private var monitor: Any?
@@ -93,11 +97,29 @@ final class CodeNavPointer {
         let down = Self.isCommandOnly(NSEvent.modifierFlags)
         if down != commandDown { commandDown = down }
         let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, receiver: $0.receiver, from: from, text: text, store: store) }
-        if next != target { target = next }
+        if next != target {
+            target = next
+            hoverPoint = point
+        }
+        updateHover()
     }
 
     func leave(token: Int) {
-        if hoveringToken == token { hoveringToken = nil }
+        if hoveringToken == token {
+            hoveringToken = nil
+            updateHover()
+        }
+    }
+
+    /// §65.8: ⌘ held over a name asks for the hover card (after a rest, Core `CodeNavHoverStore`); anything else stops it.
+    private func updateHover() {
+        guard commandDown, let target, let store = target.store, hoveringToken == target.token else {
+            hoverStore?.hoverDefinition(nil, receiver: nil)
+            return
+        }
+        if hoverStore !== store { hoverStore?.hoverDefinition(nil, receiver: nil) }
+        hoverStore = store
+        store.hoverDefinition(CodeNavHoverDebounce.Key(symbol: target.symbol, at: target.clickedAt, anchor: target.token), receiver: target.receiver)
     }
 
     /// The part of row `token` to underline: the name under the pointer while ⌘ is held.
@@ -163,8 +185,13 @@ final class CodeNavPointer {
         switch event.type {
         case .flagsChanged:
             let down = Self.isCommandOnly(event.modifierFlags)
-            if down != commandDown { commandDown = down }
+            if down != commandDown {
+                commandDown = down
+                if down, target != nil { hoverPoint = lastPoint }
+                updateHover()
+            }
         case .leftMouseDown:
+            hoverStore?.codeNav.hover.dismiss()   // §65.8: a click never leaves the hover card behind
             guard Self.isCommandOnly(event.modifierFlags), event.clickCount == 1, let target, hoveringToken == target.token else { break }
             swallowMouseUp = true
             // §65.8: Settings › Review › Diff › ⌘-click — the peek band (default) or the jump.
@@ -235,6 +262,11 @@ struct CodeNavHotspot<Content: View>: View {
         let pointer = CodeNavPointer.shared
         let underline = hovered ? pointer.underline(for: token) : nil
         return content(underline)
+            // MARK: ide-nav (§65.8): the hover card, from where the pointer rests on the name.
+            .popover(isPresented: hoverShown(store), attachmentAnchor: .rect(.rect(CGRect(origin: pointer.hoverPoint, size: CGSize(width: 1, height: 14)))),
+                     arrowEdge: .bottom) {
+                if let card = store.codeNav.hover.card { CodeNavHoverCard(card: card) }
+            }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .onContinuousHover(coordinateSpace: .local) { phase in
                 switch phase {
@@ -257,6 +289,11 @@ struct CodeNavHotspot<Content: View>: View {
                 CodeNavPopupView()
                     .environment(store)
             }
+    }
+
+    private func hoverShown(_ store: AppState) -> Binding<Bool> {
+        Binding(get: { token != 0 && store.codeNav.hover.card?.key.anchor == token },
+                set: { if !$0, store.codeNav.hover.card?.key.anchor == token { store.codeNav.hover.dismiss() } })
     }
 
     private func popupShown(_ store: AppState) -> Binding<Bool> {

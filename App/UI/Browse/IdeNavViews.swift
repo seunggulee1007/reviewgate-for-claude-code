@@ -299,3 +299,38 @@ struct KindBadge: View {
             .foregroundStyle(.secondary)
     }
 }
+
+// MARK: - The hover card
+
+/// §65.8: ⌘ held over a name for a moment — its declaration in bold, where it is, and its first lines.
+struct CodeNavHoverCard: View {
+    let card: CodeNavHoverStore.Card
+
+    var body: some View {
+        let c = card.candidate
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: card.preview.symbol?.signature ?? c.preview)
+                .font(.system(.body, design: .monospaced).weight(.bold))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Text(verbatim: "\((c.path as NSString).lastPathComponent):\(c.line)").font(.caption.weight(.medium))
+                if let container = card.preview.symbol?.container ?? c.container {
+                    Text(verbatim: container).font(.caption).foregroundStyle(.secondary)
+                }
+                if !c.kind.rawValue.isEmpty { KindBadge(kind: c.kind) }
+                Spacer(minLength: 0)
+            }
+            .help(c.path)
+            Divider()
+            CodeNavPreviewLines(preview: card.preview, marked: card.preview.line, visible: 12)
+            if card.others > 0 {
+                Text("\(card.others) more — ⌥F12 shows them all").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(width: 520, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("Hover definition card")
+    }
+}

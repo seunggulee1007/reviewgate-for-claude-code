@@ -165,6 +165,56 @@ import Testing
         #expect(CodeNavCommandClick.current(defaults) == .peek)
     }
 
+    // MARK: The hover card (§65.8)
+
+    private func key(_ symbol: String, line: Int = 3, column: Int = 5) -> CodeNavHoverDebounce.Key {
+        CodeNavHoverDebounce.Key(symbol: symbol, at: CodeNavLocation(view: .review, path: "A.kt", line: line, column: column), anchor: 7)
+    }
+
+    @Test func hoverWaitsRestartOnANewNameAndStopOnNone() {
+        var d = CodeNavHoverDebounce()
+        let first = d.update(key("total"))
+        #expect(first == 1 && d.isCurrent(1))
+        #expect(d.update(key("total")) == nil && d.isCurrent(1))   // still resting on the same name: nothing new
+        let second = d.update(key("price"))
+        #expect(second == 2 && !d.isCurrent(1) && d.isCurrent(2))   // a newer name: the older wait no longer counts
+        #expect(d.update(nil) == nil && !d.isCurrent(2))            // off the name (or ⌘ up)
+        #expect(d.update(nil) == nil)
+        #expect(d.update(key("price")) == 4)                        // back on it: a fresh wait
+    }
+
+    @Test func hoverAsksOnceAfterTheRestAndDropsStaleAnswers() async throws {
+        let store = CodeNavHoverStore()
+        store.wait = .milliseconds(30)
+        var asked: [EngineCommand] = []
+        let request: @MainActor (EngineCommand) async throws -> EngineEvent = { command in
+            asked.append(command)
+            switch command {
+            case let .findDefinition(symbol, _, _, _, _):
+                return .definitions(DefinitionsReply(symbol: symbol, candidates: [self.candidate("a/\(symbol).kt", 4), self.candidate("b.kt", 1)]))
+            case let .definitionPreview(path, line, _, _): return .definitionPreview(self.preview(path, line))
+            default: throw EngineClientError.unexpectedReply("x")
+            }
+        }
+        // Sliding over three names quickly: only the last one is asked for.
+        store.pointer(key("a"), receiver: nil, using: request)
+        store.pointer(key("b"), receiver: nil, using: request)
+        store.pointer(key("c"), receiver: "repo", using: request)
+        store.pointer(key("c"), receiver: "repo", using: request)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(asked == [.findDefinition(symbol: "c", fromPath: "A.kt", line: 3, column: 5, receiver: "repo"),
+                          .definitionPreview(path: "a/c.kt", line: 4, after: CodeNavHoverStore.lines)])
+        #expect(store.card?.key == key("c") && store.card?.others == 1)
+        // Leaving the name takes the card away; nothing more is asked.
+        store.pointer(nil, receiver: nil, using: request)
+        #expect(store.card == nil)
+        // Moving away before the rest is over asks nothing.
+        store.pointer(key("d"), receiver: nil, using: request)
+        store.pointer(nil, receiver: nil, using: request)
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(asked.count == 2 && store.card == nil)
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))

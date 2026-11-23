@@ -1179,6 +1179,22 @@
         }
       }
     },
+    "%lld more — ⌥F12 shows them all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld more — ⌥F12 shows them all"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개 더 있어요 — ⌥F12 로 모두 볼 수 있어요"
+          }
+        }
+      }
+    },
     "%lld nodes": {
       "localizations": {
         "en": {

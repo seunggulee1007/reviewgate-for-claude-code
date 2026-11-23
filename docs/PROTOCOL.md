@@ -10805,7 +10805,14 @@ through). The UI is the client team's follow-up.
   highlighted as the diff, the definition line marked, ≤ 15 lines tall and scrollable; several candidates → the list on
   the band's right (a click shows one, a double-click opens it); ↑ / ↓ switch, ↩ opens, Esc closes; none → "No definition
   found for X" with 프로젝트에서 찾기. Previews read once per `path:line`. One band per window; a new peek replaces it.
-  A diff row is one VoiceOver element (polish-10), so in a diff the band is used with the keyboard. Core `CodeNavPeekStore` (`IdeNav.swift`), App `IdeNavViews.swift`.
+  A diff row is one VoiceOver element (polish-10), so in a diff the band is used with the keyboard. Core
+  `CodeNavPeekStore` (`IdeNav.swift`), App `IdeNavViews.swift`.
+- *Hover preview*: ⌘ alone held with the pointer resting on a name for 600 ms (`CodeNavHoverStore.delay`; the underline
+  shows as before) → `find_definition` (with `column` / `receiver`), then `definition_preview {after: 8}` of the first
+  candidate → a popover from the name: `symbol.signature` in bold (else the candidate's `preview`), file:line, container,
+  kind, the lines (the definition line marked), "N more — ⌥F12 shows them all". A new name restarts the wait (only the
+  newest wait's replies count, `CodeNavHoverDebounce`); leaving the name, releasing ⌘ or a click closes it; nothing is
+  asked while the pointer only passes over names. Core `IdeNavHover.swift`.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.
