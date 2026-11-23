@@ -20,7 +20,7 @@ import { FindContext, type FindReveal } from "./findContext";
 import { AgentChip } from "../agents/AgentPanel";
 import { Markdown } from "./Markdown";
 import { AwaitingPermissionBadge } from "./PermissionBits";
-import { PermissionLine } from "./PermissionLine"; // MARK: r2-review-flow (M27)
+import { HandledCardsRow, PermissionLine } from "./PermissionLine"; // MARK: r2-review-flow (M27); §56.5
 import { QuestionCard } from "./QuestionCard";
 import { BudgetRow, ToolResultRow, ToolUseRow } from "./ToolRows";
 import { budgetIsOn } from "./BudgetBadge"; // §54
@@ -36,7 +36,9 @@ import { useAgentUi } from "../../agentUi";
 import { AgentMenuButton, AgentReportRow, collapsedLine, ContinueRow, ModelChip, ResumedBadge, StopAgentButton, useAgentContextMenu, useAgentMenuItems } from "../agents/AgentBits";
 import { OlderRowsBar } from "./OlderRows"; // MARK: wave4 w4-history (§38.3)
 // MARK: wave4b w4b-tabs (§39.2)
-import { foldExplore } from "../../exploreFold";
+import { foldExplore, type ExploreEntry } from "../../exploreFold";
+import { foldHandled, handledOutcome } from "../../handledCards"; // §56.5
+import { pendingPermissionsOf } from "../../permissionQueue";
 import { revealStaysInViewedChat, stopViewing, useViewedChat, useViewing } from "../../viewedChat";
 import { ExploreRunRow, ViewedChatHeader } from "./ViewingChat";
 import { isEnter } from "../../ime";
@@ -60,17 +62,33 @@ const PinContext = createContext<() => void>(() => undefined);
 /** Rows in order; an Agent/Task call becomes a group and its own result is shown inside that group. */
 function Rows({ items, root, nested, fold }: { items: ChatItem[]; root: string | null | undefined; nested?: boolean; fold?: { running: boolean; focusId: string | null } }) {
   const index = useContext(IndexContext);
+  // §56.5: the cards still waiting (one string: the selector's value stays equal while they do).
+  const pendingIds = useStore((s) => pendingPermissionsOf(s.state).map((r) => r.requestId).join("\n"));
+  const viewing = useViewing() !== null;
   // MARK: wave4b w4b-tabs — §39.2 (market-12): a run of reads / searches is one "탐색: …" row (exploreFold.ts)
   if (fold) {
+    const entry = (e: ExploreEntry) =>
+      e.kind === "run" ? (
+        <ExploreRunRow key={`run-${e.id}`} run={e} running={fold.running} forceOpen={fold.focusId !== null && e.items.some((i) => i.kind === "toolUse" && i.toolUseId === fold.focusId)}>
+          <Rows items={e.items} root={root} nested={nested} />
+        </ExploreRunRow>
+      ) : (
+        <Rows key={e.item.id} items={[e.item]} root={root} nested={nested} />
+      );
+    // §56.5: decided permission cards and questions one after another are one line, "권한 3건 처리됨" (handledCards.ts).
+    const pending = new Set(pendingIds ? pendingIds.split("\n") : []);
+    const pieces = foldHandled(foldExplore(items), (e) => (e.kind === "run" ? e.id : e.item.id), (e) =>
+      e.kind === "item" && e.item.kind === "permission" ? handledOutcome(e.item, !viewing && pending.has(e.item.request.requestId)) : null,
+    );
     return (
       <>
-        {foldExplore(items).map((e) =>
-          e.kind === "run" ? (
-            <ExploreRunRow key={`run-${e.id}`} run={e} running={fold.running} forceOpen={fold.focusId !== null && e.items.some((i) => i.kind === "toolUse" && i.toolUseId === fold.focusId)}>
-              <Rows items={e.items} root={root} nested={nested} />
-            </ExploreRunRow>
+        {pieces.map((p) =>
+          p.kind === "handled" ? (
+            <HandledCardsRow key={`handled-${p.id}`} run={p}>
+              {p.entries.map(entry)}
+            </HandledCardsRow>
           ) : (
-            <Rows key={e.item.id} items={[e.item]} root={root} nested={nested} />
+            entry(p.entry)
           ),
         )}
       </>
