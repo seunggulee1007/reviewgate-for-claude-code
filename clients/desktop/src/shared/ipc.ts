@@ -286,7 +286,9 @@ export type MenuAction =
   | { type: "new_terminal_chat" }
   | { type: "new_classic_chat" }
   | { type: "continue_as_terminal" }
-  | { type: "toggle_terminal_panel" };
+  | { type: "toggle_terminal_panel" }
+  // §9 Chat › New Chat in a Workbench… (Ctrl+Alt+W, the renderer's key)
+  | { type: "new_chat_in_workbench" };
 
 // MARK: polish p-foundation — P5-sheets-44
 /**
@@ -390,14 +392,17 @@ export type RGBridge = {
   setUI(hash: string, patch: ProjectUI): Promise<void>;
   /**
    * Opens `path` in a new workbench window (or focuses the window that has it). wave3 desktop-flow (§36.12): `setupReport` —
-   * the new workbench's setup failed; that window shows the exit and the log (`takeWorkbenchSetupReport`).
+   * the new workbench's setup failed; that window shows the exit and the log (`takeWorkbenchSetupReport`). §9 New Chat in a
+   * Workbench: `draft` — a message held for a new chat, which that window puts into its composer (`takeWorkbenchDraft`).
    */
-  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport): Promise<void>;
+  openWorkbenchWindow(path: string, setupReport?: WorkbenchSetupReport, draft?: string): Promise<void>;
   // MARK: wave3 desktop-flow
   /** §36.12: the failed setup's report of this window's new workbench (any of `paths` = its folder), once; null when none. */
   takeWorkbenchSetupReport?(paths: string[]): Promise<WorkbenchSetupReport | null>;
   /** §36.14: puts `text` into the composer of the window that has `path` open (it comes to the front); false when no other window has it. */
   composeInWindow?(path: string, text: string): Promise<boolean>;
+  /** §9: the message held for a new chat that this window's new workbench was opened for (any of `paths`), once; null when none. */
+  takeWorkbenchDraft?(paths: string[]): Promise<string | null>;
   /** M19: opens `path` — or a folder the user picks — in a NEW window; focuses the window that already has it. */
   openInNewWindow(path?: string): Promise<void>;
   /** M19: focuses another of our windows that has `path` open; false when no other window has it. */
