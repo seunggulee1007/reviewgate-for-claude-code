@@ -154,7 +154,11 @@ public enum EngineMessages {
         case "invalid_branch_name": return String(localized: "Not a valid branch name: \(detail)", bundle: .module)
         case "branch_in_use": return String(localized: "That branch is already checked out in \(detail)", bundle: .module)
         case "path_exists": return String(localized: "The folder already exists: \(detail)", bundle: .module)
-        case "switch_blocked": return String(localized: "Finish the review before switching branches", bundle: .module)
+        case "switch_blocked": return switchBlockedText(detail)   // MARK: a-gitflow — §61
+        case "pr_same_branch":
+            return detail.isEmpty ? String(localized: "This is the base branch — create a branch for this work first", bundle: .module)
+                : String(localized: "You're on \(detail), the base branch — create a branch for this work first", bundle: .module)
+        case "pr_no_commits": return String(localized: "This branch has no commits since \(detail)", bundle: .module)
         case "detached_head": return String(localized: "Check out a branch first (HEAD is detached)", bundle: .module)
         case "no_remote": return String(localized: "The repository has no remote", bundle: .module)
         case "unsupported_remote": return String(localized: "The origin remote is not a GitHub URL: \(detail)", bundle: .module)
@@ -326,6 +330,18 @@ public enum EngineMessages {
             }
             return refusal(code: "mcp_failed", error: underlying)
         default: return message
+        }
+    }
+
+    // MARK: a-gitflow — §61
+
+    /// `switch_blocked:<kind>`: why a branch switch (or a new branch) was refused, in the branch menu's words.
+    static func switchBlockedText(_ kind: String) -> String {
+        switch kind {
+        case "pendingReview": String(localized: "Finish the review before switching branches", bundle: .module)
+        case "dirtyWorktree": String(localized: "Working tree has uncommitted changes — commit them before switching branches", bundle: .module)
+        case "running": String(localized: "Claude is working — switch branches when the turn ends", bundle: .module)
+        default: String(localized: "Branches cannot be switched right now", bundle: .module)
         }
     }
 

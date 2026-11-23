@@ -9838,3 +9838,11 @@ review" whatever the reason.
   `pr_no_commits:<baseRef>` (nothing on the branch since the base). `state.branches.defaultBranch` — `origin/HEAD`'s
   branch, else `main` / `master` (remote first, then local), else null — lets the clients say "create a branch first"
   before the sheet opens.
+- **Clients — the words.** Each `switch_blocked:<kind>` refusal has its own words, starting from the branch menu's
+  footer (Core `EngineMessages.switchBlockedText`, Windows `errorCodes.ts` `switchBlockedText`): `pendingReview` "Finish
+  the review before switching branches", `dirtyWorktree` "Working tree has uncommitted changes — commit them before
+  switching branches", `running` "Claude is working — switch branches when the turn ends". `pr_same_branch` says
+  "You're on main, the base branch — create a branch for this work first", `pr_no_commits` "This branch has no commits
+  since origin/main". Create PR is disabled — its reason in the tooltip — in a folder without git, on a detached HEAD,
+  while Claude works and on `defaultBranch` (Core `AppState.prCreateBlocker`, Windows `branchFlow.ts`
+  `prCreateBlocker`); a dirty tree or a pending review no longer disables it. New Branch follows `createBlocker`.
