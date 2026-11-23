@@ -143,8 +143,10 @@ struct SessionErrorBanner: View {
                 .help(restartHelp)
                 .accessibilityIdentifier("Restart session from banner")
         case .openSettings:
-            Button("Settings…") { openSettings() }
+            // §55.11: cli_not_found / cli_not_executable — straight to Advanced's claude path.
+            Button("Settings…") { SettingsNavigation.shared.open("claudePath", with: openSettings) }
                 .controlSize(.small)
+                .help("Settings › Advanced › claude path")
                 .accessibilityIdentifier("Open settings from banner")
         case .mcpLogin:
             Button("Log in…") {

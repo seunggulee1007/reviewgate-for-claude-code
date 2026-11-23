@@ -75,9 +75,9 @@ Mac·Windows 열과 비교해요.
 
 | 동작 | Mac | Windows | 비고 |
 |---|---|---|---|
-| 새 채팅 | ⌘T | Ctrl+T | Mac 앱은 설정 › 새 채팅 종류(기본: 터미널)를 따라요 |
-| 새 터미널 채팅 | ⌃⌘T | Ctrl+Alt+T | Windows 는 설정 › 터미널 채팅 (미리 보기)를 켰을 때 |
-| 새 채팅 (클래식) | ⌃⌥⌘T | Ctrl+Alt+Shift+T | Windows 는 설정 › 터미널 채팅 (미리 보기)를 켰을 때 |
+| 새 채팅 | ⌘T | Ctrl+T | Mac 앱은 설정 › 세션 › 새 채팅 종류(기본: 터미널)를 따라요 |
+| 새 터미널 채팅 | ⌃⌘T | Ctrl+Alt+T | Windows 는 설정 › 세션 › 터미널 채팅 (미리 보기)를 켰을 때 |
+| 새 채팅 (클래식) | ⌃⌥⌘T | Ctrl+Alt+Shift+T | Windows 는 설정 › 세션 › 터미널 채팅 (미리 보기)를 켰을 때 |
 | 채팅 탭 닫기 | ⌘⇧W | Ctrl+Shift+W | |
 | 채팅 탭 1–9 | ⌘1…⌘9 | Ctrl+1…Ctrl+9 | |
 | 닫은 채팅 탭 다시 열기 | ⌘⇧T | Ctrl+Shift+T | |

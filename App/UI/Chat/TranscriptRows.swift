@@ -291,10 +291,10 @@ struct TranscriptRowView: View, Equatable {
                          : String(localized: "Change limit reached: \(counts)"))
                         .fontWeight(.semibold)
                     Text(target).font(.caption).foregroundStyle(.secondary)
-                    // polish P3-transcript-26: the way out, not only the reason — Settings › General › the change limit.
-                    SettingsLink { Text("Change Limit…") }
+                    // polish P3-transcript-26: the way out, not only the reason — Settings › Session › the change limit (§55.11: to its row).
+                    SettingsJumpButton("Change Limit…", to: "budgetEnabled")
                         .controlSize(.small)
-                        .help("Settings › General — the change limit per reply (files / lines)")
+                        .help("Settings › Session — the change limit per reply (files / lines)")
                         .accessibilityIdentifier("Change limit from row")
                 }
             } icon: {

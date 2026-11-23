@@ -346,6 +346,7 @@ struct ReviewGateApp: App {
                 .environment(store.pr)
                 .appAppearance()
         }
+        .windowResizability(.contentMinSize)   // §55.11: resizable, never smaller than the panes need (fits 637 pt high)
         // MARK: wave4d w4d-windows (polish-08): Help › Keyboard Shortcuts — docs/SHORTCUTS.md's table, one window.
         Window("Keyboard Shortcuts", id: keyboardShortcutsWindowID) {
             ShortcutsView()

@@ -68,6 +68,8 @@ struct NotificationSettingsRows: View {
     @AppStorage(NotificationGroup.turnEnd.defaultsKey) private var turnEnd = true
     @AppStorage(NotificationGroup.other.defaultsKey) private var other = true
     private var status: NotificationStatusModel { NotificationStatusModel.shared }
+    /// The groups' tooltip while the main switch is off.
+    private var offReason: String { notificationsEnabled ? "" : String(localized: "Turn on notifications first") }
 
     var body: some View {
         if let problem = NotificationHealth.problem(appEnabled: notificationsEnabled, system: status.system) {
@@ -87,13 +89,19 @@ struct NotificationSettingsRows: View {
         }
         Toggle("Permission requests, questions and plans", isOn: $waiting)
             .disabled(!notificationsEnabled)
+            .help(offReason)
             .accessibilityIdentifier("Notify waiting")
+            .settingAnchor("notifyWaiting")
         Toggle("When work finishes", isOn: $turnEnd)
             .disabled(!notificationsEnabled)
+            .help(offReason)
             .accessibilityIdentifier("Notify turn end")
+            .settingAnchor("notifyTurnEnd")
         Toggle("Everything else (errors, side questions, other sessions, subagents)", isOn: $other)
             .disabled(!notificationsEnabled)
+            .help(offReason)
             .accessibilityIdentifier("Notify other")
+            .settingAnchor("notifyOther")
         Text("Clicking a notification opens its window, chat and card.")
             .font(.caption).foregroundStyle(.secondary)
         // A Focus (Do Not Disturb) silences them too, and an app cannot read it without asking for another permission.
@@ -118,6 +126,7 @@ struct NotificationSoundRows: View {
     var body: some View {
         let enabled = notificationsEnabled && notificationSound
         Text("Sounds").font(.subheadline.weight(.semibold))
+            .settingAnchor("notificationSounds")
         ForEach(NotificationSoundCategory.allCases) { category in
             NotificationSoundRow(category: category, names: names, enabled: enabled)
         }

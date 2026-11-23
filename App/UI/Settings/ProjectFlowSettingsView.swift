@@ -19,13 +19,13 @@ struct ProjectFlowSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Section("Commit message template") {
-                    CommitTemplateEditor(showsTitle: false)
+                    CommitTemplateEditor(showsTitle: false).settingAnchor("commitTemplate")
                 }
                 Section("Workbench setup") {
-                    WorkbenchSetupEditor(showsTitle: false)
+                    WorkbenchSetupEditor(showsTitle: false).settingAnchor("workbenchSetup")
                 }
                 Section("PR comments") {
-                    PRRespondCommandField()
+                    PRRespondCommandField().settingAnchor("prRespondCommand")
                 }
                 AutoAcceptSettingsSection()   // MARK: wave4c w4c-trust (§41.2)
             } else {

@@ -1,46 +1,47 @@
 import SwiftUI
 import ReviewGateCore
 
-/// Settings › General › Permissions, the §33 rows (wave1 mac-perms): isolated worktree agents (§33.4), the terminal's
-/// allow rules (§33.5, and their Bash rules — r2 M20), keeping "세션 동안 허용" per repository (§33.7, r2 M21) with what this window remembered, and the
-/// terminal (Claude Code) allow rules with import (§33.8). Rows of the enclosing `Form` section.
+/// Settings › Permissions, the §33 rows (wave1 mac-perms) in their three sections (§55.11): the terminal's allow rules
+/// (§33.5, and their Bash rules — r2 M20) with the sheet that shows and imports them (§33.8), keeping "세션 동안 허용" per
+/// repository (§33.7, r2 M21) with what this window remembered, and isolated worktree agents (§33.4). The whole set
+/// (the screenshot tour's guards shot) is `PermissionSettingsRows`. Rows of the enclosing `Form` section.
 struct PermissionSettingsRows: View {
+    var body: some View {
+        TerminalAllowRuleRows()
+        SessionAllowRows()
+        WorktreeIsolationRow()
+    }
+}
+
+/// Every window's engine gets the §33 switches again.
+@MainActor private func pushWorktreePermissionsToEveryWindow() {
+    for store in WorkbenchRegistry.shared.allStores { store.pushWorktreePermissionSettings() }
+}
+
+/// §33.5 / §33.8: the terminal's allow rules (lookup and read tools; Bash with its own switch) and the sheet of them.
+struct TerminalAllowRuleRows: View {
     @Environment(AppState.self) private var store
-    @AppStorage(AppSettings.Key.allowWorktreeIsolation) private var allowWorktreeIsolation = true   // M05b: on unless turned off
     @AppStorage(AppSettings.Key.applyUserAllowRules) private var applyUserAllowRules = true
-    @AppStorage(AppSettings.Key.persistSessionAllows) private var persistSessionAllows = true   // r2-skills-side (§33.7, M21): on by default
     @AppStorage(AppSettings.Key.applyUserBashRules) private var applyUserBashRules = true   // MARK: r2-skills-side (§33.5, M20)
     @State private var showTerminalRules = false
 
     var body: some View {
         Group {
-            Toggle("Allow agents that work in another worktree (isolation)", isOn: $allowWorktreeIsolation)
-                .onChange(of: allowWorktreeIsolation) { _, _ in pushToEveryWindow() }
-                .accessibilityIdentifier("Allow worktree isolation")
-            Text("In auto mode they run without a card; otherwise each asks with a card. A row afterwards says where they worked · applies from the next session")
-                .font(.caption).foregroundStyle(.secondary)
-            Toggle("Apply the terminal's allow rules (lookup and read tools)", isOn: $applyUserAllowRules)
-                .onChange(of: applyUserAllowRules) { _, _ in pushToEveryWindow() }
+            Toggle(isOn: $applyUserAllowRules) { SettingLabel("applyUserAllowRules") }
+                .onChange(of: applyUserAllowRules) { _, _ in pushWorktreePermissionsToEveryWindow() }
                 .accessibilityIdentifier("Apply terminal allow rules")
-            Text("Tools you allowed in Claude Code that cannot change files — web search and fetch, read-only MCP tools, agents — run without a card here too. Edits and commands still go through the review. Applies live.")
-                .font(.caption).foregroundStyle(.secondary)
+                .settingAnchor("applyUserAllowRules")
             // MARK: r2-skills-side — §33.5 (M20): the terminal's Bash(…) rules, like the app's allow patterns.
-            Toggle("Also apply the terminal's Bash allow rules", isOn: $applyUserBashRules)
-                .onChange(of: applyUserBashRules) { _, _ in pushToEveryWindow() }
+            Toggle(isOn: $applyUserBashRules) { SettingLabel("applyUserBashRules") }
+                .onChange(of: applyUserBashRules) { _, _ in pushWorktreePermissionsToEveryWindow() }
                 .disabled(!applyUserAllowRules)
                 .help(applyUserAllowRules ? "" : String(localized: "Turn on the terminal allow rules first"))
                 .accessibilityIdentifier("Apply terminal Bash rules")
-            Text("Commands your Bash(…) rules allow (e.g. Bash(mvn:*)) run without a card, as in the terminal; your deny and ask rules still win, and the files they change are reviewed. Applies immediately.")
-                .font(.caption).foregroundStyle(.secondary)
-            Toggle("Keep \"Allow for session\" for this repository", isOn: $persistSessionAllows)
-                .onChange(of: persistSessionAllows) { _, _ in pushToEveryWindow() }
-                .accessibilityIdentifier("Keep session allows")
-            Text("Kept when the app reopens · shared by the repository's worktrees and workbenches")
-                .font(.caption).foregroundStyle(.secondary)
-            rememberedAllows
+                .settingAnchor("applyUserBashRules")
             LabeledContent {
                 Button("Show…") { showTerminalRules = true }
                     .disabled(store.projectInfo == nil)
+                    .help(store.projectInfo == nil ? String(localized: "Open a project to see which of your Claude Code rules apply here") : "")
                     .accessibilityLabel("Show the terminal allow rules")
                     .accessibilityIdentifier("Show terminal allow rules")
             } label: {
@@ -50,10 +51,27 @@ struct PermissionSettingsRows: View {
                      : String(localized: "Which rules apply here, which are ignored, and what you can import"))
                     .font(.caption).foregroundStyle(.secondary)
             }
+            .settingAnchor("terminalAllowRules")
             .sheet(isPresented: $showTerminalRules) {
                 TerminalAllowRulesSheet()
                     .environment(store)
             }
+        }
+    }
+}
+
+/// §33.7: keeping "Allow for session" per repository, and what this window's session remembered.
+struct SessionAllowRows: View {
+    @Environment(AppState.self) private var store
+    @AppStorage(AppSettings.Key.persistSessionAllows) private var persistSessionAllows = true   // r2-skills-side (§33.7, M21): on by default
+
+    var body: some View {
+        Group {
+            Toggle(isOn: $persistSessionAllows) { SettingLabel("persistSessionAllows") }
+                .onChange(of: persistSessionAllows) { _, _ in pushWorktreePermissionsToEveryWindow() }
+                .accessibilityIdentifier("Keep session allows")
+                .settingAnchor("persistSessionAllows")
+            rememberedAllows
         }
     }
 
@@ -83,10 +101,19 @@ struct PermissionSettingsRows: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
         .accessibilityIdentifier("Remembered allows")
+        .settingAnchor("rememberedAllows")
     }
+}
 
-    private func pushToEveryWindow() {
-        for store in WorkbenchRegistry.shared.allStores { store.pushWorktreePermissionSettings() }
+/// §33.4: agents that work in another worktree (isolation), on unless turned off.
+struct WorktreeIsolationRow: View {
+    @AppStorage(AppSettings.Key.allowWorktreeIsolation) private var allowWorktreeIsolation = true   // M05b: on unless turned off
+
+    var body: some View {
+        Toggle(isOn: $allowWorktreeIsolation) { SettingLabel("allowWorktreeIsolation") }
+            .onChange(of: allowWorktreeIsolation) { _, _ in pushWorktreePermissionsToEveryWindow() }
+            .accessibilityIdentifier("Allow worktree isolation")
+            .settingAnchor("allowWorktreeIsolation")
     }
 }
 
