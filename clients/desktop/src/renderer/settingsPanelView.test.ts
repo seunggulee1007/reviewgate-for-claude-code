@@ -72,6 +72,21 @@ describe("Settings: tabs, search, when a change applies (§55.11)", () => {
     expect(out).toContain("Settings without a badge apply right away.");
   });
 
+  it("§63: Settings › Tasks — the start screen switch, the scope, platform, prefix with its example, location, MCP server, template with Reset", () => {
+    scene(settings({ skipStartScreen: true } as Partial<AppSettings>), { open: false, starting: false, canRestart: false });
+    startedWith(null);
+    const out = renderToStaticMarkup(createElement(m.SettingsPanel, { highlight: "taskMcpServer" }));
+    expect(out).toContain('class="active" data-testid="Settings Tasks"');
+    for (const id of ["skipStartScreen", "taskPlatform", "taskBranchPrefix", "taskStartLocation", "taskMcpServer", "taskPromptTemplate"]) expect(out).toContain(`data-setting="${id}"`);
+    expect(out).not.toMatch(/checked=""[^>]*data-testid="Show the start screen"/); // skipped → the switch is off
+    expect(out).toContain("No project open — these are the default for every project.");
+    expect(out).toContain("e.g. feature/ACME-123-fix-cart-total"); // the example follows the prefix
+    // No tracker read through MCP: the server field is off, with its reason.
+    expect(out).toMatch(/disabled=""[^>]*title="Only Jira, Linear and other trackers are read through an MCP server"/);
+    expect(out).toMatch(/disabled=""[^>]*title="This is the built-in template"[^>]*data-testid="Reset task prompt template"/);
+    expect(out).toContain("Summarize the task first and tell me your plan before you change code.");
+  });
+
   it("one banner on every tab names what waits for a restart, with Restart now", () => {
     const before = settings();
     startedWith(m.sessionStartValues(before));

@@ -10501,4 +10501,5 @@ Everything but the GitHub read is the client's (Mac: Core `TaskStart.swift`; tes
   the current one holds a conversation, the prompt) or the dialog calls `createWorkbenchWith({task: {text, draft: true}})`
   (Run as Task's remembered prefix is left alone); `task_started {draft: true}` and a task started here go through
   `deliverFirstPrompt`: the composer, or — a terminal chat — one bracketed paste into its prompt, retried every 0.3 s for
-  up to 30 s, then the composer with the reason.
+  up to 30 s, then the composer with the reason. Settings › Tasks (업무) is `components/settings/TasksTab.tsx` with its rows
+  in `settingsIndex.ts` (tab after Git & Workbenches, as on the Mac).

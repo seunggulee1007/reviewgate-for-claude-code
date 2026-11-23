@@ -7,7 +7,7 @@
 import type { AppSettings } from "../shared/ipc";
 import { renderSystemPrompt } from "../shared/systemPrompt";
 
-export type SettingsTab = "general" | "permissions" | "session" | "review" | "git" | "project" | "accounts" | "advanced";
+export type SettingsTab = "general" | "permissions" | "session" | "review" | "git" | "tasks" | "project" | "accounts" | "advanced";
 
 /** In tab order, with the English key of each name. */
 export const SETTINGS_TABS: { id: SettingsTab; title: string }[] = [
@@ -16,6 +16,7 @@ export const SETTINGS_TABS: { id: SettingsTab; title: string }[] = [
   { id: "session", title: "Session" },
   { id: "review", title: "Review" },
   { id: "git", title: "Git & Workbenches" },
+  { id: "tasks", title: "Tasks" }, // MARK: task-start (§63)
   { id: "project", title: "Project" },
   { id: "accounts", title: "Accounts" },
   { id: "advanced", title: "Advanced" },
@@ -105,6 +106,13 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   e("runAsTaskEnabled", "git", "Workbenches", "Run as Task"),
   e("commitPushByDefault", "git", "Commit", "Push by default"),
   e("commitTrailer", "git", "Commit", "Commit trailer"),
+  // Tasks — MARK: task-start (§63), the Mac's SettingsCatalog rows
+  e("skipStartScreen", "tasks", "Start screen", "Show the start screen when a project opens", "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."),
+  e("taskPlatform", "tasks", "Start from a task", "Task platform", "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."),
+  e("taskBranchPrefix", "tasks", "Start from a task", "Branch prefix", "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels."),
+  e("taskStartLocation", "tasks", "Start from a task", "Start in", "A new branch in this window (your uncommitted changes come along), or a new workbench — its own folder, branch and window."),
+  e("taskMcpServer", "tasks", "Start from a task", "MCP server for tasks", "The MCP server Claude reads Jira, Linear and other tasks with (its mcp__<server>__* tools). The list is this project's servers; you can type another name."),
+  e("taskPromptTemplate", "tasks", "First prompt", "First prompt template", "The first message, put into the message box (or the terminal's prompt) and never sent by itself. {id}, {title}, {url}, {body} are the task's; {mcp} is how Claude reads it. A line whose placeholders are all empty is left out."),
   // Project · Accounts
   e("commitTemplate", "project", "Commit message template", "Commit message template"),
   e("workbenchSetup", "project", "Workbench setup", "Workbench setup"),

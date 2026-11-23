@@ -9,6 +9,7 @@ import {
   searchSettings,
   sessionStartValues,
   settingApplies,
+  settingEntry,
   settingsTabOf,
 } from "./settingsIndex";
 
@@ -48,6 +49,17 @@ describe("Settings search", () => {
     const order = SETTINGS_TABS.map((t) => t.id);
     const tabs = searchSettings("a").map((e) => order.indexOf(e.tab));
     expect(tabs).toEqual([...tabs].sort((a, b) => a - b));
+  });
+
+  it("§63: Settings › Tasks is in the search — the MCP server, the branch prefix, the start screen; by its Korean tab name too", () => {
+    expect(ids("MCP")).toContain("taskMcpServer");
+    expect(ids("branch prefix")).toContain("taskBranchPrefix");
+    expect(ids("start screen")).toContain("skipStartScreen");
+    expect(ids("{body}")).toEqual(["taskPromptTemplate"]);
+    expect(searchSettings("업무", (k) => (k === "Tasks" ? "업무" : k)).map((e) => e.id)).toEqual(["skipStartScreen", "taskPlatform", "taskBranchPrefix", "taskStartLocation", "taskMcpServer", "taskPromptTemplate"]);
+    expect(settingEntry("skipStartScreen")?.tab).toBe("tasks");
+    expect(settingApplies("taskPlatform")).toBe("immediately");
+    expect(SETTINGS_TABS.map((tab) => tab.id).indexOf("tasks")).toBe(SETTINGS_TABS.map((tab) => tab.id).indexOf("git") + 1); // after Git, as on the Mac
   });
 
   it("ids are unique, every tab has rows, an unknown tab opens General", () => {
