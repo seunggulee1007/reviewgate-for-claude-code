@@ -145,6 +145,8 @@ export type SessionEvent =
   | ({ type: "start_progress" } & StartProgress)
   /** A tool call was denied because no engine-started turn was running (Claude Code continued on its own; §18). */
   | { type: "unprompted_denied"; toolName: string }
+  /** §63: a call that changes files was denied because earlier changes wait for the user's review. */
+  | { type: "review_first_denied"; toolName: string }
   /** A `result` arrived without an engine-started turn: not a turn_end — nothing to collect or count (§18). */
   | { type: "unprompted_turn_end"; sessionId: string }
   /** §52: the live background tasks changed (REPLACE: the whole list, oldest first). */

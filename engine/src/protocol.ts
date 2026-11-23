@@ -10,6 +10,7 @@ import type { DraftComment, GHAccount, PRComment, PRDetail, PRFileMeta, PRIssueC
 import type { DiffSide, NoteAnchor, ReviewNote } from "./review/notes.js";
 import type { FileOrigin } from "./session/provenance.js";
 import type { FileRiskKind } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
+import type { ReviewFirstMode } from "./session/reviewFirst.js";
 
 export type { FileOrigin, NoteAnchor, SkippedPath };
 
@@ -419,6 +420,21 @@ export type Settings = {
   newChatKind?: SessionKind;
   /** §57.15: answer Claude Code's permission dialogs of a terminal chat from the app too (default true; live). */
   terminalPermissionBridge?: boolean;
+  /**
+   * §63: Claude's next work waits for the review — `edits` (default; absent or unknown too): while files from a finished
+   * turn are pending / changes requested, a call that changes files is denied; `prompts`: a new prompt is refused too;
+   * `off`: neither (a send is a question that may edit, §3). Live.
+   */
+  reviewFirst?: ReviewFirstMode;
+};
+
+/** §63: the review-first rule while it holds Claude back (`gate.reviewFirst`; null / absent: it does not). */
+export type ReviewFirstState = {
+  mode: Exclude<ReviewFirstMode, "off">;
+  /** Files it waits on (pending + changes requested). */
+  waiting: number;
+  /** Calls it denied in the current (or, between turns, the last) turn. */
+  blocked: number;
 };
 
 // ---------------------------------------------------------------- §34 review round 2
@@ -1188,6 +1204,8 @@ export type GateState = {
   // MARK: wave4c w4c-trust
   /** §41.2: the last single-file reject while [되돌리기] can put it back; absent otherwise. */
   rejectUndo?: RejectUndoState;
+  /** §63: the review-first rule while it holds Claude back; null when it does not (off, nothing waits, a change request runs). */
+  reviewFirst?: ReviewFirstState | null;
 };
 
 /** §32: which parts of `.claude/settings.local.json` the turn changed (a file created / deleted counts for every part it has). */

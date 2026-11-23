@@ -23,6 +23,7 @@ import { autoModeDecides, hookPermissionMode, inAutoMode } from "./autoMode.js";
 import { remembersSessions, sendMessageKey, type SendTarget } from "./peerSend.js"; // MARK: r2-peers (§33.2)
 import { changedPaths, dirState, type DirState } from "./outsideWatch.js";
 import { clearlyWrites } from "./shellWrites.js";
+import { reviewFirstToolDecision } from "./reviewFirst.js";
 import { settingsEditRisk } from "./settingsDiff.js";
 import { destructiveGitReason, dirtyPaths, entriesSince, gitCommandCardReason, headReflog, isOwnCommitSubject, movesHead, stashesWork, type GitProbe, type ReflogEntry } from "./gitDestructive.js"; // MARK: r1-git (§46)
 import {
@@ -439,6 +440,13 @@ export type HookContext = {
   onGitCommand?: (result: GitCommandResult) => void;
   /** What the PreToolUse hook read before a git command ran, by tool_use id (`noteGitBefore` → `postGitCommand`). */
   gitBefore?: Map<string, GitBefore>;
+  /**
+   * §63: the paths the review-first rule waits on now (reviewFirst.ts `reviewFirstWaiting`; null: nothing holds Claude
+   * back) — owned by the engine, read at every call so an accept lifts it at once.
+   */
+  reviewFirst?: () => readonly string[] | null;
+  /** §63: a call was denied by the review-first rule. */
+  onReviewFirst?: (toolName: string) => void;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
 };
@@ -669,6 +677,21 @@ async function guardUnprompted(toolName: string, input: Record<string, unknown>,
   if (!unpromptedBlocked(toolName, input, ctx, ro, agentId)) return undefined;
   ctx.onUnprompted?.(toolName);
   return denyPre(agentId ? UNPROMPTED_AGENT_REASON : UNPROMPTED_REASON); // MARK: r2-peers
+}
+
+/**
+ * §63: denies (and reports) a call that would change files while earlier changes wait for the user's review; undefined
+ * when the rule lets it go on. Plan files (plan mode) and Claude's memory are outside the review and stay writable.
+ */
+function guardReviewFirst(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro?: ReadOnlyContext): HookJSONOutput | undefined {
+  const waiting = ctx.reviewFirst?.() ?? null;
+  if (!waiting) return undefined;
+  const file = EDIT_TOOLS_RE.test(toolName) ? toolFile(input, ctx.cwd) : undefined;
+  const exempt = (f: string): boolean => isPlanFile(f, ctx) || isClaudeMemoryFile(f, ctx.claudeHome);
+  const reason = reviewFirstToolDecision(waiting, toolName, input, { ...(file ? { file } : {}), exempt, ...(ro ? { ro } : {}) });
+  if (!reason) return undefined;
+  ctx.onReviewFirst?.(toolName);
+  return denyPre(reason);
 }
 
 /** The containment root: the git toplevel of cwd (cached), or cwd itself outside a repository. */
@@ -1153,6 +1176,8 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const ti = toolInput(input);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, undefined, input);
     if (unprompted) return unprompted;
+    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx); // §63
+    if (reviewFirst) return reviewFirst;
     const file = toolFile(ti, ctx.cwd);
     // Never into git's own data or ReviewGate's state (objects, refs, the index, HEAD, reviewgate/): checked before anything
     // can allow it. M23: a hook, info/exclude or the config is handled like an edit outside the project (below).
@@ -1221,6 +1246,8 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const ro = await readOnlyContextOf(ctx, cwd);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro, input);
     if (unprompted) return unprompted;
+    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx, ro); // §63: a command that only reads still runs
+    if (reviewFirst) return reviewFirst;
     const command = String(ti.command ?? "");
     await noteGitBefore(ctx, input, command); // MARK: r1-git (§46): what a git command may change, read before it runs
     const planDeny = planModeBlocked(input.tool_name, ti, ctx, ro);
