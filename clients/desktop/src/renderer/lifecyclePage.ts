@@ -5,7 +5,8 @@
  * (a toast, P1-chrome-13).
  */
 import { closeGuardExtras } from "./closeGuardExtras";
-import { commitOf, hasPendingReview, isRunning, useStore, type Store } from "./store";
+import { commitOf, isRunning, useStore, type Store } from "./store";
+import { prCreateBlocker } from "./branchFlow";
 import { acceptBlockedReason, rejectBlockedReason } from "./reviewRound";
 import { finishReviewBlocked } from "./reviewGate";
 import { rejectShortcutTarget } from "./rejectShortcut";
@@ -31,7 +32,7 @@ export function menuEnabledOf(s: Facts): MenuEnabled {
     rejectAll: pending > 0 && rejectBlocked === null,
     finishReview: finishReviewBlocked(st) === null,
     commit: commitOf(st).canCommit,
-    createPR: !hasPendingReview(st) && !st.branches.isWorktreeDirty && !isRunning(st) && (st.project.branch ?? null) !== null,
+    createPR: prCreateBlocker(st) === null, // MARK: a-gitflow — §61: not a dirty tree or a pending review
     chatSwitch: sessionSwitchRefusal(st) === null,
     stop: isRunning(st),
     // MARK: terminal-win — §57.17: the current chat is a terminal chat (its menu items are the TUI's own)

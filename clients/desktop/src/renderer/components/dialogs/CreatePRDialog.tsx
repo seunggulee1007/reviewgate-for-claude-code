@@ -10,6 +10,7 @@
  */
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { PRDraftEvent } from "@reviewgate/engine";
+import { prBaseBlocker } from "../../branchFlow";
 import { ghBlocker, loadPRMeta, prCreateMeta, savePRMeta, type PRMetaText } from "../../commitFormat";
 import { engineRequest } from "../../engineRequest";
 import { EMPTY_PR_SHEET, prFillBlocker, prSheetReduce } from "../../flowLogic";
@@ -17,6 +18,7 @@ import { t } from "../../i18n";
 import { refusalText, useStore } from "../../store";
 import { flowRepoRoot } from "../../../shared/flowSettings";
 import { Modal } from "../Menu";
+import { blockerReason } from "../BranchSwitcher";
 import "./dialogs.css";
 import "../flow/flow.css";
 
@@ -26,9 +28,14 @@ export function CreatePRDialog({ onClose }: { onClose: () => void }) {
   const createPR = useStore((s) => s.createPR);
   const fillPRWithClaude = useStore((s) => s.fillPRWithClaude);
   const repoRoot = useStore((s) => flowRepoRoot(s.state));
+  const openDialog = useStore((s) => s.openDialog);
+  const defaultBranch = useStore((s) => s.state.branches.defaultBranch ?? null);
+  const createBlocker = useStore((s) => s.state.branches.createBlocker ?? null);
   const head = project?.branch ?? "HEAD";
-  const bases = branches.filter((b) => !b.isCurrent).map((b) => b.name);
-  const [base, setBase] = useState(() => ["main", "develop", "master"].find((n) => bases.includes(n)) ?? bases[0] ?? "main");
+  const locals = branches.filter((b) => !b.isCurrent).map((b) => b.name);
+  // MARK: a-gitflow — §61: the repository's default branch first (it may exist only on the remote), then the usual names.
+  const bases = defaultBranch && defaultBranch !== head && !locals.includes(defaultBranch) ? [defaultBranch, ...locals] : locals;
+  const [base, setBase] = useState(() => (defaultBranch && defaultBranch !== head ? defaultBranch : null) ?? ["main", "develop", "master"].find((n) => bases.includes(n)) ?? bases[0] ?? "main");
   /** The title / body, whether the user changed each, what Claude's fill replaced. */
   const [sheet, edit] = useReducer(prSheetReduce, EMPTY_PR_SHEET);
   const { title, body } = sheet;
@@ -67,10 +74,11 @@ export function CreatePRDialog({ onClose }: { onClose: () => void }) {
     };
   }, [base]);
   const ghReason = ghBlocker(prDraft?.gh, prDraft?.host);
+  const baseReason = prBaseBlocker(base, head, prDraft); // §61: main → main, or nothing since the base
   const fillBlocker = prFillBlocker({ base, ghReason, unsupported: fillUnsupported, baseRef: prDraft?.baseRef ?? null, commits: prDraft ? prDraft.commits.length : null });
 
   const create = async () => {
-    if (!base || creating || writing || ghReason) return;
+    if (!base || creating || writing || ghReason || baseReason) return;
     setCreating(true);
     setError(null);
     const result = await createPR(base, title.trim() || null, body.trim() || null, draft, prCreateMeta(meta));
@@ -187,12 +195,29 @@ export function CreatePRDialog({ onClose }: { onClose: () => void }) {
           : t("Pushes {0} and runs `gh pr create` against {1}.", head, base || "main")}
       </div>
       {ghReason && <div className="hint error" role="status" data-testid="Create PR gh reason">{ghReason}</div>}
+      {baseReason && (
+        <div className="row hint error" style={{ gap: 8 }} role="status" data-testid="Create PR base reason">
+          <span className="grow">{baseReason}</span>
+          {base === head && (
+            <button
+              type="button"
+              className="small"
+              disabled={createBlocker !== null}
+              title={createBlocker ? blockerReason(createBlocker) : t("Create a branch from HEAD and check it out — uncommitted changes come along")}
+              onClick={() => openDialog({ kind: "newBranch" })}
+              data-testid="Create PR new branch"
+            >
+              {t("New Branch…")}
+            </button>
+          )}
+        </div>
+      )}
       {error && <div className="hint error" data-testid="Create PR error">{error}</div>}
       <div className="actions">
         {creating && <span className="spinner" />}
         <span className="spacer" />
         <button type="button" disabled={creating} onClick={onClose}>{t("Cancel")}</button>
-        <button type="button" className="primary" disabled={!base || creating || writing || ghReason !== null} title={ghReason ?? undefined} onClick={() => void create()} data-testid="Create PR">
+        <button type="button" className="primary" disabled={!base || creating || writing || ghReason !== null || baseReason !== null} title={ghReason ?? baseReason ?? undefined} onClick={() => void create()} data-testid="Create PR">
           {t("Create PR")}
         </button>
       </div>

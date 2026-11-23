@@ -9853,3 +9853,9 @@ review" whatever the reason.
   starts on `defaultBranch` (listed even when only the remote has it), shows the reason when the base is the branch
   itself or nothing is on it since the base, disables Create PR then, and offers New Branch… beside the first — the
   branch sheet opens as the PR sheet closes.
+- **Windows client.** The same rules (`branchFlow.ts`): the branch menu's New Branch… follows `createBlocker` (the
+  dialog says the uncommitted changes come along when the tree is dirty; Create branch is off with the blocker as its
+  title), Create PR from this branch… / the menu bar's item / the commit banner's Create PR… follow `prCreateBlocker`,
+  and a `dirtyWorktree` footer is followed by Commit… (the commit dialog; off with `commitBeforeSwitchBlocker`'s reason).
+  The PR dialog lists `defaultBranch` first (even when only the remote has it), and `prBaseBlocker` turns Create PR off
+  with the reason under the fields — New Branch… beside it when the base is the branch itself.

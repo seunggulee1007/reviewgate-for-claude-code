@@ -4,6 +4,7 @@
  * (<web>/commit/<sha>); red with "Push now" (→ `push`) when the push failed. Dismissed per `at`.
  */
 import { useState } from "react";
+import { prCreateBlocker } from "../../branchFlow";
 import { t } from "../../i18n";
 import { commitOf, refusalText, useStore } from "../../store";
 
@@ -14,6 +15,7 @@ export function CommitBanner() {
   const dismiss = useStore((s) => s.dismissCommitBanner);
   const openDialog = useStore((s) => s.openDialog);
   const pushNow = useStore((s) => s.pushNow);
+  const prBlocker = useStore((s) => prCreateBlocker(s.state)); // MARK: a-gitflow — §61: on the default branch a branch comes first
   const [pushing, setPushing] = useState(false);
   const last = commit.lastCommit;
   if (!last || dismissedAt === last.at) return null;
@@ -50,7 +52,7 @@ export function CommitBanner() {
       {!last.pushed && (
         <button type="button" className="small" disabled={pushing} onClick={() => void push()} data-testid="Push now">{t("Push now")}</button>
       )}
-      <button type="button" className="small" onClick={() => openDialog({ kind: "createPR" })} data-testid="Create PR…">{t("Create PR…")}</button>
+      <button type="button" className="small" disabled={prBlocker !== null} title={prBlocker ?? t("Push this branch and open a pull request (gh pr create)")} onClick={() => openDialog({ kind: "createPR" })} data-testid="Create PR…">{t("Create PR…")}</button>
       {last.pushed && web && (
         <button type="button" className="small" onClick={() => void window.rg.openExternal(`${web}/commit/${last.sha}`)} data-testid="Open commit">{t("Open")}</button>
       )}
