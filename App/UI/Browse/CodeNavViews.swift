@@ -48,11 +48,20 @@ final class CodeNavPointer {
         let symbol: String
         /// UTF-16 offsets into the row's text.
         let range: Range<Int>
+        /// §65.6: `user` of `user.save()`.
+        let receiver: String?
         let from: CodeNavLocation
         weak var store: AppState?
 
         static func == (a: Target, b: Target) -> Bool {
-            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.from == b.from && a.store === b.store
+            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.receiver == b.receiver && a.from == b.from && a.store === b.store
+        }
+
+        /// The row's place with the name's column (§65.6: `find_definition`'s `column`).
+        var clickedAt: CodeNavLocation {
+            var at = from
+            at.column = range.lowerBound + 1
+            return at
         }
     }
 
@@ -80,7 +89,7 @@ final class CodeNavPointer {
         lastPoint = point
         let down = Self.isCommandOnly(NSEvent.modifierFlags)
         if down != commandDown { commandDown = down }
-        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, from: from, store: store) }
+        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, receiver: $0.receiver, from: from, store: store) }
         if next != target { target = next }
     }
 
@@ -105,7 +114,7 @@ final class CodeNavPointer {
         guard let store = target.store else { return }
         anchorPoint = lastPoint
         store.codeNav.caret = target.from
-        Task { await store.goToDefinition(target.symbol, from: target.from, anchor: target.token) }
+        Task { await store.goToDefinition(target.symbol, from: target.clickedAt, anchor: target.token, receiver: target.receiver) }
     }
 
     /// Navigate › Go to Definition (F12): the name under the pointer, if the pointer is over one in `store`'s window.

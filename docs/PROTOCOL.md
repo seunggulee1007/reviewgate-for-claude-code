@@ -10793,6 +10793,9 @@ through). The UI is the client team's follow-up.
 `NavIndexReply`), `state.nav` (`ReviewState.nav`, nil from an older engine) and `candidates[].container`, leniently as
 §62's; `EngineCommand` sends the four commands, `find_definition`'s `column` / `receiver` and `list_files {filesOnly}`
 (`Core/…/Engine/CodeNavProtocol.swift`; tests `IdeNavTests`).
+- *Go to Definition* sends the clicked name's `column` and its `receiver` — `CodeNavText.symbol` reads the identifier
+  before `x.` / `x?.` / `x!!.` / `x::` / `x->` on the drawn line (`this.gate.refresh()` → `gate`; nothing after `)` / `]`
+  or for a qualified `a.b.C`).
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

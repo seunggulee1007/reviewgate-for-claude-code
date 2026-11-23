@@ -11,11 +11,18 @@ public struct CodeNavSymbol: Sendable, Equatable {
     public var symbol: String
     /// UTF-16 offsets into the line.
     public var range: Range<Int>
+    /// §65.6: the identifier the name is a member of on that line — `user` of `user.save()`, `this` of `this.total`,
+    /// `Repo` of `Repo::find` (`x.`, `x?.`, `x!!.`, `x::`, `x->`); nil when unqualified or after `)` / `]`.
+    public var receiver: String?
 
-    public init(symbol: String, range: Range<Int>) {
+    public init(symbol: String, range: Range<Int>, receiver: String? = nil) {
         self.symbol = symbol
         self.range = range
+        self.receiver = receiver
     }
+
+    /// §65.6: the 1-based UTF-16 column `find_definition` takes (the name's first character).
+    public var column: Int { range.lowerBound + 1 }
 }
 
 /// Where the user is or was: which view, the file (repo-relative) and the line (1-based).
@@ -238,7 +245,30 @@ public enum CodeNavText {
             let qualified = (parts + [word]).joined(separator: ".")
             if !parts.isEmpty, qualified.utf16.count <= symbolLimit { return CodeNavSymbol(symbol: qualified, range: lo..<(hi + 1)) }
         }
-        return CodeNavSymbol(symbol: word, range: lo..<(hi + 1))
+        return CodeNavSymbol(symbol: word, range: lo..<(hi + 1), receiver: receiver(u, before: lo))
+    }
+
+    /// §65.6: the identifier before `x.` / `x?.` / `x!!.` / `x::` / `x->` that ends right before UTF-16 offset `start`.
+    static func receiver(_ u: [UInt16], before start: Int) -> String? {
+        var i = start
+        // The separator, read backwards.
+        if i >= 1, u[i - 1] == 0x2E {   // .
+            i -= 1
+            if i >= 1, u[i - 1] == 0x3F { i -= 1 }   // ?.
+            else if i >= 2, u[i - 1] == 0x21, u[i - 2] == 0x21 { i -= 2 }   // !!.
+        } else if i >= 2, u[i - 1] == 0x3A, u[i - 2] == 0x3A {   // ::
+            i -= 2
+        } else if i >= 2, u[i - 1] == 0x3E, u[i - 2] == 0x2D {   // ->
+            i -= 2
+        } else {
+            return nil
+        }
+        guard i >= 1, isWordUnit(u[i - 1]) else { return nil }   // `foo().bar`, `a[0].b`: nothing known
+        var lo = i - 1
+        while lo > 0, isWordUnit(u[lo - 1]) { lo -= 1 }
+        guard !isDigit(u[lo]) else { return nil }
+        let name = string(u[lo..<i])
+        return name.utf16.count <= symbolLimit ? name : nil
     }
 
     /// `c:out`, `my-widget`, `MyWidget`: word parts joined by at most one ':' and any '-', nothing empty.
@@ -373,7 +403,7 @@ public final class CodeNavStore {
     public init() {}
 
     /// Looks up `symbol` clicked at `from`; one candidate opens, several peek, none says so (`anchor`: the clicked view).
-    func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, sameReviewFile: (String) -> Bool,
+    func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, receiver: String? = nil, sameReviewFile: (String) -> Bool,
                         using request: @escaping (EngineCommand) async throws -> EngineEvent) async {
         definitionSeq += 1
         let seq = definitionSeq
@@ -385,7 +415,8 @@ public final class CodeNavStore {
         }
         defer { looking.cancel() }
         do {
-            let reply = try await request(.findDefinition(symbol: symbol, fromPath: from.path, line: from.line))
+            let reply = try await request(.findDefinition(symbol: symbol, fromPath: from.path, line: from.line, column: from.column,
+                                                          receiver: receiver))
             guard seq == definitionSeq else { return }
             guard case let .definitions(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             switch CodeNavText.outcome(r) {
@@ -481,10 +512,12 @@ public final class CodeNavStore {
 }
 
 extension AppState {
-    /// ⌘-click / Go to Definition on `symbol` at `from`; `anchor` names the view the popover hangs from.
-    public func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int) async {
+    /// ⌘-click / Go to Definition on `symbol` at `from` (its `column` and `receiver` when the click gave them, §65.6);
+    /// `anchor` names the view the popover hangs from.
+    public func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, receiver: String? = nil) async {
         guard projectInfo != nil else { return }
-        await codeNav.goToDefinition(symbol, from: from, anchor: anchor, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
+        await codeNav.goToDefinition(symbol, from: from, anchor: anchor, receiver: receiver,
+                                     sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
             guard let self else { throw EngineClientError.stopped }
             return try await self.reply(cmd)
         }

@@ -55,6 +55,41 @@ import Testing
         #expect(d.candidates.first?.container == "CartRepository")
     }
 
+    // MARK: The click's column and receiver (§65.6)
+
+    private func hit(_ line: String, on marker: String, path: String = "A.java") -> CodeNavSymbol? {
+        guard let r = line.range(of: marker) else { Issue.record("no \(marker)"); return nil }
+        let offset = line.utf16.distance(from: line.utf16.startIndex, to: r.lowerBound.samePosition(in: line.utf16)!)
+        return CodeNavText.symbol(in: line, at: offset, path: path)
+    }
+
+    @Test func theClickNamesItsReceiverAndColumn() {
+        #expect(hit("    this.gate.refresh();", on: "refresh")?.receiver == "gate")
+        #expect(hit("    this.gate.refresh();", on: "gate")?.receiver == "this")
+        #expect(hit("    this.gate.refresh();", on: "refresh")?.column == 15)
+        #expect(hit("val n = user?.name", on: "name", path: "A.kt")?.receiver == "user")
+        #expect(hit("val n = user!!.name", on: "name", path: "A.kt")?.receiver == "user")
+        #expect(hit("list.map(Repo::find)", on: "find", path: "A.kt")?.receiver == "Repo")
+        #expect(hit("$row->save();", on: "save", path: "a.php")?.receiver == "$row")   // `$` is a JS name character
+        #expect(hit("cartService.total(items)", on: "total")?.receiver == "cartService")
+        #expect(hit("total(items)", on: "total")?.receiver == nil)   // unqualified
+        #expect(hit("foo().bar()", on: "bar")?.receiver == nil)   // after `)`: nothing known
+        #expect(hit("rows[0].name", on: "name")?.receiver == nil)
+        #expect(hit("import com.acme.Cart;", on: "Cart")?.receiver == nil)   // a qualified name, not a member
+        #expect(hit("1.5f.toInt()", on: "toInt", path: "A.kt")?.receiver == nil)
+    }
+
+    @Test func goToDefinitionSendsTheColumnAndReceiver() async {
+        let store = CodeNavStore()
+        var asked: [EngineCommand] = []
+        await store.goToDefinition("save", from: CodeNavLocation(view: .review, path: "src/A.java", line: 9, column: 14), anchor: 1,
+                                   receiver: "repo", sameReviewFile: { _ in false }) { command in
+            asked.append(command)
+            return .definitions(DefinitionsReply(symbol: "save", candidates: []))
+        }
+        #expect(asked == [.findDefinition(symbol: "save", fromPath: "src/A.java", line: 9, column: 14, receiver: "repo")])
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))
