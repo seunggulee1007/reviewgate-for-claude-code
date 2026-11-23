@@ -160,6 +160,10 @@ public final class AppState {
     public private(set) var storage: StorageState?
     /// §41.2: the open repository's auto-accept rules (`state.autoAcceptRules`; none on older engines).
     public private(set) var autoAcceptRules: AutoAcceptRules = .none
+    /// MARK: ide-nav — §65.1: the symbol index (`state.nav.index`; nil from an older engine), and whether it is building
+    /// (what the Navigate menu reads, so its progress does not rebuild the menu bar).
+    public private(set) var navIndex: NavIndexState?
+    public private(set) var navIndexBuilding = false
     /// What the Review / Workbenches / Chat menus show (`MenuState`), written only when it differs.
     public private(set) var menuState = MenuState()
     public internal(set) var transcript: [ChatItem] = [] {
@@ -2485,6 +2489,8 @@ public final class AppState {
         }
         put(\.storage, s.storage)
         put(\.autoAcceptRules, s.autoAcceptRules ?? .none)
+        put(\.navIndex, s.nav?.index)   // MARK: ide-nav (§65.1)
+        put(\.navIndexBuilding, s.nav?.index.isBuilding ?? false)
         return changed
     }
 

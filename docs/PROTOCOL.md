@@ -10829,6 +10829,21 @@ through). The UI is the client team's follow-up.
   contiguous run at a word start, else the camel humps, else the letters in order; the query's own extension set aside);
   ↩ opens a changed file of the review in its diff (at `:line` when given) and any other file read-only in the code
   browser, Back returning to where the user was (`AppState.goToFile`).
+- *Symbols in This File* (Navigate › 이 파일의 심볼… **⌘F12**, the file on screen in the diff pane; off with "Show a file
+  or a diff first"): `document_symbols` once when it opens, filtered as the user types (`NavFuzzy.filterOutline`: §65.3's
+  kinds of match, file order kept, the best-scoring row picked), indented by `depth`, a kind icon, the matched letters
+  bold, the line number; `truncated` → "Only the start of a long file".
+- *Symbols in Project* (Navigate › 프로젝트 심볼… **⌥⌘⇧N**): `workspace_symbols {query, limit: 100}` 80 ms after the
+  typing stops (a newer query drops the older reply), `name` bold at `matches`, the container, `file:line`; the footer
+  says "Indexing… n / N files" while `state.nav.index` (`AppState.navIndex`) is building — the query is sent again when
+  it turns `ready` — and "Showing the first 100" / "The project is larger than the index — some symbols are missing"
+  (`NavFuzzy.projectNotes`); a refusal is said in place, `failed` with Try Again (`nav_index_build {}`). ↩ opens as Go
+  to File (at the symbol's line and column).
+- *Keys.* ⌘⇧O (VS Code's symbols in file) is Switch Project and ⌘T (workspace symbols) New Chat on both apps, so the Mac
+  follows IntelliJ as Windows does: ⌘F12 ↔ Ctrl+F12 (File Structure), ⌥⌘⇧N ↔ Ctrl+Alt+Shift+N (Go to Symbol — the Mac
+  IntelliJ key ⌥⌘O is Open in IDE here), Peek ⌥F12 ↔ Alt+F12, F4 / ⇧F4 ↔ F4 / Shift+F4; Go to File stays ⌘P ↔ Ctrl+P
+  (File menu). docs/SHORTCUTS.md and Core `ShortcutTable.swift` carry them; Windows' `shortcutTable.ts` is aligned at the
+  merge.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

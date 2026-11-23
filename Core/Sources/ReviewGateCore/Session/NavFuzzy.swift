@@ -173,3 +173,91 @@ public enum NavFuzzy {
         return out
     }
 }
+
+// MARK: - The palettes
+
+/// §65.8: the symbol palette a window shows — this file's (its repo-relative path) or the project's.
+public enum NavPalette: Sendable, Equatable, Identifiable {
+    case file(String)
+    case project
+
+    public var id: String {
+        switch self {
+        case let .file(path): "file:" + path
+        case .project: "project"
+        }
+    }
+}
+
+/// One row of Symbols in File: the symbol and the letters to mark.
+public struct OutlineRow: Sendable, Equatable {
+    public var symbol: DocumentSymbol
+    public var offsets: [Int]
+
+    public init(symbol: DocumentSymbol, offsets: [Int] = []) {
+        self.symbol = symbol
+        self.offsets = offsets
+    }
+}
+
+extension NavFuzzy {
+    /// Symbols in File as the user types: every symbol for an empty query, else those whose name matches — in file order
+    /// (the outline stays an outline), `best` the best-scoring row to pick (the first on a tie).
+    public static func filterOutline(_ symbols: [DocumentSymbol], query: String) -> (rows: [OutlineRow], best: Int?) {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return (symbols.map { OutlineRow(symbol: $0) }, symbols.isEmpty ? nil : 0) }
+        var rows: [OutlineRow] = []
+        var best: (index: Int, score: Int)?
+        for s in symbols {
+            guard let m = match(q, in: s.symbol.name) else { continue }
+            if best == nil || m.score > best!.score { best = (rows.count, m.score) }
+            rows.append(OutlineRow(symbol: s, offsets: m.offsets))
+        }
+        return (rows, best?.index)
+    }
+
+    /// Symbols in Project's footer lines: the index building, the list cut, the index cut.
+    public static func projectNotes(_ reply: WorkspaceSymbolsReply?, index: NavIndexState?) -> [String] {
+        var out: [String] = []
+        let state = index ?? reply?.index
+        if let state, state.status == .building {
+            out.append(state.filesTotal.map { String(localized: "Indexing… \(state.files) / \($0) files", bundle: .module) }
+                       ?? String(localized: "Indexing…", bundle: .module))
+        }
+        if let reply, reply.truncated { out.append(String(localized: "Showing the first \(reply.symbols.count)", bundle: .module)) }
+        if state?.truncated == true || reply?.index.truncated == true {
+            out.append(String(localized: "The project is larger than the index — some symbols are missing", bundle: .module))
+        }
+        return out
+    }
+}
+
+extension AppState {
+    /// ⌘F12: the symbols of `path` (§65.2), or why there are none in the user's words.
+    public func documentSymbols(path: String) async -> (reply: DocumentSymbolsReply?, error: String?) {
+        guard projectInfo != nil else { return (nil, CodeBrowserText.refusal(code: "no_project", fallback: "")) }
+        do {
+            guard case let .documentSymbols(r) = try await reply(.documentSymbols(path: path)) else { return (nil, nil) }
+            return (r, nil)
+        } catch {
+            return (nil, CodeNavText.message(error))
+        }
+    }
+
+    /// ⌘⇧P: the project's symbols matching `query` (§65.3, at most 100), or why there are none.
+    public func workspaceSymbols(query: String) async -> (reply: WorkspaceSymbolsReply?, error: String?) {
+        guard projectInfo != nil else { return (nil, CodeBrowserText.refusal(code: "no_project", fallback: "")) }
+        do {
+            guard case let .workspaceSymbols(r) = try await reply(.workspaceSymbols(query: query, limit: 100)) else { return (nil, nil) }
+            return (r, nil)
+        } catch {
+            return (nil, CodeNavText.message(error))
+        }
+    }
+
+    /// §65.1 `nav_index_build` — `full`: Navigate › Rebuild Symbol Index; else what changed (a failed index's Try Again).
+    public func buildNavIndex(full: Bool) async {
+        guard projectInfo != nil else { return }
+        _ = try? await reply(.navIndexBuild(full: full))
+    }
+}

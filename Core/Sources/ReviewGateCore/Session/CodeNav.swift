@@ -405,6 +405,8 @@ public final class CodeNavStore {
     public let peek = CodeNavPeekStore()
     /// §65.8: the hover card (⌘ held over a name, IdeNavHover.swift).
     public let hover = CodeNavHoverStore()
+    /// §65.8: Symbols in File (⌘F12) / Symbols in Project (⌘⇧P) shown.
+    public var palette: NavPalette?
     public private(set) var openRequest: OpenRequest?
     public private(set) var history = CodeNavHistory()
     /// Where the user is: the place last opened or clicked (Back's Forward, Open in IDE's line).
@@ -619,6 +621,7 @@ public final class CodeNavStore {
         referencePreviewSeq += 1
         referenceSearches = []
         hover.dismiss()
+        palette = nil
         openRequest = nil
         history.clear()
         caret = nil

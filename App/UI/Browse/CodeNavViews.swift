@@ -687,6 +687,11 @@ enum CodeNavActions {
         ExternalEditor.preferred(for: store).open(IDELink.absolutePath(root: root, relative: path), line: line ?? 1, column: column)
     }
 
+    /// The file on screen in the diff pane (no line: what the menu bar reads, so a click does not rebuild it).
+    static func currentPath(_ store: AppState) -> String? {
+        store.codeBrowser.selection?.path ?? store.historySelection?.path ?? store.liveSelection ?? store.selectedPath
+    }
+
     /// The file on screen in the diff pane and the line the user is at: the project file, else the review's, a past
     /// round's or the live diff's file; the line where the user last clicked or jumped in it.
     static func current(_ store: AppState) -> (path: String, line: Int?)? {
@@ -729,6 +734,19 @@ struct CodeNavCommands: Commands {
             .keyboardShortcut(Self.f12, modifiers: .shift)
             .disabled(!hasProject)
             .accessibilityIdentifier("Navigate menu Find references")
+            // MARK: ide-nav (§65.8): the symbols of the file on screen, and of the project.
+            let file = store.flatMap { CodeNavActions.currentPath($0) }
+            Button("Symbols in This File…") { if let file { store?.codeNav.palette = .file(file) } }
+                .keyboardShortcut(Self.f12, modifiers: .command)
+                .disabled(file == nil)
+                .help(file == nil ? Text("Show a file or a diff first") : Text("The classes, methods and fields of the file on screen"))
+                .accessibilityIdentifier("Navigate menu Symbols in this file")
+            Button("Symbols in Project…") { store?.codeNav.palette = .project }
+                .keyboardShortcut("n", modifiers: [.command, .option, .shift])
+                .disabled(!hasProject)
+                .help(hasProject ? Text("Find a class, method or field anywhere in the project by name") : Text("Open a project first"))
+                .accessibilityIdentifier("Navigate menu Symbols in project")
+            Divider()
             // MARK: ide-nav (§65.8): the References tab's hits, one after the other.
             let hasHits = store.map { !$0.codeNav.referenceGroups.isEmpty } ?? false
             Button("Next Reference") { if let store { Task { await store.stepReference(1) } } }
@@ -799,6 +817,7 @@ struct CodeNavObservers: ViewModifier {
         @Bindable var nav = store.codeNav
         content
             .sheet(isPresented: $nav.referencesShown) { CodeNavReferencesSheet() }
+            .sheet(item: $nav.palette) { palette in SymbolsPaletteSheet(palette: palette) }   // MARK: ide-nav (§65.8)
             .onChange(of: nav.referencesTick) { _, _ in
                 if panelAvailable { model.shell.show(.references) } else { nav.referencesShown = true }
             }

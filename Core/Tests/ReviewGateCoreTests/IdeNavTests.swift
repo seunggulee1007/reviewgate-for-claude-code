@@ -319,6 +319,46 @@ import Testing
         #expect(store.history.back == [reading, CodeNavLocation(view: .review, path: "src/Cart.kt")])
     }
 
+    @Test func symbolsInFileFilterInFileOrderAndPickTheBest() {
+        func sym(_ name: String, _ line: Int, depth: Int, container: String? = nil) -> DocumentSymbol {
+            DocumentSymbol(NavSymbol(name: name, kind: depth == 0 ? .class : .method, path: "Cart.kt", line: line, container: container), depth: depth)
+        }
+        let outline = [sym("CartService", 1, depth: 0), sym("totalPrice", 4, depth: 1, container: "CartService"),
+                       sym("total", 9, depth: 1, container: "CartService"), sym("clear", 12, depth: 1, container: "CartService")]
+        let all = NavFuzzy.filterOutline(outline, query: " ")
+        #expect(all.rows.count == 4 && all.best == 0 && all.rows.allSatisfy { $0.offsets.isEmpty })
+        let tot = NavFuzzy.filterOutline(outline, query: "total")
+        #expect(tot.rows.map(\.symbol.symbol.name) == ["totalPrice", "total"])   // file order kept
+        #expect(tot.best == 1 && tot.rows[1].offsets == [0, 1, 2, 3, 4])          // the exact one is picked
+        let humps = NavFuzzy.filterOutline(outline, query: "tP")
+        #expect(humps.rows.map(\.symbol.symbol.name) == ["totalPrice"] && humps.rows[0].offsets == [0, 5])
+        #expect(NavFuzzy.filterOutline(outline, query: "zz").rows.isEmpty && NavFuzzy.filterOutline(outline, query: "zz").best == nil)
+        #expect(NavFuzzy.filterOutline([], query: "").best == nil)
+    }
+
+    @Test func symbolsInProjectSayWhatIsMissing() {
+        let building = NavIndexState(status: .building, files: 120, filesTotal: 800)
+        #expect(NavFuzzy.projectNotes(nil, index: building).count == 1)
+        let reply = WorkspaceSymbolsReply(query: "a", symbols: [], truncated: true, index: NavIndexState(status: .ready, truncated: true))
+        #expect(NavFuzzy.projectNotes(reply, index: NavIndexState(status: .ready)).count == 2)
+        #expect(NavFuzzy.projectNotes(WorkspaceSymbolsReply(query: "a", symbols: []), index: NavIndexState(status: .ready)).isEmpty)
+        #expect(NavPalette.file("a.kt").id != NavPalette.project.id)
+    }
+
+    @Test func theStateSliceFollowsTheIndex() async {
+        let app = AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: UserDefaults(suiteName: "IdeNavTests.\(UUID().uuidString)")!)
+        var s = ReviewState.empty
+        s.seq = 1
+        s.project = ProjectInfo(path: "/repo", root: "/repo", name: "repo", branch: "main", remoteURL: nil)
+        s.nav = NavState(index: NavIndexState(status: .building, files: 1, filesTotal: 10))
+        app.handle(.state(s))
+        #expect(app.navIndex?.filesTotal == 10 && app.navIndexBuilding)
+        s.seq = 2
+        s.nav = NavState(index: NavIndexState(status: .ready, files: 10, symbols: 99))
+        app.handle(.state(s))
+        #expect(app.navIndex?.status == .ready && !app.navIndexBuilding)
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))
