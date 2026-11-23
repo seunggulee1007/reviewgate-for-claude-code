@@ -75,6 +75,8 @@ export function PeekBand() {
   useOwnEvents(ref, (e) => {
     const b = useNav.getState().band;
     if (!b) return false;
+    // A focused button keeps its Enter / Space (Open, References, ×, a candidate); Esc and the arrows are the band's.
+    if (e.key === "Enter" && e.target instanceof HTMLButtonElement) return false;
     const r = bandKey(e.key, b.selected, b.loading || b.error ? 0 : b.rows.length);
     if (!r) return false;
     if (r.kind === "close") useNav.getState().closeBand();
