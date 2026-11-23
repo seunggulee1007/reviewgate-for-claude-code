@@ -9429,6 +9429,8 @@ chat's id);
   window keeps 200 pt above); the height is remembered.
 - **The screenshot build** (`.screenshots` bundle id, DEBUG) honours `REVIEWGATE_TERMINAL_SHELL=/bin/sh`: a plain shell
   with no `-l` / `-i`, so no dotfiles run in a tour.
+- **Tabs of the panel (§57.18).** The panel's bar starts with 터미널 · 출력 · 실행; these shells are the 터미널 tab.
+  While the panel is hidden a 22 pt bar under the window holds the same three buttons ("터미널 패널 (⌃`)" …).
 
 ### 57.7 Default kind and flows that send for you
 
@@ -9805,6 +9807,53 @@ type ClientCapabilities = {
 - **The strip's hint** (as the Mac §57.5, `terminalStrip.ts` `showsReviewedHint`): "…변경은 왼쪽에 나와요" only in the first
   three terminal chats that reach it, or until its × (per user, `localStorage` `rg.terminalReviewedHintCount` /
   `rg.terminalReviewedHintDismissed`); then the terminal icon alone, the words in its tooltip.
+
+### 57.18 The bottom panel: 출력 and 실행
+
+The panel of §57.6 (Windows: §57.17's shell panel) has three tabs — **터미널** (the shells, unchanged), **출력**,
+**실행** — so a dev server, a test run or what Claude's commands printed sit under the diff and the chat as in VS Code /
+Cursor. Client only: no engine command or event is added; the engine already sends what 출력 shows.
+
+- **Finding it.** While the panel is hidden, a thin bar under the window (project open, not the PRs tab) holds
+  [터미널] [출력] [실행 n] — each opens the panel on that tab; "터미널" says "터미널 패널 (⌃`)", 실행 counts the commands
+  running. The panel's bar starts with the same three tabs (a tab's tooltip says what it holds), then the tab's own
+  controls, then ⌄ (hide). The tab is remembered (Mac: user defaults `terminalPanelTab`; Windows: per project,
+  `ui.terminalPanelTab`), as the height already was.
+- **⌃` / Ctrl+`** keeps §57.6 on the 터미널 tab. On 출력 or 실행 it shows the panel there, and hides it when shown. A
+  shell exiting behind another tab never hides the panel (the last tab closing hides it only on 터미널).
+- **출력** — read-only, selectable, at most 5 000 lines (oldest dropped; `OutputLog` in Core, `outputLog.ts` on Windows),
+  following new lines while scrolled to the end. Sources (the menu: 모두 / ReviewGate / Claude 명령, remembered):
+  - *ReviewGate* — every line the window logs: the engine's `log` events (§2) and its stderr (the stderr twin of an event
+    dropped, robustness-03), and what the app logs itself (notices, errors, `[warn] …`). The daily log file is unchanged.
+  - *Claude 명령* — each Bash `tool_use` of this window (chat and terminal chats alike: §57.4's PostToolUse rows carry the
+    same `tool_use` / `tool_result`) as `$ <command>`, then its output: the `tool_result` preview, or — when `truncated` —
+    the kept full output from `tool_output` (§12; the preview when the engine kept none, then "… (출력이 잘렸어요)"); a
+    failed one ends with "✗ 명령이 실패했어요". Results restored from a transcript are not replayed.
+  - Search keeps the lines holding the text (case-insensitive). Copy puts the lines shown on the clipboard; Clear empties
+    the window's output (not the log file). Both are disabled, with the reason in the tooltip, when there is nothing.
+- **실행** — named commands per repository, each in its own PTY. Left: the list (state dot, name, command, ▶ or ■,
+  context menu 실행 / 중지 / 명령 복사 / 제거) with "명령 추가…" and "다시 찾기"; right: the selected command's bar (state,
+  ▶ / ■ / ↻) over its terminal.
+  - *Candidates* are read from the project root's files, never run by themselves (`RunCandidates` in Core, `runConfigs.ts`
+    on Windows): `package.json` scripts `dev` / `start` / `serve` / `test` / `build` with the package manager its
+    `packageManager` field or lockfile names (`npm run dev`, `npm test`, `pnpm run dev`, `yarn dev`, `bun run test`);
+    the Gradle wrapper with a build or settings file: `bootRun` (the Spring Boot plugin), `run` (the `application`
+    plugin), `test`; the Maven wrapper with a `pom.xml`: `spring-boot:run` (Spring Boot's plugin or parent), `test`. The
+    Mac runs `./gradlew` / `./mvnw`, Windows `.\gradlew.bat` / `.\mvnw.cmd`. A plain `gradle` / `mvn` without a wrapper is
+    not offered (add it by hand). Files over 1 MB are not read.
+  - *Kept* per repository — the main worktree's key, so every workbench shares them (Mac: user defaults `projectRuns`,
+    `[key: {configs, dismissed}]`; Windows: `settings.projectRunConfigs[projectRootHash(flowRepoRoot)]`). A config is
+    `{id, name, command, detected, confirmed}`. The list is the kept ones, then each candidate neither kept (same command)
+    nor removed; 제거 drops a kept one and remembers a candidate's command as removed until 다시 찾기.
+  - *Nothing runs without a click.* ▶ on a candidate asks once: "이 명령을 실행할까요?" with the command and the folder, and
+    that it runs as the user with their permissions — ReviewGate does not sandbox it. 실행 keeps it as confirmed; a
+    command the user typed ("명령 추가…") never asks.
+  - *The PTY.* Mac: the login shell `-l -i -c 'exec /bin/sh -c <command>'` in the project folder (`TerminalLaunch.run`:
+    the shell panel's environment, no `RG_*`; csh with a `!` and shells that cannot read the quoting go through zsh, as
+    §57.5). ▶ on a command that ran before, and ↻, start it again in a fresh terminal (its output until then goes); ■ is
+    SIGTERM to its process group, SIGKILL after 3 s. The bar says 실행 중 / 끝남 (n) (orange when n ≠ 0) / 중지됨. The
+    window closing or the app quitting ends every run with the shells.
+- **Hard limits.** No automatic run, no network, nothing read outside the project folder (never `~/.claude`).
 
 ## 58. Accept N & Continue
 

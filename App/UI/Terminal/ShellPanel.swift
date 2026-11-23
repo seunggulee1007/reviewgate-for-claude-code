@@ -18,9 +18,18 @@ final class ShellPanelModel {
         let cwd: String
     }
 
+    /// MARK: c-panel (§57.18): the panel's three tabs — the shells, the window's output, the run configurations.
+    enum PanelTab: String, CaseIterable { case terminal, output, run }
+
     var visible = false
     private(set) var tabs: [Tab] = []
     var selectedId: UUID?
+    /// §57.18: the tab the panel shows, remembered for every window (user defaults `terminalPanelTab`).
+    var tab: PanelTab = PanelTab(rawValue: UserDefaults.standard.string(forKey: "terminalPanelTab") ?? "") ?? .terminal {
+        didSet { UserDefaults.standard.set(tab.rawValue, forKey: "terminalPanelTab") }
+    }
+    /// §57.18: the run tab — its commands as listed, the PTY of each one started, the one shown, the one asking first.
+    var runs = RunPanelModel()
     @ObservationIgnored private var opened = 0
     /// The folder a new tab starts in: the window's project (worktree or workbench), read when the tab is made.
     @ObservationIgnored var cwd: () -> String? = { nil }
@@ -31,15 +40,26 @@ final class ShellPanelModel {
 
     /// ⌃` / View › Toggle Terminal Panel: hidden → shown with the keyboard (a first tab when there is none); shown and
     /// focused → hidden, the keyboard back to the chat; shown but not focused → the keyboard to it.
+    /// §57.18: on the 출력 or 실행 tab ⌃` shows the panel there, and hides it when shown.
     func toggle() {
         if !visible {
             visible = true
+            guard tab == .terminal else { return }
             if tabs.isEmpty { newTab() } else { focusSelected() }
-        } else if selected?.host.isFocused == true {
+        } else if tab != .terminal || selected?.host.isFocused == true {
             visible = false
             focusChat()
         } else {
             focusSelected()
+        }
+    }
+
+    /// §57.18: the status bar's buttons and the panel's tab bar — the panel on `tab` (a first shell for the terminal).
+    func show(_ tab: PanelTab) {
+        self.tab = tab
+        visible = true
+        if tab == .terminal {
+            if tabs.isEmpty { newTab() } else { focusSelected() }
         }
     }
 
@@ -53,6 +73,7 @@ final class ShellPanelModel {
         let tab = Tab(host: host, name: "\((shell as NSString).lastPathComponent) \(opened)", cwd: folder)
         tabs.append(tab)
         selectedId = tab.id
+        self.tab = .terminal
         visible = true
         host.onExit = { [weak self] code in
             // VS Code: a shell that ends cleanly (exit, ⌃D) takes its tab with it; any other end stays to be read.
@@ -69,6 +90,7 @@ final class ShellPanelModel {
         let tab = tabs.remove(at: index)
         Task { await tab.host.stop() }
         if selectedId == id { selectedId = tabs.indices.contains(index) ? tabs[index].id : tabs.last?.id }
+        guard self.tab == .terminal else { return }   // §57.18: a shell ending behind 출력 / 실행 leaves the panel as it is
         if tabs.isEmpty {
             visible = false
             focusChat()
@@ -94,16 +116,17 @@ final class ShellPanelModel {
 
     /// Every shell ends (the window closes, the project changes).
     func stopAll() async {
-        let hosts = tabs.map(\.host)
+        let hosts = tabs.map(\.host) + runs.takeAll()
         tabs = []
         selectedId = nil
         visible = false
         await TerminalHub.stop(hosts)
     }
 
-    /// Quit: SIGTERM to every shell without waiting.
+    /// Quit: SIGTERM to every shell (and every run, §57.18) without waiting.
     func terminateAll() {
         for tab in tabs where tab.host.view.process.running { tab.host.terminate() }
+        runs.terminateAll()
     }
 
     private func focusSelected() {
@@ -119,6 +142,8 @@ struct ShellPanelView: View {
     @AppStorage("terminalPanelHeight") private var height = 220.0
     /// The height when the drag on the edge began.
     @State private var dragStart: Double?
+    /// §57.18: the 출력 tab's search (per window, not remembered).
+    @State private var outputQuery = ""
 
     var body: some View {
         let shell = model.shell
@@ -139,23 +164,32 @@ struct ShellPanelView: View {
                 .help(String(localized: "Drag to resize the terminal panel"))
                 .accessibilityHidden(true)
             HStack(spacing: 2) {
-                Text("Terminal").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    .padding(.trailing, 6)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 2) {
-                        ForEach(shell.tabs) { tab in
-                            ShellTabButton(tab: tab, isSelected: tab.id == shell.selected?.id)
+                // MARK: c-panel (§57.18): 터미널 · 출력 · 실행
+                PanelTabBar()
+                Divider().frame(height: 14).padding(.horizontal, 4)
+                switch shell.tab {
+                case .terminal:
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 2) {
+                            ForEach(shell.tabs) { tab in
+                                ShellTabButton(tab: tab, isSelected: tab.id == shell.selected?.id)
+                            }
                         }
                     }
+                    Spacer(minLength: 4)
+                    Button { shell.newTab() } label: { Image(systemName: "plus") }
+                        .buttonStyle(.icon)
+                        .controlSize(.small)
+                        .help(String(localized: "New terminal in the project folder"))
+                        .accessibilityLabel(Text("New terminal"))
+                        .accessibilityIdentifier("Shell panel new tab")
+                case .output:
+                    Spacer(minLength: 4)
+                    OutputPanelControls(query: $outputQuery)
+                case .run:
+                    Spacer(minLength: 4)
                 }
-                Spacer(minLength: 4)
-                Button { shell.newTab() } label: { Image(systemName: "plus") }
-                    .buttonStyle(.icon)
-                    .controlSize(.small)
-                    .help(String(localized: "New terminal in the project folder"))
-                    .accessibilityLabel(Text("New terminal"))
-                    .accessibilityIdentifier("Shell panel new tab")
-                Button { shell.toggle() } label: { Image(systemName: "chevron.down") }
+                Button { shell.visible = false; shell.focusChat() } label: { Image(systemName: "chevron.down") }
                     .buttonStyle(.icon)
                     .controlSize(.small)
                     .help(String(localized: "Hide the terminal panel (⌃`) — its shells keep running"))
@@ -164,19 +198,129 @@ struct ShellPanelView: View {
             }
             .padding(.horizontal, 8).padding(.vertical, 3)
             Divider()
-            if let tab = shell.selected {
-                TerminalContainer(host: tab.host)
-                    .id(tab.id)
-                    .overlay { ShellExitedOverlay(tab: tab) }
-                    .accessibilityIdentifier("Shell panel terminal")
-            } else {
-                Color.clear
+            switch shell.tab {
+            case .terminal:
+                if let tab = shell.selected {
+                    TerminalContainer(host: tab.host)
+                        .id(tab.id)
+                        .overlay { ShellExitedOverlay(tab: tab) }
+                        .accessibilityIdentifier("Shell panel terminal")
+                } else {
+                    VStack(spacing: 8) {
+                        Text("No terminal is open.").font(.callout).foregroundStyle(.secondary)
+                        Button("New Terminal") { shell.newTab() }
+                            .controlSize(.small)
+                            .help(String(localized: "New terminal in the project folder"))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .output:
+                OutputPanelView(query: outputQuery)
+            case .run:
+                RunPanelView()
             }
         }
         .frame(minHeight: 80, idealHeight: height, maxHeight: height)
         .layoutPriority(1)   // its height first; the review and the chat keep the rest (200 pt at least)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Shell panel")
+    }
+}
+
+/// MARK: c-panel (§57.18): the panel's tabs — 터미널 (the shells), 출력, 실행 (with how many commands run).
+private struct PanelTabBar: View {
+    @Environment(WindowModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let shell = model.shell
+        HStack(spacing: 2) {
+            ForEach(ShellPanelModel.PanelTab.allCases, id: \.self) { tab in
+                let selected = shell.tab == tab
+                Button { shell.show(tab) } label: {
+                    HStack(spacing: 4) {
+                        Text(verbatim: PanelTabText.title(tab)).font(.caption.weight(selected ? .semibold : .regular))
+                        if tab == .run, shell.runs.runningCount > 0 {
+                            Text(verbatim: "\(shell.runs.runningCount)").font(.caption2.monospacedDigit())
+                                .padding(.horizontal, 4)
+                                .background(Color.green.opacity(0.25), in: Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .foregroundStyle(selected ? .primary : .secondary)
+                    .background(selected ? Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.08) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(PanelTabText.help(tab))
+                .accessibilityAddTraits(selected ? [.isSelected] : [])
+                .accessibilityIdentifier("Panel tab \(tab.rawValue)")
+            }
+        }
+    }
+}
+
+/// The tabs' words, shared by the panel and the status bar.
+enum PanelTabText {
+    static func title(_ tab: ShellPanelModel.PanelTab) -> String {
+        switch tab {
+        case .terminal: String(localized: "Terminal")
+        case .output: String(localized: "panel.output", defaultValue: "Output")
+        case .run: String(localized: "panel.run", defaultValue: "Run")
+        }
+    }
+
+    static func help(_ tab: ShellPanelModel.PanelTab) -> String {
+        switch tab {
+        case .terminal: String(localized: "Terminal panel (⌃`)")
+        case .output: String(localized: "Output — ReviewGate's log and the Bash commands Claude ran")
+        case .run: String(localized: "Run — the project's commands (dev server, tests), each in its own terminal")
+        }
+    }
+}
+
+/// MARK: c-panel (§57.18): the bar under the window while the panel is hidden — the way to it for anyone who does not
+/// know ⌃`: 터미널 · 출력 · 실행, and how many commands are running.
+struct PanelStatusBar: View {
+    @Environment(WindowModel.self) private var model
+
+    var body: some View {
+        let shell = model.shell
+        HStack(spacing: 2) {
+            Spacer()
+            ForEach(ShellPanelModel.PanelTab.allCases, id: \.self) { tab in
+                Button { shell.show(tab) } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: icon(tab)).font(.caption2)
+                        Text(verbatim: PanelTabText.title(tab)).font(.caption2)
+                        if tab == .run, shell.runs.runningCount > 0 {
+                            Text(verbatim: "\(shell.runs.runningCount)").font(.caption2.monospacedDigit()).foregroundStyle(.green)
+                        }
+                    }
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(IconButtonStyle(padding: 0))
+                .foregroundStyle(.secondary)
+                .help(PanelTabText.help(tab))
+                .accessibilityLabel(Text(verbatim: PanelTabText.title(tab)))
+                .accessibilityIdentifier("Panel status \(tab.rawValue)")
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 22)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Panel status bar")
+    }
+
+    private func icon(_ tab: ShellPanelModel.PanelTab) -> String {
+        switch tab {
+        case .terminal: "apple.terminal"
+        case .output: "text.alignleft"
+        case .run: "play.circle"
+        }
     }
 }
 

@@ -487,6 +487,7 @@ private struct WorkbenchWindow: View {
                 // MARK: terminal-chat (§57.6): the bottom panel's shells start in the window's project folder; ⌃` anywhere in
                 // the window toggles it, and hiding it gives the keyboard back to the chat.
                 entry.model.shell.cwd = { [weak entry] in entry?.store.projectURL?.path }
+                entry.model.shell.runs.store = entry.store   // MARK: c-panel (§57.18): the run tab's commands are the project's
                 entry.model.shell.focusChat = { [weak entry] in
                     guard let entry else { return }
                     if entry.store.shownChatIsTerminal, entry.store.viewingChat == nil {
