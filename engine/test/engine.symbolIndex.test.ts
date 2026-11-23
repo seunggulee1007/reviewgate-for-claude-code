@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { FileIndex } from "../src/files/fileIndex.js";
 import { findDefinition } from "../src/files/navigate.js";
 import { humpMatch, matchName, rankSymbols, SymbolIndex } from "../src/files/symbolIndex.js";
 import { definitionPreview, type FileSymbol } from "../src/files/symbols.js";
@@ -142,6 +143,14 @@ describe("§65 fuzzy matching", () => {
     expect(names(rankSymbols(files, "CartSvc.tot", 10).symbols)).toEqual(["CartService.total"]);
     expect(rankSymbols(files, "uS", 2)).toMatchObject({ truncated: true });
     expect(rankSymbols(files, "   ", 10).symbols).toEqual([]);
+  });
+
+  it("list_files filesOnly (Go to File): no directories, camel humps of the basename first", async () => {
+    const index = new FileIndex(async () => ["src/user/svc/c.txt", "src/UserService.java", "src/UsersServiceOld.md"]);
+    const items = await index.search("UsrSvc", new Set(), 10, true);
+    expect(items.map((i) => i.path)).toEqual(["src/UserService.java", "src/UsersServiceOld.md", "src/user/svc/c.txt"]);
+    expect(items.every((i) => i.kind === "file")).toBe(true);
+    expect((await index.search("svc", new Set(), 10)).some((i) => i.kind === "dir")).toBe(true);
   });
 });
 
@@ -297,7 +306,7 @@ describe("§65 through the engine", () => {
     await h.waitFor((s) => s.nav?.index.status === "ready" && s.nav.index.files === 12, "nav state ready");
   });
 
-  it("document_symbols: file order with depth; definition_preview; nav_index_build; refusals", async () => {
+  it("document_symbols: file order with depth; definition_preview; nav_index_build; list_files filesOnly; refusals", async () => {
     const { h } = await opened();
     const d = await h.engine.request({ type: "document_symbols", path: "src/main/java/com/acme/cart/CartService.java" });
     expect(d).toMatchObject({ type: "document_symbols", path: "src/main/java/com/acme/cart/CartService.java", language: "java", truncated: false });
@@ -307,6 +316,8 @@ describe("§65 through the engine", () => {
     const b = await h.engine.request({ type: "nav_index_build", full: true });
     expect(b.type).toBe("nav_index");
     await h.waitFor((s) => s.nav?.index.status === "ready", "built");
+    const f = await h.engine.request({ type: "list_files", query: "cartsvc", filesOnly: true });
+    expect(f.items[0]).toEqual({ path: "src/main/java/com/acme/cart/CartService.java", kind: "file" });
     await expect(h.engine.request({ type: "document_symbols", path: "../x.java" })).rejects.toThrow(/invalid_path/);
     await expect(h.engine.request({ type: "definition_preview", path: "nope.ts", line: 1 })).rejects.toThrow(/file_not_found/);
     const bare = makeHarness();

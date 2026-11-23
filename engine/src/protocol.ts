@@ -765,8 +765,8 @@ export type EngineCommand =
   | Cmd<"mcp_remove", { name: string; scope: McpScope; /** §42.3: the `origin.file` the user confirmed — a folder above the project's `.mcp.json`. */ file?: string }>
   | Cmd<"mcp_auth", { name: string }>
   // §23–27
-  /** Fuzzy file search for @-mentions; replies `files`. */
-  | Cmd<"list_files", { query: string; limit?: number }>
+  /** Fuzzy file search for @-mentions (and Go to File, §65: `filesOnly` leaves the directories out); replies `files`. */
+  | Cmd<"list_files", { query: string; limit?: number; filesOnly?: boolean }>
   /** An image a transcript row references by hash; replies `attachment`. */
   | Cmd<"attachment_get", { hash: string }>
   /** Model / effort of the running session from its next request on; persisted per project. `effort: null` = the model's default. */

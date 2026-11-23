@@ -1621,7 +1621,7 @@ export class ReviewEngine {
         return;
       // ---- §23–27
       case "list_files":
-        return this.listFiles(cmd.query, cmd.limit);
+        return this.listFiles(cmd.query, cmd.limit, cmd.filesOnly === true);
       case "attachment_get":
         return this.attachmentGet(cmd.hash);
       case "set_model":
@@ -5728,14 +5728,14 @@ export class ReviewEngine {
   }
 
   /** `list_files {query, limit?}` → `files`: fuzzy matches over the repository's files + directories, review files first. */
-  private async listFiles(query: unknown, limit: unknown): Promise<FilesEvent> {
+  private async listFiles(query: unknown, limit: unknown, filesOnly = false): Promise<FilesEvent> {
     const cp = this.requireProject();
     const q = typeof query === "string" ? query.slice(0, 500) : "";
     this.fileIndex ??= new FileIndex(() => listRepoFiles(cp));
     const changed = new Set(this.gate.changedFiles.filter((f) => f.status !== "D").map((f) => f.path));
     const n = typeof limit === "number" && limit > 0 ? limit : LIST_FILES_MAX;
     try {
-      return { type: "files", query: q, items: await this.fileIndex.search(q, changed, n) };
+      return { type: "files", query: q, items: await this.fileIndex.search(q, changed, n, filesOnly) };
     } catch (e) {
       throw new CommandRefused(`list_files_failed:${firstLineOf(errorMessage(e))}`, { code: "list_files_failed" });
     }

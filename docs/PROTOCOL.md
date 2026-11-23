@@ -132,7 +132,7 @@ type EngineCommand =
   | Cmd<"mcp_add", { name: string; scope: "session" | "project" | "user" | "local"; config: McpAddConfig }>         // → mcp_status (local: §36.6)
   | Cmd<"mcp_remove", { name: string; scope: "session" | "project" | "user" | "local" }>                            // → mcp_status
   | Cmd<"mcp_auth", { name: string }>                      // opens a terminal running `claude /mcp` (§22)
-  | Cmd<"list_files", { query: string; limit?: number }>   // → files (§23)
+  | Cmd<"list_files", { query: string; limit?: number; filesOnly?: boolean }>   // → files (§23; filesOnly + camel humps: Go to File, §65)
   | Cmd<"attachment_get", { hash: string }>                // → attachment (§24)
   | Cmd<"set_model", { model: string; effort?: EffortLevel | null }>   // live model / effort switch, persisted per project (§25)
   | Cmd<"rewind", { toTurn: number; mode: "conversation" | "files" | "both"; editText?: string; mentions?: string[]; attachments?: SendAttachment[]; force?: boolean }>   // → rewound (§26)
@@ -10551,12 +10551,13 @@ Claude kept changing new files while earlier ones were still pending. `settings.
 ## 65. The symbol index: outline, symbols in the project, peek and better go to definition (ide-nav)
 
 §62 answers one click with one `git grep`. An IDE-like flow needs more: an inline **peek** of a definition, a **hover**
-preview, a **References** tab in the bottom panel (F4 / ⇧F4 step through it), **symbols in this
+preview, a **References** tab in the bottom panel (F4 / ⇧F4 step through it), **Go to File** (⌘P), **symbols in this
 file** (⌘⇧O) and **symbols in the project** (⌘T) — and Go to Definition that knows `repository.find(…)` means
 `CartRepository.find`, not the clicked file's own `find`. The engine keeps an in-memory **symbol index** of the open worktree
 for that: the declarations of every source file with their **containers** (the enclosing class / object / interface /
 component), read with §62's per-language patterns and a brace / indentation tracker. Still no language server, nothing
-persisted, nothing leaves the machine. Additive on the wire: four commands, two optional `find_definition` fields, one state field, one optional candidate field.
+persisted, nothing leaves the machine. Additive on the wire: four commands, two optional `find_definition` fields, one
+`list_files` flag, one state field, one optional candidate field.
 
 ```ts
 // commands (lane "nav", read-only)
@@ -10566,6 +10567,7 @@ definition_preview { path: string; line: number; before?: number; after?: number
 nav_index_build    { full?: boolean }                                           → nav_index
 // extended
 find_definition    { symbol; fromPath?; line?; column?: number; receiver?: string }   → definitions (candidates[].container?)
+list_files         { query; limit?; filesOnly?: boolean }                       → files   (lane "query", §23)
 
 type NavSymbol = { name: string; kind: DefinitionKind; path: string; line: number; column: number;
                    container?: string; signature?: string; endLine?: number };
@@ -10668,6 +10670,15 @@ the name has beyond the query (≤ 80). Then: types (`class interface enum recor
 container) — only symbols with a fitting container, +¼ of that match's score: `CartSvc.tot` → `CartService.total`. Ties:
 the shorter name, then path, then line.
 
+### 65.4 Go to File (⌘P): `list_files {query, filesOnly: true}`
+
+§23's `list_files` already ranks files fuzzily (subsequence, the basename first, contiguous runs, word starts, the review's
+files first, ≤ 50) — Go to File reuses it rather than adding a command. New: `filesOnly: true` leaves the directories out;
+**camel humps** of the basename's stem score +300 for any query of two or more characters without a `/` (`UsrSvc` →
+`UserService.java`, the query's own extension ignored: `UsrSvc.java`); a vendored / minified path −50 (both modes). A
+`path:line` query (`CartService.java:42`) is the client's to split: send the path part, open the pick at the line. An
+older engine ignores `filesOnly` (clients drop `kind: "dir"` items themselves then).
+
 ### 65.5 `definition_preview {path, line, before?, after?}` — the peek / hover body
 
 `project_file` (§47) sends a whole file (up to 2 MB); a hover over many names wants a slice. Lines `startLine …` of the file
@@ -10721,6 +10732,7 @@ other builds running):
 | `workspace_symbols` (`SymIdx`, `Engine`, `handle`, `rS`, `findDef`, `x`) | 10–46 ms |
 | `document_symbols` `engine/src/engine.ts` (10 000 lines, 532 symbols) / `protocol.ts` (1 289 symbols) | 12–15 ms / 7–8 ms |
 | `definition_preview` in `engine.ts` | 11–13 ms |
+| `list_files {filesOnly}` first query (lists the files) / next ones | 27–32 ms / < 1 ms |
 | `find_definition` §62 alone / with containers, first time (files not yet read) / again | 52–60 ms / +6–35 ms / ±0 |
 
 ### 65.8 How clients present it
@@ -10740,6 +10752,9 @@ other builds running):
   folder and count, then `line` and `preview` with the symbol marked; a `kind` row labelled "definition". Keep the last
   few searches as tabs or a history menu in the panel ("refresh" re-sends the same request). The `container` of a
   definition candidate makes a good group title ("CartRepository.find — 12 references in 5 files").
+- **Go to File** (⌘P — Ctrl+P on Windows): `list_files {query, filesOnly: true, limit: 50}` per keystroke (debounce
+  ~50 ms; the newest reply wins); rows of basename (the query's letters bold — clients mark them themselves with the same
+  subsequence the engine used) and folder; ↩ opens (`project_file` or the review's diff); `path:42` opens at the line.
 - **Symbols in this file** (⌘⇧O — Ctrl+Shift+O): `document_symbols {path}` once per file shown (again after a turn / a
   refresh), filtered client-side as the user types (the same matching as `workspace_symbols` is fine: subsequence + humps),
   indented by `depth`, `kind` as an icon, `container` dimmed; ↩ jumps to `line` / `column`. The same reply can drive an
@@ -10755,7 +10770,8 @@ other builds running):
   says why (no project open, indexing).
 
 **Windows.** `document_symbols`, `workspace_symbols`, `definition_preview` and `nav_index_build` are on the renderer's
-allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields pass through). The UI is the client team's follow-up.
+allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
+through). The UI is the client team's follow-up.
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.
@@ -10765,8 +10781,8 @@ UI work adds them.
 - **Not in this pass.** A persisted index, a file-system watcher (re-checks ride on turns, refreshes, reads and the 30 s
   query re-check), inheritance / overload resolution, symbols of other languages (XML, SQL, MyBatis mappers), local
   variables and parameters in the outline.
-- Owner: ide-nav (engine `files/symbols.ts`, `files/symbolIndex.ts`, `files/navigate.ts`,
+- Owner: ide-nav (engine `files/symbols.ts`, `files/symbolIndex.ts`, `files/navigate.ts`, `files/fileIndex.ts`,
   `engine.ts`, `state.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`). Tests:
   `engine/test/symbols.extract.test.ts` (containers per language), `engine/test/engine.symbolIndex.test.ts` (fuzzy
-  ranking, the index's build / refresh / limits / failure, container-aware go to definition, the preview, the
+  ranking, Go to File, the index's build / refresh / limits / failure, container-aware go to definition, the preview, the
   engine's commands and state, a turn's refresh, §59 shadow mode, the lane), `clients/desktop/src/main/ipcGuard.test.ts`.
