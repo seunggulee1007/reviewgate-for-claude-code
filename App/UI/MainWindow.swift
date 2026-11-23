@@ -140,6 +140,10 @@ struct MainWindow: View {
                 model.showNewWorkbench = false
                 model.newWorkbenchBranch = nil; model.newWorkbenchPlanMode = nil; model.newWorkbenchTask = nil
             }
+            // §9 New Chat in a Workbench: never in a folder tracked without git (§59), where every way in is off.
+            .sheet(isPresented: Binding(get: { model.showWorkbenchChat && store.workbenchChatBlocker == nil }, set: { model.showWorkbenchChat = $0 })) {
+                WorkbenchChatSheet { url in openWorkbench(url) }
+            }
             .onChange(of: model.createPRTick) { _, _ in if store.projectURL != nil, !store.isShadowProject { showCreatePR = true } }   // polish P5-sheets-46
             .sheet(isPresented: $showCreatePR, onDismiss: {
                 guard newBranchAfterPR else { return }

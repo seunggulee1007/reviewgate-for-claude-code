@@ -53,7 +53,8 @@ JavaScript / TypeScript, Vue and JSP above all — list its references, step Bac
 IntelliJ IDEA, VS Code or Xcode. Search-based, no language server to set up.
 
 **Workbenches.** Run several Claude sessions on one project at once — each in its own git worktree and branch, each
-with its own gate.
+with its own gate. Waiting for Claude to finish before a new chat? "New Chat in a Workbench" (⌥⌘T) opens one in a fresh
+workbench right away.
 
 **Pull requests in the same viewer.** Open your GitHub or GitHub Enterprise PRs in the same diff viewer, leave line
 comments, or hand a comment thread to Claude.

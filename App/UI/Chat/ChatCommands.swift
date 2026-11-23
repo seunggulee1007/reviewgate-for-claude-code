@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// wave4 w4-input (polish-06): the Chat menu — ⌘T a new chat (§57.7: of the default kind; ⌃⌘T terminal, ⌃⌥⌘T classic), ⌘⇧W closes the tab on screen, ⌘1…⌘9 the chat tab at that
+/// wave4 w4-input (polish-06): the Chat menu — ⌘T a new chat (§57.7: of the default kind; ⌃⌘T terminal, ⌃⌥⌘T classic; §9 ⌥⌘T in a workbench), ⌘⇧W closes the tab on screen, ⌘1…⌘9 the chat tab at that
 /// place. A blocked switch is a disabled item, as the tab strip's `+` and tabs are. Electron has the same keys
 /// (src/renderer/keymap.ts). ⌘W stays the window's (File › Close).
 /// MARK: wave7 w7-state — §45.2: it reads the window's `menuState` alone (the tabs' titles, the live chat, the blocker).
@@ -31,6 +31,12 @@ struct ChatCommands: Commands {
                 .keyboardShortcut("t", modifiers: [.control, .option, .command])
                 .disabled(!menu.hasProject || menu.newChatBlocked)
                 .accessibilityIdentifier("Chat menu New classic chat")
+            // §9: a new chat that need not wait for Claude here — in a workbench of its own (git worktree, window, Claude).
+            Button("New Chat in a Workbench…") { model?.showWorkbenchChat = true }
+                .keyboardShortcut("t", modifiers: [.option, .command])
+                .disabled(menu.workbenchChatBlocker != nil)
+                .help(menu.workbenchChatBlocker ?? String(localized: "Starts a chat now in a workbench of its own — a new branch from HEAD, its own window and Claude"))
+                .accessibilityIdentifier("Chat menu New chat in a workbench")
             // MARK: terminal-continue (§57.9): the chat on screen's conversation goes on in a terminal chat.
             if let id = menu.continueTerminalChatId {
                 Button("Continue as Terminal Chat") { if let store { Task { await store.continueAsTerminalChat(id: id) } } }

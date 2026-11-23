@@ -5041,6 +5041,22 @@
         }
       }
     },
+    "Branches from HEAD into a new worktree and opens it in its own window with a new chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branches from HEAD into a new worktree and opens it in its own window with a new chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD에서 분기해 새 워크트리를 만들고, 자기 창에서 새 채팅으로 열어요."
+          }
+        }
+      }
+    },
     "Changed: %@": {
       "localizations": {
         "en": {
@@ -5517,6 +5533,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 멈추면 리뷰가 열려요"
+          }
+        }
+      }
+    },
+    "Claude works in one folder one turn at a time. A workbench is a folder of its own — a new branch from HEAD, its own window and Claude — so its chat starts now.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude works in one folder one turn at a time. A workbench is a folder of its own — a new branch from HEAD, its own window and Claude — so its chat starts now."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude는 한 폴더에서 한 번에 한 턴씩 일해요. 워크벤치는 따로 쓰는 폴더라서(HEAD에서 딴 새 브랜치, 자기 창과 Claude) 거기서는 채팅이 바로 시작돼요."
           }
         }
       }
@@ -10615,6 +10647,22 @@
         }
       }
     },
+    "Create": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "만들기"
+          }
+        }
+      }
+    },
     "Create PR": {
       "localizations": {
         "en": {
@@ -11719,6 +11767,38 @@
         }
       }
     },
+    "Don't wait — open in a workbench": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't wait — open in a workbench"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리지 않고 워크벤치에서 열기"
+          }
+        }
+      }
+    },
+    "Don't wait — open in a workbench: a new chat in a folder of its own (a new branch from HEAD, its own window and Claude) (⌥⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't wait — open in a workbench: a new chat in a folder of its own (a new branch from HEAD, its own window and Claude) (⌥⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리지 않고 워크벤치에서 열기: 따로 쓰는 폴더(HEAD에서 딴 새 브랜치, 자기 창과 Claude)에서 새 채팅을 열어요 (⌥⌘T)"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "en": {
@@ -12807,6 +12887,38 @@
         }
       }
     },
+    "New Chat in a Workbench": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Chat in a Workbench"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치에서 새 대화"
+          }
+        }
+      }
+    },
+    "New Chat in a Workbench…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Chat in a Workbench…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치에서 새 대화…"
+          }
+        }
+      }
+    },
     "New projects": {
       "localizations": {
         "en": {
@@ -13079,6 +13191,22 @@
         }
       }
     },
+    "Not in a workbench: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in a workbench: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치에서 열 수 없어요: %@"
+          }
+        }
+      }
+    },
     "Nothing to go back to — ⌘-click a name to jump to its definition": {
       "localizations": {
         "en": {
@@ -13251,6 +13379,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "열 앱"
+          }
+        }
+      }
+    },
+    "Open in a Workbench": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in a Workbench"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치에서 열기"
           }
         }
       }
@@ -13991,6 +14135,38 @@
         }
       }
     },
+    "Starts a chat now in a workbench of its own — a new branch from HEAD, its own window and Claude": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts a chat now in a workbench of its own — a new branch from HEAD, its own window and Claude"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "따로 쓰는 워크벤치(HEAD에서 딴 새 브랜치, 자기 창과 Claude)에서 채팅을 바로 시작해요"
+          }
+        }
+      }
+    },
+    "Starts now in a folder of its own, without waiting (⌥⌘T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts now in a folder of its own, without waiting (⌥⌘T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리지 않고 따로 쓰는 폴더에서 바로 시작해요 (⌥⌘T)"
+          }
+        }
+      }
+    },
     "Status lines are turned off — see the line above": {
       "localizations": {
         "en": {
@@ -14179,6 +14355,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널이 너비를 모두 써요"
+          }
+        }
+      }
+    },
+    "The workbench is being created": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The workbench is being created"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "워크벤치를 만드는 중이에요"
           }
         }
       }
@@ -14387,6 +14579,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@이(가) 선언된 곳으로 가요 (⌘-클릭)"
+          }
+        }
+      }
+    },
+    "Windows uses W: Ctrl+Alt+T is New Terminal Chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows uses W: Ctrl+Alt+T is New Terminal Chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows 는 Ctrl+Alt+T 가 새 터미널 채팅이라 W 예요"
           }
         }
       }
@@ -34338,6 +34546,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "내 테스트 명령"
+          }
+        }
+      }
+    },
+    "Your waiting message moves to the new chat's message box there — it is not sent.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your waiting message moves to the new chat's message box there — it is not sent."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기다리던 메시지는 그 새 채팅의 입력란으로 옮겨요 — 보내지는 않아요."
           }
         }
       }
