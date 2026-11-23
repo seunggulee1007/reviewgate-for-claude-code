@@ -96,6 +96,11 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "pr_comment", body: "Thanks!" }).ok).toBe(true);
   });
 
+  it("allows task_fetch (§63.1: the task dialog reads a GitHub issue; the engine refuses anything but an issue ref)", () => {
+    expect(validateCommand({ type: "task_fetch", ref: "#42" }).ok).toBe(true);
+    expect(validateCommand({ type: "task_fetch", ref: "https://github.com/acme/widgets/issues/42" }).ok).toBe(true);
+  });
+
   it("allows the composer commands (§23–27)", () => {
     for (const type of ["list_files", "attachment_get", "set_model", "rewind", "compact", "interrupt"]) {
       expect(validateCommand({ type }).ok).toBe(true);
