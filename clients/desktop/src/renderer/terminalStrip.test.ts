@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import type { TerminalSessionState } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { REVIEW_NOW_IDLE_MS, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal } from "./terminalStrip";
+import { ESCAPE_GRACE_MS, escapeMark, isEscapeKey, REVIEW_NOW_IDLE_MS, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal } from "./terminalStrip";
 
 const term = (over: Partial<TerminalSessionState> = {}): TerminalSessionState => ({
   running: true,
@@ -69,6 +69,23 @@ describe("Review now", () => {
     expect(showsReviewNow({ ...base, working: false, info: term({ interruptSuspected: true }) })).toBe(false);
     expect(showsReviewNow({ ...base, info: term({ running: false, interruptSuspected: true }) })).toBe(false);
     expect(showsReviewNow({ ...base, info: null, nowMs: 10 * REVIEW_NOW_IDLE_MS })).toBe(false);
+  });
+  it("2 s after an Esc the window saw while the turn ran, unless a hook came since (§57.4)", () => {
+    const info = term({ hookCount: 4 });
+    const escape = escapeMark({ working: true, info, nowMs: 1000 });
+    expect(escape).toEqual({ atMs: 1000, hookCount: 4 });
+    expect(showsReviewNow({ ...base, info, escape, nowMs: 1000 + ESCAPE_GRACE_MS - 1 })).toBe(false);
+    expect(showsReviewNow({ ...base, info, escape, nowMs: 1000 + ESCAPE_GRACE_MS })).toBe(true);
+    // A hook followed (Claude Code went on: the Esc closed a menu).
+    expect(showsReviewNow({ ...base, info: term({ hookCount: 5 }), escape, nowMs: 10_000 })).toBe(false);
+    // Between turns, or with the terminal not running, an Esc is nothing.
+    expect(escapeMark({ working: false, info, nowMs: 1000 })).toBeNull();
+    expect(escapeMark({ working: true, info: term({ running: false }), nowMs: 1000 })).toBeNull();
+    expect(showsReviewNow({ ...base, working: false, info, escape, nowMs: 10_000 })).toBe(false);
+  });
+  it("the Esc key: a lone ESC or its kitty form — not a paste, an arrow, Alt+key or a release", () => {
+    for (const k of ["\x1b", "\x1b[27u", "\x1b[27;1u", "\x1b[27;1:1u"]) expect(isEscapeKey(k)).toBe(true);
+    for (const k of ["\x1b[200~hi\x1b[201~", "\x1b[A", "\x1b\r", "\x1b[27;1:3u", "\x1b[27;5u", "\x1b\x1b", "a", ""]) expect(isEscapeKey(k)).toBe(false);
   });
   it("activity: the state's seq, the gate's phase, the terminal state", () => {
     const s = { seq: 4, gate: { phase: "running" }, session: { terminal: term() } };

@@ -29,6 +29,9 @@ final class TerminalHub {
     private(set) var spawning: Set<String> = []
     /// The last time the live terminal chat's state changed (a hook, a turn) — "Review now" after 60 s without one.
     private(set) var lastActivity = Date()
+    /// MARK: terminal-friction (§57.4): the Esc the user pressed while the live chat's turn ran — "Review now" once no hook
+    /// followed it for 2 s. Cleared when the turn ends.
+    private(set) var escape: TerminalEscapeMark?
     @ObservationIgnored private weak var store: AppState?
     @ObservationIgnored private var enginePIDAtSpawn: [String: Int32] = [:]
     @ObservationIgnored private var keyMonitor: Any?
@@ -63,6 +66,21 @@ final class TerminalHub {
             host.focus()
             // From the PRs tab the terminal is not in the window yet: the keyboard goes to it once it is.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { host.focus() }
+            return nil
+        }
+        // MARK: terminal-friction — §58 "Accept N & Continue" (the user's click only): the paste, then Enter.
+        store.terminalInputBlocker = { [weak self, weak store] in
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id], host.state.isRunning, !host.disconnected else {
+                return NewChatKindText.terminalNotRunning
+            }
+            return host.acceptsPaste ? nil : NewChatKindText.terminalNotReady
+        }
+        store.onTerminalSubmit = { [weak self, weak store] text in
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id], host.state.isRunning, !host.disconnected else {
+                return NewChatKindText.terminalNotRunning
+            }
+            guard host.submit(text) else { return NewChatKindText.terminalNotReady }
+            host.focus()
             return nil
         }
         observe()
@@ -165,6 +183,7 @@ final class TerminalHub {
     private func sync() {
         guard let store, !closing else { return }
         lastActivity = Date()
+        if !store.isRunning || escape?.chatId != store.currentSessionId { escape = nil }
         // The engine stopped (its window offers to reopen the project): the PTYs stay — their hooks now fail closed, so
         // they are disconnected and offer Restart once the project is open again.
         if store.projectURL == nil, store.errorBanner?.scope == .engine {
@@ -252,7 +271,14 @@ final class TerminalHub {
         let host = chatHosts[chatId] ?? TerminalHost()
         chatHosts[chatId] = host
         host.hooksSeen = { [weak store] in store?.sessionInfo.terminal?.hooksSeen == true }
+        host.takesFileDrops = true   // MARK: terminal-friction (§57.5)
         host.onExit = { [weak store] code in store?.terminalExited(sessionId: chatId, exitCode: code) }
+        // §57.4: an Esc while this chat's turn runs (never between turns — that one closes a TUI menu).
+        host.onEscape = { [weak self, weak store] at in
+            guard let self, let store, chatId == store.currentSessionId,
+                  TerminalReviewNowRules.recordsEscape(turnRunning: store.isRunning, info: store.terminalInfo) else { return }
+            self.escape = TerminalEscapeMark(at: at, hookCount: store.terminalInfo?.hookCount ?? 0, chatId: chatId)
+        }
         let launch = TerminalLaunch.claude(spec: spec, parentEnv: ProcessInfo.processInfo.environment,
                                            loginShell: TerminalLaunch.userLoginShell(), appVersion: Self.appVersion,
                                            debugShell: Self.debugShell)

@@ -2065,6 +2065,22 @@
         }
       }
     },
+    "Accepts the %lld pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accepts the %lld pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중인 파일 %lld개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)"
+          }
+        }
+      }
+    },
     "Add a note": {
       "localizations": {
         "en": {
@@ -12435,6 +12451,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "PR diff에서 이 줄을 보여 줘요"
+          }
+        }
+      }
+    },
+    "Shows a summary of the %lld pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows a summary of the %lld pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중인 파일 %lld개의 요약을 먼저 보여 준 뒤 수락하고, Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)"
           }
         }
       }

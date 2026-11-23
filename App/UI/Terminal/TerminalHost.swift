@@ -148,6 +148,61 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.send(data: [0x1b])
     }
 
+    // MARK: terminal-friction (§58, §57.4, §57.5)
+
+    /// §58: "Accept N & Continue" — `text` as one bracketed paste, then Enter a moment later (its own write, so the TUI
+    /// reads it as the key, not as part of the paste). The user's click only; nothing automatic presses Enter.
+    func submit(_ text: String) -> Bool {
+        guard paste(text) else { return false }
+        let gen = generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, gen == self.generation, self.state.isRunning else { return }
+                self.view.send(data: [0x0d])
+            }
+        }
+        return true
+    }
+
+    /// The program turned bracketed paste on: a paste can go in now.
+    var acceptsPaste: Bool { view.terminalStateSnapshot().bracketedPasteMode }
+
+    /// §57.4: the user pressed Esc in this terminal (when); set for a terminal chat's host only.
+    @ObservationIgnored var onEscape: ((Date) -> Void)?
+    @ObservationIgnored private var escapeFilter = EscapeKeyFilter()
+
+    private func noteInput(_ data: ArraySlice<UInt8>) {
+        guard let onEscape else { return }
+        if let at = escapeFilter.input(data, at: Date()) { onEscape(at) }
+        guard data.count == 1, TerminalEscapeKey.isEscape(data) else { return }
+        // A lone ESC is the Esc key once nothing follows it (⌥Return and the like send ESC, then the key).
+        DispatchQueue.main.asyncAfter(deadline: .now() + EscapeKeyFilter.metaWindow + 0.02) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let at = self.escapeFilter.flush(now: Date()) else { return }
+                self.onEscape?(at)
+            }
+        }
+    }
+
+    /// §57.5: a terminal chat's host takes files dropped on it (read when a start makes its view).
+    @ObservationIgnored var takesFileDrops = false
+
+    /// §57.5: files dropped on the terminal — their shell-escaped paths, as Terminal.app writes them, one bracketed paste
+    /// and no Enter; the terminal takes the keyboard. Refused (with a toast saying why) while nothing runs or the program
+    /// has no bracketed paste.
+    private func dropFiles(_ urls: [URL]) -> Bool {
+        guard state.isRunning, !disconnected else {
+            Toast.show(NewChatKindText.terminalNotRunning, systemImage: "exclamationmark.triangle.fill")
+            return false
+        }
+        guard paste(TerminalPathText.dropText(urls.map(\.path))) else {
+            Toast.show(NewChatKindText.terminalNotReady, systemImage: "exclamationmark.triangle.fill")
+            return false
+        }
+        focus()
+        return true
+    }
+
     /// The keyboard goes to the terminal when its window shows it (`makeFirstResponder` only; the app is never activated).
     func focus() {
         guard let window = view.window, window.firstResponder !== view else { return }
@@ -196,6 +251,14 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         // the input method (Hanja) and ⌥-letters type their characters.
         v.optionAsMetaKey = false
         v.optionAsMetaKeyForFunctionalKeys = true
+        v.onInput = { [weak self] data in
+            MainActor.assumeIsolated { self?.noteInput(data) }
+        }
+        if takesFileDrops {
+            v.onDropFiles = { [weak self] urls in
+                MainActor.assumeIsolated { self?.dropFiles(urls) ?? false }
+            }
+        }
     }
 
     private func waitForExit(seconds: Double) async -> Bool {

@@ -83,12 +83,13 @@ import Testing
         let with = #"""
         {"open":true,"starting":false,"terminal":{"running":true,"hooksSeen":true,"promptId":"p1",
          "waiting":{"kind":"permission","message":"Claude needs your permission to use Bash","since":"2026-11-16T10:00:00.000Z"},
-         "interruptSuspected":false}}
+         "interruptSuspected":false,"hookCount":3}}
         """#
         let info = try JSONDecoder().decode(SessionInfo.self, from: Data(with.utf8))
         #expect(info.terminal == TerminalSessionInfo(
             running: true, hooksSeen: true, promptId: "p1",
-            waiting: TerminalWaiting(kind: .permission, message: "Claude needs your permission to use Bash", since: "2026-11-16T10:00:00.000Z")))
+            waiting: TerminalWaiting(kind: .permission, message: "Claude needs your permission to use Bash", since: "2026-11-16T10:00:00.000Z"),
+            hookCount: 3))
         let without = try JSONDecoder().decode(SessionInfo.self, from: Data(#"{"open":true,"starting":false}"#.utf8))
         #expect(without.terminal == nil)
         let null = try JSONDecoder().decode(SessionInfo.self, from: Data(#"{"open":true,"starting":false,"terminal":null}"#.utf8))

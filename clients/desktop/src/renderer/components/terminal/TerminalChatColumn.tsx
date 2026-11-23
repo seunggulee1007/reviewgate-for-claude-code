@@ -9,9 +9,14 @@ import { t, usesMacKeys } from "../../i18n";
 import { Icon } from "../../icons";
 import { isEnter } from "../../ime";
 import { useStore } from "../../store";
-import { showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal } from "../../terminalStrip";
+import { escapeMark, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal, type EscapeMark } from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
-import { clearTerminalFind, findInTerminal, focusTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
+import { showToast } from "../../toast";
+import { droppedMentionPaths, MENTION_DRAG_TYPE } from "../../mentions";
+import { pasteRefusal } from "../../terminalPaste";
+import { dropText, mentionText } from "../../terminalDrop";
 import { useViewing } from "../../viewedChat";
 import { ViewingChatBar } from "../chat/ViewingChat";
 import { engineRequest, refusalOf } from "../../engineRequest";
@@ -54,14 +59,31 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
   const info = state.session.terminal ?? null;
   const working = state.gate.phase === "running";
   const status = terminalStatus(props.ptyId);
-  const now = useNow(5000);
+  // Each second: "Review now" shows 2 s after an Esc with no hook since (§57.4).
+  const now = useNow(1000);
+  // §57.4: the Esc pressed here while the turn ran (with the engine's hookCount then); the turn's end clears it.
+  const [escape, setEscape] = useState<EscapeMark | null>(null);
+  const latest = useRef({ working, info });
+  latest.current = { working, info };
+  useEffect(
+    () =>
+      onTerminalEscape((ptyId) => {
+        if (ptyId !== props.ptyId) return;
+        const mark = escapeMark({ ...latest.current, nowMs: Date.now() });
+        if (mark) setEscape(mark);
+      }),
+    [props.ptyId],
+  );
+  useEffect(() => {
+    if (!working) setEscape(null);
+  }, [working]);
   // "Review now" after 60 s without a change in the live terminal chat (the Mac's rule: no per-hook timestamp).
   const activity = useRef({ key: "", at: Date.now() });
   const key = terminalActivityKey(state);
   if (activity.current.key !== key) activity.current = { key, at: Date.now() };
   const disconnected = status.running && info?.running !== true && props.startedAt > 0 && now - props.startedAt >= DISCONNECT_GRACE_MS;
   const strip = stripStatus({ disconnected, info, working });
-  const reviewNow = showsReviewNow({ working, info, lastActivityMs: activity.current.at, nowMs: now });
+  const reviewNow = showsReviewNow({ working, info, lastActivityMs: activity.current.at, nowMs: now, escape });
   const overlay = terminalOverlay({ exit: status.running ? null : status.exit, failed: props.failed, disconnected });
   const [finding, setFinding] = useState(false);
   const redraw = usesMacKeys() ? t("Stale lines on the screen? ⌃L redraws it") : t("Stale lines on the screen? Ctrl+L redraws it");
@@ -85,6 +107,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
             {t("Review now")}
           </button>
         )}
+        {state.gate.pendingCount > 0 && <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />}
         <button
           type="button"
           className={`plain small ${finding ? "active" : ""}`}
@@ -109,7 +132,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
         </button>
       </div>
       {finding && <TerminalFind ptyId={props.ptyId} onClose={() => setFinding(false)} />}
-      <div className="terminal-body">
+      <div className="terminal-body" onDragOver={(e) => acceptTerminalDrop(e)} onDrop={(e) => dropOnTerminal(e, props.ptyId, status.running && !disconnected)}>
         <TerminalView ptyId={props.ptyId} label={t("Terminal chat — Claude Code itself runs in this chat")} testId="Terminal chat terminal" />
         {overlay && (
           <div className="terminal-overlay" data-testid="Terminal chat overlay">
@@ -140,6 +163,71 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
       </div>
     </div>
   );
+}
+
+/**
+ * §58: "Accept N & Continue" in a terminal chat — the files accepted, then "Continue." pasted into Claude Code and Enter
+ * pressed (the user's click only). Off with its reason until Claude Code is idle at its prompt.
+ */
+function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
+  const state = useStore((s) => s.state);
+  const [busy, setBusy] = useState(false);
+  const count = state.gate.pendingCount;
+  const blocker = terminalAcceptContinueBlocker(state, { shown: true, running: props.running, bracketed: acceptsPaste(props.ptyId) });
+  const run = async (): Promise<void> => {
+    setBusy(true);
+    const why = await runTerminalAcceptContinue({
+      accept: async () => {
+        await engineRequest({ type: "accept_all" });
+      },
+      paste: (text) => pasteIntoTerminal(props.ptyId, text),
+      enter: () => sendToTerminal(props.ptyId, "\r"),
+      refusal: (e) => refusalOf(e).error,
+    });
+    setBusy(false);
+    focusTerminal(props.ptyId);
+    showToast(why ?? t("Accepted {0} files — Claude continues", count));
+  };
+  return (
+    <button
+      type="button"
+      className="small"
+      disabled={blocker !== null || busy}
+      title={blocker ?? t("Accepts the {0} pending file(s), then types “Continue.” into Claude Code with Enter", count)}
+      aria-label={t("Accept and continue")}
+      onClick={() => void run()}
+      data-testid="Terminal chat accept and continue"
+    >
+      {t("Accept {0} & Continue", count)}
+    </button>
+  );
+}
+
+/** §57.5: files (Explorer / Finder) or review-list rows dragged over the terminal: taken as a copy. */
+function acceptTerminalDrop(e: React.DragEvent<HTMLDivElement>): boolean {
+  const types = e.dataTransfer.types;
+  if (!types.includes("Files") && !types.includes(MENTION_DRAG_TYPE)) return false;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  return true;
+}
+
+/**
+ * §57.5: a drop on the terminal — review-list rows as `@path`, files as their paths (quoted as the platform's terminal
+ * writes them) — one bracketed paste, never Enter; the terminal takes the keyboard. Why not, as a toast.
+ */
+function dropOnTerminal(e: React.DragEvent<HTMLDivElement>, ptyId: string, running: boolean): void {
+  if (!acceptTerminalDrop(e)) return;
+  const mentions = droppedMentionPaths(e.dataTransfer);
+  const files = Array.from(e.dataTransfer.files ?? []).map((f) => window.rg.pathForFile?.(f) ?? "");
+  const text = mentions.length > 0 ? mentionText(mentions) : dropText(files, window.rg.platform ?? "win32");
+  if (!text) return;
+  const why = pasteRefusal({ liveTerminalChat: true, running, bracketed: acceptsPaste(ptyId) }, text);
+  if (why !== null || !pasteIntoTerminal(ptyId, text)) {
+    showToast(why ?? pasteRefusal({ liveTerminalChat: true, running: true, bracketed: false }, text) ?? "");
+    return;
+  }
+  focusTerminal(ptyId);
 }
 
 /** "Review now": `terminal_end_turn` — a refusal other than `no_turn` (it closed meanwhile) says why. */

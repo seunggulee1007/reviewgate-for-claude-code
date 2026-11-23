@@ -192,6 +192,11 @@ public final class AppState {
     /// MARK: terminal-default — §57.7 "Paste into the terminal": the App pastes the text into the live terminal chat's
     /// PTY (bracketed, never followed by Enter) and gives it the keyboard; returns why it could not (nil: pasted).
     @ObservationIgnored public var onTerminalPaste: (@MainActor (String) -> String?)?
+    /// MARK: terminal-friction — §58 "Accept N & Continue" in a terminal chat (the user's click only): the App pastes the
+    /// text into the live terminal chat's PTY and presses Enter; returns why it could not (nil: sent).
+    @ObservationIgnored public var onTerminalSubmit: (@MainActor (String) -> String?)?
+    /// Why the live terminal chat's PTY cannot take a paste now (not running, disconnected, no bracketed paste); nil: it can.
+    @ObservationIgnored public var terminalInputBlocker: (@MainActor () -> String?)?
     // MARK: wave1 mac-session
     /// M7: the message the last `send` carried and when — back to the front of the queue when the engine fails it.
     @ObservationIgnored var recentSend: (message: QueuedMessage, at: Date)?

@@ -236,6 +236,20 @@ describe("TerminalSession", () => {
     expect(r.ts.state).toMatchObject({ promptId: "p2", interruptSuspected: false });
   });
 
+  it("hookCount counts the current spawn's hooks (absent before the first); a new spawn starts again", async () => {
+    const r = rig();
+    expect(r.ts.state.hookCount).toBeUndefined();
+    await r.hook(ups("p1"));
+    await r.hook(pre("Bash", { command: "ls" }, "b1"));
+    expect(r.ts.state.hookCount).toBe(2);
+    r.ts.handleStatus({ cost: { total_cost_usd: 0.01 } }); // the status line tee is no hook
+    expect(r.ts.state.hookCount).toBe(2);
+    r.ts.setToken("tok-2");
+    expect(r.ts.state.hookCount).toBeUndefined();
+    await r.hook({ hook_event_name: "Notification", notification_type: "permission_prompt", message: "x" });
+    expect(r.ts.state.hookCount).toBe(1);
+  });
+
   for (const [name, close, reason] of [
     ["idle_prompt", (r: Rig) => r.hook({ hook_event_name: "Notification", notification_type: "idle_prompt", message: "Claude is waiting for your input" }), "interrupted"],
     ["SessionEnd", (r: Rig) => r.hook({ hook_event_name: "SessionEnd", reason: "prompt_input_exit" }), "session_end"],

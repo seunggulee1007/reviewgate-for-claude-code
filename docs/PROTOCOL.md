@@ -8871,6 +8871,7 @@ type TerminalWaiting = { kind: "permission" | "question"; message: string; since
 type TerminalSessionState = { running: boolean; hooksSeen: boolean; promptId: string | null;
   waiting: TerminalWaiting | null; interruptSuspected: boolean;
   // Stage 2 — all optional, absent = none:
+  hookCount?: number;                          // §57.4: hooks of the current spawn so far (absent: none yet)
   status?: TerminalStatus | null;              // §57.13: the TUI's last status line input (the statusLine tee)
   requestQueued?: TerminalRequestQueued | null; // §57.14: a Request changes waiting to reach Claude
   permissions?: TerminalPermission[];          // §57.15: dialogs the app may answer, oldest first
@@ -8899,7 +8900,9 @@ terminal_permission_response { sessionId; requestId; allow: boolean; message?: s
   `hooksSeen`: a hook with the current spawn's token arrived. `promptId`: the open review turn's `prompt_id` (null: none
   open, or a turn Claude started itself). `waiting`: Claude Code waits for the user in the TUI (Notification
   `permission_prompt` / `agent_needs_input` → `permission`, `elicitation_dialog` → `question`), cleared by the next hook.
-  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4).
+  `interruptSuspected`: a tool call ended `is_interrupt` (Esc) and no Stop came (§57.4). `hookCount`: the hooks the
+  current spawn sent so far, every event counted (the status line tee is no hook; a new spawn starts at none) — a client
+  that saw Esc in its PTY tells from it whether a hook followed (§57.4).
 - **Refusals** (`CommandRefused("<code>:<detail>", {code})`): `terminal_chat` — a chat-only command on a terminal chat
   (`restart_session`, `send`, `steer`, `steer_take_back`, `btw_ask`, `interrupt`, `permission_response`,
   `set_permission_mode`, `set_model`, `plan_response`, `plan_follow`, `rewind`, `compact`, `peer_accept`, `task_stop`,
@@ -9056,7 +9059,15 @@ chat's id);
   PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
 - **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
   `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
-  set, or when the gate has run a turn with no hook for 60 s.
+  set, when the gate has run a turn with no hook for 60 s, or — the client sees what goes into its PTY — 2 s after the
+  user pressed Esc there while the turn ran and no hook came since (`hookCount` unchanged).
+  - *The Esc rule on the client* (Mac: Core `TerminalReviewNowRules`, `EscapeKeyFilter`). The Esc key is a lone `ESC`
+    write, or its kitty form `CSI 27 u` (`27;1u`, `27;1:1u`); a lone `ESC` followed within 50 ms by another write is
+    ⌥ as Meta (⌥Return, ⌥←), not Esc. ⌘. (Stop), which writes Esc, counts too. It is recorded only while a turn of the
+    live chat runs (an Esc between turns closes a TUI menu: nothing), with the `hookCount` of that moment; any later
+    hook (Claude Code went on — the Esc closed a menu, or the tool call's interrupt sets `interruptSuspected`) drops it,
+    and the turn's end clears it. Nothing is settled by itself: the strip only offers Review now at once instead of
+    after 60 s.
 - **Waiting.** `state.session.terminal.waiting` is set by the Notification hook (`permission_prompt` /
   `agent_needs_input` → `permission`, `elicitation_dialog` → `question`, with the CLI's message and when) and cleared by
   any later hook — Claude Code is waiting in the TUI. Clients badge it as they badge a permission card (Dock "!",
@@ -9158,8 +9169,11 @@ chat's id);
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요"
   (hooks arrive),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
-  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set or nothing
-  changed for 60 s — Esc in the TUI sends no Stop, so the turn stays open until then (§57.4).
+  resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set, Esc was
+  pressed in the terminal 2 s ago with no hook since, or nothing changed for 60 s — Esc in the TUI sends no Stop, so the
+  turn stays open until then (§57.4).
+  - *Accept N & Continue* (§58): while files are pending, right of the status — off with its reason until Claude Code
+    is idle at its prompt; the click (or ⌘⇧↩) accepts them and sends `Continue.` with Enter.
   - *Cost* (§57.13, once `terminal.status` came): "$0.01 · 25%" right of the status — Claude Code's own cost so far in
     the conversation and the context used, from its status line; a click shows the model, the numbers and "리뷰한 턴"
     (`hud.sessionCostUSD`, which grows with each `turn_end`). VoiceOver reads both numbers.
@@ -9191,7 +9205,8 @@ chat's id);
     요청에 ReviewGate에서도 답하기" (`terminalPermissionBridge`, default on, `set_settings` live).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
-  restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter).
+  restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter — but §58's Accept N &
+  Continue, the user's own click).
 - **Before the first hook** the strip reads "Claude Code가 이 폴더를 신뢰할지 물으면 Yes를 고르세요" (accent colour; narrow:
   "폴더를 신뢰할지 물으면 Yes"): the first run in a folder asks with "No, exit" selected, and No ends Claude Code — the hint
   is on screen before the user presses Return. Its tooltip says it starts reviewing with the first prompt.
@@ -9209,6 +9224,16 @@ chat's id);
   Esc / Tab / Backspace and arrows, so ⌥Return during 한 reaches the input method (Hanja), and the input method's reads and
   replacements before the caret work on the cursor row. The marked-text overlay neither blanks the rest of the line
   (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
+- **Files dropped on the terminal** (Finder, a screenshot's thumbnail — file URLs): their absolute paths go in as one
+  bracketed paste (`TerminalPaste`), never Enter, as Terminal.app and iTerm2 write them (Core `TerminalPathText.dropText`):
+  each shell-escaped — a backslash before a space and each of ``!"#$&'()*,;<=>?[\]^`{|}~`` and tab; Unicode as it is; a
+  name with another control character (a newline) single-quoted whole — separated by spaces, with one space after. Claude
+  Code takes an image's path as the image. The terminal takes the keyboard. While Claude Code is not running, or has no
+  bracketed paste yet, the drop is refused with the toast of §57.7's paste. Images dragged out of another app without a
+  file (a browser's picture) are not taken.
+- **Mention in Chat** (the changed-files list, a past round's file): in a terminal chat it pastes `@<relative path>` (`@"…"`
+  when the path holds whitespace) and a space into the TUI's prompt (`AppState.mentionInTerminal`, the §57.7 paste: no
+  Enter; its refusals as a toast) instead of adding a chip to the message box.
 - **Not in Stage 1.** The change budget (§54), the chat's permission cards and the per-turn model are not applied to a
   terminal chat (the TUI asks itself; the guard of §57.8 makes it ask for git and unseen edits); the TUI's `/rewind`
   restores files outside ReviewGate's snapshots (the next turn shows them as changed).
@@ -9259,14 +9284,15 @@ real TUI. The chat UI stays one menu item away; chats keep the kind they were ma
 
   `+`'s tooltip names the kind it opens and points at the right-click and the setting; its VoiceOver label is "새 터미널
   채팅" or "새 채팅". ⌥⌘T is macOS's Show / Hide Toolbar, so the classic item takes ⌃⌥⌘T.
-- **Flows that send for you.** The app never types into a terminal chat's PTY on its own (no auto-Enter). Each flow that
-  puts text in front of Claude, decided:
+- **Flows that send for you.** The app never types into a terminal chat's PTY on its own (no auto-Enter; the one Enter
+  it types is §58's Accept N & Continue, on the user's click). Each flow that puts text in front of Claude, decided:
 
   | Flow | In a terminal chat |
   |---|---|
   | Run as Task (§49) | its workbench's chat is a chat (the engine sends the task); the sheet says so |
   | Plan handoff / "implement in a new chat" (§42.1) | a chat (engine); plan cards never show in a terminal chat |
-  | Accept N & Continue (§58), Accept & Send, the queue, steer, /btw, Stop and send | no message box — not offered (`canAcceptAndContinue` false; the engine refuses `send` / `steer` / `btw_ask` with `terminal_chat`) |
+  | Accept N & Continue (§58) | the strip's own button: accept, then `Continue.` pasted **and Enter** — the user's click (or ⌘⇧↩), only while Claude Code is idle at its prompt |
+  | Accept & Send, the queue, steer, /btw, Stop and send | no message box — not offered (the engine refuses `send` / `steer` / `btw_ask` with `terminal_chat`) |
   | Peer messages (§29) | the TUI receives them itself; `peer_accept` refused `terminal_chat` |
   | Chat move's "continue there" (§39.4) | `chat_move` refused `terminal_chat` |
   | PR comments "Send to Claude" / "Send all unresolved" (§36.14) | **pasted** into the target window's terminal (its tooltip says "붙여넣어요 … Return") |
@@ -9582,6 +9608,15 @@ type ClientCapabilities = {
   panel; hiding it or switching tabs never ends a shell. Ctrl+` (the physical Backquote key, also from inside a
   terminal): hidden → shown and focused (a first tab of Settings' default shell if none); shown and focused → hidden, the
   keyboard back to the chat's terminal or message box; shown elsewhere → focused.
+- **The strip's terminal-friction rules** (as the Mac, `TerminalChatColumn.tsx`). *Review now* also 2 s after an Esc the
+  user pressed in the terminal while the turn ran and no hook since (`terminalStrip.ts` `isEscapeKey` / `escapeMark` /
+  `showsReviewNow`; xterm sends Alt+key in one write, so a lone `ESC` is always the key; Ctrl+.'s Esc is not counted).
+  *Accept N & Continue* (§58, `terminalAcceptContinue.ts`): the strip's button, same rule, same order (`accept_all`
+  awaited, `Continue.` pasted, Enter 150 ms later), at once — no summary dialog and no Ctrl+Shift+Enter (the classic
+  composer has no Accept & Continue on Windows either). *A drop on the terminal* (`terminalDrop.ts`): files from Explorer
+  as their paths (`webUtils.getPathForFile`), each in double quotes when it holds a space or a cmd character, as Windows
+  Terminal writes them (POSIX backslashes on macOS / Linux); review-list rows (`application/x-reviewgate-paths`) as
+  `@path` — one bracketed paste, never Enter, the refusal as the paste's toast.
 
 ## 58. Accept N & Continue
 
@@ -9604,9 +9639,25 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
   be on another tab). The confirm is off, with the send's reason as its tooltip, while Claude cannot take the message.
 - **Tooltips.** "Accepts the N pending file(s), then tells Claude to continue (⌘⇧↩)", or with the sheet "Shows a summary of
   the N pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)"; AX "Accept and continue".
-- **Not in a terminal chat** (§57): its column has no message box (the TUI is the composer) and `canAcceptAndContinue` is
-  false there, so neither the button nor ⌘⇧↩ can send — the engine would refuse `send` with `terminal_chat` anyway.
-- **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.
+- **In a terminal chat** (§57) the column has no message box (the TUI is the composer; `canAcceptAndContinue` stays false
+  and the engine refuses `send` with `terminal_chat`), so the strip over the terminal carries its own **"Accept N &
+  Continue"** while files are pending (Core `terminalAcceptContinueBlocker` / `terminalAcceptAndContinue`). One click,
+  or ⌘⇧↩: the summary sheet first under the same rule; then `accept_all` and its reply awaited, then `Continue.` goes into
+  the TUI as one bracketed paste (`TerminalPaste`, the paste path of §57.7) and **Enter** 150 ms later, as its own write.
+  The prompt is adopted as any (§57.4): the review summary (`[Review gate] Accepted: …`) reaches Claude as that prompt's
+  `additionalContext` — the same words a chat puts in front of `Continue.`. The toast is the chat's. It is the only Enter
+  the app ever types, and only on this click.
+  - *When it is on:* files pending and none changes-requested, the live terminal chat on screen (not one shown
+    read-only), Claude Code idle at its prompt — no turn running or adopted (`promptId`), nothing collected or reverted,
+    nothing it waits for in the TUI (`waiting`) — and its PTY running, connected, with bracketed paste on. Checked before
+    the accept, so nothing is accepted for a Continue that cannot go. Off, the tooltip says why ("Claude Code가 아직 작업
+    중이에요 — 턴이 끝나면 쓸 수 있어요", "Claude Code가 터미널에서 답을 기다려요 — 먼저 거기서 답하세요", the send's
+    reasons); a refusal at the click is a toast. The accept stands if the chat changed or a turn started meanwhile —
+    nothing is typed then.
+  - *Tooltips:* "대기 중인 파일 N개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)", with the
+    sheet "…요약을 먼저 보여 준 뒤 수락하고, …"; AX "Accept and continue".
+- **Mac only** for chats for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before. Its terminal
+  chat has the strip's button (§57.17).
 
 ## 59. Folders that are not git repositories (track without git)
 

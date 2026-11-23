@@ -20,6 +20,14 @@ struct TerminalChatView: View {
                     model.terminals.focus(chatId: store.currentSessionId)
                 }
             }
+            // MARK: terminal-friction (§57.5): "Mention in Chat" from the file lists — `@path` pasted into the TUI, no Enter.
+            .onChange(of: model.mentionTick) { _, _ in
+                if let why = store.mentionInTerminal(model.mentionPaths) { Toast.show(why, systemImage: "exclamationmark.triangle.fill") }
+            }
+            // §58: "Accept N & Continue"'s summary sheet, when a pending file still needs a look.
+            .sheet(isPresented: Binding(get: { model.showAcceptAllContinue }, set: { model.showAcceptAllContinue = $0 })) {
+                AcceptAllSheet(continues: true)
+            }
     }
 
     @ViewBuilder
@@ -83,7 +91,8 @@ private struct TerminalStatusStrip: View {
             .help(help)
             .accessibilityIdentifier("Terminal chat status")
             Spacer(minLength: 4)
-            TimelineView(.periodic(from: .now, by: 5)) { context in
+            // MARK: terminal-friction (§57.4): ticks each second, so "Review now" shows 2 s after an Esc with no hook.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
                 if showsReviewNow(info, now: context.date) {
                     Button("Review now") { Task { await store.endTerminalTurn() } }
                         .controlSize(.small)
@@ -91,6 +100,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
+            if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
                 Task { await model.terminals.restart(chatId: chatId) }
@@ -110,10 +120,11 @@ private struct TerminalStatusStrip: View {
         .background(host.disconnected ? Color.orange.opacity(0.12) : Color.clear)
     }
 
-    /// "Review now": a tool call ended by Esc, or the turn has run 60 s with nothing from Claude Code.
+    /// "Review now": a tool call ended by Esc, Esc pressed here with no hook after it for 2 s, or the turn has run 60 s with
+    /// nothing from Claude Code (`TerminalReviewNowRules`).
     private func showsReviewNow(_ info: TerminalSessionInfo?, now: Date) -> Bool {
-        guard store.isRunning, let info, info.running else { return false }
-        return info.interruptSuspected || now.timeIntervalSince(model.terminals.lastActivity) >= 60
+        TerminalReviewNowRules.shows(turnRunning: store.isRunning, info: info, chatId: chatId, escape: model.terminals.escape,
+                                     lastActivity: model.terminals.lastActivity, now: now)
     }
 
     private static var reviewedText: String { String(localized: "Reviewed by ReviewGate — changes show on the left") }
@@ -146,6 +157,29 @@ private struct TerminalStatusStrip: View {
         }
         return (Self.trustText, "questionmark.folder", .accentColor,
                 String(localized: "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed."))
+    }
+}
+
+// MARK: terminal-friction (§58)
+
+/// "Accept N & Continue" in a terminal chat: the pending files accepted, then "Continue." pasted into Claude Code and
+/// Return pressed — the user's click (or ⌘⇧↩), never by itself. On only while Claude Code is idle at its prompt.
+private struct TerminalAcceptContinueButton: View {
+    @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
+
+    var body: some View {
+        let count = store.pendingFiles.count
+        let blocker = store.terminalAcceptContinueBlocker
+        Button("Accept \(count) & Continue") { AcceptAllAction.runContinuing(store: store, model: model) }
+            .controlSize(.small)
+            .keyboardShortcut(.return, modifiers: [.command, .shift])
+            .disabled(blocker != nil)
+            .help(blocker ?? (store.acceptAllNeedsSheet
+                ? String(localized: "Shows a summary of the \(count) pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)")
+                : String(localized: "Accepts the \(count) pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)")))
+            .accessibilityLabel(Text("Accept and continue"))
+            .accessibilityIdentifier("Terminal chat accept and continue")
     }
 }
 
