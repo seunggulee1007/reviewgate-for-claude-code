@@ -20,6 +20,10 @@ struct TerminalChatView: View {
                     model.terminals.focus(chatId: store.currentSessionId)
                 }
             }
+            // MARK: terminal-friction (§57.5): "Mention in Chat" from the file lists — `@path` pasted into the TUI, no Enter.
+            .onChange(of: model.mentionTick) { _, _ in
+                if let why = store.mentionInTerminal(model.mentionPaths) { Toast.show(why, systemImage: "exclamationmark.triangle.fill") }
+            }
             // §58: "Accept N & Continue"'s summary sheet, when a pending file still needs a look.
             .sheet(isPresented: Binding(get: { model.showAcceptAllContinue }, set: { model.showAcceptAllContinue = $0 })) {
                 AcceptAllSheet(continues: true)

@@ -20,7 +20,7 @@ final class ReviewTerminalView: LocalProcessTerminalView {
         tcsetattr(fd, TCSANOW, &t)
     }
 
-    // MARK: terminal-friction — what goes to the PTY (§57.4)
+    // MARK: terminal-friction — what goes to the PTY, files dropped on it (§57.4 / §57.5)
 
     /// Every write to the PTY — the user's keys, a paste, the terminal's own replies — before it goes (the Esc rule).
     var onInput: ((ArraySlice<UInt8>) -> Void)?
@@ -28,6 +28,29 @@ final class ReviewTerminalView: LocalProcessTerminalView {
     override func send(source: TerminalView, data: ArraySlice<UInt8>) {
         onInput?(data)
         super.send(source: source, data: data)
+    }
+
+    /// Files dropped from Finder (or a screenshot's thumbnail): true when they went in. Nil: drops are not taken.
+    var onDropFiles: (([URL]) -> Bool)? {
+        didSet { onDropFiles == nil ? unregisterDraggedTypes() : registerForDraggedTypes([.fileURL]) }
+    }
+
+    private static func fileURLs(_ info: NSDraggingInfo) -> [URL] {
+        (info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        onDropFiles != nil && !Self.fileURLs(sender).isEmpty ? .copy : []
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = Self.fileURLs(sender)
+        guard !urls.isEmpty, let onDropFiles else { return false }
+        return onDropFiles(urls)
     }
 
     // MARK: Copy

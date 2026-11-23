@@ -9222,6 +9222,16 @@ chat's id);
   Esc / Tab / Backspace and arrows, so ⌥Return during 한 reaches the input method (Hanja), and the input method's reads and
   replacements before the caret work on the cursor row. The marked-text overlay neither blanks the rest of the line
   (SwiftTerm#825) nor stays behind the caret (#826), and a composition is committed when the focus leaves.
+- **Files dropped on the terminal** (Finder, a screenshot's thumbnail — file URLs): their absolute paths go in as one
+  bracketed paste (`TerminalPaste`), never Enter, as Terminal.app and iTerm2 write them (Core `TerminalPathText.dropText`):
+  each shell-escaped — a backslash before a space and each of ``!"#$&'()*,;<=>?[\]^`{|}~`` and tab; Unicode as it is; a
+  name with another control character (a newline) single-quoted whole — separated by spaces, with one space after. Claude
+  Code takes an image's path as the image. The terminal takes the keyboard. While Claude Code is not running, or has no
+  bracketed paste yet, the drop is refused with the toast of §57.7's paste. Images dragged out of another app without a
+  file (a browser's picture) are not taken.
+- **Mention in Chat** (the changed-files list, a past round's file): in a terminal chat it pastes `@<relative path>` (`@"…"`
+  when the path holds whitespace) and a space into the TUI's prompt (`AppState.mentionInTerminal`, the §57.7 paste: no
+  Enter; its refusals as a toast) instead of adding a chip to the message box.
 - **Not in Stage 1.** The change budget (§54), the chat's permission cards and the per-turn model are not applied to a
   terminal chat (the TUI asks itself; the guard of §57.8 makes it ask for git and unseen edits); the TUI's `/rewind`
   restores files outside ReviewGate's snapshots (the next turn shows them as changed).

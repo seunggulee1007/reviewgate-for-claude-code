@@ -271,6 +271,7 @@ final class TerminalHub {
         let host = chatHosts[chatId] ?? TerminalHost()
         chatHosts[chatId] = host
         host.hooksSeen = { [weak store] in store?.sessionInfo.terminal?.hooksSeen == true }
+        host.takesFileDrops = true   // MARK: terminal-friction (§57.5)
         host.onExit = { [weak store] code in store?.terminalExited(sessionId: chatId, exitCode: code) }
         // §57.4: an Esc while this chat's turn runs (never between turns — that one closes a TUI menu).
         host.onEscape = { [weak self, weak store] at in

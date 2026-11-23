@@ -148,7 +148,7 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.send(data: [0x1b])
     }
 
-    // MARK: terminal-friction (§58, §57.4)
+    // MARK: terminal-friction (§58, §57.4, §57.5)
 
     /// §58: "Accept N & Continue" — `text` as one bracketed paste, then Enter a moment later (its own write, so the TUI
     /// reads it as the key, not as part of the paste). The user's click only; nothing automatic presses Enter.
@@ -182,6 +182,25 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
                 self.onEscape?(at)
             }
         }
+    }
+
+    /// §57.5: a terminal chat's host takes files dropped on it (read when a start makes its view).
+    @ObservationIgnored var takesFileDrops = false
+
+    /// §57.5: files dropped on the terminal — their shell-escaped paths, as Terminal.app writes them, one bracketed paste
+    /// and no Enter; the terminal takes the keyboard. Refused (with a toast saying why) while nothing runs or the program
+    /// has no bracketed paste.
+    private func dropFiles(_ urls: [URL]) -> Bool {
+        guard state.isRunning, !disconnected else {
+            Toast.show(NewChatKindText.terminalNotRunning, systemImage: "exclamationmark.triangle.fill")
+            return false
+        }
+        guard paste(TerminalPathText.dropText(urls.map(\.path))) else {
+            Toast.show(NewChatKindText.terminalNotReady, systemImage: "exclamationmark.triangle.fill")
+            return false
+        }
+        focus()
+        return true
     }
 
     /// The keyboard goes to the terminal when its window shows it (`makeFirstResponder` only; the app is never activated).
@@ -234,6 +253,11 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         v.optionAsMetaKeyForFunctionalKeys = true
         v.onInput = { [weak self] data in
             MainActor.assumeIsolated { self?.noteInput(data) }
+        }
+        if takesFileDrops {
+            v.onDropFiles = { [weak self] urls in
+                MainActor.assumeIsolated { self?.dropFiles(urls) ?? false }
+            }
         }
     }
 
