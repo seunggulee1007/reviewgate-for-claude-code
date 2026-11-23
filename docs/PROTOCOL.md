@@ -9846,3 +9846,10 @@ review" whatever the reason.
   since origin/main". Create PR is disabled — its reason in the tooltip — in a folder without git, on a detached HEAD,
   while Claude works and on `defaultBranch` (Core `AppState.prCreateBlocker`, Windows `branchFlow.ts`
   `prCreateBlocker`); a dirty tree or a pending review no longer disables it. New Branch follows `createBlocker`.
+- **Mac.** The branch menu: New Branch… follows `branchCreateBlocker()` (its tooltip says the changes come along, and
+  the sheet adds "your uncommitted changes come along" when the tree is dirty); Create PR from this branch… and the
+  commit banner's Create PR… follow `prCreateBlocker` with the reason as their tooltip; under a `dirtyWorktree` footer,
+  Commit… opens the commit sheet (disabled with `commitLockReason` or "Nothing to commit" when it cannot). The PR sheet
+  starts on `defaultBranch` (listed even when only the remote has it), shows the reason when the base is the branch
+  itself or nothing is on it since the base, disables Create PR then, and offers New Branch… beside the first — the
+  branch sheet opens as the PR sheet closes.
