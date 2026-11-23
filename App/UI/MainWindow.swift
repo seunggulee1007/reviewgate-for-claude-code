@@ -598,25 +598,39 @@ struct MainWindow: View {
     // MARK: Diff pane collapse (M16)
 
     /// The thin edge tab left of the diff pane, next to the file list; click (or ⌘⇧D) collapses or expands it. §57.5: a
-    /// terminal chat's review panel opens there too, left of the terminal.
+    /// terminal chat's review panel opens there too, left of the terminal — the tab reads "Review" and its badge is the
+    /// number of files waiting for a verdict (the tooltip and VoiceOver say "리뷰 패널 열기 · 대기 N개").
     private var diffEdgeTab: some View {
         let terminal = store.shownChatIsTerminal
         let opens = diffCollapsed   // the chevron points where the pane goes
+        let pending = store.pendingFiles.count
         return Button {
             setDiffCollapsed(!diffCollapsed)
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: opens ? "chevron.right" : "chevron.left").font(.caption2.weight(.semibold))
-                Text("Diff")
+                let word = terminal ? String(localized: "Review") : String(localized: "Diff")
+                if word.count <= 3 {
+                    // A short word (Korean "리뷰") reads upright, one syllable under the other; turned it lay on its side.
+                    VStack(spacing: 0) {
+                        ForEach(Array(word.enumerated()), id: \.offset) { Text(verbatim: String($0.element)) }
+                    }
                     .font(.caption.weight(.medium))
-                    .fixedSize()
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 12, height: 36)
-                if !store.changedFiles.isEmpty {
-                    Text(verbatim: String(store.changedFiles.count))
+                    .accessibilityHidden(true)
+                } else {
+                    Text(verbatim: word)
+                        .font(.caption.weight(.medium))
+                        .fixedSize()
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 12, height: 40)
+                        .accessibilityHidden(true)
+                }
+                if pending > 0 {
+                    Text(verbatim: String(pending))
                         .font(.caption2.weight(.semibold).monospacedDigit())
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(Color.orange.wash(colorScheme, light: 0.20, dark: 0.28), in: Capsule())
+                        .accessibilityHidden(true)
                 }
                 Spacer(minLength: 0)
             }
@@ -628,15 +642,42 @@ struct MainWindow: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .background(Color(nsColor: .windowBackgroundColor))
-        .help(terminal ? (terminalLayout == .overlay
-                            ? (diffCollapsed ? Text("Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (⌘⇧D)")
-                                             : Text("Hide the review panel (⌘⇧D, or Esc in the panel)"))
-                            : (diffCollapsed ? Text("Show the review panel between the file list and the terminal (⌘⇧D)") : Text("Hide the review panel — the terminal takes the width (⌘⇧D)")))
-                       : (diffCollapsed ? Text("Show the diff pane (⌘⇧D)") : Text("Hide the diff pane (⌘⇧D)")))
-        .accessibilityLabel(terminal ? (diffCollapsed ? Text("Show review panel") : Text("Hide review panel"))
-                                     : (diffCollapsed ? Text("Show diff pane") : Text("Hide diff pane")))
-        .accessibilityHint(terminal ? Text("The review panel opens left of the terminal, next to the file list (⌘⇧D)") : Text(verbatim: ""))
+        .help(edgeTabHelp(terminal: terminal, pending: pending))
+        .accessibilityLabel(edgeTabLabel(terminal: terminal, pending: pending))
+        .accessibilityHint(terminal ? (terminalLayout == .overlay
+                                       ? Text("It opens over the terminal, next to the file list (⌘⇧D)")
+                                       : Text("The review panel opens left of the terminal, next to the file list (⌘⇧D)"))
+                                    : Text(verbatim: ""))
         .accessibilityIdentifier("Diff edge tab")
+        .contextMenu {
+            if terminal {
+                Toggle("Hide Sidebar While Reviewing", isOn: $reviewHidesSidebar)
+                    .help("In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal")
+            }
+        }
+    }
+
+    /// "리뷰 패널 열기 · 대기 N개" (a terminal chat) / "Show diff pane · N pending" — what the click does and what the badge counts.
+    private func edgeTabLabel(terminal: Bool, pending: Int) -> Text {
+        switch (terminal, diffCollapsed, pending > 0) {
+        case (true, true, true): Text("Open review panel · \(pending) pending")
+        case (true, true, false): Text("Open review panel")
+        case (true, false, true): Text("Close review panel · \(pending) pending")
+        case (true, false, false): Text("Close review panel")
+        case (false, true, true): Text("Show diff pane · \(pending) pending")
+        case (false, true, false): Text("Show diff pane")
+        case (false, false, true): Text("Hide diff pane · \(pending) pending")
+        case (false, false, false): Text("Hide diff pane")
+        }
+    }
+
+    /// The label, then where it opens (a terminal chat: over the terminal in a narrow window) and the key.
+    private func edgeTabHelp(terminal: Bool, pending: Int) -> Text {
+        let label = edgeTabLabel(terminal: terminal, pending: pending)
+        guard terminal else { return label + Text(verbatim: " (⌘⇧D)") }
+        let place = !diffCollapsed ? Text("the terminal takes the width")
+            : terminalLayout == .overlay ? Text("over the terminal, next to the file list") : Text("between the file list and the terminal")
+        return label + Text(verbatim: " — ") + place + Text(verbatim: " (⌘⇧D)")
     }
 
     /// `remember` (explicit toggles only — ⌘⇧D, the edge tab) persists the choice per project; automatic

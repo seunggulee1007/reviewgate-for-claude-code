@@ -9104,10 +9104,14 @@ chat's id);
     file is picked in the sidebar or a link, for a past round's file, the running turn's live diff (§34.6) and a project
     file (§47); and, for a terminal chat, again each time the gate enters `reviewing` with files pending — so a panel the
     user closed during one review is back for the next. It closes when the review empties (all accepted / rejected).
-  - *Closing it.* The edge tab, left of the terminal (tooltip "파일 목록과 터미널 사이에 리뷰 패널 표시 (⌘⇧D)" / "리뷰 패널
-    숨기기 — 터미널이 너비를 모두 써요 (⌘⇧D)") or View › Toggle Diff Pane (⌘⇧D — the same key and the same pane as in a
-    chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the terminal). VoiceOver: "리뷰 패널 표시 / 숨기기" on
-    the tab, with the hint that the panel opens left of the terminal, next to the file list; the panel itself is "리뷰 패널".
+  - *Closing it.* The edge tab, left of the terminal, or View › Toggle Diff Pane (⌘⇧D — the same key and the same pane as
+    in a chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the terminal). The tab reads "리뷰", upright (a word of three letters or fewer stands one
+    letter under the other; a longer one — "Review", a chat's "Diff" — is turned) and its badge is the number of files waiting for a verdict (`pendingFiles`, none when nothing waits — not the
+    changed files, accepted ones included, it counted before). Its tooltip and VoiceOver label say what the click does and
+    what the number is: "리뷰 패널 열기 · 대기 N개" / "리뷰 패널 닫기 · 대기 N개" ("리뷰 패널 열기" with nothing waiting), the
+    tooltip then where — "— 터미널 위, 파일 목록 옆에 열려요", "— 파일 목록과 터미널 사이에 열려요" or "— 터미널이 너비를 모두
+    써요" — and ⌘⇧D; the VoiceOver hint says where it opens. A chat's tab: "Diff 패널 표시 · 대기 N개" / "Diff 패널 숨기기 · 대기
+    N개". Its right-click carries "리뷰하는 동안 사이드바 숨기기" (below). The panel itself is "리뷰 패널".
   - *Widths: the terminal never goes below 80 columns* (Core `PaneSplit`; a column is SwiftTerm's cell, the advance of
     "W" in the 13 pt monospaced system font rounded to the screen's pixels — 8 pt on a Retina screen, the terminal tour's
     numbers below — and the terminal adds a legacy scroller's 15 pt when scroll bars always show: 80 columns = 640 pt, or
