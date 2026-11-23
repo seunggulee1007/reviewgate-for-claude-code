@@ -613,6 +613,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
         return {};
       }
       // The Esc rule (§57.4): a turn left open by an interrupt ends at the next prompt.
+      this.opts.log("info", "terminal: a prompt arrived with the previous turn still open — its Stop never came; ended it");
       this.closeTurn("interrupted");
     }
     this.settlePrompt({ ok: false, reason: PROMPT_TIMEOUT_REASON }); // a stale wait (the CLI gave up on it, a forged hook)

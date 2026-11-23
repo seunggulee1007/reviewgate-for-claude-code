@@ -9236,7 +9236,9 @@ chat's id);
   prompt is adopted. A write tool whose hook comes while a prompt is being adopted (the gate already runs the prompt's
   turn, the terminal has none open yet) joins that turn (§52.1) — the turn is ours from then, so `session.externalTurn`
   is cleared with the join. (0.5.22 left it set: with nothing in a terminal chat to clear it, every later prompt was
-  blocked as "ReviewGate still has a turn running", and "Review now" had no turn to end.)
+  blocked as "ReviewGate still has a turn running", and "Review now" had no turn to end.) In a terminal chat
+  `externalTurn` only stands for a write tool's turn being taken: one still set when a prompt comes and none is being
+  taken is stale and ends before the prompt (logged warn); the Esc-rule close is logged too ("its Stop never came").
 - **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
   `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
   set, when the gate has run a turn with no hook for 60 s, or — the client sees what goes into its PTY — 2 s after the

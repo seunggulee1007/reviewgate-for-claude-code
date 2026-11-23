@@ -1040,6 +1040,19 @@ describe("terminal chats (§57)", () => {
       await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p3", "p3 running");
       expect(warns(r.h)).toEqual([]);
     });
+
+    it("a turn Claude started still marked running with none being taken does not block the next prompt: it ends", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await turn(r, s, "p1");
+      // Whatever left it set (0.5.22's join path did): in a terminal chat only a write tool being taken sets it.
+      (r.h.engine as unknown as { externalTurn: unknown }).externalTurn = { commandUuid: "p1", since: new Date().toISOString(), peer: null };
+      expect((await hook(s, ups("p2", "go on"))).decision).toBeUndefined();
+      const st = await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p2", "p2 running");
+      expect(st.session.externalTurn).toBeNull();
+      expect(warns(r.h)).toContain("terminal: a prompt arrived with a turn Claude started still marked running and none being taken; it ends");
+    });
   });
 });
 

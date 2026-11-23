@@ -3187,6 +3187,12 @@ export class ReviewEngine {
         await this.terminalGateSettled(ts, deadline);
         if (this.session !== ts || this.closed) return void answer({ ok: false, reason: RETIRED_REASON });
       }
+      if (this.externalTurn !== null && this.adoptQueue === null) {
+        // A terminal's only turn not ours is a write tool's while the engine takes it (§52.1, `adoptQueue`): with none
+        // being taken, the mark is stale — the prompt proves the CLI is not in a turn. It ends, then the prompt.
+        this.log("warn", "terminal: a prompt arrived with a turn Claude started still marked running and none being taken; it ends");
+        this.externalTurn = null;
+      }
       const slices = this.slices();
       if (!this.gate.checkpoint || !canSend(slices)) return void answer({ ok: false, reason: terminalBlockedReason(this.closedReason(slices)) });
       await this.followHeadMove();
