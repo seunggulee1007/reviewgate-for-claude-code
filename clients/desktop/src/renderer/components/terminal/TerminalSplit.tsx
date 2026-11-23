@@ -10,7 +10,7 @@ import type { ReviewState } from "@reviewgate/engine";
 import type { ProjectUI } from "../../../shared/ipc";
 import { reviewPanelCollapsed } from "../../friction";
 import { t } from "../../i18n";
-import { isComposing } from "../../ime";
+import { isComposing, isEnter } from "../../ime";
 import { useStore } from "../../store";
 import { measureCellWidth, reviewDrawerWidth, reviewHidesSidebar, reviewPanelWidth, reviewWidthForShare, terminalMinWidth, terminalReviewLayout, terminalShareOf, REVIEW_FLOOR, type TerminalReviewLayout } from "../../terminalLayout";
 import { focusLiveTerminal, liveTerminalChatId } from "../../terminal/terminalChat";
@@ -119,7 +119,7 @@ export function TerminalSplit() {
       if (!scroller || scroller.contains(el)) return; // the scroller itself scrolls natively
       e.preventDefault();
       scroller.scrollBy({ top: e.key === "ArrowDown" ? 40 : -40 });
-    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && drawer) {
+    } else if (isEnter(e) && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && drawer) {
       const accept = drawer.querySelector<HTMLButtonElement>('[data-testid="Accept"]:not(:disabled)');
       if (!accept) return;
       e.preventDefault();
