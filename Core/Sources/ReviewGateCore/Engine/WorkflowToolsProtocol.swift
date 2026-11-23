@@ -107,10 +107,13 @@ public struct WorkbenchFromPr: Codable, Sendable, Hashable {
 public struct WorkbenchTask: Codable, Sendable, Hashable {
     public var text: String
     public var mode: PermissionMode?
+    /// MARK: task-start — §63: the text is not sent; the new window's composer (or terminal prompt) gets it.
+    public var draft: Bool?
 
-    public init(text: String, mode: PermissionMode? = nil) {
+    public init(text: String, mode: PermissionMode? = nil, draft: Bool? = nil) {
         self.text = text
         self.mode = mode
+        self.draft = draft
     }
 }
 

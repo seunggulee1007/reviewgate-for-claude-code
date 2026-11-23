@@ -61,6 +61,11 @@ each in its own terminal with Run, Stop and Restart. Nothing runs until you clic
 with its own gate. Waiting for Claude to finish before a new chat? "New Chat in a Workbench" (⌥⌘T) opens one in a fresh
 workbench right away.
 
+**Start from a task.** A project window opens on a start screen: start straight away, start from a task, or continue a
+recent chat. Give a task's id or link — a GitHub issue is read with `gh`, Jira, Linear and other trackers by Claude
+through the MCP server you pick — and ReviewGate makes its branch (or workbench) and puts a first prompt in the message
+box for you to send.
+
 **Pull requests in the same viewer.** Open your GitHub or GitHub Enterprise PRs in the same diff viewer, leave line
 comments, or hand a comment thread to Claude.
 

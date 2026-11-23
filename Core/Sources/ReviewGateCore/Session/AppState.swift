@@ -224,6 +224,8 @@ public final class AppState {
     @ObservationIgnored public var onTerminalRestart: (@MainActor () -> Void)?
     /// The terminal waits and permission dialogs raised as attention (`terminalSnapshotApplied`), so each is raised once.
     @ObservationIgnored var raisedTerminalWaitKeys: Set<String> = []
+    /// MARK: task-start — §63: the first prompt on its way into a terminal chat's prompt (retried while its Claude Code starts).
+    @ObservationIgnored var firstPromptTask: Task<Void, Never>?
     /// MARK: terminal-default — §57.7 "Paste into the terminal": the App pastes the text into the live terminal chat's
     /// PTY (bracketed, never followed by Enter) and gives it the keyboard; returns why it could not (nil: pasted).
     @ObservationIgnored public var onTerminalPaste: (@MainActor (String) -> String?)?
@@ -2359,6 +2361,8 @@ public final class AppState {
         case .projectFile, .projectSearch:   // MARK: code-browser — §47 replies, consumed by the request that asked
             break
         case .definitions, .references:   // MARK: code-nav — §62 replies, consumed by the request that asked
+            break
+        case .taskFetched:   // MARK: task-start — §63 reply, consumed by the request that asked
             break
         }
     }

@@ -22,6 +22,8 @@ export type TaskHandoff = {
   text: string;
   /** The fresh chat's mode (one of the four; never a bypass); absent: the worktree's own default. */
   mode?: PermissionMode;
+  /** MARK: task-start — §63: a draft — the client puts `text` into the composer; nothing is sent. */
+  draft?: true;
   /** ISO-8601 */
   at: string;
 };
@@ -66,6 +68,7 @@ export function takeTaskHandoff(gitDir: string, now: number = Date.now()): TaskH
     from: { path: fromPath, name: typeof v.from?.name === "string" && v.from.name ? v.from.name : basename(fromPath) },
     text,
     ...(v.mode !== undefined ? { mode: v.mode } : {}),
+    ...(v.draft === true ? { draft: true as const } : {}),
     at: v.at,
   };
 }

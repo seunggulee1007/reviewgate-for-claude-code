@@ -710,6 +710,9 @@ public enum EngineCommand: Sendable, Equatable {
     case findDefinition(symbol: String, fromPath: String? = nil, line: Int? = nil)
     /// §62: every line holding `symbol` as a whole word, the clicked file first → `.references`.
     case findReferences(symbol: String, fromPath: String? = nil, limit: Int? = nil)
+    // MARK: task-start
+    /// §63: one GitHub issue (`gh issue view`) for "Start from a task" → `.taskFetched`.
+    case taskFetch(ref: String)
     case shutdown
 
     /// The wire `type` discriminator.
@@ -869,6 +872,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .projectSearch: "project_search"
         case .findDefinition: "find_definition"   // MARK: code-nav
         case .findReferences: "find_references"
+        case .taskFetch: "task_fetch"   // MARK: task-start
         case .shutdown: "shutdown"
         }
     }
@@ -912,6 +916,7 @@ extension EngineCommand: Encodable {
         case columns, visible   // wave6 w6-statusline
         case caseSensitive, wholeWord   // code-browser
         case symbol, fromPath   // code-nav
+        case ref   // task-start
         case confirm   // §59
     }
 
@@ -1186,6 +1191,8 @@ extension EngineCommand: Encodable {
             try c.encode(symbol, forKey: .symbol)
             try c.encodeIfPresent(fromPath, forKey: .fromPath)
             try c.encodeIfPresent(limit, forKey: .limit)
+        case let .taskFetch(ref):   // MARK: task-start (§63)
+            try c.encode(ref, forKey: .ref)
         case let .requestChanges(extra, noteIds):
             try c.encodeIfPresent(extra, forKey: .extra)
             try c.encodeIfPresent(noteIds, forKey: .noteIds)
@@ -3035,6 +3042,9 @@ public enum EngineEvent: Sendable, Equatable {
     case definitions(DefinitionsReply)
     /// §62: reply to `find_references`.
     case references(ReferencesReply)
+    // MARK: task-start
+    /// §63: reply to `task_fetch`.
+    case taskFetched(TaskFetchedReply)
     // MARK: wave4d w4d-plan
     /// §42.1: `plan_approved` with `into` — the fresh chat, the plan handed to a workbench, or received from one.
     case planApprovedInto(PlanApprovedInfo)
@@ -3084,6 +3094,7 @@ public enum EngineEvent: Sendable, Equatable {
         case let .projectSearch(reply): reply.id
         case let .definitions(reply): reply.id   // MARK: code-nav
         case let .references(reply): reply.id
+        case let .taskFetched(reply): reply.id   // MARK: task-start
         default: nil
         }
     }
@@ -3329,6 +3340,8 @@ extension EngineEvent: Decodable {
             self = .definitions(try DefinitionsReply(from: decoder))
         case "references":
             self = .references(try ReferencesReply(from: decoder))
+        case "task_fetched":   // MARK: task-start (§63)
+            self = .taskFetched(try TaskFetchedReply(from: decoder))
         case "plan_proposed":
             self = .planProposed(
                 path: try c.decodeIfPresent(String.self, forKey: .path),

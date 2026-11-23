@@ -2802,7 +2802,7 @@ private final class Tour {
         for appearance in [Appearance.dark, .light] {
             AppSettings.setAppearance(appearance)
             // Not Advanced: its toolchain rows show where node was found, which may be under the home folder.
-            for pane in [SettingsPane.general, .permissions, .session, .review, .git, .extensions] {
+            for pane in [SettingsPane.general, .permissions, .session, .review, .git, .tasks, .extensions] {
                 UserDefaults.standard.set(pane.rawValue, forKey: tabKey)
                 try await shot(pane.rawValue, appearance: appearance)
             }
@@ -2822,8 +2822,31 @@ private final class Tour {
             try await shot("restart-banner", appearance: appearance)
             log("settings restart-banner-\(appearance.rawValue): waiting \(store.settingsWaitingForRestart.joined(separator: ", "))")
             store.debugSetSettingsAtSessionStart(nil)
+            try await startScreenShots(appearance: appearance)   // MARK: task-start (§63)
         }
         AppSettings.setAppearance(.dark)
+    }
+
+    /// MARK: task-start — §63.4: the start screen (at the laptop window's chat area) and the "Start from a task" sheet, each
+    /// in a panel of its own (hidden while quiet), as `start-*` PNGs.
+    private func startScreenShots(appearance: Appearance) async throws {
+        func shot<V: View>(_ name: String, _ view: V, size: NSSize) async throws {
+            let host = NSHostingView(rootView: view.environment(store).environment(store.pr).environment(entry.model)
+                .frame(width: size.width, height: size.height))
+            let panel = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            panel.title = "Start"
+            panel.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
+            panel.contentView = host
+            ScreenshotTour.hideIfQuiet(panel)
+            panel.orderFrontRegardless()
+            try await Task.sleep(for: .milliseconds(900))
+            let rep = try render(panel)
+            log("start \(name)-\(appearance.rawValue): \(Int(panel.frame.width))×\(Int(panel.frame.height)) pt, chats \(store.startScreenChats.count)")
+            try write(rep, "start-\(name)-\(appearance.rawValue)")
+            panel.orderOut(nil)
+        }
+        try await shot("screen", StartScreenView(), size: NSSize(width: 700, height: 560))
+        try await shot("task-sheet", TaskStartSheet { _ in }, size: NSSize(width: 560, height: 520))
     }
 
     // MARK: Open Project (`SHOTS_LAYOUT=open`)

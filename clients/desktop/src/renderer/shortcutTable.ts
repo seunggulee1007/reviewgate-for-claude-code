@@ -18,6 +18,16 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Settings…", mac: "⌘,", win: "Ctrl+," },
     ],
   },
+  // MARK: task-start (§63.4): the Mac's start screen — this client has none yet, so the keys are listed as Mac only.
+  {
+    title: "Start screen",
+    note: "When a project window opens",
+    rows: [
+      { action: "Start now · Start from a task · Open a chat", mac: "1 / 2 / 3", win: "—", note: "Mac app only" },
+      { action: "Move through the choices and the recent chats, then open the marked one", mac: "↑ ↓ ↩", win: "—", note: "Mac app only" },
+      { action: "Start now", mac: "Esc", win: "—", note: "Mac app only" },
+    ],
+  },
   {
     title: "View",
     rows: [

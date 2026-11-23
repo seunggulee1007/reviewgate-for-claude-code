@@ -256,6 +256,7 @@ struct MainWindow: View {
                                 }
                             }
                             .frame(minHeight: 200, maxHeight: .infinity)
+                            .overlay { StartScreenOverlay() }   // MARK: task-start (§63): 바로 시작 · 업무로 시작 · 대화로 열기
                             if model.shell.visible { ShellPanelView() } else { PanelStatusBar() }   // c-panel (§57.18)
                         }
                     }
@@ -770,6 +771,7 @@ struct MainWindow: View {
     /// MARK: wave4d w4d-plan — §42.1: a workbench made for the pending plan gets it first (its window implements it when it
     /// opens); a refusal stays on the plan card. Either way the new workbench opens.
     private func workbenchCreated(_ url: URL) {
+        WorkbenchRegistry.shared.suppressStartScreen(for: url)   // MARK: task-start (§63): it opens into its fresh chat
         // A workbench some window already shows ("Open that workbench") would only take the plan when it is opened again.
         guard let mode = model.newWorkbenchPlanMode, store.pendingPlan != nil, WorkbenchRegistry.shared.entry(for: url) == nil else {
             model.newWorkbenchPlanMode = nil

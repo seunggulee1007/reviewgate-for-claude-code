@@ -42,6 +42,12 @@ public enum ShortcutTable {
             ShortcutRow("New Window", mac: "⌘N", windows: "Ctrl+N"),   // MARK: polish p-lifecycle (P1-chrome-06)
             ShortcutRow("Settings…", mac: "⌘,", windows: "Ctrl+,"),
         ]),
+        // MARK: task-start (§63.4): the start screen of a project window (Mac only for now).
+        ShortcutSection("Start screen", note: "When a project window opens", rows: [
+            ShortcutRow("Start now · Start from a task · Open a chat", mac: "1 / 2 / 3", windows: "—", note: "Mac app only"),
+            ShortcutRow("Move through the choices and the recent chats, then open the marked one", mac: "↑ ↓ ↩", windows: "—", note: "Mac app only"),
+            ShortcutRow("Start now", mac: "Esc", windows: "—", note: "Mac app only"),
+        ]),
         ShortcutSection("View", rows: [
             ShortcutRow("Refresh", mac: "⌘R", windows: "Ctrl+R"),
             ShortcutRow("Toggle Sidebar", mac: "⌃⌘S", windows: "Ctrl+B"),
