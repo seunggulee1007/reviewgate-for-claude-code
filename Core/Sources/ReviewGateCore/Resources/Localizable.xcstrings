@@ -2993,6 +2993,22 @@
         }
       }
     },
+    "Changed allow rules may apply to look-up / read tools from the next session (check them in Settings › Permissions › Terminal (Claude Code) allow rules).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed allow rules may apply to look-up / read tools from the next session (check them in Settings › Permissions › Terminal (Claude Code) allow rules)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바뀐 허용 규칙은 다음 세션부터 조회·읽기 도구에 적용될 수 있어요 (설정 › 권한 › 터미널(Claude Code) 허용 규칙에서 확인)."
+          }
+        }
+      }
+    },
     "Changed where this window's review does not see it": {
       "localizations": {
         "en": {
@@ -6611,6 +6627,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "아직 side question 답이 없어요 — /btw 뒤에 질문을 적어요"
+          }
+        }
+      }
+    },
+    "Node.js (node) was not found. Install Node.js, or set its path in Settings › Advanced › Toolchain overrides › node path, then reopen the project.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Node.js (node) was not found. Install Node.js, or set its path in Settings › Advanced › Toolchain overrides › node path, then reopen the project."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Node.js(node)를 찾을 수 없어요. Node.js를 설치하거나 설정 › 고급 › 툴체인 경로 지정 › node 경로에 경로를 지정한 뒤 프로젝트를 다시 여세요."
           }
         }
       }

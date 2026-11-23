@@ -441,7 +441,7 @@ public enum ReviewProvenanceText {
 
     /// Added when the permissions changed (§33.5: the user's allow rules apply to read-only tools).
     public static var localSettingsPermissionsNote: String {
-        String(localized: "Changed allow rules may apply to look-up / read tools from the next session (check them in Settings › General › Permissions › Terminal (Claude Code) allow rules).", bundle: .module)
+        String(localized: "Changed allow rules may apply to look-up / read tools from the next session (check them in Settings › Permissions › Terminal (Claude Code) allow rules).", bundle: .module)
     }
 
     public static func nestedKind(_ kind: NestedKind) -> String {
