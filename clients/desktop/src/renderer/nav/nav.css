@@ -78,3 +78,16 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .nav-hover-where { font-size: 11px; color: var(--fg-3); margin: 2px 0 4px; }
 .nav-hover-code { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); white-space: pre; overflow: hidden; max-height: calc(18 * 16px); line-height: 16px; }
 .nav-hover-code .target { color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* §65.8 The References tab of the bottom panel: the hits by file on the left, the selected one's context on the right. */
+.nav-refs-tab { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; background: var(--panel); }
+.nav-refs-tab.empty-tab { align-items: center; justify-content: center; font-size: 12px; padding: 12px; text-align: center; }
+.nav-refs-split { display: flex; flex: 1 1 auto; min-height: 0; }
+.nav-refs-split .nav-refs-list { flex: 1 1 55%; min-width: 0; outline: none; }
+.nav-refs-split .nav-refs-list:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.nav-ref.selected { background: var(--accent-bg); }
+.nav-refs-preview { flex: 1 1 45%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.nav-refs-preview-head { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.nav-refs-preview-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-refs-preview-code { flex: 1 1 auto; overflow: auto; font-family: var(--mono); font-size: 12px; background: var(--bg); }
+.nav-refs-preview-code mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 2px; }

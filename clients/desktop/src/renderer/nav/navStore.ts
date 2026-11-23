@@ -11,7 +11,7 @@ import { t } from "../i18n";
 import { useStore } from "../store";
 import { showToast } from "../toast";
 import { isSendableSymbol } from "./identifier";
-import { EMPTY_HISTORY, goBack, goForward, peekRows, pushHistory, referenceRows, searchRows, type NavHistory, type NavLocation, type PeekRow, type RefRow } from "./navModel";
+import { EMPTY_HISTORY, goBack, goForward, peekRows, pushHistory, referenceOrder, referenceRows, searchRows, stepReference, type NavHistory, type NavLocation, type PeekRow, type RefRow } from "./navModel";
 import { sameAnchor, useBandSlot, type BandAnchor } from "./bandSlot"; // §65.8
 import { bandLines, bandRows, type BandLine, type BandRow } from "./peekModel";
 import { HoverDebounce } from "./hoverModel";
@@ -33,11 +33,18 @@ export type PeekState = {
 };
 
 export type RefsState = {
+  /** Each search's own number: the References tab comes forward for a new one (§65.8). */
+  seq: number;
   mode: "references" | "search";
   symbol: string;
   fromPath?: string;
   loading: boolean;
+  /** In the tab's order (`referenceOrder`: by file, then line) — the order F4 / Shift+F4 walk. */
   rows: RefRow[];
+  /** The row the preview shows and F4 steps from (-1: none yet). */
+  selected: number;
+  /** §65.8 the selected row's context (`definition_preview`), the refusal said, absent while it comes. */
+  preview?: { index: number; data: SymbolPreviewEvent | null; error: string | null };
   files: number;
   truncated: boolean;
   timedOut: boolean;
@@ -94,6 +101,14 @@ type NavState = {
   hideHover(): void;
   findReferences(q: { symbol: string; fromPath?: string }): void;
   findInProject(symbol: string): void;
+  /** §65.8: the References tab's row `index` — its context in the preview pane. */
+  selectReference(index: number): void;
+  /** F4 / Shift+F4: the next / previous row, selected and opened where §62 opens it. False: there are none. */
+  stepReferences(dir: 1 | -1): boolean;
+  /** Enter / a click: the row opened (Back returns to where the user was). */
+  openReference(index: number): void;
+  /** The same search again (the tab's ↻). */
+  refreshReferences(): void;
   /** Opens a result: a changed file of the review in its diff at that line, any other file in the project file view. */
   openTarget(target: NavTarget, from: NavLocation | null): void;
   back(): void;
@@ -274,12 +289,13 @@ export const useNav = create<NavState>((set, get) => {
     findReferences({ symbol, fromPath }) {
       if (!isSendableSymbol(symbol)) return;
       const seq = ++refSeq;
-      const base = { mode: "references" as const, symbol, rows: [], files: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}) };
+      const base = { seq, mode: "references" as const, symbol, rows: [], selected: -1, files: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}) };
       set({ peek: null, refs: { ...base, loading: true } });
       engineRequest({ type: "find_references", symbol, ...(fromPath ? { fromPath } : {}) })
         .then((reply) => {
           if (seq !== refSeq || !get().refs) return;
-          set({ refs: { ...base, loading: false, rows: referenceRows(reply.hits), files: reply.files, truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          set({ refs: { ...base, loading: false, rows: referenceOrder(referenceRows(reply.hits)), files: reply.files, truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          if (reply.hits.length > 0) get().selectReference(0);
         })
         .catch((e: unknown) => {
           if (seq === refSeq && get().refs) set({ refs: { ...base, loading: false, error: messageOf(e) } });
@@ -288,17 +304,59 @@ export const useNav = create<NavState>((set, get) => {
 
     findInProject(symbol) {
       const seq = ++refSeq;
-      const base = { mode: "search" as const, symbol, rows: [], files: 0, truncated: false, timedOut: false, error: null };
+      const base = { seq, mode: "search" as const, symbol, rows: [], selected: -1, files: 0, truncated: false, timedOut: false, error: null };
       set({ peek: null, refs: { ...base, loading: true } });
       engineRequest({ type: "project_search", query: symbol, wholeWord: true, caseSensitive: true })
         .then((reply) => {
           if (seq !== refSeq || !get().refs) return;
-          const rows = searchRows(reply.matches, symbol);
+          const rows = referenceOrder(searchRows(reply.matches, symbol));
           set({ refs: { ...base, loading: false, rows, files: new Set(rows.map((r) => r.path)).size, truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          if (rows.length > 0) get().selectReference(0);
         })
         .catch((e: unknown) => {
           if (seq === refSeq && get().refs) set({ refs: { ...base, loading: false, error: messageOf(e) } });
         });
+    },
+
+    selectReference(index) {
+      const r = get().refs;
+      const row = r?.rows[index];
+      if (!r || !row) return;
+      if (r.selected === index && r.preview?.index === index) return;
+      const seq = r.seq;
+      set({ refs: { ...r, selected: index, preview: { index, data: null, error: null } } });
+      engineRequest({ type: "definition_preview", path: row.path, line: row.line, before: 4, after: 8 })
+        .then((data) => {
+          const cur = get().refs;
+          if (cur && cur.seq === seq && cur.selected === index) set({ refs: { ...cur, preview: { index, data, error: null } } });
+        })
+        .catch((e: unknown) => {
+          const cur = get().refs;
+          if (cur && cur.seq === seq && cur.selected === index) set({ refs: { ...cur, preview: { index, data: null, error: messageOf(e) } } });
+        });
+    },
+
+    stepReferences(dir) {
+      const r = get().refs;
+      const next = r && !r.loading ? stepReference(r.selected, r.rows.length, dir) : null;
+      if (next === null) return false;
+      get().openReference(next);
+      return true;
+    },
+
+    openReference(index) {
+      const r = get().refs;
+      const row = r?.rows[index];
+      if (!r || !row) return;
+      get().selectReference(index);
+      get().openTarget({ path: row.path, line: row.line, column: row.column, symbol: r.symbol }, currentLocation());
+    },
+
+    refreshReferences() {
+      const r = get().refs;
+      if (!r) return;
+      if (r.mode === "search") get().findInProject(r.symbol);
+      else get().findReferences({ symbol: r.symbol, ...(r.fromPath ? { fromPath: r.fromPath } : {}) });
     },
 
     openTarget(target, from) {

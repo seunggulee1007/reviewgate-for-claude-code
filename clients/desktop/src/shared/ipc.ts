@@ -226,8 +226,8 @@ export type ProjectUI = {
   terminalReviewSplit?: number;
   /** §57.17: the bottom shell panel's height in px (at least 80; the window keeps 200 above it). */
   terminalPanelHeight?: number;
-  /** MARK: c-panel — §57.18: the panel's tab (absent: the terminal). */
-  terminalPanelTab?: "terminal" | "output" | "run";
+  /** MARK: c-panel — §57.18: the panel's tab (absent: the terminal); §65.8 "references". */
+  terminalPanelTab?: "terminal" | "output" | "run" | "references";
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };

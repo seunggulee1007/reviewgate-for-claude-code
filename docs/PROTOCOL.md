@@ -10324,7 +10324,8 @@ section.
     this section), the results shown in the references panel. `truncated` "Showing the best 50", `timedOut` "Search stopped
     after 10 s" (a single candidate still opens, the toast says so). A refusal is said in the peek. A newer request drops an
     older one's reply (the client numbers them).
-  - **Find References** (Shift+F12, the line menu, the peek's footer): a panel under the panes, "N references in M files"
+  - **Find References** (Shift+F12, the line menu, the peek's footer): a panel under the panes (§65.8: the bottom
+    panel's References tab now; this strip only on the PRs tab), "N references in M files"
     (`Only the first 500`, `Search stopped after 15 s`), grouped by file in the order received; a row opens as above; a
     `kind` hit is labelled "Looks like the definition".
   - **Back / Forward**: Alt+← / Alt+→ (not in a text field; inside Monaco too), ← / → in the diff header (once there is a
@@ -10812,6 +10813,14 @@ through).
   `symbol.signature` in bold (else the candidate's `preview`), "File.kt:5 · folder", the doc comment and the next lines,
   the definition line marked. Nothing for no candidate or a refusal. Ctrl released, the pointer off the name, a click or
   a scroll ends it; each request is numbered and only the newest one's reply shows.
+- **References tab** (`nav/ReferencesPanel.tsx`; the bottom panel of §57.18 gets a fourth tab, 참조, `ui.terminalPanelTab:
+  "references"`): Shift+F12, the line menu, the peek's References and "Find in Project" fill it and bring it forward.
+  Left the hits grouped by file (`referenceOrder`: files in the order their first hit came, lines as received — the
+  order F4 walks), "definition" on a `kind` row; right the selected hit's context (`definition_preview {path, line,
+  before: 4, after: 8}`, its line marked with the name). ↑ / ↓ pick, Enter / a double click opens (§62's opening; Back
+  returns), F4 / Shift+F4 anywhere but a terminal open the next / previous (wrapping; from none selected the first / the
+  last), ↻ sends the same search again, × clears it. Empty, it says what fills it. The §62 strip under the panes stays
+  only on the PRs tab (it has no bottom panel).
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.

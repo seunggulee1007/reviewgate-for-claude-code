@@ -14,6 +14,8 @@ import { clampPanelHeight, closeShell, forgetShell, openShell, PANEL_TABS, panel
 import type { OutputFilter } from "../../outputLog";
 import { OutputControls, OutputPanel } from "./OutputPanel"; // MARK: c-panel (§57.18)
 import { RunPanel } from "./RunPanel";
+import { ReferencesPanel } from "../../nav/ReferencesPanel"; // §65.8
+import { useNav } from "../../nav/navStore";
 import { isTerminalPanelKey } from "../../terminal/terminalKeys";
 import { focusLiveTerminal } from "../../terminal/terminalChat";
 import { focusTerminal, runningRuns, shellTerminals, subscribeTerminals, terminalsVersion, terminalStatus } from "../../terminal/termHost";
@@ -64,6 +66,10 @@ export function useShellPanelHost(): void {
       toggleShellPanel(defaultShell(), backToChat, currentTab());
     };
     document.addEventListener("keydown", onKey);
+    // §65.8: a new Find References / Find in Project brings the References tab forward (the PRs tab has its own strip).
+    const offRefs = useNav.subscribe((n, prev) => {
+      if (n.refs && n.refs.seq !== prev.refs?.seq && useStore.getState().tab !== "prs") showPanelTab("references");
+    });
     // A shell that exited 0, or ended with the project: its tab goes.
     const offTerms = subscribeTerminals(() => {
       for (const id of shellTerminals()) {
@@ -74,6 +80,7 @@ export function useShellPanelHost(): void {
     return () => {
       document.removeEventListener("keydown", onKey);
       offTerms();
+      offRefs();
     };
   }, []);
 }
@@ -117,7 +124,7 @@ export function PanelStatusBar() {
       <span className="grow" />
       {PANEL_TABS.map((tab) => (
         <button key={tab} type="button" className="plain small" title={panelTabHelp(tab)} onClick={() => showPanelTab(tab)} data-testid={`Panel status ${tab}`}>
-          <Icon name={tab === "terminal" ? "terminal" : tab === "output" ? "lines" : "play"} size={11} />
+          <Icon name={tab === "terminal" ? "terminal" : tab === "output" ? "lines" : tab === "references" ? "search" : "play"} size={11} />
           <span>{panelTabTitle(tab)}</span>
           {tab === "run" && running > 0 && <span className="run-count">{running}</span>}
         </button>
@@ -274,6 +281,11 @@ export function ShellPanel() {
       {tab === "run" && (
         <div className="shell-body">
           <RunPanel />
+        </div>
+      )}
+      {tab === "references" && (
+        <div className="shell-body">
+          <ReferencesPanel />
         </div>
       )}
       {tab === "terminal" && <div className="shell-body">

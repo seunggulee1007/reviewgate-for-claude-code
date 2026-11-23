@@ -73,13 +73,15 @@ export function windowKey(e: ShortcutKey): WindowKey | null {
 
 /**
  * §62 code navigation: F12, Shift+F12, Alt+← / Alt+→ (Back / Forward), Ctrl+Alt+O (Open in IDE — the physical O);
- * §65.8 Alt+F12 (Peek Definition).
+ * §65.8 Alt+F12 (Peek Definition), F4 / Shift+F4 (next / previous reference).
  */
-export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde" | "peek";
+export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde" | "peek" | "nextReference" | "previousReference";
 
 export function navKey(e: ShortcutKey): NavKey | null {
   if (e.key === "F12" && !mod(e) && !e.altKey) return e.shiftKey ? "references" : "definition";
   if (e.key === "F12" && !mod(e) && e.altKey && !e.shiftKey) return "peek";
+  // §65.8: F4 / Shift+F4 step through the References tab (Alt+F4 stays Windows' own).
+  if (e.key === "F4" && !mod(e) && !e.altKey) return e.shiftKey ? "previousReference" : "nextReference";
   if (e.altKey && !mod(e) && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return e.key === "ArrowLeft" ? "back" : "forward";
   if (mod(e) && e.altKey && !e.shiftKey && (e.code === "KeyO" || e.key.toLowerCase() === "o")) return "openInIde";
   return null;

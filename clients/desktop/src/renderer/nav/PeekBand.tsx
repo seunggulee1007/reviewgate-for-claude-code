@@ -6,7 +6,6 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../i18n";
-import { languageFor, monaco } from "../monaco";
 import { searchedWord } from "./navModel";
 import { useNav } from "./navStore";
 import { BAND_VISIBLE_LINES, bandKey, bandLines, bandScrollLine, bandTitle, type BandLine } from "./peekModel";
@@ -20,8 +19,9 @@ function useColorized(lines: readonly BandLine[] | null, path: string): string[]
   useEffect(() => {
     if (!lines || lines.length === 0) return;
     let live = true;
-    monaco.editor
-      .colorize(lines.map((l) => l.text).join("\n"), languageFor(path), { tabSize: 4 })
+    // Monaco loads with the first band, not with the window's navigation layer.
+    import("../monaco")
+      .then(({ languageFor, monaco }) => monaco.editor.colorize(lines.map((l) => l.text).join("\n"), languageFor(path), { tabSize: 4 }))
       .then((out) => {
         const parts = out.split("<br/>");
         if (live && parts.length >= lines.length) setHtml({ key, lines: parts.slice(0, lines.length) });

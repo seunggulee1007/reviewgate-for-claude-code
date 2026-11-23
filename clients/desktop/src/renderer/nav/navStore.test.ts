@@ -134,7 +134,7 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().peek).toMatchObject({ loading: false, rows: [], error: null });
     m.useNav.getState().findInProject("nope");
     await flush();
-    expect(sent[sent.length - 1]).toEqual({ type: "project_search", query: "nope", wholeWord: true, caseSensitive: true });
+    expect(sent.find((c) => c.type === "project_search")).toEqual({ type: "project_search", query: "nope", wholeWord: true, caseSensitive: true });
     expect(m.useNav.getState().peek).toBeNull();
     expect(m.useNav.getState().refs).toMatchObject({ mode: "search", files: 2, loading: false });
     m.useNav.getState().findReferences({ symbol: "nope", fromPath: "a.js" });
@@ -269,5 +269,51 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().hover?.path).toBe("fast.kt");
     m.useNav.getState().hideHover();
     expect(m.useNav.getState().hover).toBeNull();
+  });
+
+  it("§65.8 References tab: rows by file, the first one's context asked; F4 / Shift+F4 open the next / previous", async () => {
+    replies.set("find_references", () => ({
+      type: "references",
+      symbol: "total",
+      hits: [
+        { path: "src/A.java", line: 3, column: 5, preview: "total();" },
+        { path: "lib/C.java", line: 8, column: 2, preview: "total()", kind: "method" },
+        { path: "src/A.java", line: 9, column: 5, preview: "x = total();" },
+      ],
+      files: 2,
+      truncated: false,
+    }));
+    const previews: EngineCommand[] = [];
+    replies.set("definition_preview", (cmd) => {
+      previews.push(cmd);
+      const p = cmd as { path: string; line: number };
+      return { type: "definition_preview", path: p.path, line: p.line, startLine: p.line - 4, lines: ["a", "b", "c", "d", "total();"], totalLines: 40, language: "java", truncated: false };
+    });
+    m.useNav.getState().findReferences({ symbol: "total", fromPath: "src/A.java" });
+    const firstSeq = m.useNav.getState().refs!.seq;
+    await flush();
+    await flush();
+    const r = m.useNav.getState().refs!;
+    expect(r.rows.map((x) => `${x.path}:${x.line}`)).toEqual(["src/A.java:3", "src/A.java:9", "lib/C.java:8"]);
+    expect(r.selected).toBe(0);
+    expect(previews).toEqual([{ type: "definition_preview", path: "src/A.java", line: 3, before: 4, after: 8 }]);
+    expect(r.preview).toMatchObject({ index: 0, error: null });
+
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // F4: A.java:9 in the review's diff
+    expect(m.useNav.getState().refs!.selected).toBe(1);
+    expect(m.useNav.getState().reveal).toMatchObject({ path: "src/A.java", line: 9 });
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // lib/C.java:8 — not under review: the file view
+    await flush();
+    expect(m.useNav.getState().file).toMatchObject({ path: "lib/C.java", line: 8 });
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // wraps to the first
+    expect(m.useNav.getState().refs!.selected).toBe(0);
+    expect(m.useNav.getState().stepReferences(-1)).toBe(true); // Shift+F4: the last
+    expect(m.useNav.getState().refs!.selected).toBe(2);
+
+    m.useNav.getState().refreshReferences();
+    expect(m.useNav.getState().refs!.seq).toBeGreaterThan(firstSeq);
+    expect(sent.filter((c) => c.type === "find_references")).toHaveLength(2);
+    m.useNav.getState().closeRefs();
+    expect(m.useNav.getState().stepReferences(1)).toBe(false);
   });
 });

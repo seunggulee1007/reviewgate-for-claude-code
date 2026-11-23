@@ -11,13 +11,16 @@ import { showToast } from "../toast";
 import { navKey } from "../keymap";
 import { isTerminalTarget } from "../terminal/terminalKeys";
 import { domTargetAt, domTargetAtSelection, navModifier, type DomNavTarget } from "./domTarget";
-import { groupByFile, markSymbol, peekKey, splitPath, type NavLocation, type RefRow } from "./navModel";
-import { backBlocked, currentLocation, endHover, forwardBlocked, hoverTimer, useNav } from "./navStore";
+import { groupByFile, peekKey, splitPath, type NavLocation, type RefRow } from "./navModel";
+import { currentLocation, endHover, hoverTimer, useNav } from "./navStore";
+import { NavHistoryButtons, Preview } from "./NavBits";
 import { openInIde } from "./openInIde";
 import { useBandSlot } from "./bandSlot"; // §65.8
 import { PeekBand } from "./PeekBand";
 import { ctrlClickAction } from "./peekModel";
 import "./nav.css";
+
+export { NavHistoryButtons, Preview } from "./NavBits";
 
 const APPROXIMATE = () => t("Search-based: may list look-alikes");
 
@@ -155,6 +158,10 @@ function useNavKeys(): void {
       const k = navKey(e);
       if (!k || e.defaultPrevented || useStore.getState().dialog || isTerminalTarget(e.target)) return;
       const inMonaco = e.target instanceof Element && e.target.closest(".monaco-editor") !== null;
+      if (k === "nextReference" || k === "previousReference") {
+        if (useNav.getState().stepReferences(k === "nextReference" ? 1 : -1)) e.preventDefault();
+        return;
+      }
       if (k === "back" || k === "forward") {
         if (editable(e.target) && !inMonaco) return;
         e.preventDefault();
@@ -189,15 +196,6 @@ function useNavKeys(): void {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
-}
-
-/** The symbol marked in a preview line. */
-export function Preview(props: { text: string; symbol: string }) {
-  return (
-    <div className="nav-preview" title={props.text}>
-      {markSymbol(props.text, props.symbol).map((p, i) => (p.mark ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>))}
-    </div>
-  );
 }
 
 /** Mounted once: the listeners, the peek list and the peek band (portalled into the slot under its line). */
@@ -435,23 +433,5 @@ export function NavRefsPanel() {
         ))}
       </div>
     </div>
-  );
-}
-
-/** ← / → (Alt+← / Alt+→): each says why it cannot go when it cannot. `always`: shown even with no history yet. */
-export function NavHistoryButtons(props: { always?: boolean }) {
-  const history = useNav((s) => s.history);
-  if (!props.always && history.back.length === 0 && history.forward.length === 0) return null;
-  const back = backBlocked(history);
-  const forward = forwardBlocked(history);
-  return (
-    <span className="nav-history" role="group" aria-label={t("Back") + " / " + t("Forward")}>
-      <button type="button" className="small" disabled={back !== null} onClick={() => useNav.getState().back()} title={back ?? `${t("Back")} (Alt+←)`} aria-label={t("Back")} data-testid="Nav back">
-        ←
-      </button>
-      <button type="button" className="small" disabled={forward !== null} onClick={() => useNav.getState().forward()} title={forward ?? `${t("Forward")} (Alt+→)`} aria-label={t("Forward")} data-testid="Nav forward">
-        →
-      </button>
-    </span>
   );
 }

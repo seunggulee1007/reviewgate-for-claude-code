@@ -70,6 +70,9 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Peek Definition", mac: "⌥F12", win: "Alt+F12", note: "On Windows Ctrl+click peeks too — Settings › Review › Code navigation" },
       { action: "Show the definition on hover", mac: "⌘ (0.6 s)", win: "Ctrl (0.6 s)", note: "Hold it with the pointer resting on a name" }, // §65.8
       { action: "Find References", mac: "⇧F12", win: "Shift+F12" },
+      // §65.8: the References tab of the bottom panel
+      { action: "Next Reference", mac: "F4", win: "F4", note: "Opens it in the diff or the file view" },
+      { action: "Previous Reference", mac: "⇧F4", win: "Shift+F4" },
       { action: "Back", mac: "⌃-", win: "Alt+←" },
       { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },
       { action: "Open in IDE", mac: "⌥⌘O", win: "Ctrl+Alt+O" },
