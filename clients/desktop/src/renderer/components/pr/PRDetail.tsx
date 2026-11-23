@@ -1,19 +1,23 @@
 /**
  * The opened PR (the Mac app's `PRDetailView`): header (title, refs, decision, stats, Open in
- * browser, Review), the submit-result banner, then the reviews + files list on the left and the
- * selected file's diff (`PRDiffPane`) on the right.
+ * browser, Review), the submit-result banner, then a "Conversation | Files" switch — Conversation (§60, the default
+ * whenever a PR opens) is the description, comments and reviews as one thread; Files is the reviews + files list on the
+ * left and the selected file's diff (`PRDiffPane`) on the right.
  */
 import { useState } from "react";
 import type { PRDetail as PRDetailModel, PRFileMeta, PRReview, ReviewEvent } from "@reviewgate/engine";
 import { relativeTime, t } from "../../i18n";
 import { useStore } from "../../store";
 import { PRDiffPane } from "./PRDiffPane";
+import { CodeComments, PRConversation } from "./PRConversation";
+import { prTimeline } from "../../prConversation";
 import { PRClaudeHeaderButtons } from "../flow/PRClaude"; // MARK: wave3 desktop-flow
 import "./pr.css";
 
 export function PRDetail() {
   const pr = useStore((s) => s.state.pr);
-  if (pr.selected) return <Opened pr={pr.selected} />;
+  // A PR opens on its Conversation: the view is the opened PR's own state (keyed by the PR).
+  if (pr.selected) return <Opened key={pr.selected.url} pr={pr.selected} />;
   if (pr.isLoading && pr.selectedSummary) {
     return (
       <div className="pr-detail empty" data-testid="PR loading">
@@ -38,6 +42,8 @@ function Opened({ pr }: { pr: PRDetailModel }) {
   const openDialog = useStore((s) => s.openDialog);
   const result = state.lastSubmitResult;
   const decision = decisionBadge(pr);
+  const [view, setView] = useState<"conversation" | "files">("conversation");
+  const said = prTimeline(pr, state.conversation ?? [], state.reviews).length - 1; // the description is not counted
   return (
     <div className="pr-detail" data-testid="PR detail">
       <div className="pr-detail-header">
@@ -61,6 +67,14 @@ function Opened({ pr }: { pr: PRDetailModel }) {
           <span className="caption num red">−{pr.deletions}</span>
           <span className="caption muted">{t("{0} files", pr.changedFiles)}</span>
         </div>
+        <div className="segmented mini pr-view-switch" role="tablist" aria-label={t("PR view")} data-testid="PR view">
+          <button type="button" role="tab" aria-selected={view === "conversation"} className={view === "conversation" ? "active" : ""} onClick={() => setView("conversation")} data-testid="PR view conversation">
+            {t("Conversation")} <span className="num muted">{said}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={view === "files"} className={view === "files" ? "active" : ""} onClick={() => setView("files")} data-testid="PR view files">
+            {t("Files")} <span className="num muted">{state.files.length}</span>
+          </button>
+        </div>
       </div>
       {result && dismissedSubmitAt !== result.submittedAt && (
         <div className="banner green" data-testid="Submit banner">
@@ -71,15 +85,22 @@ function Opened({ pr }: { pr: PRDetailModel }) {
           <button type="button" className="plain small" onClick={dismissSubmitBanner} aria-label={t("Dismiss")} data-testid="Dismiss submit banner">✕</button>
         </div>
       )}
-      <div className="pr-body">
-        <div className="pr-side">
-          <ul className="list">
-            <ReviewsSection />
-            <FilesSection />
-          </ul>
+      {view === "conversation" ? (
+        <div className="pr-body">
+          <CodeComments onShow={() => setView("files")} />
+          <PRConversation pr={pr} />
         </div>
-        <PRDiffPane />
-      </div>
+      ) : (
+        <div className="pr-body">
+          <div className="pr-side">
+            <ul className="list">
+              <ReviewsSection />
+              <FilesSection />
+            </ul>
+          </div>
+          <PRDiffPane />
+        </div>
+      )}
     </div>
   );
 }

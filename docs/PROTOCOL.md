@@ -9796,3 +9796,19 @@ text is kept across the three views and goes with another PR). **Code comments**
 PR's file order) and line, outdated ones last (`PRCodeComments.group`); a row switches to Files, selects the file and
 scrolls its diff to the line (an outdated row opens the file's outdated comments above the diff). The Reviews list that
 sat above the files is gone: the reviews are in the Conversation now.
+
+**Windows client.** The PR detail (`components/pr/PRDetail.tsx`) has a **Conversation | Files** switch under its header;
+every PR opens on Conversation (the switch is the opened PR's own state). Conversation (`PRConversation.tsx`, the merge in
+`prConversation.ts`) is the thread above in one centered column: the description (a "Description" pill; "No description
+provided." when it is empty), then the comments and the reviews, each with its author, the review's state pill, the time
+(relative; the absolute one in the tooltip), "edited" for an edited comment, "Open on GitHub" (`openExternal`) and the
+body through the app's Markdown renderer (DOMPurify, links opened outside). The switch counts the thread's comments and
+reviews. Files is the reviews + files list and the diff as before. Under the thread, **Leave a comment** (a multi-line
+field; Ctrl+Enter or Comment sends `pr_comment` through the store's `prComment`): Comment is disabled, its tooltip saying
+why, while the text is blank or a comment is posting (`isCommenting`, or the request still out); the text clears only on
+`ok:true` and a refusal's words (`errorCodes.ts`: `no_pr_selected`, `empty_body`, `pr_comment_failed` with gh's line,
+`not_a_git_repo`) stay under the field with the text. Left of the thread, **Code comments (N)** (only when the PR has
+inline comments) lists every inline comment by file (the PR's file order) and line (the old side marked "−", the outdated
+ones last as "Outdated"), one row per line with the first comment's author and first line and a 💬 count; a row switches
+to Files, selects its file and scrolls its line into view, marked and unfolded (`prShowComment` → `prFocus`, kept per
+PR); an outdated row only selects the file.

@@ -1063,5 +1063,19 @@
   "This folder could not be tracked without git: {0}": "이 폴더를 git 없이 추적하지 못했어요: {0}",
   "This folder could not be tracked without git.": "이 폴더를 git 없이 추적하지 못했어요.",
   "This looks like a large or personal folder — confirm before tracking it without git.": "크거나 개인적인 폴더로 보여요 — git 없이 추적하기 전에 확인이 필요해요.",
-  "Not a git repository — changes tracked by ReviewGate": "git 저장소 아님 — ReviewGate가 변경을 추적해요"
+  "Not a git repository — changes tracked by ReviewGate": "git 저장소 아님 — ReviewGate가 변경을 추적해요",
+  "Conversation": "대화",
+  "PR view": "PR 보기",
+  "edited": "수정됨",
+  "No description provided.": "본문이 없어요.",
+  "Leave a comment": "댓글 남기기",
+  "Posting the comment…": "댓글을 올리는 중이에요…",
+  "Write a comment first.": "댓글을 먼저 적어 주세요.",
+  "Open a pull request first.": "PR을 먼저 열어 주세요.",
+  "The comment could not be posted: {0}": "댓글을 올리지 못했어요: {0}",
+  "The comment could not be posted.": "댓글을 올리지 못했어요.",
+  "Code comments ({0})": "코드 댓글 ({0})",
+  "Outdated": "오래됨",
+  "Outdated — the line is no longer in the diff. Opens {0}.": "오래됨 — 이 줄은 지금 diff에 없어요. {0} 파일을 열어요.",
+  "Show {0}:{1} in the diff": "diff에서 {0}:{1} 보기"
 }
