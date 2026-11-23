@@ -51,6 +51,11 @@ ReviewGate는 턴과 턴 사이에 관문을 두는 macOS 앱입니다. Claude�
 Vue, JSP를 먼저 챙겼습니다. 참조를 모아 보고, 뒤로·앞으로 오가고, 그 줄을 IntelliJ IDEA·VS Code·Xcode에서 엽니다.
 검색으로 찾기 때문에 따로 설정할 language server가 없습니다.
 
+**에디터처럼 아래쪽 패널.** diff와 채팅 아래에 프로젝트 폴더의 셸 탭(⌃`), ReviewGate 로그와 Claude가 실행한 Bash
+명령·출력을 모아 보는 출력 탭, 프로젝트 명령을 돌리는 실행 탭이 있습니다. package.json과 빌드 wrapper에서 찾은
+`npm run dev`, `./gradlew bootRun`, `./mvnw test` 같은 명령이나 직접 추가한 명령을 저마다의 터미널에서 실행·중지·재시작합니다.
+누르기 전에는 아무것도 실행하지 않고, 찾은 명령은 처음 한 번 물어봅니다.
+
 **워크벤치.** 한 프로젝트에서 Claude 세션 여러 개를 동시에 돌립니다. 세션마다 git worktree와 브랜치, 관문이 따로
 있습니다.
 
