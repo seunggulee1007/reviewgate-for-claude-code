@@ -163,4 +163,21 @@ import Testing
         #expect(settings.systemPromptAppend == AppSettings.renderedSystemPromptAppend(defaults: defaults))
         #expect(settings.budget == nil && settings.claudePath == nil)   // nothing else rides along
     }
+
+    @Test func aClearedSideModelReachesTheEngineAtOnce() {
+        let defaults = freshDefaults()
+        let store = makeStore(defaults)
+        var sent: [EngineCommand] = []
+        store.commandSink = { sent.append($0) }
+        defaults.set("haiku", forKey: AppSettings.Key.sideModel)
+        store.updateSideSettings()
+        defaults.removeObject(forKey: AppSettings.Key.sideModel)
+        store.updateSideSettings()
+        let models = sent.compactMap { command -> String? in
+            if case let .setSettings(settings) = command { return settings.sideModel }
+            return nil
+        }
+        #expect(models == ["haiku", ""])   // "" = the main session's model; nil kept "haiku" in the engine
+        #expect(SettingsCatalog.applies("sideModel") == .immediately)
+    }
 }

@@ -2114,9 +2114,10 @@ public final class AppState {
         return wholeReviewDiff(path: path)?.diff
     }
 
-    /// §21: pushes the side-question settings to the engine (new side questions use them).
+    /// §21: pushes the side-question settings to the engine (new side questions use them). A cleared model goes out as ""
+    /// (the main session's), not left out — left out, the engine kept the last one until the window's engine restarted.
     public func updateSideSettings() {
-        var side = EngineSettings(sideModel: AppSettings.sideModel(defaults: defaults),
+        var side = EngineSettings(sideModel: AppSettings.sideModel(defaults: defaults) ?? "",
                                   sideAllowWeb: AppSettings.sideWeb(defaults: defaults) == .on)   // MARK: wave4b w4b-side (§40.3)
         side.sideWeb = AppSettings.sideWeb(defaults: defaults).rawValue
         fire(.setSettings(side))

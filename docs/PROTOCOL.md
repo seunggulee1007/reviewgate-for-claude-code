@@ -8706,6 +8706,9 @@ with a restart button on the Extensions tab only (lane b-settings).
   first time an open session is seen, dropped when none is open — and `settingsWaitingForRestart` names the settings
   that differ now, in catalog order; changed back, they wait no more. Plugins, hooks and the project's local settings keep
   their own comparison with what the session applied (§16, §36.6).
+- **A cleared side-question model applies at once** (Mac). `updateSideSettings` sends `sideModel: ""` (the main
+  session's model) when the field is emptied; it left the key out before, and the engine kept the last model until the
+  window's engine restarted ("clearing the model applies after reopening the project").
 
 ## 56. The message box as the terminal's
 
