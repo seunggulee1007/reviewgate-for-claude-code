@@ -327,6 +327,7 @@ export function installIPC(deps: Deps): void {
   ipcMain.on("rg:pty:resize", (evt, ptyId: unknown, cols: unknown, rows: unknown) => hub(evt.sender)?.resize(evt.sender.id, ptyId, cols, rows));
   ipcMain.on("rg:pty:ack", (evt, ptyId: unknown, chars: unknown) => hub(evt.sender)?.ack(evt.sender.id, ptyId, chars));
   ipcMain.on("rg:pty:focus", (evt, focused: unknown) => hub(evt.sender)?.focus(evt.sender.id, focused));
+  ipcMain.handle("rg:run:detect", (evt) => hub(evt.sender)?.detectRuns(evt.sender.id) ?? []); // MARK: c-panel (§57.18)
   ipcMain.handle("rg:toolchainInfo",(): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
   // MARK: wave3 desktop-flow (src/main/flowWindows.ts)
   /** §36.12: the new workbench's window takes its failed setup's report once its project is open. */

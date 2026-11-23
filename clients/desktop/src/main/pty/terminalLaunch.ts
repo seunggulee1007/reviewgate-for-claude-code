@@ -191,6 +191,21 @@ export function buildShellLaunch(a: ShellLaunchInput): Launch {
   return { ok: true, file: comspec || win32.join(systemRoot, "System32", "cmd.exe"), args: "", env, cwd: a.cwd };
 }
 
+export type RunLaunchInput = Omit<ShellLaunchInput, "shell"> & { shell: ShellKind; command: string };
+
+/**
+ * MARK: c-panel — §57.18: a run configuration — Settings' terminal shell running the kept command in the project root,
+ * with the shell panel's environment (no hook token, no claude variables). PowerShell: `-NoLogo -Command "<cmd>; exit
+ * $LASTEXITCODE"` (so a program's exit code is the tab's), every word quoted by `windowsQuote`; Command Prompt:
+ * `/d /s /c "<cmd>"` (with /s cmd.exe drops exactly the outer quotes). POSIX (development only): `$SHELL -l -c <cmd>`.
+ */
+export function buildRunLaunch(a: RunLaunchInput): Launch {
+  const shell = buildShellLaunch(a);
+  if (a.platform !== "win32") return { ...shell, args: ["-l", "-c", a.command] };
+  if (a.shell === "powershell") return { ...shell, args: `-NoLogo -Command ${windowsQuote(`${a.command}; exit $LASTEXITCODE`)}` };
+  return { ...shell, args: `/d /s /c "${a.command}"` };
+}
+
 /** A synchronous PATH lookup (the engine's `platform.which` is async): Windows tries PATHEXT, POSIX needs the file. */
 export function whichSync(name: string, o: { platform: LaunchPlatform; env: Record<string, string | undefined>; isFile(p: string): boolean }): string | null {
   const win = o.platform === "win32";

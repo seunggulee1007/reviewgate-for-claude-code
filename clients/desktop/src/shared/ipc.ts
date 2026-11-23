@@ -10,6 +10,7 @@ import type { PreReviewEffort, WorkbenchSetup } from "@reviewgate/engine";
 import type { WorkbenchSetupReport } from "./flowSettings.js";
 import type { CloseGuardExtras } from "./closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
 import type { MenuEnabled } from "./menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
+import type { ProjectRuns, RunConfig } from "./runConfigs.js"; // MARK: c-panel (§57.18)
 
 /** M18: UI theme. "system" follows the OS (`nativeTheme` in main, `prefers-color-scheme` in the renderer). */
 export type Appearance = "system" | "light" | "dark";
@@ -43,6 +44,8 @@ export type AppSettings = {
   projectWorkbenchSetup?: Record<string, WorkbenchSetup>;
   /** §36.14: the command "Send to Claude" on PR comments starts with (`{pr}` = the number) — client only, never sent to the engine. */
   projectPrRespondCommand?: Record<string, string>;
+  /** MARK: c-panel — §57.18: the bottom panel's Run tab per repository (src/shared/runConfigs.ts) — client only. */
+  projectRunConfigs?: Record<string, ProjectRuns>;
   /** §36.13: the effort "AI pre-review" runs with (default medium). */
   preReviewEffort?: PreReviewEffort;
   // MARK: wave1 desktop-perms — Settings › Permissions (docs/PROTOCOL.md §33.4–33.7); optional so older settings files stay valid.
@@ -211,6 +214,8 @@ export type ProjectUI = {
   terminalReviewSplit?: number;
   /** §57.17: the bottom shell panel's height in px (at least 80; the window keeps 200 above it). */
   terminalPanelHeight?: number;
+  /** MARK: c-panel — §57.18: the panel's tab (absent: the terminal). */
+  terminalPanelTab?: "terminal" | "output" | "run";
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };
@@ -497,7 +502,9 @@ export type RGBridge = {
 export type ShellKind = "powershell" | "cmd";
 export type PtyOpen =
   | { kind: "chat"; sessionId: string; cols: number; rows: number }
-  | { kind: "shell"; shell: ShellKind; cols: number; rows: number };
+  | { kind: "shell"; shell: ShellKind; cols: number; rows: number }
+  // MARK: c-panel — §57.18: a kept run configuration by id; main reads its command from the settings (never the renderer's text).
+  | { kind: "run"; runId: string; cols: number; rows: number };
 export type PtyRefusal =
   | "pty_unavailable" | "terminal_needs_native_claude" | "terminal_cmdline_too_long" | "spawn_failed"
   | "not_current" // not the current terminal chat
@@ -505,7 +512,7 @@ export type PtyRefusal =
 export type PtyOpenResult = { ok: true; ptyId: string } | { ok: false; code: PtyRefusal; error: string };
 export type PtyExit = { ptyId: string; exitCode: number | null; quickNoHooks: boolean; reason: "exited" | "killed" | "switched" | "closed" };
 export type PtyInfo = { available: boolean; reason: string | null; osBuild: number | null; shells: ShellKind[] };
-export type PtyListEntry = { ptyId: string; kind: "chat" | "shell"; sessionId?: string; shell?: ShellKind; running: boolean };
+export type PtyListEntry = { ptyId: string; kind: "chat" | "shell" | "run"; sessionId?: string; shell?: ShellKind; runId?: string; running: boolean };
 export type PtyAttach = { replay: string; running: boolean; exit: PtyExit | null };
 export type PtyBridge = {
   info(): Promise<PtyInfo>; // invoke rg:pty:info
@@ -518,6 +525,7 @@ export type PtyBridge = {
   resize(ptyId: string, cols: number, rows: number): void; // send rg:pty:resize  (int, cols 2..1000, rows 1..500)
   ack(ptyId: string, chars: number): void; // send rg:pty:ack
   focus(focused: boolean): void; // send rg:pty:focus → webContents.setIgnoreMenuShortcuts
+  detectRuns(): Promise<RunConfig[]>; // invoke rg:run:detect (§57.18): the window's project files' candidates, nothing runs
   onData(cb: (ptyId: string, data: string) => void): () => void; // rg:pty:data (batched)
   onExit(cb: (e: PtyExit) => void): () => void; // rg:pty:exit
 };

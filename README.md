@@ -52,6 +52,11 @@ cards in the app instead of terminal prompts. Throwaway files in temporary folde
 JavaScript / TypeScript, Vue and JSP above all — list its references, step Back and Forward, and open the line in
 IntelliJ IDEA, VS Code or Xcode. Search-based, no language server to set up.
 
+**A bottom panel, as in your editor.** Under the diff and the chat: shell tabs in the project folder (⌃`), an Output
+tab with ReviewGate's log and every Bash command Claude ran with its output, and a Run tab for the project's own
+commands — `npm run dev`, `./gradlew bootRun`, `./mvnw test` found in package.json and the build wrappers, or your own —
+each in its own terminal with Run, Stop and Restart. Nothing runs until you click; a found command asks once.
+
 **Workbenches.** Run several Claude sessions on one project at once — each in its own git worktree and branch, each
 with its own gate. Waiting for Claude to finish before a new chat? "New Chat in a Workbench" (⌥⌘T) opens one in a fresh
 workbench right away.

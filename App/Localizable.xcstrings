@@ -23,6 +23,22 @@
         }
       }
     },
+    "%@\n\nIt runs in %@ as you, with your permissions — ReviewGate does not sandbox it. It asks only before this command's first run.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@\n\nIt runs in %@ as you, with your permissions — ReviewGate does not sandbox it. It asks only before this command's first run."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n\n%2$@ 에서 내 권한으로 실행돼요 — ReviewGate가 따로 격리하지 않아요. 이 명령을 처음 실행할 때만 물어봐요."
+          }
+        }
+      }
+    },
     "%@ (%@)": {
       "localizations": {
         "en": {
@@ -265,6 +281,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ · %@ — 클릭하면 크게 봐요"
+          }
+        }
+      }
+    },
+    "%@ — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ — %2$@"
           }
         }
       }
@@ -2113,6 +2145,22 @@
         }
       }
     },
+    "Add a command to run in the project folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a command to run in the project folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 실행할 명령을 추가해요"
+          }
+        }
+      }
+    },
     "Add a note": {
       "localizations": {
         "en": {
@@ -2209,6 +2257,38 @@
         }
       }
     },
+    "Add Command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령 추가"
+          }
+        }
+      }
+    },
+    "Add Command…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Command…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령 추가…"
+          }
+        }
+      }
+    },
     "Add commit": {
       "localizations": {
         "en": {
@@ -2237,6 +2317,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "설정에서 추가…"
+          }
+        }
+      }
+    },
+    "Add it to this project's run commands": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add it to this project's run commands"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트의 실행 명령에 추가해요"
           }
         }
       }
@@ -5521,6 +5617,22 @@
         }
       }
     },
+    "Claude commands": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude commands"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 명령"
+          }
+        }
+      }
+    },
     "Claude is working — the review opens when it stops": {
       "localizations": {
         "en": {
@@ -5549,6 +5661,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude는 한 폴더에서 한 번에 한 턴씩 일해요. 워크벤치는 따로 쓰는 폴더라서(HEAD에서 딴 새 브랜치, 자기 창과 Claude) 거기서는 채팅이 바로 시작돼요."
+          }
+        }
+      }
+    },
+    "Clear output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 지우기"
+          }
+        }
+      }
+    },
+    "Clear the output — the daily log file keeps its lines": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear the output — the daily log file keeps its lines"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력을 지워요 — 날짜별 로그 파일에는 그대로 남아요"
           }
         }
       }
@@ -8775,6 +8919,22 @@
         }
       }
     },
+    "Command, e.g. ./gradlew bootRun": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command, e.g. ./gradlew bootRun"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령 (예: ./gradlew bootRun)"
+          }
+        }
+      }
+    },
     "Commands": {
       "localizations": {
         "en": {
@@ -9927,6 +10087,22 @@
         }
       }
     },
+    "Copy output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 복사"
+          }
+        }
+      }
+    },
     "Copy Plan": {
       "localizations": {
         "en": {
@@ -10291,6 +10467,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "입력(JSON) 복사"
+          }
+        }
+      }
+    },
+    "Copy the lines shown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy the lines shown"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보이는 줄을 복사해요"
           }
         }
       }
@@ -12391,6 +12583,22 @@
         }
       }
     },
+    "Every line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 줄"
+          }
+        }
+      }
+    },
     "Every line that holds %@ as a whole word": {
       "localizations": {
         "en": {
@@ -12487,6 +12695,38 @@
         }
       }
     },
+    "Exited (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exited (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끝남 (%lld)"
+          }
+        }
+      }
+    },
+    "Find again — read package.json, the Gradle and Maven wrappers again and bring back removed ones": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find again — read package.json, the Gradle and Maven wrappers again and bring back removed ones"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 찾기 — package.json과 Gradle·Maven wrapper를 다시 읽고, 삭제한 명령도 다시 보여 줘요"
+          }
+        }
+      }
+    },
     "Find References": {
       "localizations": {
         "en": {
@@ -12499,6 +12739,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조 찾기"
+          }
+        }
+      }
+    },
+    "Find run commands again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find run commands again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 명령 다시 찾기"
           }
         }
       }
@@ -12531,6 +12787,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "다시 앞으로 가요 (⌃⇧-)"
+          }
+        }
+      }
+    },
+    "found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "found"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "찾음"
+          }
+        }
+      }
+    },
+    "Found in the project's files — it asks before its first run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found in the project's files — it asks before its first run"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 파일에서 찾은 명령이에요 — 처음 실행할 때 한 번 물어봐요"
           }
         }
       }
@@ -12679,6 +12967,38 @@
         }
       }
     },
+    "It has not run yet — Run starts it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It has not run yet — Run starts it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 실행하지 않았어요 — 실행을 누르면 시작해요"
+          }
+        }
+      }
+    },
+    "It is running — Stop it or Restart": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It is running — Stop it or Restart"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중이에요 — 중지하거나 재시작하세요"
+          }
+        }
+      }
+    },
     "It opens over the terminal, next to the file list (⌘⇧D)": {
       "localizations": {
         "en": {
@@ -12691,6 +13011,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널 위, 파일 목록 옆에 열려요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "It runs in %@ through your login shell, as you — ReviewGate does not sandbox it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It runs in %@ through your login shell, as you — ReviewGate does not sandbox it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 에서 로그인 셸로, 내 권한으로 실행돼요 — ReviewGate가 따로 격리하지 않아요."
+          }
+        }
+      }
+    },
+    "It runs in the project folder through your login shell — only when you press Run.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It runs in the project folder through your login shell — only when you press Run."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 로그인 셸로 실행돼요 — 실행을 눌렀을 때만요."
           }
         }
       }
@@ -12871,6 +13223,22 @@
         }
       }
     },
+    "Name (optional)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name (optional)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름 (선택)"
+          }
+        }
+      }
+    },
     "Navigate": {
       "localizations": {
         "en": {
@@ -12931,6 +13299,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "새 프로젝트부터"
+          }
+        }
+      }
+    },
+    "New Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 터미널"
           }
         }
       }
@@ -13143,6 +13527,38 @@
         }
       }
     },
+    "No line matches.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No line matches."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "맞는 줄이 없어요."
+          }
+        }
+      }
+    },
+    "No output yet — ReviewGate's log and the Bash commands Claude runs show here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No output yet — ReviewGate's log and the Bash commands Claude runs show here."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 출력이 없어요 — ReviewGate 로그와 Claude가 실행하는 Bash 명령이 여기에 나와요."
+          }
+        }
+      }
+    },
     "No references": {
       "localizations": {
         "en": {
@@ -13155,6 +13571,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조 없음"
+          }
+        }
+      }
+    },
+    "No run commands found in this project — add one.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No run commands found in this project — add one."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에서 찾은 실행 명령이 없어요 — 직접 추가해 보세요."
+          }
+        }
+      }
+    },
+    "No terminal is open.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No terminal is open."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열린 터미널이 없어요."
           }
         }
       }
@@ -13203,6 +13651,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "워크벤치에서 열 수 없어요: %@"
+          }
+        }
+      }
+    },
+    "Not running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not running"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중이 아니에요"
+          }
+        }
+      }
+    },
+    "Nothing to copy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to copy"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "복사할 내용이 없어요"
           }
         }
       }
@@ -13543,6 +14023,38 @@
         }
       }
     },
+    "Output source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output source"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 출처"
+          }
+        }
+      }
+    },
+    "Output — ReviewGate's log and the Bash commands Claude ran": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output — ReviewGate's log and the Bash commands Claude ran"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 — ReviewGate 로그와 Claude가 실행한 Bash 명령"
+          }
+        }
+      }
+    },
     "over the terminal, next to the file list": {
       "localizations": {
         "en": {
@@ -13555,6 +14067,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널 위, 파일 목록 옆에 열려요"
+          }
+        }
+      }
+    },
+    "panel.output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력"
+          }
+        }
+      }
+    },
+    "panel.run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행"
           }
         }
       }
@@ -13735,6 +14279,22 @@
         }
       }
     },
+    "Restart — stops it and runs it again in a fresh terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart — stops it and runs it again in a fresh terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "재시작 — 멈추고 새 터미널에서 다시 실행해요"
+          }
+        }
+      }
+    },
     "Restarting resumes this chat with the new settings; the review list is kept.": {
       "localizations": {
         "en": {
@@ -13779,6 +14339,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "백그라운드에 있는 동안 ReviewGate가 이 터미널을 놓쳤어요. 다시 시작하세요"
+          }
+        }
+      }
+    },
+    "ReviewGate's own log — the engine, notices and errors": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate's own log — the engine, notices and errors"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate 자체 로그 — 엔진, 알림, 오류"
+          }
+        }
+      }
+    },
+    "Run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행"
+          }
+        }
+      }
+    },
+    "Run %@ in the project folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run %@ in the project folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 %@ 실행"
+          }
+        }
+      }
+    },
+    "Run this command?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run this command?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 명령을 실행할까요?"
+          }
+        }
+      }
+    },
+    "Run — the project's commands (dev server, tests), each in its own terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run — the project's commands (dev server, tests), each in its own terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 — 프로젝트 명령(개발 서버, 테스트)을 저마다의 터미널에서 실행해요"
+          }
+        }
+      }
+    },
+    "Run ‘%@’": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run ‘%@’"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "‘%@’ 실행"
+          }
+        }
+      }
+    },
+    "Search output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력에서 검색"
           }
         }
       }
@@ -13959,6 +14631,22 @@
         }
       }
     },
+    "Show only the lines holding this text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only the lines holding this text"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 글자가 들어 있는 줄만 보여 줘요"
+          }
+        }
+      }
+    },
     "Show the review panel between the file list and the terminal (⌘⇧D)": {
       "localizations": {
         "en": {
@@ -14087,6 +14775,22 @@
         }
       }
     },
+    "Source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출처"
+          }
+        }
+      }
+    },
     "Split": {
       "localizations": {
         "en": {
@@ -14183,6 +14887,38 @@
         }
       }
     },
+    "Stop — ends the command and what it started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop — ends the command and what it started"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "중지 — 명령과 그 명령이 띄운 프로세스를 끝내요"
+          }
+        }
+      }
+    },
+    "Stop ‘%@’": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop ‘%@’"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "‘%@’ 중지"
+          }
+        }
+      }
+    },
     "Stopped by an error, usage limit or login": {
       "localizations": {
         "en": {
@@ -14231,6 +14967,38 @@
         }
       }
     },
+    "Terminal panel (⌃`)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal panel (⌃`)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 패널 (⌃`)"
+          }
+        }
+      }
+    },
+    "The Bash commands Claude ran in this window and their output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Bash commands Claude ran in this window and their output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 이 창에서 실행한 Bash 명령과 그 출력"
+          }
+        }
+      }
+    },
     "The commit message template, workbench setup and PR command of the open repository are in Project.": {
       "localizations": {
         "en": {
@@ -14243,6 +15011,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "열린 저장소의 커밋 메시지 템플릿, 워크벤치 준비, PR 명령은 설정 › 프로젝트에 있어요."
+          }
+        }
+      }
+    },
+    "The output is empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The output is empty"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력이 비어 있어요"
           }
         }
       }
@@ -14519,6 +15303,22 @@
         }
       }
     },
+    "Type the command first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type the command first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 명령을 입력하세요"
+          }
+        }
+      }
+    },
     "Typing and the chat": {
       "localizations": {
         "en": {
@@ -14579,6 +15379,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@이(가) 선언된 곳으로 가요 (⌘-클릭)"
+          }
+        }
+      }
+    },
+    "Which lines to show: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which lines to show: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보여 줄 줄: %@"
           }
         }
       }

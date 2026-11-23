@@ -7,7 +7,7 @@
  */
 import { create } from "zustand";
 import type { ShellKind } from "../../shared/ipc";
-import { t } from "../i18n";
+import { t, usesMacKeys } from "../i18n";
 import { measureCellWidth } from "../terminalLayout";
 import { terminalStartRefusal } from "../terminalStrip";
 import { adoptTerminal, disposeTerminal, estimateSize, focusTerminal, shellTerminals, terminalConfig, terminalHasFocus, terminalShellOf, terminalStatus } from "./termHost";
@@ -25,9 +25,28 @@ export const useShellPanel = create<{ shown: boolean; active: string | null; ope
   failed: null,
 }));
 
-/** What Ctrl+` does now. */
-export function panelToggleAction(p: { shown: boolean; focused: boolean }): "show" | "hide" | "focus" {
+/** MARK: c-panel — §57.18: the panel's tabs. */
+export type PanelTab = "terminal" | "output" | "run";
+export const PANEL_TABS: readonly PanelTab[] = ["terminal", "output", "run"];
+
+/** A tab's name: Terminal · Output · Run (the Mac's catalog key for Output, whose plain "Output" means something else). */
+export function panelTabTitle(tab: PanelTab): string {
+  if (tab === "terminal") return t("Terminal");
+  if (tab === "run") return t("Run");
+  const ko = t("panel.output");
+  return ko === "panel.output" ? "Output" : ko;
+}
+
+export function panelTabHelp(tab: PanelTab): string {
+  if (tab === "terminal") return usesMacKeys() ? t("Terminal panel (⌃`)") : t("Terminal panel (Ctrl+`)");
+  if (tab === "output") return t("Output — ReviewGate's log and the Bash commands Claude ran");
+  return t("Run — the project's commands (dev server, tests), each in its own terminal");
+}
+
+/** What Ctrl+` does now. §57.18: on the Output or Run tab it shows the panel, and hides it when shown. */
+export function panelToggleAction(p: { shown: boolean; focused: boolean; tab?: PanelTab }): "show" | "hide" | "focus" {
   if (!p.shown) return "show";
+  if (p.tab && p.tab !== "terminal") return "hide";
   return p.focused ? "hide" : "focus";
 }
 
@@ -81,14 +100,17 @@ export async function closeShell(ptyId: string): Promise<void> {
   forgetShell(ptyId);
 }
 
-/** The tab goes (its PTY ended or was closed); the neighbour becomes active; none left hides the panel. */
-export function forgetShell(ptyId: string): void {
+/**
+ * The tab goes (its PTY ended or was closed); the neighbour becomes active; none left hides the panel — §57.18: only
+ * while the panel shows the terminal tab (`onTerminalTab`), so a shell ending behind Output or Run leaves it open.
+ */
+export function forgetShell(ptyId: string, onTerminalTab = true): void {
   const before = shellTerminals();
   disposeTerminal(ptyId);
   const rest = shellTerminals();
   const s = useShellPanel.getState();
   if (rest.length === 0) {
-    useShellPanel.setState({ shown: false, active: null });
+    useShellPanel.setState(onTerminalTab ? { shown: false, active: null } : { active: null });
     return;
   }
   if (s.active === ptyId) {
@@ -109,13 +131,14 @@ export async function restartShell(ptyId: string): Promise<void> {
  * Ctrl+` / View › Toggle Terminal Panel. `defaultShell`: Settings' choice for a first tab. `backToChat`: where the
  * keyboard goes when the panel hides (the chat's terminal, else the message box).
  */
-export function toggleShellPanel(defaultShell: ShellKind, backToChat: () => void): void {
+export function toggleShellPanel(defaultShell: ShellKind, backToChat: () => void, tab: PanelTab = "terminal"): void {
   const s = useShellPanel.getState();
   const tabs = shellTerminals();
   const focused = document.activeElement?.closest?.(".shell-panel") != null || tabs.some((id) => terminalHasFocus(id));
-  switch (panelToggleAction({ shown: s.shown, focused })) {
+  switch (panelToggleAction({ shown: s.shown, focused, tab })) {
     case "show": {
       useShellPanel.setState({ shown: true, failed: null });
+      if (tab !== "terminal") return;
       const active = s.active && tabs.includes(s.active) ? s.active : (tabs[0] ?? null);
       if (active) {
         useShellPanel.setState({ active });

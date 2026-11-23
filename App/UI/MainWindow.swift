@@ -256,7 +256,7 @@ struct MainWindow: View {
                                 }
                             }
                             .frame(minHeight: 200, maxHeight: .infinity)
-                            if model.shell.visible { ShellPanelView() }
+                            if model.shell.visible { ShellPanelView() } else { PanelStatusBar() }   // c-panel (§57.18)
                         }
                     }
                     .inspector(isPresented: inspectorVisible) {

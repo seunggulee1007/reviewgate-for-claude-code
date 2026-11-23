@@ -47,6 +47,33 @@
 .shell-tab.active { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--border); }
 .shell-tab .close { padding: 0 2px; }
 .shell-body { position: relative; display: flex; flex: 1; min-height: 0; }
+/* MARK: c-panel — §57.18: the panel's tabs, the bar under the window, Output and Run */
+.panel-tab { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 0; border-radius: 5px; background: transparent; font-size: 12px; color: var(--fg-2); cursor: default; }
+.panel-tab:hover { background: var(--bg-3, var(--accent-bg)); }
+.panel-tab.active { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
+.panel-tab-sep { width: 1px; height: 14px; margin: 0 4px; background: var(--border); }
+.run-count { padding: 0 5px; border-radius: 8px; font-size: 10px; background: color-mix(in srgb, var(--green, #2ea043) 30%, transparent); color: var(--fg); }
+.panel-status-bar { display: flex; align-items: center; gap: 2px; flex: none; height: 22px; padding: 0 8px; border-top: 1px solid var(--border); background: var(--bg-2); }
+.panel-status-bar button { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--fg-2); }
+.output-controls { gap: 4px; }
+.output-controls select, .output-controls input { font-size: 12px; height: 22px; }
+.output-controls input { width: 160px; }
+.output-log { flex: 1; min-height: 0; margin: 0; padding: 4px 8px; overflow: auto; font: 12px/1.45 var(--mono, ui-monospace, Consolas, monospace); white-space: pre-wrap; word-break: break-word; user-select: text; }
+.output-empty { display: flex; flex: 1; align-items: center; justify-content: center; padding: 12px; text-align: center; }
+.run-panel { display: flex; flex: 1; min-height: 0; }
+.run-list { display: flex; flex-direction: column; width: 240px; flex: none; border-right: 1px solid var(--border); overflow: auto; }
+.run-none { padding: 8px; }
+.run-row { display: flex; align-items: center; gap: 6px; margin: 1px 4px; padding: 3px 6px; border-radius: 6px; cursor: default; }
+.run-row:hover { background: var(--bg-2); }
+.run-row.active { background: var(--accent-bg); }
+.run-text { display: flex; flex-direction: column; min-width: 0; flex: 1; font-size: 12px; }
+.run-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--fg-3, var(--fg-2)); flex: none; }
+.run-dot.on { background: var(--green, #2ea043); border-color: var(--green, #2ea043); }
+.run-list-bar { margin-top: auto; padding: 3px 6px; border-top: 1px solid var(--border); }
+.run-add { display: flex; flex-direction: column; gap: 4px; margin: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; }
+.run-body { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.run-bar { gap: 8px; padding: 2px 8px; border-bottom: 1px solid var(--border); }
+.run-confirm, .run-idle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; flex: 1; padding: 12px; text-align: center; }
 
 /* §57.5: a terminal chat's tab — a terminal glyph, an orange dot while its Claude Code is not running. */
 .chat-tab .tab-kind { position: relative; display: inline-flex; color: var(--fg-2); flex: none; }

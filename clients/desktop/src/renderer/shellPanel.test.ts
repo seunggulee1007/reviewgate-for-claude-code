@@ -45,10 +45,11 @@ async function load() {
   const host = await import("./terminal/termHost");
   const panel = await import("./terminal/shellPanel");
   const { usePtyInfo } = await import("./terminal/ptyInfo");
-  const { ShellPanel } = await import("./components/terminal/ShellPanel");
+  const { ShellPanel, PanelStatusBar } = await import("./components/terminal/ShellPanel");
+  const runs = await import("./terminal/runPanel");
   host.setTerminalLoader(() => new Promise<never>(() => undefined)); // the markup only
   host.initTermHost(pty as unknown as PtyBridge);
-  return { useStore, host, panel, usePtyInfo, ShellPanel };
+  return { useStore, host, panel, usePtyInfo, ShellPanel, PanelStatusBar, runs };
 }
 
 describe("the panel's rules", () => {
@@ -122,6 +123,72 @@ describe("shell tabs", () => {
     expect(killed).toEqual(["s1", "s2", "s3"]);
     expect(m.host.shellTerminals()).toEqual([]);
     expect(m.panel.useShellPanel.getState().shown).toBe(false);
+  });
+
+  // MARK: c-panel — §57.18
+  it("the panel's tabs and the bar under the window name what they hold", () => {
+    put(m.panel.useShellPanel, { shown: true, failed: null });
+    const out = renderToStaticMarkup(createElement(m.ShellPanel));
+    expect(out).toContain('data-testid="Panel tab terminal"');
+    expect(out).toContain('title="Terminal panel (Ctrl+`)"');
+    expect(out).toContain(">Output<");
+    expect(out).toContain(">Run<");
+    expect(out).toContain('title="Output — ReviewGate&#x27;s log and the Bash commands Claude ran"');
+    put(m.panel.useShellPanel, { shown: false });
+    const bar = renderToStaticMarkup(createElement(m.PanelStatusBar));
+    expect(bar).toContain('data-testid="Panel status bar"');
+    expect(bar).toContain('title="Terminal panel (Ctrl+`)"');
+    expect(bar).toContain('data-testid="Panel status run"');
+    put(m.panel.useShellPanel, { shown: true });
+    expect(renderToStaticMarkup(createElement(m.PanelStatusBar))).toBe("");
+  });
+
+  it("Ctrl+` on Output or Run shows the panel there and hides it when shown", () => {
+    expect(panelToggleAction({ shown: false, focused: false, tab: "output" })).toBe("show");
+    expect(panelToggleAction({ shown: true, focused: false, tab: "output" })).toBe("hide");
+    expect(panelToggleAction({ shown: true, focused: false, tab: "run" })).toBe("hide");
+    expect(panelToggleAction({ shown: true, focused: false, tab: "terminal" })).toBe("focus");
+  });
+
+  it("Output: its controls say what they do, and an empty log says what will show", () => {
+    put(m.useStore, { ui: { ...m.useStore.getState().ui, terminalPanelTab: "output" } });
+    put(m.panel.useShellPanel, { shown: true });
+    const out = renderToStaticMarkup(createElement(m.ShellPanel));
+    expect(out).toContain('aria-label="Output source"');
+    expect(out).toContain('title="Nothing to copy"');
+    expect(out).toContain('title="The output is empty"');
+    expect(out).toContain("No output yet");
+  });
+
+  it("Run: a found command asks once, is kept as confirmed, then main opens it by id only", async () => {
+    const saved: unknown[] = [];
+    put(m.useStore, {
+      ui: { ...m.useStore.getState().ui, terminalPanelTab: "run" },
+      settings: { projectRunConfigs: {} } as never,
+      saveSettings: async (patch: Record<string, unknown>) => {
+        saved.push(patch);
+        put(m.useStore, { settings: { ...m.useStore.getState().settings!, ...patch } as never });
+      },
+    } as never);
+    (window.rg.pty as unknown as { open: unknown }).open = async (req: PtyOpen) => (opened.push(req), { ok: true as const, ptyId: `r${++next}` });
+    const found = { id: "npm:dev", name: "npm: dev", command: "npm run dev", detected: true, confirmed: false };
+    put(m.runs.useRunPanel, { detected: [found], selected: null, confirming: null, failed: null });
+    let out = renderToStaticMarkup(createElement(m.ShellPanel));
+    expect(out).toContain(">npm run dev<");
+    expect(out).toContain("Found in the project&#x27;s files — it asks before its first run");
+    expect(out).toContain('aria-label="Run ‘npm: dev’"');
+    m.runs.runConfig(found);
+    expect(opened).toEqual([]); // nothing runs before the answer
+    put(m.runs.useRunPanel, { ...m.runs.useRunPanel.getState() });
+    out = renderToStaticMarkup(createElement(m.ShellPanel));
+    expect(out).toContain("Run this command?");
+    await m.runs.confirmRun();
+    expect(JSON.stringify(saved)).toContain('"confirmed":true');
+    expect(opened).toEqual([{ kind: "run", runId: "npm:dev", cols: expect.any(Number), rows: expect.any(Number) }]);
+    expect(m.host.runTerminalOf("npm:dev")).toMatch(/^r/);
+    m.runs.runConfig(m.runs.listedConfigs()[0]!); // confirmed now: no second question
+    expect(m.runs.useRunPanel.getState().confirming).toBeNull();
+    put(m.useStore, { ui: { ...m.useStore.getState().ui, terminalPanelTab: "terminal" } });
   });
 
   it("a refusal says why", async () => {

@@ -205,6 +205,39 @@ import Testing
         #expect(TerminalLaunch.debugShell(environment: ["REVIEWGATE_TERMINAL_SHELL": ""], bundleIdentifier: "x.screenshots") == nil)
     }
 
+    /// c-panel (§57.18): a run configuration is the login shell running `/bin/sh -c <command>` in the project root —
+    /// the command one word, read by sh whatever the user's shell is; no hook token.
+    @Test func aRunConfigurationRunsItsCommandThroughTheLoginShell() throws {
+        let command = #"npm run dev -- --port 5173 && echo "done $HOME""#
+        let zsh = TerminalLaunch.run(command: command, cwd: "/work/acme", parentEnv: parent.merging(["RG_HOOK_TOKEN": "leak"]) { $1 },
+                                     loginShell: "/bin/zsh", appVersion: "1")
+        #expect(zsh.executable == "/bin/zsh")
+        #expect(zsh.execName == "-zsh")
+        #expect(zsh.cwd == "/work/acme")
+        #expect(Array(zsh.args.prefix(3)) == ["-l", "-i", "-c"])
+        #expect(zsh.args[3] == "exec /bin/sh -c " + TerminalLaunch.posixQuote(command))
+        #expect(env(zsh).keys.allSatisfy { !$0.hasPrefix("RG_") && !$0.hasPrefix("CLAUDE") })
+        // The quoted line gives sh back the command as one word.
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "printf '%s' " + TerminalLaunch.posixQuote(command)]
+        let out = Pipe()
+        p.standardOutput = out
+        try p.run()
+        p.waitUntilExit()
+        #expect(String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) == command)
+
+        let csh = TerminalLaunch.run(command: "make run", cwd: "/w", parentEnv: parent, loginShell: "/bin/tcsh", appVersion: "1")
+        #expect(csh.args.first == "-i")
+        let bang = TerminalLaunch.run(command: "echo hi!", cwd: "/w", parentEnv: parent, loginShell: "/bin/tcsh", appVersion: "1")
+        #expect(bang.executable == "/bin/zsh")
+        let nu = TerminalLaunch.run(command: "make", cwd: "/w", parentEnv: parent, loginShell: "/opt/acme/bin/nu", appVersion: "1")
+        #expect(nu.executable == "/bin/zsh")
+        let debug = TerminalLaunch.run(command: "make", cwd: "/w", parentEnv: parent, loginShell: "/bin/zsh", appVersion: "1", debugShell: "/bin/sh")
+        #expect(debug.executable == "/bin/sh")
+        #expect(debug.args == ["-c", "exec /bin/sh -c make"])
+    }
+
     @Test func theLoginShellIsAnAbsolutePath() {
         #expect(TerminalLaunch.userLoginShell().hasPrefix("/"))
     }

@@ -1,6 +1,6 @@
 /**
  * MARK: terminal-win — PROTOCOL §57.17: one PtyHub per window (Workbench). It owns that window's PTYs in main: at most one
- * terminal chat PTY (the engine has one live session) and the shell panel's tabs.
+ * terminal chat PTY (the engine has one live session), the shell panel's tabs and its Run tab's commands (§57.18).
  *
  * - The renderer never supplies a file, args, env or cwd. For a chat, main asks the engine for `terminal_spec` itself,
  *   builds the launch (terminalLaunch.ts), spawns, and sends `terminal_started` / `terminal_exited`: the hook token and
@@ -15,6 +15,7 @@
 import { randomUUID } from "node:crypto";
 import type { EngineCommand, ReviewState, TerminalSpecEvent } from "@reviewgate/engine";
 import type { PtyAttach, PtyExit, PtyListEntry, PtyOpen, PtyOpenResult, ShellKind } from "../../shared/ipc.js";
+import type { RunConfig } from "../../shared/runConfigs.js";
 import { requestWithDetails, type EngineLike } from "../engineRequest.js";
 import type { Launch, LaunchRefusal } from "./terminalLaunch.js";
 
@@ -61,6 +62,12 @@ export type PtyHubDeps = {
   setIgnoreMenuShortcuts(ignore: boolean): void;
   chatLaunch(spec: TerminalSpecEvent): Launch | LaunchRefusal;
   shellLaunch(shell: ShellKind, cwd: string): Launch;
+  /** MARK: c-panel — §57.18: a kept command in Settings' terminal shell. */
+  runLaunch(command: string, cwd: string): Launch;
+  /** §57.18: the kept, runnable command of `runId` for the window's repository (a detected one only once confirmed); null: none. */
+  runCommand(runId: string): string | null;
+  /** §57.18: the candidates the project folder's files offer (read only). */
+  detectRuns(cwd: string): RunConfig[];
   /** The window's project folder (worktree / workbench) for a new shell tab; null without a project. */
   projectPath(): string | null;
   isAlive(pid: number): boolean;
@@ -80,9 +87,10 @@ export const MAX_INPUT = 1024 * 1024;
 
 type Entry = {
   id: string;
-  kind: "chat" | "shell";
+  kind: "chat" | "shell" | "run";
   sessionId?: string;
   shell?: ShellKind;
+  runId?: string;
   pty: PtyProcess;
   cols: number;
   rows: number;
@@ -155,6 +163,7 @@ export class PtyHub {
       return p;
     }
     if (req.kind === "shell" && (req.shell === "powershell" || req.shell === "cmd")) return this.openShell(req.shell, cols, rows);
+    if (req.kind === "run" && typeof req.runId === "string" && req.runId.length > 0 && req.runId.length <= 100) return this.openRun(req.runId, cols, rows);
     return refusal("invalid_request", "invalid terminal request");
   }
 
@@ -201,7 +210,41 @@ export class PtyHub {
     return r;
   }
 
-  private spawnEntry(launch: Launch, cols: number, rows: number, what: { kind: "chat"; sessionId: string } | { kind: "shell"; shell: ShellKind }): PtyOpenResult {
+  /**
+   * MARK: c-panel — §57.18: a Run tab command. The renderer names only the kept config's id; main reads its command from
+   * the settings (refused when it is not kept, or detected and not yet confirmed). One PTY per id: a running one first ends.
+   */
+  private async openRun(runId: string, cols: number, rows: number): Promise<PtyOpenResult> {
+    const cwd = this.d.projectPath();
+    if (!cwd) return refusal("no_project", "no project is open in this window");
+    const command = this.d.runCommand(runId);
+    if (command === null) return refusal("not_confirmed", "this command is not kept or not confirmed");
+    for (const e of [...this.entries.values()]) {
+      if (e.kind !== "run" || e.runId !== runId) continue;
+      await this.terminate(e, "killed");
+      this.entries.delete(e.id);
+    }
+    if (this.closing) return refusal("pty_unavailable", "the window is closing");
+    const r = this.spawnEntry(this.d.runLaunch(command, cwd), cols, rows, { kind: "run", runId });
+    // The command is the user's; only its id goes to the log.
+    if (r.ok) this.d.log("info", `run PTY started (${runId}) pid=${this.entries.get(r.ptyId)!.pty.pid}`);
+    return r;
+  }
+
+  /** §57.18: Run tab candidates of this window's project folder (nothing runs). */
+  detectRuns(senderId: number): RunConfig[] {
+    if (!this.owns(senderId, "detect runs")) return [];
+    const cwd = this.d.projectPath();
+    if (!cwd) return [];
+    try {
+      return this.d.detectRuns(cwd);
+    } catch (err) {
+      this.d.log("warn", `run: detection failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
+  }
+
+  private spawnEntry(launch: Launch, cols: number, rows: number, what: { kind: "chat"; sessionId: string } | { kind: "shell"; shell: ShellKind } | { kind: "run"; runId: string }): PtyOpenResult {
     let pty: PtyProcess;
     try {
       pty = this.d.spawn!(launch.file, launch.args, {
@@ -360,6 +403,7 @@ export class PtyHub {
       kind: e.kind,
       ...(e.sessionId ? { sessionId: e.sessionId } : {}),
       ...(e.shell ? { shell: e.shell } : {}),
+      ...(e.runId ? { runId: e.runId } : {}),
       running: e.running,
     }));
   }
@@ -416,7 +460,7 @@ export class PtyHub {
     for (const e of this.entries.values()) {
       if (!e.running) continue;
       if (e.kind === "chat" && (projectChanged || key === null || st.sessions?.currentId !== e.sessionId)) void this.terminate(e, "switched");
-      else if (e.kind === "shell" && projectChanged) void this.terminate(e, "closed");
+      else if ((e.kind === "shell" || e.kind === "run") && projectChanged) void this.terminate(e, "closed");
     }
   }
 

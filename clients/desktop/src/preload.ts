@@ -179,6 +179,7 @@ const bridge: RGBridge = {
     resize: (ptyId: string, cols: number, rows: number) => ipcRenderer.send("rg:pty:resize", ptyId, cols, rows),
     ack: (ptyId: string, chars: number) => ipcRenderer.send("rg:pty:ack", ptyId, chars),
     focus: (focused: boolean) => ipcRenderer.send("rg:pty:focus", focused),
+    detectRuns: () => ipcRenderer.invoke("rg:run:detect"), // MARK: c-panel (§57.18)
     onData: (cb: (ptyId: string, data: string) => void) => {
       const listener = (_e: Electron.IpcRendererEvent, ptyId: string, data: string) => cb(ptyId, data);
       ipcRenderer.on("rg:pty:data", listener);

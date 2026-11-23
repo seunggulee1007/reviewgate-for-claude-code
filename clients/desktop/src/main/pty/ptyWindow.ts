@@ -8,7 +8,10 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createPlatform, type ReviewEngine } from "@reviewgate/engine";
 import { nodePty } from "./nodePty.js";
 import { PtyHub } from "./ptyHub.js";
-import { buildChatLaunch, buildShellLaunch, whichSync, type LaunchPlatform, type ShimFs } from "./terminalLaunch.js";
+import { buildChatLaunch, buildRunLaunch, buildShellLaunch, whichSync, type LaunchPlatform, type ShimFs } from "./terminalLaunch.js";
+import { detectRunCandidates } from "../../shared/runConfigs.js";
+import type { ShellKind } from "../../shared/ipc.js";
+import { folderFiles } from "../runFiles.js";
 
 const launchFs: ShimFs = {
   exists: (p) => existsSync(p),
@@ -34,6 +37,9 @@ export function createWindowPtyHub(o: {
   engine: ReviewEngine;
   projectPath: () => string | null;
   fullRepaint: () => boolean;
+  /** §57.18: Settings' terminal shell, and the kept runnable command of a run id. */
+  terminalShell: () => ShellKind;
+  runCommand: (runId: string) => string | null;
   log: (level: "info" | "warn", msg: string) => void;
 }): PtyHub {
   const load = nodePty();
@@ -55,6 +61,9 @@ export function createWindowPtyHub(o: {
     },
     chatLaunch: (spec) => buildChatLaunch({ spec, platform, parentEnv: process.env, appVersion: app.getVersion(), fullRepaint: o.fullRepaint(), fs: launchFs, which }),
     shellLaunch: (shell, cwd) => buildShellLaunch({ shell, cwd, platform, parentEnv: process.env, which, appVersion: app.getVersion() }),
+    runLaunch: (command, cwd) => buildRunLaunch({ shell: o.terminalShell(), command, cwd, platform, parentEnv: process.env, which, appVersion: app.getVersion() }),
+    runCommand: o.runCommand,
+    detectRuns: (cwd) => detectRunCandidates(folderFiles(cwd), process.platform),
     projectPath: o.projectPath,
     isAlive: (pid) => {
       try {
