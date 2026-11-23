@@ -321,9 +321,12 @@ extension AppState {
         }
     }
 
-    /// Go to File's candidates: `list_files` without the directories.
+    /// Go to File's candidates: `list_files {filesOnly: true}` (§65.4: the basename's camel humps rank too); an older
+    /// engine ignores the flag, so the directories are left out here as well.
     public func quickOpenFiles(query: String) async -> [FileItem] {
-        await listFiles(query: query, limit: 50).filter { !$0.isDirectory }
+        guard projectInfo != nil, case let .files(_, _, items)? = try? await reply(.listFiles(query: query, limit: 50, filesOnly: true))
+        else { return [] }
+        return items.filter { !$0.isDirectory }
     }
 
     /// Runs the Search tab's query.

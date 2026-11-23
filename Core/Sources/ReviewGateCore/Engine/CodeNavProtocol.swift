@@ -29,17 +29,20 @@ public struct DefinitionCandidate: Sendable, Hashable, Decodable {
     public var kind: DefinitionKind
     public var preview: String
     public var score: Double
+    /// §65.6: the enclosing container (`CartService`, `Repo.Companion`), when the engine's index read it.
+    public var container: String?
 
-    public init(path: String, line: Int, column: Int = 1, kind: DefinitionKind, preview: String, score: Double = 0) {
+    public init(path: String, line: Int, column: Int = 1, kind: DefinitionKind, preview: String, score: Double = 0, container: String? = nil) {
         self.path = path
         self.line = line
         self.column = column
         self.kind = kind
         self.preview = preview
         self.score = score
+        self.container = container
     }
 
-    private enum CodingKeys: String, CodingKey { case path, line, column, kind, preview, score }
+    private enum CodingKeys: String, CodingKey { case path, line, column, kind, preview, score, container }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -48,7 +51,8 @@ public struct DefinitionCandidate: Sendable, Hashable, Decodable {
         }
         self.init(path: path, line: max(1, lenientValue(Int.self, c, .line) ?? 1), column: max(1, lenientValue(Int.self, c, .column) ?? 1),
                   kind: lenientValue(DefinitionKind.self, c, .kind) ?? DefinitionKind(rawValue: ""),
-                  preview: lenientValue(String.self, c, .preview) ?? "", score: lenientValue(Double.self, c, .score) ?? 0)
+                  preview: lenientValue(String.self, c, .preview) ?? "", score: lenientValue(Double.self, c, .score) ?? 0,
+                  container: lenientValue(String.self, c, .container).flatMap { $0.isEmpty ? nil : $0 })
     }
 }
 
@@ -133,5 +137,259 @@ public struct ReferencesReply: Sendable, Equatable, Decodable {
         self.init(id: lenientValue(String.self, c, .id), symbol: lenientValue(String.self, c, .symbol) ?? "",
                   hits: lenientElements(ReferenceHit.self, c, .hits), files: lenientValue(Int.self, c, .files),
                   truncated: lenientValue(Bool.self, c, .truncated) ?? false, timedOut: lenientValue(Bool.self, c, .timedOut) ?? false)
+    }
+}
+
+// MARK: ide-nav — docs/PROTOCOL.md §65: the symbol index on the wire (outline, symbols in the project, the peek / hover
+// body, the index's state). Read leniently as §62's replies.
+
+/// One declaration (§65): its name, kind, place (repo-relative, 1-based line and UTF-16 column), the enclosing container
+/// (`Outer.Inner`), its line trimmed (`signature`) and — for a container — the last line of its body.
+public struct NavSymbol: Sendable, Hashable, Decodable {
+    public var name: String
+    public var kind: DefinitionKind
+    public var path: String
+    public var line: Int
+    public var column: Int
+    public var container: String?
+    public var signature: String?
+    public var endLine: Int?
+
+    public init(name: String, kind: DefinitionKind, path: String, line: Int, column: Int = 1, container: String? = nil,
+                signature: String? = nil, endLine: Int? = nil) {
+        self.name = name
+        self.kind = kind
+        self.path = path
+        self.line = line
+        self.column = column
+        self.container = container
+        self.signature = signature
+        self.endLine = endLine
+    }
+
+    fileprivate enum CodingKeys: String, CodingKey { case name, kind, path, line, column, container, signature, endLine }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let name = lenientValue(String.self, c, .name), !name.isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .name, in: c, debugDescription: "no name")
+        }
+        self.init(name: name, kind: lenientValue(DefinitionKind.self, c, .kind) ?? DefinitionKind(rawValue: ""),
+                  path: lenientValue(String.self, c, .path) ?? "", line: max(1, lenientValue(Int.self, c, .line) ?? 1),
+                  column: max(1, lenientValue(Int.self, c, .column) ?? 1),
+                  container: lenientValue(String.self, c, .container).flatMap { $0.isEmpty ? nil : $0 },
+                  signature: lenientValue(String.self, c, .signature).flatMap { $0.isEmpty ? nil : $0 },
+                  endLine: lenientValue(Int.self, c, .endLine))
+    }
+
+    /// `Container.name`, or the name alone.
+    public var qualifiedName: String { container.map { "\($0).\(name)" } ?? name }
+}
+
+/// §65.2: a symbol of the outline — `depth` containers of the file around it (0 = top level).
+public struct DocumentSymbol: Sendable, Hashable, Decodable {
+    public var symbol: NavSymbol
+    public var depth: Int
+
+    public init(_ symbol: NavSymbol, depth: Int = 0) {
+        self.symbol = symbol
+        self.depth = depth
+    }
+
+    private enum CodingKeys: String, CodingKey { case depth }
+
+    public init(from decoder: Decoder) throws {
+        let symbol = try NavSymbol(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(symbol, depth: max(0, lenientValue(Int.self, c, .depth) ?? 0))
+    }
+}
+
+/// §65.3: a symbol of the project — `matches` are the 0-based UTF-16 offsets of the query's characters in `name`.
+public struct WorkspaceSymbol: Sendable, Hashable, Decodable {
+    public var symbol: NavSymbol
+    public var matches: [Int]
+
+    public init(_ symbol: NavSymbol, matches: [Int] = []) {
+        self.symbol = symbol
+        self.matches = matches
+    }
+
+    private enum CodingKeys: String, CodingKey { case matches }
+
+    public init(from decoder: Decoder) throws {
+        let symbol = try NavSymbol(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(symbol, matches: lenientValue([Int].self, c, .matches) ?? [])
+    }
+}
+
+/// §65.1: `state.nav.index` — the symbol index of the open worktree.
+public struct NavIndexState: Sendable, Equatable, Codable {
+    public enum Status: String, Sendable, Codable { case idle, building, ready, failed }
+
+    public var status: Status
+    public var files: Int
+    public var symbols: Int
+    /// The symbol cap or the time budget cut the last build short.
+    public var truncated: Bool
+    /// ISO-8601 of the last finished build.
+    public var builtAt: String?
+    /// While building: the files to read.
+    public var filesTotal: Int?
+    public var durationMs: Int?
+    /// `failed`: git's first line.
+    public var error: String?
+
+    public init(status: Status, files: Int = 0, symbols: Int = 0, truncated: Bool = false, builtAt: String? = nil,
+                filesTotal: Int? = nil, durationMs: Int? = nil, error: String? = nil) {
+        self.status = status
+        self.files = files
+        self.symbols = symbols
+        self.truncated = truncated
+        self.builtAt = builtAt
+        self.filesTotal = filesTotal
+        self.durationMs = durationMs
+        self.error = error
+    }
+
+    private enum CodingKeys: String, CodingKey { case status, files, symbols, truncated, builtAt, filesTotal, durationMs, error }
+
+    /// Never fails: an unknown status reads as `idle`.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(status: lenientValue(Status.self, c, .status) ?? .idle, files: lenientValue(Int.self, c, .files) ?? 0,
+                  symbols: lenientValue(Int.self, c, .symbols) ?? 0, truncated: lenientValue(Bool.self, c, .truncated) ?? false,
+                  builtAt: lenientValue(String.self, c, .builtAt), filesTotal: lenientValue(Int.self, c, .filesTotal),
+                  durationMs: lenientValue(Int.self, c, .durationMs), error: lenientValue(String.self, c, .error))
+    }
+
+    public var isBuilding: Bool { status == .building }
+}
+
+/// §65: `state.nav`.
+public struct NavState: Sendable, Equatable, Codable {
+    public var index: NavIndexState
+
+    public init(index: NavIndexState) { self.index = index }
+
+    private enum CodingKeys: String, CodingKey { case index }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(index: lenientValue(NavIndexState.self, c, .index) ?? NavIndexState(status: .idle))
+    }
+}
+
+/// §65.2: reply to `document_symbols` — every symbol of the file in file order.
+public struct DocumentSymbolsReply: Sendable, Equatable, Decodable {
+    public var id: String?
+    public var path: String
+    public var language: String
+    public var symbols: [DocumentSymbol]
+    public var truncated: Bool
+
+    public init(id: String? = nil, path: String, language: String = "plaintext", symbols: [DocumentSymbol], truncated: Bool = false) {
+        self.id = id
+        self.path = path
+        self.language = language
+        self.symbols = symbols
+        self.truncated = truncated
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, path, language, symbols, truncated }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: lenientValue(String.self, c, .id), path: lenientValue(String.self, c, .path) ?? "",
+                  language: lenientValue(String.self, c, .language) ?? "plaintext",
+                  symbols: lenientElements(DocumentSymbol.self, c, .symbols), truncated: lenientValue(Bool.self, c, .truncated) ?? false)
+    }
+}
+
+/// §65.3: reply to `workspace_symbols` — best first; `index` as it was when the engine answered.
+public struct WorkspaceSymbolsReply: Sendable, Equatable, Decodable {
+    public var id: String?
+    public var query: String
+    public var symbols: [WorkspaceSymbol]
+    public var truncated: Bool
+    public var index: NavIndexState
+
+    public init(id: String? = nil, query: String, symbols: [WorkspaceSymbol], truncated: Bool = false, index: NavIndexState = NavIndexState(status: .ready)) {
+        self.id = id
+        self.query = query
+        self.symbols = symbols
+        self.truncated = truncated
+        self.index = index
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, query, symbols, truncated, index }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: lenientValue(String.self, c, .id), query: lenientValue(String.self, c, .query) ?? "",
+                  symbols: lenientElements(WorkspaceSymbol.self, c, .symbols), truncated: lenientValue(Bool.self, c, .truncated) ?? false,
+                  index: lenientValue(NavIndexState.self, c, .index) ?? NavIndexState(status: .ready))
+    }
+}
+
+/// §65.5: reply to `definition_preview` — lines `startLine…` of the file around `line`; `symbol` the declaration on `line`.
+public struct SymbolPreviewReply: Sendable, Equatable, Decodable {
+    public var id: String?
+    public var path: String
+    public var line: Int
+    public var startLine: Int
+    public var lines: [String]
+    public var totalLines: Int
+    public var language: String
+    public var truncated: Bool
+    public var symbol: NavSymbol?
+
+    public init(id: String? = nil, path: String, line: Int, startLine: Int, lines: [String], totalLines: Int? = nil,
+                language: String = "plaintext", truncated: Bool = false, symbol: NavSymbol? = nil) {
+        self.id = id
+        self.path = path
+        self.line = line
+        self.startLine = startLine
+        self.lines = lines
+        self.totalLines = totalLines ?? (startLine + lines.count - 1)
+        self.language = language
+        self.truncated = truncated
+        self.symbol = symbol
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, path, line, startLine, lines, totalLines, language, truncated, symbol }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let line = max(1, lenientValue(Int.self, c, .line) ?? 1)
+        self.init(id: lenientValue(String.self, c, .id), path: lenientValue(String.self, c, .path) ?? "", line: line,
+                  startLine: max(1, lenientValue(Int.self, c, .startLine) ?? line), lines: lenientValue([String].self, c, .lines) ?? [],
+                  totalLines: lenientValue(Int.self, c, .totalLines), language: lenientValue(String.self, c, .language) ?? "plaintext",
+                  truncated: lenientValue(Bool.self, c, .truncated) ?? false, symbol: lenientValue(NavSymbol.self, c, .symbol))
+    }
+
+    /// The index into `lines` of `line` (nil when the slice does not hold it).
+    public var focusIndex: Int? {
+        let i = line - startLine
+        return lines.indices.contains(i) ? i : nil
+    }
+}
+
+/// §65.1: reply to `nav_index_build` — the index's state at once (the build runs on in the background).
+public struct NavIndexReply: Sendable, Equatable, Decodable {
+    public var id: String?
+    public var index: NavIndexState
+
+    public init(id: String? = nil, index: NavIndexState) {
+        self.id = id
+        self.index = index
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, index }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: lenientValue(String.self, c, .id), index: lenientValue(NavIndexState.self, c, .index) ?? NavIndexState(status: .idle))
     }
 }

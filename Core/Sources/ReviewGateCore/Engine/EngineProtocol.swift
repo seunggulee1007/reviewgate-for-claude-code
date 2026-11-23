@@ -597,8 +597,8 @@ public enum EngineCommand: Sendable, Equatable {
     case mcpRemove(name: String, scope: McpScope)
     case mcpAuth(name: String)
     // §23–27
-    /// Fuzzy file search for @-mentions → `files`.
-    case listFiles(query: String, limit: Int? = nil)
+    /// Fuzzy file search for @-mentions → `files`; `filesOnly` (§65.4, Go to File) leaves the directories out.
+    case listFiles(query: String, limit: Int? = nil, filesOnly: Bool = false)
     /// An image a transcript row references → `attachment`.
     case attachmentGet(hash: String)
     /// The model / effort of the session from its next request on (persisted per project).
@@ -708,10 +708,20 @@ public enum EngineCommand: Sendable, Equatable {
     /// §47: `git grep` over the project's files (a fixed string; case ignored unless `caseSensitive`) → `.projectSearch`.
     case projectSearch(query: String, caseSensitive: Bool = false, wholeWord: Bool = false, limit: Int? = nil)
     // MARK: code-nav
-    /// §62: where `symbol` is declared (search-based), ranked for the file and line clicked in → `.definitions`.
-    case findDefinition(symbol: String, fromPath: String? = nil, line: Int? = nil)
+    /// §62: where `symbol` is declared (search-based), ranked for the file and line clicked in → `.definitions`. §65.6:
+    /// `column` (1-based UTF-16) of the clicked name on that line and its `receiver` (`user` of `user.save()`).
+    case findDefinition(symbol: String, fromPath: String? = nil, line: Int? = nil, column: Int? = nil, receiver: String? = nil)
     /// §62: every line holding `symbol` as a whole word, the clicked file first → `.references`.
     case findReferences(symbol: String, fromPath: String? = nil, limit: Int? = nil)
+    // MARK: ide-nav
+    /// §65.2: the symbols of one file in file order (`depth` = its containers) → `.documentSymbols`.
+    case documentSymbols(path: String)
+    /// §65.3: fuzzy symbol search over the project's index (built on first use) → `.workspaceSymbols`.
+    case workspaceSymbols(query: String, limit: Int? = nil)
+    /// §65.5: lines around `line` of a file (the comment block above it and 15 after by default) → `.definitionPreview`.
+    case definitionPreview(path: String, line: Int, before: Int? = nil, after: Int? = nil)
+    /// §65.1: builds the symbol index now (`full`: from scratch) → `.navIndex`; progress in `state.nav`.
+    case navIndexBuild(full: Bool = false)
     // MARK: task-start
     /// §63: one GitHub issue (`gh issue view`) for "Start from a task" → `.taskFetched`.
     case taskFetch(ref: String)
@@ -874,6 +884,10 @@ public enum EngineCommand: Sendable, Equatable {
         case .projectSearch: "project_search"
         case .findDefinition: "find_definition"   // MARK: code-nav
         case .findReferences: "find_references"
+        case .documentSymbols: "document_symbols"   // MARK: ide-nav
+        case .workspaceSymbols: "workspace_symbols"
+        case .definitionPreview: "definition_preview"
+        case .navIndexBuild: "nav_index_build"
         case .taskFetch: "task_fetch"   // MARK: task-start
         case .shutdown: "shutdown"
         }
@@ -918,6 +932,7 @@ extension EngineCommand: Encodable {
         case columns, visible   // wave6 w6-statusline
         case caseSensitive, wholeWord   // code-browser
         case symbol, fromPath   // code-nav
+        case filesOnly, column, receiver, after, full   // ide-nav
         case ref   // task-start
         case confirm   // §59
     }
@@ -1059,9 +1074,10 @@ extension EngineCommand: Encodable {
             if !mentions.isEmpty { try c.encode(mentions, forKey: .mentions) }
             if !attachments.isEmpty { try c.encode(attachments, forKey: .attachments) }
             try c.encode(model, forKey: .model)
-        case let .listFiles(query, limit):
+        case let .listFiles(query, limit, filesOnly):
             try c.encode(query, forKey: .query)
             try c.encodeIfPresent(limit, forKey: .limit)
+            if filesOnly { try c.encode(true, forKey: .filesOnly) }
         case let .attachmentGet(hash):
             try c.encode(hash, forKey: .hash)
         case let .setModel(model, effort):
@@ -1185,14 +1201,29 @@ extension EngineCommand: Encodable {
             if wholeWord { try c.encode(true, forKey: .wholeWord) }
             try c.encodeIfPresent(limit, forKey: .limit)
         // MARK: code-nav (§62)
-        case let .findDefinition(symbol, fromPath, line):
+        case let .findDefinition(symbol, fromPath, line, column, receiver):
             try c.encode(symbol, forKey: .symbol)
             try c.encodeIfPresent(fromPath, forKey: .fromPath)
             try c.encodeIfPresent(line, forKey: .line)
+            try c.encodeIfPresent(column, forKey: .column)   // ide-nav (§65.6)
+            try c.encodeIfPresent(receiver, forKey: .receiver)
         case let .findReferences(symbol, fromPath, limit):
             try c.encode(symbol, forKey: .symbol)
             try c.encodeIfPresent(fromPath, forKey: .fromPath)
             try c.encodeIfPresent(limit, forKey: .limit)
+        // MARK: ide-nav (§65)
+        case let .documentSymbols(path):
+            try c.encode(path, forKey: .path)
+        case let .workspaceSymbols(query, limit):
+            try c.encode(query, forKey: .query)
+            try c.encodeIfPresent(limit, forKey: .limit)
+        case let .definitionPreview(path, line, before, after):
+            try c.encode(path, forKey: .path)
+            try c.encode(line, forKey: .line)
+            try c.encodeIfPresent(before, forKey: .before)
+            try c.encodeIfPresent(after, forKey: .after)
+        case let .navIndexBuild(full):
+            if full { try c.encode(true, forKey: .full) }
         case let .taskFetch(ref):   // MARK: task-start (§63)
             try c.encode(ref, forKey: .ref)
         case let .requestChanges(extra, noteIds):
@@ -2587,6 +2618,8 @@ public struct ReviewState: Codable, Sendable, Equatable {
     public var storage: StorageState? = nil
     // MARK: wave4c w4c-trust — §41.2: the open repository's auto-accept rules (absent: every rule off / an older engine)
     public var autoAcceptRules: AutoAcceptRules? = nil
+    // MARK: ide-nav — §65: the symbol index of the open worktree (absent: no project / an older engine)
+    public var nav: NavState? = nil
 
     /// What a client shows before the engine's first snapshot (and after the engine exited).
     public static let empty = ReviewState(
@@ -3047,6 +3080,15 @@ public enum EngineEvent: Sendable, Equatable {
     case definitions(DefinitionsReply)
     /// §62: reply to `find_references`.
     case references(ReferencesReply)
+    // MARK: ide-nav
+    /// §65.2: reply to `document_symbols`.
+    case documentSymbols(DocumentSymbolsReply)
+    /// §65.3: reply to `workspace_symbols`.
+    case workspaceSymbols(WorkspaceSymbolsReply)
+    /// §65.5: reply to `definition_preview`.
+    case definitionPreview(SymbolPreviewReply)
+    /// §65.1: reply to `nav_index_build`.
+    case navIndex(NavIndexReply)
     // MARK: task-start
     /// §63: reply to `task_fetch`.
     case taskFetched(TaskFetchedReply)
@@ -3099,6 +3141,10 @@ public enum EngineEvent: Sendable, Equatable {
         case let .projectSearch(reply): reply.id
         case let .definitions(reply): reply.id   // MARK: code-nav
         case let .references(reply): reply.id
+        case let .documentSymbols(reply): reply.id   // MARK: ide-nav
+        case let .workspaceSymbols(reply): reply.id
+        case let .definitionPreview(reply): reply.id
+        case let .navIndex(reply): reply.id
         case let .taskFetched(reply): reply.id   // MARK: task-start
         default: nil
         }
@@ -3345,6 +3391,14 @@ extension EngineEvent: Decodable {
             self = .definitions(try DefinitionsReply(from: decoder))
         case "references":
             self = .references(try ReferencesReply(from: decoder))
+        case "document_symbols":   // MARK: ide-nav (§65)
+            self = .documentSymbols(try DocumentSymbolsReply(from: decoder))
+        case "workspace_symbols":
+            self = .workspaceSymbols(try WorkspaceSymbolsReply(from: decoder))
+        case "definition_preview":
+            self = .definitionPreview(try SymbolPreviewReply(from: decoder))
+        case "nav_index":
+            self = .navIndex(try NavIndexReply(from: decoder))
         case "task_fetched":   // MARK: task-start (§63)
             self = .taskFetched(try TaskFetchedReply(from: decoder))
         case "plan_proposed":

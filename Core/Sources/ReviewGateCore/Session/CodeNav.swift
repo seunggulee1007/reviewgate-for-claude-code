@@ -11,11 +11,18 @@ public struct CodeNavSymbol: Sendable, Equatable {
     public var symbol: String
     /// UTF-16 offsets into the line.
     public var range: Range<Int>
+    /// §65.6: the identifier the name is a member of on that line — `user` of `user.save()`, `this` of `this.total`,
+    /// `Repo` of `Repo::find` (`x.`, `x?.`, `x!!.`, `x::`, `x->`); nil when unqualified or after `)` / `]`.
+    public var receiver: String?
 
-    public init(symbol: String, range: Range<Int>) {
+    public init(symbol: String, range: Range<Int>, receiver: String? = nil) {
         self.symbol = symbol
         self.range = range
+        self.receiver = receiver
     }
+
+    /// §65.6: the 1-based UTF-16 column `find_definition` takes (the name's first character).
+    public var column: Int { range.lowerBound + 1 }
 }
 
 /// Where the user is or was: which view, the file (repo-relative) and the line (1-based).
@@ -92,6 +99,18 @@ public enum CodeNavOutcome: Sendable, Equatable {
     case notFound
 }
 
+/// A Find References request of the window (the References tab's history runs one again).
+public struct ReferenceSearch: Sendable, Equatable, Identifiable {
+    public var symbol: String
+    public var from: CodeNavLocation?
+    public var id: String { "\(symbol)@\(from?.path ?? ""):\(from?.line ?? 0)" }
+
+    public init(symbol: String, from: CodeNavLocation?) {
+        self.symbol = symbol
+        self.from = from
+    }
+}
+
 /// References of one file, in the order received.
 public struct ReferenceGroup: Sendable, Equatable, Identifiable {
     public var path: String
@@ -115,6 +134,14 @@ public enum CodeNavText {
         case 1: .open(reply.candidates[0])
         default: .peek(reply.candidates)
         }
+    }
+
+    /// §65.8 F4 / ⇧F4: the hit after (or before) `current` among `count`, round the ends; the first (or last) when none
+    /// is picked yet; nil when there are none.
+    public static func step(from current: Int?, by delta: Int, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        guard let current, (0..<count).contains(current) else { return delta >= 0 ? 0 : count - 1 }
+        return ((current + delta) % count + count) % count
     }
 
     /// The hits grouped by file, in the order received.
@@ -238,7 +265,30 @@ public enum CodeNavText {
             let qualified = (parts + [word]).joined(separator: ".")
             if !parts.isEmpty, qualified.utf16.count <= symbolLimit { return CodeNavSymbol(symbol: qualified, range: lo..<(hi + 1)) }
         }
-        return CodeNavSymbol(symbol: word, range: lo..<(hi + 1))
+        return CodeNavSymbol(symbol: word, range: lo..<(hi + 1), receiver: receiver(u, before: lo))
+    }
+
+    /// §65.6: the identifier before `x.` / `x?.` / `x!!.` / `x::` / `x->` that ends right before UTF-16 offset `start`.
+    static func receiver(_ u: [UInt16], before start: Int) -> String? {
+        var i = start
+        // The separator, read backwards.
+        if i >= 1, u[i - 1] == 0x2E {   // .
+            i -= 1
+            if i >= 1, u[i - 1] == 0x3F { i -= 1 }   // ?.
+            else if i >= 2, u[i - 1] == 0x21, u[i - 2] == 0x21 { i -= 2 }   // !!.
+        } else if i >= 2, u[i - 1] == 0x3A, u[i - 2] == 0x3A {   // ::
+            i -= 2
+        } else if i >= 2, u[i - 1] == 0x3E, u[i - 2] == 0x2D {   // ->
+            i -= 2
+        } else {
+            return nil
+        }
+        guard i >= 1, isWordUnit(u[i - 1]) else { return nil }   // `foo().bar`, `a[0].b`: nothing known
+        var lo = i - 1
+        while lo > 0, isWordUnit(u[lo - 1]) { lo -= 1 }
+        guard !isDigit(u[lo]) else { return nil }
+        let name = string(u[lo..<i])
+        return name.utf16.count <= symbolLimit ? name : nil
     }
 
     /// `c:out`, `my-widget`, `MyWidget`: word parts joined by at most one ':' and any '-', nothing empty.
@@ -351,12 +401,33 @@ public final class CodeNavStore {
     }
 
     public private(set) var popup: Popup?
+    /// §65.8: the peek band under a clicked row (ide-nav, IdeNav.swift).
+    public let peek = CodeNavPeekStore()
+    /// §65.8: the hover card (⌘ held over a name, IdeNavHover.swift).
+    public let hover = CodeNavHoverStore()
+    /// §65.8: Symbols in File (⌘F12) / Symbols in Project (⌘⇧P) shown.
+    public var palette: NavPalette?
     public private(set) var openRequest: OpenRequest?
     public private(set) var history = CodeNavHistory()
     /// Where the user is: the place last opened or clicked (Back's Forward, Open in IDE's line).
     public var caret: CodeNavLocation?
     // Find References
+    /// The fallback sheet is shown (§65.8: only where the window has no bottom panel — the PRs tab).
     public var referencesShown = false
+    /// Bumped by every Find References: the window shows the References tab (or the sheet).
+    public private(set) var referencesTick = 0
+    /// §65.8: the hit picked in the References tab (an index of `referenceHits`) and its lines around it.
+    public private(set) var referenceSelection: Int?
+    public private(set) var referencePreview: SymbolPreviewReply?
+    public private(set) var referencePreviewError: String?
+    /// The window's searches, newest first (at most `searchesLimit`).
+    public private(set) var referenceSearches: [ReferenceSearch] = []
+    public static let searchesLimit = 8
+    /// Lines before / after a reference its preview shows.
+    public static let referenceContext = (before: 6, after: 10)
+    @ObservationIgnored private var referencePreviewSeq = 0
+    /// F4 has jumped since the search: the next steps do not push Back again (one Back returns to where you read).
+    @ObservationIgnored private var steppedSinceSearch = false
     public private(set) var referencesSymbol = ""
     public private(set) var referencesFrom: CodeNavLocation?
     public private(set) var references: ReferencesReply?
@@ -373,7 +444,7 @@ public final class CodeNavStore {
     public init() {}
 
     /// Looks up `symbol` clicked at `from`; one candidate opens, several peek, none says so (`anchor`: the clicked view).
-    func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, sameReviewFile: (String) -> Bool,
+    func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, receiver: String? = nil, sameReviewFile: (String) -> Bool,
                         using request: @escaping (EngineCommand) async throws -> EngineEvent) async {
         definitionSeq += 1
         let seq = definitionSeq
@@ -385,7 +456,8 @@ public final class CodeNavStore {
         }
         defer { looking.cancel() }
         do {
-            let reply = try await request(.findDefinition(symbol: symbol, fromPath: from.path, line: from.line))
+            let reply = try await request(.findDefinition(symbol: symbol, fromPath: from.path, line: from.line, column: from.column,
+                                                          receiver: receiver))
             guard seq == definitionSeq else { return }
             guard case let .definitions(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             switch CodeNavText.outcome(r) {
@@ -409,6 +481,14 @@ public final class CodeNavStore {
         let inReview = from?.view != .other && sameReviewFile(place.path)
         let target = CodeNavLocation(view: inReview ? .review : .projectFile, path: place.path, line: place.line, column: place.column)
         if let from, from != target { history.push(from) }
+        go(to: target)
+    }
+
+    /// §65.8: Go to File / a palette's pick — a changed file of the review in its diff (`line` nil: as the review shows
+    /// it), any other file read-only; Back returns to where the user was (`caret`).
+    func openFile(_ path: String, line: Int?, column: Int? = nil, sameReviewFile: (String) -> Bool) {
+        let target = CodeNavLocation(view: sameReviewFile(path) ? .review : .projectFile, path: path, line: line, column: column)
+        if let caret, caret != target { history.push(caret) }
         go(to: target)
     }
 
@@ -444,13 +524,22 @@ public final class CodeNavStore {
         referencesSeq += 1
         let seq = referencesSeq
         popup = nil
-        referencesShown = true
+        referencesTick += 1
         referencesSymbol = symbol
         referencesFrom = from
         references = nil
         referenceGroups = []
         referencesError = nil
         referencesLoading = true
+        referenceSelection = nil
+        referencePreview = nil
+        referencePreviewError = nil
+        referencePreviewSeq += 1
+        steppedSinceSearch = false
+        let search = ReferenceSearch(symbol: symbol, from: from)
+        referenceSearches.removeAll { $0.id == search.id }
+        referenceSearches.insert(search, at: 0)
+        if referenceSearches.count > Self.searchesLimit { referenceSearches.removeLast(referenceSearches.count - Self.searchesLimit) }
         defer { if seq == referencesSeq { referencesLoading = false } }
         do {
             let reply = try await request(.findReferences(symbol: symbol, fromPath: from?.path))
@@ -458,10 +547,66 @@ public final class CodeNavStore {
             guard case let .references(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             references = r
             referenceGroups = CodeNavText.groups(r.hits)
+            if !r.hits.isEmpty {
+                referencesLoading = false
+                await selectReference(0, using: request)
+            }
         } catch {
             guard seq == referencesSeq else { return }
             referencesError = CodeNavText.message(error)
         }
+    }
+
+    /// Every hit in the order the References tab lists them (file by file).
+    public var referenceHits: [ReferenceHit] { referenceGroups.flatMap(\.hits) }
+
+    /// Picks hit `index` of `referenceHits` and reads its lines around it (the tab's preview).
+    func selectReference(_ index: Int, using request: (EngineCommand) async throws -> EngineEvent) async {
+        let hits = referenceHits
+        guard hits.indices.contains(index) else { return }
+        referenceSelection = index
+        let hit = hits[index]
+        if let p = referencePreview, p.path == hit.path, p.line == hit.line { return }
+        referencePreviewSeq += 1
+        let seq = referencePreviewSeq
+        referencePreviewError = nil
+        do {
+            let reply = try await request(.definitionPreview(path: hit.path, line: hit.line, before: Self.referenceContext.before,
+                                                             after: Self.referenceContext.after))
+            guard seq == referencePreviewSeq else { return }
+            guard case let .definitionPreview(p) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
+            referencePreview = p
+        } catch {
+            guard seq == referencePreviewSeq else { return }
+            referencePreview = nil
+            referencePreviewError = CodeNavText.message(error)
+        }
+    }
+
+    /// F4 / ⇧F4: the next / previous hit picked and opened in the diff or the code browser. The first step since the
+    /// search remembers where the user was (`caret`) for Back; the next ones do not, so one Back returns there.
+    @discardableResult
+    func stepReference(_ delta: Int, sameReviewFile: (String) -> Bool,
+                       using request: (EngineCommand) async throws -> EngineEvent) async -> ReferenceHit? {
+        let hits = referenceHits
+        guard let index = CodeNavText.step(from: referenceSelection, by: delta, count: hits.count) else { return nil }
+        let hit = hits[index]
+        let from = steppedSinceSearch ? nil : (caret ?? referencesFrom)
+        steppedSinceSearch = true
+        open(DefinitionCandidate(path: hit.path, line: hit.line, column: hit.column, kind: hit.kind ?? .file, preview: hit.preview),
+             from: from, sameReviewFile: sameReviewFile)
+        await selectReference(index, using: request)
+        return hit
+    }
+
+    /// ↩ / a double-click in the References tab: the hit opened, Back returning to where the user was.
+    func openReference(_ index: Int, sameReviewFile: (String) -> Bool) {
+        let hits = referenceHits
+        guard hits.indices.contains(index) else { return }
+        let hit = hits[index]
+        referenceSelection = index
+        open(DefinitionCandidate(path: hit.path, line: hit.line, column: hit.column, kind: hit.kind ?? .file, preview: hit.preview),
+             from: caret ?? referencesFrom, sameReviewFile: sameReviewFile)
     }
 
     /// The project changed or closed.
@@ -469,6 +614,14 @@ public final class CodeNavStore {
         definitionSeq += 1
         referencesSeq += 1
         popup = nil
+        peek.reset()
+        referenceSelection = nil
+        referencePreview = nil
+        referencePreviewError = nil
+        referencePreviewSeq += 1
+        referenceSearches = []
+        hover.dismiss()
+        palette = nil
         openRequest = nil
         history.clear()
         caret = nil
@@ -481,10 +634,12 @@ public final class CodeNavStore {
 }
 
 extension AppState {
-    /// ⌘-click / Go to Definition on `symbol` at `from`; `anchor` names the view the popover hangs from.
-    public func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int) async {
+    /// ⌘-click / Go to Definition on `symbol` at `from` (its `column` and `receiver` when the click gave them, §65.6);
+    /// `anchor` names the view the popover hangs from.
+    public func goToDefinition(_ symbol: String, from: CodeNavLocation, anchor: Int, receiver: String? = nil) async {
         guard projectInfo != nil else { return }
-        await codeNav.goToDefinition(symbol, from: from, anchor: anchor, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
+        await codeNav.goToDefinition(symbol, from: from, anchor: anchor, receiver: receiver,
+                                     sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
             guard let self else { throw EngineClientError.stopped }
             return try await self.reply(cmd)
         }
@@ -497,6 +652,32 @@ extension AppState {
             guard let self else { throw EngineClientError.stopped }
             return try await self.reply(cmd)
         }
+    }
+
+    /// The References tab: pick hit `index` (its preview), open it (↩), or step to the next / previous one (F4 / ⇧F4).
+    public func selectReference(_ index: Int) async {
+        await codeNav.selectReference(index) { [weak self] cmd in
+            guard let self else { throw EngineClientError.stopped }
+            return try await self.reply(cmd)
+        }
+    }
+
+    public func openReference(_ index: Int) {
+        codeNav.openReference(index, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil })
+    }
+
+    @discardableResult
+    public func stepReference(_ delta: Int) async -> ReferenceHit? {
+        await codeNav.stepReference(delta, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
+            guard let self else { throw EngineClientError.stopped }
+            return try await self.reply(cmd)
+        }
+    }
+
+    /// Go to File / Symbols in File / Symbols in Project: open `path` at `line` (a changed file in its diff).
+    public func goToFile(path: String, line: Int? = nil, column: Int? = nil) {
+        codeNav.dismissPopup()
+        codeNav.openFile(path, line: line, column: column, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil })
     }
 
     /// Opens a peek row or a reference: the popover / panel closes, the place opens, Back returns to where it started.

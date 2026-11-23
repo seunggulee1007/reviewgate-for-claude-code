@@ -50,9 +50,11 @@ compares the plan with what was actually done, marks risky changes and shows the
 **Guard rails.** Edits outside the project ask first, writes into `.git/` are refused, and permission requests become
 cards in the app instead of terminal prompts. Throwaway files in temporary folders pass quietly.
 
-**Code navigation while you review.** ⌘-click a name in any diff or file to jump to its definition — Java, Kotlin,
-JavaScript / TypeScript, Vue and JSP above all — list its references, step Back and Forward, and open the line in
-IntelliJ IDEA, VS Code or Xcode. Search-based, no language server to set up.
+**Code navigation while you review.** ⌘-click a name in any diff or file to peek its definition in a band under the
+line — the place you read never moves — or F12 to jump there; hold ⌘ over a name for its signature. Java, Kotlin,
+JavaScript / TypeScript, Vue and JSP above all. References fill a tab of the bottom panel (F4 steps through them), Go to
+File (⌘P), Symbols in This File (⌘F12) and Symbols in Project (⌥⌘⇧N) find the rest; step Back and Forward, and open
+the line in IntelliJ IDEA, VS Code or Xcode. Search-based with an in-memory symbol index, no language server to set up.
 
 **A bottom panel, as in your editor.** Under the diff and the chat: shell tabs in the project folder (⌃`), an Output
 tab with ReviewGate's log and every Bash command Claude ran with its output, and a Run tab for the project's own

@@ -9842,7 +9842,7 @@ type ClientCapabilities = {
 ### 57.18 The bottom panel: 출력 and 실행
 
 The panel of §57.6 (Windows: §57.17's shell panel) has three tabs — **터미널** (the shells, unchanged), **출력**,
-**실행** — so a dev server, a test run or what Claude's commands printed sit under the diff and the chat as in VS Code /
+**실행** (the Mac adds **참조**, §65.8) — so a dev server, a test run or what Claude's commands printed sit under the diff and the chat as in VS Code /
 Cursor. Client only: no engine command or event is added; the engine already sends what 출력 shows.
 
 - **Finding it.** While the panel is hidden, a thin bar under the window (project open, not the PRs tab) holds
@@ -9862,6 +9862,7 @@ Cursor. Client only: no engine command or event is added; the engine already sen
     failed one ends with "✗ 명령이 실패했어요". Results restored from a transcript are not replayed.
   - Search keeps the lines holding the text (case-insensitive). Copy puts the lines shown on the clipboard; Clear empties
     the window's output (not the log file). Both are disabled, with the reason in the tooltip, when there is nothing.
+- **참조** (ide-nav, §65.8; Mac) — Find References' results with a preview; F4 / ⇧F4 step through them.
 - **실행** — named commands per repository, each in its own PTY. Left: the list (state dot, name, command, ▶ or ■,
   context menu 실행 / 중지 / 명령 복사 / 제거) with "명령 추가…" and "다시 찾기"; right: the selected command's bar (state,
   ▶ / ■ / ↻) over its terminal.
@@ -10365,8 +10366,8 @@ Find References / Find in Project (`project_search`, whole word, case-sensitive)
 shows "Looking for X…" there. **Opening** (`CodeNavStore.openRequest`, `CodeNavObservers`): a changed file of the review,
 reached from the review or the code browser, shows its diff at the line (`WindowModel.showReviewDiff(path:line:orFile:)`);
 a line outside the diff's hunks — and every other file, and every jump from a past round's / PR / live diff — opens
-read-only in the code browser at the line. **Find References** (the row's menu, ⇧F12, a peek's or note's button): a sheet
-grouped by file in the order received, "N references in M files", a `kind` row labelled "definition"; a click opens as
+read-only in the code browser at the line. **Find References** (the row's menu, ⇧F12, a peek's or note's button): the bottom
+panel's 참조 tab (§65.8; on the PRs tab, which has no panel, a sheet) grouped by file in the order received, "N references in M files", a `kind` row labelled "definition"; a click opens as
 above. **Back / Forward** (Navigate menu ⌃- / ⌃⇧-, chevrons in the code browser's header and in the review header once
 there is history, each saying why it is off): `CodeNavHistory`, ≤ 50 places of `{view: review | projectFile | other, path,
 line}`; a jump pushes where it started, Back to `other` (a past round's / PR / live diff) closes the code browser in front
@@ -10789,8 +10790,62 @@ other builds running):
 allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
 through). The UI is the client team's follow-up.
 
-**Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
-UI work adds them.
+**Mac.** Core decodes the four replies (`DocumentSymbolsReply`, `WorkspaceSymbolsReply`, `SymbolPreviewReply`,
+`NavIndexReply`), `state.nav` (`ReviewState.nav`, nil from an older engine) and `candidates[].container`, leniently as
+§62's; `EngineCommand` sends the four commands, `find_definition`'s `column` / `receiver` and `list_files {filesOnly}`
+(`Core/…/Engine/CodeNavProtocol.swift`; tests `IdeNavTests`).
+- *Go to Definition* sends the clicked name's `column` and its `receiver` — `CodeNavText.symbol` reads the identifier
+  before `x.` / `x?.` / `x!!.` / `x::` / `x->` on the drawn line (`this.gate.refresh()` → `gate`; nothing after `)` / `]`
+  or for a qualified `a.b.C`).
+- *Peek Definition* (Navigate › 정의 미리 보기 ⌥F12 on the name under the pointer, a row's menu, and ⌘-click while
+  Settings › Review › Diff › "이름을 ⌘-클릭하면" is 미리 보기 — the default; 정의로 이동 there makes ⌘-click jump as §62,
+  F12 always jumps): a band inside the clicked row, under its code (`CodeNavPeekSlot` in `DiffCodeText`, so every diff,
+  full file and project file has it; the half of a split row), never moving the list's scroll position. Header
+  "File.kt:42 — Container.member" (the preview's `symbol`, else the candidate's `container`), the kind, the folder, 열기
+  (jumps as §62, Back returns to the click), 참조 찾기, ×. Body: `definition_preview {path, line}` of the picked candidate,
+  highlighted as the diff, the definition line marked, ≤ 15 lines tall and scrollable; several candidates → the list on
+  the band's right (a click shows one, a double-click opens it); ↑ / ↓ switch, ↩ opens, Esc closes; none → "No definition
+  found for X" with 프로젝트에서 찾기. Previews read once per `path:line`. One band per window; a new peek replaces it.
+  A diff row is one VoiceOver element (polish-10), so in a diff the band is used with the keyboard. Core
+  `CodeNavPeekStore` (`IdeNav.swift`), App `IdeNavViews.swift`.
+- *Hover preview*: ⌘ alone held with the pointer resting on a name for 600 ms (`CodeNavHoverStore.delay`; the underline
+  shows as before) → `find_definition` (with `column` / `receiver`), then `definition_preview {after: 8}` of the first
+  candidate → a popover from the name: `symbol.signature` in bold (else the candidate's `preview`), file:line, container,
+  kind, the lines (the definition line marked), "N more — ⌥F12 shows them all". A new name restarts the wait (only the
+  newest wait's replies count, `CodeNavHoverDebounce`); leaving the name, releasing ⌘ or a click closes it; nothing is
+  asked while the pointer only passes over names. Core `IdeNavHover.swift`.
+- *References tab*: the bottom panel's fourth tab **참조** (§57.18; its status-bar button too). Find References (⇧F12,
+  the row's menu, the peek's 참조 찾기) shows the panel on it — or, on the PRs tab where the window has no panel, §62's
+  sheet as before. Left: the hits by file (name, folder, count; line and `preview` with the name bold, a `kind` hit
+  labelled 정의) in the order received; right: the picked hit in its lines (`definition_preview {before: 6, after: 10}`,
+  the hit's line marked and centred), "n / N" and 열기. The first hit is picked when the reply comes. A click picks, ↩ /
+  a double-click opens (§62's opening, Back returns), **F4 / ⇧F4** (Navigate › 다음 참조 / 이전 참조, the bar's ⌃ / ⌄)
+  pick and open the next / previous hit round the ends — the first step remembers where the user was, the next ones push
+  nothing, so one Back returns there. The bar: the name, "N references in M files", ↻ (the same request again) and a menu
+  of the window's last 8 searches. Core `CodeNavStore` (`referenceSelection`, `stepReference`, `CodeNavText.step`), App
+  `Terminal/ReferencesPanel.swift`.
+- *Go to File* (⌘P, §47's sheet): `list_files {query, limit: 50, filesOnly: true}` (directories dropped too, for an
+  older engine); each row's file name — else its folder — has the query's letters bold (`NavFuzzy.fileMarks`: one
+  contiguous run at a word start, else the camel humps, else the letters in order; the query's own extension set aside);
+  ↩ opens a changed file of the review in its diff (at `:line` when given) and any other file read-only in the code
+  browser, Back returning to where the user was (`AppState.goToFile`).
+- *Symbols in This File* (Navigate › 이 파일의 심볼… **⌘F12**, the file on screen in the diff pane; off with "Show a file
+  or a diff first"): `document_symbols` once when it opens, filtered as the user types (`NavFuzzy.filterOutline`: §65.3's
+  kinds of match, file order kept, the best-scoring row picked), indented by `depth`, a kind icon, the matched letters
+  bold, the line number; `truncated` → "Only the start of a long file".
+- *Symbols in Project* (Navigate › 프로젝트 심볼… **⌥⌘⇧N**): `workspace_symbols {query, limit: 100}` 80 ms after the
+  typing stops (a newer query drops the older reply), `name` bold at `matches`, the container, `file:line`; the footer
+  says "Indexing… n / N files" while `state.nav.index` (`AppState.navIndex`) is building — the query is sent again when
+  it turns `ready` — and "Showing the first 100" / "The project is larger than the index — some symbols are missing"
+  (`NavFuzzy.projectNotes`); a refusal is said in place, `failed` with Try Again (`nav_index_build {}`). ↩ opens as Go
+  to File (at the symbol's line and column).
+- *Rebuild Symbol Index* (Navigate › 심볼 색인 다시 만들기): `nav_index_build {full: true}`; off without a project and
+  while `state.nav.index.status` is `building` (`AppState.navIndexBuilding`, the menu's tooltip says "Indexing…").
+- *Keys.* ⌘⇧O (VS Code's symbols in file) is Switch Project and ⌘T (workspace symbols) New Chat on both apps, so the Mac
+  follows IntelliJ as Windows does: ⌘F12 ↔ Ctrl+F12 (File Structure), ⌥⌘⇧N ↔ Ctrl+Alt+Shift+N (Go to Symbol — the Mac
+  IntelliJ key ⌥⌘O is Open in IDE here), Peek ⌥F12 ↔ Alt+F12, F4 / ⇧F4 ↔ F4 / Shift+F4; Go to File stays ⌘P ↔ Ctrl+P
+  (File menu). docs/SHORTCUTS.md and Core `ShortcutTable.swift` carry them; Windows' `shortcutTable.ts` is aligned at the
+  merge.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

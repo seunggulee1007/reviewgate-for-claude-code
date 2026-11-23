@@ -120,6 +120,7 @@ public enum SettingsCatalog {
         public static let sideModel = "Same model as the main conversation: it reuses the conversation's cache and answers fastest. Another model (e.g. haiku) costs less per token but reads the whole conversation again."
         public static let wrapLines = "Off: each line stays on one line and all lines of a diff scroll sideways together (trackpad, or Shift + scroll wheel)."
         public static let diffLayout = "Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough."
+        public static let commandClick = "Peek shows the definition in a band under the line, so the place you read stays where it is; Go to Definition jumps there (Back returns). F12 always jumps, ⌥F12 always peeks."
         public static let peerInbound = "When another Claude session of yours (a terminal, the IDE) sends a message to this window's Claude: handle it as it arrives — once Claude is free, its changes reviewed like any other; a sender your session list does not show still asks — ask with a card first, or decline it. A project can choose its own in the project menu."
         public static let statusLine = "Your own status line (the statusLine command of your Claude Code settings, such as the OMC HUD) under the message box, colored as in the terminal. It runs while a project is open and the chat is on screen."
         public static let systemPrompt = "Added to Claude's system prompt in every session. Placeholders {maxFiles} and {maxLines} are substituted."
@@ -188,6 +189,7 @@ public enum SettingsCatalog {
         // Review
         SettingEntry("diffWrapLines", .review, section: "Diff", title: "Wrap lines", info: Info.wrapLines),
         SettingEntry("diffLayout", .review, section: "Diff", title: "Diff layout", info: Info.diffLayout),
+        SettingEntry("codeNavCommandClick", .review, section: "Diff", title: "⌘-click on a name", info: Info.commandClick),   // ide-nav (§65.8)
         SettingEntry("reviewFirst", .review, section: "Review first", title: "Claude waits for your review before its next work", info: Info.reviewFirst),
         SettingEntry("checkpointIgnorePatterns", .review, section: "Checkpoint ignore patterns", title: "Checkpoint ignore patterns", info: Info.ignorePatterns),
         SettingEntry("testCommandPatterns", .review, section: "Test command patterns", title: "Test command patterns", info: Info.testCommands),

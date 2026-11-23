@@ -331,6 +331,13 @@ struct DiffCodeText: View {
         let shown = DiffLineText.shown(text)
         let cut = shown.cut
         let from = navContext.flatMap { context in navLine.map { CodeNavLocation(view: context.view, path: context.path, line: $0) } }
+        VStack(alignment: .leading, spacing: 0) {
+            code(shown, cut: cut, from: from)
+            if let from { CodeNavPeekSlot(row: from, text: shown.text) }   // MARK: ide-nav (§65.8): the peek band
+        }
+    }
+
+    private func code(_ shown: DiffLineText.Shown, cut: Bool, from: CodeNavLocation?) -> some View {
         CodeNavHotspot(text: shown.text, from: from, wrap: layout.wrap, offset: layout.offset) { underline in
             Group {
                 if layout.wrap {
@@ -429,6 +436,7 @@ struct DiffSettingsSection: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
     @AppStorage(ExternalEditor.defaultsKey) private var editor = ""
+    @AppStorage(CodeNavCommandClick.defaultsKey) private var commandClick = CodeNavCommandClick.peek.rawValue   // MARK: ide-nav (§65.8)
 
     var body: some View {
         Section("Diff") {
@@ -452,6 +460,13 @@ struct DiffSettingsSection: View {
             .accessibilityIdentifier("Settings open in")
             Text("Automatic: IntelliJ IDEA for a Java, Kotlin or JSP project when it is installed, else VS Code. Picking an app in an Open in Editor menu changes this too.")
                 .font(.caption).foregroundStyle(.secondary)
+            // MARK: ide-nav (§65.8): ⌘-click shows the definition under the line, or jumps to it.
+            Picker(selection: $commandClick) {
+                Text("Peek").tag(CodeNavCommandClick.peek.rawValue)
+                Text("Go to Definition").tag(CodeNavCommandClick.open.rawValue)
+            } label: { SettingLabel("codeNavCommandClick") }
+            .accessibilityIdentifier("Settings command click")
+            .settingAnchor("codeNavCommandClick")
         }
     }
 }
