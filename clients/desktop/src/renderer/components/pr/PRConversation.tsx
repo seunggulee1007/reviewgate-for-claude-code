@@ -1,13 +1,14 @@
 /**
  * The PR's Conversation (docs/PROTOCOL.md §60): the description, the general comments and the reviews as one
  * time-ordered thread — each with its author, its time (relative; the absolute one in the tooltip), its Markdown body
- * and "Open on GitHub" — and under it the composer that posts `pr_comment`.
+ * and "Open on GitHub" — and under it the composer that posts `pr_comment`. Beside it, "Code comments (N)": every
+ * inline comment by file and line, each row opening its line in the PR diff.
  */
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { PRDetail } from "@reviewgate/engine";
 import { formatDate, relativeTime, t } from "../../i18n";
 import { useStore } from "../../store";
-import { commentBlocker, postComment, prTimeline, reviewStateBadge, type TimelineItem } from "../../prConversation";
+import { codeCommentGroups, commentBlocker, excerpt, postComment, prTimeline, reviewStateBadge, type CodeCommentRow, type TimelineItem } from "../../prConversation";
 import { isEnter } from "../../ime";
 import { Markdown } from "../chat/Markdown";
 import "../chat/chat.css";
@@ -26,6 +27,53 @@ export function PRConversation({ pr }: { pr: PRDetail }) {
         ))}
       </ol>
       <CommentComposer />
+    </div>
+  );
+}
+
+/** "Code comments (N)" — the inline comments by file and line; a row shows its line in the Files view. Null without any. */
+export function CodeComments({ onShow }: { onShow: () => void }) {
+  const comments = useStore((s) => s.state.pr.comments);
+  const files = useStore((s) => s.state.pr.files);
+  const prShowComment = useStore((s) => s.prShowComment);
+  const groups = useMemo(() => codeCommentGroups(comments, files), [comments, files]);
+  if (comments.length === 0) return null;
+  const show = (row: CodeCommentRow) => {
+    prShowComment(row.path, row.side, row.line);
+    onShow();
+  };
+  return (
+    <div className="pr-side" data-testid="Code comments">
+      <ul className="list" aria-label={t("Code comments ({0})", comments.length)}>
+        <li className="section">{t("Code comments ({0})", comments.length)}</li>
+        {groups.map((g) => (
+          <Fragment key={g.path}>
+            <li className="pr-cc-file" title={g.path}>
+              <span className="truncate">{g.path}</span>
+              <span className="num muted">{g.count}</span>
+            </li>
+            {g.rows.map((row) => {
+              const first = row.comments[0]!;
+              const where = row.line === null ? t("Outdated") : `${row.side === "LEFT" ? "−" : ""}${row.line}`;
+              const title =
+                row.line === null
+                  ? t("Outdated — the line is no longer in the diff. Opens {0}.", g.path)
+                  : t("Show {0}:{1} in the diff", g.path, row.line);
+              return (
+                <li key={row.key}>
+                  <button type="button" className="pr-cc-row" onClick={() => show(row)} title={title} aria-label={`${title} — ${first.author}: ${excerpt(first.body)}`} data-testid={`Code comment ${row.key.replace("\u0000", " ")}`}>
+                    <span className="pr-cc-line num muted">{where}</span>
+                    <span className="truncate grow">
+                      <span className="bold">{first.author}</span> {excerpt(first.body)}
+                    </span>
+                    {row.comments.length > 1 && <span className="num muted" title={t("{0} comment(s)", row.comments.length)}>💬 {row.comments.length}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </Fragment>
+        ))}
+      </ul>
     </div>
   );
 }

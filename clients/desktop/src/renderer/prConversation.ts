@@ -1,8 +1,8 @@
 /**
  * The PR's Conversation (docs/PROTOCOL.md §60): the description, the general comments (`state.pr.conversation`) and the
- * reviews (`state.pr.reviews`) as one time-ordered thread.
+ * reviews (`state.pr.reviews`) as one time-ordered thread; the inline comments (`state.pr.comments`) by file and line.
  */
-import type { PRDetail, PRIssueComment, PRReview } from "@reviewgate/engine";
+import type { PRComment, PRDetail, PRFileMeta, PRIssueComment, PRReview } from "@reviewgate/engine";
 import { t } from "./i18n";
 
 export type TimelineItem =
@@ -70,4 +70,39 @@ export function commentBlocker(text: string, posting: boolean): string | null {
 export async function postComment(text: string, post: (body: string) => Promise<string | null>): Promise<{ text: string; refusal: string | null }> {
   const refusal = await post(text);
   return refusal === null ? { text: "", refusal: null } : { text, refusal };
+}
+
+/** One line's inline comments (oldest first); `line` null: the file's outdated ones (their line left the diff). */
+export type CodeCommentRow = { key: string; path: string; side: "LEFT" | "RIGHT"; line: number | null; comments: PRComment[] };
+export type CodeCommentFile = { path: string; count: number; rows: CodeCommentRow[] };
+
+/**
+ * "Code comments (N)": every inline comment grouped by file (the PR's file order, then any other path by name) and,
+ * in a file, by line (by number, the old side first on a tie; the outdated ones last).
+ */
+export function codeCommentGroups(comments: readonly PRComment[], files: readonly Pick<PRFileMeta, "filename">[]): CodeCommentFile[] {
+  const byPath = new Map<string, Map<string, CodeCommentRow>>();
+  for (const c of comments) {
+    const side = c.side === "LEFT" ? "LEFT" : "RIGHT";
+    const key = c.line === null ? `${c.path}\u0000outdated` : `${c.path}\u0000${side}:${c.line}`;
+    const rows = byPath.get(c.path) ?? new Map<string, CodeCommentRow>();
+    byPath.set(c.path, rows);
+    const row = rows.get(key) ?? { key, path: c.path, side: c.line === null ? "RIGHT" : side, line: c.line, comments: [] };
+    rows.set(key, row);
+    row.comments.push(c);
+  }
+  const order = new Map(files.map((f, i) => [f.filename, i]));
+  const rank = (p: string) => order.get(p) ?? Number.MAX_SAFE_INTEGER;
+  return [...byPath.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))
+    .map(([path, rows]) => {
+      const list = [...rows.values()].sort((a, b) => (a.line ?? Infinity) - (b.line ?? Infinity) || (a.side === b.side ? 0 : a.side === "LEFT" ? -1 : 1));
+      for (const r of list) r.comments.sort((a, b) => time(a.createdAt) - time(b.createdAt) || a.id - b.id);
+      return { path, count: list.reduce((n, r) => n + r.comments.length, 0), rows: list };
+    });
+}
+
+/** The first line of a comment's text, for a one-line row. */
+export function excerpt(body: string): string {
+  return body.split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
 }

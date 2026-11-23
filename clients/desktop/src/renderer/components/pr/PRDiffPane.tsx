@@ -5,13 +5,15 @@
  *
  * Line matching follows GitHub's `line`/`side`: add/context lines match `newNo` on RIGHT, deleted
  * lines match `oldNo` on LEFT. Hunk headers cannot be commented.
+ *
+ * §60: a row of the Conversation's "Code comments" (`prFocus`) brings its line into view, marked and never folded away.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiffLine, DraftComment, PRComment, PRFileMeta } from "@reviewgate/engine";
 import { relativeTime, t } from "../../i18n";
 import { useStore } from "../../store";
 import { Bubble } from "../diff/Bubble";
-import { LineComposer, UnifiedDiff, type LineKey } from "../UnifiedDiff";
+import { LineComposer, UnifiedDiff, keyId, type LineKey } from "../UnifiedDiff";
 // MARK: wave3 desktop-flow — §36.14 PR comments to Claude, a PR line's side question
 import { prAskTitle, SendCommentButton, usePrLineAsk } from "../flow/PRClaude";
 import { refusalMessage } from "../../errorCodes";
@@ -40,6 +42,19 @@ export function PRDiffPane() {
   const prReply = useStore((s) => s.prReply);
   const [composer, setComposer] = useState<Composer | null>(null);
   const [busy, setBusy] = useState(false);
+  // §60: the line a "Code comments" row jumped to — marked, unfolded and scrolled to once per jump.
+  const focus = useStore((s) => (s.prFocus && s.prFocus.path === filename && s.prFocus.pr === s.state.pr.selected?.url ? s.prFocus : null));
+  const focusId = focus ? keyId({ side: focus.side === "LEFT" ? "old" : "new", line: focus.line }) : null;
+  const highlighted = useMemo(() => (focusId ? new Set([focusId]) : undefined), [focusId]);
+  const paneRef = useRef<HTMLDivElement>(null);
+  const scrolledSeq = useRef(0);
+  useEffect(() => {
+    if (!focus || !diff || scrolledSeq.current === focus.seq) return;
+    const row = paneRef.current?.querySelector<HTMLElement>(`.line[data-side="${focus.side === "LEFT" ? "old" : "new"}"][data-line="${focus.line}"]`);
+    if (!row) return;
+    scrolledSeq.current = focus.seq;
+    row.scrollIntoView({ block: "center" });
+  });
 
   const file: PRFileMeta | null = pr.files.find((f) => f.filename === filename) ?? null;
   useEffect(() => setComposer(null), [filename]);
@@ -137,7 +152,7 @@ export function PRDiffPane() {
   };
 
   return (
-    <div className="pr-diff" data-testid="PR diff pane">
+    <div className="pr-diff" data-testid="PR diff pane" ref={paneRef}>
       <div className="pane-header">
         <div className="row">
           <span className="bold truncate" title={file.filename}>{file.filename}</span>
@@ -158,6 +173,7 @@ export function PRDiffPane() {
             diff={diff}
             onAdd={(_l, key) => setComposer({ side: ghSide(key), line: key.line, replyTo: null })}
             extra={extra}
+            highlighted={highlighted}
             path={file.filename} /* MARK: wave2 desktop-diff — 경로:줄 복사 */
             context={context} /* MARK: wave4c w4c-review — 20줄 더 보기 (its lines are outside the PR's diff: no comment / side question) */
             revealedActions={false}

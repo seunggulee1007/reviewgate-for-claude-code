@@ -9,7 +9,7 @@ import type { PRDetail as PRDetailModel, PRFileMeta, PRReview, ReviewEvent } fro
 import { relativeTime, t } from "../../i18n";
 import { useStore } from "../../store";
 import { PRDiffPane } from "./PRDiffPane";
-import { PRConversation } from "./PRConversation";
+import { CodeComments, PRConversation } from "./PRConversation";
 import { prTimeline } from "../../prConversation";
 import { PRClaudeHeaderButtons } from "../flow/PRClaude"; // MARK: wave3 desktop-flow
 import "./pr.css";
@@ -87,6 +87,7 @@ function Opened({ pr }: { pr: PRDetailModel }) {
       )}
       {view === "conversation" ? (
         <div className="pr-body">
+          <CodeComments onShow={() => setView("files")} />
           <PRConversation pr={pr} />
         </div>
       ) : (

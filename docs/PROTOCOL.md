@@ -9797,4 +9797,8 @@ reviews. Files is the reviews + files list and the diff as before. Under the thr
 field; Ctrl+Enter or Comment sends `pr_comment` through the store's `prComment`): Comment is disabled, its tooltip saying
 why, while the text is blank or a comment is posting (`isCommenting`, or the request still out); the text clears only on
 `ok:true` and a refusal's words (`errorCodes.ts`: `no_pr_selected`, `empty_body`, `pr_comment_failed` with gh's line,
-`not_a_git_repo`) stay under the field with the text.
+`not_a_git_repo`) stay under the field with the text. Left of the thread, **Code comments (N)** (only when the PR has
+inline comments) lists every inline comment by file (the PR's file order) and line (the old side marked "−", the outdated
+ones last as "Outdated"), one row per line with the first comment's author and first line and a 💬 count; a row switches
+to Files, selects its file and scrolls its line into view, marked and unfolded (`prShowComment` → `prFocus`, kept per
+PR); an outdated row only selects the file.

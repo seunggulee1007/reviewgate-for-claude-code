@@ -1073,5 +1073,9 @@
   "Write a comment first.": "댓글을 먼저 적어 주세요.",
   "Open a pull request first.": "PR을 먼저 열어 주세요.",
   "The comment could not be posted: {0}": "댓글을 올리지 못했어요: {0}",
-  "The comment could not be posted.": "댓글을 올리지 못했어요."
+  "The comment could not be posted.": "댓글을 올리지 못했어요.",
+  "Code comments ({0})": "코드 댓글 ({0})",
+  "Outdated": "오래됨",
+  "Outdated — the line is no longer in the diff. Opens {0}.": "오래됨 — 이 줄은 지금 diff에 없어요. {0} 파일을 열어요.",
+  "Show {0}:{1} in the diff": "diff에서 {0}:{1} 보기"
 }
