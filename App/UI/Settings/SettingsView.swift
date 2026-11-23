@@ -103,6 +103,7 @@ struct SettingsView: View {
         case .session: SessionSettingsPane()
         case .review: ReviewSettingsPane()
         case .git: GitSettingsPane()
+        case .tasks: TaskSettingsPane()   // MARK: task-start (§63)
         case .extensions: ExtensionsSettingsView()
         case .project: ProjectFlowSettingsView()   // wave3 mac-flow: commit template, workbench setup, PR command of this repository
         case .accounts: AccountsSettingsView()
@@ -131,6 +132,7 @@ struct SettingsPaneIcon: View {
         case .session: "bubble.left.and.text.bubble.right.fill"
         case .review: "checkmark.seal.fill"
         case .git: "arrow.triangle.branch"
+        case .tasks: "checklist"
         case .extensions: "puzzlepiece.extension.fill"
         case .project: "folder.fill"
         case .accounts: "person.crop.circle.fill"
@@ -145,6 +147,7 @@ struct SettingsPaneIcon: View {
         case .session: .blue
         case .review: .green
         case .git: .red
+        case .tasks: .purple
         case .extensions: .indigo
         case .project: .teal
         case .accounts: .cyan

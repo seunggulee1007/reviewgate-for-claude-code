@@ -170,6 +170,22 @@
         }
       }
     },
+    "%@ only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ only"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에만"
+          }
+        }
+      }
+    },
     "%@ report:": {
       "localizations": {
         "en": {
@@ -1921,6 +1937,38 @@
         }
       }
     },
+    "A new branch in this window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new branch in this window"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창에서 새 브랜치"
+          }
+        }
+      }
+    },
+    "A new branch in this window (your uncommitted changes come along), or a new workbench — its own folder, branch and window.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new branch in this window (your uncommitted changes come along), or a new workbench — its own folder, branch and window."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창에서 새 브랜치(커밋하지 않은 변경도 함께 가요), 또는 새 워크벤치 — 폴더, 브랜치, 창이 따로 생겨요."
+          }
+        }
+      }
+    },
     "A new chat continues from before this message; the files stay as they are.": {
       "localizations": {
         "en": {
@@ -1949,6 +1997,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 메시지 직전부터 새 채팅으로 이어가요. 기존 채팅은 “(되돌리기 전)”으로 남아요."
+          }
+        }
+      }
+    },
+    "A new workbench": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new workbench"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 워크벤치에서"
           }
         }
       }
@@ -3309,6 +3373,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모든 프로젝트"
+          }
+        }
+      }
+    },
+    "All projects (default)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All projects (default)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 프로젝트 (기본값)"
           }
         }
       }
@@ -5009,6 +5089,38 @@
         }
       }
     },
+    "Task platform": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task platform"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 플랫폼"
+          }
+        }
+      }
+    },
+    "Tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무"
+          }
+        }
+      }
+    },
     "between the file list and the terminal": {
       "localizations": {
         "en": {
@@ -6049,6 +6161,22 @@
         }
       }
     },
+    "Back to the built-in template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to the built-in template"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 템플릿으로 되돌려요"
+          }
+        }
+      }
+    },
     "Back to the card's answers; nothing is saved (esc)": {
       "localizations": {
         "en": {
@@ -6256,6 +6384,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "브랜치 이름"
+          }
+        }
+      }
+    },
+    "Branch prefix": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch prefix"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치 접두어"
           }
         }
       }
@@ -7315,6 +7459,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "전환할 프로젝트 폴더를 선택하세요"
+          }
+        }
+      }
+    },
+    "Choose an MCP server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose an MCP server"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 서버 고르기"
           }
         }
       }
@@ -12423,6 +12583,22 @@
         }
       }
     },
+    "Forget this project's own settings; it uses the default again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget this project's own settings; it uses the default again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트만의 설정을 지우고 다시 기본값을 써요"
+          }
+        }
+      }
+    },
     "Forward": {
       "localizations": {
         "en": {
@@ -14071,6 +14247,38 @@
         }
       }
     },
+    "The MCP server Claude reads Jira, Linear and other tasks with (its mcp__<server>__* tools). The list is this project's servers; you can type another name.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The MCP server Claude reads Jira, Linear and other tasks with (its mcp__<server>__* tools). The list is this project's servers; you can type another name."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 Jira, Linear 등 다른 트래커의 업무를 읽을 MCP 서버(mcp__<서버>__* 도구)예요. 목록은 이 프로젝트의 서버이고, 다른 이름을 직접 입력해도 돼요."
+          }
+        }
+      }
+    },
+    "The MCP server Claude reads the task with": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The MCP server Claude reads the task with"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 업무를 읽을 MCP 서버"
+          }
+        }
+      }
+    },
     "The PR's conversation, every comment on its code by file and line, or its files and diff": {
       "localizations": {
         "en": {
@@ -14403,6 +14611,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "댓글을 먼저 써 주세요"
+          }
+        }
+      }
+    },
+    "e.g. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "예: %@"
           }
         }
       }
@@ -15207,6 +15431,38 @@
         }
       }
     },
+    "First prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First prompt"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "첫 프롬프트"
+          }
+        }
+      }
+    },
+    "First prompt template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First prompt template"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "첫 프롬프트 템플릿"
+          }
+        }
+      }
+    },
     "Fit the graph": {
       "localizations": {
         "en": {
@@ -15606,6 +15862,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "GitHub(gh)"
+          }
+        }
+      }
+    },
+    "GitHub Issues": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues"
+          }
+        }
+      }
+    },
+    "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Issues는 GitHub CLI(gh)로 읽어요. Jira, Linear 등 다른 트래커는 아래 MCP 서버로 Claude가 읽어요 — ReviewGate는 트래커를 직접 부르지 않고 토큰도 저장하지 않아요."
           }
         }
       }
@@ -17200,6 +17488,22 @@
         }
       }
     },
+    "Jira": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jira"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jira"
+          }
+        }
+      }
+    },
     "Jump to Latest": {
       "localizations": {
         "en": {
@@ -17792,6 +18096,22 @@
         }
       }
     },
+    "Linear": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linear"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linear"
+          }
+        }
+      }
+    },
     "List the installed versions again": {
       "localizations": {
         "en": {
@@ -18252,6 +18572,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 끝냄으로 표시하고 커밋·푸시"
+          }
+        }
+      }
+    },
+    "MCP server for tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP server for tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무용 MCP 서버"
           }
         }
       }
@@ -20070,6 +20406,22 @@
         }
       }
     },
+    "No project open — these are the default for every project.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No project open — these are the default for every project."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열린 프로젝트가 없어요 — 모든 프로젝트의 기본값이에요."
+          }
+        }
+      }
+    },
     "No recent projects": {
       "localizations": {
         "en": {
@@ -21292,6 +21644,22 @@
         }
       }
     },
+    "Only Jira, Linear and other trackers are read through an MCP server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only Jira, Linear and other trackers are read through an MCP server"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jira, Linear 등 다른 트래커만 MCP 서버로 읽어요"
+          }
+        }
+      }
+    },
     "Only Markdown files that exist can be opened": {
       "localizations": {
         "en": {
@@ -22443,6 +22811,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "기타"
+          }
+        }
+      }
+    },
+    "Other (MCP server)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other (MCP server)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기타 (MCP 서버)"
           }
         }
       }
@@ -24977,6 +25361,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "요청함: %@"
+          }
+        }
+      }
+    },
+    "Reset": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "초기화"
           }
         }
       }
@@ -27990,6 +28390,22 @@
         }
       }
     },
+    "Settings for": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings for"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "적용 대상"
+          }
+        }
+      }
+    },
     "Settings of %@ — every workbench of this repository uses them.": {
       "localizations": {
         "en": {
@@ -28662,6 +29078,22 @@
         }
       }
     },
+    "Show the start screen when a project opens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the start screen when a project opens"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열면 시작 화면 보여 주기"
+          }
+        }
+      }
+    },
     "Show the terminal allow rules": {
       "localizations": {
         "en": {
@@ -29206,6 +29638,38 @@
         }
       }
     },
+    "Start from a task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start from a task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무로 시작"
+          }
+        }
+      }
+    },
+    "Start in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "시작 위치"
+          }
+        }
+      }
+    },
     "Start in %@ mode like the terminal?": {
       "localizations": {
         "en": {
@@ -29218,6 +29682,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널처럼 %@ 모드로 시작할까요?"
+          }
+        }
+      }
+    },
+    "Start screen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start screen"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "시작 화면"
           }
         }
       }
@@ -30598,6 +31078,22 @@
         }
       }
     },
+    "The first message, put into the message box (or the terminal's prompt) and never sent by itself. {id}, {title}, {url}, {body} are the task's; {mcp} is how Claude reads it. A line whose placeholders are all empty is left out.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The first message, put into the message box (or the terminal's prompt) and never sent by itself. {id}, {title}, {url}, {body} are the task's; {mcp} is how Claude reads it. A line whose placeholders are all empty is left out."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "첫 메시지예요. 메시지 입력창(또는 터미널 프롬프트)에 들어가고 저절로 보내지지 않아요. {id}, {title}, {url}, {body}는 업무의 값이고 {mcp}는 Claude가 업무를 읽는 방법이에요. 자리표시자가 모두 비는 줄은 빠져요."
+          }
+        }
+      }
+    },
     "The folder already exists: %@": {
       "localizations": {
         "en": {
@@ -31302,6 +31798,22 @@
         }
       }
     },
+    "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 브랜치는 <접두어><ID>-<제목 단어>예요. 예: feature/ACME-123-fix-cart-total. {type}은 이슈 라벨에 따라 fix, docs, chore, feature 중 하나가 돼요."
+          }
+        }
+      }
+    },
     "The terminal could not start %@": {
       "localizations": {
         "en": {
@@ -31798,6 +32310,22 @@
         }
       }
     },
+    "This is the built-in template": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the built-in template"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 템플릿이에요"
+          }
+        }
+      }
+    },
     "This looks like a large or personal folder (%@). Initializing git here is probably a mistake.": {
       "localizations": {
         "en": {
@@ -31878,6 +32406,22 @@
         }
       }
     },
+    "This project uses the default until you change something here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project uses the default until you change something here."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "여기서 바꾸기 전까지 이 프로젝트는 기본값을 써요."
+          }
+        }
+      }
+    },
     "This project's": {
       "localizations": {
         "en": {
@@ -31906,6 +32450,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트의 .claude/settings.json에 자체 statusLine이 있어요 — 저장소와 함께 온 명령이에요. 여기서 바로 이 명령을 허용해야만 실행되고, 명령이 바뀌면 다시 물어봐요."
+          }
+        }
+      }
+    },
+    "This project's session reported no MCP servers — type the server's name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project's session reported no MCP servers — type the server's name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트의 세션에 MCP 서버가 없어요 — 서버 이름을 직접 입력해 주세요"
           }
         }
       }
@@ -33238,6 +33798,22 @@
         }
       }
     },
+    "Use the Default": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the Default"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본값 쓰기"
+          }
+        }
+      }
+    },
     "Use this format": {
       "localizations": {
         "en": {
@@ -33666,6 +34242,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "무엇이 궁금한가요?"
+          }
+        }
+      }
+    },
+    "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 창에서 열 때 바로 시작, 업무로 시작, 최근 대화 이어가기 중에서 골라요(1 / 2 / 3, Esc는 바로 시작). 끄면 창이 채팅으로 바로 열려요."
           }
         }
       }
@@ -36848,6 +37440,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "만들고 열기"
+          }
+        }
+      }
+    },
+    "This project already uses the default": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project already uses the default"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트는 이미 기본값을 써요"
+          }
+        }
+      }
+    },
+    "This project has its own settings.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project has its own settings."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트만의 설정이 있어요."
           }
         }
       }

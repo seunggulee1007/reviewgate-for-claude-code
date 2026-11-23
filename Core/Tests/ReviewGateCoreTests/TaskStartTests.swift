@@ -102,6 +102,13 @@ import Testing
         #expect(TaskStartSettings.default.template == TaskPrompt.defaultTemplate)
     }
 
+    @Test func theTasksPaneIsInTheSearch() {
+        let ids = SettingsCatalog.search("MCP").map(\.id)
+        #expect(ids.contains("taskMcpServer"))
+        #expect(SettingsCatalog.search("branch prefix").map(\.id).contains("taskBranchPrefix"))
+        #expect(SettingsCatalog.entry("skipStartScreen")?.pane == .tasks)
+    }
+
     // MARK: The start screen
 
     @Test func whenTheStartScreenShows() {

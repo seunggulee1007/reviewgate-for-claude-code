@@ -9,7 +9,7 @@ import Foundation
 /// A pane of the Settings window, in sidebar order. The raw values are what `SettingsView.tabKey` stores (`general`,
 /// `extensions`, `project` and `accounts` were the tabs before the split, so a stored choice still opens there).
 public enum SettingsPane: String, CaseIterable, Sendable, Identifiable {
-    case general, permissions, session, review, git, extensions, project, accounts, advanced
+    case general, permissions, session, review, git, tasks, extensions, project, accounts, advanced   // MARK: task-start: tasks (§63)
 
     public var id: String { rawValue }
 
@@ -21,6 +21,7 @@ public enum SettingsPane: String, CaseIterable, Sendable, Identifiable {
         case .session: "Session"
         case .review: "Review"
         case .git: "Git & Workbenches"
+        case .tasks: "Tasks"   // MARK: task-start (§63)
         case .extensions: "Extensions"
         case .project: "Project"
         case .accounts: "Accounts"
@@ -133,6 +134,13 @@ public enum SettingsCatalog {
         public static let userHooks = "Off: hooks in ~/.claude and project settings and plugin hooks do not run — your statusLine is turned off too. ReviewGate's own safety hooks always stay on."
         public static let cliPin = "Claude Code updates itself in the background. Pin a version to keep starting new sessions with it; ReviewGate marks the versions it was checked with."
         public static let toolchainOverrides = "Leave empty to detect via the login shell."
+        // MARK: task-start (§63)
+        public static let startScreen = "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."
+        public static let taskPlatform = "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."
+        public static let taskBranchPrefix = "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels."
+        public static let taskLocation = "A new branch in this window (your uncommitted changes come along), or a new workbench — its own folder, branch and window."
+        public static let taskMcpServer = "The MCP server Claude reads Jira, Linear and other tasks with (its mcp__<server>__* tools). The list is this project's servers; you can type another name."
+        public static let taskPromptTemplate = "The first message, put into the message box (or the terminal's prompt) and never sent by itself. {id}, {title}, {url}, {body} are the task's; {mcp} is how Claude reads it. A line whose placeholders are all empty is left out."
     }
 
     /// Every setting the search finds, in pane order (then the order they show in).
@@ -188,6 +196,13 @@ public enum SettingsCatalog {
         SettingEntry("runAsTaskEnabled", .git, section: "Workbenches", title: "Run as Task", info: Info.runAsTask),
         SettingEntry("commitPushByDefault", .git, section: "Commit", title: "Push by default", info: Info.pushByDefault),
         SettingEntry("commitTrailer", .git, section: "Commit", title: "Commit trailer", info: Info.commitTrailer),
+        // Tasks — MARK: task-start (§63)
+        SettingEntry("skipStartScreen", .tasks, section: "Start screen", title: "Show the start screen when a project opens", info: Info.startScreen),
+        SettingEntry("taskPlatform", .tasks, section: "Start from a task", title: "Task platform", info: Info.taskPlatform),
+        SettingEntry("taskBranchPrefix", .tasks, section: "Start from a task", title: "Branch prefix", info: Info.taskBranchPrefix),
+        SettingEntry("taskStartLocation", .tasks, section: "Start from a task", title: "Start in", info: Info.taskLocation),
+        SettingEntry("taskMcpServer", .tasks, section: "Start from a task", title: "MCP server for tasks", info: Info.taskMcpServer),
+        SettingEntry("taskPromptTemplate", .tasks, section: "First prompt", title: "First prompt template", info: Info.taskPromptTemplate),
         // Extensions
         SettingEntry("loadUserSettings", .extensions, section: "Extensions", title: "Load user settings (skills, plugins, MCP, hooks from ~/.claude)", info: Info.loadUserSettings, applies: .nextSession),
         SettingEntry("disabledPlugins", .extensions, section: "Plugins", title: "Plugins", applies: .nextSession),
