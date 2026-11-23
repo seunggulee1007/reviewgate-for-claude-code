@@ -270,19 +270,25 @@ struct HUDStrip: View {
             if store.isRunning {
                 ProgressView().controlSize(.mini)
             }
-            Text(activityText)
-                .foregroundStyle(store.isRunning ? Color.primary : Color.secondary)
-                .truncationMode(.middle)
+            // "Working · 12s" while the turn has no activity of its own yet (ticking); the measuring copy never ticks.
+            if store.isRunning, hud.activityIsIdle, !measuring, let started = hud.turnStartedAt {
+                TimelineView(.periodic(from: started, by: 1)) { context in activityLabel(hud.statusText(isRunning: true, now: context.date)) }
+            } else {
+                activityLabel(activityText)
+            }
         }
         .frame(width: measuring ? Self.measuredActivityWidth : nil, alignment: .leading)
         .help(activityText)
         .accessibilityIdentifier("HUD activity")
     }
 
-    private var activityText: String {
-        if !hud.activity.isEmpty { return hud.activity }
-        return store.isRunning ? String(localized: "Working…") : String(localized: "Idle")
+    private func activityLabel(_ text: String) -> some View {
+        Text(verbatim: text)
+            .foregroundStyle(store.isRunning ? Color.primary : Color.secondary)
+            .truncationMode(.middle)
     }
+
+    private var activityText: String { hud.statusText(isRunning: store.isRunning) }
 
     // MARK: Formatting
 

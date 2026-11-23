@@ -6,10 +6,14 @@ public enum ElapsedFormat {
     /// The app's UI language ("ko", "en", …), as the catalogs resolve it.
     public static var uiLanguage: String { Bundle.main.preferredLocalizations.first ?? "en" }
 
-    public static func text(seconds raw: Double, language: String = uiLanguage) -> String {
+    /// `tenths: false`: whole seconds from 10 s on ("12초"), as Electron's default.
+    public static func text(seconds raw: Double, language: String = uiLanguage, tenths: Bool = true) -> String {
         let s = max(0, raw)
         let korean = language.lowercased().hasPrefix("ko")
-        if s < 60 { return String(format: korean ? "%.1f초" : "%.1fs", s) }
+        if s < 60 {
+            if !tenths, s >= 10 { return korean ? "\(Int(s))초" : "\(Int(s))s" }
+            return String(format: korean ? "%.1f초" : "%.1fs", s)
+        }
         let whole = Int(s)
         if whole < 3600 {
             return korean ? "\(whole / 60)분 \(whole % 60)초" : String(format: "%dm %02ds", whole / 60, whole % 60)
