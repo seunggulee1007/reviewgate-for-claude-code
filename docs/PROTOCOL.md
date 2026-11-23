@@ -153,7 +153,7 @@ type EngineCommand =
   | Cmd<"workbench_preview", { branch: string; from?: string; location?: "managed" | "sibling" }>   // → workbench_preview (§36.12)
   | Cmd<"prereview_start", { scope: "round" | "files"; paths?: string[]; effort: "low" | "medium" | "high" }>   // → prereview (§36.13)
   | Cmd<"prereview_cancel", { prereviewId: string }> | Cmd<"prereview_dismiss", { prereviewId: string; findingId: string }>
-  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>   // → definitions: ranked candidates, ≤ 50 (§62; lane "nav")
+  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string }>   // → definitions: ranked candidates, ≤ 50 (§62; column / receiver: §65; lane "nav")
   | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>  // → references: whole-word hits, ≤ limit (§62; lane "nav")
   | Cmd<"document_symbols", { path: string }>             // → document_symbols: one file's outline (§65; lane "nav")
   | Cmd<"workspace_symbols", { query: string; limit?: number }>   // → workspace_symbols: fuzzy over the symbol index, ≤ 500 (§65; lane "nav")
@@ -10552,10 +10552,11 @@ Claude kept changing new files while earlier ones were still pending. `settings.
 
 §62 answers one click with one `git grep`. An IDE-like flow needs more: an inline **peek** of a definition, a **hover**
 preview, a **References** tab in the bottom panel (F4 / ⇧F4 step through it), **symbols in this
-file** (⌘⇧O) and **symbols in the project** (⌘T). The engine keeps an in-memory **symbol index** of the open worktree
+file** (⌘⇧O) and **symbols in the project** (⌘T) — and Go to Definition that knows `repository.find(…)` means
+`CartRepository.find`, not the clicked file's own `find`. The engine keeps an in-memory **symbol index** of the open worktree
 for that: the declarations of every source file with their **containers** (the enclosing class / object / interface /
 component), read with §62's per-language patterns and a brace / indentation tracker. Still no language server, nothing
-persisted, nothing leaves the machine. Additive on the wire: four commands and one state field.
+persisted, nothing leaves the machine. Additive on the wire: four commands, two optional `find_definition` fields, one state field, one optional candidate field.
 
 ```ts
 // commands (lane "nav", read-only)
@@ -10563,6 +10564,8 @@ document_symbols   { path: string }                                             
 workspace_symbols  { query: string; limit?: number }                            → workspace_symbols
 definition_preview { path: string; line: number; before?: number; after?: number } → definition_preview
 nav_index_build    { full?: boolean }                                           → nav_index
+// extended
+find_definition    { symbol; fromPath?; line?; column?: number; receiver?: string }   → definitions (candidates[].container?)
 
 type NavSymbol = { name: string; kind: DefinitionKind; path: string; line: number; column: number;
                    container?: string; signature?: string; endLine?: number };
@@ -10573,6 +10576,7 @@ type WorkspaceSymbolsEvent = { type: "workspace_symbols"; id?; query: string; sy
 type SymbolPreviewEvent    = { type: "definition_preview"; id?; path: string; line: number; startLine: number; lines: string[];
                                totalLines: number; language: string; truncated: boolean; symbol?: NavSymbol };
 type NavIndexEvent         = { type: "nav_index"; id?; index: NavIndexState };
+type DefinitionCandidate   = { path; line; column; kind; preview; score; container?: string };   // §62 + container
 
 // state (while a project is open; absent from an older engine)
 state.nav = { index: NavIndexState };
@@ -10676,6 +10680,30 @@ reading, when there is one (its `container`, `signature`, `endLine` — a peek m
 properties groovy`, else `plaintext` — Monaco's ids where Monaco has one. Refusals: §47's, `binary_file`,
 `line_out_of_range` (`line` < 1 or past the end; a missing / non-numeric `line` too).
 
+### 65.6 Go to Definition knows the receiver
+
+`find_definition` (§62) ranks as before, then — with the index — reads the containers of its candidates (the files of the
+best ones, at most **40** files, through the index: a file read once is kept) and sets `candidates[].container`. When the clicked name's
+receiver is known, members of the receiver's type win:
+
+- **The receiver.** `receiver` when sent (an identifier: `this`, `self`, `super`, `user`, `CartService`); else read from
+  `fromPath`'s `line`: the word's occurrence (the only one on the line, or the one at `column`) preceded by `x.` / `x?.` /
+  `x!!.` / `x::` / `x->` gives `x`; preceded by none, it is unqualified; after `)` / `]` (`foo().bar`) nothing is known.
+- **Its type.** Unqualified, `this`, `self` → the innermost type / object / component of `fromPath` around `line` (its
+  qualified name: a Kotlin companion's members are `Repo.Companion`'s). `super` → the enclosing class's `extends X` /
+  Kotlin `: X(`. A capitalised receiver → that type (static members, a Kotlin companion: `Repo.create()` → `Repo.Companion`,
+  an `object`). A lower-case one → its declaration in `fromPath`, nearest above `line` first: `Type name` (Java fields,
+  parameters, locals, `for (Type x : …)`), `name: Type` (Kotlin, TS, Swift), `val / var / let / const name = [new] Type(`,
+  `name = new Type(`; none → a **guess** from the name (`cartService` → `CartService`).
+- **Score.** A candidate whose container fits +90 (+45 for a guessed type); a member (method, function, field, property,
+  constructor, constant, variable) of another container −30 — only when some candidate fits, so an unknown or inherited
+  type changes nothing. Measured on this repository: `this.gate.refresh()` in `engine.ts` → `ReviewGate.refresh`
+  (`review/gate.ts`) first, where §62 alone put engine.ts's own `refresh` first; `this.fileIndex.search(…)` →
+  `FileIndex.search`.
+- Still a heuristic: no inheritance (an inherited member does not fit its subclass), no overloads by argument types, no
+  generics, no chains beyond one receiver. Clients send `receiver` when they already know it (their tokenizer saw `x.` before
+  the word) and `column` always; an older engine ignores both.
+
 ### 65.7 Lanes and speed
 
 All four commands run on lane `nav` with `find_definition` / `find_references` — never behind a turn, a commit, the
@@ -10693,11 +10721,12 @@ other builds running):
 | `workspace_symbols` (`SymIdx`, `Engine`, `handle`, `rS`, `findDef`, `x`) | 10–46 ms |
 | `document_symbols` `engine/src/engine.ts` (10 000 lines, 532 symbols) / `protocol.ts` (1 289 symbols) | 12–15 ms / 7–8 ms |
 | `definition_preview` in `engine.ts` | 11–13 ms |
+| `find_definition` §62 alone / with containers, first time (files not yet read) / again | 52–60 ms / +6–35 ms / ±0 |
 
 ### 65.8 How clients present it
 
 - **Peek definition** (⌥F12 on Mac — Alt+F12 on Windows — and "Peek Definition" in the row's / Monaco's menu): send
-  `find_definition {symbol, fromPath, line}`; for the first candidate (or the one picked in §62's
+  `find_definition {symbol, fromPath, line, column, receiver?}`; for the first candidate (or the one picked in §62's
   candidate list) `definition_preview {path, line}` and show the lines **inline under the clicked row** (a framed band the
   width of the pane, ≤ 15 visible lines, scrollable), headed by `container.name` · `kind` · file name and folder, the
   definition line marked, syntax-highlighted by `language`. Several candidates: the list on the band's right (↑ / ↓ switch
@@ -10709,7 +10738,8 @@ other builds running):
 - **References tab** in the bottom panel (⇧F12 / "Find References" open it; F4 / ⇧F4 = next / previous result, opening it
   in the diff or the code browser as §62): `find_references {symbol, fromPath}` grouped by file as §62 says — file name,
   folder and count, then `line` and `preview` with the symbol marked; a `kind` row labelled "definition". Keep the last
-  few searches as tabs or a history menu in the panel ("refresh" re-sends the same request).
+  few searches as tabs or a history menu in the panel ("refresh" re-sends the same request). The `container` of a
+  definition candidate makes a good group title ("CartRepository.find — 12 references in 5 files").
 - **Symbols in this file** (⌘⇧O — Ctrl+Shift+O): `document_symbols {path}` once per file shown (again after a turn / a
   refresh), filtered client-side as the user types (the same matching as `workspace_symbols` is fine: subsequence + humps),
   indented by `depth`, `kind` as an icon, `container` dimmed; ↩ jumps to `line` / `column`. The same reply can drive an
@@ -10725,18 +10755,18 @@ other builds running):
   says why (no project open, indexing).
 
 **Windows.** `document_symbols`, `workspace_symbols`, `definition_preview` and `nav_index_build` are on the renderer's
-allow list (`clients/desktop/src/main/ipcGuard.ts`). The UI is the client team's follow-up.
+allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields pass through). The UI is the client team's follow-up.
 
-**Mac.** Nothing new is decoded yet; Core's `ReviewState` decoder ignores the new keys until the
+**Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.
 - **Not in this pass.** A persisted index, a file-system watcher (re-checks ride on turns, refreshes, reads and the 30 s
-  query re-check), symbols of other languages (XML, SQL, MyBatis mappers), local
+  query re-check), inheritance / overload resolution, symbols of other languages (XML, SQL, MyBatis mappers), local
   variables and parameters in the outline.
 - Owner: ide-nav (engine `files/symbols.ts`, `files/symbolIndex.ts`, `files/navigate.ts`,
   `engine.ts`, `state.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`). Tests:
   `engine/test/symbols.extract.test.ts` (containers per language), `engine/test/engine.symbolIndex.test.ts` (fuzzy
-  ranking, the index's build / refresh / limits / failure, the preview, the
+  ranking, the index's build / refresh / limits / failure, container-aware go to definition, the preview, the
   engine's commands and state, a turn's refresh, §59 shadow mode, the lane), `clients/desktop/src/main/ipcGuard.test.ts`.

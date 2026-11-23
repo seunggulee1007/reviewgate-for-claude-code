@@ -878,7 +878,7 @@ export type EngineCommand =
    * Where `symbol` is declared (search-based, no language server): `fromPath` / `line` = where the user clicked (ranking by
    * its imports, package and folder). Replies `definitions`, best first, at most 50.
    */
-  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>
+  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number; /** §65 */ column?: number; /** §65: `this`, `user`, `CartService` in `user.symbol` */ receiver?: string }>
   /** Every line holding `symbol` as a whole word (`git grep -w -F`), the clicked file first. Replies `references`. */
   | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>
   // MARK: ide-nav — §65
@@ -3191,7 +3191,7 @@ export type DefinitionKind =
  * §62: one place `symbol` may be declared — repo-relative path, 1-based line and column (UTF-16 code units of the line), the
  * line without its indent (≤ 200 characters around the symbol), and a relative `score` (higher is better; only for order).
  */
-export type DefinitionCandidate = { path: string; line: number; column: number; kind: DefinitionKind; preview: string; score: number };
+export type DefinitionCandidate = { path: string; line: number; column: number; kind: DefinitionKind; preview: string; score: number; /** §65 */ container?: string };
 
 /**
  * §62: reply to `find_definition` — candidates best first (≤ 50). `truncated`: more candidates than sent, or the word was on

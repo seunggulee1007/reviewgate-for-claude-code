@@ -1736,8 +1736,17 @@ export class ReviewEngine {
         return { type: "project_search", query: found.query, matches: found.matches, truncated: found.truncated, ...(found.timedOut ? { timedOut: true as const } : {}) };
       }
       // MARK: code-nav — §62: read-only, search-based
-      case "find_definition":
-        return { type: "definitions", ...(await findDefinition(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line })) };
+      case "find_definition": {
+        const root = this.requireProject().root;
+        const index = this.symbolIndex; // MARK: ide-nav — §65: containers from the index (files read on demand, never the whole build)
+        return {
+          type: "definitions",
+          ...(await findDefinition(root, {
+            symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, receiver: cmd.receiver,
+            ...(index ? { symbolsOf: (p: string) => index.fileSymbols(p) } : {}),
+          })),
+        };
+      }
       case "find_references":
         return { type: "references", ...(await findReferences(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })) };
       // MARK: ide-nav — §65: read-only, lane "nav"

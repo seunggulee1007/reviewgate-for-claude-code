@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { findDefinition } from "../src/files/navigate.js";
 import { humpMatch, matchName, rankSymbols, SymbolIndex } from "../src/files/symbolIndex.js";
 import { definitionPreview, type FileSymbol } from "../src/files/symbols.js";
 import type { ToolFileEntry } from "../src/session/events.js";
@@ -204,6 +205,40 @@ describe("§65 SymbolIndex", () => {
   });
 });
 
+describe("§65 find_definition — containers", () => {
+  const withIndex = (dir: string) => {
+    const index = new SymbolIndex({ root: dir, onChange: () => {} });
+    return (symbol: string, fromPath: string, line: number, extra: { receiver?: string; column?: number } = {}) =>
+      findDefinition(dir, { symbol, fromPath, line, ...extra, symbolsOf: (p) => index.fileSymbols(p) });
+  };
+  const top = (cs: { path: string; container?: string }[]): string => `${cs[0]!.path}#${cs[0]!.container ?? ""}`;
+
+  it("Java: a field's declared type wins over the clicked file's own method; unqualified / this → the enclosing class; a guessed type from the name", async () => {
+    const dir = repo();
+    const def = withIndex(dir);
+    const from = "src/main/java/com/acme/cart/CartService.java";
+    // Without the index: §62's ranking puts the clicked file's own `find` first.
+    expect((await findDefinition(dir, { symbol: "find", fromPath: from, line: 13 })).candidates[0]!.path).toBe(from);
+    const viaField = (await def("find", from, 13)).candidates;
+    expect(top(viaField)).toBe("src/main/java/com/acme/cart/CartRepository.java#CartRepository");
+    expect(viaField.find((c) => c.path === from)).toMatchObject({ container: "CartService" });
+    expect(top((await def("find", from, 17)).candidates)).toBe(`${from}#CartService`);
+    expect(top((await def("find", from, 18)).candidates)).toBe(`${from}#CartService`);
+    expect(top((await def("find", from, 19)).candidates)).toBe("src/main/java/com/acme/cart/UserRepository.java#UserRepository");
+    // An explicit receiver beats the line.
+    expect(top((await def("find", from, 17, { receiver: "AuditRepository" })).candidates)).toBe("src/main/java/com/acme/a/AuditRepository.java#AuditRepository");
+  });
+
+  it("Kotlin: Type.member reaches the companion object; TS: a variable declared with an explicit type", async () => {
+    const dir = repo();
+    const def = withIndex(dir);
+    const kt = (await def("create", "app/src/main/kotlin/com/acme/Repo.kt", 14)).candidates;
+    expect(kt[0]).toMatchObject({ line: 10, container: "Repo.Companion" });
+    const ts = (await def("load", "web/src/views/checkout.ts", 4)).candidates;
+    expect(top(ts)).toBe("web/src/models/cart.ts#CartStore");
+  });
+});
+
 describe("§65 definition_preview", () => {
   it("the comment / annotation block above by default, 15 lines after, the symbol on the line; before / after; refusals", () => {
     const dir = repo();
@@ -290,6 +325,13 @@ describe("§65 through the engine", () => {
     await turn(h, () => write(dir, "src/main/java/com/acme/cart/BrandNewThing.java", "package com.acme.cart;\n\npublic class BrandNewThing {}\n"));
     await h.waitFor((s) => (s.nav?.index.files ?? 0) > files, "index refreshed after the turn");
     expect(names((await h.engine.request({ type: "workspace_symbols", query: "BrandNewThing" })).symbols)).toEqual(["BrandNewThing"]);
+  });
+
+  it("find_definition through the engine uses the index's containers (and says them)", async () => {
+    const { h } = await opened();
+    const d = await h.engine.request({ type: "find_definition", symbol: "find", fromPath: "src/main/java/com/acme/cart/CartService.java", line: 13 });
+    expect(d.candidates[0]).toMatchObject({ path: "src/main/java/com/acme/cart/CartRepository.java", container: "CartRepository", kind: "method" });
+    expect(h.engine.state.nav?.index.status).toBe("idle"); // read on demand, the whole index not built
   });
 
   it("works in a folder tracked without git (§59): untracked files indexed, no .git appears", async () => {
