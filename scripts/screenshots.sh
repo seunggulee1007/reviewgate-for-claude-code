@@ -8,7 +8,10 @@
 # - the build is io.github.seunggulee1007.reviewgate.screenshots: its own defaults domain (reset on every run, the tour's
 #   settings written there), no reviewgate:// scheme or folder role in its Info.plist, and unregistered from
 #   LaunchServices afterwards;
-# - the engine's data dir is a fresh folder under SHOTS_DIR (never ~/.reviewgate); workbenches would go there too;
+# - the engine's data dir is a fresh folder under SHOTS_DIR (never ~/.reviewgate);
+# - the managed workbench folder is the fixture /Users/Shared/acme-workbenches (the "Run as Task" / new workbench sheet shows
+#   it; the tour creates no workbench), and every PNG is read (scripts/png-home-check.swift, Vision text recognition on this Mac): one showing
+#   the home folder's path fails the run (HOME PATH);
 # - the session loads no user settings (no ~/.claude skills, plugins, hooks, MCP servers or CLAUDE.md); the app starts
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
 # - a layout on the fake claude (SHOTS_LAYOUT=terminal) never reads ~/.claude at all: the app and its engine get
@@ -441,7 +444,7 @@ w notificationsEnabled -bool false           # never asks macOS for the notifica
 w notificationsOffNoticeDismissed -bool true
 w confirmCloseWhileWorking -bool false       # the tour's quit never waits on an alert
 w reopenLastProjects -bool false
-w worktreeRoot -string "$DATA/worktrees"
+w worktreeRoot -string /Users/Shared/acme-workbenches   # shown in the sheets: never a path under $HOME (SHOTS_DIR may be)
 [ "$CLAUDE_BIN" = claude ] || w claudePath -string "$CLAUDE_BIN"   # §57 terminal tour: the fake, never the real one
 w defaultModeOffered -data "$(printf '["%s"]' "$DEMO_DIR" | xxd -p | tr -d '\n')"
 
@@ -515,6 +518,8 @@ done
 OPEN_PID=""
 [ ! -f "$RAW/tour-failed.txt" ] || die "the tour failed: $(cat "$RAW/tour-failed.txt") (log: $RAW/tour.log)"
 ls "$RAW"/*.png >/dev/null 2>&1 || die "the tour wrote no images (log: $RAW/tour.log)"
+# No PNG may show the real home folder's path (a sheet's folder, a data dir under SHOTS_DIR, …).
+xcrun swift "$ROOT/scripts/png-home-check.swift" "$RAW"/*.png || die "a PNG shows the home folder's path (HOME PATH above; $RAW)"
 
 if [ -n "${SHOTS_LAYOUT:-}" ]; then   # the layout / scroll check: its PNGs stay in the scratch folder, never in docs/images
   say "layout shots: $(ls "$RAW"/*.png | tr '\n' ' ')"
