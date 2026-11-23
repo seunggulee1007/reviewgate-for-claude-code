@@ -1,13 +1,14 @@
 /**
  * §60 the PR's Conversation on Windows: the description, the general comments and the reviews as one time-ordered
- * thread (PENDING left out, an empty-body review still marks its state), and the PR detail opening on it.
+ * thread (PENDING left out, an empty-body review still marks its state), the PR detail opening on it, and the composer
+ * that posts `pr_comment` (disabled reasons, ok clears, a refusal keeps the text and says why).
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { EngineCommand, PRDetail, PRIssueComment, PRReview, ReviewState } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { prTimeline, reviewStateBadge } from "./prConversation";
+import { commentBlocker, postComment, prTimeline, reviewStateBadge } from "./prConversation";
 
 // The app's Markdown renderer needs a DOM (DOMPurify): here it only shows which text went through it.
 vi.mock("./components/chat/Markdown", () => ({ Markdown: ({ text }: { text: string }) => createElement("div", { className: "markdown" }, text) }));
@@ -79,6 +80,29 @@ describe("prTimeline (§60)", () => {
   });
 });
 
+describe("the comment composer (§60)", () => {
+  beforeAll(() => initI18n("ko", "win32"));
+  afterAll(() => initI18n("en", "darwin"));
+
+  it("is disabled, with a reason, while the text is blank or a comment is posting", () => {
+    expect(commentBlocker("", false)).toBe("댓글을 먼저 적어 주세요.");
+    expect(commentBlocker("  \n ", false)).toBe("댓글을 먼저 적어 주세요.");
+    expect(commentBlocker("Thanks!", true)).toBe("댓글을 올리는 중이에요…");
+    expect(commentBlocker("Thanks!", false)).toBeNull();
+  });
+
+  it("clears the text only when the comment was posted; a refusal keeps it and says why", async () => {
+    const sent: string[] = [];
+    expect(await postComment("Thanks!", async (b) => (sent.push(b), null))).toEqual({ text: "", refusal: null });
+    expect(await postComment("  Thanks!\n", async () => "댓글을 올리지 못했어요: gh: not logged in")).toEqual({ text: "  Thanks!\n", refusal: "댓글을 올리지 못했어요: gh: not logged in" });
+    expect(sent).toEqual(["Thanks!"]);
+  });
+});
+
+/** What the engine answers `pr_comment` with (null: ok). */
+let commentReply: { error: string; code: string } | null = null;
+const commands: EngineCommand[] = [];
+
 async function loadStore() {
   (globalThis as unknown as { document: unknown }).document = { documentElement: { dataset: {} }, hasFocus: () => true };
   (globalThis as unknown as { window: unknown }).window = {
@@ -86,7 +110,11 @@ async function loadStore() {
     rg: {
       send: () => undefined,
       request: async () => ({}),
-      requestDetailed: async (_c: EngineCommand) => ({ ok: true, reply: { type: "result", ok: true } }),
+      requestDetailed: async (c: EngineCommand) => {
+        commands.push(c);
+        if (c.type === "pr_comment" && commentReply) return { ok: false, ...commentReply };
+        return { ok: true, reply: { type: "result", ok: true } };
+      },
       setSettings: async (patch: Record<string, unknown>) => patch,
       getSettings: async () => ({}),
       setUI: async () => undefined,
@@ -144,6 +172,36 @@ describe("the PR detail's Conversation (§60, Windows)", () => {
     expect(html).toMatch(/<time[^>]*dateTime="2026-11-01T10:00:00Z"[^>]*title="[^"]+"/);
     expect(html.split('data-testid="Open entry on GitHub"').length - 1).toBe(3);
     expect(html).toContain("GitHub에서 열기");
+  });
+
+  it("has the composer under the thread: named, Ctrl+Enter, disabled with its reason while blank or posting", async () => {
+    show({});
+    let html = await render();
+    const composer = html.slice(html.indexOf('data-testid="PR comment composer"'));
+    expect(composer).toContain('aria-label="댓글 남기기"');
+    expect(composer).toContain('placeholder="댓글 남기기"');
+    expect(composer).toContain("Ctrl+Enter: 댓글");
+    expect(composer).toMatch(/<button type="submit"[^>]*disabled=""[^>]*title="댓글을 먼저 적어 주세요."[^>]*data-testid="Post comment"/);
+    expect(html.indexOf('data-testid="PR entry description"')).toBeLessThan(html.indexOf('data-testid="PR comment composer"'));
+    show({ isCommenting: true });
+    html = await render();
+    expect(html).toMatch(/disabled=""[^>]*title="댓글을 올리는 중이에요…"[^>]*data-testid="Post comment"/);
+  });
+
+  it("prComment sends pr_comment and answers null, or the refusal's words (§60 codes)", async () => {
+    commands.length = 0;
+    commentReply = null;
+    expect(await useStore.getState().prComment("Thanks!")).toBeNull();
+    expect(commands).toContainEqual({ type: "pr_comment", body: "Thanks!" });
+    const words = async (error: string, code: string) => {
+      commentReply = { error, code };
+      return useStore.getState().prComment("x");
+    };
+    expect(await words("pr_comment_failed:gh: not logged in to github.com", "pr_comment_failed")).toBe("댓글을 올리지 못했어요: gh: not logged in to github.com");
+    expect(await words("empty_body", "empty_body")).toBe("댓글을 먼저 적어 주세요.");
+    expect(await words("no_pr_selected", "no_pr_selected")).toBe("PR을 먼저 열어 주세요.");
+    expect(await words("not_a_git_repo:pr_comment", "not_a_git_repo")).toMatch(/[가-힣]/);
+    commentReply = null;
   });
 
   it("says so when the PR has no description", async () => {

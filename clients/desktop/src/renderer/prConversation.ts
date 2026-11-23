@@ -55,3 +55,19 @@ export function reviewStateBadge(state: string): { label: string; color: string 
   }
 }
 
+
+/** Why the composer's send button is disabled (null: it is enabled). */
+export function commentBlocker(text: string, posting: boolean): string | null {
+  if (posting) return t("Posting the comment…");
+  if (!text.trim()) return t("Write a comment first.");
+  return null;
+}
+
+/**
+ * Sends the composer's text: on `ok` the composer is empty again; a refusal keeps the text and says why under it.
+ * `post` answers null on ok, else the refusal's words (the store's `prComment`).
+ */
+export async function postComment(text: string, post: (body: string) => Promise<string | null>): Promise<{ text: string; refusal: string | null }> {
+  const refusal = await post(text);
+  return refusal === null ? { text: "", refusal: null } : { text, refusal };
+}

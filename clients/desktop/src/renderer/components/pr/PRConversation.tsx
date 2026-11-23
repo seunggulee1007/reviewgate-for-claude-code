@@ -1,13 +1,14 @@
 /**
  * The PR's Conversation (docs/PROTOCOL.md §60): the description, the general comments and the reviews as one
  * time-ordered thread — each with its author, its time (relative; the absolute one in the tooltip), its Markdown body
- * and "Open on GitHub".
+ * and "Open on GitHub" — and under it the composer that posts `pr_comment`.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { PRDetail } from "@reviewgate/engine";
 import { formatDate, relativeTime, t } from "../../i18n";
 import { useStore } from "../../store";
-import { prTimeline, reviewStateBadge, type TimelineItem } from "../../prConversation";
+import { commentBlocker, postComment, prTimeline, reviewStateBadge, type TimelineItem } from "../../prConversation";
+import { isEnter } from "../../ime";
 import { Markdown } from "../chat/Markdown";
 import "../chat/chat.css";
 
@@ -24,7 +25,67 @@ export function PRConversation({ pr }: { pr: PRDetail }) {
           </li>
         ))}
       </ol>
+      <CommentComposer />
     </div>
+  );
+}
+
+/** "Leave a comment": Ctrl+Enter (⌘↩) or Comment sends; the text clears only once it was posted. */
+function CommentComposer() {
+  const isCommenting = useStore((s) => s.state.pr.isCommenting === true);
+  const prComment = useStore((s) => s.prComment);
+  const [text, setText] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const blocker = commentBlocker(text, posting || isCommenting);
+  const send = () => {
+    if (blocker) return;
+    setPosting(true);
+    setRefusal(null);
+    void postComment(text, prComment).then((next) => {
+      setPosting(false);
+      setText((now) => (next.refusal === null && now === text ? "" : now));
+      setRefusal(next.refusal);
+    });
+  };
+  return (
+    <form
+      className="pr-comment-composer"
+      data-testid="PR comment composer"
+      onSubmit={(e) => {
+        e.preventDefault();
+        send();
+      }}
+    >
+      <textarea
+        value={text}
+        rows={4}
+        placeholder={t("Leave a comment")}
+        aria-label={t("Leave a comment")}
+        aria-invalid={refusal !== null}
+        aria-describedby={refusal !== null ? "pr-comment-refusal" : undefined}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (isEnter(e) && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            send();
+          }
+        }}
+        data-testid="PR comment text"
+      />
+      <div className="row">
+        {refusal !== null && (
+          <span id="pr-comment-refusal" className="caption red pr-comment-refusal" role="alert" data-testid="PR comment refusal">
+            {refusal}
+          </span>
+        )}
+        <span className="spacer" />
+        <span className="tiny faint">{t("⌘↩ to {0}", t("Comment"))}</span>
+        <button type="submit" className="primary small" disabled={blocker !== null} title={blocker ?? undefined} data-testid="Post comment">
+          {t("Comment")}
+        </button>
+      </div>
+    </form>
   );
 }
 

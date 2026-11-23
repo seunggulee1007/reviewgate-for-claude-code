@@ -1067,5 +1067,11 @@
   "Conversation": "대화",
   "PR view": "PR 보기",
   "edited": "수정됨",
-  "No description provided.": "본문이 없어요."
+  "No description provided.": "본문이 없어요.",
+  "Leave a comment": "댓글 남기기",
+  "Posting the comment…": "댓글을 올리는 중이에요…",
+  "Write a comment first.": "댓글을 먼저 적어 주세요.",
+  "Open a pull request first.": "PR을 먼저 열어 주세요.",
+  "The comment could not be posted: {0}": "댓글을 올리지 못했어요: {0}",
+  "The comment could not be posted.": "댓글을 올리지 못했어요."
 }

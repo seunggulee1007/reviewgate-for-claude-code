@@ -39,3 +39,6 @@
 .pr-entry.no-body.review > header { border-bottom: 0; border-radius: var(--radius); }
 .pr-entry > header time { white-space: nowrap; }
 .pr-entry > .markdown, .pr-entry-empty { padding: 8px 10px; font-size: 12.5px; overflow-wrap: anywhere; user-select: text; }
+.pr-comment-composer { max-width: 760px; margin: 12px auto 0; display: flex; flex-direction: column; gap: 6px; }
+.pr-comment-composer textarea { width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: inherit; font-size: 12.5px; }
+.pr-comment-refusal { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }

@@ -9793,4 +9793,8 @@ every PR opens on Conversation (the switch is the opened PR's own state). Conver
 provided." when it is empty), then the comments and the reviews, each with its author, the review's state pill, the time
 (relative; the absolute one in the tooltip), "edited" for an edited comment, "Open on GitHub" (`openExternal`) and the
 body through the app's Markdown renderer (DOMPurify, links opened outside). The switch counts the thread's comments and
-reviews. Files is the reviews + files list and the diff as before.
+reviews. Files is the reviews + files list and the diff as before. Under the thread, **Leave a comment** (a multi-line
+field; Ctrl+Enter or Comment sends `pr_comment` through the store's `prComment`): Comment is disabled, its tooltip saying
+why, while the text is blank or a comment is posting (`isCommenting`, or the request still out); the text clears only on
+`ok:true` and a refusal's words (`errorCodes.ts`: `no_pr_selected`, `empty_body`, `pr_comment_failed` with gh's line,
+`not_a_git_repo`) stay under the field with the text.

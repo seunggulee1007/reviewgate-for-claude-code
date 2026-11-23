@@ -143,6 +143,10 @@ export const REFUSAL_CODES = [
   "unknown_history_entry",
   "unknown_hunk",
   "unknown_pr_file",
+  // §60 pr_comment (the PR conversation's composer shows these under itself)
+  "no_pr_selected",
+  "empty_body",
+  "pr_comment_failed",
   // MARK: wave1 desktop-perms — §33.1: the card's request is no longer open (a toast; the card turns "handled")
   "unknown_permission_request",
   "unknown_worktree",
@@ -649,6 +653,12 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("This review round is no longer in the history.");
     case "unknown_pr_file":
       return t("That file is not part of the pull request.");
+    case "no_pr_selected":
+      return t("Open a pull request first.");
+    case "empty_body":
+      return t("Write a comment first.");
+    case "pr_comment_failed":
+      return d ? t("The comment could not be posted: {0}", d) : t("The comment could not be posted.");
     case "unknown_permission_request":
       return t("This permission request was already handled");
     case "unknown_session":
