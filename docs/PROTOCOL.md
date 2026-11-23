@@ -10839,6 +10839,8 @@ through). The UI is the client team's follow-up.
   it turns `ready` — and "Showing the first 100" / "The project is larger than the index — some symbols are missing"
   (`NavFuzzy.projectNotes`); a refusal is said in place, `failed` with Try Again (`nav_index_build {}`). ↩ opens as Go
   to File (at the symbol's line and column).
+- *Rebuild Symbol Index* (Navigate › 심볼 색인 다시 만들기): `nav_index_build {full: true}`; off without a project and
+  while `state.nav.index.status` is `building` (`AppState.navIndexBuilding`, the menu's tooltip says "Indexing…").
 - *Keys.* ⌘⇧O (VS Code's symbols in file) is Switch Project and ⌘T (workspace symbols) New Chat on both apps, so the Mac
   follows IntelliJ as Windows does: ⌘F12 ↔ Ctrl+F12 (File Structure), ⌥⌘⇧N ↔ Ctrl+Alt+Shift+N (Go to Symbol — the Mac
   IntelliJ key ⌥⌘O is Open in IDE here), Peek ⌥F12 ↔ Alt+F12, F4 / ⇧F4 ↔ F4 / Shift+F4; Go to File stays ⌘P ↔ Ctrl+P

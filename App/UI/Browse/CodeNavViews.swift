@@ -746,6 +746,14 @@ struct CodeNavCommands: Commands {
                 .disabled(!hasProject)
                 .help(hasProject ? Text("Find a class, method or field anywhere in the project by name") : Text("Open a project first"))
                 .accessibilityIdentifier("Navigate menu Symbols in project")
+            // §65.1: `nav_index_build {full: true}` — off while it builds.
+            let building = store?.navIndexBuilding == true
+            Button("Rebuild Symbol Index") { if let store { Task { await store.buildNavIndex(full: true) } } }
+                .disabled(!hasProject || building)
+                .help(!hasProject ? Text("Open a project first")
+                      : building ? Text("Indexing… — it can be rebuilt once this build ends")
+                      : Text("Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)"))
+                .accessibilityIdentifier("Navigate menu Rebuild symbol index")
             Divider()
             // MARK: ide-nav (§65.8): the References tab's hits, one after the other.
             let hasHits = store.map { !$0.codeNav.referenceGroups.isEmpty } ?? false
