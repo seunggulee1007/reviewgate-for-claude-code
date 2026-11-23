@@ -27,6 +27,9 @@ import { textContextMenu } from "./contextMenu.js"; // MARK: polish p-lifecycle 
 import { ptyAvailable } from "./pty/nodePty.js";
 import type { PtyHub } from "./pty/ptyHub.js";
 import { createWindowPtyHub } from "./pty/ptyWindow.js";
+import { flowRepoRoot } from "../shared/flowSettings.js"; // MARK: c-panel (§57.18)
+import { projectRootHash } from "../shared/hash.js";
+import { runnableCommand } from "../shared/runConfigs.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const PRELOAD = join(here, "preload.cjs");
@@ -221,6 +224,12 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     engine,
     projectPath: () => wb.projectRoot ?? wb.projectPath,
     fullRepaint: () => loadSettings().terminalFullRepaint !== false,
+    // MARK: c-panel — §57.18: the Run tab's commands are kept per repository (as the flow settings, src/shared/flowSettings.ts)
+    terminalShell: () => (loadSettings().terminalShell === "cmd" ? "cmd" : "powershell"),
+    runCommand: (runId) => {
+      const root = flowRepoRoot(engine.state);
+      return root ? runnableCommand(loadSettings().projectRunConfigs?.[projectRootHash(root)], runId) : null;
+    },
     log: (level, msg) => logLine(prefix, level, msg),
   });
   windows.set(id, wb);

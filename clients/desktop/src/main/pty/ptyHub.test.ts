@@ -124,6 +124,9 @@ function rig(o: Partial<PtyHubDeps> = {}, ownerId = 7): Rig {
     setIgnoreMenuShortcuts: (v) => void ignore.push(v),
     chatLaunch: (spec) => launch(spec.argv[0]!),
     shellLaunch: (shell) => launch(shell === "cmd" ? "C:\\Windows\\system32\\cmd.exe" : "pwsh.exe"),
+    runLaunch: (command) => ({ ...launch("pwsh.exe"), args: `-NoLogo -Command "${command}"` }),
+    runCommand: (runId) => (runId === "npm:dev" ? "npm run dev" : null),
+    detectRuns: () => [{ id: "npm:dev", name: "npm: dev", command: "npm run dev", detected: true, confirmed: false }],
     projectPath: () => "/work/acme",
     isAlive: (pid) => alive.has(pid),
     killTree: async (pid) => {
@@ -380,6 +383,41 @@ describe("PtyHub (§57.17)", () => {
     expect(r.engine.requests).toEqual([]); // no terminal_spec for a shell
     const none = rig({ projectPath: () => null });
     expect(await none.hub.open(7, { kind: "shell", shell: "cmd", cols: 80, rows: 24 })).toMatchObject({ ok: false, code: "no_project" });
+  });
+
+  // MARK: c-panel — §57.18
+  it("a Run tab command opens by its kept id — main reads the command; unknown or unconfirmed ids are refused", async () => {
+    const r = rig();
+    const id = okId(await r.hub.open(7, { kind: "run", runId: "npm:dev", cols: 80, rows: 24 }));
+    expect(r.ptys[0]!.args).toBe('-NoLogo -Command "npm run dev"');
+    expect(r.hub.list(7)).toEqual([{ ptyId: id, kind: "run", runId: "npm:dev", running: true }]);
+    expect(r.logs.some((l) => l.includes("npm run dev"))).toBe(false); // only the id is logged
+    expect(await r.hub.open(7, { kind: "run", runId: "npm:test", cols: 80, rows: 24 })).toMatchObject({ ok: false, code: "not_confirmed" });
+    expect(await r.hub.open(7, { kind: "run", runId: "", cols: 80, rows: 24 })).toMatchObject({ ok: false, code: "invalid_request" });
+    expect(await r.hub.open(7, { kind: "run", command: "calc.exe", cols: 80, rows: 24 } as never)).toMatchObject({ ok: false, code: "invalid_request" });
+    const none = rig({ projectPath: () => null });
+    expect(await none.hub.open(7, { kind: "run", runId: "npm:dev", cols: 80, rows: 24 })).toMatchObject({ ok: false, code: "no_project" });
+  });
+
+  it("running a command again ends its previous PTY first; a project change ends the runs", async () => {
+    const r = rig();
+    r.hub.onEngineState(state());
+    okId(await r.hub.open(7, { kind: "run", runId: "npm:dev", cols: 80, rows: 24 }));
+    const second = okId(await r.hub.open(7, { kind: "run", runId: "npm:dev", cols: 80, rows: 24 }));
+    expect(r.ptys[0]!.kills).toBe(1);
+    expect(exits(r).map((e) => e.reason)).toEqual(["killed"]);
+    expect(r.hub.list(7).map((e) => e.ptyId)).toEqual([second]);
+    r.hub.onEngineState(state({ project: "/work/acme-2" }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.ptys[1]!.kills).toBe(1);
+    expect(exits(r).at(-1)).toMatchObject({ ptyId: second, reason: "closed" });
+  });
+
+  it("run detection reads the owner window's project folder only", () => {
+    const r = rig();
+    expect(r.hub.detectRuns(7).map((c) => c.command)).toEqual(["npm run dev"]);
+    expect(r.hub.detectRuns(8)).toEqual([]);
+    expect(rig({ projectPath: () => null }).hub.detectRuns(7)).toEqual([]);
   });
 
   it("focus → setIgnoreMenuShortcuts", () => {

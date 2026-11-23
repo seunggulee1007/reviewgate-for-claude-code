@@ -3,12 +3,14 @@ import type { TerminalSpecEvent } from "@reviewgate/engine";
 import { hookSettings, terminalArgv, TERMINAL_SYSTEM_APPEND } from "../../../../../engine/src/session/terminalSpec.js";
 import {
   buildChatLaunch,
+  buildRunLaunch,
   buildShellLaunch,
   COMMAND_LINE_TOO_LONG,
   MAX_COMMAND_LINE,
   NEEDS_NATIVE_CLAUDE,
   whichSync,
   windowsCommandLine,
+  windowsQuote,
   type ChatLaunchInput,
   type ShimFs,
 } from "./terminalLaunch.js";
@@ -230,6 +232,26 @@ describe("buildShellLaunch (§57.17)", () => {
     expect(buildShellLaunch({ shell: "cmd", cwd: "C:\\work\\acme", platform: "win32", parentEnv: PARENT, which: () => null })).toMatchObject({ file: "C:\\Windows\\system32\\cmd.exe", args: "" });
     const { ComSpec: _c, ...noComspec } = PARENT;
     expect(buildShellLaunch({ shell: "cmd", cwd: "C:\\work\\acme", platform: "win32", parentEnv: { ...noComspec, SystemRoot: "D:\\Win" }, which: () => null }).file).toBe("D:\\Win\\System32\\cmd.exe");
+  });
+});
+
+// MARK: c-panel — §57.18
+describe("buildRunLaunch (§57.18)", () => {
+  const command = `.\\gradlew.bat bootRun --args="--server.port=8081"`;
+  it("PowerShell: -Command with the exit code passed on, one quoted word; the shell panel's environment", () => {
+    const r = buildRunLaunch({ shell: "powershell", command, cwd: "C:\\work\\acme", platform: "win32", parentEnv: { ...PARENT, RG_HOOK_TOKEN: "leak" }, which: () => null });
+    expect(r.file).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    expect(r.args).toBe(`-NoLogo -Command ${windowsQuote(`${command}; exit $LASTEXITCODE`)}`);
+    expect(r.cwd).toBe("C:\\work\\acme");
+    expect(Object.keys(r.env).some((k) => k.toUpperCase().startsWith("RG_"))).toBe(false);
+  });
+  it("Command Prompt: /d /s /c with the command inside one pair of quotes", () => {
+    const r = buildRunLaunch({ shell: "cmd", command: "npm run dev", cwd: "C:\\work\\acme", platform: "win32", parentEnv: PARENT, which: () => null });
+    expect(r).toMatchObject({ file: "C:\\Windows\\system32\\cmd.exe", args: '/d /s /c "npm run dev"' });
+  });
+  it("POSIX (development): the user's shell -l -c", () => {
+    const r = buildRunLaunch({ shell: "powershell", command: "npm test", cwd: "/work/acme", platform: "darwin", parentEnv: { SHELL: "/bin/zsh", PATH: "/usr/bin" }, which: () => null });
+    expect(r).toMatchObject({ file: "/bin/zsh", args: ["-l", "-c", "npm test"], cwd: "/work/acme" });
   });
 });
 

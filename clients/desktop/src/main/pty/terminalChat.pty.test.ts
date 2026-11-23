@@ -14,7 +14,7 @@ import type { PtyExit } from "../../shared/ipc.js";
 import { countOrphans } from "../orphans.js";
 import { nodePty } from "./nodePty.js";
 import { PtyHub, type PtyHubDeps } from "./ptyHub.js";
-import { buildChatLaunch, buildShellLaunch, whichSync, type LaunchPlatform } from "./terminalLaunch.js";
+import { buildChatLaunch, buildRunLaunch, buildShellLaunch, whichSync, type LaunchPlatform } from "./terminalLaunch.js";
 import { writeFakeClaude } from "./testing/fakeClaudeShim.js";
 
 const WIN = process.platform === "win32";
@@ -137,6 +137,9 @@ describe("a fake claude through a real PTY drives one review turn (§57.17)", ()
       setIgnoreMenuShortcuts: () => undefined,
       chatLaunch: (spec) => buildChatLaunch({ spec, platform: LP, parentEnv: process.env, appVersion: "0.5.17", fullRepaint: true, fs: { exists: existsSync, read: (p) => (existsSync(p) ? readFileSync(p, "utf8") : null) }, which }),
       shellLaunch: (shell, cwd) => buildShellLaunch({ shell, cwd, platform: LP, parentEnv: process.env, which }),
+      runLaunch: (command, cwd) => buildRunLaunch({ shell: "powershell", command, cwd, platform: LP, parentEnv: process.env, which }),
+      runCommand: () => null,
+      detectRuns: () => [],
       projectPath: () => repo,
       isAlive: (pid) => {
         try {

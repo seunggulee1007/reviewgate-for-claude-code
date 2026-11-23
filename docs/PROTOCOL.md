@@ -9853,6 +9853,13 @@ Cursor. Client only: no engine command or event is added; the engine already sen
     §57.5). ▶ on a command that ran before, and ↻, start it again in a fresh terminal (its output until then goes); ■ is
     SIGTERM to its process group, SIGKILL after 3 s. The bar says 실행 중 / 끝남 (n) (orange when n ≠ 0) / 중지됨. The
     window closing or the app quitting ends every run with the shells.
+  - *Windows* (§57.17's hub): `rg:pty:open {kind:"run", runId}` — the renderer names only the kept config's id; main reads
+    the command from the settings and refuses one not kept, or detected and not yet confirmed (`not_confirmed`). Settings'
+    terminal shell runs it in the project folder: PowerShell `-NoLogo -Command "<command>; exit $LASTEXITCODE"` (so the
+    program's exit code is the tab's), Command Prompt `/d /s /c "<command>"`; the shell panel's environment. Running a
+    command again ends its previous PTY first; a project change ends the runs as it ends the shells; the log names only the
+    id. `rg:run:detect` returns the window's project folder's candidates. The confirmation is inline in the 실행 tab (no
+    dialog). Without a PTY (§57.17's check) 출력 still works; 터미널 and 실행 say why they cannot.
 - **Hard limits.** No automatic run, no network, nothing read outside the project folder (never `~/.claude`).
 
 ## 58. Accept N & Continue

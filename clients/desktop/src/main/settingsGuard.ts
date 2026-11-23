@@ -12,6 +12,7 @@ import { win32 } from "node:path";
 import { isPeerInboundMode, isPermissionMode } from "@reviewgate/engine";
 import type { AppSettings } from "../shared/ipc.js";
 import { isCommitTemplate, isPrRespondCommand, isProjectMap, isWorkbenchSetup } from "../shared/flowSettings.js"; // MARK: wave3 desktop-flow
+import { isProjectRuns } from "../shared/runConfigs.js"; // MARK: c-panel (§57.18)
 import { PROJECT_HASH } from "./projectPatterns.js";
 import { claudeHome, isClaudeVersionPath } from "./cliPin.js"; // MARK: wave3 desktop-session — §36.8
 import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows
@@ -73,6 +74,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   projectCommitTemplate: (v) => isProjectMap(v, isCommitTemplate),
   projectWorkbenchSetup: (v) => isProjectMap(v, isWorkbenchSetup),
   projectPrRespondCommand: (v) => isProjectMap(v, isPrRespondCommand),
+  projectRunConfigs: (v) => isProjectMap(v, isProjectRuns), // MARK: c-panel (§57.18)
   preReviewEffort: oneOf("low", "medium", "high"),
   // MARK: wave1 desktop-perms (§33.4 / §33.5 / §33.7)
   allowWorktreeIsolation: bool,
