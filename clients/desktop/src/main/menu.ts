@@ -6,7 +6,7 @@
  */
 import { app, BrowserWindow, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import { basename } from "node:path";
-import type { ReviewState } from "@reviewgate/engine";
+import type { NavIndexState, ReviewState } from "@reviewgate/engine";
 import { loadSettings } from "./settings.js";
 import { recentEntries } from "./recentProjects.js"; // MARK: wave4 w4-install
 import type { MenuAction } from "../shared/ipc.js";
@@ -61,7 +61,8 @@ export function buildMenu(opts: MenuHandlers): void {
   const pty = ptyInfo();
   const terminal = { chat: settings.terminalChatPreview === true && pty.available, panel: pty.shells.length > 0 };
   // `t("File")` stands for the UI language.
-  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, hasRepo, runAsTask, can, terminal]);
+  const index = state?.nav?.index; // §65.8: Rebuild Symbol Index is off while it builds
+  const signature = JSON.stringify([t("File"), entries, tabs, hasProject, hasRepo, runAsTask, can, terminal, index?.status ?? null]);
   if (signature === lastSignature) return;
   lastSignature = signature;
   const needsProject = { enabled: hasProject };
@@ -178,6 +179,7 @@ export function buildMenu(opts: MenuHandlers): void {
     file,
     editMenu(needsProject, can),
     view,
+    navigateMenu(hasProject, index),
     reviewMenu(can, hasProject),
     chatMenu(needsProject, can, tabs, terminal.chat),
     windowMenu(),
@@ -212,6 +214,37 @@ export function mn(label: string, key: string, mac = isMac): string {
   if (ascii && at >= 0) return `${escaped.slice(0, at)}&${escaped.slice(at)}`;
   const tail = escaped.endsWith("…") ? "…" : "";
   return `${tail ? escaped.slice(0, -1) : escaped}(&${key.toUpperCase()})${tail}`;
+}
+
+/**
+ * §65.8: Navigate — the palettes (Go to File stays File's, its accelerator registered there), the References tab's next /
+ * previous, Back / Forward, and Rebuild Symbol Index (`nav_index_build {full: true}`; off while the index builds — the
+ * label says so, a Windows menu shows no tooltip). The keys are the renderer's (nav/NavViews.tsx).
+ */
+function navigateMenu(project: boolean, index: NavIndexState | undefined): MenuItemConstructorOptions {
+  const item = (label: string, action: MenuAction, key?: string, enabled = project): MenuItemConstructorOptions => ({ label, ...(key ? shownKey(key) : {}), enabled, click: () => dispatch(action, () => undefined) });
+  const building = index?.status === "building";
+  return {
+    label: mn(t("Navigate"), "N"),
+    submenu: [
+      item(t("Go to File…"), { type: "quick_open" }, "CmdOrCtrl+P"),
+      item(t("Symbols in This File…"), { type: "nav_palette", mode: "fileSymbols" }, "CmdOrCtrl+F12"),
+      item(t("Symbols in Project…"), { type: "nav_palette", mode: "projectSymbols" }, "CmdOrCtrl+Alt+Shift+N"),
+      { type: "separator" },
+      item(t("Next Reference"), { type: "nav_reference", dir: 1 }, "F4"),
+      item(t("Previous Reference"), { type: "nav_reference", dir: -1 }, "Shift+F4"),
+      { type: "separator" },
+      item(t("Back"), { type: "nav_history", dir: "back" }, "Alt+Left"),
+      item(t("Forward"), { type: "nav_history", dir: "forward" }, "Alt+Right"),
+      { type: "separator" },
+      {
+        label: building ? t("Rebuild Symbol Index — indexing…") : t("Rebuild Symbol Index"),
+        enabled: project && !building,
+        toolTip: building ? t("Indexing…") : t("Reads every file of the project again for the symbol palettes"),
+        click: () => dispatch({ type: "nav_rebuild_index" }, () => undefined),
+      },
+    ],
+  };
 }
 
 // MARK: polish p-lifecycle — P1-chrome-09 / P2-review-28 / P5-sheets-46: the Mac's Review menu, with its keys. The renderer

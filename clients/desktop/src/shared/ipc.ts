@@ -305,7 +305,12 @@ export type MenuAction =
   | { type: "continue_as_terminal" }
   | { type: "toggle_terminal_panel" }
   // §9 Chat › New Chat in a Workbench… (Ctrl+Alt+W, the renderer's key)
-  | { type: "new_chat_in_workbench" };
+  | { type: "new_chat_in_workbench" }
+  // §65.8 Navigate: the symbol palettes, the References tab's next / previous, Back / Forward, Rebuild Symbol Index
+  | { type: "nav_palette"; mode: "fileSymbols" | "projectSymbols" }
+  | { type: "nav_reference"; dir: 1 | -1 }
+  | { type: "nav_history"; dir: "back" | "forward" }
+  | { type: "nav_rebuild_index" };
 
 // MARK: polish p-foundation — P5-sheets-44
 /**

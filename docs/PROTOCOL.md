@@ -10837,6 +10837,19 @@ through).
   Ctrl+P was File › Go to File's accelerator already (it did nothing until now). `nav/navKeys.test.ts` holds every
   navigation key against the window's other key maps and the shortcut table; docs/SHORTCUTS.md "코드 탐색" lists them —
   its Mac column carries §65.8's keys until the Mac app picks its own (Core's `ShortcutTable.swift` is reconciled then).
+- **Navigate menu** (탐색, Alt+N; between View and Review): Go to File… (Ctrl+P, registered in File as before), Symbols in
+  This File… (Ctrl+F12), Symbols in Project… (Ctrl+Alt+Shift+N), Next / Previous Reference (F4 / Shift+F4; none yet → a
+  toast says Shift+F12 fills them), Back / Forward (Alt+← / Alt+→) — the keys shown, the renderer's own (menu actions
+  `nav_palette`, `nav_reference`, `nav_history`) — and **Rebuild Symbol Index** (`nav_index_build {full: true}`, a toast
+  "Rebuilding…", a refusal said): off while `state.nav.index.status` is `building`, its label then "… — indexing…"
+  (a Windows menu shows no tooltip); main rebuilds the menu when the focused window's index status changes. Every item is
+  off without a project.
+- Tests: `nav/identifier.test.ts` (receivers), `nav/peekModel.test.ts` (setting, header, marked line, keys),
+  `nav/hoverModel.test.ts` (600 ms debounce, stale replies), `nav/navStore.test.ts` (column / receiver sent, peek candidate
+  switching and its previews, hover, the References tab's order and F4 / Shift+F4), `nav/navModel.test.ts`
+  (`referenceOrder`, `stepReference`), `nav/quickOpenModel.test.ts` (path:line, humps, ranking, bold runs, the index
+  line), `nav/navKeys.test.ts` (no key of another map or table row), `main/menuBar.test.ts` (Navigate, Rebuild off while
+  building), `shortcutTable.test.ts` (docs/SHORTCUTS.md).
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.
