@@ -1937,6 +1937,22 @@
         }
       }
     },
+    "A changed file of the review — it opens in its diff": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A changed file of the review — it opens in its diff"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 중인 변경 파일이에요 — diff 로 열어요"
+          }
+        }
+      }
+    },
     "A deny instruction you wrote on a permission card is not sent yet.": {
       "localizations": {
         "en": {

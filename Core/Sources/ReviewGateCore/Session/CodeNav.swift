@@ -482,6 +482,14 @@ public final class CodeNavStore {
         go(to: target)
     }
 
+    /// §65.8: Go to File / a palette's pick — a changed file of the review in its diff (`line` nil: as the review shows
+    /// it), any other file read-only; Back returns to where the user was (`caret`).
+    func openFile(_ path: String, line: Int?, column: Int? = nil, sameReviewFile: (String) -> Bool) {
+        let target = CodeNavLocation(view: sameReviewFile(path) ? .review : .projectFile, path: path, line: line, column: column)
+        if let caret, caret != target { history.push(caret) }
+        go(to: target)
+    }
+
     private func go(to location: CodeNavLocation) {
         caret = location
         tick += 1
@@ -661,6 +669,12 @@ extension AppState {
             guard let self else { throw EngineClientError.stopped }
             return try await self.reply(cmd)
         }
+    }
+
+    /// Go to File / Symbols in File / Symbols in Project: open `path` at `line` (a changed file in its diff).
+    public func goToFile(path: String, line: Int? = nil, column: Int? = nil) {
+        codeNav.dismissPopup()
+        codeNav.openFile(path, line: line, column: column, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil })
     }
 
     /// Opens a peek row or a reference: the popover / panel closes, the place opens, Back returns to where it started.

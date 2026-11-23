@@ -10824,6 +10824,11 @@ through). The UI is the client team's follow-up.
   nothing, so one Back returns there. The bar: the name, "N references in M files", ↻ (the same request again) and a menu
   of the window's last 8 searches. Core `CodeNavStore` (`referenceSelection`, `stepReference`, `CodeNavText.step`), App
   `Terminal/ReferencesPanel.swift`.
+- *Go to File* (⌘P, §47's sheet): `list_files {query, limit: 50, filesOnly: true}` (directories dropped too, for an
+  older engine); each row's file name — else its folder — has the query's letters bold (`NavFuzzy.fileMarks`: one
+  contiguous run at a word start, else the camel humps, else the letters in order; the query's own extension set aside);
+  ↩ opens a changed file of the review in its diff (at `:line` when given) and any other file read-only in the code
+  browser, Back returning to where the user was (`AppState.goToFile`).
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

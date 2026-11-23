@@ -274,6 +274,51 @@ import Testing
         #expect(store.referenceSearches.map(\.symbol) == ["price", "total"])
     }
 
+    // MARK: Matching for the palettes (§65.3 / §65.8)
+
+    @Test func matchesRankAsTheEngineDoes() {
+        func score(_ q: String, _ n: String) -> Int? { NavFuzzy.match(q, in: n)?.score }
+        #expect(score("total", "total") == 1000)
+        #expect(score("tot", "total") == 798)                // a prefix, minus the 2 characters beyond it
+        #expect(score("TOTAL", "total") == 780)
+        #expect(score("TOT", "total") == 758)
+        #expect(score("UsrSvc", "UserService") == 595)       // camel humps
+        #expect(NavFuzzy.match("UsrSvc", in: "UserService")?.offsets == [0, 1, 3, 4, 7, 9])
+        #expect(NavFuzzy.match("uS", in: "userService")?.score == 751)   // a prefix ignoring case comes before humps
+        #expect(NavFuzzy.match("uSvc", in: "userService")?.offsets == [0, 4, 7, 9])
+        #expect(NavFuzzy.match("NPE", in: "NullPointerException")?.offsets == [0, 4, 11])
+        #expect(score("Service", "UserService") == 446)      // a substring at a word start
+        #expect(score("ervice", "UserService") == 395)       // inside a word
+        #expect(score("usrv", "userService") == 193)         // the letters in order
+        #expect(score("x", "userService") == nil)            // one character: no subsequence
+        #expect(score("zz", "total") == nil)
+        #expect(NavFuzzy.wordStarts(Array("HTTPServer".utf16)) == [0, 4])
+        #expect(NavFuzzy.wordStarts(Array("cart_total2".utf16)) == [0, 5, 10])
+    }
+
+    @Test func goToFileMarksTheNameFirst() {
+        #expect(NavFuzzy.fileMarks("cart", path: "src/cart/CartService.java").name == [0, 1, 2, 3])
+        #expect(NavFuzzy.fileMarks("cart", path: "src/cart/CartService.java").folder.isEmpty)
+        #expect(NavFuzzy.fileMarks("CS", path: "src/CartService.java").name == [0, 4])
+        #expect(NavFuzzy.fileMarks("UsrSvc.java", path: "app/UserService.java").name.prefix(6) == [0, 1, 3, 4, 7, 9])
+        let both = NavFuzzy.fileMarks("cart/svc", path: "src/cart/CartService.java")
+        #expect(!both.folder.isEmpty && !both.name.isEmpty)
+        #expect(NavFuzzy.fileMarks("", path: "a.java") == ([], []))
+        let marked = NavFuzzy.emphasized("CartService.java", offsets: [0, 4])
+        #expect(marked.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.count == 2)
+    }
+
+    @Test func goToFileOpensAChangedFileInItsDiff() {
+        let store = CodeNavStore()
+        let reading = CodeNavLocation(view: .projectFile, path: "README.md", line: 3)
+        store.caret = reading
+        store.openFile("src/Cart.kt", line: nil, sameReviewFile: { $0 == "src/Cart.kt" })
+        #expect(store.openRequest?.location == CodeNavLocation(view: .review, path: "src/Cart.kt"))
+        store.openFile("docs/a.md", line: 12, sameReviewFile: { _ in false })
+        #expect(store.openRequest?.location == CodeNavLocation(view: .projectFile, path: "docs/a.md", line: 12))
+        #expect(store.history.back == [reading, CodeNavLocation(view: .review, path: "src/Cart.kt")])
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))
