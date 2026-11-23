@@ -1,12 +1,12 @@
 import SwiftUI
 import ReviewGateCore
 
-/// The opened PR: header, then the Conversation (§60, where it opens) or the changed-files list with the selected file's
-/// diff ("Files").
+/// The opened PR: header, then one of three views — the Conversation (§60, where it opens), every inline comment by
+/// file and line ("Code comments"), or the changed-files list with the selected file's diff ("Files").
 /// Expects a `PRStore` in the environment.
 struct PRDetailView: View {
     /// §60: what the PR detail shows under its header.
-    enum Page: Hashable { case conversation, files }
+    enum Page: Hashable { case conversation, codeComments, files }
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(PRStore.self) private var store
@@ -15,6 +15,9 @@ struct PRDetailView: View {
     /// `submittedAt` of the banner the user dismissed; a newer submit shows a fresh banner.
     @State private var dismissedBannerAt: Date?
     @State private var page: Page = .conversation
+    /// A code comment's line to show in the Files view's diff (`PRDiffPane` takes it once the file's diff is there).
+    @State private var lineJump: PRLineJump?
+    @State private var jumpTick = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,12 +31,14 @@ struct PRDetailView: View {
                 switch page {
                 case .conversation:
                     PRConversationView()
+                case .codeComments:
+                    PRCodeCommentsView { line in show(line) }
                 case .files:
                     HSplitView {
                         filesList
                             .frame(minWidth: 200, idealWidth: 260, maxWidth: 420)
                         PRDiffPane(file: store.selectedFile, diff: store.selectedDiff, truncated: store.selectedDiffTruncated,
-                                   comments: store.comments.filter { $0.path == store.selectedFile?.filename })
+                                   comments: store.comments.filter { $0.path == store.selectedFile?.filename }, jump: $lineJump)
                             .frame(minWidth: 400, maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
@@ -52,20 +57,31 @@ struct PRDetailView: View {
         .sheet(isPresented: $showSubmitSheet) { SubmitReviewSheet() }
         .onChange(of: store.selectedSummary?.id) { _, _ in   // another PR opens on its Conversation
             page = .conversation
+            lineJump = nil
         }
     }
 
-    /// §60: Conversation | Files (N).
+    /// §60: Conversation | Code comments (N) | Files (N).
     private var pagePicker: some View {
         Picker("Show", selection: $page) {
             Text("Conversation").tag(Page.conversation)
+            Text("Code comments (\(store.comments.count))").tag(Page.codeComments)
             Text("Files (\(store.files.count))").tag(Page.files)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
         .fixedSize()
-        .help("The PR's conversation, or its files and diff")
+        .help("The PR's conversation, every comment on its code by file and line, or its files and diff")
         .accessibilityIdentifier("PR detail page")
+    }
+
+    /// A code comment's row: its file in the Files view, scrolled to its line (the outdated ones open above the diff).
+    private func show(_ line: PRCodeCommentLine) {
+        guard let file = store.files.first(where: { $0.filename == line.path }) else { return }
+        if store.selectedFile?.id != file.id { store.selectFile(file) }
+        jumpTick += 1
+        lineJump = PRLineJump(path: line.path, side: line.side, line: line.line, tick: jumpTick)
+        page = .files
     }
 
     // MARK: Header

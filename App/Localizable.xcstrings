@@ -611,6 +611,22 @@
         }
       }
     },
+    "%lld comments": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld comments"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "댓글 %lld개"
+          }
+        }
+      }
+    },
     "%lld done": {
       "localizations": {
         "en": {
@@ -8119,6 +8135,22 @@
         }
       }
     },
+    "Code comments (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code comments (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "코드 댓글 (%lld)"
+          }
+        }
+      }
+    },
     "Code graph": {
       "localizations": {
         "en": {
@@ -8387,6 +8419,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "댓글"
+          }
+        }
+      }
+    },
+    "Comments written on lines of the diff show up here, by file and line.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comments written on lines of the diff show up here, by file and line."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diff의 줄에 단 댓글이 파일과 줄별로 여기에 모여요."
           }
         }
       }
@@ -11799,6 +11847,22 @@
         }
       }
     },
+    "Line %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번 줄"
+          }
+        }
+      }
+    },
     "Mac app only · after a file’s last change, the next file": {
       "localizations": {
         "en": {
@@ -11843,6 +11907,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Markdown · ⌘↩로 댓글 남기기"
+          }
+        }
+      }
+    },
+    "No code comments": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No code comments"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "코드 댓글이 없어요"
           }
         }
       }
@@ -12007,6 +12087,22 @@
         }
       }
     },
+    "Old line %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Old line %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 %lld번 줄"
+          }
+        }
+      }
+    },
     "Or answer in the terminal": {
       "localizations": {
         "en": {
@@ -12019,6 +12115,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "또는 터미널에서 답하기"
+          }
+        }
+      }
+    },
+    "Outdated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outdated"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오래된 댓글"
           }
         }
       }
@@ -12263,6 +12375,22 @@
         }
       }
     },
+    "Show this line in the PR's diff": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show this line in the PR's diff"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PR diff에서 이 줄을 보여 줘요"
+          }
+        }
+      }
+    },
     "Sounds": {
       "localizations": {
         "en": {
@@ -12343,18 +12471,18 @@
         }
       }
     },
-    "The PR's conversation, or its files and diff": {
+    "The PR's conversation, every comment on its code by file and line, or its files and diff": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The PR's conversation, or its files and diff"
+            "value": "The PR's conversation, every comment on its code by file and line, or its files and diff"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "PR의 대화, 또는 파일과 diff를 봐요"
+            "value": "PR의 대화, 코드에 달린 댓글 전체(파일·줄별), 또는 파일과 diff를 봐요"
           }
         }
       }
@@ -12435,6 +12563,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 패널은 터미널 왼쪽, 파일 목록 옆에 열려요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "This file is not in the PR's file list, so there is no diff to show": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file is not in the PR's file list, so there is no diff to show"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일은 PR의 파일 목록에 없어서 보여 줄 diff가 없어요"
           }
         }
       }

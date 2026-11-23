@@ -2,7 +2,7 @@ import SwiftUI
 import ReviewGateCore
 
 // docs/PROTOCOL.md §60 on the Mac: the PR's Conversation (description, general comments and reviews as one thread, with
-// "Leave a comment" under it).
+// "Leave a comment" under it) and every inline comment of the PR in one list, by file and line.
 
 /// The opened PR's Conversation: the description, then the comments and the reviews by time, then the composer.
 struct PRConversationView: View {
@@ -153,5 +153,80 @@ struct PRReviewStateBadge: View {
             .padding(.horizontal, 5).padding(.vertical, 1)
             .background(color.opacity(0.15), in: Capsule())
             .foregroundStyle(color)
+    }
+}
+
+// MARK: - Code comments
+
+/// Every inline review comment of the PR, by file and line; a row shows that line in the PR's diff (`onOpen`).
+struct PRCodeCommentsView: View {
+    @Environment(PRStore.self) private var store
+    let onOpen: (PRCodeCommentLine) -> Void
+
+    var body: some View {
+        let groups = PRCodeComments.group(store.comments, fileOrder: store.files.map(\.filename))
+        if groups.isEmpty {
+            ContentUnavailableView("No code comments", systemImage: "text.bubble",
+                                   description: Text("Comments written on lines of the diff show up here, by file and line."))
+        } else {
+            let files = Set(store.files.map(\.filename))
+            List {
+                ForEach(groups) { file in
+                    Section {
+                        ForEach(file.lines) { line in
+                            row(line, inFiles: files.contains(line.path))
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Text(verbatim: file.path).lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 4)
+                            Label("\(file.count)", systemImage: "bubble.left").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .listStyle(.inset)
+            .accessibilityIdentifier("PR code comments")
+        }
+    }
+
+    private func row(_ line: PRCodeCommentLine, inFiles: Bool) -> some View {
+        let first = line.comments.first
+        return Button { onOpen(line) } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                lineLabel(line)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 72, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let first {
+                        HStack(spacing: 6) {
+                            Text(verbatim: first.author).font(.caption.weight(.semibold))
+                            Text(first.createdAt, format: .relative(presentation: .named))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .help(first.createdAt.formatted(date: .complete, time: .shortened))
+                            if line.comments.count > 1 {
+                                Text("\(line.comments.count) comments").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Text(verbatim: first.body)
+                            .font(.callout)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!inFiles)
+        .help(inFiles ? String(localized: "Show this line in the PR's diff")
+                      : String(localized: "This file is not in the PR's file list, so there is no diff to show"))
+        .accessibilityIdentifier("Code comment \(line.id)")
+    }
+
+    private func lineLabel(_ line: PRCodeCommentLine) -> Text {
+        guard let number = line.line else { return Text("Outdated") }
+        return line.side == "LEFT" ? Text("Old line \(number)") : Text("Line \(number)")
     }
 }

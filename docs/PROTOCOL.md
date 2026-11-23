@@ -9787,9 +9787,12 @@ Inline comments stay on the diff as before. Under the thread a composer posts `p
 while the text is blank or `isCommenting` is true, the text is cleared only on `ok:true`, and a refusal shows its words
 under the composer (the text stays). Clients send it only for a git project (§59 hides the PR tab otherwise).
 
-**Mac.** The PR detail opens on **Conversation**, a segment of `Conversation | Files (N)` under its header (another PR
-opens on Conversation again). Conversation is the thread above (`PRTimeline.items`; a `COMMENTED` review with an empty
-body stays out too — GitHub makes one for each batch of inline comments, which stay on the diff), each entry with its
-author, a relative time (the exact one on hover), "edited", the body as Markdown (a template's `<!-- … -->` hidden) and
-"Open on GitHub" (button and context menu), then "Leave a comment" (⌘↩ posts; the text is kept across the views and goes
-with another PR). The Reviews list that sat above the files is gone: the reviews are in the Conversation now.
+**Mac.** The PR detail opens on **Conversation**, a segment of `Conversation | Code comments (N) | Files (N)` under its
+header (another PR opens on Conversation again). Conversation is the thread above (`PRTimeline.items`; a `COMMENTED`
+review with an empty body stays out too — GitHub makes one for each batch of inline comments, which are listed under
+Code comments), each entry with its author, a relative time (the exact one on hover), "edited", the body as Markdown (a
+template's `<!-- … -->` hidden) and "Open on GitHub" (button and context menu), then "Leave a comment" (⌘↩ posts; the
+text is kept across the three views and goes with another PR). **Code comments** lists every inline comment by file (the
+PR's file order) and line, outdated ones last (`PRCodeComments.group`); a row switches to Files, selects the file and
+scrolls its diff to the line (an outdated row opens the file's outdated comments above the diff). The Reviews list that
+sat above the files is gone: the reviews are in the Conversation now.

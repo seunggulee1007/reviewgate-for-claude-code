@@ -17,6 +17,8 @@ struct PRDiffPane: View {
     var truncated: Bool = false
     /// Comments already filtered to `file.filename`.
     let comments: [PRComment]
+    /// §60: a code comment's line to scroll to once this file's diff is on screen (taken once, then set back to nil).
+    var jump: Binding<PRLineJump?> = .constant(nil)
 
     @State private var composer: Composer?
     /// Comments on lines that changed since (GitHub's "outdated", `line == nil`), shown above the diff on request, and the
@@ -32,6 +34,17 @@ struct PRDiffPane: View {
     @State private var maxColumns = 0
     // MARK: wave4c w4c-review — §41.3 "Show 20 more lines" from the PR's head commit
     @State private var more = DiffMoreLines()
+    /// What the list scrolls to on `scrollTick`: find's current match / change block, or a code comment's line (§60).
+    @State private var scrollKey: String?
+    @State private var scrollColumn: Int?
+    @State private var scrollTick = 0
+
+    /// §60: the jump waits for its file's diff.
+    private struct JumpKey: Equatable {
+        let tick: Int?
+        let path: String?
+        let lineCount: Int
+    }
 
     private struct HighlightKey: Equatable {
         let path: String?
@@ -84,6 +97,14 @@ struct PRDiffPane: View {
             outdatedReplyTo = nil
         }
         .onChange(of: diff) { _, _ in more = DiffMoreLines() }   // wave4c w4c-review
+        .onChange(of: find.scrollTick) { _, _ in
+            scrollKey = find.scrollKey
+            scrollColumn = find.scrollColumn
+            scrollTick += 1
+        }
+        .task(id: JumpKey(tick: jump.wrappedValue?.tick, path: file?.filename, lineCount: diff?.allLines.count ?? -1)) {
+            await takeJump()
+        }
         .task(id: HighlightKey(path: file?.filename, lineCount: diff?.allLines.count ?? -1, dark: colorScheme == .dark)) {
             highlighted = nil
             guard let file, let diff, !diff.isBinary else { return }
@@ -102,6 +123,27 @@ struct PRDiffPane: View {
             guard !Task.isCancelled else { return }
             maxColumns = widest
         }
+    }
+
+    /// §60: a code comment's line — scrolled to once its file's diff is here; the outdated comments open above the diff.
+    private func takeJump() async {
+        guard let target = jump.wrappedValue, target.path == file?.filename, let diff else { return }
+        guard let number = target.line else {
+            showOutdated = true
+            jump.wrappedValue = nil
+            return
+        }
+        let wanted = LineKey(side: target.side, number: number)
+        guard let line = diff.allLines.first(where: { Self.key(for: $0) == wanted }) else {
+            jump.wrappedValue = nil   // no longer in the diff: the file shows from its top
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(150))   // the list has just been made (another view, another file)
+        guard !Task.isCancelled else { return }
+        scrollKey = DiffDisplayItem.key(line)
+        scrollColumn = nil
+        scrollTick += 1
+        jump.wrappedValue = nil
     }
 
     private func header(_ file: PRFile) -> some View {
@@ -205,8 +247,8 @@ struct PRDiffPane: View {
                 DiffSplitReader { split in
                     let layout = split ? DiffSplit.layout(items) : nil   // §34.11: built only while split is shown
                     DiffLinesList(wrap: wrapLines, maxColumns: maxColumns, gutter: split ? DiffCodeMetrics.splitGutter : DiffCodeMetrics.diffGutter,
-                                  resetKey: AnyHashable(file.filename), scrollTarget: layout?.rowId(forLineKey: find.scrollKey) ?? find.scrollKey,
-                                  scrollTick: find.scrollTick, scrollColumn: find.scrollColumn, split: split) {
+                                  resetKey: AnyHashable(file.filename), scrollTarget: layout?.rowId(forLineKey: scrollKey) ?? scrollKey,
+                                  scrollTick: scrollTick, scrollColumn: scrollColumn, split: split) {
                         if let layout {
                             // One List row per split row: each side's comments, drafts and composer under its line.
                             ForEach(layout.rows) { row in
@@ -429,6 +471,15 @@ struct PRDiffPane: View {
         for d in drafts { map[LineKey(side: d.side, number: d.line), default: []].append(d) }
         return map
     }
+}
+
+/// §60: a code comment's file and line for the PR diff to show (`tick` tells two clicks on the same row apart).
+struct PRLineJump: Equatable {
+    let path: String
+    /// LEFT / RIGHT; "" with `line` nil (the file's outdated comments).
+    let side: String
+    let line: Int?
+    let tick: Int
 }
 
 /// One existing review comment (author · time · body) with a "Reply" action.
