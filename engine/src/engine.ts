@@ -1162,7 +1162,8 @@ export class ReviewEngine {
         if (this.isSessionSlashCommand(cmd.text)) opts.command = true;
         // §63 `prompts`: a new message waits for the review ("Accept N & Send" accepts first; a slash command starts no work).
         if (cmd.acceptPending !== true && reviewFirstPromptDecision(this.reviewFirstModeNow(), this.reviewFirstWaitingNow(), cmd.text)) {
-          throw new CommandRefused("gate_closed:review_first", { code: "review_first" });
+          // `gate_closed` as any closed gate: a client that sent it anyway (an older state) keeps the message and waits.
+          throw new CommandRefused("gate_closed:review_first");
         }
         await this.syncForgottenAllows(); // release-2 review (§33.7): another worktree's window may have cleared the set
         await this.send(cmd.text, cmd.acceptPending === true, opts);

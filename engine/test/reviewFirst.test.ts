@@ -276,7 +276,7 @@ describe("classic chat through the engine", () => {
     const { h, dir } = await opened({ reviewFirst: "prompts" });
     await reviewedTurn(h, dir);
     expect(h.engine.state.gate.reviewFirst).toMatchObject({ mode: "prompts", waiting: 2 });
-    expect(await result(h, { type: "send", text: "go on" })).toMatchObject({ ok: false, error: "gate_closed:review_first", code: "review_first" });
+    expect(await result(h, { type: "send", text: "go on" })).toMatchObject({ ok: false, error: "gate_closed:review_first", code: "gate_closed" });
     expect(h.engine.state.gate.phase).toBe("reviewing");
     const before = h.session().sends.length;
     expect(await result(h, { type: "send", text: "Continue.", acceptPending: true })).toMatchObject({ ok: true });
