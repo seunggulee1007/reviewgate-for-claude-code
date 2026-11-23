@@ -10466,7 +10466,7 @@ Everything but the GitHub read is the client's (Mac: Core `TaskStart.swift`; tes
   the chats, ↩ takes the marked one, **Esc is 바로 시작** — the screen never blocks. 대화로 열기 is off (its reason as the
   tooltip) when the project has no earlier chat.
 
-### 63.5 Mac, and what Windows still needs
+### 63.5 Mac and Windows
 
 - **Mac.** `StartScreenOverlay` (App `UI/Start/StartScreenView.swift`) sits over the diff and chat area of a project
   window (the sidebar, toolbar and menus stay usable) and decides once per project open (`WindowModel.showStartScreen`,
@@ -10481,9 +10481,24 @@ Everything but the GitHub read is the client's (Mac: Core `TaskStart.swift`; tes
   "브랜치 만들고 시작", "워크벤치 만들기", or "이 폴더에서 시작" (§59), off with its reason as the tooltip. Settings ›
   Tasks: `App/UI/Settings/TaskSettingsPane.swift` (a "<project>에만 / 모든 프로젝트 (기본값)" switch, "기본값 쓰기"). The
   quiet tour `SHOTS_LAYOUT=settings` also writes `start-screen-*` and `start-task-sheet-*`.
-- **Windows (follow-up).** The engine side is shared; the client needs: `task_fetch` on the renderer's allow list
-  (`src/main/ipcGuard.ts`), the same model as Core `TaskStart.swift` (reference parsing, `TaskBranch`, `TaskPrompt`,
-  `StartScreen` / `StartScreenCursor`, settings per project with a default) with its tests, a start screen over the chat
-  area after `open_project` (skipped for restored windows and the workbench windows it opens; Esc = 바로 시작), the task
-  dialog, Settings › Tasks in `settingsIndex.ts`, and `task_started {draft: true}` into the composer — or, for a terminal
-  chat, its prompt as a bracketed paste. The shortcut rows of "시작 화면" are listed there as Mac only until then.
+- **Windows.** The same rules as Core `TaskStart.swift` in `src/renderer/taskStart.ts` (reference, branch, prompt,
+  `shouldShowStartScreen`, the recent chats, the keys; tests `taskStart.test.ts`) and the settings in
+  `src/shared/taskStartSettings.ts` — `skipStartScreen`, `taskStartSettings` (the default) and `projectTaskStartSettings`
+  keyed by the hash of the repository's main worktree (`flowRepoRoot`), read field by field; main's `settingsGuard` stores
+  only well-formed entries. `task_fetch` is on the renderer's allow list (`src/main/ipcGuard.ts`). The start screen
+  (`components/start/StartScreen.tsx`) covers the diff and chat area (`.panes`; the sidebar, menus and bottom panel stay
+  usable) and is decided once per project the window opens (`startScreen.ts` `stepStartScreen`: a reconnect never brings it
+  back, a switch decides again; a git-init prompt comes first; a turn that starts or files that arrive put it away). Main
+  opens a window with `--rg-no-start-screen` (`window.rgNoStartScreen`) for the launch restore, `REVIEWGATE_PROJECT`, the
+  e2e runs, a moved chat's worktree and a workbench it just created (`openWorkbenchWindow(…, created: true)` — one opened
+  from the sidebar shows the screen); that skips only the window's first project. Three cards with 1 / 2 / 3 badges (Tab
+  moves the mark with the focus), the recent chats (kind, title, "지금 열려 있어요", relative time, the last message as the
+  tooltip), "다음부터 바로 시작". The task dialog (`components/start/TaskStartDialog.tsx`, the store's `taskStart`
+  dialog): the id / link field (a GitHub issue read 0.5 s after typing stops, at once for a link; the title, or why it could
+  not be read), the branch (editable, `branchNameHint`), "이 창에서 새 브랜치 / 새 워크벤치에서", the first prompt
+  (editable), "업무 설정…", Start ("브랜치 만들고 시작" / "워크벤치 만들기" / "이 폴더에서 시작"), off with its reason as
+  the tooltip; Esc / Cancel goes back to the start screen. `taskStartFlow.ts` starts it (`create_branch`, a fresh chat when
+  the current one holds a conversation, the prompt) or the dialog calls `createWorkbenchWith({task: {text, draft: true}})`
+  (Run as Task's remembered prefix is left alone); `task_started {draft: true}` and a task started here go through
+  `deliverFirstPrompt`: the composer, or — a terminal chat — one bracketed paste into its prompt, retried every 0.3 s for
+  up to 30 s, then the composer with the reason.

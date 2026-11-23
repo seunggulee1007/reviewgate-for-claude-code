@@ -40,6 +40,7 @@ import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChat
 import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/TerminalSplit"; // §57.5
 import { PanelStatusBar, ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.17, §57.18
 import { useViewing } from "./viewedChat"; // §57.5
+import { StartScreen, useStartScreenWatch } from "./components/start/StartScreen"; // MARK: task-start (§63.4)
 
 declare global {
   interface Window {
@@ -68,6 +69,7 @@ export function App() {
   useTerminalChatPty(); // §57.17: the live terminal chat's PTY and its waits
   useTerminalReviewReopen(); // §57.5: a terminal chat's review panel opens again with each review
   useShellPanelHost(); // §57.17: Ctrl+` and the shell tabs' exits
+  useStartScreenWatch(); // MARK: task-start — §63.4: whether a project the window opens shows the start screen
   useNotificationNotices(); // MARK: wave4b w4-notify — §39.6: a clicked notification lands on its card; the OS refusing one
   // polish-03: ⌘⇧R / Ctrl+Shift+R is always the reject shortcut — never the browser's force reload.
   useRejectShortcut(() => {
@@ -194,6 +196,8 @@ export function App() {
             ) : (
               <ErrorBoundary name="Start" className="pane diff"><NoProject /></ErrorBoundary>
             )}
+            {/* MARK: task-start — §63.4: over the diff and chat area (the sidebar, menus and bottom panel stay usable) */}
+            {tab !== "prs" && hasProject && <ErrorBoundary name="Start screen"><StartScreen /></ErrorBoundary>}
           </div>
           {/* §62: Find References / Find in Project results under the panes */}
           {hasProject && <ErrorBoundary name="References"><NavRefsPanel /></ErrorBoundary>}

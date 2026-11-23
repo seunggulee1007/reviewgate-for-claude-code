@@ -306,6 +306,8 @@ export type Dialog =
   | { kind: "newBranch" }
   /** §9 "New Chat in a Workbench": one field (the branch) and [만들기] — components/dialogs/WorkbenchChatDialog.tsx. */
   | { kind: "workbenchChat" }
+  /** MARK: task-start — §63.3 "Start from a task" (업무로 시작), from the start screen: components/start/TaskStartDialog.tsx. */
+  | { kind: "taskStart" }
   | { kind: "createPR" }
   /** §55.11: `highlight` — a setting's id (settingsIndex.ts): its tab opens at its row, tinted for a moment. */
   | { kind: "settings"; tab?: import("./settingsIndex").SettingsTab; highlight?: string }
@@ -1343,8 +1345,11 @@ export const useStore = create<Store>((set, get, api) => {
         // `user_message` follows), or (`sent: false`) the session could not take it: it goes into the composer, once.
         // The engine keeps the worktree's mode itself (this client has no per-project mode memory).
         case "task_started":
-          appendLog(`[info] task from ${ev.from}: ${ev.sent ? "sent in a fresh chat" : "waiting in the composer"} (${ev.mode})`);
-          if (!ev.sent && ev.text) insertIntoComposer(ev.text);
+          appendLog(`[info] task from ${ev.from}: ${ev.sent ? "sent in a fresh chat" : ev.draft ? "a draft for this chat" : "waiting in the composer"} (${ev.mode})`);
+          // MARK: task-start — §63.2: a task's first prompt (`draft`) goes where this window's chat takes text — the composer,
+          // or a terminal chat's prompt as a paste (taskStartFlow.ts); never sent.
+          if (ev.draft && ev.text) void import("./taskStartFlow").then((m) => m.deliverFirstPrompt(ev.text));
+          else if (!ev.sent && ev.text) insertIntoComposer(ev.text);
           break;
         case "transcript_restore": {
           if (get().replaceTranscript) {

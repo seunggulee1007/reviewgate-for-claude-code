@@ -18,6 +18,8 @@ import {
   taskFetchRefusal,
   taskHint,
   taskSlug,
+  taskDraft,
+  taskStartBlocker,
   MAX_TASK_SLUG,
   type FetchedTask,
 } from "./taskStart";
@@ -111,6 +113,39 @@ describe("the first prompt (§63.3)", () => {
     expect(taskFetchRefusal("gh_missing", "")).toContain("GitHub CLI (gh)");
     expect(taskFetchRefusal("bad_task_ref", "")).toContain("owner/repo#123");
     expect(taskFetchRefusal("unknown_command", "")).toBeNull();
+  });
+});
+
+describe("the task dialog (§63.3)", () => {
+  beforeAll(() => initI18n("en", "win32"));
+  const ref = (text: string) => parseTaskReference(text)!;
+
+  it("fills the branch and the prompt from the issue read, else from the id and link", () => {
+    const github = { ...DEFAULT_TASK_START, platform: "github" as const };
+    const read = taskDraft(github, ref("#42"), task({ id: "42", title: "Crash on save", body: "Steps", url: "https://github.com/acme/widgets/issues/42", labels: ["bug"] }));
+    expect(read.branch).toBe("feature/42-crash-on-save");
+    expect(read.prompt).toContain("Work on task 42: Crash on save");
+    expect(read.prompt).not.toContain("gh issue view");
+    // The issue could not be read: its id, and Claude reads it with gh.
+    const unread = taskDraft(github, ref("https://github.com/acme/widgets/issues/42"), null);
+    expect(unread.branch).toBe("feature/42");
+    expect(unread.prompt).toContain("gh issue view https://github.com/acme/widgets/issues/42");
+    // A tracker Claude reads through MCP: the id only (its title is not known), the hint with the server's tools.
+    const jira = taskDraft({ ...DEFAULT_TASK_START, platform: "jira", mcpServer: "acme-tracker", branchPrefix: "{type}/" }, ref("https://tracker.example.com/browse/ACME-12"), null);
+    expect(jira.branch).toBe("feature/ACME-12");
+    expect(jira.prompt).toContain("mcp__acme-tracker__*");
+    // The project's own template.
+    expect(taskDraft({ ...DEFAULT_TASK_START, promptTemplate: "Do {id}." }, ref("ACME-3"), null).prompt).toBe("Do ACME-3.");
+  });
+
+  it("Start says why it is off, in order", () => {
+    const base = { ref: ref("ACME-1"), fetching: false, prompt: "Work", branchHint: null, createBlocker: null };
+    expect(taskStartBlocker(base)).toBeNull();
+    expect(taskStartBlocker({ ...base, ref: null })).toBe("Enter a task id or link");
+    expect(taskStartBlocker({ ...base, fetching: true })).toBe("Reading the issue…");
+    expect(taskStartBlocker({ ...base, prompt: "  " })).toBe("The first prompt is empty");
+    expect(taskStartBlocker({ ...base, branchHint: "A branch with this name already exists", createBlocker: "x" })).toBe("A branch with this name already exists");
+    expect(taskStartBlocker({ ...base, createBlocker: "Finish the merge first" })).toBe("Finish the merge first");
   });
 });
 

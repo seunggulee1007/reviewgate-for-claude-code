@@ -7,7 +7,7 @@
 import type { GatePhase, SessionMeta } from "@reviewgate/engine";
 import { t } from "./i18n";
 import { cleanTaskPrefix } from "./runAsTask";
-import { readsThroughMcp, type TaskPlatform } from "../shared/taskStartSettings";
+import { readsThroughMcp, type TaskPlatform, type TaskStartSettings } from "../shared/taskStartSettings";
 
 // ---------------------------------------------------------------- the task the user names
 
@@ -204,6 +204,27 @@ export function taskPlatformLine(platform: TaskPlatform, mcpServer: string, titl
     default:
       return mcpServer.trim() ? t("{0} — Claude reads it with the {1} MCP server", t(title), mcpServer.trim()) : t("{0} — choose its MCP server in Settings › Tasks", t(title));
   }
+}
+
+// ---------------------------------------------------------------- the task dialog
+
+/** What the dialog fills in for `ref` (the issue read, else its id and link): the branch and the first prompt — until the user edits them. */
+export function taskDraft(settings: TaskStartSettings, ref: TaskReference, fetched: FetchedTask | null): { task: FetchedTask; branch: string; prompt: string } {
+  const task = fetched ?? taskOf(ref);
+  const hint = taskHint(settings.platform, settings.mcpServer, task, fetchesFromGitHub(ref, settings.platform));
+  return {
+    task,
+    branch: taskBranchName(settings.branchPrefix, task.id, task.title, task.labels),
+    prompt: renderTaskPrompt(settings.promptTemplate ?? defaultTaskTemplate(), task, hint),
+  };
+}
+
+/** Why Start is off (null: it can start) — in the Mac's order. */
+export function taskStartBlocker(o: { ref: TaskReference | null; fetching: boolean; prompt: string; branchHint: string | null; createBlocker: string | null }): string | null {
+  if (!o.ref) return t("Enter a task id or link");
+  if (o.fetching) return t("Reading the issue…");
+  if (!o.prompt.trim()) return t("The first prompt is empty");
+  return o.branchHint ?? o.createBlocker;
 }
 
 // ---------------------------------------------------------------- the start screen
