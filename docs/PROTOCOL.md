@@ -10340,3 +10340,51 @@ it as before, but **never sends it**: its fresh chat is of the client's default 
 the user sends the prompt), and `task_started {…, sent: false, draft: true}` hands the text to the client, which puts it
 where that chat takes text: the message box, or — in a terminal chat — the TUI's prompt as one bracketed paste, never
 Enter (§57.7). A handoff without `draft` behaves exactly as §49 says.
+
+### 63.3 Client rules: the task, its branch and its first prompt
+
+Everything but the GitHub read is the client's (Mac: Core `TaskStart.swift`; tests `TaskStartTests`).
+
+- **The reference** (`TaskReference.parse`): what the user typed or pasted, trimmed; in a sentence, its first link. An
+  `/issues/<n>` link → id `n` (a GitHub host — `github.com` or a host with `github` in it — is read with `task_fetch`); any
+  other link → a tracker key in it (`ACME-123`), else its last numeric path part, else its last path part; `#42` / `42` →
+  `42`; `owner/repo#42` → `42`; a key `ACME-123`; else the token's ASCII-safe part (`[A-Za-z0-9._-]`, ≤ 40). Nothing
+  ASCII (a Korean word) is no reference. The engine reads it (`task_fetch`) for a GitHub link always, and for a number or
+  `owner/repo#n` when the project's platform is GitHub Issues.
+- **The branch** (`TaskBranch.name`): `<prefix><id>-<slug>`. `{type}` in the prefix becomes `fix` (a label with bug / fix /
+  defect), `docs` (doc), `chore` (chore / maintenance), else `feature`; the prefix is then cleaned as §49's
+  (`TaskBranchName.cleanPrefix`). The slug is the title's ASCII words, lower-cased with accents folded, joined by `-`, cut
+  at a word to at most 50 characters, a leading copy of the id left out. A title with no ASCII word (Korean) or no title
+  (a task Claude reads through MCP) gives `<prefix><id>`. The field is editable before Start; the engine has the last word
+  (`invalid_branch_name`, `branch_in_use`).
+- **The first prompt** (`TaskPrompt.render`): the template (Settings › Tasks, or the built-in one) with `{id} {title}
+  {url} {body}` and `{mcp}`. A line whose placeholders are all empty is left out; one where some are empty loses trailing
+  `:`/`—`/`-`; three or more newlines become two. `{mcp}` is the hint: for Jira / Linear / Other "Read this task with the
+  `<server>` MCP server (its `mcp__<server>__*` tools) and summarize it before you start." (server characters outside
+  `[A-Za-z0-9_-]` become `_` in the tool name; no server chosen: "Read the task first … and summarize it."), for a
+  GitHub issue the app could not read "Read the issue first (gh issue view <link>) …", else nothing. A template without
+  `{mcp}` gets the hint as its first paragraph. The prompt is put into the message box — or a terminal chat's prompt as a
+  bracketed paste, retried for up to 30 s while its Claude Code starts — and **never sent by the app**.
+- **Where.** "이 창에서 새 브랜치": `create_branch {name}` from HEAD (§61: uncommitted changes come along), then a fresh
+  chat when the window's chat already holds a conversation (Settings' kind), then the prompt. "새 워크벤치에서":
+  `workbench_create {branch, task: {text: prompt, draft: true}}` (63.2), its window opened as after Run as Task, with no
+  start screen. In a folder tracked without git (§59) there is only "이 폴더에서 시작": no branch, the prompt here.
+- **Settings › Tasks** (per repository — its main worktree — with a default every project without its own uses):
+  platform (None / GitHub Issues / Jira / Linear / Other via MCP), branch prefix (`feature/` at first), where it starts
+  (branch / workbench), the MCP server (the project's servers by name, or one typed), the first-prompt template with
+  Reset. Stored as JSON `TaskStartSettings` under `taskStartSettings` (the default) and `projectTaskStartSettings`
+  (`{projectKey: settings}`); read leniently field by field.
+
+### 63.4 The start screen
+
+- **When.** A project opens in a window — Open Project, File › New Window, Open Recent, a switch — and nothing is in
+  progress there: the gate is idle, no file waits for review, no task text waits for the composer. Not for the windows a
+  launch restores, not for a workbench window the app opens itself (New Workbench, Run as Task, 63.3), and not when
+  "다음부터 바로 시작" is on (`skipStartScreen`; Settings › Tasks › Start screen turns it back). It covers the chat area, never
+  the sidebar or the menus; a turn that starts meanwhile (a peer message, §29) puts it away.
+- **Choices.** 1 **바로 시작** — the window's chat when it is still empty, else a fresh one (`newChatKind`); 2 **업무로 시작**
+  — the task sheet (63.3; Cancel comes back here); 3 **대화로 열기** — marks the first of the recent chats: the five newest
+  with a conversation, not archived, moved (§39.4) or carried on in a terminal chat (§57.9), each with its title, when it
+  was last used and its kind (chat / terminal); ↩ or a click opens it (`session_open`). ↑ / ↓ move through the choices and
+  the chats, ↩ takes the marked one, **Esc is 바로 시작** — the screen never blocks. 대화로 열기 is off (its reason as the
+  tooltip) when the project has no earlier chat.

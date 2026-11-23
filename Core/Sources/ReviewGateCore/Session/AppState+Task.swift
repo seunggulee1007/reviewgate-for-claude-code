@@ -11,15 +11,18 @@ public struct TaskStartedInfo: Decodable, Sendable, Equatable {
     public var mode: PermissionMode
     public var from: String
     public var sent: Bool
+    /// MARK: task-start — §63: a draft (`WorkbenchTask.draft`) — never sent; it waits in the composer or the terminal's prompt.
+    public var draft: Bool
 
-    public init(text: String, mode: PermissionMode, from: String, sent: Bool) {
+    public init(text: String, mode: PermissionMode, from: String, sent: Bool, draft: Bool = false) {
         self.text = text
         self.mode = mode
         self.from = from
         self.sent = sent
+        self.draft = draft
     }
 
-    private enum CodingKeys: String, CodingKey { case text, mode, from, sent }
+    private enum CodingKeys: String, CodingKey { case text, mode, from, sent, draft }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -27,6 +30,7 @@ public struct TaskStartedInfo: Decodable, Sendable, Equatable {
         mode = (try? c.decode(PermissionMode.self, forKey: .mode)) ?? .default
         from = try c.decodeIfPresent(String.self, forKey: .from) ?? ""
         sent = try c.decodeIfPresent(Bool.self, forKey: .sent) ?? false
+        draft = (try? c.decodeIfPresent(Bool.self, forKey: .draft)) ?? false
     }
 }
 
@@ -55,7 +59,9 @@ extension AppState {
     func applyTaskStarted(_ info: TaskStartedInfo) {
         rememberPermissionMode(info.mode)
         appendLog("[info] task from \(info.from): \(info.sent ? "sent in a fresh chat" : "waiting in the composer") (\(info.mode.rawValue))")
-        if !info.sent, !info.text.isEmpty { taskForComposer = TaskComposerText(text: info.text) }
+        guard !info.sent, !info.text.isEmpty else { return }
+        // MARK: task-start — §63: a draft goes where the fresh chat takes text (the terminal's prompt in a terminal chat).
+        if info.draft { deliverFirstPrompt(info.text) } else { taskForComposer = TaskComposerText(text: info.text) }
     }
 
     #if DEBUG
