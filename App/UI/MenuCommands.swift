@@ -14,6 +14,7 @@ struct ViewMenuCommands: Commands {
     @AppStorage(DiffPrefsKeys.ignoreWhitespace) private var ignoreWhitespace = false
     @AppStorage(DiffPrefsKeys.wrapLines) private var wrapLines = true
     @AppStorage(DiffPrefsKeys.diffLayout) private var diffLayout = DiffLayoutMode.unified
+    @AppStorage(AppSettings.Key.terminalReviewHidesSidebar) private var reviewHidesSidebar = true   // §57.5
 
     var body: some Commands {
         // M15: View → Refresh (⌘R) — the review re-diff, branches, workbenches, PRs; on the PR tab only the PR lists.
@@ -32,6 +33,10 @@ struct ViewMenuCommands: Commands {
                 .keyboardShortcut("d", modifiers: [.command, .shift])
                 .disabled(!menu.hasProject || onPRs)
                 .accessibilityIdentifier("View menu Toggle diff pane")
+            // §57.5: a terminal chat's review panel moves the file list away where it would otherwise be a drawer.
+            Toggle("Hide Sidebar While Reviewing", isOn: $reviewHidesSidebar)
+                .help("In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal")
+                .accessibilityIdentifier("View menu Hide sidebar while reviewing")
             Button("Toggle Agent Panel") { focused?.model.toggleAgentPanelTick += 1 }
                 .keyboardShortcut("a", modifiers: [.command, .option])
                 .disabled(!menu.hasProject)

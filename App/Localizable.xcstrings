@@ -4801,6 +4801,22 @@
         }
       }
     },
+    "between the file list and the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "between the file list and the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일 목록과 터미널 사이에 열려요"
+          }
+        }
+      }
+    },
     "Branches from %@ and checks it out — your uncommitted changes come along.": {
       "localizations": {
         "en": {
@@ -5245,6 +5261,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "닫기 (esc · ↩ · space) — /btw만 입력하면 다시 보여요"
+          }
+        }
+      }
+    },
+    "Close review panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close review panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 닫기"
+          }
+        }
+      }
+    },
+    "Close review panel · %lld pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close review panel · %lld pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 닫기 · 대기 %lld개"
           }
         }
       }
@@ -11271,6 +11319,22 @@
         }
       }
     },
+    "Don't show this again — the shield stays, with this note in its tooltip": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't show this again — the shield stays, with this note in its tooltip"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 보지 않기 — 방패 아이콘은 남고, 이 안내는 툴팁에 있어요"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "en": {
@@ -11927,6 +11991,86 @@
         }
       }
     },
+    "Hide diff pane · %lld pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide diff pane · %lld pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diff 패널 숨기기 · 대기 %lld개"
+          }
+        }
+      }
+    },
+    "Hide Sidebar While Reviewing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Sidebar While Reviewing"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰하는 동안 사이드바 숨기기"
+          }
+        }
+      }
+    },
+    "Hide this hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide this hint"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 안내 숨기기"
+          }
+        }
+      }
+    },
+    "In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서 리뷰 패널이 열려 있는 동안 파일 목록을 숨겨요 — 그러지 않으면 패널이 터미널을 가려요"
+          }
+        }
+      }
+    },
+    "It opens over the terminal, next to the file list (⌘⇧D)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It opens over the terminal, next to the file list (⌘⇧D)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 위, 파일 목록 옆에 열려요 (⌘⇧D)"
+          }
+        }
+      }
+    },
     "Leave a comment": {
       "localizations": {
         "en": {
@@ -12003,6 +12147,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Markdown · ⌘↩로 댓글 남기기"
+          }
+        }
+      }
+    },
+    "More: Diff range, Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Diff range, Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: diff 범위, 메모 추가 (⌥⌘N), 공백 무시, 줄바꿈, 나란히 보기 (⌥⌘L), diff에서 찾기 (⌥⌘F), 전체 파일, 에디터에서 열기 (⇧⌘E)"
           }
         }
       }
@@ -12215,6 +12375,38 @@
         }
       }
     },
+    "Open review panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open review panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 열기"
+          }
+        }
+      }
+    },
+    "Open review panel · %lld pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open review panel · %lld pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 패널 열기 · 대기 %lld개"
+          }
+        }
+      }
+    },
     "Opens a terminal chat, where every / command works": {
       "localizations": {
         "en": {
@@ -12259,6 +12451,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "오래된 댓글"
+          }
+        }
+      }
+    },
+    "over the terminal, next to the file list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "over the terminal, next to the file list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 위, 파일 목록 옆에 열려요"
           }
         }
       }
@@ -12467,6 +12675,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "보기"
+          }
+        }
+      }
+    },
+    "Show diff pane · %lld pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show diff pane · %lld pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diff 패널 표시 · 대기 %lld개"
           }
         }
       }
@@ -12707,6 +12931,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 패널은 터미널 왼쪽, 파일 목록 옆에 열려요 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "the terminal takes the width": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the terminal takes the width"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널이 너비를 모두 써요"
           }
         }
       }
@@ -33633,6 +33873,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "…더 있음(처음 %lld개만 표시)"
+          }
+        }
+      }
+    },
+    "↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ / ↓로 변경을 오가고, ⌘↩로 파일을 수락하고, Esc나 ⌘⇧D로 닫아요"
           }
         }
       }

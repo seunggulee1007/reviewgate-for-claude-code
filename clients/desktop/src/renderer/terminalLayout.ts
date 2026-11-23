@@ -66,6 +66,16 @@ export function reviewDrawerWidth(total: number, reviewFloor = REVIEW_FLOOR, sha
   return Math.max(Math.min(want, total - terminalStrip), Math.min(reviewFloor, Math.max(total, 0)));
 }
 
+/**
+ * §57.5: whether a terminal chat's open review panel moves the file list (`sidebar` px with its divider) out of the way —
+ * exactly when beside it the panel would be a drawer. `area`: the terminal + panel area now (`sidebarHidden`: it holds
+ * the sidebar's width too). Without the file list the panel sits beside the terminal where that area holds both, else the
+ * drawer is 45 % of the wider area; the file list comes back once the panel fits beside the terminal with it.
+ */
+export function reviewHidesSidebar(area: number, sidebar: number, sidebarHidden: boolean, minTerminal: number, reviewFloor = REVIEW_FLOOR): boolean {
+  return terminalReviewLayout(sidebarHidden ? area - sidebar : area, minTerminal, reviewFloor) === "drawer";
+}
+
 /** The width of "W" in the terminal's font — canvas `measureText`, as xterm measures its cells. `fallback` without a canvas. */
 export function measureCellWidth(font: string, fallback = 7.8): number {
   if (typeof document === "undefined") return fallback;

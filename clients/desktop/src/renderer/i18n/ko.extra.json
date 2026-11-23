@@ -142,6 +142,7 @@
   "Also auto-allow this tool with the same command prefix for the rest of the session": "이 세션이 끝날 때까지 같은 명령 접두어의 이 도구를 자동으로 허용해요",
   "code": "코드",
   "Changes ({0})": "변경사항 ({0})",
+  "Don't show this again — the icon stays, with this note in its tooltip": "다시 보지 않기 — 아이콘은 남고, 이 안내는 툴팁에 있어요",
   "Commands that only read (ls, cat, grep, git status/log/diff, …) run without asking. Takes effect on the next Open Project.": "읽기만 하는 명령(ls, cat, grep, git status/log/diff 등)은 묻지 않고 실행해요. 다음 프로젝트 열기부터 적용돼요.",
   "One per line, Claude-style: Bash(npm test:*), Bash(git *). Matching commands never ask. Takes effect on the next Open Project.": "한 줄에 하나, Claude 형식: Bash(npm test:*), Bash(git *). 일치하는 명령은 묻지 않아요. 다음 프로젝트 열기부터 적용돼요.",
   "Theme": "테마",

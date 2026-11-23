@@ -2,6 +2,29 @@ import SwiftUI
 import AppKit
 import ReviewGateCore
 
+/// §57.5: what moves the file list for a terminal chat's review panel — the panel opening or closing (`onFit(true)` on a
+/// close or a new chat kind / switch: the user's "keep it" ends), the area's width, the tab — and the sidebar shown again.
+private struct ReviewRoomObservers: ViewModifier {
+    let collapsed: Bool
+    let area: CGFloat
+    let terminal: Bool
+    let option: Bool
+    let tab: MainTab
+    let visibility: NavigationSplitViewVisibility
+    let onFit: (_ reset: Bool) -> Void
+    let onVisibility: (NavigationSplitViewVisibility) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: collapsed) { _, collapsed in onFit(collapsed) }
+            .onChange(of: area) { _, _ in onFit(false) }
+            .onChange(of: terminal) { _, _ in onFit(true) }
+            .onChange(of: option) { _, _ in onFit(true) }
+            .onChange(of: tab) { _, _ in onFit(false) }
+            .onChange(of: visibility) { _, visibility in onVisibility(visibility) }
+    }
+}
+
 /// Sidebar mode: the session's changed files + chat, past review rounds (§14), or the PR browser.
 enum MainTab: String, CaseIterable, Identifiable {
     case changes, history, prs
@@ -64,6 +87,17 @@ struct MainWindow: View {
     @State private var windowWidth: CGFloat = 0
     /// The sidebar was hidden to make room for the agent panel (restored when the panel closes or the window widens).
     @State private var sidebarHiddenForPanel = false
+    /// §57.5: a terminal chat's review panel moves the file list away while beside it the panel would be a drawer
+    /// (`PaneSplit.reviewHidesSidebar`; the View menu's and the edge tab's "Hide Sidebar While Reviewing" switch).
+    @AppStorage(AppSettings.Key.terminalReviewHidesSidebar) private var reviewHidesSidebar = true
+    /// The file list's width with its divider, kept while it is hidden (the terminal tour's 1000 pt window: 301 pt).
+    @State private var sidebarWidth: CGFloat = 301
+    /// The sidebar is out of the way for the review panel (it comes back when the panel closes or fits beside it).
+    @State private var sidebarHiddenForReview = false
+    /// The user brought the sidebar back while the panel was open: it stays until the panel closes.
+    @State private var sidebarKeptForReview = false
+    /// §57.5: the drawer holds the keyboard (the user opened it): ↑ / ↓ go through the changes, ⌘↩ accepts, Esc closes.
+    @FocusState private var drawerFocused: Bool
     /// §16: the applied-extensions sheet (from the fallback banner).
     @State private var showExtensions = false
     // MARK: wave4 w4-install
@@ -152,6 +186,8 @@ struct MainWindow: View {
                     if store.projectURL == nil { noProjectSidebar } else { ProjectSearchSidebar() }
                 }
             }
+            // The column width must stay the outermost modifier: wrapped, NavigationSplitView ignored it (a ~190 pt sidebar).
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 > 0 { sidebarWidth = $0 + 1 } }
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             switch tab {
@@ -327,6 +363,21 @@ struct MainWindow: View {
             windowWidth = width
             fitAgentPanel()
         }
+        // §57.5: the file list steps aside for a terminal chat's review panel where it would otherwise be a drawer.
+        .modifier(ReviewRoomObservers(collapsed: diffCollapsed, area: terminalAreaWidth, terminal: store.shownChatIsTerminal,
+                                      option: reviewHidesSidebar, tab: tab, visibility: columnVisibility,
+                                      onFit: { reset in
+                                          if reset { sidebarKeptForReview = false }
+                                          fitReviewSidebar()
+                                      },
+                                      onVisibility: { visibility in
+                                          // The toolbar's sidebar button while the panel had it hidden: the user wants it —
+                                          // left alone until the panel closes.
+                                          if visibility != .detailOnly, sidebarHiddenForReview {
+                                              sidebarHiddenForReview = false
+                                              sidebarKeptForReview = true
+                                          }
+                                      }))
         .modifier(InspectorObservers(showAgentPanel: $showAgentPanel, showSidePanel: $showSidePanel, tab: $tab,
                                      onFit: fitAgentPanel, onAskSelection: askAboutSelection))
         .modifier(CodeBrowserObservers(tab: $tab) { setDiffCollapsed(false, remember: false) })   // MARK: code-browser (§47)
@@ -357,7 +408,33 @@ struct MainWindow: View {
             withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .detailOnly }
         } else if !tight, sidebarHiddenForPanel {
             sidebarHiddenForPanel = false
+            guard !sidebarHiddenForReview else { return }   // the review panel still wants the room
             withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .all }
+        }
+    }
+
+    // MARK: Review panel room (§57.5)
+
+    /// A terminal chat's open review panel hides the file list exactly when beside it the panel would be a drawer: where
+    /// the area then holds 80 columns and the panel it sits beside the terminal (a 1280 pt window), else the drawer is 45 %
+    /// of the wider area (1000 pt: 440 pt instead of 360). One switch, no animation — each frame of one resized the terminal
+    /// (a SIGWINCH and a redraw of the TUI each). The sidebar comes back when the panel closes, the chat is not a terminal
+    /// chat or the window is wide enough for both.
+    private func fitReviewSidebar() {
+        guard terminalAreaWidth > 0 else { return }
+        let hidden = columnVisibility == .detailOnly
+        let wants = reviewHidesSidebar && store.shownChatIsTerminal && tab.showsReview && !diffCollapsed && !sidebarKeptForReview
+            && PaneSplit.reviewHidesSidebar(area: Double(terminalAreaWidth), sidebar: Double(sidebarWidth), sidebarHidden: hidden,
+                                            minTerminal: Double(TerminalHost.width(columns: Self.terminalColumns)),
+                                            reviewFloor: Self.reviewFloorWidth)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        if wants, !sidebarHiddenForReview, !hidden {
+            sidebarHiddenForReview = true
+            withTransaction(quiet) { columnVisibility = .detailOnly }
+        } else if !wants, sidebarHiddenForReview {
+            sidebarHiddenForReview = false
+            if !sidebarHiddenForPanel { withTransaction(quiet) { columnVisibility = .all } }
         }
     }
 
@@ -470,7 +547,11 @@ struct MainWindow: View {
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { terminalAreaWidth = $0 }
         }
-        .onChange(of: terminalLayout, initial: true) { _, layout in model.terminalReviewLayout = layout }
+        .onChange(of: terminalLayout, initial: true) { _, layout in
+            model.terminalReviewLayout = layout
+            // The window widened under a drawer that held the keyboard: the drawer is gone, the terminal has it again.
+            if layout == .sideBySide, drawerFocused { model.terminals.focus(chatId: store.currentSessionId) }
+        }
         .onChange(of: diffCollapsed, initial: true) { _, collapsed in model.reviewPanelOpen = !collapsed }
     }
 
@@ -481,8 +562,9 @@ struct MainWindow: View {
     }
 
     /// §57.5: the review panel over the terminal in a narrow window — on its left, next to the file list, from under the
-    /// chat tabs to the bottom, a shadow on its edge, a strip of the terminal left visible. It takes no keyboard by itself (the terminal keeps it); a click in it does, and then
-    /// Esc closes it (Esc in the terminal stays the TUI's).
+    /// chat tabs to the bottom, a shadow on its edge, a strip of the terminal left visible. Opened by the user (the edge tab,
+    /// ⌘⇧D) it takes the keyboard — ↑ / ↓ the next / previous change, ⌘↩ accept, Esc closes it and the terminal has the
+    /// keyboard again; opened by itself for a new review it leaves the keyboard in the terminal (Esc there stays the TUI's).
     private var reviewDrawer: some View {
         reviewPane
             .frame(width: CGFloat(PaneSplit.reviewDrawerWidth(total: Double(terminalAreaWidth), reviewFloor: Self.reviewFloorWidth)))
@@ -491,10 +573,21 @@ struct MainWindow: View {
             .overlay(alignment: .trailing) { Divider() }
             .compositingGroup()
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.55 : 0.22), radius: 14, x: 4)
+            .focusable()
+            .focusEffectDisabled()
+            .focused($drawerFocused)
+            .onKeyPress(.downArrow) { model.nextChangeTick += 1; return .handled }
+            .onKeyPress(.upArrow) { model.previousChangeTick += 1; return .handled }
+            .onKeyPress(.return, phases: .down) { press in
+                // ⌘↩: accept the file on screen (as ⌘⇧A) and go on to the next pending one.
+                guard press.modifiers == .command, let file = store.selectedFile, file.state == .pending, !store.isAcceptLocked else { return .ignored }
+                ReviewUndo.accept(file, store: store)
+                return .handled
+            }
             .onExitCommand { setDiffCollapsed(true) }
             .accessibilityElement(children: .contain)
             .accessibilityLabel(Text("Review panel over the terminal"))
-            .accessibilityHint(Text("Esc or ⌘⇧D closes it; the terminal behind it keeps its width"))
+            .accessibilityHint(Text("↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it"))
             .accessibilityIdentifier("Review drawer")
             #if DEBUG
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugReviewFrame = $0 }
@@ -509,25 +602,39 @@ struct MainWindow: View {
     // MARK: Diff pane collapse (M16)
 
     /// The thin edge tab left of the diff pane, next to the file list; click (or ⌘⇧D) collapses or expands it. §57.5: a
-    /// terminal chat's review panel opens there too, left of the terminal.
+    /// terminal chat's review panel opens there too, left of the terminal — the tab reads "Review" and its badge is the
+    /// number of files waiting for a verdict (the tooltip and VoiceOver say "리뷰 패널 열기 · 대기 N개").
     private var diffEdgeTab: some View {
         let terminal = store.shownChatIsTerminal
         let opens = diffCollapsed   // the chevron points where the pane goes
+        let pending = store.pendingFiles.count
         return Button {
             setDiffCollapsed(!diffCollapsed)
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: opens ? "chevron.right" : "chevron.left").font(.caption2.weight(.semibold))
-                Text("Diff")
+                let word = terminal ? String(localized: "Review") : String(localized: "Diff")
+                if word.count <= 3 {
+                    // A short word (Korean "리뷰") reads upright, one syllable under the other; turned it lay on its side.
+                    VStack(spacing: 0) {
+                        ForEach(Array(word.enumerated()), id: \.offset) { Text(verbatim: String($0.element)) }
+                    }
                     .font(.caption.weight(.medium))
-                    .fixedSize()
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 12, height: 36)
-                if !store.changedFiles.isEmpty {
-                    Text(verbatim: String(store.changedFiles.count))
+                    .accessibilityHidden(true)
+                } else {
+                    Text(verbatim: word)
+                        .font(.caption.weight(.medium))
+                        .fixedSize()
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 12, height: 40)
+                        .accessibilityHidden(true)
+                }
+                if pending > 0 {
+                    Text(verbatim: String(pending))
                         .font(.caption2.weight(.semibold).monospacedDigit())
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(Color.orange.wash(colorScheme, light: 0.20, dark: 0.28), in: Capsule())
+                        .accessibilityHidden(true)
                 }
                 Spacer(minLength: 0)
             }
@@ -539,15 +646,42 @@ struct MainWindow: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .background(Color(nsColor: .windowBackgroundColor))
-        .help(terminal ? (terminalLayout == .overlay
-                            ? (diffCollapsed ? Text("Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (⌘⇧D)")
-                                             : Text("Hide the review panel (⌘⇧D, or Esc in the panel)"))
-                            : (diffCollapsed ? Text("Show the review panel between the file list and the terminal (⌘⇧D)") : Text("Hide the review panel — the terminal takes the width (⌘⇧D)")))
-                       : (diffCollapsed ? Text("Show the diff pane (⌘⇧D)") : Text("Hide the diff pane (⌘⇧D)")))
-        .accessibilityLabel(terminal ? (diffCollapsed ? Text("Show review panel") : Text("Hide review panel"))
-                                     : (diffCollapsed ? Text("Show diff pane") : Text("Hide diff pane")))
-        .accessibilityHint(terminal ? Text("The review panel opens left of the terminal, next to the file list (⌘⇧D)") : Text(verbatim: ""))
+        .help(edgeTabHelp(terminal: terminal, pending: pending))
+        .accessibilityLabel(edgeTabLabel(terminal: terminal, pending: pending))
+        .accessibilityHint(terminal ? (terminalLayout == .overlay
+                                       ? Text("It opens over the terminal, next to the file list (⌘⇧D)")
+                                       : Text("The review panel opens left of the terminal, next to the file list (⌘⇧D)"))
+                                    : Text(verbatim: ""))
         .accessibilityIdentifier("Diff edge tab")
+        .contextMenu {
+            if terminal {
+                Toggle("Hide Sidebar While Reviewing", isOn: $reviewHidesSidebar)
+                    .help("In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal")
+            }
+        }
+    }
+
+    /// "리뷰 패널 열기 · 대기 N개" (a terminal chat) / "Show diff pane · N pending" — what the click does and what the badge counts.
+    private func edgeTabLabel(terminal: Bool, pending: Int) -> Text {
+        switch (terminal, diffCollapsed, pending > 0) {
+        case (true, true, true): Text("Open review panel · \(pending) pending")
+        case (true, true, false): Text("Open review panel")
+        case (true, false, true): Text("Close review panel · \(pending) pending")
+        case (true, false, false): Text("Close review panel")
+        case (false, true, true): Text("Show diff pane · \(pending) pending")
+        case (false, true, false): Text("Show diff pane")
+        case (false, false, true): Text("Hide diff pane · \(pending) pending")
+        case (false, false, false): Text("Hide diff pane")
+        }
+    }
+
+    /// The label, then where it opens (a terminal chat: over the terminal in a narrow window) and the key.
+    private func edgeTabHelp(terminal: Bool, pending: Int) -> Text {
+        let label = edgeTabLabel(terminal: terminal, pending: pending)
+        guard terminal else { return label + Text(verbatim: " (⌘⇧D)") }
+        let place = !diffCollapsed ? Text("the terminal takes the width")
+            : terminalLayout == .overlay ? Text("over the terminal, next to the file list") : Text("between the file list and the terminal")
+        return label + Text(verbatim: " — ") + place + Text(verbatim: " (⌘⇧D)")
     }
 
     /// `remember` (explicit toggles only — ⌘⇧D, the edge tab) persists the choice per project; automatic
@@ -555,13 +689,27 @@ struct MainWindow: View {
     private func setDiffCollapsed(_ collapsed: Bool, remember: Bool = true) {
         guard collapsed != diffCollapsed else { return }
         if store.shownChatIsTerminal {
+            // §57.5: the drawer the user opens takes the keyboard (not one that opens by itself for a review); closing the
+            // drawer that held it gives it back to the terminal.
+            let handBack = collapsed && drawerFocused
+            let focusDrawer = !collapsed && remember && openedLayout == .overlay
             // §57.5: no animation beside a terminal — each of its frames resized the terminal, and the TUI redrew at every
             // width on the way (nine SIGWINCHs for one open); now one resize, one redraw.
             diffCollapsed = collapsed
+            if focusDrawer { Task { @MainActor in drawerFocused = true } }   // once the drawer is in the window
+            if handBack { model.terminals.focus(chatId: store.currentSessionId) }
         } else {
             withAnimation(.easeInOut(duration: 0.15)) { diffCollapsed = collapsed }
         }
         if remember { updateUIState { $0.diffCollapsed = collapsed } }
+    }
+
+    /// §57.5: the layout the review panel opens in — side by side where moving the file list away makes room for it.
+    private var openedLayout: TerminalReviewLayout {
+        let minTerminal = Double(TerminalHost.width(columns: Self.terminalColumns))
+        guard reviewHidesSidebar, columnVisibility != .detailOnly, !sidebarKeptForReview, terminalAreaWidth > 0 else { return terminalLayout }
+        return PaneSplit.terminalReviewLayout(total: Double(terminalAreaWidth + sidebarWidth), minTerminal: minTerminal,
+                                              reviewFloor: Self.reviewFloorWidth)
     }
 
     // MARK: Per-project UI state (M15)

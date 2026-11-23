@@ -3016,12 +3016,17 @@ private final class Tour {
         let opened = await waitFor(seconds: 5) { model.reviewPanelOpen }
         try await Task.sleep(for: .milliseconds(1200))
         let overCols = host.view.terminalDimensions.cols
+        // §57.5: the file list steps aside for the drawer (Hide Sidebar While Reviewing, on by default): the terminal widens
+        // once, under the drawer, and the drawer is 45 % of the wider area.
+        let sidebarAway = Self.sidebarItem(window)?.isCollapsed == true
         log("terminal: layout review at 1000 × 637 — " + (opened && model.terminalReviewLayout == .overlay
-            ? "the review panel opened as a drawer over the terminal, chat view \(size(host))"
+            ? "the review panel opened as a drawer over the terminal (\(Int(model.debugReviewFrame.width)) pt), chat view \(size(host))"
             : "— LOST (open \(model.reviewPanelOpen), layout \(model.terminalReviewLayout), \(size(host)))")
-            + (overCols >= 80 && overCols == wide ? " — the terminal kept its \(overCols) columns" : " — CUT (\(overCols) columns, was \(wide))"))
+            + (overCols >= 80 && (sidebarAway ? overCols > wide : overCols == wide)
+               ? " — the terminal \(sidebarAway ? "widened to" : "kept its") \(overCols) columns" : " — CUT (\(overCols) columns, was \(wide))"))
+        log("terminal: layout review — the file list " + (sidebarAway ? "stepped aside for the drawer" : "— LOST (it stayed beside the drawer)"))
         let signals = Self.reports(host, "winsize").count - signalsBefore
-        log("terminal: layout review — SIGWINCH ×\(signals) for the drawer opening " + (signals == 0 ? "(no reflow)" : "— JUMP (the TUI redrew)"))
+        log("terminal: layout review — SIGWINCH ×\(signals) for the drawer opening " + (signals <= (sidebarAway ? 1 : 0) ? "(one resize at most: the file list leaving)" : "— JUMP (the TUI redrew on the way)"))
         log("terminal: layout review — the terminal " + (!focusedBefore ? "INFO had no keyboard before (\(String(describing: window.firstResponder)))"
                                                           : host.isFocused ? "kept the keyboard" : "— LOST (the keyboard went to \(String(describing: window.firstResponder)))"))
         let drawerAt = placement(host)
@@ -3036,12 +3041,20 @@ private final class Tour {
         let closed = await waitFor(seconds: 5) { !model.reviewPanelOpen }
         try await Task.sleep(for: .milliseconds(600))
         let closeSignals = Self.reports(host, "winsize").count - signalsOpen
-        log("terminal: layout drawer closed — " + (closed && host.view.terminalDimensions.cols == wide && closeSignals == 0
-            ? "chat view \(size(host)), no SIGWINCH" : "— LOST (open \(model.reviewPanelOpen), \(size(host)), SIGWINCH ×\(closeSignals))"))
+        let sidebarBack = Self.sidebarItem(window)?.isCollapsed == false
+        log("terminal: layout drawer closed — " + (closed && sidebarBack && host.view.terminalDimensions.cols == wide && closeSignals <= 1
+            ? "the file list back, chat view \(size(host)), SIGWINCH ×\(closeSignals)" : "— LOST (open \(model.reviewPanelOpen), file list \(sidebarBack), \(size(host)), SIGWINCH ×\(closeSignals))"))
         await ptyFollows(host, "drawer closed")
         try write(try render(window), "terminal-chat-panel-closed-dark")
+        // §57.5: opened by the user (⌘⇧D, the edge tab) the drawer takes the keyboard — ↑ / ↓ / ⌘↩ work at once.
+        host.focus()
         entry.model.toggleDiffTick += 1
         _ = await waitFor(seconds: 5) { model.reviewPanelOpen }
+        let tookKeys = await waitFor(seconds: 3) { !host.isFocused }
+        log("terminal: drawer keyboard — " + (tookKeys ? "the drawer the user opened took it (\(String(describing: window.firstResponder.map { type(of: $0) })))"
+                                                      : "INFO the terminal kept it (a quiet window may hold no focus)"))
+        try await Task.sleep(for: .milliseconds(600))
+        try write(try render(window), "terminal-chat-drawer-opened-dark")
         // A wide window: side by side, the terminal at 80 columns or more, the divider moving it within that.
         window.setFrame(NSRect(origin: window.frame.origin, size: NSSize(width: 1440, height: 900)), display: true)
         _ = await waitFor(seconds: 5) { model.terminalReviewLayout == .sideBySide }
@@ -3138,7 +3151,8 @@ private final class Tour {
             window.setFrame(NSRect(origin: window.frame.origin, size: frame), display: true)
             _ = await waitFor(seconds: 5) { host.view.terminalDimensions.cols != before.cols && host.view.terminalDimensions.rows != before.rows }
             try await Task.sleep(for: .milliseconds(600))
-            log("terminal: layout \(name) — chat view \(size(host)), shell view \(size(shell))")
+            log("terminal: layout \(name) — chat view \(size(host)), shell view \(size(shell)), review \(model.terminalReviewLayout), file list \(Self.sidebarItem(window)?.isCollapsed == true ? "hidden" : "shown")")
+            if frame.width == 1280 { try write(try render(window), "terminal-chat-1280-dark") }
             await ptyFollows(host, name)
             await sttyFollows(shell, name)
         }

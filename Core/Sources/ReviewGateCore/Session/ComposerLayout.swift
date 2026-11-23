@@ -64,6 +64,37 @@ public enum PaneSplit {
         let want = max(reviewFloor, (total * share).rounded())
         return max(min(want, total - terminalStrip), min(reviewFloor, max(total, 0)))
     }
+
+    /// §57.5: whether a terminal chat's open review panel moves the file list (the sidebar, `sidebar` points wide with its
+    /// divider) out of the way — exactly when beside the file list the panel would be a drawer. `area` is the terminal +
+    /// panel area now (`sidebarHidden`: the file list is out of the way already, so the area holds its width too). Without
+    /// it the panel sits beside the terminal where that area holds both (a 1280 pt window: 956 → 1257 pt), else the drawer is
+    /// 45 % of the wider area (1000 pt: 360 → 440 pt, the terminal's visible part 316 → 537 pt). The sidebar comes back once
+    /// the panel fits beside the terminal with it, so a widened window shows it again.
+    public static func reviewHidesSidebar(area: Double, sidebar: Double, sidebarHidden: Bool, minTerminal: Double, reviewFloor: Double) -> Bool {
+        let besideSidebar = sidebarHidden ? area - sidebar : area
+        return terminalReviewLayout(total: besideSidebar, minTerminal: minTerminal, reviewFloor: reviewFloor) == .overlay
+    }
+}
+
+/// §57.5: the strip's "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요" says where the review is only the first few times — in the first
+/// `chats` terminal chats that reach it (per user, `countKey`) — or until the user closes it (`dismissedKey`); after that the
+/// strip keeps only its shield, with the same tooltip.
+public enum TerminalReviewedHint {
+    public static let chats = 3
+    public static let countKey = "terminalReviewedHintCount"
+    public static let dismissedKey = "terminalReviewedHintDismissed"
+
+    /// `count`: terminal chats that showed it so far; `countedHere`: this chat is one of them (it keeps the words while it
+    /// is on screen, also as the last one counted).
+    public static func shows(count: Int, dismissed: Bool, countedHere: Bool) -> Bool {
+        !dismissed && (countedHere || count < chats)
+    }
+
+    /// The hint shows in a chat that has not counted yet: it counts now.
+    public static func counts(count: Int, dismissed: Bool, countedHere: Bool) -> Bool {
+        !countedHere && shows(count: count, dismissed: dismissed, countedHere: false)
+    }
 }
 
 /// §57.5: a terminal chat's review panel beside the terminal, or as a drawer over it.

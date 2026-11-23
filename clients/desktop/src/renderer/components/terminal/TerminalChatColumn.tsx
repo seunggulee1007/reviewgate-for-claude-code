@@ -9,7 +9,19 @@ import { t, usesMacKeys } from "../../i18n";
 import { Icon } from "../../icons";
 import { isEnter } from "../../ime";
 import { useStore } from "../../store";
-import { escapeMark, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal, type EscapeMark } from "../../terminalStrip";
+import {
+  countsReviewedHint,
+  escapeMark,
+  readReviewedHint,
+  showsReviewedHint,
+  showsReviewNow,
+  stripStatus,
+  terminalActivityKey,
+  terminalOverlay,
+  terminalStartRefusal,
+  writeReviewedHint,
+  type EscapeMark,
+} from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
 import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
 import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
@@ -83,6 +95,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
   if (activity.current.key !== key) activity.current = { key, at: Date.now() };
   const disconnected = status.running && info?.running !== true && props.startedAt > 0 && now - props.startedAt >= DISCONNECT_GRACE_MS;
   const strip = stripStatus({ disconnected, info, working });
+  const hint = useReviewedHint(props.chatId, strip.kind === "reviewed");
   const reviewNow = showsReviewNow({ working, info, lastActivityMs: activity.current.at, nowMs: now, escape });
   const overlay = terminalOverlay({ exit: status.running ? null : status.exit, failed: props.failed, disconnected });
   const [finding, setFinding] = useState(false);
@@ -90,11 +103,30 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
   return (
     <div className="terminal-chat" data-testid="Terminal chat">
       <div className={`terminal-strip ${disconnected ? "disconnected" : ""}`} data-testid="Terminal chat strip">
-        <span className={`terminal-status ${strip.tone}`} title={`${strip.help}\n${redraw}`} role="status" data-testid="Terminal chat status">
+        <span
+          className={`terminal-status ${strip.tone}`}
+          title={`${strip.kind === "reviewed" && !hint.shows ? `${strip.text}\n` : ""}${strip.help}\n${redraw}`}
+          role="status"
+          aria-label={strip.kind === "reviewed" && !hint.shows ? (strip.short ?? strip.text) : undefined}
+          data-testid="Terminal chat status"
+        >
           <Icon name="terminal" size={13} />
-          <span className="long truncate">{strip.text}</span>
-          {strip.short && <span className="short truncate">{strip.short}</span>}
+          {/* §57.5: "…changes show on the left" only the first few times (or until closed): then the icon, the words in its tooltip. */}
+          {(strip.kind !== "reviewed" || hint.shows) && <span className="long truncate">{strip.text}</span>}
+          {strip.short && (strip.kind !== "reviewed" || hint.shows) && <span className="short truncate">{strip.short}</span>}
         </span>
+        {strip.kind === "reviewed" && hint.shows && (
+          <button
+            type="button"
+            className="plain small"
+            aria-label={t("Hide this hint")}
+            title={t("Don't show this again — the icon stays, with this note in its tooltip")}
+            onClick={hint.dismiss}
+            data-testid="Terminal chat hint close"
+          >
+            ×
+          </button>
+        )}
         <span className="grow" />
         {reviewNow && (
           <button
@@ -330,4 +362,26 @@ function ViewedTerminalChat() {
       <ViewingChatBar />
     </div>
   );
+}
+
+/** The terminal chats that showed the reviewed hint in this window (they keep it while on screen). */
+const hintChats = new Set<string>();
+
+/** §57.5: the reviewed hint shows in the first few terminal chats that reach it, or until the user closes it (per user). */
+function useReviewedHint(chatId: string, reviewed: boolean): { shows: boolean; dismiss: () => void } {
+  const [stored, setStored] = useState(readReviewedHint);
+  useEffect(() => {
+    if (!reviewed || !countsReviewedHint(stored.count, stored.dismissed, hintChats.has(chatId))) return;
+    hintChats.add(chatId);
+    const next = { ...stored, count: stored.count + 1 };
+    writeReviewedHint({ count: next.count });
+    setStored(next);
+  }, [chatId, reviewed, stored]);
+  return {
+    shows: showsReviewedHint(stored.count, stored.dismissed, hintChats.has(chatId)),
+    dismiss: () => {
+      writeReviewedHint({ dismissed: true });
+      setStored((v) => ({ ...v, dismissed: true }));
+    },
+  };
 }

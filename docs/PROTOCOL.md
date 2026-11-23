@@ -9184,14 +9184,19 @@ chat's id);
     file is picked in the sidebar or a link, for a past round's file, the running turn's live diff (§34.6) and a project
     file (§47); and, for a terminal chat, again each time the gate enters `reviewing` with files pending — so a panel the
     user closed during one review is back for the next. It closes when the review empties (all accepted / rejected).
-  - *Closing it.* The edge tab, left of the terminal (tooltip "파일 목록과 터미널 사이에 리뷰 패널 표시 (⌘⇧D)" / "리뷰 패널
-    숨기기 — 터미널이 너비를 모두 써요 (⌘⇧D)") or View › Toggle Diff Pane (⌘⇧D — the same key and the same pane as in a
-    chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the terminal). VoiceOver: "리뷰 패널 표시 / 숨기기" on
-    the tab, with the hint that the panel opens left of the terminal, next to the file list; the panel itself is "리뷰 패널".
+  - *Closing it.* The edge tab, left of the terminal, or View › Toggle Diff Pane (⌘⇧D — the same key and the same pane as
+    in a chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the terminal). The tab reads "리뷰", upright (a word of three letters or fewer stands one
+    letter under the other; a longer one — "Review", a chat's "Diff" — is turned) and its badge is the number of files waiting for a verdict (`pendingFiles`, none when nothing waits — not the
+    changed files, accepted ones included, it counted before). Its tooltip and VoiceOver label say what the click does and
+    what the number is: "리뷰 패널 열기 · 대기 N개" / "리뷰 패널 닫기 · 대기 N개" ("리뷰 패널 열기" with nothing waiting), the
+    tooltip then where — "— 터미널 위, 파일 목록 옆에 열려요", "— 파일 목록과 터미널 사이에 열려요" or "— 터미널이 너비를 모두
+    써요" — and ⌘⇧D; the VoiceOver hint says where it opens. A chat's tab: "Diff 패널 표시 · 대기 N개" / "Diff 패널 숨기기 · 대기
+    N개". Its right-click carries "리뷰하는 동안 사이드바 숨기기" (below). The panel itself is "리뷰 패널".
   - *Widths: the terminal never goes below 80 columns* (Core `PaneSplit`; a column is SwiftTerm's cell, the advance of
-    "W" in the 13 pt monospaced system font, ≈ 7.8 pt, and the terminal adds a legacy scroller's 15 pt when scroll bars
-    always show — 80 columns ≈ 627 pt). `terminalReviewLayout`: **side by side** when the terminal + panel area holds 80
-    columns and the panel's 360 pt floor (≈ 987 pt — e.g. 1440 × 900 with the sidebar), else **a drawer**. Side by side
+    "W" in the 13 pt monospaced system font rounded to the screen's pixels — 8 pt on a Retina screen, the terminal tour's
+    numbers below — and the terminal adds a legacy scroller's 15 pt when scroll bars always show: 80 columns = 640 pt, or
+    655 pt). `terminalReviewLayout`: **side by side** when the terminal + panel area holds 80 columns and the panel's
+    360 pt floor (1000 pt — e.g. 1440 × 900 with the sidebar), else **a drawer**. Side by side
     the divider is draggable between those two minimums (`terminalWidth`); the terminal's share is remembered for all
     windows (`terminalReviewSplit`, default 0.55 — the panel, the split's leading pane, is `reviewPanelWidth`, what the
     terminal leaves). As a drawer (`reviewDrawerWidth`) the panel slides in from the main area's left edge, next to the file
@@ -9199,14 +9204,34 @@ chat's id);
     bottom — with a shadow on its right edge: 45 % of the area, at least 360 pt, leaving at least 120 pt of the terminal
     visible on its right (a tinier window: the floor wins). The terminal keeps its whole width under it — opening and closing
     the drawer resizes nothing and the TUI never reflows. At the laptop's 1000 × 637 (676 pt beside the sidebar) that is
-    the drawer (360 pt) over an 84-column terminal; at 1280 × 800 a 420 pt drawer; at 1440 × 900 side by side, file list |
-    diff | terminal (the terminal tour measures all three and where the panel is). Crossing the threshold while the window, the sidebar or the shell panel changes
-    switches the layout with one resize of the terminal (to or from the full width).
+    the drawer (360 pt) over an 84-column terminal; at 1440 × 900 side by side, file list | diff | terminal (the terminal
+    tour measures all three and where the panel is). Crossing the threshold while the window, the sidebar or the shell panel
+    changes switches the layout with one resize of the terminal (to or from the full width).
+  - *The file list steps aside* (View › "리뷰하는 동안 사이드바 숨기기" — `terminalReviewHidesSidebar`,
+    default on; `PaneSplit.reviewHidesSidebar`). While a terminal chat's review panel is open and beside the file list it
+    would be a drawer, the sidebar hides, in one step without an animation (each frame of one would resize the terminal):
+    where the area then holds both the panel sits beside the terminal — 1280 × 800: 956 → 1257 pt, side by side, the
+    terminal 86 columns — else the drawer is 45 % of the wider area — 1000 × 637: 676 → 977 pt, a 440 pt drawer (was 360)
+    over a 122-column terminal with 537 pt of it visible (was 316). Side by side needs a 1023 pt window without the file
+    list, 1324 pt with it (a 301 pt sidebar). The file list comes back when the panel closes, the chat on screen is not a
+    terminal chat, the switch goes off, or the window widens until both fit beside it (1440 × 900); the toolbar's sidebar
+    button brings it back for the rest of that review. So with the switch on the terminal resizes once when the drawer opens
+    and once when it closes (one SIGWINCH each, the tour checks); off, the drawer keeps the old rule (nothing under it
+    resizes). The agent panel's own hiding of the sidebar (narrow windows) is left to it.
   - *The drawer and the keyboard.* It opens and closes as the panel does (the edge tab, ⌘⇧D, by itself on each new review,
-    closed when the review empties) and takes no keyboard by itself — the terminal keeps it; a click in the drawer gives it
-    the keyboard (accept / reject keys work there), and then Esc closes it (`onExitCommand`; Esc in the terminal stays the
-    TUI's). The edge tab's tooltip says the drawer is over the terminal, next to the file list; VoiceOver: "터미널 위 리뷰 패널", with the hint that
-    Esc or ⌘⇧D closes it.
+    closed when the review empties). Opened by the user (the edge tab, ⌘⇧D) it takes the keyboard at once: ↓ / ↑ the next /
+    previous change (Review › Next / Previous Change), ⌘↩ accepts the file on screen and goes on to the next pending one (as
+    ⌘⇧A), Esc closes it (`onExitCommand`). Opened by itself for a new review it takes nothing — the terminal keeps the
+    keyboard (Esc there stays the TUI's); a click in it gives it the keyboard. Closing the drawer that holds the keyboard (Esc,
+    ⌘⇧D, the last file accepted) gives it back to the terminal, and so does the window widening into side by side under it.
+    VoiceOver: "터미널 위 리뷰 패널", with the hint "↑ / ↓로 변경을 오가고, ⌘↩로 파일을 수락하고, Esc나 ⌘⇧D로 닫아요".
+  - *The header in the panel.* Under 480 pt (the drawer, a narrow side-by-side panel; a laptop window's diff pane beside a
+    chat too) the diff header is one line: the file's status and path (cut in the middle), +n −m, "⋯", Reject as an icon
+    (its word in the tooltip and for VoiceOver) and Accept, prominent, with its word. "⋯" holds the rest — the range
+    (전체 / 이번 턴 / 요청 이후 / 수락 이후, when the file has more than one), Add note, the view switches, Find, Full file and
+    Open in Editor; the range's hints stay under the line, and a file's badges (notes, partial revert, whitespace only,
+    changed after accept) take a second line only when it has one. Wider, the header keeps its rows (the same `DiffViewHeader`,
+    the same "⋯").
   - *The keyboard.* The terminal is the split's trailing pane open or closed — one view: opening or closing the panel
     never moves the first responder; only the terminal's size changes. Beside a terminal the panel opens and closes
     without an animation: each animation frame resized the terminal and the TUI redrew at every width on the way (nine
@@ -9249,7 +9274,9 @@ chat's id);
   PTYs (all at once, not one after another), and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
   shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요"
-  (hooks arrive),
+  (hooks arrive — only in the first three terminal chats that reach it, or until its × "이 안내 숨기기"; per user,
+  `TerminalReviewedHint`, `terminalReviewedHintCount` / `terminalReviewedHintDismissed`; after that the shield alone with
+  the words in its tooltip),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set, Esc was
   pressed in the terminal 2 s ago with no hook since, or nothing changed for 60 s — Esc in the TUI sends no Stop, so the
@@ -9699,6 +9726,21 @@ type ClientCapabilities = {
   as their paths (`webUtils.getPathForFile`), each in double quotes when it holds a space or a cmd character, as Windows
   Terminal writes them (POSIX backslashes on macOS / Linux); review-list rows (`application/x-reviewgate-paths`) as
   `@path` — one bracketed paste, never Enter, the refusal as the paste's toast.
+- **The edge tab** (`TerminalSplit.tsx` `ReviewEdgeTab`, as the Mac §57.5): it reads "리뷰" with a badge of the files
+  waiting for a verdict (none when nothing waits); its accessible name is "리뷰 패널 열기 · 대기 N개" / "리뷰 패널 닫기 · 대기
+  N개", its tooltip adds where the panel opens and Ctrl+Shift+D.
+- **The file list steps aside** (as the Mac §57.5, `terminalLayout.ts` `reviewHidesSidebar`): while the open review panel
+  would be a drawer beside the file list, the sidebar hides — side by side where that makes room, else a wider drawer — and
+  comes back when the panel closes or fits beside it, or the terminal split goes (a chat-kind chat on screen); shown again
+  by the user it stays until the panel closes. The edge tab's right-click "리뷰하는 동안 사이드바 숨기기" turns it off (per
+  user, `localStorage` `rg.terminalReviewHidesSidebar`, default on).
+- **The drawer and the keyboard** (as the Mac §57.5): the drawer the user opens (Ctrl+Shift+D, the edge tab — the store's
+  `diffToggleSeq`) takes the keyboard: ↑ / ↓ scroll its diff, Ctrl+Enter clicks its Accept (the same reasons keep it off),
+  Esc closes it. One that opens by itself for a review leaves the keyboard in the terminal; closing the drawer that held it
+  gives it back to the terminal. The Windows diff header keeps its two rows in the drawer (it has no "⋯" menu yet).
+- **The strip's hint** (as the Mac §57.5, `terminalStrip.ts` `showsReviewedHint`): "…변경은 왼쪽에 나와요" only in the first
+  three terminal chats that reach it, or until its × (per user, `localStorage` `rg.terminalReviewedHintCount` /
+  `rg.terminalReviewedHintDismissed`); then the terminal icon alone, the words in its tooltip.
 
 ## 58. Accept N & Continue
 

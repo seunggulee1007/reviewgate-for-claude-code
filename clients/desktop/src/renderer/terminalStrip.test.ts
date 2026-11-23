@@ -2,7 +2,22 @@
 import { afterAll, describe, expect, it } from "vitest";
 import type { TerminalSessionState } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { ESCAPE_GRACE_MS, escapeMark, isEscapeKey, REVIEW_NOW_IDLE_MS, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal } from "./terminalStrip";
+import {
+  countsReviewedHint,
+  ESCAPE_GRACE_MS,
+  escapeMark,
+  isEscapeKey,
+  readReviewedHint,
+  REVIEW_NOW_IDLE_MS,
+  REVIEWED_HINT_COUNT_KEY,
+  showsReviewedHint,
+  showsReviewNow,
+  stripStatus,
+  terminalActivityKey,
+  terminalOverlay,
+  terminalStartRefusal,
+  writeReviewedHint,
+} from "./terminalStrip";
 
 const term = (over: Partial<TerminalSessionState> = {}): TerminalSessionState => ({
   running: true,
@@ -127,5 +142,31 @@ describe("why Claude Code could not start", () => {
       expect(terminalStartRefusal(code, "x")).toMatch(/[가-힣]/);
     }
     initI18n("en", "darwin");
+  });
+});
+
+describe("the reviewed hint, the first few times", () => {
+  it("shows in the first three chats, keeps the third while on screen, never once closed", () => {
+    expect(showsReviewedHint(0, false, false)).toBe(true);
+    expect(countsReviewedHint(0, false, false)).toBe(true);
+    expect(countsReviewedHint(1, false, true)).toBe(false);
+    expect(showsReviewedHint(3, false, true)).toBe(true);
+    expect(showsReviewedHint(3, false, false)).toBe(false);
+    expect(countsReviewedHint(3, false, false)).toBe(false);
+    expect(showsReviewedHint(1, true, true)).toBe(false);
+  });
+
+  it("persists the count and the dismissal; blocked storage reads as never shown", () => {
+    const map = new Map<string, string>();
+    const storage = { getItem: (k: string) => map.get(k) ?? null, setItem: (k: string, v: string) => void map.set(k, v) };
+    expect(readReviewedHint(storage)).toEqual({ count: 0, dismissed: false });
+    writeReviewedHint({ count: 2 }, storage);
+    writeReviewedHint({ dismissed: true }, storage);
+    expect(readReviewedHint(storage)).toEqual({ count: 2, dismissed: true });
+    map.set(REVIEWED_HINT_COUNT_KEY, "x");
+    expect(readReviewedHint(storage).count).toBe(0);
+    const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
+    expect(readReviewedHint(blocked)).toEqual({ count: 0, dismissed: false });
+    expect(() => writeReviewedHint({ count: 1 }, blocked)).not.toThrow();
   });
 });

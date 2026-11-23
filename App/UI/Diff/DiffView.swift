@@ -722,12 +722,17 @@ struct DiffViewHeader: View {
     let onAddNote: () -> Void
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     @Environment(\.diffSplitFits) private var splitFits
+    /// The header's width: under `oneLineBelow` (a terminal chat's review drawer, ~360–440 pt; a laptop window's diff pane
+    /// beside the chat) it is one line — the file, its counts, "⋯", Reject and Accept.
+    @State private var width: CGFloat = 0
+    static let oneLineBelow: CGFloat = 480
+    private var oneLine: Bool { width > 0 && width < Self.oneLineBelow }
 
     var body: some View {
         // The file's unsent notes — what Request changes sends (wave2 mac-flow, §34.4: sent ones are "요청함" cards).
         let noteCount = store.unsentNotes.filter { $0.path == file.path }.count
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+            HStack(spacing: oneLine ? 6 : 8) {
                 Text(file.status.rawValue)
                     .font(.caption.weight(.bold).monospaced())
                     .foregroundStyle(statusColor(file.status))
@@ -741,9 +746,55 @@ struct DiffViewHeader: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text("+\(file.added)").font(.caption.monospacedDigit()).foregroundStyle(.green)
+                    .fixedSize()
                     .accessibilityLabel(ReviewSpeech.counts(added: file.added, deleted: file.deleted))   // MARK: wave4d w4d-speed
                 Text("−\(file.deleted)").font(.caption.monospacedDigit()).foregroundStyle(.red)
+                    .fixedSize()
                     .accessibilityHidden(true)
+                if oneLine {
+                    oneLineControls
+                } else {
+                    badges(noteCount: noteCount)
+                }
+            }
+            if oneLine, hasBadges(noteCount: noteCount) {
+                HStack(spacing: 6) { badges(noteCount: noteCount) }
+            }
+            DiffProvenanceHeader(file: file)   // wave1 mac-review — §31–32
+            if oneLine {
+                DiffRangeHints(file: file)   // the range itself is in "⋯"
+            } else {
+                DiffRangePicker(file: file)   // wave2 mac-flow (§34.1): 전체 / 이번 턴 / 요청 이후 / 수락 이후
+                // Narrow diff panes (agent panel open, small window) fall back to icon-only controls instead of overflowing,
+                // and narrower still fold everything but Reject / Accept into "⋯" — Accept is never pushed past the pane's edge.
+                // FullOrCompact, not ViewThatFits: the buttons, toggles and editor menu are AppKit views it rebuilt every pass.
+                FullOrCompact { measuring in
+                    controls(measuring: measuring)
+                } compact: {
+                    FullOrCompact { measuring in
+                        controls(measuring: measuring, iconOnly: true).labelStyle(.iconOnly)
+                    } compact: {
+                        foldedControls
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        // Review › Add Note… is on exactly when this header's "Add note" is.
+        .onChange(of: addNoteDisabled, initial: true) { _, off in model.canAddNote = !off }
+        .onDisappear { model.canAddNote = false }
+        #if DEBUG
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugDiffHeaderFrame = $0 }   // the layout check
+        #endif
+    }
+
+    private func hasBadges(noteCount: Int) -> Bool {
+        noteCount > 0 || file.partial || (file.changedSinceAccepted && file.state == .pending) || file.whitespaceOnly
+    }
+
+    @ViewBuilder
+    private func badges(noteCount: Int) -> some View {
                 if noteCount > 0 {
                     Label("\(noteCount) notes", systemImage: "text.bubble")
                         .font(.caption)
@@ -762,30 +813,24 @@ struct DiffViewHeader: View {
                         .help("Every change of this file is whitespace — “Ignore whitespace” shows nothing is left")
                         .accessibilityIdentifier("Whitespace only badge")
                 }
+    }
+
+    /// The one-line header's end (§57.5): Revert selected when parts are ticked, "⋯" with the rest (the range among them),
+    /// Reject as an icon and Accept, prominent, with its word.
+    private var oneLineControls: some View {
+        HStack(spacing: 6) {
+            if showsHunkControls, selectedHunks > 0 {
+                Button("Revert selected (\(selectedHunks))", systemImage: "scissors") { confirmRevertSelected = true }
+                    .labelStyle(.iconOnly)
+                    .disabled(!canRejectHunks)
+                    .help(Text("Revert the ticked parts to the start of the turn; the rest stays under review") + Text(verbatim: " (\(selectedHunks))"))
+                    .accessibilityLabel("Revert selected")
+                    .accessibilityIdentifier("Revert selected hunks")
             }
-            DiffProvenanceHeader(file: file)   // wave1 mac-review — §31–32
-            DiffRangePicker(file: file)   // wave2 mac-flow (§34.1): 전체 / 이번 턴 / 요청 이후 / 수락 이후
-            // Narrow diff panes (agent panel open, small window) fall back to icon-only controls instead of overflowing, and
-            // narrower still (a laptop window's chat beside it, ~300 pt) fold everything but Reject / Accept into "⋯" — Accept
-            // is never pushed past the pane's edge.
-            // FullOrCompact, not ViewThatFits: the buttons, toggles and editor menu are AppKit views it rebuilt every pass.
-            FullOrCompact { measuring in
-                controls(measuring: measuring)
-            } compact: {
-                FullOrCompact { measuring in
-                    controls(measuring: measuring, iconOnly: true).labelStyle(.iconOnly)
-                } compact: {
-                    foldedControls
-                }
-            }
+            moreMenu(folded: true, range: true)
+            verdictControls(measuring: false, oneLine: true)
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        // Review › Add Note… is on exactly when this header's "Add note" is.
-        .onChange(of: addNoteDisabled, initial: true) { _, off in model.canAddNote = !off }
-        .onDisappear { model.canAddNote = false }
-        #if DEBUG
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.debugDiffHeaderFrame = $0 }   // the layout check
-        #endif
+        .fixedSize()
     }
 
     private var addNoteDisabled: Bool {
@@ -813,8 +858,16 @@ struct DiffViewHeader: View {
 
     /// "⋯": whitespace, wrapping, find, the full file and the editors — at every width. `folded`: the narrowest header, where
     /// the note and the unified / split choice come in here too.
-    private func moreMenu(folded: Bool) -> some View {
+    private func moreMenu(folded: Bool, range: Bool = false) -> some View {
         Menu {
+            if range, store.availableRanges(for: file).count > 1 {
+                let ranges = store.availableRanges(for: file)
+                Picker("Diff range", selection: Binding(get: { store.diffSince(for: file) }, set: { store.setDiffRange($0, for: file) })) {
+                    ForEach(ranges, id: \.self) { since in Text(verbatim: since.label).tag(since) }
+                }
+                .accessibilityIdentifier("Diff range")
+                Divider()
+            }
             if folded {
                 Button("Add note", systemImage: "text.bubble") { onAddNote() }
                     .disabled(addNoteDisabled)
@@ -840,7 +893,9 @@ struct DiffViewHeader: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(folded
+        .help(range
+              ? "More: Diff range, Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
+              : folded
               ? "More: Add note (⌥⌘N), Ignore whitespace, Wrap lines, Split diff (⌥⌘L), Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)"
               : "More: Ignore whitespace, Wrap lines, Find in diff (⌥⌘F), Full file, Open in Editor (⇧⌘E)")
         .accessibilityLabel("More diff options")
@@ -877,13 +932,15 @@ struct DiffViewHeader: View {
     }
 
     /// Reject / Accept (Undo Accept, the verdict) — in every width of the header.
+    /// `oneLine`: the one-line header — Reject and Undo Accept as icons (their words in the tooltip), Accept keeps its word.
     @ViewBuilder
-    private func verdictControls(measuring: Bool) -> some View {
+    private func verdictControls(measuring: Bool, oneLine: Bool = false) -> some View {
         switch file.state {
         case .pending:
             // wave2 mac-flow (§34.2): while a turn runs accept still applies; reject waits and says why.
             // polish P2-review-23 (r2-review-flow): Edit › Undo (⌘Z) takes the accept / the reject back.
             Button("Reject", systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
+                .labelStyle(IconOnlyIf(on: oneLine))
                 .controlSize(.regular)
                 .fixedSize()
                 .disabled(store.isRejectLocked || file.uncaptured)
@@ -908,6 +965,7 @@ struct DiffViewHeader: View {
         case .accepted:
             Label("Accepted", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.green)
             Button("Undo Accept", systemImage: "arrow.uturn.left") { store.unaccept(file) }
+                .labelStyle(IconOnlyIf(on: oneLine))
                 .controlSize(.regular)
                 .fixedSize()
                 .disabled(store.isReviewLocked)
@@ -935,6 +993,15 @@ struct DiffViewHeader: View {
         case .renamed: .blue
         case .other: .secondary
         }
+    }
+}
+
+/// The icon alone when `on` (the one-line diff header's Reject / Undo Accept), else the icon and the title.
+private struct IconOnlyIf: LabelStyle {
+    let on: Bool
+    @ViewBuilder
+    func makeBody(configuration: Configuration) -> some View {
+        if on { configuration.icon } else { Label(configuration) }
     }
 }
 

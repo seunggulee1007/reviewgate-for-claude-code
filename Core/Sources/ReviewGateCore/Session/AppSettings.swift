@@ -83,6 +83,9 @@ public enum AppSettings {
         /// Closing the last window or quitting asks first (Bool, unset → on). While Claude works the separate
         /// `confirmCloseWhileWorking` decides (CloseGuard.swift).
         public static let confirmQuit = "confirmQuit"
+        /// §57.5: a terminal chat's review panel moves the file list out of the way while it would be a drawer beside it
+        /// (Bool, unset → on): side by side where that makes room, else a wider drawer (`PaneSplit.reviewHidesSidebar`).
+        public static let terminalReviewHidesSidebar = "terminalReviewHidesSidebar"
     }
 
     public static let defaultWorktreeRoot = "~/.reviewgate/worktrees"

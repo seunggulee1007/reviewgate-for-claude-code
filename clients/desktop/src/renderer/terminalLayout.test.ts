@@ -4,6 +4,7 @@ import {
   DEFAULT_TERMINAL_SHARE,
   REVIEW_FLOOR,
   reviewDrawerWidth,
+  reviewHidesSidebar,
   reviewPanelWidth,
   reviewWidthForShare,
   terminalMinWidth,
@@ -91,5 +92,22 @@ describe("the drawer", () => {
     expect(reviewDrawerWidth(450)).toBe(360);
     expect(reviewDrawerWidth(300)).toBe(300);
     expect(reviewDrawerWidth(0)).toBe(0);
+  });
+});
+
+describe("the file list steps aside for the review panel", () => {
+  const hides = (a: number, hidden = false) => reviewHidesSidebar(a, 301, hidden, MIN);
+  it("only where beside it the panel would be a drawer", () => {
+    // 1000 px: a drawer with or without the file list — hidden, the drawer is 45 % of the wider area.
+    expect(hides(area(1000, true))).toBe(true);
+    expect(hides(area(1000, false), true)).toBe(true);
+    expect(terminalReviewLayout(area(1000, false), MIN)).toBe("drawer");
+    expect(reviewDrawerWidth(area(1000, false))).toBe(Math.round(974 * 0.45));
+    // 1280 px: hidden, it fits side by side.
+    expect(hides(area(1280, true))).toBe(true);
+    expect(terminalReviewLayout(area(1280, false), MIN)).toBe("side");
+    // 1440 px: it fits beside the file list — the file list stays, and comes back once the window is that wide.
+    expect(hides(area(1440, true))).toBe(false);
+    expect(hides(area(1440, false), true)).toBe(false);
   });
 });

@@ -77,10 +77,25 @@ describe("the terminal split", () => {
     expect(out).toContain('data-testid="Terminal split"');
     expect(out).toContain('aria-expanded="false"');
     // Before the first measure the area is 0 px: too narrow to sit side by side.
-    expect(out).toContain("Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (Ctrl+Shift+D)");
+    expect(out).toContain('title="Open review panel — over the terminal, next to the file list (Ctrl+Shift+D)"');
+    expect(out).toContain('aria-label="Open review panel"');
+    expect(out).not.toContain('data-testid="Review edge tab badge"');
     expect(out).not.toContain('data-testid="Review drawer"');
     expect(out).not.toContain('data-testid="Review panel"');
     expect(out).toContain('data-testid="Terminal chat starting"');
+  });
+
+  it("the edge tab's badge counts the files waiting for a verdict, and its name says so", () => {
+    const before = m.useStore.getState().state;
+    const file = (path: string, state: string) => ({ path, status: "M", state, added: 1, deleted: 0 });
+    put(m.useStore, {
+      state: { ...before, changedFiles: [file("a.ts", "pending"), file("b.ts", "accepted"), file("c.ts", "pending")] } as unknown as ReviewState,
+      ui: { diffCollapsed: true },
+    });
+    const out = renderToStaticMarkup(createElement(m.TerminalSplit));
+    expect(out).toContain('aria-label="Open review panel · 2 pending"');
+    expect(out).toMatch(/data-testid="Review edge tab badge">2</);
+    put(m.useStore, { state: before, ui: {} });
   });
 
   it("a ⌘⇧D collapse lasts until the live terminal chat's next review", () => {

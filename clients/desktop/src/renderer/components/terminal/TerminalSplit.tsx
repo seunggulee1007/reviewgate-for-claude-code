@@ -12,7 +12,7 @@ import { reviewPanelCollapsed } from "../../friction";
 import { t } from "../../i18n";
 import { isComposing } from "../../ime";
 import { useStore } from "../../store";
-import { measureCellWidth, reviewDrawerWidth, reviewPanelWidth, reviewWidthForShare, terminalMinWidth, terminalReviewLayout, terminalShareOf, REVIEW_FLOOR, type TerminalReviewLayout } from "../../terminalLayout";
+import { measureCellWidth, reviewDrawerWidth, reviewHidesSidebar, reviewPanelWidth, reviewWidthForShare, terminalMinWidth, terminalReviewLayout, terminalShareOf, REVIEW_FLOOR, type TerminalReviewLayout } from "../../terminalLayout";
 import { focusLiveTerminal, liveTerminalChatId } from "../../terminal/terminalChat";
 import { clampFontSize, TERMINAL_FONT_FAMILY } from "../../terminal/termHostOptions";
 import ChatPane from "../chat/ChatPane";
@@ -21,10 +21,39 @@ import { LiveDiffPane } from "../diff/LiveDiffPane";
 import { Divider } from "../Divider";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { HistoryDiffPane } from "../history/HistoryDiffPane";
+import { PointerMenu } from "../agents/AgentBits";
 import "./terminal.css";
 
 /** The edge tab's width (styles.css `.diff-edge-tab`). */
 const EDGE_TAB = 26;
+
+/** §57.5 "Hide Sidebar While Reviewing" (per user, on unless turned off from the edge tab's right-click). */
+const HIDES_SIDEBAR_KEY = "rg.terminalReviewHidesSidebar";
+
+function readHidesSidebar(): boolean {
+  try {
+    return typeof localStorage === "undefined" || localStorage.getItem(HIDES_SIDEBAR_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function writeHidesSidebar(on: boolean): void {
+  try {
+    localStorage.setItem(HIDES_SIDEBAR_KEY, on ? "1" : "0");
+  } catch {
+    // blocked storage: the choice lasts until the window reloads
+  }
+}
+
+/** The drawer's first element that scrolls vertically (the diff), for ↑ / ↓. */
+function drawerScroller(drawer: HTMLElement): HTMLElement | null {
+  for (const el of Array.from(drawer.querySelectorAll<HTMLElement>("*"))) {
+    const overflow = getComputedStyle(el).overflowY;
+    if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) return el;
+  }
+  return null;
+}
 
 export function TerminalSplit() {
   const ref = useRef<HTMLDivElement>(null);
@@ -43,6 +72,15 @@ export function TerminalSplit() {
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragged = useRef<number | null>(null);
   const reviewWidth = dragWidth ?? reviewWidthForShare(share, area, minTerminal);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerHasFocus = useRef(false);
+  const toggleSeq = useStore((s) => s.diffToggleSeq);
+  const sidebarVisible = useStore((s) => s.sidebarVisible);
+  const [hidesSidebar, setHidesSidebar] = useState(readHidesSidebar);
+  const sidebarWidth = useRef(301);
+  /** We hid the file list for the panel; the user brought it back while the panel was open. */
+  const sidebarHidden = useRef(false);
+  const sidebarKept = useRef(false);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -64,18 +102,89 @@ export function TerminalSplit() {
     useStore.getState().setUI({ diffCollapsed: true });
     focusLiveTerminal();
   };
-  /** Esc in the drawer (not in one of its text fields, never the IME's) closes it and gives the terminal the keyboard. */
+  /**
+   * In the drawer (not in one of its text fields, never the IME's): Esc closes it and gives the terminal the keyboard, ↑ / ↓
+   * scroll the diff, Ctrl+Enter (⌘↩) accepts the file — its Accept button, so the same reasons keep it off.
+   */
   const onDrawerKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "Escape" || isComposing(e) || e.defaultPrevented) return;
+    if (isComposing(e) || e.defaultPrevented) return;
     const el = e.target as HTMLElement;
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
-    e.preventDefault();
-    close();
+    const drawer = drawerRef.current;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !e.altKey && !e.ctrlKey && !e.metaKey && drawer) {
+      const scroller = drawerScroller(drawer);
+      if (!scroller || scroller.contains(el)) return; // the scroller itself scrolls natively
+      e.preventDefault();
+      scroller.scrollBy({ top: e.key === "ArrowDown" ? 40 : -40 });
+    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && drawer) {
+      const accept = drawer.querySelector<HTMLButtonElement>('[data-testid="Accept"]:not(:disabled)');
+      if (!accept) return;
+      e.preventDefault();
+      accept.click();
+    }
+  };
+
+  // §57.5: the drawer the user opens (⌘⇧D, the edge tab) takes the keyboard — ↑ / ↓ / Ctrl+Enter work at once; one that
+  // opens by itself for a review leaves it in the terminal.
+  const lastSeq = useRef(toggleSeq);
+  useEffect(() => {
+    if (toggleSeq === lastSeq.current) return;
+    lastSeq.current = toggleSeq;
+    if (!open || layout !== "drawer") return;
+    const id = requestAnimationFrame(() => {
+      const drawer = drawerRef.current;
+      if (!drawer) return;
+      (drawerScroller(drawer) ?? drawer).focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [toggleSeq, open, layout]);
+  // Closing the drawer that held the keyboard (Esc, ⌘⇧D, the last file accepted) gives it back to the terminal.
+  useEffect(() => {
+    if ((open && layout === "drawer") || !drawerHasFocus.current) return;
+    drawerHasFocus.current = false;
+    focusLiveTerminal();
+  }, [open, layout]);
+
+  // §57.5: the file list steps aside while the open panel would be a drawer beside it — side by side where that makes
+  // room, else a wider drawer — and comes back when the panel closes or fits beside it (terminalLayout.reviewHidesSidebar).
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>(".app > .sidebar");
+    if (sidebarVisible && el) sidebarWidth.current = el.getBoundingClientRect().width + 1;
+    if (sidebarVisible && sidebarHidden.current) {
+      sidebarHidden.current = false; // the user brought it back: left alone until the panel closes
+      sidebarKept.current = true;
+    }
+  }, [sidebarVisible]);
+  useEffect(() => {
+    if (!open) sidebarKept.current = false;
+    const want = hidesSidebar && open && !sidebarKept.current && area > 0 && reviewHidesSidebar(area, sidebarWidth.current, !sidebarVisible, minTerminal);
+    const s = useStore.getState();
+    if (want && !sidebarHidden.current && s.sidebarVisible) {
+      sidebarHidden.current = true;
+      s.toggleSidebar();
+    } else if (!want && sidebarHidden.current) {
+      sidebarHidden.current = false;
+      if (!s.sidebarVisible) s.toggleSidebar();
+    }
+  }, [hidesSidebar, open, area, sidebarVisible, minTerminal]);
+  useEffect(
+    () => () => {
+      // Another chat (not a terminal chat) replaced this split: the file list is back.
+      if (sidebarHidden.current && !useStore.getState().sidebarVisible) useStore.getState().toggleSidebar();
+    },
+    [],
+  );
+  const setHides = (on: boolean) => {
+    writeHidesSidebar(on);
+    setHidesSidebar(on);
   };
 
   return (
     <div className="terminal-split" ref={ref} data-layout={layout} data-testid="Terminal split">
-      <ReviewEdgeTab open={open} layout={layout} onToggle={toggle} />
+      <ReviewEdgeTab open={open} layout={layout} onToggle={toggle} hidesSidebar={hidesSidebar} onHidesSidebar={setHides} />
       {open && layout === "side" && (
         <>
           <div className="review-side" style={{ flex: `0 0 ${Math.round(reviewWidth)}px`, minWidth: Math.min(REVIEW_FLOOR, area) }} role="region" aria-label={t("Review panel")} data-testid="Review panel">
@@ -102,12 +211,18 @@ export function TerminalSplit() {
       </ErrorBoundary>
       {open && layout === "drawer" && (
         <div
+          ref={drawerRef}
           className="review-drawer"
           style={{ left: EDGE_TAB, top: tabsHeight, width: reviewDrawerWidth(area) }}
           role="region"
+          tabIndex={-1}
           aria-label={t("Review panel over the terminal")}
-          aria-description={t("Esc or ⌘⇧D closes it; the terminal behind it keeps its width")}
+          aria-description={t("↑ / ↓ go through the changes, ⌘↩ accepts the file, Esc or ⌘⇧D closes it")}
           onKeyDown={onDrawerKey}
+          onFocus={() => (drawerHasFocus.current = true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) drawerHasFocus.current = false;
+          }}
           data-testid="Review drawer"
         >
           <ReviewPane />
@@ -126,20 +241,60 @@ function ReviewPane() {
   return <ErrorBoundary key="diff" name="Diff" className="pane diff"><DiffPane /></ErrorBoundary>;
 }
 
-/** The thin tab left of the review panel, next to the file list: opens or hides it (⌘⇧D); says where it opens. */
-function ReviewEdgeTab(props: { open: boolean; layout: TerminalReviewLayout; onToggle: () => void }) {
-  const changed = useStore((s) => s.state.changedFiles.length);
-  const label = changed > 0 ? t("Changes ({0})", changed) : t("Changes");
-  const help = props.open
-    ? t("Hide the review panel — the terminal takes the width (⌘⇧D)")
+/**
+ * The thin tab left of the review panel, next to the file list: opens or hides it (⌘⇧D). It reads "Review", its badge is
+ * the number of files waiting for a verdict, and its tooltip / accessible name say so ("Open review panel · 2 pending")
+ * and where it opens. Right-click: "Hide Sidebar While Reviewing".
+ */
+function ReviewEdgeTab(props: { open: boolean; layout: TerminalReviewLayout; onToggle: () => void; hidesSidebar: boolean; onHidesSidebar: (on: boolean) => void }) {
+  const pending = useStore((s) => s.state.changedFiles.filter((f) => f.state === "pending").length);
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const label = props.open
+    ? pending > 0 ? t("Close review panel · {0} pending", pending) : t("Close review panel")
+    : pending > 0 ? t("Open review panel · {0} pending", pending) : t("Open review panel");
+  const where = props.open
+    ? t("the terminal takes the width")
     : props.layout === "side"
-      ? t("Show the review panel between the file list and the terminal (⌘⇧D)")
-      : t("Show the review panel over the terminal, next to the file list — the window is too narrow for both side by side (⌘⇧D)");
+      ? t("between the file list and the terminal")
+      : t("over the terminal, next to the file list");
   return (
-    <button type="button" className="diff-edge-tab" onClick={props.onToggle} title={help} aria-label={help} aria-expanded={props.open} data-testid="Review edge tab">
-      <span className="chev" aria-hidden="true">{props.open ? "◂" : "▸"}</span>
-      <span className="label">{label}</span>
-    </button>
+    <>
+      <button
+        type="button"
+        className="diff-edge-tab"
+        onClick={props.onToggle}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuAt({ x: e.clientX, y: e.clientY });
+        }}
+        title={`${label} — ${where} ${t("(⌘⇧D)")}`}
+        aria-label={label}
+        aria-expanded={props.open}
+        data-testid="Review edge tab"
+      >
+        <span className="chev" aria-hidden="true">{props.open ? "◂" : "▸"}</span>
+        <span className="label">{t("Review")}</span>
+        {pending > 0 && (
+          <span className="edge-badge" aria-hidden="true" data-testid="Review edge tab badge">
+            {pending}
+          </span>
+        )}
+      </button>
+      {menuAt && (
+        <PointerMenu
+          at={menuAt}
+          onClose={() => setMenuAt(null)}
+          items={[
+            {
+              label: `${props.hidesSidebar ? "✓ " : ""}${t("Hide Sidebar While Reviewing")}`,
+              hint: t("In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal"),
+              onClick: () => props.onHidesSidebar(!props.hidesSidebar),
+              testId: "Hide sidebar while reviewing",
+            },
+          ]}
+        />
+      )}
+    </>
   );
 }
 
