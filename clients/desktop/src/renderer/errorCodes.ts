@@ -76,6 +76,7 @@ export const ERROR_EVENT_CODES = [
   "reject_scheduled",
   "reject_applied",
   "reject_changed_again",
+  "review_first_blocked", // §63: a call denied while files wait for the review
 ] as const;
 
 /** `result{ok:false}` refusal codes (§19.6 "Refusal codes"). */
@@ -342,6 +343,7 @@ export function presentationOf(code: string | undefined): ErrorPresentation {
     case "reject_scheduled":
     case "reject_applied":
     case "reject_changed_again":
+    case "review_first_blocked": // §63
       return "row";
     default:
       return "banner";

@@ -332,6 +332,8 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     backgroundWork: s.backgroundWork !== false,
     // §52.2 subagents in the turn as before 0.6 (next session start; off unless turned on; older engines ignore it)
     subagentsInTurn: s.subagentsInTurn === true,
+    // §63 what waits for the review (live; absent / unknown: edits; older engines ignore it)
+    reviewFirst: s.reviewFirst === "prompts" || s.reviewFirst === "off" ? s.reviewFirst : "edits",
     allowedProjectStatusLine: allowedProjectStatusLineFor(s.projectStatusLineAllowed, projectRoot),
     // MARK: wave3 desktop-session — §36.6 this project's "Load local settings" (next session start; older engines ignore it)
     loadLocalSettings: loadLocalSettingsFor(s.projectLoadLocalSettings, projectRoot),

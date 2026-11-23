@@ -10,6 +10,7 @@ import { ScopeRowActions, ScopeRowFiles } from "./ScopeRowActions"; // MARK: r1-
 import { asksStill, rejectAskedPath } from "../../rejectSchedule"; // MARK: r2-review-flow (M32)
 import { useStore } from "../../store";
 import { rejectBlockedReason } from "../../reviewRound";
+import { firstWaitingPath, openReviewHelp, openReviewTitle, REVIEW_FIRST_ROW } from "../../reviewFirst"; // §63
 import "../session.css";
 
 const ICON = { fatal: "⊗", error: "ⓘ", warning: "⚠", info: "ⓘ" } as const;
@@ -36,6 +37,7 @@ export function ErrorNoticeRow({ item }: { item: ErrorRow }) {
         {scope && <ScopeRowFiles item={item} />}
         {scope && <ScopeRowActions item={item} />}
         <RejectAgainActions code={code} detail={item.facts?.cliDetail} />
+        {code === REVIEW_FIRST_ROW && <ReviewFirstActions />}
         {tone === "info" && words && (
           <details>
             <summary>{t("Details")}</summary>
@@ -44,6 +46,20 @@ export function ErrorNoticeRow({ item }: { item: ErrorRow }) {
         )}
       </span>
     </div>
+  );
+}
+
+/** §63: a call denied while files wait for the review — [리뷰 열기] while one still waits. */
+function ReviewFirstActions() {
+  const path = useStore((s) => firstWaitingPath(s.state));
+  const selectFile = useStore((s) => s.selectFile);
+  if (!path) return null;
+  return (
+    <span className="row" style={{ gap: 6, marginTop: 4 }}>
+      <button type="button" className="small" onClick={() => selectFile(path)} title={openReviewHelp()} data-testid="Open review from review-first row">
+        {openReviewTitle()}
+      </button>
+    </span>
   );
 }
 

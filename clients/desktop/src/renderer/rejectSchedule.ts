@@ -8,7 +8,7 @@ import { t } from "./i18n";
 // ---------------------------------------------------------------- M32 rows and the scheduled state
 
 /** The rows about a reject during a turn: gray chat rows only (no banner, the queue goes on). */
-export const REVIEW_FLOW_ROW_CODES: ReadonlySet<string> = new Set(["reject_scheduled", "reject_applied", "reject_changed_again"]);
+export const REVIEW_FLOW_ROW_CODES: ReadonlySet<string> = new Set(["reject_scheduled", "reject_applied", "reject_changed_again", "review_first_blocked"]);
 
 export function isReviewFlowRow(code: string | undefined): boolean {
   return code !== undefined && REVIEW_FLOW_ROW_CODES.has(code);
@@ -24,6 +24,8 @@ export function reviewFlowNoticeText(ev: { code?: string; detail?: string }): st
       return t("Reverted as you asked while Claude worked: {0}", what);
     case "reject_changed_again":
       return t("Claude changed this again after you rejected it, so it was not reverted: {0}", what);
+    case "review_first_blocked": // §63 (`detail`: the waiting count — the row does not repeat it)
+      return t("Claude's edits are blocked while files wait for your review");
     default:
       return null;
   }

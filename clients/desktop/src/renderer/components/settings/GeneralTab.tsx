@@ -25,6 +25,7 @@ import { DEFAULT_SYSTEM_PROMPT_APPEND } from "../../../shared/systemPrompt"; // 
 import { TerminalSettingsSection } from "./TerminalSettings"; // MARK: terminal-win (§57.17)
 import { UpdateSettingsSection } from "./UpdateSettings"; // §48 Windows
 import { AppliesBadge } from "./SettingsBits"; // §55.11
+import { REVIEW_FIRST_MODES, reviewFirstModeLabel, reviewFirstModeOf, type ReviewFirstMode } from "../../reviewFirst"; // §63
 
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
@@ -218,6 +219,19 @@ export function ReviewPane({ settings }: PaneProps) {
   const patch = usePatch();
   return (
     <div className="body" data-testid="Settings review">
+      {/* §63: Claude's next work waits for the review — edits blocked by default, prompts too, or neither */}
+      <section data-setting="reviewFirst">
+        <h4>{t("Review first")}</h4>
+        <div className="field-row">
+          <span>{t("Claude waits for your review before its next work")}</span>
+          <select value={reviewFirstModeOf(settings.reviewFirst)} onChange={(e) => patch({ reviewFirst: e.target.value as ReviewFirstMode })} data-testid="Review first" aria-label={t("Claude waits for your review before its next work")}>
+            {REVIEW_FIRST_MODES.map((m) => (
+              <option key={m} value={m}>{reviewFirstModeLabel(m)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="note">{t("Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before.")}</div>
+      </section>
       <section data-setting="checkpointIgnorePatterns">
         <h4>{t("Checkpoint ignore patterns")}</h4>
         <TextArea value={settings.checkpointIgnorePatterns} mono rows={4} onCommit={(v) => patch({ checkpointIgnorePatterns: v })} testId="Checkpoint ignore patterns" />

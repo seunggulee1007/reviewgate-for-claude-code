@@ -124,6 +124,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   // MARK: §52
   backgroundWork: bool,
   subagentsInTurn: bool, // §52.2
+  reviewFirst: (v) => v === "edits" || v === "prompts" || v === "off", // §63
   projectStatusLineAllowed: (v) => projectShas(v),
   // MARK: wave4b w4-notify — §39.6
   notifyWaiting: bool,
