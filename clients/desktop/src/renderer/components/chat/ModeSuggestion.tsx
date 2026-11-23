@@ -2,14 +2,15 @@
  * §2.8 / §33.8 first open of a project: when the user's Claude Code settings start sessions in another mode
  * (`permissions.defaultMode`, one ReviewGate offers), a slim question above the composer — "터미널처럼 {mode} 모드로
  * 시작할까요?". Yes stores it as the mode new sessions start in (`settings.permissionMode`) and switches the live
- * session when it is idle; No is remembered for that mode (this window's browser storage), so it is never asked again.
+ * session when it is idle; × (no) is remembered for that mode (this window's browser storage), so it is never asked again.
+ * §56.5: one line; why it asks is the question's tooltip.
  */
 import { useEffect, useRef, useState } from "react";
 import type { PermissionMode } from "@reviewgate/engine";
 import { t } from "../../i18n";
 import { permissionMode, useStore } from "../../store";
 import { modeSuggestion } from "../../terminalRules";
-import { modeLabel } from "./ModeMenu";
+import { modeHelp, modeLabel } from "./ModeMenu";
 
 const DECLINED_KEY = "rg.modeSuggestion.declined";
 
@@ -69,18 +70,18 @@ export function ModeSuggestion() {
     setSuggested(null);
   };
 
+  // §56.5: one line — the question (why it asks on hover, no settings key), Yes, and × (no: not asked again).
   return (
     <div className="mode-suggestion" role="region" aria-label={t("Start in {0} mode like the terminal?", modeLabel(mode))} data-testid="Mode suggestion">
-      <span className="grow">
-        <span className="bold">{t("Start in {0} mode like the terminal?", modeLabel(mode))}</span>{" "}
-        <span className="caption muted">{t("Your Claude Code settings start sessions in this mode (permissions.defaultMode). Yes switches this session too; No won't ask again.")}</span>
+      <span className="grow truncate bold" title={t("Claude Code starts in this mode in your terminal: {0}", modeHelp(mode))}>
+        {t("Start in {0} mode like the terminal?", modeLabel(mode))}
       </span>
       {/* polish P4-composer-04: what each answer does (the Mac's keys) */}
       <button type="button" className="small primary" onClick={() => void yes()} title={t("Switch this session and remember the mode for this project")} data-testid="Mode suggestion yes">
         {t("Yes")}
       </button>
-      <button type="button" className="small" onClick={no} title={t("Keep the current mode; this project will not be asked again")} data-testid="Mode suggestion no">
-        {t("No")}
+      <button type="button" className="plain tiny" onClick={no} title={t("Keep the current mode; this project will not be asked again")} aria-label={t("No")} data-testid="Mode suggestion no">
+        ×
       </button>
     </div>
   );
