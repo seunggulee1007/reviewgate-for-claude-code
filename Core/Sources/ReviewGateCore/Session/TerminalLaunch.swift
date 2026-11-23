@@ -107,6 +107,26 @@ public struct TerminalLaunch: Sendable, Equatable {
                               execName: "-" + (loginShell as NSString).lastPathComponent, cwd: cwd)
     }
 
+    /// MARK: c-panel (§57.18): a run configuration — `<shell> -l -i -c 'exec /bin/sh -c <command>'` in `cwd`, so the
+    /// user's login PATH finds gradle's JDK / node, and the command reads the same (POSIX sh) whatever their shell is.
+    /// The shell panel's environment (no hook token, no `RG_*`); csh with a `!` in it and shells that cannot read the
+    /// quoting go through zsh, as the terminal chat does.
+    public static func run(command: String, cwd: String, parentEnv: [String: String], loginShell: String, appVersion: String,
+                           debugShell: String? = nil) -> TerminalLaunch {
+        let env = flatten(baseEnv(parentEnv: parentEnv, appVersion: appVersion))
+        let words = ["/bin/sh", "-c", command]
+        if let debugShell {
+            return TerminalLaunch(executable: debugShell, args: ["-c", execLine(words, family: .posix)], env: env, execName: nil, cwd: cwd)
+        }
+        var shell = loginShell
+        var family = shellFamily(loginShell)
+        if family == .csh, command.contains("!") { family = .other }
+        if family == .other { shell = "/bin/zsh"; family = .posix }
+        let line = execLine(words, family: family)
+        let args = family == .csh ? ["-i", "-c", line] : ["-l", "-i", "-c", line]
+        return TerminalLaunch(executable: shell, args: args, env: env, execName: "-" + (shell as NSString).lastPathComponent, cwd: cwd)
+    }
+
     /// `s` as one POSIX shell word: bare when it is only safe characters, else in single quotes (`$`, `${…}`, spaces and
     /// quotes stay literal; a `'` becomes `'\''`).
     public static func posixQuote(_ s: String) -> String {
