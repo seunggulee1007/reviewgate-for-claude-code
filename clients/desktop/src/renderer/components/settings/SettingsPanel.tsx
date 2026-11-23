@@ -131,7 +131,7 @@ function SearchResults({ query, results, onOpen }: { query: string; results: Set
                     <span>{t(r.title)}</span>
                     <AppliesBadge applies={r.applies} />
                   </span>
-                  {r.section !== r.title && <span className="caption muted">{t(r.section)}</span>}
+                  {r.section !== r.title && r.section !== tab.title && <span className="caption muted">{t(r.section)}</span>}
                 </button>
               </li>
             ))}
