@@ -983,4 +983,63 @@ describe("terminal chats (§57)", () => {
     const second = await hook(s, ups("p2"));
     expect(String((second.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext ?? "")).not.toContain("change budget");
   });
+
+  describe("§57.4 a prompt while the turn still looks open", () => {
+    const bash = (id: string, command: string, extra: Record<string, unknown> = {}) => ({ tool_name: "Bash", tool_input: { command, ...extra }, tool_use_id: id, prompt_id: "p1" });
+    const notification = "<task-notification>\n<task-id>bg1</task-id>\n<status>completed</status>\n<summary>Background command \"echo build\" completed (exit code 0)</summary>\n</task-notification>";
+    const warns = (h: Harness): string[] => (h.ofType("log") as unknown as { level: string; message: string }[]).filter((l) => l.level === "warn").map((l) => l.message);
+
+    it("a background Bash and no Stop: the next prompt (a task notification, then the user's) ends the turn, which is reviewed", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      await hook(s, ups("p1", "build acme"));
+      write(r.dir, "build.txt", "built\n");
+      const call = bash("b1", "echo build > build.txt", { run_in_background: true });
+      await hook(s, { hook_event_name: "PreToolUse", ...call });
+      await hook(s, { hook_event_name: "PostToolUse", ...call, tool_response: { stdout: "", stderr: "", interrupted: false, backgroundTaskId: "bg1" } });
+      // No Stop. Claude Code submits the task's result as a prompt: the open turn ends (the Esc rule), is collected, and
+      // the notification is a turn of its own.
+      expect((await hook(s, ups("p2", notification))).decision).toBeUndefined();
+      let st = await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p2", "p2 running");
+      expect(st.changedFiles.map((f) => f.path)).toContain("build.txt");
+      expect(r.h.ofType("turn_end").map((e) => e.stopReason)).toEqual(["interrupted"]);
+      // Its Stop never comes either: the user's prompt goes the same way.
+      expect((await hook(s, ups("p3", "go on"))).decision).toBeUndefined();
+      st = await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p3", "p3 running");
+      expect(r.h.ofType("turn_end")).toHaveLength(2);
+      expect(st.session.externalTurn).toBeNull();
+    });
+
+    it("a write tool while a prompt is being adopted joins that turn; the prompts after it are not blocked", async () => {
+      const r = await rig();
+      const id = await newTerminal(r);
+      const s = await spec(r, id);
+      // Snapshot A takes a while: the write tool's hook comes while the gate already runs the prompt's turn and the
+      // terminal has none open yet — the turn Claude started joins it.
+      const gate = (r.h.engine as unknown as { gate: { snapshotStart(): Promise<string> } }).gate;
+      const real = gate.snapshotStart.bind(gate);
+      gate.snapshotStart = async () => {
+        await new Promise((res) => setTimeout(res, 400));
+        return real();
+      };
+      const p1 = hook(s, ups("p1", "build acme"));
+      await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === null, "p1 being adopted");
+      write(r.dir, "one.txt", "1\n");
+      const pre = hook(s, { hook_event_name: "PreToolUse", ...write_("one.txt", "w1", "p1") });
+      expect(await p1).toEqual({});
+      expect(await pre).toEqual({});
+      gate.snapshotStart = real;
+      expect(r.h.engine.state.session.externalTurn).toBeNull();
+      await hook(s, { hook_event_name: "PostToolUse", ...write_("one.txt", "w1", "p1"), tool_response: { type: "create", filePath: join(r.dir, "one.txt") } });
+      await hook(s, { hook_event_name: "Stop" });
+      await r.h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.some((f) => f.path === "one.txt"), "p1 collected");
+      // Before the fix both were blocked: "ReviewGate still has a turn running. Send the prompt again once it ended."
+      expect((await hook(s, ups("p2", "go on"))).decision).toBeUndefined();
+      expect((await hook(s, ups("p3", notification))).decision).toBeUndefined();
+      await r.h.waitFor((x) => x.gate.phase === "running" && x.session.terminal?.promptId === "p3", "p3 running");
+      expect(warns(r.h)).toEqual([]);
+    });
+  });
 });
+

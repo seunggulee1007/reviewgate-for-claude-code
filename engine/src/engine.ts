@@ -9247,6 +9247,9 @@ export class ReviewEngine {
         while (this.gate.running && this.turnSent === null && this.session === source && Date.now() < joinBy) await pause(20);
         this.log("info", "a turn Claude started joins the turn of a message sent meanwhile");
         ok = this.gate.running;
+        // Joined, the turn is ours: no turn that is not ours holds the input any more (left set, nothing would clear it
+        // in a terminal chat — every later prompt was blocked as "still has a turn running").
+        this.externalTurn = null;
         return;
       }
       this.externalTurn = null;

@@ -9229,6 +9229,14 @@ chat's id);
   Notification `idle_prompt`, SessionEnd, the PTY's exit (`terminal_exited`), or "Review now" (`terminal_end_turn`).
   Closing early is safe: B is a tree, and a later tool call of the same prompt opens a continuation turn through the
   PreToolUse path, which keeps A while the review stands. An open turn never times out by itself.
+- **A prompt while the turn still looks open.** Claude Code runs UserPromptSubmit when it submits a prompt to the model
+  — the user's, a queued one, or a background task's result (`<task-notification>…`) — so a prompt that comes while the
+  previous turn still looks open means its Stop never came (an Esc, or the CLI went on without one). The terminal's open
+  turn ends first (`interrupted`, as above) and is collected; a gate turn with no terminal turn open ends too; then the
+  prompt is adopted. A write tool whose hook comes while a prompt is being adopted (the gate already runs the prompt's
+  turn, the terminal has none open yet) joins that turn (§52.1) — the turn is ours from then, so `session.externalTurn`
+  is cleared with the join. (0.5.22 left it set: with nothing in a terminal chat to clear it, every later prompt was
+  blocked as "ReviewGate still has a turn running", and "Review now" had no turn to end.)
 - **"Review now"** (`terminal_end_turn {sessionId}`) ends the open turn as `ended_by_user` and collects it; refused
   `no_turn` when none is open, `terminal_not_current` for another chat. Clients offer it while `interruptSuspected` is
   set, when the gate has run a turn with no hook for 60 s, or — the client sees what goes into its PTY — 2 s after the
