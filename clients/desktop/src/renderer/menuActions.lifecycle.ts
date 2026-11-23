@@ -60,6 +60,7 @@ export const lifecycleMenuActions: MenuActionHandlers = {
   commit: openReviewDialog("commit"),
   create_pr: openReviewDialog("createPR"),
   new_chat: press("t", "KeyT"),
+  new_chat_in_workbench: press("w", "KeyW", { alt: true }), // §9 (ChatTabs' key: the dialog, or why not)
   close_chat_tab: press("W", "KeyW", { shift: true }),
   chat_tab: (a) => {
     if (a.index >= 0 && a.index < 9) pressKey({ key: String(a.index + 1), code: `Digit${a.index + 1}` });

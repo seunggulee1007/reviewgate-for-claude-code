@@ -22,6 +22,7 @@ import { ExtensionsDialog } from "../extensions/ExtensionsDialog";
 import { LockConflictDialog } from "./LockConflictDialog";
 import { CompactDialog, RewindDialog } from "./RewindDialog";
 import { NewBranchDialog, NewWorkbenchDialog } from "./NewWorkbenchDialog";
+import { WorkbenchChatDialog } from "./WorkbenchChatDialog"; // §9
 // MARK: wave1 desktop-review
 import { planRejectAll } from "../../reviewGate";
 import { FinishReviewDialog, RejectExternalDialog, StaleReviewDialog } from "./ReviewGateDialogs";
@@ -48,6 +49,8 @@ export function Dialogs() {
       return <NewWorkbenchDialog onClose={close} fromPr={dialog.pr} />;
     case "newBranch":
       return <NewBranchDialog onClose={close} />;
+    case "workbenchChat": // §9 New Chat in a Workbench
+      return <WorkbenchChatDialog onClose={close} />;
     case "createPR":
       return <CreatePRDialog onClose={close} />;
     case "submitReview":

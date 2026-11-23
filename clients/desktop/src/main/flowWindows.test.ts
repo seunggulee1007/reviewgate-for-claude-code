@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { isComposerDraft, isWorkbenchSetupReport } from "../shared/flowSettings.js";
-import { createSetupReports } from "./flowWindows.js";
+import { COMPOSER_HANDOFF_MS, createComposerHandoffs, createSetupReports } from "./flowWindows.js";
 
 const report = { branch: "feature/PAY-1600", exitCode: 1, log: "[ERROR] BUILD FAILURE" };
 
@@ -36,5 +36,35 @@ describe("§36.14 a composer draft for another window", () => {
     expect(isComposerDraft("  ")).toBe(false);
     expect(isComposerDraft(42)).toBe(false);
     expect(isComposerDraft("a\0b")).toBe(false);
+  });
+});
+
+describe("§9 New Chat in a Workbench: a held message reaches the new workbench's window once", () => {
+  it("is kept per folder, taken by any of the window's paths, and says the first chat must be a chat", () => {
+    const h = createComposerHandoffs();
+    expect(h.waits("/work/acme-wb/wb-261123-0905", 0)).toBe(false);
+    expect(h.remember("/work/acme-wb/wb-261123-0905/", "go on here\n\n@src/cart.ts", 0)).toBe(true);
+    expect(h.waits("/work/acme-wb/wb-261123-0905", 0)).toBe(true);
+    expect(h.take(["/elsewhere", "/work/acme-wb/wb-261123-0905"], 0)).toBe("go on here\n\n@src/cart.ts");
+    expect(h.take(["/work/acme-wb/wb-261123-0905"], 0)).toBeNull();
+    expect(h.waits("/work/acme-wb/wb-261123-0905", 0)).toBe(false);
+  });
+
+  it("text only, never empty; a quarter of an hour; the newer one wins; at most 20 wait", () => {
+    const h = createComposerHandoffs();
+    expect(h.remember("/a", "  ", 0)).toBe(false);
+    expect(h.remember("/a", 42, 0)).toBe(false);
+    expect(h.remember("", "x", 0)).toBe(false);
+    expect(h.remember("/a", "old", 0)).toBe(true);
+    expect(h.remember("/a", "new", 0)).toBe(true);
+    expect(h.waits("/a", COMPOSER_HANDOFF_MS)).toBe(true);
+    expect(h.waits("/a", COMPOSER_HANDOFF_MS + 1)).toBe(false);
+    expect(h.take(["/a"], COMPOSER_HANDOFF_MS + 1)).toBeNull();
+    expect(h.remember("/a", "new", 0)).toBe(true);
+    expect(h.take(["/a"], 0)).toBe("new");
+    for (let i = 0; i < 25; i++) h.remember(`/w/${i}`, `m${i}`, 0);
+    expect(h.waits("/w/0", 0)).toBe(false);
+    expect(h.take(["/w/24"], 0)).toBe("m24");
+    expect(h.take("/w/23", 0)).toBeNull();
   });
 });

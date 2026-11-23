@@ -87,6 +87,9 @@ public extension AppState {
         settings.loadLocalSettings = AppSettings.loadLocalSettings(root: AppSettings.projectKey(url), defaults: settingsDefaults)
         // MARK: wave6 w6-statusline — §44.2: the project's own statusLine command allowed here ("" none), never the last project's.
         settings.allowedProjectStatusLine = AppSettings.allowedProjectStatusLine(root: AppSettings.projectKey(url), defaults: settingsDefaults)
+        // §9 New Chat in a Workbench: a held message waits for this workbench's composer, so its first chat is a chat (a
+        // terminal chat has no composer, §57.7); the user's kind goes back once it is open (`takeWorkbenchHandoff`).
+        if WorkbenchComposerHandoff.shared.waits(for: url) { settings.newChatKind = .chat }
         return settings
     }
 }

@@ -88,6 +88,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "New chat", mac: "⌘T", win: "Ctrl+T" },
       { action: "New Terminal Chat", mac: "⌃⌘T", win: "Ctrl+Alt+T", note: "On Windows while Terminal chat (preview) is on" }, // MARK: terminal-chat (§57.5) · terminal-win (§57.17)
       { action: "New Chat (Classic)", mac: "⌃⌥⌘T", win: "Ctrl+Alt+Shift+T", note: "On Windows while Terminal chat (preview) is on" }, // MARK: terminal-default (§57.7) · terminal-win (§57.17)
+      { action: "New Chat in a Workbench…", mac: "⌥⌘T", win: "Ctrl+Alt+W", note: "Windows uses W: Ctrl+Alt+T is New Terminal Chat" }, // §9 New Chat in a Workbench
       { action: "Close Chat Tab", mac: "⌘⇧W", win: "Ctrl+Shift+W" },
       { action: "Chat tabs 1–9", mac: "⌘1…⌘9", win: "Ctrl+1…Ctrl+9" },
       // MARK: r2-chats-cards — polish PX-19 / P4-composer-05

@@ -698,6 +698,27 @@ start; should the CLI report another id (`session_info` / `turn_end`) the meta, 
   `viewingSendWait`; the chip in `ChatTabs.tsx`, the line and [취소] in `ViewingChat.tsx`). The history's [열기] never waits
   either: while a switch would, it shows the chat read-only in a tab, as a tab click does (both clients). Tests
   `pendingSwitch.test.ts`, `viewedChat.test.ts`, `reviewRoundStore.test.ts`.
+- **New Chat in a Workbench (워크벤치에서 새 대화; client-only, no wire change).** One folder is one review gate, so a new
+  chat has to wait for the turn — but a workbench (docs/M10-WORKBENCHES.md) is a worktree of its own with its own branch,
+  window and Claude, and its chat starts at once. Offered in the chat menu ("워크벤치에서 새 대화…", also Chat ›, ⌥⌘T),
+  and on the held chip itself: "새 채팅 대기 중" shows [워크벤치에서 열기] ("기다리지 않고 워크벤치에서 열기") the moment the
+  user waits. A sheet with one field — the branch, `wb/<yyMMdd-HHmm>` (`-2`, `-3`… when taken by a branch or workbench) —
+  and [만들기] (Return) sends `workbench_create {branch}`: from this worktree's HEAD, with the repository's usual setup
+  (§36.12; its steps show while it runs, a refusal shows its words in the sheet, `branch_in_use` offers that workbench).
+  Once created, the held switch here is called off (a held new chat simply is not opened here) and the workbench's window
+  opens; its first chat is of the default kind (§57.7). Messages held with an [이 채팅으로 이어가기] switch go along: they
+  wait for that window (process-wide, taken once, at most 15 minutes, keyed by the folder) and land in its composer —
+  never sent; the first chat is then a chat (a terminal chat has no composer: `set_settings {newChatKind: "chat"}` before
+  that open, the user's kind right after). Without git (§59) the chip has no button and says why in its tooltip; the menu
+  items are disabled with the reason. Mac: Core `Session/WorkbenchChat.swift` (`WorkbenchChatBranch`,
+  `WorkbenchComposerHandoff`, `handHeldSwitchToWorkbench`, `takeWorkbenchHandoff`), App `UI/Sidebar/WorkbenchChatSheet.swift`,
+  `PendingChatSwitchChip`; test `WorkbenchChatTests`. Electron: the same — the + button's right-click menu (always, also
+  without the terminal preview), Chat › "워크벤치에서 새 대화…" and Ctrl+Alt+W (Ctrl+Alt+T is New Terminal Chat there), the
+  chip's [워크벤치에서 열기], `WorkbenchChatDialog.tsx`; `renderer/workbenchChat.ts`, `createWorkbenchWith {handHeldSwitch}`
+  (storeFlow.ts). The message travels through main (`rg:openWorkbenchWindow` draft → `rg:takeWorkbenchDraft`, main
+  `flowWindows.ts` `createComposerHandoffs`, which also makes that open's first chat a chat): text and @ mentions; images
+  cannot cross windows, so they come back to this composer (as with Run as Task, §49). Tests `workbenchChat.test.ts`,
+  `flowWindows.test.ts`, `flowStore.test.ts`, `menuBar.test.ts`.
 
 ### 9.1 The chat left keeps its Claude Code process a while (r2-chats-cards M33)
 

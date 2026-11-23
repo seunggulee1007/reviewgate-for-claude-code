@@ -74,10 +74,11 @@ const bridge: RGBridge = {
   // MARK: wave3 desktop-session — §36.8
   pinClaudeVersion: (version: string) => unwrap(ipcRenderer.invoke("rg:pinClaudeVersion", version)),
   setUI: (hash: string, patch: ProjectUI) => ipcRenderer.invoke("rg:setUI", hash, patch),
-  openWorkbenchWindow: (path: string, setupReport?: WorkbenchSetupReport) => ipcRenderer.invoke("rg:openWorkbenchWindow", path, setupReport),
+  openWorkbenchWindow: (path: string, setupReport?: WorkbenchSetupReport, draft?: string) => ipcRenderer.invoke("rg:openWorkbenchWindow", path, setupReport ?? null, draft ?? null),
   // MARK: wave3 desktop-flow — §36.12 a new workbench's failed setup, §36.14 PR comments into another window's composer
   takeWorkbenchSetupReport: (paths: string[]) => ipcRenderer.invoke("rg:takeWorkbenchSetupReport", paths),
   composeInWindow: (path: string, text: string) => ipcRenderer.invoke("rg:composeInWindow", path, text),
+  takeWorkbenchDraft: (paths: string[]) => ipcRenderer.invoke("rg:takeWorkbenchDraft", paths), // §9 New Chat in a Workbench
   openInNewWindow: (path?: string) => ipcRenderer.invoke("rg:openInNewWindow", path),
   focusProjectWindow: (path: string) => ipcRenderer.invoke("rg:focusProjectWindow", path),
   closeProjectInWindow: (path: string) => ipcRenderer.invoke("rg:closeProjectInWindow", path),

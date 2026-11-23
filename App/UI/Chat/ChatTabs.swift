@@ -132,6 +132,13 @@ struct ChatTabStrip: View {
                 }
                 .disabled(store.newChatBlocker != nil || store.projectInfo == nil)
                 .accessibilityIdentifier("Chat menu new classic chat")
+                // §9: one folder runs one turn at a time — a workbench (its own worktree, window and Claude) need not wait.
+                Button { model.showWorkbenchChat = true } label: {
+                    Label("New Chat in a Workbench…", systemImage: "arrow.triangle.branch")
+                    Text(store.workbenchChatBlocker ?? String(localized: "Starts now in a folder of its own, without waiting (⌥⌘T)"))
+                }
+                .disabled(store.workbenchChatBlocker != nil)
+                .accessibilityIdentifier("Chat menu new chat in a workbench")
                 Button("History…") { showHistory = true }
                     .accessibilityIdentifier("Chat history")
                 if let current = store.sessions.first(where: { $0.id == store.currentSessionId }) {
@@ -316,6 +323,7 @@ struct ChatTabStrip: View {
 struct PendingChatSwitchChip: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
 
     var body: some View {
         if let pending = store.pendingChatSwitch {
@@ -326,7 +334,23 @@ struct PendingChatSwitchChip: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: 150)
-                    .help(store.pendingChatSwitchText ?? "")
+                    .help(tooltip)
+                // §9 New Chat in a Workbench: the way out shows the moment the user waits (not without git, §59 — the
+                // tooltip says why).
+                if store.workbenchChatBlocker == nil {
+                    Button { model.showWorkbenchChat = true } label: {
+                        Label("Open in a Workbench", systemImage: "arrow.triangle.branch")
+                            .font(.caption)
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(.link)
+                    .controlSize(.small)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .help(String(localized: "Don't wait — open in a workbench: a new chat in a folder of its own (a new branch from HEAD, its own window and Claude) (⌥⌘T)"))
+                    .accessibilityLabel(Text("Don't wait — open in a workbench"))
+                    .accessibilityIdentifier("Pending chat switch open in workbench")
+                }
                 Button { store.cancelPendingChatSwitch() } label: {
                     Image(systemName: "xmark").font(.caption2.weight(.semibold))
                 }
@@ -341,6 +365,13 @@ struct PendingChatSwitchChip: View {
             .accessibilityLabel(Text(verbatim: store.pendingChatSwitchText ?? ""))
             .accessibilityIdentifier("Pending chat switch")
         }
+    }
+
+    /// What it waits for — and, where there is no workbench, why it cannot open in one.
+    private var tooltip: String {
+        let waits = store.pendingChatSwitchText ?? ""
+        guard let blocker = store.workbenchChatBlocker else { return waits }
+        return waits + "\n" + String(localized: "Not in a workbench: \(blocker)")
     }
 
     private func label(_ pending: PendingChatSwitch) -> String {

@@ -26,7 +26,8 @@ vi.mock("./composerBridge", () => ({
 type Reply = { ok: true; reply: unknown } | { ok: false; error: string; code?: string; paths?: string[]; partial?: unknown };
 const sent: EngineCommand[] = [];
 let respond: (cmd: EngineCommand) => Reply | Promise<Reply> = () => ({ ok: true, reply: { type: "result", ok: true } });
-const opened: { path: string; report: unknown }[] = [];
+const opened: { path: string; report: unknown; draft?: string }[] = [];
+let drafts: Record<string, string> = {}; // §9 New Chat in a Workbench: what main keeps for a new workbench's window
 const composed: { path: string; text: string }[] = [];
 let windowFor: (path: string) => boolean = () => false;
 let reports: Record<string, unknown> = {};
@@ -52,7 +53,7 @@ async function loadStore() {
       setUI: async () => undefined,
       notify: async () => true,
       onEvent: () => () => undefined,
-      openWorkbenchWindow: async (path: string, report?: unknown) => void opened.push({ path, report }),
+      openWorkbenchWindow: async (path: string, report?: unknown, draft?: string) => void opened.push({ path, report, ...(draft !== undefined ? { draft } : {}) }),
       composeInWindow: async (path: string, text: string) => {
         if (!windowFor(path)) return false;
         composed.push({ path, text });
@@ -60,6 +61,16 @@ async function loadStore() {
       },
       takeWorkbenchSetupReport: async (paths: string[]) => {
         for (const p of paths) if (reports[p]) return reports[p];
+        return null;
+      },
+      takeWorkbenchDraft: async (paths: string[]) => {
+        for (const p of paths) {
+          const text = drafts[p];
+          if (text) {
+            delete drafts[p];
+            return text;
+          }
+        }
         return null;
       },
       platform: "darwin",
@@ -114,6 +125,7 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     leftComposer.length = 0;
     savedPatches = [];
     reports = {};
+    drafts = {};
     windowFor = () => false;
     respond = () => ({ ok: true, reply: { type: "result", ok: true } });
     // a fresh project view per test: another folder first so the next snapshot is a project change
@@ -333,6 +345,44 @@ describe("the daily flow in the store (wave3 desktop-flow)", () => {
     expect(inserted).toEqual(["Fix the cart"]);
     h({ type: "task_started", text: "", mode: "default", from: "/work/acme", sent: false });
     expect(inserted).toEqual(["Fix the cart"]);
+    expect(sent.some((c) => c.type === "send")).toBe(false);
+  });
+
+  it("§9 New Chat in a Workbench: once created the held switch is called off and its message goes with the window; a refusal keeps it waiting", async () => {
+    const { usePendingSwitch } = await import("./pendingSwitch");
+    usePendingSwitch.setState({ pending: { kind: "open", id: "s2", messages: [{ text: "go on here", extras: { mentions: ["src/cart.ts"] } }] }, inflight: false });
+    useStore.setState({ dialog: { kind: "workbenchChat" } });
+    respond = (c) => (c.type === "workbench_create" ? { ok: false, error: "path_exists:/wt/wb-261123-0905", code: "path_exists" } : { ok: true, reply: { type: "result", ok: true } });
+    expect(await useStore.getState().createWorkbenchWith({ branch: "wb/261123-0905", handHeldSwitch: true })).toBeNull();
+    // Refused: the words stay in the dialog, the switch still waits here, no window.
+    expect(useStore.getState().flow.create).toMatchObject({ running: false, error: "The folder already exists: /wt/wb-261123-0905" });
+    expect(useStore.getState().dialog).toEqual({ kind: "workbenchChat" });
+    expect(usePendingSwitch.getState().pending?.kind).toBe("open");
+    expect(opened).toEqual([]);
+
+    let finish: (() => void) | null = null;
+    respond = (c) => (c.type === "workbench_create" ? new Promise((r) => (finish = () => r({ ok: true, reply: { type: "result", ok: true } }))) : { ok: true, reply: { type: "result", ok: true } });
+    const created = useStore.getState().createWorkbenchWith({ branch: "wb/261123-0905-2", handHeldSwitch: true });
+    await flush();
+    // From this worktree's HEAD, the repository's usual setup: nothing but the branch on the wire.
+    expect(sent.filter((c) => c.type === "workbench_create").pop()).toEqual({ type: "workbench_create", branch: "wb/261123-0905-2" });
+    useStore.getState().handleEvent({ type: "workbench_progress", path: "/wt/wb-261123-0905-2", branch: "wb/261123-0905-2", step: "done" });
+    expect(usePendingSwitch.getState().pending?.kind).toBe("open"); // not before it exists
+    finish!();
+    expect(await created).toBe("/wt/wb-261123-0905-2");
+    expect(opened).toEqual([{ path: "/wt/wb-261123-0905-2", report: undefined, draft: "go on here\n\n@src/cart.ts" }]);
+    expect(usePendingSwitch.getState().pending).toBeNull();
+    expect(useStore.getState().dialog).toBeNull();
+    expect(inserted).toEqual([]);
+    expect(sent.some((c) => c.type === "send" || c.type === "session_open" || c.type === "session_new")).toBe(false);
+  });
+
+  it("§9 the new workbench's window puts the held message into its composer once its project opens (never sent)", async () => {
+    drafts = { "/wt/wb-261123-0905": "go on here\n\n@src/cart.ts" };
+    snapshot({ path: "/wt/wb-261123-0905" });
+    await flush();
+    expect(inserted).toEqual(["go on here\n\n@src/cart.ts"]);
+    expect(drafts).toEqual({});
     expect(sent.some((c) => c.type === "send")).toBe(false);
   });
 

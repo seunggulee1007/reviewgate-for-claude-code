@@ -39,6 +39,11 @@ export function terminalChatKey(e: ShortcutKey): "terminal" | "classic" | null {
   return e.shiftKey ? "classic" : "terminal";
 }
 
+/** §9 New Chat in a Workbench: Ctrl+Alt+W (the Mac's ⌥⌘T — Ctrl+Alt+T is New Terminal Chat here). The physical key decides. */
+export function isWorkbenchChatKey(e: ShortcutKey): boolean {
+  return mod(e) && e.altKey && !e.shiftKey && (e.code === "KeyW" || e.key.toLowerCase() === "w");
+}
+
 /** ⌘↩ = "message" (to the main conversation), ⌥⌘↩ = "note" in a side thread's follow-up field; never the IME's Enter. */
 export function sideThreadKey(e: ShortcutKey & ImeKeyLike): "message" | "note" | null {
   if (!mod(e) || e.shiftKey || !isEnter(e)) return null;

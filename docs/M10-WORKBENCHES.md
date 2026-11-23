@@ -28,6 +28,14 @@ Per-worktree ignore: the managed root is added to nothing (it's outside the repo
 - Refuse opening the same root twice: engine lock error → alert "This workbench is already open in another window/session (pid N since …). Take over?" (Take over = `open_project{takeover:true}`).
 - When a workbench's review is done, "Create PR from this branch…" (M10.1, optional): `gh pr create --fill --head <branch> --base <main>` via engine command `pr_create { base, title?, body?, draft? }` → returns URL; shown in the Reviews banner.
 
+### New Chat in a Workbench (PROTOCOL §9)
+Turns go one at a time per worktree, so a new chat asked for while Claude works waits. "워크벤치에서 새 대화…" (the chat menu,
+Chat ›, ⌥⌘T; and [워크벤치에서 열기] on the "새 채팅 대기 중" chip) makes a workbench in one step instead: a one-field sheet
+with the branch `wb/<yyMMdd-HHmm>` (editable; `-2`… when taken) and [만들기] (Return) → `workbench_create {branch}` from
+HEAD → its window, whose first chat is of the default kind. A message held for a chat switch moves to that window's
+composer (never sent; that first chat is then a chat). No engine command was added. Not offered without git (§59).
+Windows: the same from the + button's right-click, Chat › and Ctrl+Alt+W; the message goes through main with the window.
+
 ## Windows client
 Same commands; each workbench = one BrowserWindow with its own in-process `ReviewEngine`.
 

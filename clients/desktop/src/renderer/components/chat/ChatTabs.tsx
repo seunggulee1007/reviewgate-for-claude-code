@@ -32,7 +32,8 @@ import { MovedChatBadge } from "./ChatMoveViews"; // MARK: wave4b w4b-follow
 import { useTerminalChats } from "../../terminal/terminalChat"; // §57.17
 import { ptyAvailable, usePtyInfo } from "../../terminal/ptyInfo"; // §57.17
 import { continueAsTerminalBlocker, continueAsTerminalHelp, defaultChatKind, terminalChatsOffered } from "../../continueTerminal"; // §57.7 / §57.9
-import { terminalChatKey } from "../../keymap"; // §57.5
+import { isWorkbenchChatKey, terminalChatKey } from "../../keymap"; // §57.5 · §9 New Chat in a Workbench
+import { workbenchChatRefusal } from "../../workbenchChat"; // §9
 import { subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost"; // §57.17
 import "../terminal/terminal.css"; // §57.17: the tab's terminal glyph
 
@@ -163,6 +164,14 @@ export function ChatTabs() {
         void viewChat(next);
         return;
       }
+      // §9 New Chat in a Workbench (Ctrl+Alt+W): its dialog, or why not (no project, no git).
+      if (isWorkbenchChatKey(e)) {
+        e.preventDefault();
+        const why = workbenchChatRefusal(s.state);
+        if (why !== null) sayWhy(why);
+        else s.openDialog({ kind: "workbenchChat" });
+        return;
+      }
       // §57.5 / §57.17: Ctrl+Alt+T a new terminal chat, Ctrl+Alt+Shift+T a classic one — while the preview offers them.
       const kind = terminalChatKey(e);
       if (kind !== null) {
@@ -258,10 +267,17 @@ export function ChatTabs() {
     ];
   };
 
-  // §57.5 / §57.7: with the preview on, + opens the default kind and its right-click (or the menu) the other.
+  // §57.5 / §57.7: with the preview on, + opens the default kind and its right-click (or the menu) the other. §9: the
+  // right-click always offers a new chat in a workbench (it need not wait for Claude here).
+  const workbenchRefusal = workbenchChatRefusal(state);
   const newMenuItems = (): AgentMenuItem[] => [
-    { label: t("New Terminal Chat"), onClick: () => void useStore.getState().newTerminalChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("Claude Code itself in this column (Ctrl+Alt+T)"), testId: "New chat menu terminal" },
-    { label: t("New Chat (Classic)"), onClick: () => void useStore.getState().newClassicChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("ReviewGate's chat UI in this column (Ctrl+Alt+Shift+T)"), testId: "New chat menu classic" },
+    ...(offered
+      ? [
+          { label: t("New Terminal Chat"), onClick: () => void useStore.getState().newTerminalChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("Claude Code itself in this column (Ctrl+Alt+T)"), testId: "New chat menu terminal" },
+          { label: t("New Chat (Classic)"), onClick: () => void useStore.getState().newClassicChat(), disabled: newRefusal, hint: waits ? t("It opens once Claude is done") : t("ReviewGate's chat UI in this column (Ctrl+Alt+Shift+T)"), testId: "New chat menu classic" },
+        ]
+      : []),
+    { label: t("New Chat in a Workbench…"), onClick: () => openDialog({ kind: "workbenchChat" }), disabled: workbenchRefusal, hint: t("Starts now in a folder of its own, without waiting (Ctrl+Alt+W)"), testId: "New chat menu workbench" },
   ];
   const defaultTerminal = defaultChatKind(settings, offered) === "terminal";
   const newTitle =
@@ -272,9 +288,7 @@ export function ChatTabs() {
           t("Right-click for the other kind; Settings › New chats open as changes the default"),
           ...(waits ? [t("It opens once Claude is done")] : []),
         ].join("\n")
-      : waits
-        ? t("New chat (⌘T) — it opens once Claude is done")
-        : t("{0} ({1})", t("New chat"), "⌘T"));
+      : [waits ? t("New chat (⌘T) — it opens once Claude is done") : t("{0} ({1})", t("New chat"), "⌘T"), t("Right-click: New Chat in a Workbench… (Ctrl+Alt+W)")].join("\n"));
   return (
     <div className="chat-tabs" data-testid="Chat tabs">
       <div
@@ -406,11 +420,10 @@ export function ChatTabs() {
         className="plain small"
         title={newTitle}
         aria-label={defaultTerminal ? t("New terminal chat") : t("New chat")}
-        aria-haspopup={offered ? "menu" : undefined}
+        aria-haspopup="menu"
         disabled={newRefusal !== null}
         onClick={() => void newChat()}
         onContextMenu={(e) => {
-          if (!offered) return;
           e.preventDefault();
           setNewMenuAt({ x: e.clientX, y: e.clientY });
         }}
@@ -419,8 +432,25 @@ export function ChatTabs() {
         <Icon name="plus" size={14} />
       </button>
       {pending && (
-        <span className="pending-switch pill" title={pendingSwitchText(state, pending) ?? undefined} data-testid="Pending chat switch">
+        <span
+          className="pending-switch pill"
+          title={[pendingSwitchText(state, pending), workbenchRefusal !== null && state.project ? t("Not in a workbench: {0}", workbenchRefusal) : null].filter(Boolean).join("\n") || undefined}
+          data-testid="Pending chat switch"
+        >
           <span className="truncate">{pendingSwitchLabel(state, pending)}</span>
+          {/* §9 New Chat in a Workbench: the way out shows the moment the user waits (not without git, §59 — the tooltip says why). */}
+          {workbenchRefusal === null && (
+            <button
+              type="button"
+              className="link small"
+              aria-label={t("Don't wait — open in a workbench")}
+              title={t("Don't wait — open in a workbench: a new chat in a folder of its own (a new branch from HEAD, its own window and Claude) (Ctrl+Alt+W)")}
+              onClick={() => openDialog({ kind: "workbenchChat" })}
+              data-testid="Pending chat switch open in workbench"
+            >
+              {t("Open in a Workbench")}
+            </button>
+          )}
           <button type="button" className="plain small" aria-label={t("Call off the waiting chat switch")} title={t("Call it off")} onClick={cancelPendingSwitch} data-testid="Cancel pending chat switch">
             <Icon name="close" size={10} />
           </button>

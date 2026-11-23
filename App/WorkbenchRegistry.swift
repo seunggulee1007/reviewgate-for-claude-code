@@ -125,6 +125,9 @@ final class WindowModel {
     var startedTaskText: String?
     var startedTaskTick = 0
 
+    /// §9 "New Chat in a Workbench" (⌥⌘T, the chat menu, the held switch's chip): its one-field sheet.
+    var showWorkbenchChat = false
+
     /// §49: opens the New Workbench sheet as "Run as Task" with `text`.
     func runAsTask(_ text: String) {
         newWorkbenchTask = text

@@ -272,6 +272,8 @@ function chatMenu(needsProject: { enabled: boolean }, can: MenuEnabled, tabs: st
     submenu: [
       { label: t("New chat"), ...shownKey("CmdOrCtrl+T"), enabled: can.chatSwitch, click: () => dispatch({ type: "new_chat" }, () => undefined) },
       ...terminalItems,
+      // §9: a new chat that need not wait for Claude here — in a workbench of its own (git worktree, window, Claude).
+      { label: t("New Chat in a Workbench…"), ...shownKey("CmdOrCtrl+Alt+W"), enabled: can.workbenchChat, click: () => dispatch({ type: "new_chat_in_workbench" }, () => undefined) },
       { label: t("Close Chat Tab"), ...shownKey("CmdOrCtrl+Shift+W"), ...needsProject, click: () => dispatch({ type: "close_chat_tab" }, () => undefined) },
       ...(tabs.length > 0 ? [{ type: "separator" as const }] : []),
       ...tabs.map((title, index): MenuItemConstructorOptions => ({

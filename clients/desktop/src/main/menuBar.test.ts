@@ -115,6 +115,17 @@ describe("the Windows menu bar (P1-chrome-09)", () => {
     expect(built.builds).toBe(before + 1);
   });
 
+  it("§9 Chat › New Chat in a Workbench… (Ctrl+Alt+W): on with git, off otherwise; it asks the page", async () => {
+    let items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true, workbenchChat: true } });
+    const item = () => items.find((i) => i.label === "New Chat in a Workbench…");
+    expect(item()).toMatchObject({ accelerator: "CmdOrCtrl+Alt+W", registerAccelerator: false, enabled: true });
+    sent.length = 0;
+    (item()?.click as unknown as () => void)();
+    expect(sent).toEqual([{ type: "new_chat_in_workbench" }]);
+    items = await menu({ state: state(), menu: { ...NOTHING_ENABLED, chatSwitch: true } });
+    expect(item()?.enabled).toBe(false);
+  });
+
   it("§57.17: terminal chat items only while the preview is on and a PTY runs; the panel toggle whenever shells can open; a terminal chat turns off its chat-only items", async () => {
     const labels = (items: MenuItemConstructorOptions[]) => items.map((i) => i.label);
     settings.terminalChatPreview = false;

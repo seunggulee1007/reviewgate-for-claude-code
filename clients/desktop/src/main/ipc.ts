@@ -17,7 +17,7 @@ import { isOpenableMarkdown } from "./markdownOpen.js"; // MARK: wave4d w4d-conf
 import { isOpenableGraphHtml } from "./graphOpen.js"; // MARK: wave5 w5-graph (§43.3)
 // MARK: wave3 desktop-flow
 import { resyncFlowSettings } from "./flowSync.js";
-import { createSetupReports } from "./flowWindows.js";
+import { createComposerHandoffs, createSetupReports } from "./flowWindows.js";
 import { isComposerDraft } from "../shared/flowSettings.js";
 import { requestWithDetails } from "./engineRequest.js";
 import { isImageDataURL, isSafeExternalURL, validateCommand, type Validated } from "./ipcGuard.js";
@@ -66,16 +66,26 @@ export function installIPC(deps: Deps): void {
    * MARK: wave3 desktop-session — §36.6: the project's own settings (`loadLocalSettings`, its allow patterns) go to the engine
    * right before its `open_project` / `switch_project` — the same main lane, so the session that starts has them.
    */
-  const beforeOpen = (engine: ReviewEngine, cmd: EngineCommand) => {
+  const beforeOpen = (engine: ReviewEngine, cmd: EngineCommand): string | null => {
     const path = projectOpenPath(cmd);
+    if (!path) return null;
+    // §9 New Chat in a Workbench: a held message waits for this workbench's composer, so its first chat is a chat (a
+    // terminal chat has none, §57.7); the user's kind goes back right after the open (`afterOpen`).
+    const firstChat = composerHandoffs.waits(path);
+    void engine.handle({ type: "set_settings", settings: { ...engineSettings(loadSettings(), path), ...(firstChat ? { newChatKind: "chat" } : {}) } });
+    return firstChat ? path : null;
+  };
+  const afterOpen = (engine: ReviewEngine, path: string | null) => {
     if (path) void engine.handle({ type: "set_settings", settings: engineSettings(loadSettings(), path) });
   };
   ipcMain.handle("rg:cmd", (evt, raw: unknown) => {
     const v = guarded(evt.sender, raw);
     if (!v.ok) return { __error: v.error };
     return withEngine(evt.sender, (e) => {
-      beforeOpen(e, v.cmd);
-      return e.handle(v.cmd);
+      const restore = beforeOpen(e, v.cmd);
+      const done = e.handle(v.cmd);
+      afterOpen(e, restore);
+      return done;
     });
   });
   ipcMain.handle("rg:request", async (evt, raw: unknown) => {
@@ -234,9 +244,11 @@ export function installIPC(deps: Deps): void {
   ipcMain.handle("rg:setUI", (_e, hash: unknown, patch: unknown) => {
     if (typeof hash === "string" && /^[0-9a-f]{8}$/.test(hash) && typeof patch === "object" && patch !== null) saveProjectUI(hash, patch as ProjectUI);
   });
-  ipcMain.handle("rg:openWorkbenchWindow", (_e, path: string, setupReport?: unknown) => {
+  ipcMain.handle("rg:openWorkbenchWindow", (_e, path: string, setupReport?: unknown, draft?: unknown) => {
     // MARK: wave3 desktop-flow — §36.12: a failed setup's log goes with the window that opens the new workbench.
-    if (setupReport !== undefined) setupReports.remember(path, setupReport);
+    if (setupReport !== undefined && setupReport !== null) setupReports.remember(path, setupReport);
+    // §9 New Chat in a Workbench: the message held for a new chat goes into that window's composer (never sent).
+    if (draft !== undefined && draft !== null) composerHandoffs.remember(path, draft);
     const existing = deps.findWindowFor(path);
     if (existing) {
       existing.win.focus();
@@ -319,6 +331,8 @@ export function installIPC(deps: Deps): void {
   // MARK: wave3 desktop-flow (src/main/flowWindows.ts)
   /** §36.12: the new workbench's window takes its failed setup's report once its project is open. */
   ipcMain.handle("rg:takeWorkbenchSetupReport", (_e, paths: unknown) => setupReports.take(paths));
+  /** §9: the new workbench's window takes the message held for a new chat once its project is open (its composer). */
+  ipcMain.handle("rg:takeWorkbenchDraft", (_e, paths: unknown) => composerHandoffs.take(paths));
   /**
    * §36.14 "Send to Claude": PR comments go into the composer of the window that has `path` open (the PR head's workbench),
    * which comes to the front; false when no other window has it (the caller uses its own composer). Nothing is sent.
@@ -337,6 +351,8 @@ export function installIPC(deps: Deps): void {
 
 /** MARK: wave3 desktop-flow — reports waiting for the window of their new workbench. */
 const setupReports = createSetupReports();
+/** §9 New Chat in a Workbench — held messages waiting for the window of their new workbench. */
+const composerHandoffs = createComposerHandoffs();
 
 /** One picked image file → its base64, or the §24 code it would be refused with (read only when it passes). */
 export async function readPickedImage(path: string): Promise<PickedImage> {
