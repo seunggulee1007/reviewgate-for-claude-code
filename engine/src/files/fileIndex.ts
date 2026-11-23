@@ -1,11 +1,13 @@
 import type { FileItem } from "../protocol.js";
+import { MINIFIED, VENDOR } from "./navigate.js";
+import { humpMatch } from "./symbolIndex.js";
 
 /** `list_files` never returns more than this many items (§23). */
 export const LIST_FILES_MAX = 50;
 /** Paths kept in the index (files + derived directories); a larger repository is cut (logged by the engine). */
 export const FILE_INDEX_MAX_ENTRIES = 200_000;
 
-type Entry = { path: string; lower: string; base: string; kind: "file" | "dir" };
+type Entry = { path: string; lower: string; base: string; kind: "file" | "dir"; /** The basename as written (camel humps, §65). */ name?: string };
 
 /**
  * The repository's file list for @-mentions (§23): `git ls-files --cached --others --exclude-standard` plus every
@@ -45,9 +47,9 @@ export class FileIndex {
     return run;
   }
 
-  /** The best `limit` (≤ 50) matches of `query`; files of the current review (`changed`) rank first. */
-  async search(query: string, changed: ReadonlySet<string>, limit = LIST_FILES_MAX): Promise<FileItem[]> {
-    return searchEntries(await this.load(), query, changed, limit);
+  /** The best `limit` (≤ 50) matches of `query`; files of the current review (`changed`) rank first; `filesOnly`: no directories (§65). */
+  async search(query: string, changed: ReadonlySet<string>, limit = LIST_FILES_MAX, filesOnly = false): Promise<FileItem[]> {
+    return searchEntries(await this.load(), query, changed, limit, filesOnly);
   }
 }
 
@@ -64,7 +66,8 @@ function buildEntries(files: string[]): { entries: Entry[]; truncated: boolean }
     }
     seen.add(key);
     const slash = path.lastIndexOf("/");
-    entries.push({ path, lower: path.toLowerCase(), base: (slash >= 0 ? path.slice(slash + 1) : path).toLowerCase(), kind });
+    const name = slash >= 0 ? path.slice(slash + 1) : path;
+    entries.push({ path, lower: path.toLowerCase(), base: name.toLowerCase(), kind, name });
   };
   for (const raw of files) {
     const f = raw.replace(/\\/g, "/");
@@ -76,13 +79,15 @@ function buildEntries(files: string[]): { entries: Entry[]; truncated: boolean }
   return { entries, truncated };
 }
 
-/** Ranks every entry against `query`; exported for tests. */
-export function searchEntries(entries: readonly Entry[], query: string, changed: ReadonlySet<string>, limit = LIST_FILES_MAX): FileItem[] {
+/** Ranks every entry against `query`; exported for tests. `filesOnly` (Go to File, §65): no directories. */
+export function searchEntries(entries: readonly Entry[], query: string, changed: ReadonlySet<string>, limit = LIST_FILES_MAX, filesOnly = false): FileItem[] {
   const cap = Math.max(1, Math.min(LIST_FILES_MAX, Number.isFinite(limit) ? Math.floor(limit) : LIST_FILES_MAX));
-  const q = query.trim().toLowerCase().replace(/\\/g, "/").replace(/^@/, "").replace(/\s+/g, "");
+  const raw = query.trim().replace(/\\/g, "/").replace(/^@/, "").replace(/\s+/g, "");
+  const q = raw.toLowerCase();
   const scored: { e: Entry; score: number }[] = [];
   for (const e of entries) {
-    const score = q ? fuzzyScore(q, e) : 0;
+    if (filesOnly && e.kind === "dir") continue;
+    const score = q ? fuzzyScore(q, e, raw) : 0;
     if (score === null) continue;
     const isChanged = e.kind === "file" && changed.has(e.path);
     // Changed files of the current review first; without a query only they and the top-level entries are useful.
@@ -98,7 +103,7 @@ export function searchEntries(entries: readonly Entry[], query: string, changed:
  * A match inside the basename beats one spread over the directories; contiguous runs, a prefix of the basename
  * and matches right after `/ . _ -` score higher; long, deep paths slightly lower.
  */
-export function fuzzyScore(q: string, e: Pick<Entry, "lower" | "base">): number | null {
+export function fuzzyScore(q: string, e: Pick<Entry, "lower" | "base" | "name">, raw?: string): number | null {
   const inBase = subsequence(q, e.base);
   const inPath = inBase ?? subsequence(q, e.lower);
   if (inPath === null) return null;
@@ -117,6 +122,9 @@ export function fuzzyScore(q: string, e: Pick<Entry, "lower" | "base">): number 
     if (before === "/" || before === "." || before === "_" || before === "-") score += 3;
     prev = i;
   }
+  // §65: camel humps of the basename's stem (`UsrSvc` → `UserService.java`) +300; vendored / minified files −50.
+  if (raw && raw.length >= 2 && !raw.includes("/") && e.name && humpMatch(raw.replace(/\.[^.]*$/, ""), e.name.replace(/\.[^.]*$/, ""))) score += 300;
+  if (VENDOR.test(e.lower) || MINIFIED.test(e.lower)) score -= 50;
   score -= e.lower.length * 0.2;
   return score;
 }

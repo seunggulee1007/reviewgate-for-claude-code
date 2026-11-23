@@ -92,6 +92,15 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "project_search", query: "CartService", wholeWord: true, caseSensitive: true }).ok).toBe(true);
   });
 
+  it("allows the symbol index commands (§65) and go to definition's receiver / column", () => {
+    expect(validateCommand({ type: "document_symbols", path: "src/A.java" }).ok).toBe(true);
+    expect(validateCommand({ type: "workspace_symbols", query: "UsrSvc", limit: 100 }).ok).toBe(true);
+    expect(validateCommand({ type: "definition_preview", path: "src/A.java", line: 12, before: 2, after: 10 }).ok).toBe(true);
+    expect(validateCommand({ type: "nav_index_build", full: true }).ok).toBe(true);
+    expect(validateCommand({ type: "find_definition", symbol: "find", fromPath: "src/A.java", line: 3, column: 20, receiver: "repository" }).ok).toBe(true);
+    expect(validateCommand({ type: "list_files", query: "UsrSvc", filesOnly: true }).ok).toBe(true);
+  });
+
   it("allows pr_comment (§60: the PR conversation's composer)", () => {
     expect(validateCommand({ type: "pr_comment", body: "Thanks!" }).ok).toBe(true);
   });

@@ -132,7 +132,7 @@ type EngineCommand =
   | Cmd<"mcp_add", { name: string; scope: "session" | "project" | "user" | "local"; config: McpAddConfig }>         // → mcp_status (local: §36.6)
   | Cmd<"mcp_remove", { name: string; scope: "session" | "project" | "user" | "local" }>                            // → mcp_status
   | Cmd<"mcp_auth", { name: string }>                      // opens a terminal running `claude /mcp` (§22)
-  | Cmd<"list_files", { query: string; limit?: number }>   // → files (§23)
+  | Cmd<"list_files", { query: string; limit?: number; filesOnly?: boolean }>   // → files (§23; filesOnly + camel humps: Go to File, §65)
   | Cmd<"attachment_get", { hash: string }>                // → attachment (§24)
   | Cmd<"set_model", { model: string; effort?: EffortLevel | null }>   // live model / effort switch, persisted per project (§25)
   | Cmd<"rewind", { toTurn: number; mode: "conversation" | "files" | "both"; editText?: string; mentions?: string[]; attachments?: SendAttachment[]; force?: boolean }>   // → rewound (§26)
@@ -153,8 +153,12 @@ type EngineCommand =
   | Cmd<"workbench_preview", { branch: string; from?: string; location?: "managed" | "sibling" }>   // → workbench_preview (§36.12)
   | Cmd<"prereview_start", { scope: "round" | "files"; paths?: string[]; effort: "low" | "medium" | "high" }>   // → prereview (§36.13)
   | Cmd<"prereview_cancel", { prereviewId: string }> | Cmd<"prereview_dismiss", { prereviewId: string; findingId: string }>
-  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>   // → definitions: ranked candidates, ≤ 50 (§62; lane "nav")
+  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string }>   // → definitions: ranked candidates, ≤ 50 (§62; column / receiver: §65; lane "nav")
   | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>  // → references: whole-word hits, ≤ limit (§62; lane "nav")
+  | Cmd<"document_symbols", { path: string }>             // → document_symbols: one file's outline (§65; lane "nav")
+  | Cmd<"workspace_symbols", { query: string; limit?: number }>   // → workspace_symbols: fuzzy over the symbol index, ≤ 500 (§65; lane "nav")
+  | Cmd<"definition_preview", { path: string; line: number; before?: number; after?: number }>   // → definition_preview: ≤ 80 lines for a peek / hover (§65; lane "nav")
+  | Cmd<"nav_index_build", { full?: boolean }>            // → nav_index: (re)builds the symbol index, progress in state.nav (§65; lane "nav")
   | Cmd<"shutdown">;                                       // result (if id) → dispose → in stdio mode the process exits 0
 ```
 
@@ -274,6 +278,7 @@ type ReviewState = {
     currentId: string | null;                    // the session the engine runs / is starting
     openTabIds: string[];                        // tabs_set
   };
+  nav?: { index: NavIndexState };                // §65: the symbol index, while a project is open (absent from an older engine)
 };
 
 type SessionMeta = {
@@ -10558,3 +10563,242 @@ Claude kept changing new files while earlier ones were still pending. `settings.
 - Owner: c-gate (engine `session/reviewFirst.ts`, `hooks.ts`, `terminalSession.ts`, `engine.ts`; Core `SettingsCatalog`,
   `AppSettings`; App Settings › Review; Windows `settings.ts`, `settingsIndex.ts`). Tests: `engine/test/reviewFirst.test.ts`
   (the decision table, the classic hooks, both kinds of chat through the engine).
+
+## 65. The symbol index: outline, symbols in the project, peek and better go to definition (ide-nav)
+
+§62 answers one click with one `git grep`. An IDE-like flow needs more: an inline **peek** of a definition, a **hover**
+preview, a **References** tab in the bottom panel (F4 / ⇧F4 step through it), **Go to File** (⌘P), **symbols in this
+file** (⌘⇧O) and **symbols in the project** (⌘T) — and Go to Definition that knows `repository.find(…)` means
+`CartRepository.find`, not the clicked file's own `find`. The engine keeps an in-memory **symbol index** of the open worktree
+for that: the declarations of every source file with their **containers** (the enclosing class / object / interface /
+component), read with §62's per-language patterns and a brace / indentation tracker. Still no language server, nothing
+persisted, nothing leaves the machine. Additive on the wire: four commands, two optional `find_definition` fields, one
+`list_files` flag, one state field, one optional candidate field.
+
+```ts
+// commands (lane "nav", read-only)
+document_symbols   { path: string }                                             → document_symbols
+workspace_symbols  { query: string; limit?: number }                            → workspace_symbols
+definition_preview { path: string; line: number; before?: number; after?: number } → definition_preview
+nav_index_build    { full?: boolean }                                           → nav_index
+// extended
+find_definition    { symbol; fromPath?; line?; column?: number; receiver?: string }   → definitions (candidates[].container?)
+list_files         { query; limit?; filesOnly?: boolean }                       → files   (lane "query", §23)
+
+type NavSymbol = { name: string; kind: DefinitionKind; path: string; line: number; column: number;
+                   container?: string; signature?: string; endLine?: number };
+type DocumentSymbol  = NavSymbol & { depth: number };
+type WorkspaceSymbol = NavSymbol & { matches: number[] };
+type DocumentSymbolsEvent  = { type: "document_symbols"; id?; path: string; language: string; symbols: DocumentSymbol[]; truncated: boolean };
+type WorkspaceSymbolsEvent = { type: "workspace_symbols"; id?; query: string; symbols: WorkspaceSymbol[]; truncated: boolean; index: NavIndexState };
+type SymbolPreviewEvent    = { type: "definition_preview"; id?; path: string; line: number; startLine: number; lines: string[];
+                               totalLines: number; language: string; truncated: boolean; symbol?: NavSymbol };
+type NavIndexEvent         = { type: "nav_index"; id?; index: NavIndexState };
+type DefinitionCandidate   = { path; line; column; kind; preview; score; container?: string };   // §62 + container
+
+// state (while a project is open; absent from an older engine)
+state.nav = { index: NavIndexState };
+type NavIndexState = {
+  status: "idle" | "building" | "ready" | "failed";
+  files: number; symbols: number;
+  truncated: boolean;            // the symbol cap or the time budget cut the last build short
+  builtAt: string | null;        // ISO-8601 of the last finished build
+  filesTotal?: number;           // while building: the files to read (progress = files / filesTotal)
+  durationMs?: number;           // the last build's
+  error?: string;                // failed: git's first line
+};
+```
+
+**Fields.** `path` repo-relative, `line` / `column` 1-based (`column` in UTF-16 code units: the name's first character), as
+§62. `kind` is §62's `DefinitionKind`; a function directly in a type's / object's body is `method`. `container` names the
+enclosing container, nested ones dotted (`CartService.Line`, `Repo.Companion`); a Kotlin extension function's container is
+its receiver type (`fun String.toSlug()` → `String`); a Go method's is its receiver's type; a Vue SFC's members' is the
+component (`PascalCase` of the file name; `index.vue` → its folder's). `signature` is the declaration's line trimmed, a
+trailing `{` dropped, ≤ 200 characters (only the first line of a declaration spread over lines). `endLine` is the last line of
+a container's body (containers only: the line of its closing brace; Python: its last indented line; a Vue component: the
+file's last line). `depth` (document symbols) counts the containers of that file around the symbol: with file order the list
+is the outline's tree (a symbol's parent is the nearest earlier symbol with `depth - 1`). `matches` are the 0-based UTF-16
+offsets in `name` of the query's characters, for highlighting.
+
+### 65.1 The index
+
+- **Lazy.** `open_project` creates it `idle` (`state.nav.index.status`); nothing is read at the session's start. The first
+  `workspace_symbols` or `nav_index_build` builds it (`building` → `ready`). `document_symbols`, `definition_preview` and
+  `find_definition` never wait for a build: they read the files they need (and keep what they read in the index).
+- **Which files.** `git ls-files -z --cached --others --exclude-standard` (tracked files and untracked ones git does not
+  ignore — §59's hidden repository too), in the languages of §62 (`.java .kt .kts .js .jsx .mjs .cjs .ts .tsx .mts .cts .vue
+  .jsp .jspf .jspx .tag .tagx .swift .py .pyi .go`; `.tld` has no symbols). Never: a file over **1 MB**, a binary one, a
+  `*.min.js` / `*.min.css`, or anything under a folder named `node_modules bower_components build dist out target .gradle
+  vendor third_party Pods DerivedData generated .next .nuxt .output coverage .git .idea .vscode .svn __pycache__ .venv venv`
+  at any depth.
+- **Limits.** At most **300 000** symbols in all (then the build stops, `truncated: true`) and **5 000** per file; a build
+  reads files for at most **60 s** (then what was read is the index, `truncated: true`). Progress reaches `state.nav.index`
+  at most every 300 ms (`files` / `filesTotal`).
+- **Kept fresh** per file by its mtime + size: after every collected turn the review's changed files (and a rename's old
+  path) are re-read; after `refresh` (review), a branch switch and a rewind every file's mtime / size is checked and only the
+  changed ones are re-read; a `project_file` read re-checks that file; a `workspace_symbols` query re-checks everything in
+  the background when the last check is older than **30 s** (edits made outside ReviewGate). Each runs 300 ms after its
+  trigger (coalesced), never while another runs. These re-checks of a `ready` index keep `status: "ready"` — only the first
+  build and `nav_index_build {full: true}` show `building`.
+- **`nav_index_build {full?}`** replies at once with the current `NavIndexState` (`nav_index`) and builds in the background:
+  `full: true` drops the index and reads every file again (a build running stops at its next batch); otherwise only what
+  changed. Clients may send `nav_index_build {}` when the user opens the code browser, to warm it.
+- `failed` (git could not list the files): `error` holds git's first line; the next `workspace_symbols` tries again.
+- A `close_project`, a project switch and `dispose` stop it; nothing is written anywhere.
+
+**What is a declaration** (only lines directly in a container's body or at the top level — a local inside a method or
+function body never is one; comments and string contents are blanked first, so a brace or a `class` in either never counts):
+
+| Language | Containers → members |
+| --- | --- |
+| Java | `class / interface / enum / record / @interface` (nested ones too) → methods (overloads each), constructors (also one-line `Name(…) { … }`), fields (with or without modifiers), enum constants (until the enum body's first `;`) |
+| Kotlin | `class / interface / object` (all modifiers of §62), `companion object` (named `Companion` unless named) → `fun` (method), `val` / `var` (property), secondary `constructor(` (constructor), primary-constructor `val` / `var` parameters (property — on the class line or one per line), enum entries; top level: `fun` (an extension's container: its receiver type), `val` / `var`, `typealias` |
+| JS / TS | `class / interface / enum / namespace` and `type X = {` → methods (`name(…) {`, also when the parameters span lines; `get` / `set` / `async` / `static` / `#private`), `constructor`, class fields with or without modifiers (`name = (…) =>` is a method), interface members, enum members; `const x = {` / `= Object.freeze({` / `= f({` → its methods and keys; `export default {` / `module.exports = {` → members of the file's stem; top level: `function`, `const / let / var`, `exports.x =`; a named `function` inside a function body (a page script's `$(function () { function init() {} })`) with no container |
+| Vue (`.vue`) | the component itself (`kind: "component"`, line of the first `<template>` / `<script>`); `<script setup>` top level → members of the component; options API `export default {` / `defineComponent({` → its methods (`data()`, `mounted()` …), `methods` / `watch` entries (method), `computed` / `props` entries (property) |
+| JSP / tag files | `<%! … %>` declarations read as a class body (fields, methods; no container); `<script>` blocks as JS (JSP inside them blanked); `<c:set var>`, `<jsp:useBean id>`, `<%@ attribute name>`, `<%@ variable name-given>` (§62's kinds); scriptlet `<% %>` locals never |
+| Swift | `class / struct / enum / protocol / actor / extension` → `func` (method; `class func` / `static func` too), `init` (constructor), `let` / `var`, `case` |
+| Python | `class` (nested ones too) → `def` (method); top level `def` (function), `NAME =` (variable); never a nested function or a docstring line |
+| Go | `type X struct {` → fields, `type X interface {` → methods; `func (r *T) Name(` → method of `T`; top level `func`, `type`, `var`, `const` |
+
+A regex literal or similar can throw the brace count off; in JS / TS and Go a top-level declaration at column 0 puts the
+tracker back to the top level. This is the same "best guess" as §62: an approximation, cheap and dependency-free.
+
+### 65.2 `document_symbols {path}` — symbols in this file (⌘⇧O, the outline)
+
+Reads the file now (§47's `project_file` checks and refusals: `invalid_path`, `file_not_found`, `not_a_file`,
+`file_unreadable`; up to 2 MB / 20 000 lines, `truncated` then — or at 5 000 symbols) and replies every symbol in file order
+with `depth`. A binary file or one of another language: `symbols: []`. `language` is the preview's language id (below).
+
+### 65.3 `workspace_symbols {query, limit?}` — symbols in the project (⌘T)
+
+Fuzzy over the index; `limit` default **100**, at most **500** (`truncated` when there were more matches). An empty query
+answers `symbols: []`. The reply carries `index` (the state at that moment): while the first build runs the engine waits
+for it at most **2 s**, then answers from what is indexed so far with `index.status: "building"` — clients show the partial
+list with "Indexing… N / M files" and send the query again when `state.nav.index.status` becomes `ready`.
+**Matching** (case-insensitive unless said): exact, case and all (1000) > a prefix (800) > exact ignoring case (780) > a
+prefix ignoring case (760) > **camel humps** (600: the query split before each capital and at `_` — `UsrSvc` → `Usr` `Svc`,
+`uS` → `u` `S`; each part must start at a word of the name, in order, words may be skipped, its other letters in order
+within that word: `UsrSvc` → `UserService`, `uS` → `userService`, `NPE` → `NullPointerException`) > a substring (450 at a
+word start, else 400) > a subsequence (200; a one-character query stops at humps); from prefixes down, minus the characters
+the name has beyond the query (≤ 80). Then: types (`class interface enum record annotation object type module component`)
++60, a constructor −15; a test file (§62's patterns) −80, a vendored / generated / minified one −150, a `.d.ts` −20.
+**`A.b`** (a dot in the query) matches `b` against the name and `A` against the container's last part (or the whole
+container) — only symbols with a fitting container, +¼ of that match's score: `CartSvc.tot` → `CartService.total`. Ties:
+the shorter name, then path, then line.
+
+### 65.4 Go to File (⌘P): `list_files {query, filesOnly: true}`
+
+§23's `list_files` already ranks files fuzzily (subsequence, the basename first, contiguous runs, word starts, the review's
+files first, ≤ 50) — Go to File reuses it rather than adding a command. New: `filesOnly: true` leaves the directories out;
+**camel humps** of the basename's stem score +300 for any query of two or more characters without a `/` (`UsrSvc` →
+`UserService.java`, the query's own extension ignored: `UsrSvc.java`); a vendored / minified path −50 (both modes). A
+`path:line` query (`CartService.java:42`) is the client's to split: send the path part, open the pick at the line. An
+older engine ignores `filesOnly` (clients drop `kind: "dir"` items themselves then).
+
+### 65.5 `definition_preview {path, line, before?, after?}` — the peek / hover body
+
+`project_file` (§47) sends a whole file (up to 2 MB); a hover over many names wants a slice. Lines `startLine …` of the file
+around `line` (1-based): by default the comment / annotation / decorator block right above the line (Javadoc, KDoc, JSDoc,
+`@Annotation`s, `#` comments — at most 20 lines, blank lines at its top dropped) and **15** lines after; `before` / `after`
+(0–79) override; never more than **80** lines in all (the end is cut first). `totalLines` is the file's line count (of what
+§47 reads: `truncated` when the file was longer than 2 MB / 20 000 lines). `symbol`: the declaration on `line` by §65's
+reading, when there is one (its `container`, `signature`, `endLine` — a peek may extend to `endLine` with a second request).
+`language` — `java kotlin javascript typescript vue jsp xml html css scss less json yaml markdown swift python go shell sql
+properties groovy`, else `plaintext` — Monaco's ids where Monaco has one. Refusals: §47's, `binary_file`,
+`line_out_of_range` (`line` < 1 or past the end; a missing / non-numeric `line` too).
+
+### 65.6 Go to Definition knows the receiver
+
+`find_definition` (§62) ranks as before, then — with the index — reads the containers of its candidates (the files of the
+best ones, at most **40** files, through the index: a file read once is kept) and sets `candidates[].container`. When the clicked name's
+receiver is known, members of the receiver's type win:
+
+- **The receiver.** `receiver` when sent (an identifier: `this`, `self`, `super`, `user`, `CartService`); else read from
+  `fromPath`'s `line`: the word's occurrence (the only one on the line, or the one at `column`) preceded by `x.` / `x?.` /
+  `x!!.` / `x::` / `x->` gives `x`; preceded by none, it is unqualified; after `)` / `]` (`foo().bar`) nothing is known.
+- **Its type.** Unqualified, `this`, `self` → the innermost type / object / component of `fromPath` around `line` (its
+  qualified name: a Kotlin companion's members are `Repo.Companion`'s). `super` → the enclosing class's `extends X` /
+  Kotlin `: X(`. A capitalised receiver → that type (static members, a Kotlin companion: `Repo.create()` → `Repo.Companion`,
+  an `object`). A lower-case one → its declaration in `fromPath`, nearest above `line` first: `Type name` (Java fields,
+  parameters, locals, `for (Type x : …)`), `name: Type` (Kotlin, TS, Swift), `val / var / let / const name = [new] Type(`,
+  `name = new Type(`; none → a **guess** from the name (`cartService` → `CartService`).
+- **Score.** A candidate whose container fits +90 (+45 for a guessed type); a member (method, function, field, property,
+  constructor, constant, variable) of another container −30 — only when some candidate fits, so an unknown or inherited
+  type changes nothing. Measured on this repository: `this.gate.refresh()` in `engine.ts` → `ReviewGate.refresh`
+  (`review/gate.ts`) first, where §62 alone put engine.ts's own `refresh` first; `this.fileIndex.search(…)` →
+  `FileIndex.search`.
+- Still a heuristic: no inheritance (an inherited member does not fit its subclass), no overloads by argument types, no
+  generics, no chains beyond one receiver. Clients send `receiver` when they already know it (their tokenizer saw `x.` before
+  the word) and `column` always; an older engine ignores both.
+
+### 65.7 Lanes and speed
+
+All four commands run on lane `nav` with `find_definition` / `find_references` — never behind a turn, a commit, the
+composer's reads (lane `query`, where `list_files` stays) or Find in Project (lane `search`); one `nav` command at a time
+(a `workspace_symbols` waiting for the first build holds the lane at most 2 s). The build itself runs off the lanes (batches
+of 16 files, the event loop free between them).
+
+Measured on ReviewGate's own repository (1 635 indexed files, 30 804 symbols; a 12-core Mac, two runs — the slower one with
+other builds running):
+
+| What | Time |
+| --- | --- |
+| First build (`git ls-files` + read + extract) | 0.7–1.5 s |
+| Re-check, nothing changed (mtime / size of every file) | 35–56 ms |
+| `workspace_symbols` (`SymIdx`, `Engine`, `handle`, `rS`, `findDef`, `x`) | 10–46 ms |
+| `document_symbols` `engine/src/engine.ts` (10 000 lines, 532 symbols) / `protocol.ts` (1 289 symbols) | 12–15 ms / 7–8 ms |
+| `definition_preview` in `engine.ts` | 11–13 ms |
+| `list_files {filesOnly}` first query (lists the files) / next ones | 27–32 ms / < 1 ms |
+| `find_definition` §62 alone / with containers, first time (files not yet read) / again | 52–60 ms / +6–35 ms / ±0 |
+
+### 65.8 How clients present it
+
+- **Peek definition** (⌥F12 on Mac — Alt+F12 on Windows — and "Peek Definition" in the row's / Monaco's menu): send
+  `find_definition {symbol, fromPath, line, column, receiver?}`; for the first candidate (or the one picked in §62's
+  candidate list) `definition_preview {path, line}` and show the lines **inline under the clicked row** (a framed band the
+  width of the pane, ≤ 15 visible lines, scrollable), headed by `container.name` · `kind` · file name and folder, the
+  definition line marked, syntax-highlighted by `language`. Several candidates: the list on the band's right (↑ / ↓ switch
+  the preview, ↩ or a double-click opens it as §62, Esc closes). "Open" / "Find References" buttons in the header.
+- **Hover preview** (the pointer resting ≥ 600 ms on a name with ⌘ held — Ctrl on Windows — or an IDE-style "show on hover"
+  setting): the same request pair with `after: 8`; a small popover with `signature` in bold (from the candidate's
+  `definition_preview.symbol`), the doc comment lines above and the next few lines; never more than one request in flight
+  (a newer pointer position cancels the older one's reply, match `id`); nothing shown for no candidate.
+- **References tab** in the bottom panel (⇧F12 / "Find References" open it; F4 / ⇧F4 = next / previous result, opening it
+  in the diff or the code browser as §62): `find_references {symbol, fromPath}` grouped by file as §62 says — file name,
+  folder and count, then `line` and `preview` with the symbol marked; a `kind` row labelled "definition". Keep the last
+  few searches as tabs or a history menu in the panel ("refresh" re-sends the same request). The `container` of a
+  definition candidate makes a good group title ("CartRepository.find — 12 references in 5 files").
+- **Go to File** (⌘P — Ctrl+P on Windows): `list_files {query, filesOnly: true, limit: 50}` per keystroke (debounce
+  ~50 ms; the newest reply wins); rows of basename (the query's letters bold — clients mark them themselves with the same
+  subsequence the engine used) and folder; ↩ opens (`project_file` or the review's diff); `path:42` opens at the line.
+- **Symbols in this file** (⌘⇧O — Ctrl+Shift+O): `document_symbols {path}` once per file shown (again after a turn / a
+  refresh), filtered client-side as the user types (the same matching as `workspace_symbols` is fine: subsequence + humps),
+  indented by `depth`, `kind` as an icon, `container` dimmed; ↩ jumps to `line` / `column`. The same reply can drive an
+  outline sidebar and a sticky "current class › method" header (use `line` … `endLine`).
+- **Symbols in the project** (⌘T — Ctrl+T): `workspace_symbols {query, limit: 100}` per keystroke (debounce ~80 ms);
+  rows `name` (bold at `matches`), `kind` icon, `container` and the file's folder dimmed; ↩ opens at `line` / `column`.
+  While `state.nav.index.status` is `building` show "Indexing… files / filesTotal" under the field and re-send the query
+  when it turns `ready`; `truncated` → "showing the first 100"; `index.truncated` → "the project is larger than the index
+  — some symbols are missing" in the footer. `failed` → the error and a "Try again" (`nav_index_build {}`).
+- **Rebuild** — a "Rebuild Symbol Index" menu item / command palette entry: `nav_index_build {full: true}`; disabled
+  while `status === "building"` (tooltip: "Indexing…").
+- Every new shortcut goes into docs/SHORTCUTS.md "코드 탐색" and each client's shortcut table; every disabled control
+  says why (no project open, indexing).
+
+**Windows.** `document_symbols`, `workspace_symbols`, `definition_preview` and `nav_index_build` are on the renderer's
+allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
+through). The UI is the client team's follow-up.
+
+**Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
+UI work adds them.
+
+- **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
+  and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.
+- **Not in this pass.** A persisted index, a file-system watcher (re-checks ride on turns, refreshes, reads and the 30 s
+  query re-check), inheritance / overload resolution, symbols of other languages (XML, SQL, MyBatis mappers), local
+  variables and parameters in the outline.
+- Owner: ide-nav (engine `files/symbols.ts`, `files/symbolIndex.ts`, `files/navigate.ts`, `files/fileIndex.ts`,
+  `engine.ts`, `state.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`). Tests:
+  `engine/test/symbols.extract.test.ts` (containers per language), `engine/test/engine.symbolIndex.test.ts` (fuzzy
+  ranking, Go to File, the index's build / refresh / limits / failure, container-aware go to definition, the preview, the
+  engine's commands and state, a turn's refresh, §59 shadow mode, the lane), `clients/desktop/src/main/ipcGuard.test.ts`.

@@ -44,6 +44,7 @@ import { fileRiskFields } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
 // MARK: wave4c w4c-trust (§41.2)
 import type { AutoAcceptRules } from "./protocol.js";
 import type { ReviewFirstState } from "./protocol.js"; // §64
+import type { NavState } from "./protocol.js"; // MARK: ide-nav (§65)
 import { anyAutoAcceptRule, normalizeAutoAcceptRules } from "./review/trust.js";
 
 /** The engine's internal slices `buildState` derives the wire snapshot from. */
@@ -121,6 +122,8 @@ export type EngineSlices = {
   // MARK: wave4c w4c-trust
   /** §41.2: the open repository's auto-accept rules (sent only while one is on). */
   autoAcceptRules?: AutoAcceptRules;
+  /** MARK: ide-nav — §65: the symbol index (while a project is open). */
+  nav?: NavState;
 };
 
 export function gatePhase(s: EngineSlices): GatePhase {
@@ -348,6 +351,7 @@ export function buildState(s: EngineSlices): ReviewState {
     },
     ...(s.storage ? { storage: structuredClone(s.storage) } : {}), // MARK: wave4b w4b-bigturn (§39.1)
     ...(s.project && s.autoAcceptRules && anyAutoAcceptRule(s.autoAcceptRules) ? { autoAcceptRules: normalizeAutoAcceptRules(s.autoAcceptRules) } : {}), // MARK: wave4c w4c-trust (§41.2)
+    ...(s.project && s.nav ? { nav: { index: { ...s.nav.index } } } : {}), // MARK: ide-nav (§65)
   };
 }
 

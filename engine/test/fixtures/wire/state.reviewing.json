@@ -448,5 +448,14 @@
       "level": "ok",
       "at": "2026-01-02T03:04:05Z"
     }
+  },
+  "nav": {
+    "index": {
+      "status": "idle",
+      "files": 0,
+      "symbols": 0,
+      "truncated": false,
+      "builtAt": null
+    }
   }
 }
