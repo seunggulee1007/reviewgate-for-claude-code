@@ -81,6 +81,8 @@ export type AppSettings = {
   /** Most recent first. */
   recentProjects: string[];
   preferredEditor: "auto" | "vscode" | "idea" | "explorer";
+  /** §62 "Open in" — where Open in IDE (Ctrl+Alt+O) opens a file: VS Code, IntelliJ IDEA or the system's default app (absent: VS Code). */
+  openInIde?: IdeKind;
   /** M12: "Push to origin" default in the commit dialog. */
   commitPushByDefault: boolean;
   /** M12: trailer line appended to every commit message ("" → none). */
@@ -220,6 +222,9 @@ export type WindowBounds = { x: number; y: number; width: number; height: number
 export type OpenWindow = { path: string; bounds?: WindowBounds };
 
 export type EditorKind = AppSettings["preferredEditor"];
+/** §62: where "Open in IDE" opens a file (Settings "Open in"; absent = VS Code). */
+export type IdeKind = "vscode" | "idea" | "system";
+export type OpenInIdeResult = "opened" | "bad_request" | "no_project" | "outside_project" | "not_a_file" | "failed";
 
 /** The tools whose path can be overridden — only through `pickExecutable` (main's native file dialog). */
 export type ExecutableKind = "claude" | "gh" | "git";
@@ -350,6 +355,11 @@ export type RGBridge = {
   onMenu(cb: (action: MenuAction) => void): () => void;
   chooseDirectory(): Promise<string | null>;
   openInEditor(path: string, line: number | null, editor?: EditorKind): Promise<string | null>;
+  /**
+   * §62 Open in IDE: a repo-relative file of this window's project at a line / column, in VS Code or IntelliJ IDEA (main builds
+   * the `vscode://` / `idea://` URL itself) or the system's default app. Resolves "opened" or why not (src/main/ideOpen.ts).
+   */
+  openInIde(ide: IdeKind, path: string, line: number, column: number): Promise<OpenInIdeResult>;
   openExternal(url: string): Promise<void>;
   /** Opens the main process log folder (userData/logs) in the file manager. */
   openLog(): Promise<void>;

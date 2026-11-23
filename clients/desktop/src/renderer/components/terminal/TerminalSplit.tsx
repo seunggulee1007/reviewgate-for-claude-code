@@ -22,6 +22,8 @@ import { Divider } from "../Divider";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { HistoryDiffPane } from "../history/HistoryDiffPane";
 import { PointerMenu } from "../agents/AgentBits";
+import { ProjectFilePane } from "../../nav/ProjectFilePane"; // §62
+import { useNav } from "../../nav/navStore";
 import "./terminal.css";
 
 /** The edge tab's width (styles.css `.diff-edge-tab`). */
@@ -68,7 +70,8 @@ export function TerminalSplit() {
   const cell = useMemo(() => measureCellWidth(`${fontSize}px ${TERMINAL_FONT_FAMILY}`), [fontSize]);
   const minTerminal = terminalMinWidth(cell);
   const layout = terminalReviewLayout(area, minTerminal);
-  const open = !collapsed || historyOpen || liveOpen;
+  const fileOpen = useNav((s) => s.file !== null); // §62
+  const open = !collapsed || historyOpen || liveOpen || fileOpen;
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragged = useRef<number | null>(null);
   const reviewWidth = dragWidth ?? reviewWidthForShare(share, area, minTerminal);
@@ -236,6 +239,8 @@ export function TerminalSplit() {
 function ReviewPane() {
   const historyOpen = useStore((s) => s.historyView !== null);
   const liveOpen = useStore((s) => s.liveView !== null && s.historyView === null);
+  const fileOpen = useNav((s) => s.file !== null); // §62: a project file opened by Go to Definition
+  if (fileOpen) return <ErrorBoundary key="project-file" name="Project file" className="pane diff"><ProjectFilePane /></ErrorBoundary>;
   if (historyOpen) return <ErrorBoundary key="history" name="History" className="pane diff"><HistoryDiffPane /></ErrorBoundary>;
   if (liveOpen) return <ErrorBoundary key="live" name="Live diff" className="pane diff"><LiveDiffPane /></ErrorBoundary>;
   return <ErrorBoundary key="diff" name="Diff" className="pane diff"><DiffPane /></ErrorBoundary>;

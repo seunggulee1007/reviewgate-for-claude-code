@@ -857,6 +857,14 @@ export type EngineCommand =
   | Cmd<"project_file", { path: string }>
   /** `git grep` over the project's files (a fixed string, case ignored unless `caseSensitive`); replies `project_search`. */
   | Cmd<"project_search", { query: string; caseSensitive?: boolean; wholeWord?: boolean; limit?: number }>
+  // MARK: code-nav — §62
+  /**
+   * Where `symbol` is declared (search-based, no language server): `fromPath` / `line` = where the user clicked (ranking by
+   * its imports, package and folder). Replies `definitions`, best first, at most 50.
+   */
+  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>
+  /** Every line holding `symbol` as a whole word (`git grep -w -F`), the clicked file first. Replies `references`. */
+  | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>
   | Cmd<"shutdown">;
 
 // ---------------------------------------------------------------- §21 side questions
@@ -2151,7 +2159,9 @@ export type EngineEvent =
   | CodeGraphEvent // MARK: wave5 w5-graph (§43.3)
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   | ProjectFileEvent // MARK: code-browser (§47)
-  | ProjectSearchEvent;
+  | ProjectSearchEvent
+  | DefinitionsEvent // MARK: code-nav (§62)
+  | ReferencesEvent;
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
 export type ReplyFor<C extends EngineCommand> =
@@ -2199,6 +2209,8 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "status_line" } ? StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   : C extends { type: "project_file" } ? ProjectFileEvent // MARK: code-browser (§47)
   : C extends { type: "project_search" } ? ProjectSearchEvent
+  : C extends { type: "find_definition" } ? DefinitionsEvent // MARK: code-nav (§62)
+  : C extends { type: "find_references" } ? ReferencesEvent
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
@@ -2219,6 +2231,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | CodeGraphEvent // MARK: wave5 w5-graph (§43.3)
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   | ProjectFileEvent | ProjectSearchEvent // MARK: code-browser (§47)
+  | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | TerminalSpecEvent; // §57
@@ -3118,3 +3131,33 @@ export type ProjectSearchMatch = { path: string; line: number; text: string };
  * than `limit`; `timedOut`: git was stopped after 20 s (the matches are what it found until then).
  */
 export type ProjectSearchEvent = { type: "project_search"; id?: string; query: string; matches: ProjectSearchMatch[]; truncated: boolean; timedOut?: true };
+
+// ---------------------------------------------------------------- MARK: code-nav — §62 go to definition / find references
+// Types only (docs/PROTOCOL.md §62).
+
+/** §62: what a definition line declares (a component / tag / file found by its file name: `line` 1, `column` 1). */
+export type DefinitionKind =
+  | "class" | "interface" | "enum" | "record" | "annotation" | "object" | "type" | "module"
+  | "function" | "method" | "constructor" | "field" | "property" | "variable" | "constant"
+  | "component" | "tag" | "file";
+
+/**
+ * §62: one place `symbol` may be declared — repo-relative path, 1-based line and column (UTF-16 code units of the line), the
+ * line without its indent (≤ 200 characters around the symbol), and a relative `score` (higher is better; only for order).
+ */
+export type DefinitionCandidate = { path: string; line: number; column: number; kind: DefinitionKind; preview: string; score: number };
+
+/**
+ * §62: reply to `find_definition` — candidates best first (≤ 50). `truncated`: more candidates than sent, or the word was on
+ * more than 100 000 lines and only those were read; `timedOut`: the search was stopped after 10 s (what it found until then).
+ */
+export type DefinitionsEvent = { type: "definitions"; id?: string; symbol: string; candidates: DefinitionCandidate[]; truncated: boolean; timedOut?: true };
+
+/** §62: one line holding the symbol as a whole word; `kind` when that line is a definition by §62's patterns. */
+export type ReferenceHit = { path: string; line: number; column: number; preview: string; kind?: DefinitionKind };
+
+/**
+ * §62: reply to `find_references` — the clicked file's lines first, then its folder's, then the rest by path, line order in a
+ * file. `files`: how many files they are in. `truncated`: more than `limit`; `timedOut`: stopped after 15 s.
+ */
+export type ReferencesEvent = { type: "references"; id?: string; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true };

@@ -51,6 +51,18 @@ Mac·Windows 열과 비교해요.
 | 파일로 이동… | ⌘P | Ctrl+P | |
 | 프로젝트에서 찾기… | ⌘⇧F | Ctrl+Shift+F | |
 
+## 코드 탐색
+
+diff나 프로젝트 파일에서 이름의 정의·참조로 가요(docs/PROTOCOL.md §62). 검색 기반이라 이름만 같은 것도 나올 수 있어요.
+
+| 동작 | Mac | Windows | 비고 |
+|---|---|---|---|
+| 정의로 이동 | F12 | F12 | 이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭) |
+| 참조 찾기 | ⇧F12 | Shift+F12 | |
+| 뒤로 | ⌃- | Alt+← | |
+| 앞으로 | ⌃⇧- | Alt+→ | |
+| IDE에서 열기 | — | Ctrl+Alt+O | Windows 앱에만 있어요 · 설정은 에디터 열기 메뉴의 "IDE에서 열기"(VS Code · IntelliJ IDEA · 시스템 기본 앱) |
+
 ## 리뷰
 
 | 동작 | Mac | Windows | 비고 |

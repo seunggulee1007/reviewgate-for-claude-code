@@ -5,7 +5,7 @@
  */
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { EngineCommand, EngineEvent, PartialSeries } from "@reviewgate/engine";
-import type { AppSettings, DraftEditEvent, EditorKind, ExecutableKind, MenuAction, NotifyRequest, ProjectUI, RGBridge, UpdateStatus } from "./shared/ipc.js";
+import type { AppSettings, DraftEditEvent, EditorKind, ExecutableKind, IdeKind, MenuAction, NotifyRequest, ProjectUI, RGBridge, UpdateStatus } from "./shared/ipc.js";
 import type { NotificationClick } from "./shared/ipc.js"; // MARK: wave4b w4-notify
 import type { WorkbenchSetupReport } from "./shared/flowSettings.js"; // MARK: wave3 desktop-flow
 import type { CloseGuardExtras } from "./shared/closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
@@ -60,6 +60,7 @@ const bridge: RGBridge = {
   },
   chooseDirectory: () => ipcRenderer.invoke("rg:chooseDirectory"),
   openInEditor: (path: string, line: number | null, editor?: EditorKind) => ipcRenderer.invoke("rg:openInEditor", path, line, editor),
+  openInIde: (ide: IdeKind, path: string, line: number, column: number) => ipcRenderer.invoke("rg:openInIde", ide, path, line, column),
   openExternal: (url: string) => ipcRenderer.invoke("rg:openExternal", url),
   openLog: () => ipcRenderer.invoke("rg:openLog"),
   showItemInFolder: (path: string) => ipcRenderer.invoke("rg:showItemInFolder", path),

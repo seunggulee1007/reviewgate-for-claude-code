@@ -13,6 +13,9 @@ import { LineComposer, type LineKey } from "../UnifiedDiff";
 import { type NoteTarget } from "./UnifiedView";
 import { ReviewNoteBubble } from "./NoteCards"; // MARK: wave2 desktop-flow — §34.4 sent notes
 import { useDiffPrefs } from "../../diffPrefs"; // MARK: wave2 desktop-diff — "줄바꿈" applies here too
+import { attachMonacoNav } from "../../nav/monacoNav"; // §62
+import { searchedWord } from "../../nav/navModel";
+import { useNav } from "../../nav/navStore";
 
 type Zone = { id: string; key: string; node: HTMLElement; note: ReviewNote | null };
 
@@ -28,8 +31,11 @@ export function MonacoDiffView(props: {
   onCloseComposer: () => void;
   onAddNote: (target: NoteTarget, body: string) => void;
   onRemoveNote: (id: string) => void;
+  /** §62: a Go to Definition landing on this file — the new side's line brought into view and marked. */
+  reveal?: { line: number; symbol?: string; seq: number } | null;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const revealing = useRef(false);
   const editorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
   const [editor, setEditor] = useState<monaco.editor.IStandaloneDiffEditor | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -69,6 +75,7 @@ export function MonacoDiffView(props: {
     // Scroll to the first change once the diff is computed.
     const once = ed.onDidUpdateDiff(() => {
       once.dispose();
+      if (revealing.current) return; // §62: a definition's line is shown instead
       const first = ed.getLineChanges()?.[0];
       if (!first) return;
       mod.revealLineInCenter(Math.max(1, first.modifiedStartLineNumber || first.modifiedEndLineNumber || 1));
@@ -102,6 +109,11 @@ export function MonacoDiffView(props: {
       }),
     );
 
+    // §62: Ctrl+click / F12 / Shift+F12 / Ctrl+Alt+O on either side (the old side's line is only a ranking hint).
+    const from = (line: number) => ({ kind: "review" as const, path: props.path, line });
+    disposables.push(attachMonacoNav(mod, { path: props.path, from }), attachMonacoNav(ed.getOriginalEditor(), { path: props.path, from }));
+    disposables.push(mod.onDidChangeCursorPosition((e) => useNav.getState().setHere(props.path, e.position.lineNumber)));
+
     return () => {
       for (const d of disposables) d.dispose();
       hover.clear();
@@ -115,6 +127,32 @@ export function MonacoDiffView(props: {
     // The file (and therefore the models) changes only with `path` / `content`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.path, props.content]);
+
+  // §62: bring a definition's line into view and mark it for a moment.
+  const revealSeq = props.reveal?.seq;
+  useEffect(() => {
+    const r = props.reveal;
+    if (!editor || !r) return;
+    revealing.current = true;
+    const mod = editor.getModifiedEditor();
+    const model = mod.getModel();
+    if (!model) return;
+    const line = Math.min(Math.max(1, r.line), model.getLineCount());
+    const word = r.symbol ? searchedWord(r.symbol) : "";
+    const at = word ? model.getLineContent(line).indexOf(word) + 1 : 0;
+    mod.revealLineInCenter(line);
+    mod.setPosition({ lineNumber: line, column: Math.max(1, at) });
+    const marks = mod.createDecorationsCollection([
+      { range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: "rg-nav-target-line" } },
+      ...(at > 0 ? [{ range: new monaco.Range(line, at, line, at + word.length), options: { inlineClassName: "rg-nav-target-symbol" } }] : []),
+    ]);
+    // The mark outlives the reveal (done right away): only its timer — or the editor going — clears it.
+    window.setTimeout(() => {
+      if (editorRef.current === editor) marks.clear();
+    }, 2500);
+    useNav.getState().revealDone(r.seq, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, revealSeq]);
 
   useEffect(() => {
     editorRef.current?.updateOptions({ renderSideBySide: props.sideBySide });

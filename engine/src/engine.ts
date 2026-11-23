@@ -213,6 +213,7 @@ import { copyFiles, copyLog, copyPatternsFor, fetchRef, filesToCopy, firstLogLin
 import { remoteBranches, type BranchSwitchBlocker } from "./git/branches.js";
 import { runGit } from "./git/exec.js";
 import { readProjectFile, searchProject } from "./files/browse.js"; // MARK: code-browser (§47)
+import { findDefinition, findReferences } from "./files/navigate.js"; // MARK: code-nav (§62)
 import { cleanCommitDraft, COMMIT_DRAFT_DIFF_LINES, COMMIT_DRAFT_SUBJECTS, COMMIT_DRAFT_SYSTEM, commitDraftPrompt, renderCommitTemplate } from "./review/commitDraft.js";
 import { roundPatch } from "./review/roundPatch.js";
 // MARK: wave4 w4-longwork
@@ -688,7 +689,7 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), nav: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
   /** §56.1: the current chat's /btw exchanges (in memory: the CLI keeps none for an SDK session). */
@@ -1714,6 +1715,11 @@ export class ReviewEngine {
         const found = await searchProject(this.requireProject().root, { query: cmd.query, caseSensitive: cmd.caseSensitive, wholeWord: cmd.wholeWord, limit: cmd.limit });
         return { type: "project_search", query: found.query, matches: found.matches, truncated: found.truncated, ...(found.timedOut ? { timedOut: true as const } : {}) };
       }
+      // MARK: code-nav — §62: read-only, search-based
+      case "find_definition":
+        return { type: "definitions", ...(await findDefinition(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line })) };
+      case "find_references":
+        return { type: "references", ...(await findReferences(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })) };
       case "shutdown":
         return;
       default:
@@ -9556,7 +9562,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "steer" | "btw"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); §56.1 btw
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "nav" | "steer" | "btw"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); code-nav: nav (§62); §56.1 btw
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -9611,6 +9617,10 @@ function laneOf(cmd: EngineCommand): Lane {
     // MARK: code-browser — §47: a `git grep` (≤ 20 s) never holds up the composer's reads on the query lane.
     case "project_search":
       return "search";
+    // MARK: code-nav — §62: a click on a name never waits behind a turn, a commit or a Find in Project.
+    case "find_definition":
+    case "find_references":
+      return "nav";
     case "live_changes":
     case "live_diff":
       return "live";
@@ -9755,6 +9765,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "file_image":
     case "project_file": // MARK: code-browser (§47)
     case "project_search":
+    case "find_definition": // MARK: code-nav (§62)
+    case "find_references":
       return "git";
     default:
       return "engine";

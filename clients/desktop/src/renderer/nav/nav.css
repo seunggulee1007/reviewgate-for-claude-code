@@ -1,0 +1,49 @@
+/*
+ * §62 code navigation (Windows): the Ctrl-held underline, the peek list at a Ctrl+click, the references panel under the
+ * panes, the project file view, Back / Forward. Colours are the theme tokens, so both themes follow.
+ */
+::highlight(rg-nav-link) { text-decoration: underline; text-decoration-color: var(--accent); color: var(--accent); }
+::highlight(rg-nav-target) { background-color: color-mix(in srgb, var(--accent) 28%, transparent); }
+body.rg-nav-pointer .unified .line .text { cursor: pointer; }
+.monaco-editor .rg-nav-link { text-decoration: underline; color: var(--accent) !important; cursor: pointer; }
+.monaco-editor .rg-nav-target-line { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.monaco-editor .rg-nav-target-symbol { background: color-mix(in srgb, var(--accent) 32%, transparent); border-radius: 2px; }
+.unified .line.rg-nav-target { box-shadow: inset 3px 0 0 var(--accent); background-color: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* The peek list: a popover at the click. */
+.nav-peek {
+  position: fixed; z-index: 60; width: min(560px, calc(100vw - 16px)); max-height: 340px; display: flex; flex-direction: column;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); font-family: var(--font);
+}
+.nav-peek-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.nav-peek-head .grow { min-width: 0; }
+.nav-peek-list { overflow: auto; flex: 1 1 auto; padding: 2px 0; }
+.nav-row { display: flex; flex-direction: column; gap: 1px; width: 100%; padding: 4px 10px; text-align: left; background: transparent; border: 0; border-radius: 0; cursor: pointer; color: var(--fg); }
+.nav-row:hover { background: var(--bg-3); }
+.nav-row.selected { background: var(--accent-bg); }
+.nav-row .nav-row-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; }
+.nav-row .nav-row-top .name { font-weight: 600; flex: none; }
+.nav-row .nav-row-top .folder { color: var(--fg-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+.nav-row .nav-kind { flex: none; font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); }
+.nav-preview { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.nav-preview mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 2px; }
+.nav-peek-foot { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-top: 1px solid var(--border); font-size: 11.5px; }
+.nav-peek-note { padding: 10px; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+
+/* The references panel: a strip under the panes. */
+.nav-refs { flex: none; height: 230px; display: flex; flex-direction: column; border-top: 1px solid var(--border-strong); background: var(--panel); min-height: 0; }
+.nav-refs-head { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 12px; flex: none; }
+.nav-refs-list { overflow: auto; flex: 1 1 auto; }
+.nav-refs-file { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px 2px; font-size: 12px; position: sticky; top: 0; background: var(--panel); }
+.nav-refs-file .name { font-weight: 600; }
+.nav-refs-file .folder { color: var(--fg-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-ref { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 1px 10px 1px 22px; background: transparent; border: 0; border-radius: 0; text-align: left; cursor: pointer; color: var(--fg); min-width: 0; }
+.nav-ref:hover, .nav-ref:focus-visible { background: var(--bg-3); }
+.nav-ref .no { flex: none; width: 44px; text-align: right; font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.nav-ref .nav-preview { flex: 1 1 auto; min-width: 0; }
+
+/* The project file view (read-only). */
+.project-file .editor { flex: 1 1 auto; min-height: 0; }
+.project-file-head .folder { color: var(--fg-3); }
+.nav-history { display: inline-flex; gap: 2px; flex: none; }
+.nav-history button { padding: 0 6px; }

@@ -84,6 +84,14 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "track_without_git", confirm: true }).ok).toBe(true);
   });
 
+  it("allows go to definition / find references (§62) and the project_file read that opens a definition", () => {
+    expect(validateCommand({ type: "find_definition", symbol: "CartService", fromPath: "src/A.java", line: 3 }).ok).toBe(true);
+    expect(validateCommand({ type: "find_references", symbol: "CartService", limit: 100 }).ok).toBe(true);
+    expect(validateCommand({ type: "project_file", path: "src/A.java" }).ok).toBe(true);
+    // "Find in Project" from the "no definition found" notice
+    expect(validateCommand({ type: "project_search", query: "CartService", wholeWord: true, caseSensitive: true }).ok).toBe(true);
+  });
+
   it("allows pr_comment (§60: the PR conversation's composer)", () => {
     expect(validateCommand({ type: "pr_comment", body: "Thanks!" }).ok).toBe(true);
   });
