@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// MARK: wave6 w6-statusline — §44.2: Settings › General › the Claude Code status line — show it (on by default; nothing
+/// MARK: wave6 w6-statusline — §44.2: Settings › Session › the Claude Code status line — show it (on by default; nothing
 /// shows without a `statusLine` in the user's settings; every open window at once) and, for the focused window's project,
 /// whether the project's own `statusLine` may run: code that came with the repository, allowed per project and bound to
 /// that very command (a changed one asks again).
@@ -13,14 +13,14 @@ struct StatusLineSettingsSection: View {
 
     var body: some View {
         Section("Claude Code status line") {
-            Toggle("Show the Claude Code status line", isOn: $showStatusLine)
+            Toggle(isOn: $showStatusLine) { SettingLabel("showStatusLine") }   // §55.11: what it shows, in its ⓘ
                 .accessibilityIdentifier("Show the Claude Code status line")
-            Text("Your own status line (the statusLine command of your Claude Code settings, such as the OMC HUD) under the message box, colored as in the terminal. It runs while a project is open and the chat is on screen.")
-                .font(.caption).foregroundStyle(.secondary)
+                .settingAnchor("showStatusLine")
             configured
             if let project = store.statusLine.reply?.project {
                 Toggle("Run this project's status line", isOn: projectAllowed)
                     .disabled(store.statusLine.reply?.disabled != nil)
+                    .help(store.statusLine.reply?.disabled != nil ? String(localized: "Status lines are turned off — see the line above") : "")
                     .accessibilityIdentifier("Run this project's status line")
                 LabeledContent("This project's") {
                     Text(verbatim: project.command).font(.caption.monospaced()).lineLimit(2).truncationMode(.middle).textSelection(.enabled)

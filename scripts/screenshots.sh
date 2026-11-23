@@ -14,7 +14,7 @@
 #   the home folder's path fails the run (HOME PATH);
 # - the session loads no user settings (no ~/.claude skills, plugins, hooks, MCP servers or CLAUDE.md); the app starts
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
-# - a layout on the fake claude (SHOTS_LAYOUT=terminal, composerbar) never reads ~/.claude at all: the app and its engine get
+# - a layout on the fake claude (SHOTS_LAYOUT=terminal, composerbar, settings) never reads ~/.claude at all: the app and its engine get
 #   CLAUDE_CONFIG_DIR=SHOTS_DIR/claude-config, a fresh folder whose settings.json holds only a harmless status line
 #   (`printf TOUR`) for the terminal chat's status line tee (§57.13) to wrap — the fake runs it only when it is exactly that;
 # - the layouts on the real claude (the README run and every other SHOTS_LAYOUT, composer among them) keep the user's
@@ -81,6 +81,9 @@
 #                  chat session starts — initialize answered — and never runs a turn): a fresh chat, the box focused, text
 #                  typed, Claude at work after two turns, a review pending, the mode offer, decided permission cards and a
 #                  question in the transcript, folded and opened (`composerbar` lines: the transcript's height; composerbar-*.png).
+#                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
+#                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
+#                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
@@ -116,7 +119,7 @@ case "$(cd "$SHOTS_DIR" 2>/dev/null && pwd -P || echo "$SHOTS_DIR")/" in
   "$HOME/"|"$HOME/.reviewgate/"*|//) die "SHOTS_DIR must be a scratch folder of its own (not \$HOME, not ~/.reviewgate)";;
 esac
 command -v xcodegen >/dev/null || die "xcodegen missing (brew install xcodegen)"
-case "${SHOTS_LAYOUT:-}" in terminal|composerbar) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
+case "${SHOTS_LAYOUT:-}" in terminal|composerbar|settings) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
 NODE_DIR="$("$ROOT/scripts/find-node.sh")" || die "Node.js >= 24 not found"
 PATH="$NODE_DIR:$PATH"
 
@@ -322,8 +325,8 @@ commit "2026-10-21T09:05:00+0000" "Free shipping from \$50"
 rm -rf "$DATA" "$RAW"
 mkdir -p "$DATA" "$RAW"
 CLAUDE_BIN=claude
-if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = composerbar ]; then
-  # §57 terminal tour (and the composer bar check): a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
+if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = composerbar ] || [ "${SHOTS_LAYOUT:-}" = settings ]; then
+  # §57 terminal tour (and the composer bar check, and §55.11's settings shots, whose window opens a terminal chat on it): a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
   # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
   # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It prints its terminal's size (the PTY's winsize)
   # on each SIGWINCH (`winsize CxR`) and when a line is `size` (`size CxR COLUMNS=…`, no turn). It never reads or writes

@@ -4,7 +4,7 @@ import Foundation
 // docs/PROTOCOL.md §36.8 on the client: the banner "New CLI x — not verified yet" from `session.cli` (once per version,
 // closable in any window), "Pin previous version" (`set_settings{claudePath}` with the previous version's file; the next
 // session start uses it), the `cli_version_changed` notice as a chat row only, and the installed versions (`cli_versions`)
-// for Settings › General "Pin CLI version".
+// for Settings › Advanced "Pin CLI version".
 
 public enum CliVersionText {
     /// The banner's title.
@@ -93,7 +93,7 @@ public enum CliVersionBanner {
     }
 }
 
-/// One row of Settings › General "Pin CLI version".
+/// One row of Settings › Advanced "Pin CLI version".
 public struct CliVersionRow: Sendable, Equatable, Identifiable {
     public var entry: CliVersionEntry
     /// The version this window's session runs.
@@ -183,7 +183,7 @@ public extension AppState {
         fire(.setSettings(EngineSettings(claudePath: path)))
     }
 
-    /// Settings › General's rows; nil before `cli_versions` answered.
+    /// Settings › Advanced's rows; nil before `cli_versions` answered.
     var cliVersionRows: [CliVersionRow]? {
         sessionTools.versions.map {
             CliVersionList.rows($0, running: cliInfo?.version, pinnedPath: AppSettings.claudePathOverride(defaults: settingsDefaults))

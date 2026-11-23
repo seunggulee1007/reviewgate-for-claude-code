@@ -79,7 +79,7 @@ export function DiskSpaceChip() {
     <span
       className="item num"
       style={{ color: disk.level === "critical" ? "var(--red)" : "var(--orange)" }}
-      title={t("Free space on the project's disk. Settings › General › Clean Up Old Review History frees what the app keeps.")}
+      title={t("Free space on the project's disk. Settings › Review › Clean Up Old Review History frees what the app keeps.")}
       aria-label={text}
       data-testid="HUD disk space"
     >
@@ -105,7 +105,7 @@ export function ReviewListNotices() {
       )}
       {large.length > 0 && (
         <>
-          <span title={t("Untracked files over the large-file limit (Settings › General) are not stored in snapshots: they cannot be reverted and the app does not commit them")}>
+          <span title={t("Untracked files over the large-file limit (Settings › Review) are not stored in snapshots: they cannot be reverted and the app does not commit them")}>
             {largeFilesText(large.length)}
           </span>
           {large.slice(0, SHOWN_PATHS).map((f) => (

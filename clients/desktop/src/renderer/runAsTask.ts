@@ -9,7 +9,7 @@ import type { AppSettings } from "../shared/ipc";
 /** The prefix "Run as Task" suggests until a task branch was created (then the one that branch used). */
 export const DEFAULT_TASK_PREFIX = "task/";
 
-/** Settings › General › Workbenches › "업무로 실행" (`runAsTaskEnabled`, absent = on). */
+/** Settings › Git & Workbenches › "업무로 실행" (`runAsTaskEnabled`, absent = on). */
 export const runAsTaskEnabled = (settings: Pick<AppSettings, "runAsTaskEnabled"> | null | undefined): boolean => settings?.runAsTaskEnabled !== false;
 
 /** The prefix the next suggestion starts with (`taskBranchPrefix`, `task/` until a task branch was created). */

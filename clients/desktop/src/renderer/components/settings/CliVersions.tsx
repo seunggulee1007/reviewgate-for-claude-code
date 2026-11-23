@@ -1,11 +1,12 @@
 /**
  * MARK: wave3 desktop-session
- * docs/PROTOCOL.md §36.8 in Settings › General: "CLI 버전 고정" — the native installer's versions (`cli_versions`, newest
+ * docs/PROTOCOL.md §36.8 in Settings › Advanced: "CLI 버전 고정" — the native installer's versions (`cli_versions`, newest
  * first) with verified / current / pinned, a pin per version (main builds and checks the path, `rg:pinClaudeVersion`) and
  * back to the newest (auto-detect). An engine before §36.8 shows the list off with the reason.
  */
 import { useEffect } from "react";
 import type { CliVersionsEvent } from "@reviewgate/engine";
+import { AppliesBadge } from "./SettingsBits"; // §55.11
 import { t } from "../../i18n";
 import { cliInfoOf, pinnedVersionOf, updateReason } from "../../sessionTools";
 import { useStore } from "../../store";
@@ -43,9 +44,10 @@ export function CliVersionView(p: { versions: CliVersionsEvent | null; loading: 
   const list = p.versions?.versions ?? [];
   const current = p.versions?.current ?? p.running;
   return (
-    <section data-testid="CLI versions">
+    <section data-testid="CLI versions" data-setting="cliPin">
       <h4 className="row" style={{ gap: 6 }}>
         <span>{t("Pin CLI version")}</span>
+        <AppliesBadge id="cliPin" />
         <span className="spacer" />
         {p.loading ? (
           <span className="spinner" aria-hidden="true" />

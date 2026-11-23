@@ -1,5 +1,5 @@
 /**
- * wave3 check-clients — Settings › General › "테스트 명령 패턴" (`settings.testCommandPatterns`, docs/PROTOCOL.md §34.9),
+ * wave3 check-clients — Settings › Review › "테스트 명령 패턴" (`settings.testCommandPatterns`, docs/PROTOCOL.md §34.9),
  * as on the Mac (TestCommandSettingsSection): the user's own test commands, one glob per line, saved when the box loses
  * the focus (a half-typed `*` never counts every command as a test run), with the commands the engine already knows.
  */
@@ -15,7 +15,7 @@ export function TestCommandPatternsSection({ settings }: { settings: AppSettings
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
   return (
-    <section data-testid="Test command patterns section">
+    <section data-testid="Test command patterns section" data-setting="testCommandPatterns">
       <h4 id="test-command-patterns">{t("Test command patterns")}</h4>
       <textarea
         className="mono"

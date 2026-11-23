@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// wave3 check-clients — Settings › General › "테스트 명령 패턴" (`settings.testCommandPatterns`, docs/PROTOCOL.md §34.9), as in
+/// wave3 check-clients — Settings › Review › "테스트 명령 패턴" (`settings.testCommandPatterns`, docs/PROTOCOL.md §34.9), as in
 /// Electron: the user's own test commands, one glob per line, sent to every open window's engine when the box loses the
 /// focus (a half-typed `*` never counts every command as a test run), with the commands the engine already knows.
 struct TestCommandSettingsSection: View {
@@ -12,14 +12,16 @@ struct TestCommandSettingsSection: View {
 
     var body: some View {
         Section("Test command patterns") {
-            TextEditor(text: $patterns)
-                .font(.body.monospaced())
-                .frame(minHeight: 50)
-                .focused($focused)
-                .accessibilityLabel("Test command patterns")
-                .accessibilityIdentifier("Test command patterns")
-            Text("One per line, matched against each command of a Bash call as typed — * is any run of characters, ? one character. A matching command counts as a test run in the turn summary. Applied when you leave this box.")
-                .font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                SettingLabel("testCommandPatterns", title: Text("Your test commands"))   // §55.11: the matching rules in its ⓘ
+                TextEditor(text: $patterns)
+                    .font(.body.monospaced())
+                    .frame(minHeight: 50)
+                    .focused($focused)
+                    .accessibilityLabel("Test command patterns")
+                    .accessibilityIdentifier("Test command patterns")
+            }
+            .settingAnchor("testCommandPatterns")
             Text("Recognized without a pattern: \(AppSettings.builtInTestCommands)")
                 .font(.caption).foregroundStyle(.secondary)
                 .textSelection(.enabled)

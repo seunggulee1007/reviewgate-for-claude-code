@@ -4,6 +4,7 @@
  * font size. The bottom panel's default shell shows whenever the panel can open (it needs no preview).
  */
 import type { AppSettings } from "../../../shared/ipc";
+import { AppliesBadge } from "./SettingsBits"; // §55.11
 import { t } from "../../i18n";
 import { usePtyInfo } from "../../terminal/ptyInfo";
 import { clampFontSize, TERMINAL_FONT_MAX, TERMINAL_FONT_MIN } from "../../terminal/termHostOptions";
@@ -17,7 +18,7 @@ export function TerminalSettingsSection({ settings, patch }: { settings: AppSett
   return (
     <section data-testid="Terminal settings">
       <h4>{t("Terminal")}</h4>
-      <label className="check" title={available ? undefined : unavailable}>
+      <label className="check" title={available ? undefined : unavailable} data-setting="terminalChatPreview">
         <input
           type="checkbox"
           checked={preview}
@@ -67,11 +68,12 @@ export function TerminalSettingsSection({ settings, patch }: { settings: AppSett
             </select>
           </div>
           <div className="note">{t("Auto draws the terminal with WebGL and falls back by itself where the graphics card cannot (virtual machines, Remote Desktop). Off always uses the slower DOM renderer.")}</div>
-          <label className="check">
+          <label className="check" data-setting="terminalFullRepaint">
             <input type="checkbox" checked={settings.terminalFullRepaint !== false} onChange={(e) => patch({ terminalFullRepaint: e.target.checked })} data-testid="Terminal full repaint" />
             {t("Repaint the whole screen each frame (recommended on Windows)")}
+            <AppliesBadge id="terminalFullRepaint" />
           </label>
-          <div className="note">{t("Claude Code redraws its whole screen instead of only what changed — no stale or doubled lines in Windows' console. Takes effect when Claude Code restarts.")}</div>
+          <div className="note">{t("Claude Code redraws its whole screen instead of only what changed — no stale or doubled lines in Windows' console.")}</div>
           <div className="field-row">
             <span>{t("Font size")}</span>
             <input
@@ -92,7 +94,7 @@ export function TerminalSettingsSection({ settings, patch }: { settings: AppSett
       )}
       {shells.length > 0 && (
         <>
-          <div className="field-row">
+          <div className="field-row" data-setting="terminalShell">
             <span>{t("Default shell")}</span>
             <select value={settings.terminalShell === "cmd" ? "cmd" : "powershell"} onChange={(e) => patch({ terminalShell: e.target.value === "cmd" ? "cmd" : "powershell" })} aria-label={t("Default shell")} data-testid="Default shell">
               {shells.includes("powershell") && <option value="powershell">{t("PowerShell")}</option>}

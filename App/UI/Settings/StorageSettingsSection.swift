@@ -2,7 +2,7 @@ import SwiftUI
 import ReviewGateCore
 
 // MARK: wave4b w4b-bigturn
-/// Settings › General › "Disk space" (docs/PROTOCOL.md §39.1, robustness-11 ① ④): the large-file limit (untracked files
+/// Settings › Review › "Disk space" (docs/PROTOCOL.md §39.1, robustness-11 ① ④): the large-file limit (untracked files
 /// from this size are stubs in snapshots; live for every open window) and [오래된 리뷰 기록 정리] — counts first, says how
 /// many rounds / checkpoints go and about how much space comes back, and removes only after the confirmation. The open
 /// review and the newest 20 stay; only the app's own refs are deleted (never a branch, tag or stash).
@@ -17,17 +17,17 @@ struct StorageSettingsSection: View {
     var body: some View {
         Section("Disk space") {
             Stepper(value: $largeFileMB, in: AppSettings.largeFileMBRange, step: 10) {
-                LabeledContent("Leave untracked files out of snapshots from") {
+                LabeledContent {
                     Text(verbatim: "\(largeFileMB) MB").monospacedDigit()
-                }
+                } label: { SettingLabel("largeFileMB") }   // §55.11: what happens to such a file, in its ⓘ
             }
             .accessibilityIdentifier("Large file limit")
-            Text("Such a file (a heap dump, an archive) stays in the review list but its content is not stored: it cannot be reverted and the app does not commit it. Files git tracks are always stored.")
-                .font(.caption).foregroundStyle(.secondary)
+            .settingAnchor("largeFileMB")
             HStack {
                 Button("Clean Up Old Review History…") { count() }
                     .disabled(store.projectURL == nil || working || store.isRunning)
                     .accessibilityIdentifier("Clean up review history")
+                    .settingAnchor("historyCleanup")
                 if working { ProgressView().controlSize(.small) }
             }
             if store.projectURL == nil {

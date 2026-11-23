@@ -17,6 +17,8 @@ struct AppliedExtensionsView: View {
     @AppStorage(AppSettings.Key.projectLoadLocalSettings) private var localSettingsRaw = Data()
     /// Popover form: tighter spacing, long lists capped.
     var compact = false
+    /// §55.11: Settings shows its own banner for every pane, so its Extensions pane leaves this one out.
+    var showsRestartNotice = true
 
     /// Parsed from the observed `@AppStorage` value (same rules as `AppSettings.disabledPlugins`), so toggles re-render.
     private var disabled: [String] {
@@ -33,24 +35,24 @@ struct AppliedExtensionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 12 : 16) {
-            if needsRestart { restartNotice }
+            if needsRestart && showsRestartNotice { restartNotice }
             sourcesSection
             // wave3 mac-session (§36.6): what .claude/settings.local.json and the local MCP servers hold that this session left out.
             if let applied, let notApplied = applied.notApplied {
                 NotAppliedLocalSection(notApplied: notApplied, byFallback: applied.fallback != nil, compact: compact)
             }
             if let applied {
-                pluginsSection(applied)
+                pluginsSection(applied).settingAnchor("disabledPlugins")
                 if let mods = applied.mods, !mods.isEmpty { ModsSection(mods: mods, compact: compact) }   // MARK: wave5 w5-graph (§43.3)
-                hooksSection(applied)
-                mcpSection(applied)
-                skillsSection(applied)
+                hooksSection(applied).settingAnchor("disableUserHooks")
+                mcpSection(applied).settingAnchor("mcpServers")
+                skillsSection(applied).settingAnchor("skills")
                 InstructionsSection(applied: applied, compact: compact)   // wave4d w4d-config (§42.3): CLAUDE.md, memory, subagents
             } else {
                 Text("Open a project to see which plugins, hooks, MCP servers and CLAUDE.md files its Claude session applied.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                hooksToggle
+                hooksToggle.settingAnchor("disableUserHooks")
             }
         }
         .onChange(of: disabledRaw) { _, _ in pushSettings() }
@@ -80,12 +82,7 @@ struct AppliedExtensionsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
-            Button("Restart now") { store.restartSession() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(!store.canRestartSession || store.isRunning)
-                .help(store.isRunning ? String(localized: "Claude is working — wait for the turn to finish") : String(localized: "Restart the Claude session now"))
-                .accessibilityIdentifier("Restart now")
+            SessionRestartButton()   // §55.11: the same action as Settings' banner
         }
         .padding(10)
         .background(Color.orange.wash(colorScheme, light: 0.10, dark: 0.18), in: RoundedRectangle(cornerRadius: 8))
@@ -118,7 +115,7 @@ struct AppliedExtensionsView: View {
                 }
             }
             if !loadUserSettings {
-                Text("“Load user settings” is off in General, so new sessions skip your ~/.claude setup.")
+                Text("“Load user settings” is off (Settings › Extensions), so new sessions skip your ~/.claude setup.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -133,7 +130,7 @@ struct AppliedExtensionsView: View {
     // MARK: Plugins
 
     private func pluginsSection(_ applied: SessionExtensions) -> some View {
-        section(title: "Plugins", count: applied.plugins.count) {
+        section(title: "Plugins", count: applied.plugins.count, applies: .nextSession) {
             if applied.plugins.isEmpty {
                 Text("No plugins").font(.callout).foregroundStyle(.secondary)
             }
@@ -180,6 +177,7 @@ struct AppliedExtensionsView: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
                 Text("Run hooks from settings files and plugins").font(.callout)
+                AppliesBadge(.nextSession)
                 Spacer(minLength: 8)
                 Toggle("Run hooks from settings files and plugins", isOn: Binding(get: { !disableUserHooks }, set: { disableUserHooks = !$0 }))
                     .toggleStyle(.switch)
@@ -248,10 +246,12 @@ struct AppliedExtensionsView: View {
 
     // MARK: Helpers
 
-    private func section(title: LocalizedStringKey, count: Int?, @ViewBuilder content: () -> some View) -> some View {
+    private func section(title: LocalizedStringKey, count: Int?, applies: SettingApplies = .immediately,
+                         @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(title).font(.subheadline.weight(.semibold))
+                AppliesBadge(applies)   // §55.11: the plugin switches wait for the next session
                 if let count {
                     Text(verbatim: "\(count)")
                         .font(.caption2.weight(.semibold).monospacedDigit())
@@ -269,14 +269,25 @@ struct AppliedExtensionsView: View {
     }
 }
 
-/// Settings › Extensions.
+/// Settings › Extensions: whether sessions load the user's ~/.claude setup (§55.11: moved here from General), then what
+/// the running session applied.
 struct ExtensionsSettingsView: View {
+    @AppStorage(AppSettings.Key.loadUserSettings) private var loadUserSettings = true
+
     var body: some View {
         ScrollView {
-            AppliedExtensionsView()
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 16) {
+                Toggle(isOn: $loadUserSettings) { SettingLabel("loadUserSettings") }
+                    .toggleStyle(.switch)
+                    .accessibilityIdentifier("Load user settings")
+                    .settingAnchor("loadUserSettings")
+                Divider()
+                AppliedExtensionsView(showsRestartNotice: false)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onChange(of: loadUserSettings) { _, _ in for store in WorkbenchRegistry.shared.allStores { store.pushSessionStartSettings() } }
     }
 }
 

@@ -403,25 +403,23 @@ struct DiffLineOptions: View {
     }
 }
 
-/// Settings › General: the same "Wrap lines" as the diff headers.
+/// Settings › Review: the same "Wrap lines" as the diff headers.
 struct DiffSettingsSection: View {
     @AppStorage(DiffCodeMetrics.wrapLinesKey) private var wrapLines = true
     @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
 
     var body: some View {
         Section("Diff") {
-            Toggle("Wrap lines", isOn: $wrapLines)
+            Toggle(isOn: $wrapLines) { SettingLabel("diffWrapLines") }   // §55.11: the explanation in its ⓘ
                 .accessibilityIdentifier("Settings wrap lines")
-            Text("Off: each line stays on one line and all lines of a diff scroll sideways together (trackpad, or Shift + scroll wheel).")
-                .font(.caption).foregroundStyle(.secondary)
+                .settingAnchor("diffWrapLines")
             // §34.11: the same choice as the diff headers' picker (⌥⌘L).
-            Picker("Diff layout", selection: $layout) {
+            Picker(selection: $layout) {
                 Text("Unified").tag(DiffLayoutMode.unified)
                 Text("Split").tag(DiffLayoutMode.split)
-            }
+            } label: { SettingLabel("diffLayout") }
             .accessibilityIdentifier("Settings diff layout")
-            Text("Split shows the old version on the left and the new on the right — a narrow diff pane shows unified until it is wide enough.")
-                .font(.caption).foregroundStyle(.secondary)
+            .settingAnchor("diffLayout")
         }
     }
 }

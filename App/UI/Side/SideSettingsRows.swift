@@ -14,25 +14,27 @@ struct SideSettingsRows: View {
 
     var body: some View {
         Group {
-            if models.isEmpty {
-                TextField("Model", text: $sideModel, prompt: Text("Same as the main session"))
-                    .accessibilityIdentifier("Side model")
-            } else {
-                Picker("Model", selection: $sideModel) {
-                    ForEach(SideTrust.modelChoices(models, current: sideModel)) { choice in
-                        Text(choice.label).tag(choice.value)
-                    }
+            // §55.11: "Same model as the main conversation: …" is the row's ⓘ.
+            Group {
+                if models.isEmpty {
+                    TextField(text: $sideModel, prompt: Text("Same as the main session")) { SettingLabel("sideModel", title: Text("Model")) }
+                } else {
+                    Picker(selection: $sideModel) {
+                        ForEach(SideTrust.modelChoices(models, current: sideModel)) { choice in
+                            Text(choice.label).tag(choice.value)
+                        }
+                    } label: { SettingLabel("sideModel", title: Text("Model")) }
                 }
-                .accessibilityIdentifier("Side model")
             }
-            Text("Same model as the main conversation: it reuses the conversation's cache and answers fastest. Another model (e.g. haiku) costs less per token but reads the whole conversation again.")
-                .font(.caption).foregroundStyle(.secondary)
-            Picker("Web in side questions", selection: $sideWeb) {
+            .accessibilityIdentifier("Side model")
+            .settingAnchor("sideModel")
+            Picker(selection: $sideWeb) {
                 ForEach(SideWebMode.allCases) { mode in
                     Text(mode.label).tag(mode.rawValue)
                 }
-            }
+            } label: { SettingLabel("sideWeb") }
             .accessibilityIdentifier("Side web")
+            .settingAnchor("sideWeb")
             Text(SideWebMode(stored: sideWeb).help)
                 .font(.caption)
                 .foregroundStyle(SideWebMode(stored: sideWeb) == .on ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))

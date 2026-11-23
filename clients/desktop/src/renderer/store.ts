@@ -304,7 +304,8 @@ export type Dialog =
       task?: string }
   | { kind: "newBranch" }
   | { kind: "createPR" }
-  | { kind: "settings"; tab?: "general" | "accounts" | "permissions" }
+  /** §55.11: `highlight` — a setting's id (settingsIndex.ts): its tab opens at its row, tinted for a moment. */
+  | { kind: "settings"; tab?: import("./settingsIndex").SettingsTab; highlight?: string }
   | { kind: "switchProject"; path: string }
   | { kind: "rejectAll" }
   // MARK: wave1 desktop-review — rejectExternal / staleReview / finishReview (storeReviewGate.ts)

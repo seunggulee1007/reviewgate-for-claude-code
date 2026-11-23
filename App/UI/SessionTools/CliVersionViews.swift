@@ -3,7 +3,7 @@ import ReviewGateCore
 
 // MARK: wave3 mac-session
 // docs/PROTOCOL.md §36.8 on the Mac: the banner "새 CLI x — 아직 검증 안 됨" in the window's banner stack (from session.cli,
-// closed once per version in every window) with "Pin previous version", and Settings › General "Pin CLI version" (the
+// closed once per version in every window) with "Pin previous version", and Settings › Advanced "Pin CLI version" (the
 // installed versions of ~/.local/share/claude/versions). The cli_version_changed notice is a chat row only.
 
 /// Pinning is app-wide: `claudePath` is one setting, every open window's engine gets it and uses it from its next session start.
@@ -65,9 +65,9 @@ struct CliVersionBannerView: View {
                 .help(pinnable.map { _ in String(localized: "New sessions start with \(previous?.version ?? "") instead (restart the session to switch now)") }
                       ?? CliVersionText.cannotPinPrevious(previous))
                 .accessibilityIdentifier("Pin previous CLI version")
-            SettingsLink { Text("Versions…") }
+            SettingsJumpButton("Versions…", to: "cliPin")
                 .controlSize(.small)
-                .help("Settings › General › Pin CLI version")
+                .help("Settings › Advanced › Pin CLI version")
                 .accessibilityIdentifier("CLI versions settings")
             dismissButton(version)
         }
@@ -121,7 +121,7 @@ struct CliVersionBannerView: View {
     }
 }
 
-/// Settings › General "Pin CLI version": the claude on the PATH (it updates itself) or one installed version, for every
+/// Settings › Advanced "Pin CLI version": the claude on the PATH (it updates itself) or one installed version, for every
 /// window's next session start.
 struct CliVersionPinSection: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -140,16 +140,13 @@ struct CliVersionPinSection: View {
 
     var body: some View {
         Section {
-            Text("Claude Code updates itself in the background. Pin a version to keep starting new sessions with it; ReviewGate marks the versions it was checked with.")
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             content
             if CliVersionList.pinDiffersFromRunning(pinnedPath: pinned, running: store.cliInfo?.version) {
                 restartRow
             }
         } header: {
             HStack {
-                Text("Pin CLI version")
+                SettingLabel("cliPin")   // §55.11: "Claude Code updates itself…" in its ⓘ, the "다음 세션부터" badge
                 Spacer()
                 if store.sessionTools.isLoadingVersions {
                     ProgressView().controlSize(.mini)
@@ -168,6 +165,7 @@ struct CliVersionPinSection: View {
             if store.isEngineRunning { await store.sessionTools.refreshVersions() }
         }
         .accessibilityIdentifier("Pin CLI version")
+        .settingAnchor("cliPin")
     }
 
     @ViewBuilder

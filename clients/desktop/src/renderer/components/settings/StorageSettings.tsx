@@ -1,6 +1,6 @@
 /**
  * MARK: wave4b w4b-bigturn
- * Settings › General › "디스크 공간" (docs/PROTOCOL.md §39.1, as on the Mac: StorageSettingsSection): the large-file limit
+ * Settings › Review › "디스크 공간" (docs/PROTOCOL.md §39.1, as on the Mac: StorageSettingsSection): the large-file limit
  * (untracked files from this size are stubs in snapshots; live) and [오래된 리뷰 기록 정리] — counts first, then says how
  * many rounds / checkpoints go and about how much space comes back, and removes only after [정리]. The open review and the
  * newest 20 stay; only the app's own refs go (never a branch, tag or stash).
@@ -43,7 +43,7 @@ export function StorageSettingsSection({ settings }: { settings: AppSettings }) 
     }
   };
   return (
-    <section data-testid="Disk space section">
+    <section data-testid="Disk space section" data-setting="largeFileMB">
       <h4>{t("Disk space")}</h4>
       <div className="stepper">
         <span style={{ width: 260 }}>{t("Leave untracked files out of snapshots from")}</span>
@@ -52,7 +52,7 @@ export function StorageSettingsSection({ settings }: { settings: AppSettings }) 
         <span>MB</span>
       </div>
       <div className="note">{t("Such a file (a heap dump, an archive) stays in the review list but its content is not stored: it cannot be reverted and the app does not commit it. Files git tracks are always stored.")}</div>
-      <div className="row" style={{ gap: 6 }}>
+      <div className="row" style={{ gap: 6 }} data-setting="historyCleanup">
         <button type="button" className="small" disabled={!hasProject || working || running} onClick={() => void run(false)} data-testid="Clean up review history">
           {t("Clean Up Old Review History…")}
         </button>

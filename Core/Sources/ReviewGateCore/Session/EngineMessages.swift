@@ -6,7 +6,7 @@ public enum EngineMessageAction: String, Sendable, Equatable, CaseIterable {
     case login
     /// `session_crashed` / `cli_not_found`: `restart_session`.
     case restartSession
-    /// `cli_not_found`: Settings › General (the claude path override).
+    /// `cli_not_found`: Settings › Advanced (the claude path override).
     case openSettings
     /// §22 `mcp_auth_required`: `mcp_auth {server}` (a terminal with `claude /mcp`).
     case mcpLogin

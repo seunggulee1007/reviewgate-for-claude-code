@@ -3187,7 +3187,7 @@ as git tools and GitHub do). The choice is remembered per user, for every diff.
 - Binary files, image previews and the "no textual diff" / truncated placeholders are the same in both; the full-file view
   keeps its own layout.
 - **Mac.** A segmented "Unified | Split" in each diff header (the review diff, live, history and PR diffs — icons in a
-  narrow header, the "⋯" menu's "Split Diff" in the narrowest), View › Split Diff (⌥⌘L) and Settings › General › Diff;
+  narrow header, the "⋯" menu's "Split Diff" in the narrowest), View › Split Diff (⌥⌘L) and Settings › Review › Diff;
   `UserDefaults` `diffLayout`. Each pane measures itself (`diffSplitWidth()`); split rows are built only while split shows,
   from the rows the List already has (`DiffSplitCache`), one List row per split row.
 - **Windows.** "Unified | Split" in the row above every line diff (`UnifiedDiff`: the review diff and its whitespace view,
@@ -4222,7 +4222,7 @@ as before.
   (`result.subtype: "error_max_turns"`) sends the notice `error{fatal: false, scope: "session", code: "max_turns",
   maxTurns: N}` before its `turn_end` (whose `stopReason` stays `error_max_turns`). The clients' row "도구 호출 한도(N회)에
   닿아 멈췄어요" with **[이어서 계속]**, which sends "계속해" to the same chat by the composer's queue rules (the limit counts
-  per message: the CLI starts counting again). Settings › 제한 has "메시지당 도구 호출 수 제한하기", off by default — the
+  per message: the CLI starts counting again). Settings › Session › 한도 has "메시지당 도구 호출 수 제한하기", off by default — the
   clients send `maxTurns: 0` until it is turned on (Mac `maxTurnsLimit`, Electron `settings.maxTurnsLimit`); the number
   (10–1000, 200 until changed) stays stored for then, its stepper greyed out while off, the note "끔(기본): 제한 없음 —
   Claude가 터미널에서처럼 메시지 하나를 끝날 때까지 이어서 하고, 언제든 [중지]로 멈출 수 있어요". A number stored before
@@ -4392,7 +4392,7 @@ existing client relies on changes meaning.
   it as a record.
 - §39.5 **Auto mode that does not ask for every command** — in 자동 the hooks leave commands to Claude Code's classifier
   (the git guard, budget, worktree rules and reason cards stay), what it blocked is a gray row, the HUD mode chip is the
-  mode menu, a pick mid-turn waits for the turn's end, Settings › 시작 모드.
+  mode menu, a pick mid-turn waits for the turn's end, Settings › Permissions › 시작 모드.
 - §39.6 **Notifications you notice** (client rules only) — the OS permission asked up front and said when it is off,
   Windows' AppUserModelId, one switch per group, plain lines, a click that lands on the card it was about.
 
@@ -4482,7 +4482,7 @@ largeFileMB?: number   // 1–100000, default 50; live (the next snapshot)
   published when the level changes or the free space moved 256 MB. `low` below **2 GB**, `critical` below **1 GB**: the HUD
   shows "디스크 여유 1.2 GB" (orange; red when critical) only then — a disk that often runs with a few GB free would see a
   10 GB mark every day — and a critical disk shows one banner per window until closed.
-- **Old review history (④).** Settings › General › 디스크 공간 › [오래된 리뷰 기록 정리…]: `history_cleanup` (count) →
+- **Old review history (④).** Settings › Review › 디스크 공간 › [오래된 리뷰 기록 정리…]: `history_cleanup` (count) →
   "리뷰 기록 N개와 체크포인트 M개를 지워요(최근 20개는 남겨요) — 약 X를 비워요." → [정리] → `history_cleanup {apply:
   true}`. It drops the history rounds beyond the newest `keep` and, per chat of the worktree, the checkpoint records beyond
   the newest `keep`; deletes only their refs (`refs/reviewgate/<ns>/history/<id>/…`, `…/turns/<id>/…` of this worktree's
@@ -4835,10 +4835,10 @@ Client rules (Mac and Electron the same, same i18n keys); the engine and the wir
 made from the events the clients already get (`permission_request` with `agent?` §33.1, `plan_proposed`, `turn_end`, …).
 An older engine works as before.
 
-- **Asked up front.** The Mac asks macOS at launch (and when Settings › Notifications is turned on) instead of at the
+- **Asked up front.** The Mac asks macOS at launch (and when Settings › General › Notifications is turned on) instead of at the
   first notification, reads the answer again on every activation and before a notification is dropped (one turned on in
   System Settings works without a relaunch). Core `NotificationHealth`; App `AttentionCenter`, `NotificationStatusModel`.
-- **Said when it cannot reach the user.** macOS off: Settings › Notifications shows "macOS에서 ReviewGate 알림이 꺼져
+- **Said when it cannot reach the user.** macOS off: Settings › General › Notifications shows "macOS에서 ReviewGate 알림이 꺼져
   있어요" with [시스템 설정 열기] (alert style None: "배너 없이 와요 — 알림 센터에만 쌓여요"), and each project window says it
   once ([닫기] closes it for good, `notificationsOffNoticeDismissed`). Electron sets the Windows AppUserModelId to the
   installer's `appId` (`io.github.seunggulee1007.reviewgate.desktop`; the executable's path when run unpackaged) — Windows shows toasts only
@@ -4882,7 +4882,7 @@ the engine and the wire do not change.
 
   A bright chime for what blocks Claude, a soft one for a question, a fanfare for finished work, the low buzz macOS uses
   for errors, a light pop for the update.
-- **Settings › Notifications** under "Play a sound" (kept: off silences every category): one picker per category —
+- **Settings › General › Notifications** under "Play a sound" (kept: off silences every category): one picker per category —
   "Default" (the alert sound of System Settings › Sound), "None", then the alert sounds macOS ships, read from
   /System/Library/Sounds (Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
   on macOS 26) — and ▶ to hear it. UserDefaults `notificationSound.<category>` = `default` / `none` / the sound's name;
@@ -4995,7 +4995,7 @@ rules. Every field stays optional; an older engine or client behaves as before.
   anywhere (`"*"`, also what `hello` carries) seeds a project opened for the first time, 자동 included — keeping 자동 out
   (→ 기본) started every new worktree of a repository worked in auto mode in 기본, with a card for every command and MCP
   call. A project opened for the first time now starts in: the mode its repository's other worktrees ran in last (engine,
-  §11), else Settings › 시작 모드, else the last mode used anywhere. Electron has no last-mode fallback
+  §11), else Settings › Permissions › 시작 모드, else the last mode used anywhere. Electron has no last-mode fallback
   (`settings.permissionMode` is the 시작 모드 only); a moved chat still takes its mode along (§39.4, same repository).
 - **A hook that blocked is not a failure** (engine `session/longWork.ts` `hookFailureNotice`). `system/hook_response`
   with `exit_code: 2` (Claude Code's blocking exit code; the reason is stderr's first line), or `exit_code: 0` with a JSON
@@ -6578,7 +6578,7 @@ the user's. Additive: one command, one event (its reply too), two settings; an o
   (≥ 20) — 250 ms after it settles, with `visible`: Mac the chat on screen in a visible window (`occlusionState`: not
   minimized, covered, on another Space or hidden); Electron the chat mounted and the window not hidden. A chat without
   lines keeps its layout (Mac: the width is measured behind the composer's buttons; Electron: a zero-height box). A
-  failed run's tooltip: "상태줄 명령이 실패했어요: <why>. 마지막 출력을 보여 주고 있어요." Settings › General › "Claude Code
+  failed run's tooltip: "상태줄 명령이 실패했어요: <why>. 마지막 출력을 보여 주고 있어요." Settings › Session › "Claude Code
   상태줄": [Claude Code 상태줄 표시] (on; nothing shows without a `statusLine`; every window at once), the command in use (or
   why nothing runs — the hooks off, or "조직의 관리 설정으로 꺼져 있어요…"), "마지막 실행이 실패했어요: <why>" after a
   failure, and — when the window's project has its own — [이 프로젝트의 상태줄 실행] (off) with that command: on stores its
@@ -7363,7 +7363,7 @@ in sends nothing and keeps its context.
   `send` through the gate, and `task_started {text, mode, from, sent: true}` is emitted. When the session cannot take a
   message, nothing is sent: `task_started {…, sent: false}` hands the text back, and the client puts it into the
   composer.
-- **Mac.** Settings › Workbenches › "업무로 실행" (`runAsTaskEnabled`, on by default) shows the entry in two places: a
+- **Mac.** Settings › Git & Workbenches › "업무로 실행" (`runAsTaskEnabled`, on by default) shows the entry in two places: a
   button in the composer's tools (next to 📎 and @), which takes the draft and its @ mentions as `@path` (images stay in
   this composer), and Workbenches › "업무로 실행…" (also in the sidebar's workbench section), which starts with an empty
   task. Both open the New Workbench sheet as "업무로 실행". It has the task (an editor) and the mode of the fresh chat
@@ -7968,7 +7968,7 @@ Seen with CLI 2.1.318 over stream-json (sonnet; default and auto mode, a project
   last result) — "에이전트 보고" with the report, or "사용자가 중지". The auto-turn row says "백그라운드 에이전트가 끝나
   Claude가 이어서 했어요" (실패해 / 멈춰) with the agent's description and report (`AutoTurnInfo.Task.kind` / `toolUseId`;
   an odd kind reads as `other`).
-- **Electron.** The same: Settings › General "서브에이전트가 턴 안에서 끝나게" (`settings.subagentsInTurn`, off, disabled
+- **Electron.** The same: Settings › Session "서브에이전트가 턴 안에서 끝나게" (`settings.subagentsInTurn`, off, disabled
   while background work is off), the group without the launch's report (`agentMeta.shownAgentResult`), the agent's
   titles on the auto-turn row (`background.autoTurnTitle`).
 - **Verified.** Engine `w52.agents.test.ts` (the session with CLI 2.1.318's frames: inputs kept / kept in the turn with
@@ -8146,7 +8146,7 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   store the text itself. An append of the user's own is untouched; its `{maxFiles}` / `{maxLines}` get the limit's numbers,
   on or off. Mac: Core `AppSettings` (`budgetEnabled`, `budget` — `Budget.off` while off —, `budgetLimits`,
   `renderedSystemPromptAppend`, `forgetLegacySystemPromptAppend` — it removes a stored earlier built-in text), `Budget.isOn`;
-  tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`. Mac UI: Settings › 한도 has "응답당 변경 한도 두기" (off) above
+  tests `Core/Tests/ReviewGateCoreTests/ChangeLimitTests.swift`. Mac UI: Settings › Session › 한도 has "응답당 변경 한도 두기" (off) above
   the two steppers, which are greyed out while it is off, and a note on what off means; a change goes to every open
   window's engine. While off the HUD shows no change-limit chip and the chat's empty state names no limit ("Claude가 바꾼
   내용은 계속하기 전에 리뷰하게 돼요."). With it on a warn row reads "변경 한도 도달: …" and a deny row "변경 한도 초과 — 편집
@@ -8155,7 +8155,7 @@ type Budget = { maxFiles: number; maxLines: number; hardMultiplier?: number };  
   (absent: off; the renderer may write a boolean), main's `budgetOf` / `systemPromptOf`, the texts in
   `src/shared/systemPrompt.ts`; the settings file now keeps "" for the built-in append (it kept a copy of every default, so
   nearly every file holds the old text) and an earlier built-in text reads as "". Test:
-  `clients/desktop/src/main/changeLimitSettings.test.ts`. Its renderer does what the Mac does — Settings › 한도 with the
+  `clients/desktop/src/main/changeLimitSettings.test.ts`. Its renderer does what the Mac does — Settings › Session › 한도 with the
   switch and greyed-out steppers, the append box showing the built-in text as its placeholder, no HUD chip and no limit in
   the empty chat while off, the rows' 변경 한도 words, the plan dialog's title without "in small units" (test:
   `clients/desktop/src/renderer/changeLimitView.test.ts`).
@@ -8674,6 +8674,68 @@ styles. A screen that uses them gets these without a change of its own.
   under the whole text, or alone when it already holds that text. Fields, the code editor, an inline span (it cuts
   nothing) and `data-no-auto-title` get none.
 
+### 55.11 Settings: panes, search and when a change applies
+
+General used to be one long scroll of fifteen sections, nearly every switch under a paragraph, and four wordings for when
+a change counted ("Applies live", "the next Open Project", "when the session restarts", "after reopening the project")
+with a restart button on the Extensions tab only (lane b-settings).
+
+- **One index** (Core `SettingsCatalog`, Electron renderer/settingsIndex.ts): every setting's pane, section, title and
+  longer explanation (English keys of the string catalog) and when a change takes effect. The panes, in order: General
+  (appearance, typing and the chat, closing and quitting, notifications, updates), Permissions, Session (chats, the
+  session, limits, side questions, messages from other sessions, the status line, the system prompt), Review (diff,
+  checkpoint ignore patterns, test commands, disk space), Git & Workbenches, Extensions, Project, Accounts, Advanced
+  (toolchain, the pinned CLI, path overrides). The stored tab (`settingsTab`) keeps its values, so `general`,
+  `extensions`, `project` and `accounts` still open where they did; an unknown one opens General. Every key is unchanged.
+- **Search** (`SettingsCatalog.search`): every word of the query, in any order and case (full-width folded), in a
+  setting's title, section, explanation or pane name — the English key and the localized words, so "bash", "Bash 자동"
+  and "권한" all find their rows. An empty query finds nothing (the panes show instead). A result opens its pane, scrolls
+  to the row and tints it for two seconds.
+- **When a change applies** (`SettingApplies`). One model in both clients: a setting with no badge applies at once (the
+  open windows get it with `set_settings`, or read it where it is used). The others carry one badge — **다음 세션부터**
+  (what the engine reads when a Claude session starts: Bash auto-allow, loading user settings, the system prompt,
+  background work, subagents in the turn, the tool-call limit, isolated worktree agents, the claude path / pinned CLI,
+  plugins and hooks), **새 창부터** (the node path: a window's engine process starts with it) and **새 프로젝트부터**
+  (the starting mode, §39.5). The paragraphs no longer say it: "Takes effect on the next Open Project" was not what
+  happened — the open window's engine already had the new value and read it at its next session start; a new window was
+  the only way the Mac's Bash / user-settings / prompt changes reached an engine, since they went out with `hello` only.
+  The Mac now pushes them (`AppState.pushSessionStartSettings`: `autoAllowTools`, `loadUserSettings`, the rendered
+  `systemPromptAppend`) to every window when they change — the prompt also when the change limit is switched, as its
+  sentence depends on it — so a restart or a new chat takes them, as Electron's whole-settings push always did.
+- **What waits for a restart** (Core `SessionStartSettings`, `AppState.settingsAtSessionStart`): the client keeps what
+  the window's session read when it started — taken when `state.session.starting` rises (a restart, a new chat) or the
+  first time an open session is seen, dropped when none is open — and `settingsWaitingForRestart` names the settings
+  that differ now, in catalog order; changed back, they wait no more. Plugins, hooks and the project's local settings keep
+  their own comparison with what the session applied (§16, §36.6).
+- **The Mac window** (App/UI/Settings: SettingsView, SettingsPanes, SettingsSupport). A sidebar lists the panes, each
+  with its symbol on a tinted square as System Settings draws them, and holds the search field at its top (the
+  sidebar's `.searchable`); while the field has text the sidebar lists the matches by pane instead — title,
+  section and badge, the explanation as the tooltip — and Return opens the first. Below the panes one line says the
+  model once: "배지가 없는 설정은 바로 적용돼요." A row's title carries an ⓘ (the explanation that used to be a
+  paragraph under it: tooltip on hover, popover on click) and its badge; a short line stays only where it changes with
+  the row (the change limit's hard stop, the starting mode's mode, a status line that failed). The window is resizable
+  (`windowResizability(.contentMinSize)`; at least 660 × 380, 740 × 540 at first) so it fits a 637 pt high screen
+  area. "Load user settings" moved from General to Extensions (its note in the capabilities popover says where).
+  "Change Limit…" on a change-limit row, the CLI banner's "Versions…" and the missing-claude banner's "Settings…" open
+  their row (Session › Limits, Advanced › Pin CLI version, Advanced › claude path) instead of whatever pane was last.
+- **One restart banner** (Mac `SettingsRestartBanner`, Electron `SettingsRestartBanner`). On every pane, while
+  `settingsWaitingForRestart` names something — or, on the Mac, the plugins / hooks / project's local settings differ
+  from what the session applied — an orange strip says "다음 세션부터 적용돼요", lists the changed settings ("바뀐 설정:
+  Bash 자동 허용 · 시스템 프롬프트 추가문") and has [지금 재시작]: the Extensions pane's action (`restart_session`; a
+  terminal chat restarts its PTY, §57.5), shared (`SessionRestartButton`), off with its reason while Claude works or the
+  session cannot restart. Settings' Extensions pane drops its own notice (the popover and the fallback sheet keep it).
+- **Windows** (components/settings/SettingsPanel.tsx, GeneralTab.tsx's panes, SettingsBits.tsx, settingsRestart.ts).
+  The same split as tabs inside the Settings dialog (720 px wide now): General, Permissions (the Bash auto-allows moved
+  there), Session (the terminal, the session, extensions — "Load user settings" and Applied extensions… —, limits, side
+  questions, other sessions, the status line, the prompt), Review, Git & Workbenches, Project, Accounts, Advanced. A
+  search field above the tabs lists the matches by tab (Return opens the first, Esc empties the field before it closes
+  the dialog); a match opens its tab, scrolls its row (`data-setting`) into view and tints it. Rows that wait carry the
+  badge and their notes lost "Takes effect on the next Open Project" / "Applies immediately". The dialog's
+  `{ kind: "settings", highlight }` opens on a row: the fatal-session banner's [설정] goes to Advanced › claude path.
+- **A cleared side-question model applies at once** (Mac). `updateSideSettings` sends `sideModel: ""` (the main
+  session's model) when the field is emptied; it left the key out before, and the engine kept the last model until the
+  window's engine restarted ("clearing the model applies after reopening the project").
+
 ## 56. The message box as the terminal's
 
 What a terminal user reaches for in Claude Code's input that the message box lacked.
@@ -9166,7 +9228,7 @@ chat's id);
 
 ### 57.5 The Mac app: the terminal chat
 
-- **Opening one.** ⌘T / the tabs' `+` / a project's first chat while Settings › "새 채팅 종류" is 터미널 (the default,
+- **Opening one.** ⌘T / the tabs' `+` / a project's first chat while Settings › Session › "새 채팅 종류" is 터미널 (the default,
   §57.7), Chat › New Terminal Chat (⌃⌘T) always, the chat tabs' ⋯ menu, or the right-click of their `+`. It is held
   while Claude works, as ⌘T is (§9: `PendingChatSwitch.newTerminalChat`, "새 터미널 채팅 대기 중").
 - **The column.** When the chat on screen is a terminal chat, the chat column keeps its tab strip and shows the terminal

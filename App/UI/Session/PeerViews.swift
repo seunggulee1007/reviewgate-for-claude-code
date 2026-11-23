@@ -296,18 +296,17 @@ struct PeerInboundProjectMenu: View {
     }
 }
 
-/// Settings › General: the default for every project (a project's own choice in its menu wins), applied live.
+/// Settings › Session: the default for every project (a project's own choice in its menu wins), applied live.
 struct PeerInboundSettingsSection: View {
     @AppStorage(AppSettings.Key.peerInbound) private var raw = PeerInboundMode.auto.rawValue   // r2-peers: the default
 
     var body: some View {
         Section("Messages from other sessions") {
-            Picker("Messages from other sessions", selection: $raw) {
+            Picker(selection: $raw) {
                 ForEach(PeerInboundMode.allCases) { Text(verbatim: $0.displayName).tag($0.rawValue) }
-            }
+            } label: { SettingLabel("peerInbound", title: Text("When another session sends a message")) }   // §55.11: the rest in its ⓘ
             .accessibilityIdentifier("Peer inbound")
-            Text("When another Claude session of yours (a terminal, the IDE) sends a message to this window's Claude: handle it as it arrives — once Claude is free, its changes reviewed like any other; a sender your session list does not show still asks — ask with a card first, or decline it. A project can choose its own in the project menu.")
-                .font(.caption).foregroundStyle(.secondary)
+            .settingAnchor("peerInbound")
         }
         .onChange(of: raw) { _, new in
             let mode = PeerInboundMode(wire: new) ?? .auto

@@ -132,7 +132,7 @@ update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
 2. **Tell Claude what to do** in the chat at the bottom. Return sends; Shift-Return starts a new line.
 3. **Review the turn.** Go through the changed files and accept or revert each one. Your next instruction goes out once
    the turn is reviewed.
-4. **Optionally, limit each turn** in Settings › General › Limits › Limit changes per reply (max files, max changed
+4. **Optionally, limit each turn** in Settings › Session › Limits › Limit changes per reply (max files, max changed
    lines; off by default) to keep turns small enough to review.
 
 ## Build from source

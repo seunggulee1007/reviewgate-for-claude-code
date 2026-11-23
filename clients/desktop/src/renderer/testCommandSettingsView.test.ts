@@ -1,4 +1,4 @@
-/** wave3 check-clients — Settings › General › "테스트 명령 패턴" as it renders (the Mac's TestCommandSettingsSection words). */
+/** wave3 check-clients — Settings › Review › "테스트 명령 패턴" as it renders (the Mac's TestCommandSettingsSection words). */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createElement, type FunctionComponent } from "react";
 import { renderToStaticMarkup } from "react-dom/server";

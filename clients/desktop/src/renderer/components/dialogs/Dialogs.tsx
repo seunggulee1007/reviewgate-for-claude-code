@@ -61,7 +61,7 @@ export function Dialogs() {
     case "settings":
       return (
         <Modal title={t("Settings")} onClose={close} wide testId="Settings dialog">
-          <SettingsPanel initialTab={dialog.tab} />
+          <SettingsPanel initialTab={dialog.tab} highlight={dialog.highlight} />
           <div className="actions">
             <button type="button" className="primary" onClick={close} data-testid="Close settings">{t("Done")}</button>
           </div>

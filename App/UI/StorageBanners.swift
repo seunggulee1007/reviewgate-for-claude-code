@@ -75,7 +75,7 @@ struct DiskSpaceChip: View {
             .labelStyle(.titleAndIcon)
             .foregroundStyle(disk.level == .critical ? Color.red : Color.orange)
             .fixedSize()
-            .help("Free space on the project's disk. Settings › General › Clean Up Old Review History frees what the app keeps.")
+            .help("Free space on the project's disk. Settings › Review › Clean Up Old Review History frees what the app keeps.")
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: label))
             .accessibilityIdentifier("HUD disk space")

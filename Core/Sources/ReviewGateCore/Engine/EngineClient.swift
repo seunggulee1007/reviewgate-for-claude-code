@@ -40,7 +40,7 @@ public enum EngineClientError: Error, LocalizedError, Sendable, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .nodeNotFound: String(localized: "Node.js (node) was not found. Install Node.js, or set its path in Settings › General › Toolchain overrides › node path, then reopen the project.", bundle: .module)
+        case .nodeNotFound: String(localized: "Node.js (node) was not found. Install Node.js, or set its path in Settings › Advanced › Toolchain overrides › node path, then reopen the project.", bundle: .module)
         case .stopped: String(localized: "engine was stopped", bundle: .module)
         case .exited: String(localized: "engine exited before replying", bundle: .module)
         case .refused(let message, _, _, _): message

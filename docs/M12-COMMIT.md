@@ -13,7 +13,7 @@ Command `commit { message: string; paths?: string[] /* default: all files with s
 ## Mac UI
 - Changes header: "Commit accepted (N)…" button (AX "Commit accepted"; ⌘⇧K) enabled when `state.commit.canCommit`; sheet: message editor prefilled with `suggestedMessage`, checklist of accepted files (default all), toggle "Push to origin" (default from settings), Commit button; refusal text localized from codes.
 - After commit: green banner "Committed <shortSha> on <branch> · pushed/not pushed" with "Create PR…" (opens the existing CreatePR sheet) and "Open" if pushed and remote is GitHub (URL = remote web URL + /commit/sha). Push error → red banner with retry ("Push now" = `commit`? no → new command `push {}` → same push logic; add it).
-- Settings → General: "Push by default", "Commit trailer" field.
+- Settings → Git & Workbenches: "Push by default", "Commit trailer" field.
 
 ## Electron UI
 Same as Mac: `CommitDialog.tsx`, header button, banner, settings fields.

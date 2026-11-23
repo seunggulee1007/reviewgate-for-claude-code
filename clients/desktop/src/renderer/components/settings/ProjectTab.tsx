@@ -28,15 +28,15 @@ export function ProjectTab() {
     <div className="col" style={{ gap: 14 }} data-testid="Project settings">
       <div className="muted caption">{t("Settings of {0} — every workbench of this repository uses them.", lastComponent(root))}</div>
       <section className="col" style={{ gap: 6 }}>
-        <h4 style={{ margin: 0 }}>{t("Commit message template")}</h4>
+        <h4 style={{ margin: 0 }} data-setting="commitTemplate">{t("Commit message template")}</h4>
         <CommitTemplateEditor />
       </section>
       <section className="col" style={{ gap: 6 }}>
-        <h4 style={{ margin: 0 }}>{t("Workbench setup")}</h4>
+        <h4 style={{ margin: 0 }} data-setting="workbenchSetup">{t("Workbench setup")}</h4>
         <WorkbenchSetupEditor />
       </section>
       <section className="col" style={{ gap: 6 }}>
-        <h4 style={{ margin: 0 }}>{t("PR comments")}</h4>
+        <h4 style={{ margin: 0 }} data-setting="prRespondCommand">{t("PR comments")}</h4>
         <PrRespondCommandField />
       </section>
       <AutoAcceptSettings />{/* MARK: wave4c w4c-trust (§41.2) */}

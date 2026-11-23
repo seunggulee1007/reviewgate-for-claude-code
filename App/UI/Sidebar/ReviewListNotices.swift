@@ -30,7 +30,7 @@ struct ReviewListNotices: View {
                     } icon: {
                         Image(systemName: "doc.badge.ellipsis").foregroundStyle(.orange)
                     }
-                    .help("Untracked files over the large-file limit (Settings › General) are not stored in snapshots: they cannot be reverted and the app does not commit them")
+                    .help("Untracked files over the large-file limit (Settings › Review) are not stored in snapshots: they cannot be reverted and the app does not commit them")
                     ForEach(large.prefix(Self.shownPaths), id: \.path) { f in
                         Text(verbatim: StorageText.largeFileRow(f))
                             .font(.caption.monospaced()).foregroundStyle(.secondary)
