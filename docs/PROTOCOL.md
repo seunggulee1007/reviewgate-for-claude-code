@@ -9786,3 +9786,11 @@ still marks its state (approved / changes requested). An edited comment (`update
 Inline comments stay on the diff as before. Under the thread a composer posts `pr_comment`: its send button is disabled
 while the text is blank or `isCommenting` is true, the text is cleared only on `ok:true`, and a refusal shows its words
 under the composer (the text stays). Clients send it only for a git project (§59 hides the PR tab otherwise).
+
+**Windows client.** The PR detail (`components/pr/PRDetail.tsx`) has a **Conversation | Files** switch under its header;
+every PR opens on Conversation (the switch is the opened PR's own state). Conversation (`PRConversation.tsx`, the merge in
+`prConversation.ts`) is the thread above in one centered column: the description (a "Description" pill; "No description
+provided." when it is empty), then the comments and the reviews, each with its author, the review's state pill, the time
+(relative; the absolute one in the tooltip), "edited" for an edited comment, "Open on GitHub" (`openExternal`) and the
+body through the app's Markdown renderer (DOMPurify, links opened outside). The switch counts the thread's comments and
+reviews. Files is the reviews + files list and the diff as before.

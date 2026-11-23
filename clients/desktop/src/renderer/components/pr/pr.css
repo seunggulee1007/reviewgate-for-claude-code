@@ -28,3 +28,14 @@
 .pr-diff { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .pr-diff .unified { flex: 1; }
 .bubble-text { white-space: pre-wrap; word-break: break-word; user-select: text; }
+
+/* §60 the Conversation: the "Conversation | Files" switch, the thread. */
+.pr-view-switch { align-self: flex-start; margin: 2px 0 0; }
+.pr-view-switch .num { margin-left: 3px; font-size: 10.5px; }
+.pr-conversation { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 12px 16px 16px; }
+.pr-thread { list-style: none; margin: 0 auto; padding: 0; max-width: 760px; display: flex; flex-direction: column; gap: 10px; }
+.pr-entry { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); min-width: 0; }
+.pr-entry > header { display: flex; gap: 6px; align-items: center; padding: 5px 6px 5px 10px; background: var(--bg-2); border-bottom: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; font-size: 12px; min-width: 0; }
+.pr-entry.no-body.review > header { border-bottom: 0; border-radius: var(--radius); }
+.pr-entry > header time { white-space: nowrap; }
+.pr-entry > .markdown, .pr-entry-empty { padding: 8px 10px; font-size: 12.5px; overflow-wrap: anywhere; user-select: text; }

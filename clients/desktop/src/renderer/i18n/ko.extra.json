@@ -1063,5 +1063,9 @@
   "This folder could not be tracked without git: {0}": "이 폴더를 git 없이 추적하지 못했어요: {0}",
   "This folder could not be tracked without git.": "이 폴더를 git 없이 추적하지 못했어요.",
   "This looks like a large or personal folder — confirm before tracking it without git.": "크거나 개인적인 폴더로 보여요 — git 없이 추적하기 전에 확인이 필요해요.",
-  "Not a git repository — changes tracked by ReviewGate": "git 저장소 아님 — ReviewGate가 변경을 추적해요"
+  "Not a git repository — changes tracked by ReviewGate": "git 저장소 아님 — ReviewGate가 변경을 추적해요",
+  "Conversation": "대화",
+  "PR view": "PR 보기",
+  "edited": "수정됨",
+  "No description provided.": "본문이 없어요."
 }
