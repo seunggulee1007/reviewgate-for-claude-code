@@ -37,13 +37,13 @@ struct HUDStrip: View {
         // Numbers keep their full width (priority 1); the model name and activity text truncate first.
         HStack(spacing: 8) {
             if store.projectInfo != nil {
-                ModelChip().layoutPriority(compact ? 0 : 1)
+                ModelChip(measuring: measuring).layoutPriority(compact ? 0 : 1)
             }
             contextItem(compact: compact, measuring: measuring).fixedSize().layoutPriority(1)
             Text(verbatim: "·").foregroundStyle(.quaternary)
             if !compact {
                 // MARK: wave4d w4d-agents2 — §42.4: the cost opens the split by model (was a plain text).
-                HUDCostButton()
+                HUDCostButton(measuring: measuring)
                     .fixedSize().layoutPriority(1)
                 if hud.sideCostUSD > 0 {
                     // §21: side questions are billed on their own, never inside the session cost.
@@ -212,6 +212,10 @@ struct HUDStrip: View {
                 .padding(14)
                 .frame(width: 380)
                 .accessibilityIdentifier("Context popover")
+            }
+            // §56.5: `/context` — and `/cost` while the narrow strip has no cost to open.
+            .onChange(of: model.hudPopoverTick) { _, _ in
+                if !measuring, model.hudPopover == .context || (compact && model.hudPopover == .cost) { showContext = true }
             }
     }
 

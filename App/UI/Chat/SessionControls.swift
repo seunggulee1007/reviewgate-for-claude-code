@@ -4,7 +4,10 @@ import ReviewGateCore
 /// §25: the HUD's model chip — opens the model / effort picker; a choice is sent at once (`set_model`).
 struct ModelChip: View {
     @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
     @State private var open = false
+    /// The HUD's hidden measuring copy (`FullOrCompact`): never opens on a typed `/model`.
+    var measuring = false
 
     var body: some View {
         Button { open.toggle() } label: {
@@ -28,6 +31,7 @@ struct ModelChip: View {
         .popover(isPresented: $open, arrowEdge: .top) {
             ModelPickerPopover()
         }
+        .onChange(of: model.hudPopoverTick) { _, _ in if !measuring, model.hudPopover == .model { open = true } }   // §56.5: `/model`
     }
 }
 
