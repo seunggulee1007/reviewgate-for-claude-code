@@ -11895,6 +11895,38 @@
         }
       }
     },
+    "Hide Sidebar While Reviewing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Sidebar While Reviewing"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰하는 동안 사이드바 숨기기"
+          }
+        }
+      }
+    },
+    "In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In a terminal chat, the file list steps aside while the review panel is open and would otherwise cover the terminal"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서 리뷰 패널이 열려 있는 동안 파일 목록을 숨겨요 — 그러지 않으면 패널이 터미널을 가려요"
+          }
+        }
+      }
+    },
     "Leave a comment": {
       "localizations": {
         "en": {

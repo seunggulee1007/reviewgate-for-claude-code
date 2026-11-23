@@ -35,6 +35,29 @@ import Testing
         #expect(PaneSplit.leadingWidth(100, total: 1117, minLeading: 420, minTrailing: 380, leadingFloor: 240) == 420)
     }
 
+    /// §57.5: the review panel moves the file list away exactly when beside it the panel would be a drawer — real numbers of
+    /// the terminal tour: 8 pt cells (80 columns = 640 pt), a 301 pt sidebar, the edge tab's 23 pt.
+    @Test func theReviewPanelHidesTheSidebarOnlyWhenItWouldBeADrawer() {
+        func hides(_ area: Double, hidden: Bool = false) -> Bool {
+            PaneSplit.reviewHidesSidebar(area: area, sidebar: 301, sidebarHidden: hidden, minTerminal: 640, reviewFloor: 360)
+        }
+        func layout(_ total: Double) -> TerminalReviewLayout {
+            PaneSplit.terminalReviewLayout(total: total, minTerminal: 640, reviewFloor: 360)
+        }
+        // 1000 × 637: 676 pt beside the sidebar — hidden; 977 pt then is still a drawer, a wider one (360 → 440 pt).
+        #expect(hides(676) && hides(977, hidden: true))
+        #expect(layout(977) == .overlay)
+        #expect(PaneSplit.reviewDrawerWidth(total: 676, reviewFloor: 360) == 360)
+        #expect(PaneSplit.reviewDrawerWidth(total: 977, reviewFloor: 360) == 440)
+        // 1280 × 800: 956 pt beside the sidebar — hidden, and 1257 pt fits side by side.
+        #expect(hides(956) && hides(1257, hidden: true) && layout(1257) == .sideBySide)
+        // 1440 × 900: 1116 pt beside the sidebar fits — the sidebar stays (and comes back once the window is that wide).
+        #expect(!hides(1116))
+        #expect(!hides(1417, hidden: true))
+        #expect(hides(1300, hidden: true))   // 999 pt beside the sidebar: still a drawer there
+        #expect(!hides(1301, hidden: true))
+    }
+
     /// terminal-chat (§57.5): a terminal chat's terminal never goes below 80 columns (627 pt). Side by side (the review
     /// panel next to the file list, the terminal on its right) only where 80
     /// columns and the review's 360 pt fit (987 pt); there the divider moves between the two; below it the review is a drawer

@@ -2,6 +2,29 @@ import SwiftUI
 import AppKit
 import ReviewGateCore
 
+/// §57.5: what moves the file list for a terminal chat's review panel — the panel opening or closing (`onFit(true)` on a
+/// close or a new chat kind / switch: the user's "keep it" ends), the area's width, the tab — and the sidebar shown again.
+private struct ReviewRoomObservers: ViewModifier {
+    let collapsed: Bool
+    let area: CGFloat
+    let terminal: Bool
+    let option: Bool
+    let tab: MainTab
+    let visibility: NavigationSplitViewVisibility
+    let onFit: (_ reset: Bool) -> Void
+    let onVisibility: (NavigationSplitViewVisibility) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: collapsed) { _, collapsed in onFit(collapsed) }
+            .onChange(of: area) { _, _ in onFit(false) }
+            .onChange(of: terminal) { _, _ in onFit(true) }
+            .onChange(of: option) { _, _ in onFit(true) }
+            .onChange(of: tab) { _, _ in onFit(false) }
+            .onChange(of: visibility) { _, visibility in onVisibility(visibility) }
+    }
+}
+
 /// Sidebar mode: the session's changed files + chat, past review rounds (§14), or the PR browser.
 enum MainTab: String, CaseIterable, Identifiable {
     case changes, history, prs
@@ -64,6 +87,15 @@ struct MainWindow: View {
     @State private var windowWidth: CGFloat = 0
     /// The sidebar was hidden to make room for the agent panel (restored when the panel closes or the window widens).
     @State private var sidebarHiddenForPanel = false
+    /// §57.5: a terminal chat's review panel moves the file list away while beside it the panel would be a drawer
+    /// (`PaneSplit.reviewHidesSidebar`; the View menu's and the edge tab's "Hide Sidebar While Reviewing" switch).
+    @AppStorage(AppSettings.Key.terminalReviewHidesSidebar) private var reviewHidesSidebar = true
+    /// The file list's width with its divider, kept while it is hidden (the terminal tour's 1000 pt window: 301 pt).
+    @State private var sidebarWidth: CGFloat = 301
+    /// The sidebar is out of the way for the review panel (it comes back when the panel closes or fits beside it).
+    @State private var sidebarHiddenForReview = false
+    /// The user brought the sidebar back while the panel was open: it stays until the panel closes.
+    @State private var sidebarKeptForReview = false
     /// §16: the applied-extensions sheet (from the fallback banner).
     @State private var showExtensions = false
     // MARK: wave4 w4-install
@@ -152,6 +184,8 @@ struct MainWindow: View {
                     if store.projectURL == nil { noProjectSidebar } else { ProjectSearchSidebar() }
                 }
             }
+            // The column width must stay the outermost modifier: wrapped, NavigationSplitView ignored it (a ~190 pt sidebar).
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 > 0 { sidebarWidth = $0 + 1 } }
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 420)
         } detail: {
             switch tab {
@@ -327,6 +361,21 @@ struct MainWindow: View {
             windowWidth = width
             fitAgentPanel()
         }
+        // §57.5: the file list steps aside for a terminal chat's review panel where it would otherwise be a drawer.
+        .modifier(ReviewRoomObservers(collapsed: diffCollapsed, area: terminalAreaWidth, terminal: store.shownChatIsTerminal,
+                                      option: reviewHidesSidebar, tab: tab, visibility: columnVisibility,
+                                      onFit: { reset in
+                                          if reset { sidebarKeptForReview = false }
+                                          fitReviewSidebar()
+                                      },
+                                      onVisibility: { visibility in
+                                          // The toolbar's sidebar button while the panel had it hidden: the user wants it —
+                                          // left alone until the panel closes.
+                                          if visibility != .detailOnly, sidebarHiddenForReview {
+                                              sidebarHiddenForReview = false
+                                              sidebarKeptForReview = true
+                                          }
+                                      }))
         .modifier(InspectorObservers(showAgentPanel: $showAgentPanel, showSidePanel: $showSidePanel, tab: $tab,
                                      onFit: fitAgentPanel, onAskSelection: askAboutSelection))
         .modifier(CodeBrowserObservers(tab: $tab) { setDiffCollapsed(false, remember: false) })   // MARK: code-browser (§47)
@@ -353,7 +402,33 @@ struct MainWindow: View {
             withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .detailOnly }
         } else if !tight, sidebarHiddenForPanel {
             sidebarHiddenForPanel = false
+            guard !sidebarHiddenForReview else { return }   // the review panel still wants the room
             withAnimation(.easeInOut(duration: 0.2)) { columnVisibility = .all }
+        }
+    }
+
+    // MARK: Review panel room (§57.5)
+
+    /// A terminal chat's open review panel hides the file list exactly when beside it the panel would be a drawer: where
+    /// the area then holds 80 columns and the panel it sits beside the terminal (a 1280 pt window), else the drawer is 45 %
+    /// of the wider area (1000 pt: 440 pt instead of 360). One switch, no animation — each frame of one resized the terminal
+    /// (a SIGWINCH and a redraw of the TUI each). The sidebar comes back when the panel closes, the chat is not a terminal
+    /// chat or the window is wide enough for both.
+    private func fitReviewSidebar() {
+        guard terminalAreaWidth > 0 else { return }
+        let hidden = columnVisibility == .detailOnly
+        let wants = reviewHidesSidebar && store.shownChatIsTerminal && tab.showsReview && !diffCollapsed && !sidebarKeptForReview
+            && PaneSplit.reviewHidesSidebar(area: Double(terminalAreaWidth), sidebar: Double(sidebarWidth), sidebarHidden: hidden,
+                                            minTerminal: Double(TerminalHost.width(columns: Self.terminalColumns)),
+                                            reviewFloor: Self.reviewFloorWidth)
+        var quiet = Transaction()
+        quiet.disablesAnimations = true
+        if wants, !sidebarHiddenForReview, !hidden {
+            sidebarHiddenForReview = true
+            withTransaction(quiet) { columnVisibility = .detailOnly }
+        } else if !wants, sidebarHiddenForReview {
+            sidebarHiddenForReview = false
+            if !sidebarHiddenForPanel { withTransaction(quiet) { columnVisibility = .all } }
         }
     }
 

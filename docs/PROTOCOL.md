@@ -9109,9 +9109,10 @@ chat's id);
     chat; SwiftTerm hands ⌘ keys to the menu, so it works from inside the terminal). VoiceOver: "리뷰 패널 표시 / 숨기기" on
     the tab, with the hint that the panel opens left of the terminal, next to the file list; the panel itself is "리뷰 패널".
   - *Widths: the terminal never goes below 80 columns* (Core `PaneSplit`; a column is SwiftTerm's cell, the advance of
-    "W" in the 13 pt monospaced system font, ≈ 7.8 pt, and the terminal adds a legacy scroller's 15 pt when scroll bars
-    always show — 80 columns ≈ 627 pt). `terminalReviewLayout`: **side by side** when the terminal + panel area holds 80
-    columns and the panel's 360 pt floor (≈ 987 pt — e.g. 1440 × 900 with the sidebar), else **a drawer**. Side by side
+    "W" in the 13 pt monospaced system font rounded to the screen's pixels — 8 pt on a Retina screen, the terminal tour's
+    numbers below — and the terminal adds a legacy scroller's 15 pt when scroll bars always show: 80 columns = 640 pt, or
+    655 pt). `terminalReviewLayout`: **side by side** when the terminal + panel area holds 80 columns and the panel's
+    360 pt floor (1000 pt — e.g. 1440 × 900 with the sidebar), else **a drawer**. Side by side
     the divider is draggable between those two minimums (`terminalWidth`); the terminal's share is remembered for all
     windows (`terminalReviewSplit`, default 0.55 — the panel, the split's leading pane, is `reviewPanelWidth`, what the
     terminal leaves). As a drawer (`reviewDrawerWidth`) the panel slides in from the main area's left edge, next to the file
@@ -9119,9 +9120,20 @@ chat's id);
     bottom — with a shadow on its right edge: 45 % of the area, at least 360 pt, leaving at least 120 pt of the terminal
     visible on its right (a tinier window: the floor wins). The terminal keeps its whole width under it — opening and closing
     the drawer resizes nothing and the TUI never reflows. At the laptop's 1000 × 637 (676 pt beside the sidebar) that is
-    the drawer (360 pt) over an 84-column terminal; at 1280 × 800 a 420 pt drawer; at 1440 × 900 side by side, file list |
-    diff | terminal (the terminal tour measures all three and where the panel is). Crossing the threshold while the window, the sidebar or the shell panel changes
-    switches the layout with one resize of the terminal (to or from the full width).
+    the drawer (360 pt) over an 84-column terminal; at 1440 × 900 side by side, file list | diff | terminal (the terminal
+    tour measures all three and where the panel is). Crossing the threshold while the window, the sidebar or the shell panel
+    changes switches the layout with one resize of the terminal (to or from the full width).
+  - *The file list steps aside* (View › "리뷰하는 동안 사이드바 숨기기" — `terminalReviewHidesSidebar`,
+    default on; `PaneSplit.reviewHidesSidebar`). While a terminal chat's review panel is open and beside the file list it
+    would be a drawer, the sidebar hides, in one step without an animation (each frame of one would resize the terminal):
+    where the area then holds both the panel sits beside the terminal — 1280 × 800: 956 → 1257 pt, side by side, the
+    terminal 86 columns — else the drawer is 45 % of the wider area — 1000 × 637: 676 → 977 pt, a 440 pt drawer (was 360)
+    over a 122-column terminal with 537 pt of it visible (was 316). Side by side needs a 1023 pt window without the file
+    list, 1324 pt with it (a 301 pt sidebar). The file list comes back when the panel closes, the chat on screen is not a
+    terminal chat, the switch goes off, or the window widens until both fit beside it (1440 × 900); the toolbar's sidebar
+    button brings it back for the rest of that review. So with the switch on the terminal resizes once when the drawer opens
+    and once when it closes (one SIGWINCH each, the tour checks); off, the drawer keeps the old rule (nothing under it
+    resizes). The agent panel's own hiding of the sidebar (narrow windows) is left to it.
   - *The drawer and the keyboard.* It opens and closes as the panel does (the edge tab, ⌘⇧D, by itself on each new review,
     closed when the review empties) and takes no keyboard by itself — the terminal keeps it; a click in the drawer gives it
     the keyboard (accept / reject keys work there), and then Esc closes it (`onExitCommand`; Esc in the terminal stays the

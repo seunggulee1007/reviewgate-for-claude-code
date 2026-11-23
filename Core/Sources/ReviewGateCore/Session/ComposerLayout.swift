@@ -64,6 +64,17 @@ public enum PaneSplit {
         let want = max(reviewFloor, (total * share).rounded())
         return max(min(want, total - terminalStrip), min(reviewFloor, max(total, 0)))
     }
+
+    /// §57.5: whether a terminal chat's open review panel moves the file list (the sidebar, `sidebar` points wide with its
+    /// divider) out of the way — exactly when beside the file list the panel would be a drawer. `area` is the terminal +
+    /// panel area now (`sidebarHidden`: the file list is out of the way already, so the area holds its width too). Without
+    /// it the panel sits beside the terminal where that area holds both (a 1280 pt window: 956 → 1257 pt), else the drawer is
+    /// 45 % of the wider area (1000 pt: 360 → 440 pt, the terminal's visible part 316 → 537 pt). The sidebar comes back once
+    /// the panel fits beside the terminal with it, so a widened window shows it again.
+    public static func reviewHidesSidebar(area: Double, sidebar: Double, sidebarHidden: Bool, minTerminal: Double, reviewFloor: Double) -> Bool {
+        let besideSidebar = sidebarHidden ? area - sidebar : area
+        return terminalReviewLayout(total: besideSidebar, minTerminal: minTerminal, reviewFloor: reviewFloor) == .overlay
+    }
 }
 
 /// §57.5: a terminal chat's review panel beside the terminal, or as a drawer over it.
