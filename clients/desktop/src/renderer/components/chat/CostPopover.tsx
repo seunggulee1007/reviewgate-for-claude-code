@@ -3,11 +3,12 @@
  * `ModelCostText`). The HUD's "$1.23 세션" opens a popover with the last turn's and the session's split by model and the side
  * questions' cost; the turn summary card ends with "이번 턴 비용(추정)" and its bar.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ModelCost } from "@reviewgate/engine";
 import { costUsd, modelCostLine, modelShares, type ModelCostShare } from "../../agentCost";
 import { t } from "../../i18n";
 import { useStore } from "../../store";
+import { useSlashUi } from "../../slashAppRun"; // MARK: b-slash (§56.5)
 import { AnchoredPopover } from "./HudPopovers";
 import { formatTokens, formatUSD } from "./HUDStrip";
 import "./cost.css";
@@ -51,6 +52,10 @@ export function HudCostButton() {
   const hud = useStore((s) => s.state.hud);
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const slashHud = useSlashUi((s) => s.hud); // §56.5: `/cost` typed in the composer
+  useEffect(() => {
+    if (slashHud?.kind === "cost") setOpen(true);
+  }, [slashHud]);
   const turn = modelShares(hud.turnModels);
   const session = modelShares(hud.sessionModels);
   const side = hud.sideCostUSD ?? 0;

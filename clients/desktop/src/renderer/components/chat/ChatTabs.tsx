@@ -27,6 +27,7 @@ import { Icon } from "../../icons";
 import { isEnter } from "../../ime";
 import { PointerMenu, type AgentMenuItem } from "../agents/AgentBits";
 import { RecordOnlyBadge } from "./RecordOnly";
+import { useSlashUi } from "../../slashAppRun"; // MARK: b-slash (§56.5)
 import { MovedChatBadge } from "./ChatMoveViews"; // MARK: wave4b w4b-follow
 import { useTerminalChats } from "../../terminal/terminalChat"; // §57.17
 import { ptyAvailable, usePtyInfo } from "../../terminal/ptyInfo"; // §57.17
@@ -117,6 +118,13 @@ export function ChatTabs() {
     const title = r?.title.trim() ?? "";
     if (r && title.length > 0 && title !== sessionTitle(sessions, r.id)) void renameChat(r.id, title);
   };
+  // §56.5: `/rename` typed in the composer edits the tab on screen, as its "이름 바꾸기…".
+  const renameRequest = useSlashUi((s) => s.rename);
+  useEffect(() => {
+    if (renameRequest === 0 || !shown || !ids.includes(shown)) return;
+    setRenaming({ id: shown, title: sessionTitle(sessions, shown) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new request starts it
+  }, [renameRequest]);
 
   // r2-chats-cards M31 / M33 (§9): a held switch goes out once the live chat is done.
   useEffect(() => startPendingSwitchDrain(), []);

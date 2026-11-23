@@ -120,9 +120,10 @@ const byName = (a: SlashEntry, b: SlashEntry) => a.name.localeCompare(b.name, un
 
 /**
  * Every command the session knows, once each: `commands` (with descriptions and source) first, then the bare names of
- * `skills` / `slashCommands` the list did not have (an engine before §36 sends names only). Sorted by name.
+ * `skills` / `slashCommands` the list did not have (an engine before §36 sends names only). Sorted by name. `appCommands`
+ * (the classic composer, §56.5): the terminal's built-ins the app answers (/model, /resume …) are listed with what they do.
  */
-export function slashEntries(caps: SessionCapabilities | null): SlashEntry[] {
+export function slashEntries(caps: SessionCapabilities | null, appCommands = false): SlashEntry[] {
   if (!caps) return [];
   const skills = new Set(Array.isArray(caps.skills) ? caps.skills : []);
   const plugins = new Set(Array.isArray(caps.plugins) ? caps.plugins : []);
@@ -138,7 +139,7 @@ export function slashEntries(caps: SessionCapabilities | null): SlashEntry[] {
     seen.add(name);
     out.push({ name, description: "", argumentHint: "", isSkill: skills.has(name), aliases: [], group: inferredGroup(name, plugins) });
   }
-  return withAppMeanings(out.sort(byName)); // wave4c w4c-commit: /clear is the app's new chat (§41.1)
+  return withAppMeanings(out.sort(byName), appCommands); // wave4c w4c-commit: /clear is the app's new chat (§41.1)
 }
 
 function groupRank(g: SlashGroup): number {

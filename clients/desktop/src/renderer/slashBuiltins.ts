@@ -10,9 +10,11 @@ import { BTW_NAME, btwDescription } from "./btw";
 import { t } from "./i18n";
 import { MCP_HINT, MCP_NAME, mcpDescription } from "./mcpPalette";
 import type { SlashEntry } from "./slashCommands";
+import { withAppCommands } from "./slashAppCommands";
 
-export function withAppMeanings(entries: SlashEntry[]): SlashEntry[] {
-  const out = entries.map((e) =>
+export function withAppMeanings(entries: SlashEntry[], appCommands = false): SlashEntry[] {
+  // b-slash (§56.5): `appCommands` (the classic composer's palette) — the terminal's built-ins the app answers there.
+  const out = (appCommands ? withAppCommands(entries) : entries).map((e) =>
     e.name === "clear" ? { ...e, description: t("Opens a new chat in the app — this chat stays in the list") }
     : e.name === BTW_NAME ? { ...e, description: btwDescription() }
     : e.name === MCP_NAME ? { ...e, description: mcpDescription() }
@@ -22,6 +24,5 @@ export function withAppMeanings(entries: SlashEntry[]): SlashEntry[] {
     { name: BTW_NAME, description: btwDescription(), argumentHint: "<question>", isSkill: false, aliases: [], group: { kind: "builtin" as const } },
     { name: MCP_NAME, description: mcpDescription(), argumentHint: MCP_HINT, isSkill: false, aliases: [], group: { kind: "builtin" as const } },
   ] satisfies SlashEntry[]).filter((e) => !out.some((o) => o.name === e.name));
-  if (own.length === 0) return out;
   return [...out, ...own].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
