@@ -782,6 +782,70 @@ describe("ReviewEngine review gate", () => {
     expect(h.engine.state.branches.switchBlocker).toEqual({ kind: "running" });
   });
 
+  // MARK: a-gitflow — §61
+  it("create_branch from HEAD carries a dirty worktree and a pending review along; switch_branch still waits", async () => {
+    const dir = track(realpathSync(makeBranchRepo()));
+    const h = harness();
+    await h.hello();
+    await h.open(dir);
+    write(dir, "a.txt", "mine\n");
+    write(dir, "new.txt", "n\n");
+    await h.engine.handle({ type: "branches" });
+    expect(h.engine.state.branches.switchBlocker).toEqual({ kind: "dirtyWorktree" });
+    expect(h.engine.state.branches.createBlocker).toBeNull();
+    await h.engine.handle({ type: "create_branch", name: "carry", id: "c" });
+    expect(h.ofType("result").find((r) => r.id === "c")?.ok).toBe(true);
+    expect(h.engine.state.project?.branch).toBe("carry");
+    expect(read(dir, "a.txt")).toBe("mine\n");
+    expect(read(dir, "new.txt")).toBe("n\n");
+    expect(sh(dir, "status", "--porcelain").trimEnd().split("\n").sort()).toEqual([" M a.txt", "?? new.txt"]);
+    // `from` may change the working tree: the switch guard applies.
+    await h.engine.handle({ type: "create_branch", name: "other", from: "main", id: "f" });
+    expect(h.ofType("result").find((r) => r.id === "f")).toMatchObject({ ok: false, error: "switch_blocked:dirtyWorktree" });
+
+    // A pending review: a new branch from HEAD keeps it (same tree, same commit); switching away is still refused.
+    await h.engine.handle({ type: "send", text: "go" });
+    expect(h.engine.state.branches.createBlocker).toEqual({ kind: "running" });
+    await h.engine.handle({ type: "create_branch", name: "mid-turn", id: "m" });
+    expect(h.ofType("result").find((r) => r.id === "m")).toMatchObject({ ok: false, error: "switch_blocked:running" });
+    write(dir, "a.txt", "claude\n");
+    await endTurn(h);
+    expect(h.engine.state.changedFiles.map((f) => [f.path, f.state])).toEqual([["a.txt", "pending"]]);
+    expect(h.engine.state.branches.switchBlocker).toEqual({ kind: "pendingReview", count: 1 });
+    await h.engine.handle({ type: "create_branch", name: "review-on", id: "r" });
+    expect(h.ofType("result").find((r) => r.id === "r")?.ok).toBe(true);
+    expect(h.engine.state.project?.branch).toBe("review-on");
+    expect(h.engine.state.changedFiles.map((f) => [f.path, f.state])).toEqual([["a.txt", "pending"]]);
+    await h.engine.handle({ type: "switch_branch", name: "main", id: "s" });
+    expect(h.ofType("result").find((r) => r.id === "s")).toMatchObject({ ok: false, error: "switch_blocked:pendingReview" });
+  });
+
+  it("untracked files and tracked changes the ignore patterns hide do not block a switch", async () => {
+    const dir = track(realpathSync(makeBranchRepo()));
+    write(dir, ".omc/notes.md", "v1\n");
+    sh(dir, "add", "-A");
+    sh(dir, "commit", "-qm", "tool notes");
+    sh(dir, "branch", "side");
+    const h = harness();
+    await h.hello({ ignorePatterns: [".omc/"] });
+    await h.open(dir);
+    write(dir, ".omc/notes.md", "v2\n");
+    write(dir, ".omc/state.json", "{}\n");
+    write(dir, "scratch.txt", "s\n");
+    await h.engine.handle({ type: "branches" });
+    let s = h.engine.state;
+    expect(s.branches.isWorktreeDirty).toBe(true); // raw `git status` (the workbench list's dirty)
+    expect(s.branches.switchBlocker).toBeNull();
+    await h.engine.handle({ type: "switch_branch", name: "side", id: "s" });
+    expect(h.ofType("result").find((r) => r.id === "s")?.ok).toBe(true);
+    expect(h.engine.state.project?.branch).toBe("side");
+    expect(read(dir, "scratch.txt")).toBe("s\n");
+    write(dir, "a.txt", "edited\n");
+    await h.engine.handle({ type: "branches" });
+    s = h.engine.state;
+    expect(s.branches.switchBlocker).toEqual({ kind: "dirtyWorktree" });
+  });
+
   it("git-init flow: candidates + unsafe, cancel, init_repo starts the session", async () => {
     const dir = track(realpathSync(makeTempDir("rg-nogit")));
     mkdirSync(join(dir, "sub-repo/.git"), { recursive: true });

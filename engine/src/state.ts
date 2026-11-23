@@ -97,7 +97,13 @@ export type EngineSlices = {
   budgetUsage: BudgetUsage;
   hud: HudState;
   /** wave3 engine-flow — §36.12 `remotes`: the remote-tracking branches (absent until the first refresh). */
-  branches: { list: BranchInfo[]; isWorktreeDirty: boolean; remotes?: RemoteBranchInfo[] };
+  branches: {
+    list: BranchInfo[];
+    isWorktreeDirty: boolean;
+    remotes?: RemoteBranchInfo[];
+    /** MARK: a-gitflow — §61: a tracked change the ignore patterns do not hide (absent: `isWorktreeDirty` decides). */
+    blocksSwitch?: boolean;
+  };
   pr: PRStore;
   lastError: string | null;
   workbenches: WorkbenchesState;
@@ -171,13 +177,27 @@ export function canRequestChanges(s: EngineSlices): boolean {
     && g.collectError === null && !s.session.externalTurn;
 }
 
-/** Port of `SessionStore.branchSwitchBlocker()`; null means switching is allowed right now. */
+/**
+ * Port of `SessionStore.branchSwitchBlocker()`; null means switching to another existing branch is allowed right now.
+ * MARK: a-gitflow — §61: `dirtyWorktree` only for a tracked change the ignore patterns do not hide (`blocksSwitch`).
+ */
 export function switchBlocker(s: EngineSlices): BranchSwitchBlocker | null {
   const g = s.gate;
   if (g.running || s.session.starting || g.collecting || g.reverting) return { kind: "running" };
   const outstanding = g.pendingFiles.length + g.changesRequestedFiles.length;
   if (outstanding > 0) return { kind: "pendingReview", count: outstanding };
-  if (s.branches.isWorktreeDirty) return { kind: "dirtyWorktree" };
+  if (s.branches.blocksSwitch ?? s.branches.isWorktreeDirty) return { kind: "dirtyWorktree" };
+  return null;
+}
+
+/**
+ * MARK: a-gitflow — §61: `create_branch` from HEAD (`git switch -c <name>`) leaves the working tree, the index and HEAD's
+ * commit as they are — uncommitted changes come along, and the review's A (a tree, HEAD's branch name aside) still holds —
+ * so only a turn / collection / revert in flight blocks it. One with `from` may change the working tree: `switchBlocker`.
+ */
+export function createBlocker(s: EngineSlices): BranchSwitchBlocker | null {
+  const g = s.gate;
+  if (g.running || s.session.starting || g.collecting || g.reverting) return { kind: "running" };
   return null;
 }
 
@@ -307,7 +327,10 @@ export function buildState(s: EngineSlices): ReviewState {
     budgetUsage: { ...s.budgetUsage },
     hud: { ...s.hud, activity: { ...s.hud.activity }, agents: s.hud.agents.map((a) => ({ ...a, files: [...a.files] })) },
     // wave3 engine-flow — §36.12: `remotes` always sent by this engine (an older one sends none: clients hide remote bases).
-    branches: { list: s.branches.list, isWorktreeDirty: s.branches.isWorktreeDirty, switchBlocker: switchBlocker(s), remotes: (s.branches.remotes ?? []).map((r) => ({ ...r })) },
+    branches: {
+      list: s.branches.list, isWorktreeDirty: s.branches.isWorktreeDirty, switchBlocker: switchBlocker(s), remotes: (s.branches.remotes ?? []).map((r) => ({ ...r })),
+      createBlocker: createBlocker(s), // MARK: a-gitflow — §61
+    },
     pr: prState(s.pr),
     lastError: s.lastError,
     workbenches: { list: s.workbenches.list.map((w) => ({ ...w, locked: w.locked ? { ...w.locked } : null })), current: s.workbenches.current, managedRoot: s.workbenches.managedRoot },

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { branches, createBranch, isWorktreeDirty, parseTrack, switchBranch } from "../src/git/branches.js";
+import { branches, createBranch, isWorktreeDirty, parseTrack, switchBranch, worktreeStatus } from "../src/git/branches.js";
 import { openCheckpoint } from "../src/git/checkpoint.js";
 import { GitCommandError } from "../src/git/exec.js";
 import { makeBranchRepo, makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
@@ -59,6 +59,23 @@ describe("git branches", () => {
     const tree = await cp.snapshot();
     expect((await cp.fileContent("a.txt", null)).toString("utf8")).toBe("a\n");
     expect((await cp.fileContent("untracked.txt", tree)).toString("utf8")).toBe("u\n");
+  });
+
+  // MARK: a-gitflow — §61
+  it("worktreeStatus: untracked and ignored-pattern paths never block a switch; renames count by either path", async () => {
+    const dir = track(makeBranchRepo());
+    const cp = await openCheckpoint(dir);
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: false, blocksSwitch: false });
+    write(dir, "u.txt", "u\n");
+    write(dir, ".omc/x.json", "{}\n");
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: false });
+    write(dir, "a.txt", "b\n");
+    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: false });
+    write(dir, "a.txt", "a\n");
+    sh(dir, "mv", "a.txt", "renamed with space.txt");
+    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt", "renamed"])).toEqual({ dirty: true, blocksSwitch: false });
   });
 
   it("ahead/behind parsing", () => {

@@ -1,4 +1,5 @@
 import type { GitCheckpoint } from "./checkpoint.js";
+import { matchesIgnore } from "./ignore.js";
 
 /** One local branch as listed by `git for-each-ref refs/heads` (docs/M8-API.md). */
 export type BranchInfo = {
@@ -90,6 +91,30 @@ export async function remoteBranches(cp: Pick<GitCheckpoint, "git">): Promise<Re
 export async function isWorktreeDirty(cp: GitCheckpoint): Promise<boolean> {
   const out = await cp.git(["--no-optional-locks", "status", "--porcelain"]);
   return out.text.trim().length > 0;
+}
+
+/**
+ * MARK: a-gitflow — §61: one `git status --porcelain -z`. `dirty`: any entry (untracked included, ignore patterns not
+ * applied — `branches.isWorktreeDirty`). `blocksSwitch`: a tracked file changed (staged or not) whose path — or, for a
+ * rename, either path — the app's ignore patterns do not hide. Untracked files never block a switch: git carries them
+ * along, and refuses the switch by itself when the target branch tracks the same path.
+ */
+export async function worktreeStatus(cp: Pick<GitCheckpoint, "git">, ignore: string[]): Promise<{ dirty: boolean; blocksSwitch: boolean }> {
+  const out = await cp.git(["--no-optional-locks", "status", "--porcelain", "-z"]);
+  const tokens = out.text.split("\0");
+  let dirty = false;
+  let blocksSwitch = false;
+  for (let i = 0; i < tokens.length; i++) {
+    const entry = tokens[i]!;
+    if (entry.length < 4) continue;
+    dirty = true;
+    const xy = entry.slice(0, 2);
+    const paths = [entry.slice(3)];
+    if (xy[0] === "R" || xy[0] === "C") paths.push(tokens[++i] ?? "");
+    if (xy === "??") continue;
+    if (paths.some((p) => p.length > 0 && !matchesIgnore(p, ignore))) blocksSwitch = true;
+  }
+  return { dirty, blocksSwitch };
 }
 
 /** `git switch <name>`. */

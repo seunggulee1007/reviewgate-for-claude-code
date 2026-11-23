@@ -1375,7 +1375,10 @@ export type RateLimitWindow = {
 export type BranchesState = {
   list: BranchInfo[];
   isWorktreeDirty: boolean;
+  /** §61: why switching to another existing branch is refused (`switch_branch`, `create_branch` with `from`). */
   switchBlocker: BranchSwitchBlocker | null;
+  /** MARK: a-gitflow — §61: why `create_branch` from HEAD is refused (only `running`: changes come along, as in git). */
+  createBlocker: BranchSwitchBlocker | null;
   /** §36.12: remote-tracking branches (`origin/develop`) as bases for `workbench_create`; never in `list` (no switching to them). */
   remotes?: RemoteBranchInfo[];
 };
