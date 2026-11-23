@@ -376,6 +376,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     // MARK: terminal-stage2
     /// §57.15: answer Claude Code's permission dialogs from the app too (engine default true; live).
     public var terminalPermissionBridge: Bool?
+    /// §63: what waits for the review — `edits` (engine default), `prompts`, `off` (`ReviewFirstMode` raw value; live).
+    public var reviewFirst: String?
 
     public init(budget: Budget? = nil, ignorePatterns: [String]? = nil, autoAllowTools: [String]? = nil,
                 loadUserSettings: Bool? = nil, systemPromptAppend: String? = nil, claudePath: String? = nil,
@@ -1580,6 +1582,8 @@ public struct GateInfo: Codable, Sendable, Equatable {
     // MARK: wave4c w4c-trust
     /// §41.2: the last single-file reject while [거절 취소] can put it back (nil otherwise, and on older engines).
     public var rejectUndo: RejectUndoInfo?
+    /// §63: the review-first rule while it holds Claude back (nil: it does not, and on older engines).
+    public var reviewFirst: ReviewFirstInfo?
 
     public init(phase: GatePhase, canSend: Bool, canRequestChanges: Bool, blockedReason: BlockedReason?, collectError: String?,
                 pendingCount: Int, changesRequestedCount: Int, isRequestingChanges: Bool, turnStartTree: String?,
@@ -1645,6 +1649,7 @@ public struct GateInfo: Codable, Sendable, Equatable {
         lastRequest = round2.lastRequest
         prereviews = Self.decodePreReviews(from: decoder)   // wave3 mac-flow (§36.13)
         rejectUndo = TrustWire.rejectUndo(from: decoder)   // MARK: wave4c w4c-trust (§41.2)
+        reviewFirst = ReviewFirstWire.info(from: decoder)   // §63
     }
 }
 

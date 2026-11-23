@@ -122,6 +122,7 @@ public enum SettingsCatalog {
         public static let peerInbound = "When another Claude session of yours (a terminal, the IDE) sends a message to this window's Claude: handle it as it arrives — once Claude is free, its changes reviewed like any other; a sender your session list does not show still asks — ask with a card first, or decline it. A project can choose its own in the project menu."
         public static let statusLine = "Your own status line (the statusLine command of your Claude Code settings, such as the OMC HUD) under the message box, colored as in the terminal. It runs while a project is open and the chat is on screen."
         public static let systemPrompt = "Added to Claude's system prompt in every session. Placeholders {maxFiles} and {maxLines} are substituted."
+        public static let reviewFirst = "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before."
         public static let ignorePatterns = "One per line; a path prefix (e.g. .omc/) or a glob with * (e.g. *.log). Matching files are hidden from the review list and never reverted. Applied when you leave the box, from the next collected turn."
         public static let testCommands = "One per line, matched against each command of a Bash call as typed — * is any run of characters, ? one character. A matching command counts as a test run in the turn summary. Applied when you leave this box."
         public static let largeFiles = "Such a file (a heap dump, an archive) stays in the review list but its content is not stored: it cannot be reverted and the app does not commit it. Files git tracks are always stored."
@@ -179,6 +180,7 @@ public enum SettingsCatalog {
         // Review
         SettingEntry("diffWrapLines", .review, section: "Diff", title: "Wrap lines", info: Info.wrapLines),
         SettingEntry("diffLayout", .review, section: "Diff", title: "Diff layout", info: Info.diffLayout),
+        SettingEntry("reviewFirst", .review, section: "Review first", title: "Claude waits for your review before its next work", info: Info.reviewFirst),
         SettingEntry("checkpointIgnorePatterns", .review, section: "Checkpoint ignore patterns", title: "Checkpoint ignore patterns", info: Info.ignorePatterns),
         SettingEntry("testCommandPatterns", .review, section: "Test command patterns", title: "Test command patterns", info: Info.testCommands),
         SettingEntry("largeFileMB", .review, section: "Disk space", title: "Leave untracked files out of snapshots from", info: Info.largeFiles),

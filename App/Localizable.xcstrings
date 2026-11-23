@@ -5025,6 +5025,38 @@
         }
       }
     },
+    "Block edits (default)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Block edits (default)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수정 막기(기본)"
+          }
+        }
+      }
+    },
+    "Block prompts too": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Block prompts too"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트까지 막기"
+          }
+        }
+      }
+    },
     "Branches from %@ and checks it out — your uncommitted changes come along.": {
       "localizations": {
         "en": {
@@ -5517,6 +5549,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 멈추면 리뷰가 열려요"
+          }
+        }
+      }
+    },
+    "Claude waits for your review before its next work": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude waits for your review before its next work"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 다음 작업 전에 리뷰를 기다려요"
           }
         }
       }
@@ -13607,6 +13655,22 @@
         }
       }
     },
+    "Review first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 먼저"
+          }
+        }
+      }
+    },
     "Reviewed turns": {
       "localizations": {
         "en": {
@@ -14263,6 +14327,22 @@
         }
       }
     },
+    "Turn off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끄기"
+          }
+        }
+      }
+    },
     "Turn on Limit changes per reply first": {
       "localizations": {
         "en": {
@@ -14339,6 +14419,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "입력과 채팅"
+          }
+        }
+      }
+    },
+    "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 바꾼 파일을 수락하거나 거절하기 전까지 Claude는 질문에 답하고 읽고 계획만 세울 수 있고, 파일을 바꾸는 수정과 명령은 막혀요 — 채팅에서도 터미널 채팅에서도요. 프롬프트까지 막기: 리뷰가 끝날 때까지 새 메시지도 기다려요(수락 후 보내기는 먼저 수락해요). 끄기: 리뷰 중에 보낸 메시지로도 예전처럼 파일을 바꿀 수 있어요."
+          }
+        }
+      }
+    },
+    "Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일들을 수락하거나 거절하기 전까지 Claude는 답하고 읽기만 하고 파일은 바꾸지 않아요(설정 › 리뷰)."
           }
         }
       }

@@ -15,6 +15,12 @@ public extension AppState {
     internal func deliver(_ message: QueuedMessage, acceptPending: Bool) {
         let accepting = acceptPending && canAcceptAndSend
         guard accepting || canSend else { return }
+        // §63 `prompts`: a plain message waits in the queue until the review is done ([N개 수락 후 보내기] sends it now).
+        if !accepting, reviewFirstHolds(message.text) {
+            requeueFront(message)
+            queuedSendInFlight = false
+            return
+        }
         recordPrompt(message.text)
         seedAttachments(message.images)
         let command = message.sendCommand(acceptPending: accepting)   // wave5 w5-model (§43.4: `.send`, or with this message's model)
@@ -156,6 +162,7 @@ public extension AppState {
         if ScopeText.isRowOnly(code) { return }   // r1-scope (§33.4): what already ran outside the review is a row with its actions
         if GitNoticeText.isRowOnly(code) { return }   // r1-git (§46): what Claude's git commands did is a row
         if ReviewFlowText.isRowOnly(code) { return }   // r2-review-flow (M32): a reject during the turn is a row
+        if ReviewFirstText.isRowOnly(code) { return }   // §63: a call denied while files wait is a row
         var banner = ErrorBanner(message: text, scope: scope, fatal: fatal, code: code,
                                  actions: SessionNotices.bannerActions(code: code, repeats: count, path: detail?.path,
                                                                        pathIsWorkbench: isWorkbenchPath(detail?.path)))
