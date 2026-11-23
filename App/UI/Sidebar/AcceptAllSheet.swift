@@ -21,8 +21,9 @@ enum AcceptAllAction {
 
     /// "Accept N & Continue" (the message box, ⌘⇧↩ with nothing typed): the same summary sheet first when a file still needs
     /// a look — its confirm then continues —, else at once.
+    /// MARK: terminal-friction (§58): in a terminal chat the same, while Claude Code is idle at its prompt.
     static func runContinuing(store: AppState, model: WindowModel) {
-        guard store.canAcceptAndContinue else { return }
+        guard store.isTerminalChat ? store.terminalAcceptContinueBlocker == nil : store.canAcceptAndContinue else { return }
         if store.acceptAllNeedsSheet {
             model.showAcceptAllContinue = true
         } else {
@@ -31,10 +32,27 @@ enum AcceptAllAction {
     }
 
     /// Accepts every pending file and tells Claude to continue, in one send; no undo — the turn has started (as Accept N & Send).
+    /// A terminal chat: the files accepted, then "Continue." pasted into Claude Code and Return pressed (§58).
     static func continueNow(store: AppState) {
         let count = store.pendingFiles.count
+        if store.isTerminalChat {
+            Task {
+                if let why = await store.terminalAcceptAndContinue() {
+                    Toast.show(why, systemImage: "exclamationmark.triangle.fill")
+                } else {
+                    Toast.show(String(localized: "Accepted \(count) files — Claude continues"))
+                }
+            }
+            return
+        }
         guard store.acceptAndContinue() else { return }
         Toast.show(String(localized: "Accepted \(count) files — Claude continues"))
+    }
+
+    /// Why "Accept N & Continue" is off here (nil: on) — a terminal chat's own rule, else the message box's.
+    static func continueBlocker(store: AppState) -> String? {
+        if store.isTerminalChat { return store.terminalAcceptContinueBlocker }
+        return store.canAcceptAndContinue ? nil : (store.cannotSendReason ?? "")
     }
 }
 
@@ -158,9 +176,9 @@ struct AcceptAllSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(files.isEmpty || !store.canAcceptAndContinue)
+                    .disabled(files.isEmpty || AcceptAllAction.continueBlocker(store: store) != nil)
                     // Off while Claude cannot take the message (it started a turn meanwhile, …): the reason, as Send gives it.
-                    .help((store.canAcceptAndContinue ? nil : store.cannotSendReason)
+                    .help(AcceptAllAction.continueBlocker(store: store).flatMap { $0.isEmpty ? nil : $0 }
                           ?? String(localized: "Accepts the \(files.count) pending file(s), then tells Claude to continue"))
                     .accessibilityIdentifier("Accept all continue")
                 } else {

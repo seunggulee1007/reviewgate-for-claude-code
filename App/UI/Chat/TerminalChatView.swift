@@ -20,6 +20,10 @@ struct TerminalChatView: View {
                     model.terminals.focus(chatId: store.currentSessionId)
                 }
             }
+            // §58: "Accept N & Continue"'s summary sheet, when a pending file still needs a look.
+            .sheet(isPresented: Binding(get: { model.showAcceptAllContinue }, set: { model.showAcceptAllContinue = $0 })) {
+                AcceptAllSheet(continues: true)
+            }
     }
 
     @ViewBuilder
@@ -92,6 +96,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
+            if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
                 Task { await model.terminals.restart(chatId: chatId) }
@@ -148,6 +153,29 @@ private struct TerminalStatusStrip: View {
         }
         return (Self.trustText, "questionmark.folder", .accentColor,
                 String(localized: "ReviewGate has heard nothing from Claude Code yet — it starts reviewing with your first prompt. The first time Claude Code runs in a folder it asks whether to trust it, and \"No, exit\" is selected: choose \"Yes, I trust this folder\" — on No, Claude Code exits and nothing can be reviewed."))
+    }
+}
+
+// MARK: terminal-friction (§58)
+
+/// "Accept N & Continue" in a terminal chat: the pending files accepted, then "Continue." pasted into Claude Code and
+/// Return pressed — the user's click (or ⌘⇧↩), never by itself. On only while Claude Code is idle at its prompt.
+private struct TerminalAcceptContinueButton: View {
+    @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
+
+    var body: some View {
+        let count = store.pendingFiles.count
+        let blocker = store.terminalAcceptContinueBlocker
+        Button("Accept \(count) & Continue") { AcceptAllAction.runContinuing(store: store, model: model) }
+            .controlSize(.small)
+            .keyboardShortcut(.return, modifiers: [.command, .shift])
+            .disabled(blocker != nil)
+            .help(blocker ?? (store.acceptAllNeedsSheet
+                ? String(localized: "Shows a summary of the \(count) pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)")
+                : String(localized: "Accepts the \(count) pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)")))
+            .accessibilityLabel(Text("Accept and continue"))
+            .accessibilityIdentifier("Terminal chat accept and continue")
     }
 }
 

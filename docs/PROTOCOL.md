@@ -9170,6 +9170,8 @@ chat's id);
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set, Esc was
   pressed in the terminal 2 s ago with no hook since, or nothing changed for 60 s — Esc in the TUI sends no Stop, so the
   turn stays open until then (§57.4).
+  - *Accept N & Continue* (§58): while files are pending, right of the status — off with its reason until Claude Code
+    is idle at its prompt; the click (or ⌘⇧↩) accepts them and sends `Continue.` with Enter.
   - *Cost* (§57.13, once `terminal.status` came): "$0.01 · 25%" right of the status — Claude Code's own cost so far in
     the conversation and the context used, from its status line; a click shows the model, the numbers and "리뷰한 턴"
     (`hud.sessionCostUSD`, which grows with each `turn_end`). VoiceOver reads both numbers.
@@ -9201,7 +9203,8 @@ chat's id);
     요청에 ReviewGate에서도 답하기" (`terminalPermissionBridge`, default on, `set_settings` live).
 - **Exit.** "Claude Code가 종료됐어요 (n)" with Restart over the terminal (`terminal_exited` was sent). Ended within 10 s
   with no hook: the hint that a folder Claude Code was not told to trust cannot be reviewed — answer Yes after
-  restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter).
+  restarting. Nothing types into the TUI for the user (§57.7: a paste only on a click, never Enter — but §58's Accept N &
+  Continue, the user's own click).
 - **Before the first hook** the strip reads "Claude Code가 이 폴더를 신뢰할지 물으면 Yes를 고르세요" (accent colour; narrow:
   "폴더를 신뢰할지 물으면 Yes"): the first run in a folder asks with "No, exit" selected, and No ends Claude Code — the hint
   is on screen before the user presses Return. Its tooltip says it starts reviewing with the first prompt.
@@ -9269,14 +9272,15 @@ real TUI. The chat UI stays one menu item away; chats keep the kind they were ma
 
   `+`'s tooltip names the kind it opens and points at the right-click and the setting; its VoiceOver label is "새 터미널
   채팅" or "새 채팅". ⌥⌘T is macOS's Show / Hide Toolbar, so the classic item takes ⌃⌥⌘T.
-- **Flows that send for you.** The app never types into a terminal chat's PTY on its own (no auto-Enter). Each flow that
-  puts text in front of Claude, decided:
+- **Flows that send for you.** The app never types into a terminal chat's PTY on its own (no auto-Enter; the one Enter
+  it types is §58's Accept N & Continue, on the user's click). Each flow that puts text in front of Claude, decided:
 
   | Flow | In a terminal chat |
   |---|---|
   | Run as Task (§49) | its workbench's chat is a chat (the engine sends the task); the sheet says so |
   | Plan handoff / "implement in a new chat" (§42.1) | a chat (engine); plan cards never show in a terminal chat |
-  | Accept N & Continue (§58), Accept & Send, the queue, steer, /btw, Stop and send | no message box — not offered (`canAcceptAndContinue` false; the engine refuses `send` / `steer` / `btw_ask` with `terminal_chat`) |
+  | Accept N & Continue (§58) | the strip's own button: accept, then `Continue.` pasted **and Enter** — the user's click (or ⌘⇧↩), only while Claude Code is idle at its prompt |
+  | Accept & Send, the queue, steer, /btw, Stop and send | no message box — not offered (the engine refuses `send` / `steer` / `btw_ask` with `terminal_chat`) |
   | Peer messages (§29) | the TUI receives them itself; `peer_accept` refused `terminal_chat` |
   | Chat move's "continue there" (§39.4) | `chat_move` refused `terminal_chat` |
   | PR comments "Send to Claude" / "Send all unresolved" (§36.14) | **pasted** into the target window's terminal (its tooltip says "붙여넣어요 … Return") |
@@ -9614,8 +9618,23 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
   be on another tab). The confirm is off, with the send's reason as its tooltip, while Claude cannot take the message.
 - **Tooltips.** "Accepts the N pending file(s), then tells Claude to continue (⌘⇧↩)", or with the sheet "Shows a summary of
   the N pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)"; AX "Accept and continue".
-- **Not in a terminal chat** (§57): its column has no message box (the TUI is the composer) and `canAcceptAndContinue` is
-  false there, so neither the button nor ⌘⇧↩ can send — the engine would refuse `send` with `terminal_chat` anyway.
+- **In a terminal chat** (§57) the column has no message box (the TUI is the composer; `canAcceptAndContinue` stays false
+  and the engine refuses `send` with `terminal_chat`), so the strip over the terminal carries its own **"Accept N &
+  Continue"** while files are pending (Core `terminalAcceptContinueBlocker` / `terminalAcceptAndContinue`). One click,
+  or ⌘⇧↩: the summary sheet first under the same rule; then `accept_all` and its reply awaited, then `Continue.` goes into
+  the TUI as one bracketed paste (`TerminalPaste`, the paste path of §57.7) and **Enter** 150 ms later, as its own write.
+  The prompt is adopted as any (§57.4): the review summary (`[Review gate] Accepted: …`) reaches Claude as that prompt's
+  `additionalContext` — the same words a chat puts in front of `Continue.`. The toast is the chat's. It is the only Enter
+  the app ever types, and only on this click.
+  - *When it is on:* files pending and none changes-requested, the live terminal chat on screen (not one shown
+    read-only), Claude Code idle at its prompt — no turn running or adopted (`promptId`), nothing collected or reverted,
+    nothing it waits for in the TUI (`waiting`) — and its PTY running, connected, with bracketed paste on. Checked before
+    the accept, so nothing is accepted for a Continue that cannot go. Off, the tooltip says why ("Claude Code가 아직 작업
+    중이에요 — 턴이 끝나면 쓸 수 있어요", "Claude Code가 터미널에서 답을 기다려요 — 먼저 거기서 답하세요", the send's
+    reasons); a refusal at the click is a toast. The accept stands if the chat changed or a turn started meanwhile —
+    nothing is typed then.
+  - *Tooltips:* "대기 중인 파일 N개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)", with the
+    sheet "…요약을 먼저 보여 준 뒤 수락하고, …"; AX "Accept and continue".
 - **Mac only** for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before.
 
 ## 59. Folders that are not git repositories (track without git)

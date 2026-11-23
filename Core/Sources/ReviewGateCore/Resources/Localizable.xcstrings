@@ -3057,6 +3057,38 @@
         }
       }
     },
+    "Claude Code is still working — this is offered once the turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code is still working — this is offered once the turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 아직 작업 중이에요 — 턴이 끝나면 쓸 수 있어요"
+          }
+        }
+      }
+    },
+    "Claude Code waits for you in the terminal — answer it there first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code waits for you in the terminal — answer it there first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 터미널에서 답을 기다려요 — 먼저 거기서 답하세요"
+          }
+        }
+      }
+    },
     "Claude already read %lld of the waiting messages — they stay in the chat": {
       "localizations": {
         "en": {
@@ -6515,6 +6547,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대상 MCP 서버가 없어요 — /mcp로 목록을 봐요"
+          }
+        }
+      }
+    },
+    "No file waits for review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No file waits for review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰를 기다리는 파일이 없어요"
           }
         }
       }

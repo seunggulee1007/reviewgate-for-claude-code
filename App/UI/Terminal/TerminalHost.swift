@@ -148,7 +148,24 @@ final class TerminalHost: LocalProcessTerminalViewDelegate {
         view.send(data: [0x1b])
     }
 
-    // MARK: terminal-friction (§57.4)
+    // MARK: terminal-friction (§58, §57.4)
+
+    /// §58: "Accept N & Continue" — `text` as one bracketed paste, then Enter a moment later (its own write, so the TUI
+    /// reads it as the key, not as part of the paste). The user's click only; nothing automatic presses Enter.
+    func submit(_ text: String) -> Bool {
+        guard paste(text) else { return false }
+        let gen = generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, gen == self.generation, self.state.isRunning else { return }
+                self.view.send(data: [0x0d])
+            }
+        }
+        return true
+    }
+
+    /// The program turned bracketed paste on: a paste can go in now.
+    var acceptsPaste: Bool { view.terminalStateSnapshot().bracketedPasteMode }
 
     /// §57.4: the user pressed Esc in this terminal (when); set for a terminal chat's host only.
     @ObservationIgnored var onEscape: ((Date) -> Void)?

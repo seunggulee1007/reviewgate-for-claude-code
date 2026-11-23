@@ -68,6 +68,21 @@ final class TerminalHub {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { host.focus() }
             return nil
         }
+        // MARK: terminal-friction — §58 "Accept N & Continue" (the user's click only): the paste, then Enter.
+        store.terminalInputBlocker = { [weak self, weak store] in
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id], host.state.isRunning, !host.disconnected else {
+                return NewChatKindText.terminalNotRunning
+            }
+            return host.acceptsPaste ? nil : NewChatKindText.terminalNotReady
+        }
+        store.onTerminalSubmit = { [weak self, weak store] text in
+            guard let self, let id = store?.currentSessionId, let host = self.chatHosts[id], host.state.isRunning, !host.disconnected else {
+                return NewChatKindText.terminalNotRunning
+            }
+            guard host.submit(text) else { return NewChatKindText.terminalNotReady }
+            host.focus()
+            return nil
+        }
         observe()
     }
 

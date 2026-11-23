@@ -86,7 +86,7 @@ Mac·Windows 열과 비교해요.
 | 채팅 기록 | ⌘Y | Ctrl+H | |
 | 보내기 — Claude 가 작업 중이면 대기열에 추가 | ⌘↩ | Ctrl+Enter | |
 | 중단하고 보내기 | ⌥⌘↩ | Ctrl+Alt+Enter | Claude 작업 중, 메시지를 입력했을 때 |
-| 대기 중인 파일 수락 후 보내기 | ⌘⇧↩ | Ctrl+Shift+Enter | |
+| 대기 중인 파일 수락 후 보내기 | ⌘⇧↩ | Ctrl+Shift+Enter | 입력란이 비어 있으면 수락 후 계속. 터미널 채팅(Mac)에서는 터미널 위 띠의 "N개 수락 후 계속하기" — Claude Code가 프롬프트에서 기다릴 때만, `Continue.`를 입력하고 Return까지 눌러요 (§58) |
 | 중지 | ⌘. | Ctrl+. | |
 | 중지 | Esc | Esc | 메시지 입력란에서, Claude 가 작업 중일 때 — Claude 가 아직 읽지 않은 메시지는 입력란으로 돌아와요 |
 | 커맨드 | ⌘/ | Ctrl+/ | |
