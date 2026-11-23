@@ -99,6 +99,7 @@ public enum ShortcutTable {
             ShortcutRow("New chat", mac: "⌘T", windows: "Ctrl+T"),
             ShortcutRow("New Terminal Chat", mac: "⌃⌘T", windows: "Ctrl+Alt+T"),   // MARK: terminal-chat (§57.5) · terminal-win (§57.17)
             ShortcutRow("New Chat (Classic)", mac: "⌃⌥⌘T", windows: "Ctrl+Alt+Shift+T"),   // MARK: terminal-default (§57.7) · terminal-win (§57.17)
+            ShortcutRow("New Chat in a Workbench…", mac: "⌥⌘T", windows: "Ctrl+Alt+W", note: "Windows uses W: Ctrl+Alt+T is New Terminal Chat"),   // §9 New Chat in a Workbench
             ShortcutRow("Close Chat Tab", mac: "⌘⇧W", windows: "Ctrl+Shift+W"),
             ShortcutRow("Chat tabs 1–9", mac: "⌘1…⌘9", windows: "Ctrl+1…Ctrl+9"),
             // MARK: r2-chats-cards — polish PX-19 / P4-composer-05
