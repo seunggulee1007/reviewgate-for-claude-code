@@ -11,6 +11,7 @@ import type { WorkbenchSetupReport } from "./flowSettings.js";
 import type { CloseGuardExtras } from "./closeGuard.js"; // MARK: polish p-lifecycle (P1-chrome-01)
 import type { MenuEnabled } from "./menuState.js"; // MARK: polish p-lifecycle (P1-chrome-09)
 import type { ProjectRuns, RunConfig } from "./runConfigs.js"; // MARK: c-panel (§57.18)
+import type { TaskStartSettings } from "./taskStartSettings.js"; // MARK: task-start (§63)
 
 /** M18: UI theme. "system" follows the OS (`nativeTheme` in main, `prefers-color-scheme` in the renderer). */
 export type Appearance = "system" | "light" | "dark";
@@ -78,6 +79,13 @@ export type AppSettings = {
   runAsTaskEnabled?: boolean;
   /** The branch prefix "Run as Task" suggests — the one the last task branch used (absent: `task/`). */
   taskBranchPrefix?: string;
+  // MARK: task-start — §63 (src/shared/taskStartSettings.ts)
+  /** "다음부터 바로 시작": a project window opens straight into its chat, no start screen (absent = the start screen shows). */
+  skipStartScreen?: boolean;
+  /** Settings › Tasks: the default every repository without its own uses (absent = the built-in default). */
+  taskStartSettings?: TaskStartSettings;
+  /** Settings › Tasks of a repository, keyed by `projectRootHash` of its main worktree. */
+  projectTaskStartSettings?: Record<string, TaskStartSettings>;
   claudePath: string;
   ghPath: string;
   gitPath: string;
