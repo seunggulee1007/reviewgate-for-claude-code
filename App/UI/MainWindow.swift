@@ -386,7 +386,7 @@ struct MainWindow: View {
         .modifier(InspectorObservers(showAgentPanel: $showAgentPanel, showSidePanel: $showSidePanel, tab: $tab,
                                      onFit: fitAgentPanel, onAskSelection: askAboutSelection))
         .modifier(CodeBrowserObservers(tab: $tab) { setDiffCollapsed(false, remember: false) })   // MARK: code-browser (§47)
-        .modifier(CodeNavObservers())   // MARK: code-nav (§62)
+        .modifier(CodeNavObservers(panelAvailable: tab != .prs))   // MARK: code-nav (§62); ide-nav (§65.8): 참조 tab
         .onChange(of: model.toggleAgentPanelTick) { _, _ in
             if !tab.showsReview { tab = .changes; showAgentPanel = true } else { showAgentPanel.toggle() }
         }

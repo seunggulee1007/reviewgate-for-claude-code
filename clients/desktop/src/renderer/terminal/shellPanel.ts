@@ -25,14 +25,15 @@ export const useShellPanel = create<{ shown: boolean; active: string | null; ope
   failed: null,
 }));
 
-/** MARK: c-panel — §57.18: the panel's tabs. */
-export type PanelTab = "terminal" | "output" | "run";
-export const PANEL_TABS: readonly PanelTab[] = ["terminal", "output", "run"];
+/** MARK: c-panel — §57.18: the panel's tabs; §65.8 References (Shift+F12's results). */
+export type PanelTab = "terminal" | "output" | "run" | "references";
+export const PANEL_TABS: readonly PanelTab[] = ["terminal", "output", "run", "references"];
 
 /** A tab's name: Terminal · Output · Run (the Mac's catalog key for Output, whose plain "Output" means something else). */
 export function panelTabTitle(tab: PanelTab): string {
   if (tab === "terminal") return t("Terminal");
   if (tab === "run") return t("Run");
+  if (tab === "references") return t("References");
   const ko = t("panel.output");
   return ko === "panel.output" ? "Output" : ko;
 }
@@ -40,6 +41,7 @@ export function panelTabTitle(tab: PanelTab): string {
 export function panelTabHelp(tab: PanelTab): string {
   if (tab === "terminal") return usesMacKeys() ? t("Terminal panel (⌃`)") : t("Terminal panel (Ctrl+`)");
   if (tab === "output") return t("Output — ReviewGate's log and the Bash commands Claude ran");
+  if (tab === "references") return t("References — Shift+F12 on a name fills it; F4 / Shift+F4 step through them");
   return t("Run — the project's commands (dev server, tests), each in its own terminal");
 }
 

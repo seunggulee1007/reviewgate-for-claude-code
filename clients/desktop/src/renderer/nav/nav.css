@@ -47,3 +47,68 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .project-file-head .folder { color: var(--fg-3); }
 .nav-history { display: inline-flex; gap: 2px; flex: none; }
 .nav-history button { padding: 0 6px; }
+
+/* §65.8 The peek band: inline under the clicked line (a DOM diff row or a Monaco view zone), the pane's width. */
+/* `.unified` is an inline-size container: 100cqw is the diff's visible width, unwrapped or not (as its folds use). */
+.unified .nav-band-slot { position: sticky; left: 0; width: 100cqw; }
+.nav-band-zone { z-index: 5; }
+.nav-band {
+  margin: 2px 0 4px; display: flex; flex-direction: column; background: var(--elevated); font-family: var(--font); white-space: normal;
+  border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent); box-shadow: var(--shadow); outline: none; cursor: auto;
+}
+.nav-band-head { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); font-size: 12px; min-width: 0; }
+.nav-band-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-band-head .nav-kind { flex: none; font-size: 10.5px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); }
+.nav-band-body { display: flex; min-height: 0; }
+.nav-band-code { flex: 1 1 auto; overflow: auto; min-width: 0; font-family: var(--mono); font-size: 12px; background: var(--bg); }
+.nav-band-line { display: flex; height: 18px; line-height: 18px; white-space: pre; }
+.nav-band-line .no { flex: none; width: 48px; padding-right: 10px; text-align: right; color: var(--fg-3); font-variant-numeric: tabular-nums; user-select: none; }
+.nav-band-line .code { flex: 1 1 auto; }
+.nav-band-line.target { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.nav-band-line.target .no { color: var(--accent); font-weight: 600; }
+.nav-band-note { padding: 8px 10px; }
+.nav-band-list { flex: none; width: 260px; max-height: 270px; overflow: auto; border-left: 1px solid var(--border); padding: 2px 0; }
+.nav-band-list .nav-row .folder { font-size: 11px; color: var(--fg-3); }
+
+/* §65.8 The hover card (Ctrl held on a name for 600 ms): never takes a click. */
+.nav-hover {
+  position: fixed; z-index: 61; max-width: min(620px, calc(100vw - 16px)); pointer-events: none; padding: 6px 10px 8px;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow);
+}
+.nav-hover-sig { font-family: var(--mono); font-size: 12px; font-weight: 700; white-space: pre-wrap; word-break: break-word; }
+.nav-hover-where { font-size: 11px; color: var(--fg-3); margin: 2px 0 4px; }
+.nav-hover-code { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); white-space: pre; overflow: hidden; max-height: calc(18 * 16px); line-height: 16px; }
+.nav-hover-code .target { color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* §65.8 The References tab of the bottom panel: the hits by file on the left, the selected one's context on the right. */
+.nav-refs-tab { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; background: var(--panel); }
+.nav-refs-tab.empty-tab { align-items: center; justify-content: center; font-size: 12px; padding: 12px; text-align: center; }
+.nav-refs-split { display: flex; flex: 1 1 auto; min-height: 0; }
+.nav-refs-split .nav-refs-list { flex: 1 1 55%; min-width: 0; outline: none; }
+.nav-refs-split .nav-refs-list:focus-visible { box-shadow: inset 0 0 0 1px var(--accent); }
+.nav-ref.selected { background: var(--accent-bg); }
+.nav-refs-preview { flex: 1 1 45%; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.nav-refs-preview-head { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.nav-refs-preview-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-refs-preview-code { flex: 1 1 auto; overflow: auto; font-family: var(--mono); font-size: 12px; background: var(--bg); }
+.nav-refs-preview-code mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 2px; }
+
+/* §65.8 The quick-open palettes (Go to File, Symbols in This File, Symbols in Project): at the top, over everything. */
+.nav-palette-backdrop { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; align-items: flex-start; padding-top: 56px; background: transparent; }
+.nav-palette {
+  width: min(640px, calc(100vw - 32px)); max-height: min(520px, calc(100vh - 80px)); display: flex; flex-direction: column;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow); font-family: var(--font);
+}
+.nav-palette-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 2px; font-size: 12px; min-width: 0; }
+.nav-palette-head .folder { color: var(--fg-3); min-width: 0; }
+.nav-palette-input { margin: 4px 10px 6px; font-size: 13px; }
+.nav-palette-status { display: flex; align-items: center; gap: 8px; padding: 0 10px 6px; }
+.nav-palette-list { overflow: auto; flex: 1 1 auto; padding: 2px 0 4px; border-top: 1px solid var(--border); }
+.nav-palette-row { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 3px 10px; text-align: left; background: transparent; border: 0; border-radius: 0; cursor: pointer; color: var(--fg); font-size: 12.5px; min-width: 0; }
+.nav-palette-row.selected { background: var(--accent-bg); }
+.nav-palette-row .name { flex: none; white-space: pre; }
+.nav-palette-row .name b { color: var(--accent); font-weight: 700; }
+.nav-palette-row .detail { color: var(--fg-3); font-size: 11.5px; min-width: 0; flex: 1 1 auto; }
+.nav-palette-row .nav-kind { flex: none; font-size: 10px; padding: 0 5px; border-radius: 4px; background: var(--bg-3); color: var(--fg-2); min-width: 52px; text-align: center; }
+.nav-palette-note { padding: 10px; }
+.nav-palette-foot { display: flex; flex-direction: column; gap: 2px; padding: 5px 10px; border-top: 1px solid var(--border); }

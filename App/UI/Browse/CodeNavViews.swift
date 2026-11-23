@@ -48,11 +48,23 @@ final class CodeNavPointer {
         let symbol: String
         /// UTF-16 offsets into the row's text.
         let range: Range<Int>
+        /// §65.6: `user` of `user.save()`.
+        let receiver: String?
         let from: CodeNavLocation
+        /// The row's drawn text (§65.8: the peek band hangs under the row drawing it).
+        let text: String
         weak var store: AppState?
 
         static func == (a: Target, b: Target) -> Bool {
-            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.from == b.from && a.store === b.store
+            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.receiver == b.receiver && a.from == b.from
+                && a.text == b.text && a.store === b.store
+        }
+
+        /// The row's place with the name's column (§65.6: `find_definition`'s `column`).
+        var clickedAt: CodeNavLocation {
+            var at = from
+            at.column = range.lowerBound + 1
+            return at
         }
     }
 
@@ -62,6 +74,10 @@ final class CodeNavPointer {
     private(set) var commandDown = false
     /// Where the peek popover hangs from in the clicked row (its coordinates).
     private(set) var anchorPoint: CGPoint = .zero
+    /// §65.8: where the hover card hangs from (the row's coordinates where the pointer came to rest on the name).
+    @ObservationIgnored private(set) var hoverPoint: CGPoint = .zero
+    /// The window the hover card was last asked for (told when the pointer leaves the name).
+    @ObservationIgnored private weak var hoverStore: AppState?
     @ObservationIgnored private var hoveringToken: Int?
     @ObservationIgnored private var lastPoint: CGPoint = .zero
     @ObservationIgnored private var monitor: Any?
@@ -73,19 +89,37 @@ final class CodeNavPointer {
         return tokens
     }
 
-    /// The pointer is at `point` of row `token`, over `hit` (nil: not over a name).
-    func hover(token: Int, hit: CodeNavSymbol?, point: CGPoint, from: CodeNavLocation, store: AppState) {
+    /// The pointer is at `point` of row `token` (drawing `text`), over `hit` (nil: not over a name).
+    func hover(token: Int, hit: CodeNavSymbol?, point: CGPoint, from: CodeNavLocation, text: String, store: AppState) {
         installIfNeeded()
         hoveringToken = token
         lastPoint = point
         let down = Self.isCommandOnly(NSEvent.modifierFlags)
         if down != commandDown { commandDown = down }
-        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, from: from, store: store) }
-        if next != target { target = next }
+        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, receiver: $0.receiver, from: from, text: text, store: store) }
+        if next != target {
+            target = next
+            hoverPoint = point
+        }
+        updateHover()
     }
 
     func leave(token: Int) {
-        if hoveringToken == token { hoveringToken = nil }
+        if hoveringToken == token {
+            hoveringToken = nil
+            updateHover()
+        }
+    }
+
+    /// §65.8: ⌘ held over a name asks for the hover card (after a rest, Core `CodeNavHoverStore`); anything else stops it.
+    private func updateHover() {
+        guard commandDown, let target, let store = target.store, hoveringToken == target.token else {
+            hoverStore?.hoverDefinition(nil, receiver: nil)
+            return
+        }
+        if hoverStore !== store { hoverStore?.hoverDefinition(nil, receiver: nil) }
+        hoverStore = store
+        store.hoverDefinition(CodeNavHoverDebounce.Key(symbol: target.symbol, at: target.clickedAt, anchor: target.token), receiver: target.receiver)
     }
 
     /// The part of row `token` to underline: the name under the pointer while ⌘ is held.
@@ -105,7 +139,20 @@ final class CodeNavPointer {
         guard let store = target.store else { return }
         anchorPoint = lastPoint
         store.codeNav.caret = target.from
-        Task { await store.goToDefinition(target.symbol, from: target.from, anchor: target.token) }
+        Task { await store.goToDefinition(target.symbol, from: target.clickedAt, anchor: target.token, receiver: target.receiver) }
+    }
+
+    /// §65.8: Peek Definition on `target` — the band under its row; the place being read stays where it is.
+    func peek(_ target: Target) {
+        guard let store = target.store else { return }
+        Task { await store.peekDefinition(target.symbol, row: target.from, rowText: target.text, from: target.clickedAt, receiver: target.receiver) }
+    }
+
+    /// Navigate › Peek Definition (⌥F12): the name under the pointer.
+    func peekUnderPointer(in store: AppState) -> Bool {
+        guard let target, target.store === store, hoveringToken == target.token else { return false }
+        peek(target)
+        return true
     }
 
     /// Navigate › Go to Definition (F12): the name under the pointer, if the pointer is over one in `store`'s window.
@@ -138,11 +185,17 @@ final class CodeNavPointer {
         switch event.type {
         case .flagsChanged:
             let down = Self.isCommandOnly(event.modifierFlags)
-            if down != commandDown { commandDown = down }
+            if down != commandDown {
+                commandDown = down
+                if down, target != nil { hoverPoint = lastPoint }
+                updateHover()
+            }
         case .leftMouseDown:
+            hoverStore?.codeNav.hover.dismiss()   // §65.8: a click never leaves the hover card behind
             guard Self.isCommandOnly(event.modifierFlags), event.clickCount == 1, let target, hoveringToken == target.token else { break }
             swallowMouseUp = true
-            goToDefinition(target)
+            // §65.8: Settings › Review › Diff › ⌘-click — the peek band (default) or the jump.
+            if CodeNavCommandClick.current() == .peek { peek(target) } else { goToDefinition(target) }
             return true   // the row's own click (picking the line) never sees it
         case .leftMouseUp:
             if swallowMouseUp {
@@ -209,6 +262,11 @@ struct CodeNavHotspot<Content: View>: View {
         let pointer = CodeNavPointer.shared
         let underline = hovered ? pointer.underline(for: token) : nil
         return content(underline)
+            // MARK: ide-nav (§65.8): the hover card, from where the pointer rests on the name.
+            .popover(isPresented: hoverShown(store), attachmentAnchor: .rect(.rect(CGRect(origin: pointer.hoverPoint, size: CGSize(width: 1, height: 14)))),
+                     arrowEdge: .bottom) {
+                if let card = store.codeNav.hover.card { CodeNavHoverCard(card: card) }
+            }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .onContinuousHover(coordinateSpace: .local) { phase in
                 switch phase {
@@ -219,7 +277,7 @@ struct CodeNavHotspot<Content: View>: View {
                     let x = wrap ? point.x : point.x + offset
                     let hit = CodeNavHitTest.offset(at: CGPoint(x: x, y: point.y), in: text, width: wrap ? width : nil)
                         .flatMap { CodeNavText.symbol(in: text, at: $0, path: from.path) }
-                    pointer.hover(token: mine, hit: hit, point: point, from: from, store: store)
+                    pointer.hover(token: mine, hit: hit, point: point, from: from, text: text, store: store)
                 case .ended:
                     if hovered { hovered = false }
                     pointer.leave(token: token)
@@ -231,6 +289,11 @@ struct CodeNavHotspot<Content: View>: View {
                 CodeNavPopupView()
                     .environment(store)
             }
+    }
+
+    private func hoverShown(_ store: AppState) -> Binding<Bool> {
+        Binding(get: { token != 0 && store.codeNav.hover.card?.key.anchor == token },
+                set: { if !$0, store.codeNav.hover.card?.key.anchor == token { store.codeNav.hover.dismiss() } })
     }
 
     private func popupShown(_ store: AppState) -> Binding<Bool> {
@@ -579,8 +642,11 @@ struct CodeNavMenuItems: View {
             let from = CodeNavLocation(view: context.view, path: context.path, line: line)
             let pointer = CodeNavPointer.shared
             if let target = pointer.target(on: from) {
+                Button("Peek Definition", systemImage: "eye") { pointer.peek(target) }   // MARK: ide-nav (§65.8)
+                    .help(String(localized: "\(target.symbol)'s definition under this line, without leaving it (⌥F12)"))
+                    .accessibilityIdentifier("Row Peek definition")
                 Button("Go to Definition", systemImage: "arrow.right.circle") { pointer.goToDefinition(target) }
-                    .help(String(localized: "Where \(target.symbol) is declared (⌘-click)"))
+                    .help(String(localized: "Where \(target.symbol) is declared (F12)"))
                     .accessibilityIdentifier("Row Go to definition")
                 Button("Find References", systemImage: "text.magnifyingglass") {
                     Task { await store.findReferences(target.symbol, from: from) }
@@ -621,6 +687,11 @@ enum CodeNavActions {
         ExternalEditor.preferred(for: store).open(IDELink.absolutePath(root: root, relative: path), line: line ?? 1, column: column)
     }
 
+    /// The file on screen in the diff pane (no line: what the menu bar reads, so a click does not rebuild it).
+    static func currentPath(_ store: AppState) -> String? {
+        store.codeBrowser.selection?.path ?? store.historySelection?.path ?? store.liveSelection ?? store.selectedPath
+    }
+
     /// The file on screen in the diff pane and the line the user is at: the project file, else the review's, a past
     /// round's or the live diff's file; the line where the user last clicked or jumped in it.
     static func current(_ store: AppState) -> (path: String, line: Int?)? {
@@ -637,11 +708,20 @@ struct CodeNavCommands: Commands {
     let focused: WorkbenchWindowEntry?
 
     private static let f12 = KeyEquivalent(Character(UnicodeScalar(UInt32(NSF12FunctionKey))!))
+    private static let f4 = KeyEquivalent(Character(UnicodeScalar(UInt32(NSF4FunctionKey))!))
 
     var body: some Commands {
         CommandMenu("Navigate") {
             let store = focused?.store
             let hasProject = store?.menuState.hasProject == true
+            // MARK: ide-nav (§65.8): the definition in a band under the line.
+            Button("Peek Definition") {
+                if let store, !CodeNavPointer.shared.peekUnderPointer(in: store) { NSSound.beep() }
+            }
+            .keyboardShortcut(Self.f12, modifiers: .option)
+            .disabled(!hasProject)
+            .help(hasProject ? Text("The definition of the name under the pointer, in a band under its line") : Text("Open a project first"))
+            .accessibilityIdentifier("Navigate menu Peek definition")
             Button("Go to Definition") {
                 if let store, !CodeNavPointer.shared.goToDefinitionUnderPointer(in: store) { NSSound.beep() }
             }
@@ -654,6 +734,39 @@ struct CodeNavCommands: Commands {
             .keyboardShortcut(Self.f12, modifiers: .shift)
             .disabled(!hasProject)
             .accessibilityIdentifier("Navigate menu Find references")
+            // MARK: ide-nav (§65.8): the symbols of the file on screen, and of the project.
+            let file = store.flatMap { CodeNavActions.currentPath($0) }
+            Button("Symbols in This File…") { if let file { store?.codeNav.palette = .file(file) } }
+                .keyboardShortcut(Self.f12, modifiers: .command)
+                .disabled(file == nil)
+                .help(file == nil ? Text("Show a file or a diff first") : Text("The classes, methods and fields of the file on screen"))
+                .accessibilityIdentifier("Navigate menu Symbols in this file")
+            Button("Symbols in Project…") { store?.codeNav.palette = .project }
+                .keyboardShortcut("n", modifiers: [.command, .option, .shift])
+                .disabled(!hasProject)
+                .help(hasProject ? Text("Find a class, method or field anywhere in the project by name") : Text("Open a project first"))
+                .accessibilityIdentifier("Navigate menu Symbols in project")
+            // §65.1: `nav_index_build {full: true}` — off while it builds.
+            let building = store?.navIndexBuilding == true
+            Button("Rebuild Symbol Index") { if let store { Task { await store.buildNavIndex(full: true) } } }
+                .disabled(!hasProject || building)
+                .help(!hasProject ? Text("Open a project first")
+                      : building ? Text("Indexing… — it can be rebuilt once this build ends")
+                      : Text("Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)"))
+                .accessibilityIdentifier("Navigate menu Rebuild symbol index")
+            Divider()
+            // MARK: ide-nav (§65.8): the References tab's hits, one after the other.
+            let hasHits = store.map { !$0.codeNav.referenceGroups.isEmpty } ?? false
+            Button("Next Reference") { if let store { Task { await store.stepReference(1) } } }
+                .keyboardShortcut(Self.f4, modifiers: [])
+                .disabled(!hasHits)
+                .help(hasHits ? Text("Open the next reference of the References tab") : Text("No references to step through — Find References (⇧F12) on a name first"))
+                .accessibilityIdentifier("Navigate menu Next reference")
+            Button("Previous Reference") { if let store { Task { await store.stepReference(-1) } } }
+                .keyboardShortcut(Self.f4, modifiers: .shift)
+                .disabled(!hasHits)
+                .help(hasHits ? Text("Open the previous reference of the References tab") : Text("No references to step through — Find References (⇧F12) on a name first"))
+                .accessibilityIdentifier("Navigate menu Previous reference")
             Divider()
             Button("Back") { store?.codeNav.goBack() }
                 .keyboardShortcut("-", modifiers: .control)
@@ -705,11 +818,17 @@ struct CodeNavHistoryButtons: View {
 struct CodeNavObservers: ViewModifier {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
+    /// §65.8: the window shows the bottom panel (not on the PRs tab) — Find References fills its 참조 tab; else the sheet.
+    let panelAvailable: Bool
 
     func body(content: Content) -> some View {
         @Bindable var nav = store.codeNav
         content
             .sheet(isPresented: $nav.referencesShown) { CodeNavReferencesSheet() }
+            .sheet(item: $nav.palette) { palette in SymbolsPaletteSheet(palette: palette) }   // MARK: ide-nav (§65.8)
+            .onChange(of: nav.referencesTick) { _, _ in
+                if panelAvailable { model.shell.show(.references) } else { nav.referencesShown = true }
+            }
             .onChange(of: nav.openRequest?.tick) { _, _ in
                 if let request = nav.openRequest { open(request.location) }
             }

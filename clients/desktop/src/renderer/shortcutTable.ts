@@ -65,8 +65,14 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
   {
     title: "Code navigation",
     rows: [
-      { action: "Go to Definition", mac: "F12", win: "F12", note: "Or ⌘-click the name (Ctrl+click on Windows)" },
-      { action: "Find References", mac: "⇧F12", win: "Shift+F12" },
+      // Core ShortcutTable.swift is the source of these rows (docs/SHORTCUTS.md "코드 탐색"); §62, §65.8
+      { action: "Go to Definition", mac: "F12", win: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition" },
+      { action: "Peek Definition", mac: "⌥F12", win: "Alt+F12", note: "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)" },
+      { action: "Find References", mac: "⇧F12", win: "Shift+F12", note: "The results fill the bottom panel's References tab" },
+      { action: "Next Reference", mac: "F4", win: "F4", note: "Opens it in the diff or the file view — one Back returns to where you were reading" },
+      { action: "Previous Reference", mac: "⇧F4", win: "Shift+F4" },
+      { action: "Symbols in This File", mac: "⌘F12", win: "Ctrl+F12", note: "Symbols in this file, filtered as you type — the outline indented" },
+      { action: "Symbols in Project", mac: "⌥⌘⇧N", win: "Ctrl+Alt+Shift+N", note: "Finds a class, method or field by name or its camel humps (UsrSvc → UserService)" },
       { action: "Back", mac: "⌃-", win: "Alt+←" },
       { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },
       { action: "Open in IDE", mac: "⌥⌘O", win: "Ctrl+Alt+O" },

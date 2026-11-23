@@ -78,8 +78,14 @@ public enum ShortcutTable {
         ]),
         // MARK: code-nav (§62)
         ShortcutSection("Code navigation", rows: [
-            ShortcutRow("Go to Definition", mac: "F12", windows: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows)"),
-            ShortcutRow("Find References", mac: "⇧F12", windows: "Shift+F12"),
+            ShortcutRow("Go to Definition", mac: "F12", windows: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition"),
+            // MARK: ide-nav (§65.8)
+            ShortcutRow("Peek Definition", mac: "⌥F12", windows: "Alt+F12", note: "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)"),
+            ShortcutRow("Find References", mac: "⇧F12", windows: "Shift+F12", note: "The results fill the bottom panel's References tab"),
+            ShortcutRow("Next Reference", mac: "F4", windows: "F4", note: "Opens it in the diff or the file view — one Back returns to where you were reading"),   // ide-nav (§65.8)
+            ShortcutRow("Previous Reference", mac: "⇧F4", windows: "Shift+F4"),
+            ShortcutRow("Symbols in This File", mac: "⌘F12", windows: "Ctrl+F12", note: "Symbols in this file, filtered as you type — the outline indented"),   // ide-nav (§65.8)
+            ShortcutRow("Symbols in Project", mac: "⌥⌘⇧N", windows: "Ctrl+Alt+Shift+N", note: "Finds a class, method or field by name or its camel humps (UsrSvc → UserService)"),
             ShortcutRow("Back", mac: "⌃-", windows: "Alt+←"),
             ShortcutRow("Forward", mac: "⌃⇧-", windows: "Alt+→"),
             ShortcutRow("Open in IDE", mac: "⌥⌘O", windows: "Ctrl+Alt+O"),

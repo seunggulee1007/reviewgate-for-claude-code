@@ -18,8 +18,9 @@ final class ShellPanelModel {
         let cwd: String
     }
 
-    /// MARK: c-panel (§57.18): the panel's three tabs — the shells, the window's output, the run configurations.
-    enum PanelTab: String, CaseIterable { case terminal, output, run }
+    /// MARK: c-panel (§57.18): the panel's tabs — the shells, the window's output, the run configurations; ide-nav (§65.8):
+    /// Find References' results.
+    enum PanelTab: String, CaseIterable { case terminal, output, run, references }
 
     var visible = false
     private(set) var tabs: [Tab] = []
@@ -188,6 +189,8 @@ struct ShellPanelView: View {
                     OutputPanelControls(query: $outputQuery)
                 case .run:
                     Spacer(minLength: 4)
+                case .references:   // MARK: ide-nav (§65.8)
+                    ReferencesPanelControls()
                 }
                 Button { shell.visible = false; shell.focusChat() } label: { Image(systemName: "chevron.down") }
                     .buttonStyle(.icon)
@@ -218,6 +221,8 @@ struct ShellPanelView: View {
                 OutputPanelView(query: outputQuery)
             case .run:
                 RunPanelView()
+            case .references:
+                ReferencesPanelView()
             }
         }
         .frame(minHeight: 80, idealHeight: height, maxHeight: height)
@@ -267,6 +272,7 @@ enum PanelTabText {
         case .terminal: String(localized: "Terminal")
         case .output: String(localized: "panel.output", defaultValue: "Output")
         case .run: String(localized: "panel.run", defaultValue: "Run")
+        case .references: String(localized: "panel.references", defaultValue: "References")
         }
     }
 
@@ -275,6 +281,7 @@ enum PanelTabText {
         case .terminal: String(localized: "Terminal panel (⌃`)")
         case .output: String(localized: "Output — ReviewGate's log and the Bash commands Claude ran")
         case .run: String(localized: "Run — the project's commands (dev server, tests), each in its own terminal")
+        case .references: String(localized: "References — where a name is used (⇧F12 on it); F4 / ⇧F4 step through them")
         }
     }
 }
@@ -320,6 +327,7 @@ struct PanelStatusBar: View {
         case .terminal: "apple.terminal"
         case .output: "text.alignleft"
         case .run: "play.circle"
+        case .references: "text.magnifyingglass"
         }
     }
 }

@@ -9,6 +9,7 @@ import { getGitPath, runGit, shadowArgs } from "../git/exec.js";
 import { repoRelativeInside } from "../platform/paths.js";
 import type { DefinitionCandidate, DefinitionKind, ReferenceHit } from "../protocol.js";
 import { readProjectFile } from "./browse.js";
+import type { FileSymbol } from "./symbols.js";
 
 /** `find_definition` sends at most this many candidates, best first. */
 export const DEFINITION_MAX = 50;
@@ -27,7 +28,7 @@ export const NAV_PREVIEW_MAX = 200;
 /** A longer line (a minified bundle) is never taken for a definition. */
 const LONG_LINE = 2_000;
 
-type Lang = "java" | "kotlin" | "js" | "vue" | "jsp" | "tld" | "swift" | "python" | "go";
+export type Lang = "java" | "kotlin" | "js" | "vue" | "jsp" | "tld" | "swift" | "python" | "go";
 const LANG_BY_EXT: Record<string, Lang> = {
   java: "java", kt: "kotlin", kts: "kotlin",
   js: "js", jsx: "js", mjs: "js", cjs: "js", ts: "js", tsx: "js", mts: "js", cts: "js",
@@ -72,7 +73,7 @@ export function parseSymbol(raw: unknown): Query {
 
 // ---------------------------------------------------------------- definition patterns
 
-type Rule = {
+export type Rule = {
   re: RegExp;
   kind: DefinitionKind | ((m: RegExpExecArray, line: string) => DefinitionKind);
   /** Keyword-backed (`class X`, `fun x`) vs a shape that can also be something else (a local, a call's line). */
@@ -91,12 +92,18 @@ const JTYPE = String.raw`[\w$][\w$.]*(?:\s*<[^()=;]*>)?(?:\s*\[\s*\])*`;
 const TSMOD = String.raw`(?:(?:static|async|get|set|public|private|protected|readonly|override|abstract|declare)\s+)*`;
 const JS_FN_VALUE = /^\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[\w$]+)\s*=>)/;
 
-/** The rules of each language for `word`, the symbol captured as group `s` (indices: flag `d`). */
-function rulesFor(word: string): Record<Lang, Rule[]> {
-  const S = String.raw`(?<![\w$])(?<s>${escapeRe(word)})(?![\w$])`;
+/** Any identifier: what the symbol index (§65) puts where a word would be. */
+const ANY_IDENT = String.raw`[A-Za-z_$][\w$]*`;
+
+/**
+ * The rules of each language for `word`, the symbol captured as group `s` (indices: flag `d`). `null`: any identifier — the
+ * same patterns read every declaration of a line for the symbol index (§65); `jspTags` are the JSP-only tag rules.
+ */
+export function rulesFor(word: string | null): Record<Lang, Rule[]> & { jspTags: Rule[] } {
+  const S = String.raw`(?<![\w$])(?<s>${word === null ? ANY_IDENT : escapeRe(word)})(?![\w$])`;
   const rx = (src: string): RegExp => new RegExp(src, "d");
-  const upper = /^[A-Z]/.test(word);
-  const allCaps = /^[A-Z][A-Z0-9_]*$/.test(word);
+  const upper = (m: RegExpExecArray): boolean => /^[A-Z]/.test(m.groups?.s ?? "");
+  const allCaps = (m: RegExpExecArray): boolean => /^[A-Z][A-Z0-9_]*$/.test(m.groups?.s ?? "");
   const typeOk = (m: RegExpExecArray): boolean => !NOT_A_TYPE.has((m.groups?.t ?? "").trim());
   const hasMods = (m: RegExpExecArray): boolean => (m.groups?.mods ?? "").trim() !== "";
 
@@ -106,10 +113,10 @@ function rulesFor(word: string): Record<Lang, Rule[]> {
     { re: rx(String.raw`^\s*${JMOD}(?:<[^>]*>\s+)?(?<t>${JTYPE})\s+${S}\s*\(`), kind: "method", strong: true, ok: typeOk },
     {
       re: rx(String.raw`^\s*${JMOD}${S}\s*\([^;]*$`), kind: "constructor",
-      strong: (m, line) => hasMods(m) || /\{\s*$/.test(line), ok: () => upper,
+      strong: (m, line) => hasMods(m) || /\{\s*$/.test(line), ok: upper,
     },
     { re: rx(String.raw`^\s*${JMOD}(?<t>${JTYPE})\s+${S}\s*(?:=(?!=)|;|,|$)`), kind: "field", strong: hasMods, ok: typeOk },
-    { re: rx(String.raw`^\s*${S}\s*(?:\(.*\))?\s*(?:[,;{]\s*)?(?:\/\/.*)?$`), kind: "constant", strong: false, ok: () => allCaps },
+    { re: rx(String.raw`^\s*${S}\s*(?:\(.*\))?\s*(?:[,;{]\s*)?(?:\/\/.*)?$`), kind: "constant", strong: false, ok: allCaps },
   ];
   const kotlin: Rule[] = [
     {
@@ -179,7 +186,7 @@ function rulesFor(word: string): Record<Lang, Rule[]> {
     { re: rx(String.raw`^\s*${S}(?:\s*,\s*[\w$]+)*\s*:=`), kind: "variable", strong: false },
   ];
   const tld: Rule[] = [{ re: rx(String.raw`<name>\s*${S}\s*</name>`), kind: "tag", strong: true }];
-  return { java, kotlin, js, vue: js, jsp: [...jspOwn, ...java, ...js], tld, swift, python, go };
+  return { java, kotlin, js, vue: js, jsp: [...jspOwn, ...java, ...js], tld, swift, python, go, jspTags: jspOwn };
 }
 
 /** A line that is only a comment (per language) is never a definition. */
@@ -191,10 +198,10 @@ function isCommentLine(lang: Lang, line: string): boolean {
   return t.startsWith("//") || t.startsWith("/*") || t.startsWith("* ") || t === "*";
 }
 
-type Classified = { kind: DefinitionKind; strong: boolean; column: number };
+type Classified = { kind: DefinitionKind; strong: boolean; column: number; name: string };
 
 /** The first rule of the file's language that takes `text` for a definition of the word, with the word's 1-based column. */
-function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
+export function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
   if (text.length > LONG_LINE || isCommentLine(lang, text)) return null;
   // A JSP scriptlet / declaration opener reads as indentation (the same width, so columns stay the line's own).
   const line = lang === "jsp" ? text.replace(/<%(?![@-])[!=]?/g, (o) => " ".repeat(o.length)).replace(/%>/g, "  ") : text;
@@ -208,6 +215,7 @@ function classify(rules: Rule[], lang: Lang, text: string): Classified | null {
       kind: typeof rule.kind === "function" ? rule.kind(m, line) : rule.kind,
       strong: typeof rule.strong === "function" ? rule.strong(m, line) : rule.strong,
       column: at + 1,
+      name: m.groups?.s ?? "",
     };
   }
   return null;
@@ -220,7 +228,7 @@ const extOf = (p: string): string => {
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : "";
 };
-const langOf = (p: string): Lang | null => LANG_BY_EXT[extOf(p)] ?? null;
+export const langOf = (p: string): Lang | null => LANG_BY_EXT[extOf(p)] ?? null;
 const dirOf = (p: string): string => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 const withoutExt = (p: string): string => p.replace(/\.d\.ts$/, "").replace(/\.[^./]+$/, "");
 
@@ -313,13 +321,15 @@ type Context = {
   wildcardDirs: string[];
   /** JSP `<%@ taglib prefix tagdir %>`: prefix → folder (no leading slash). */
   tagDirs: Map<string, string>;
+  /** The clicked file's lines (§65's receiver heuristics), empty when unreadable. */
+  lines: string[];
 };
 
 const PASCAL = (kebab: string): string => kebab.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
 
 /** What the clicked file says about where the symbol comes from — cheap: its first 2 MB, a few regexes. Never refuses. */
 function readContext(root: string, fromPath: unknown, line: unknown, q: Query): Context {
-  const ctx: Context = { path: null, lang: null, line: null, imported: [], packageDir: null, wildcardDirs: [], tagDirs: new Map() };
+  const ctx: Context = { path: null, lang: null, line: null, imported: [], packageDir: null, wildcardDirs: [], tagDirs: new Map(), lines: [] };
   const rel = typeof fromPath === "string" ? repoRelativeInside(root, fromPath) : null;
   if (rel === null) return ctx;
   ctx.path = rel;
@@ -333,6 +343,7 @@ function readContext(root: string, fromPath: unknown, line: unknown, q: Query): 
   } catch {
     return ctx;
   }
+  ctx.lines = lines;
   const ident = q.form === "fqn" ? q.word.slice(q.word.lastIndexOf(".") + 1) : q.form === "kebab" ? PASCAL(q.word) : q.form === "ident" ? q.word : null;
   const fromDir = dirOf(rel);
   const addJvmImport = (fqn: string, wildcard: boolean, alias?: string) => {
@@ -396,10 +407,10 @@ function readContext(root: string, fromPath: unknown, line: unknown, q: Query): 
 
 // ---------------------------------------------------------------- ranking
 
-const VENDOR = /(?:^|\/)(?:node_modules|bower_components|vendor|third_party|dist|build|out|target|generated|\.gradle|Pods|DerivedData)\//;
-const MINIFIED = /\.min\.(?:js|css)$/;
-const TESTISH = /(?:^|\/)(?:test|tests|__tests__|spec|androidTest|testFixtures)\/|\.(?:test|spec)\.[^/]+$|(?:Test|Tests|Spec|IT)\.(?:java|kt|swift)$|_test\.go$|(?:^|\/)test_[^/]+\.py$/;
-const TYPE_KINDS = new Set<DefinitionKind>(["class", "interface", "enum", "record", "annotation", "object", "type", "module", "component", "tag", "file"]);
+export const VENDOR = /(?:^|\/)(?:node_modules|bower_components|vendor|third_party|dist|build|out|target|generated|\.gradle|Pods|DerivedData)\//;
+export const MINIFIED = /\.min\.(?:js|css)$/;
+export const TESTISH = /(?:^|\/)(?:test|tests|__tests__|spec|androidTest|testFixtures)\/|\.(?:test|spec)\.[^/]+$|(?:Test|Tests|Spec|IT)\.(?:java|kt|swift)$|_test\.go$|(?:^|\/)test_[^/]+\.py$/;
+export const TYPE_KINDS = new Set<DefinitionKind>(["class", "interface", "enum", "record", "annotation", "object", "type", "module", "component", "tag", "file"]);
 
 type Scored = DefinitionCandidate & { strong: boolean };
 
@@ -448,7 +459,19 @@ export function navPreview(text: string, column: number): string {
 
 // ---------------------------------------------------------------- find_definition
 
-export type FindDefinitionOptions = { symbol: unknown; fromPath?: unknown; line?: unknown; timeoutMs?: number; scanMax?: number };
+export type FindDefinitionOptions = {
+  symbol: unknown;
+  fromPath?: unknown;
+  line?: unknown;
+  /** §65: the clicked column (1-based) — which occurrence on `line`, when the word is there more than once. */
+  column?: unknown;
+  /** §65: what stands before `.symbol` (`this`, `user`, `CartService`); read from `line` when absent. */
+  receiver?: unknown;
+  /** §65: the symbols of one file (the index's), for the candidates' containers; absent: §62's ranking only. */
+  symbolsOf?: (path: string) => Promise<readonly FileSymbol[] | null>;
+  timeoutMs?: number;
+  scanMax?: number;
+};
 export type FindDefinitionResult = { symbol: string; candidates: DefinitionCandidate[]; truncated: boolean; timedOut?: true };
 
 /**
@@ -519,12 +542,120 @@ export async function findDefinition(root: string, opts: FindDefinitionOptions):
   })();
   await Promise.all([byName, grepped]);
 
-  const ranked = [...found.values()]
-    .map((c) => ({ ...c, score: score(c, ctx, q) }))
-    .sort((a, b) => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || a.line - b.line);
+  const byScore = (a: Scored, b: Scored): number => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0) || a.line - b.line;
+  const ranked: Scored[] = [...found.values()].map((c) => ({ ...c, score: score(c, ctx, q) })).sort(byScore);
+  if (opts.symbolsOf && (q.form === "ident" || q.form === "fqn") && ranked.length > 0) {
+    await rankByContainer(ranked, ctx, word, opts, opts.symbolsOf);
+    ranked.sort(byScore);
+  }
   if (ranked.length > DEFINITION_MAX) truncated = true;
   const candidates = ranked.slice(0, DEFINITION_MAX).map(({ strong: _strong, ...c }) => c);
   return { symbol: q.word, candidates, truncated, ...(timedOut ? { timedOut: true as const } : {}) };
+}
+
+// ---------------------------------------------------------------- §65: the receiver's type and the candidates' containers
+
+/** At most this many candidate files are read for their containers (the best by §62's score). */
+export const CONTAINER_FILES_MAX = 40;
+const MEMBER_KINDS = new Set<DefinitionKind>(["method", "function", "field", "property", "constructor", "constant", "variable"]);
+
+/** Where the clicked member should live: a container's qualified name (the enclosing one) or a type's simple name. */
+type Target = { qname?: string; type: string; sure: boolean };
+
+/** `Type name` / `name: Type` / `name = new Type(` / `val name = Type(` in the clicked file — the nearest above `line` first. */
+export function declaredType(lines: readonly string[], name: string, line: number): string | null {
+  const n = escapeRe(name);
+  const res = [
+    new RegExp(String.raw`(?:^|[\s(,<])([A-Z][\w$]*)(?:\s*<[^;=(){}]*>)?(?:\s*\[\s*\])*\s+${n}\s*(?:[=;,):]|$)`),
+    new RegExp(String.raw`(?:^|[\s(,{])${n}\s*[?!]?\s*:\s*(?:[\w$]+\.)*([A-Z][\w$]*)`),
+    new RegExp(String.raw`\b(?:val|var|let|const)\s+${n}\s*(?::[^=]+)?=\s*(?:new\s+)?(?:[\w$]+\.)*([A-Z][\w$]*)\s*[(<{]`),
+    new RegExp(String.raw`(?:^|[\s(,])${n}\s*=\s*new\s+(?:[\w$]+\.)*([A-Z][\w$]*)\s*[(<]`),
+  ];
+  const at = Math.min(Math.max(1, line), lines.length);
+  const order = [...Array.from({ length: at }, (_, i) => at - 1 - i), ...Array.from({ length: Math.max(0, lines.length - at) }, (_, i) => at + i)];
+  for (const i of order.slice(0, 20_000)) {
+    const text = lines[i]!;
+    if (text.length > LONG_LINE || !text.includes(name)) continue;
+    for (const re of res) {
+      const m = re.exec(text);
+      if (m && !NOT_A_TYPE.has(m[1]!)) return m[1]!;
+    }
+  }
+  return null;
+}
+
+/** What the clicked `symbol` is a member of, by cheap heuristics (§65); null when nothing is known. */
+async function receiverTarget(ctx: Context, word: string, opts: FindDefinitionOptions, symbolsOf: NonNullable<FindDefinitionOptions["symbolsOf"]>): Promise<Target | null> {
+  if (ctx.path === null || ctx.line === null) return null;
+  let receiver: string | null = typeof opts.receiver === "string" && IDENT.test(opts.receiver.trim()) ? opts.receiver.trim() : null;
+  if (receiver === null) {
+    const text = ctx.lines[ctx.line - 1];
+    if (!text || text.length > LONG_LINE) return null;
+    const occ = [...text.matchAll(new RegExp(String.raw`(?<![\w$])${escapeRe(word)}(?![\w$])`, "g"))].map((m) => m.index!);
+    const column = typeof opts.column === "number" && Number.isFinite(opts.column) ? Math.floor(opts.column) : null;
+    const at = occ.length === 1 ? occ[0] : column !== null ? occ.find((i) => column >= i + 1 && column <= i + word.length + 1) : undefined;
+    if (at === undefined) return null;
+    const before = text.slice(0, at);
+    const m = /([A-Za-z_$][\w$]*)\s*(?:\?\.|!!\.|\.|::|->)\s*$/.exec(before);
+    if (m) receiver = m[1]!;
+    else if (/(?:\?\.|\.|::|->)\s*$/.test(before)) return null; // `foo().bar`, `a[0].b`: unknown
+    else receiver = "";
+  }
+  const fromSymbols = (await symbolsOf(ctx.path)) ?? [];
+  let enclosing: FileSymbol | null = null;
+  for (const s of fromSymbols) {
+    if (!TYPE_KINDS.has(s.kind) || s.endLine === undefined || s.line > ctx.line || s.endLine < ctx.line) continue;
+    if (!enclosing || s.line >= enclosing.line) enclosing = s;
+  }
+  const enclosingTarget = (): Target | null => (enclosing ? { qname: enclosing.container ? `${enclosing.container}.${enclosing.name}` : enclosing.name, type: enclosing.name, sure: true } : null);
+  if (receiver === "" || receiver === "this" || receiver === "self") return enclosingTarget();
+  if (receiver === "super") {
+    const sig = enclosing?.signature ?? "";
+    const ext = /\bextends\s+(?:[\w$]+\.)*([\w$]+)/.exec(sig) ?? /\)?\s*:\s*(?:[\w$]+\.)*([A-Z][\w$]*)\s*\(/.exec(sig);
+    return ext ? { type: ext[1]!, sure: true } : null;
+  }
+  if (/^[A-Z]/.test(receiver)) return { type: receiver, sure: true };
+  const declared = declaredType(ctx.lines, receiver, ctx.line);
+  if (declared) return { type: declared, sure: true };
+  return { type: receiver.charAt(0).toUpperCase() + receiver.slice(1), sure: false };
+}
+
+function containerFits(container: string | undefined, t: Target): boolean {
+  if (container === undefined) return false;
+  if (t.qname !== undefined) return container === t.qname;
+  const parts = container.split(".");
+  const last = parts[parts.length - 1];
+  return last === t.type || (last === "Companion" && parts[parts.length - 2] === t.type);
+}
+
+/**
+ * §65: each candidate's container from the index (the best `CONTAINER_FILES_MAX` files), and when the receiver's type is
+ * known, +90 for a member of it (+45 when only guessed from the variable's name), −30 for a member of another container —
+ * the latter only when some candidate fits.
+ */
+async function rankByContainer(ranked: Scored[], ctx: Context, word: string, opts: FindDefinitionOptions, symbolsOf: NonNullable<FindDefinitionOptions["symbolsOf"]>): Promise<void> {
+  const paths: string[] = [];
+  for (const c of ranked) {
+    if (paths.length >= CONTAINER_FILES_MAX) break;
+    if (!paths.includes(c.path)) paths.push(c.path);
+  }
+  const containers = new Map<string, string>();
+  const [target] = await Promise.all([
+    receiverTarget(ctx, word, opts, symbolsOf).catch(() => null),
+    ...paths.map(async (p) => {
+      for (const s of (await symbolsOf(p).catch(() => null)) ?? []) if (s.name === word && s.container) containers.set(`${p}\0${s.line}`, s.container);
+    }),
+  ]);
+  for (const c of ranked) {
+    const container = containers.get(`${c.path}\0${c.line}`);
+    if (container) c.container = container;
+  }
+  if (!target) return;
+  if (!ranked.some((c) => containerFits(c.container, target))) return;
+  for (const c of ranked) {
+    if (containerFits(c.container, target)) c.score += target.sure ? 90 : 45;
+    else if (c.container !== undefined && MEMBER_KINDS.has(c.kind)) c.score -= 30;
+  }
 }
 
 // ---------------------------------------------------------------- find_references

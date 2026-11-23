@@ -2,9 +2,10 @@ import SwiftUI
 import ReviewGateCore
 
 // MARK: code-browser — docs/PROTOCOL.md §47: Go to File (⌘P). The fuzzy file search of the composer's @-mentions
-// (`list_files`, §23: tracked + untracked files git does not ignore) without the folders; ↑ / ↓ move, ↩ opens the file
-// read-only in the diff pane, Esc closes. `Name.java:120` opens at line 120. Empty, it lists the files opened lately and
-// then the review's files.
+// (`list_files`, §23: tracked + untracked files git does not ignore) without the folders; ↑ / ↓ move, ↩ opens the file,
+// Esc closes. `Name.java:120` opens at line 120. Empty, it lists the files opened lately and then the review's files.
+// ide-nav (§65.4 / §65.8): `filesOnly` (the basename's camel humps rank: `UsrSvc` → UserService.java), the query's
+// letters bold in each row (Core `NavFuzzy.fileMarks`), and a changed file opens in its diff — any other read-only.
 
 struct QuickOpenSheet: View {
     @Environment(AppState.self) private var store
@@ -84,16 +85,18 @@ struct QuickOpenSheet: View {
     private func row(_ item: FileItem, isSelected: Bool) -> some View {
         let name = (item.path as NSString).lastPathComponent
         let folder = (item.path as NSString).deletingLastPathComponent
+        let marks = NavFuzzy.fileMarks(CodeBrowserText.goToFileQuery(query).name, path: item.path)
         return HStack(spacing: 8) {
             Image(systemName: "doc.text").foregroundStyle(.secondary)
-            Text(verbatim: name).fontWeight(.medium).lineLimit(1)
-            Text(verbatim: folder).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
+            Text(NavFuzzy.emphasized(name, offsets: marks.name)).lineLimit(1)
+            Text(NavFuzzy.emphasized(folder, offsets: marks.folder)).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
             Spacer(minLength: 4)
             if item.changed {
                 Text("In review")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.orange)
                     .fixedSize()
+                    .help("A changed file of the review — it opens in its diff")
             }
         }
         .padding(.vertical, 2)
@@ -121,7 +124,8 @@ struct QuickOpenSheet: View {
     }
 
     private func open(_ item: FileItem) {
-        store.openProjectFile(path: item.path, line: CodeBrowserText.goToFileQuery(query).line)
+        // §65.8: a changed file in its diff, any other read-only; Back returns to where you were.
+        store.goToFile(path: item.path, line: CodeBrowserText.goToFileQuery(query).line)
         dismiss()
     }
 }

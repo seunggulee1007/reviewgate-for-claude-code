@@ -16,6 +16,11 @@ export type DomNavTarget = {
   /** The row's line on its side (the new side's for an added / unchanged line); absent on a hunk header. */
   line?: number;
   side?: "old" | "new";
+  /** The row's `data-id` (the diff line's id): the peek band hangs under it (§65.8). */
+  rowId: number;
+  /** §65.6: the name's 1-based column in the line (UTF-16 units) and its receiver (`user` in `user.name`), when one is written. */
+  column: number;
+  receiver?: string;
   /** The name's text, for the underline. */
   range: Range;
 };
@@ -60,7 +65,7 @@ export function domTargetAtSelection(): DomNavTarget | null {
     const chosen = sel.toString().trim();
     if (isSendableSymbol(chosen) && text.contains(range.endContainer)) {
       const base = targetIn(text, start);
-      if (base) return { ...base, symbol: chosen };
+      if (base) return chosen === base.symbol ? base : { symbol: chosen, path: base.path, range: base.range, rowId: base.rowId, column: base.column, ...(base.line ? { line: base.line } : {}), ...(base.side ? { side: base.side } : {}) };
     }
   }
   return targetIn(text, start);
@@ -77,7 +82,16 @@ function targetIn(text: Element, offset: number): DomNavTarget | null {
   if (!range) return null;
   const line = Number(row.dataset["line"]);
   const side = row.dataset["side"] === "old" ? "old" : row.dataset["side"] === "new" ? "new" : undefined;
-  return { symbol: found.symbol, path, range, ...(Number.isInteger(line) && line > 0 ? { line } : {}), ...(side ? { side } : {}) };
+  return {
+    symbol: found.symbol,
+    path,
+    range,
+    rowId: Number(row.dataset["id"]),
+    column: found.start + 1,
+    ...(found.receiver ? { receiver: found.receiver } : {}),
+    ...(Number.isInteger(line) && line > 0 ? { line } : {}),
+    ...(side ? { side } : {}),
+  };
 }
 
 /** `node` + `offset` as a character offset into `root`'s text. */

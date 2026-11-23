@@ -6,7 +6,13 @@
  * file view and the project file view all call it with the line's text and the character offset.
  */
 
-export type NavSymbol = { symbol: string; start: number; end: number };
+export type NavSymbol = {
+  symbol: string;
+  start: number;
+  end: number;
+  /** §65.6: the name before `x.` / `x?.` / `x!!.` / `x::` / `x->` right in front of a plain identifier (`this`, `user`, `CartService`). */
+  receiver?: string;
+};
 
 const PATH_EXT = /\.(?:jspf?|jspx|tagx?|vue|jsx?|tsx?|mjs|cjs|html|css|scss|less|xml|json|properties|ya?ml)$/i;
 const WORD = /[A-Za-z0-9_$]/;
@@ -48,7 +54,21 @@ export function identifierAt(text: string, offset: number, path = ""): NavSymbol
   if (!/^[A-Za-z_$]/.test(word) || KEYWORDS.has(word)) return null;
 
   const qualified = qualifiedAt(text, start, end);
-  return qualified ?? { symbol: word, start, end };
+  if (qualified) return qualified;
+  const receiver = receiverBefore(text, start);
+  return receiver ? { symbol: word, start, end, receiver } : { symbol: word, start, end };
+}
+
+/**
+ * §65.6 — the receiver of the word starting at `start`: the identifier right before `.` / `?.` / `!!.` (spaces around
+ * allowed) or `::` / `->` (none: `it -> save(it)` is a lambda). Nothing after `)` / `]` (`foo().bar`: its type is not
+ * known) or a number.
+ */
+export function receiverBefore(text: string, start: number): string | undefined {
+  const m = /([A-Za-z_$][A-Za-z0-9_$]*)(?:\s*(?:\?\.|!!\.|\.)\s*|::|->)$/.exec(text.slice(0, start));
+  if (!m) return undefined;
+  const before = text[m.index - 1];
+  return before !== undefined && isWordChar(before) ? undefined : m[1];
 }
 
 function isWordChar(c: string | undefined): boolean {

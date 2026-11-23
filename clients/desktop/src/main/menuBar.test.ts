@@ -161,6 +161,31 @@ describe("the Windows menu bar (P1-chrome-09)", () => {
     settings.terminalChatPreview = false;
   });
 
+  it("§65.8 Navigate: the palettes, F4 / Shift+F4, Back / Forward shown (the renderer's keys); Rebuild Symbol Index off while it builds", async () => {
+    const withIndex = (status: string) => ({ ...state(), nav: { index: { status, files: 3, filesTotal: 9, symbols: 0, truncated: false, builtAt: null } } }) as unknown as ReviewState;
+    let items = await menu({ state: withIndex("ready"), menu: NOTHING_ENABLED });
+    const find = (label: string) => items.find((i) => i.label === label);
+    for (const [label, key] of [["Symbols in This File…", "CmdOrCtrl+F12"], ["Symbols in Project…", "CmdOrCtrl+Alt+Shift+N"], ["Next Reference", "F4"], ["Previous Reference", "Shift+F4"], ["Back", "Alt+Left"], ["Forward", "Alt+Right"]] as const) {
+      expect(find(label)?.accelerator, label).toBe(key);
+      expect(find(label)?.registerAccelerator, label).toBe(false);
+      expect(find(label)?.enabled, label).toBe(true);
+    }
+    // Go to File: Navigate shows it; File's item keeps the registered Ctrl+P
+    expect(items.filter((i) => i.label === "Go to File…").map((i) => i.registerAccelerator)).toEqual([undefined, false]);
+    sent.length = 0;
+    (find("Symbols in Project…")!.click as unknown as () => void)();
+    (find("Previous Reference")!.click as unknown as () => void)();
+    (find("Rebuild Symbol Index")!.click as unknown as () => void)();
+    expect(sent).toEqual([{ type: "nav_palette", mode: "projectSymbols" }, { type: "nav_reference", dir: -1 }, { type: "nav_rebuild_index" }]);
+
+    items = await menu({ state: withIndex("building"), menu: NOTHING_ENABLED });
+    const rebuilding = items.find((i) => i.label === "Rebuild Symbol Index — indexing…");
+    expect(rebuilding?.enabled).toBe(false);
+    expect(rebuilding?.toolTip).toBe("Indexing…");
+    items = await menu({ state: state({ project: false }), menu: null });
+    expect(items.find((i) => i.label === "Rebuild Symbol Index")?.enabled).toBe(false);
+  });
+
   it("Open Recent ends with Clear Menu; the jump list starts the app with each folder, quoted (P1-chrome-07)", async () => {
     const { jumpListItems } = await import("./menu");
     expect(jumpListItems(["C:\\Work\\acme api", "D:\\x"], "C:\\Program Files\\ReviewGate\\ReviewGate.exe")[0]).toMatchObject({ title: "acme api", args: '"C:\\Work\\acme api"', program: "C:\\Program Files\\ReviewGate\\ReviewGate.exe" });

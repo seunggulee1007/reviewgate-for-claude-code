@@ -96,6 +96,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   projectTaskStartSettings: (v) => isProjectMap(v, isTaskStartSettings),
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),
   openInIde: oneOf("vscode", "idea", "system"), // §62
+  navCtrlClick: oneOf("peek", "jump"), // §65.8
   commitPushByDefault: bool,
   commitTrailer: text(1000, { singleLine: true }),
   autoRestartSession: bool,

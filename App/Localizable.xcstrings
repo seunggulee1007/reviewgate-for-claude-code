@@ -493,6 +493,22 @@
         }
       }
     },
+    "%@'s definition under this line, without leaving it (⌥F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@'s definition under this line, without leaving it (⌥F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 정의를 이 줄 아래에 보여 줘요 — 읽던 자리는 그대로예요 (⌥F12)"
+          }
+        }
+      }
+    },
     "%@, not found": {
       "localizations": {
         "en": {
@@ -511,6 +527,22 @@
     },
     "%@:%lld": {
       "shouldTranslate": false
+    },
+    "%@:%lld — double-click to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@:%lld — double-click to open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@:%2$lld — 두 번 클릭하면 열어요"
+          }
+        }
+      }
     },
     "%lld": {
       "shouldTranslate": false
@@ -1143,6 +1175,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld개 더"
+          }
+        }
+      }
+    },
+    "%lld more — ⌥F12 shows them all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld more — ⌥F12 shows them all"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개 더 있어요 — ⌥F12 로 모두 볼 수 있어요"
           }
         }
       }
@@ -1885,6 +1933,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대량 변경은 폴더별로 접혀요"
+          }
+        }
+      }
+    },
+    "A changed file of the review — it opens in its diff": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A changed file of the review — it opens in its diff"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 중인 변경 파일이에요 — diff 로 열어요"
           }
         }
       }
@@ -5277,6 +5341,934 @@
           "stringUnit": {
             "state": "translated",
             "value": "이동하기 전 자리로 돌아가요 (⌃-)"
+          }
+        }
+      }
+    },
+    "Close the peek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the peek"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기 닫기"
+          }
+        }
+      }
+    },
+    "Close the peek (Esc)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the peek (Esc)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기 닫기 (Esc)"
+          }
+        }
+      }
+    },
+    "Definition of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definition of %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 정의"
+          }
+        }
+      }
+    },
+    "Earlier searches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier searches"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앞서 찾은 것들"
+          }
+        }
+      }
+    },
+    "Earlier searches of this window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier searches of this window"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 창에서 앞서 찾은 것들"
+          }
+        }
+      }
+    },
+    "Every line that holds this name as a whole word (⇧F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line that holds this name as a whole word (⇧F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 이름이 단어로 들어 있는 모든 줄 (⇧F12)"
+          }
+        }
+      }
+    },
+    "Find References (⇧F12) on a name lists every line that uses it here — F4 / ⇧F4 step through them, ↩ opens one.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find References (⇧F12) on a name lists every line that uses it here — F4 / ⇧F4 step through them, ↩ opens one."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름에서 참조 찾기(⇧F12)를 하면 그 이름을 쓰는 줄이 모두 여기 나와요 — F4 / ⇧F4 로 하나씩 넘기고, ↩ 로 열어요."
+          }
+        }
+      }
+    },
+    "Find a class, method or field anywhere in the project by name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find a class, method or field anywhere in the project by name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 어디에 있든 클래스·메서드·필드를 이름으로 찾아요"
+          }
+        }
+      }
+    },
+    "Finds a class, method or field by name or its camel humps (UsrSvc → UserService)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finds a class, method or field by name or its camel humps (UsrSvc → UserService)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클래스·메서드·필드를 이름이나 대문자 머리글자(UsrSvc → UserService)로 찾아요"
+          }
+        }
+      }
+    },
+    "Indexing… — it can be rebuilt once this build ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing… — it can be rebuilt once this build ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "색인 만드는 중… — 이번 작업이 끝나면 다시 만들 수 있어요"
+          }
+        }
+      }
+    },
+    "Jump there — Back (⌃-) returns here (↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jump there — Back (⌃-) returns here (↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그곳으로 가요 — 뒤로(⌃-)를 누르면 여기로 돌아와요 (↩)"
+          }
+        }
+      }
+    },
+    "Line %lld — double-click or ↩ to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %lld — double-click or ↩ to open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
+          }
+        }
+      }
+    },
+    "Next Reference": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Reference"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 참조"
+          }
+        }
+      }
+    },
+    "Next reference": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next reference"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 참조"
+          }
+        }
+      }
+    },
+    "Next reference (F4)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next reference (F4)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 참조 (F4)"
+          }
+        }
+      }
+    },
+    "No matching symbols": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching symbols"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "맞는 심볼이 없어요"
+          }
+        }
+      }
+    },
+    "No references to step through — Find References (⇧F12) on a name first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No references to step through — Find References (⇧F12) on a name first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "넘겨 볼 참조가 없어요 — 먼저 이름에서 참조 찾기(⇧F12)를 하세요"
+          }
+        }
+      }
+    },
+    "No symbols": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No symbols"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "심볼 없음"
+          }
+        }
+      }
+    },
+    "No symbols in this file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No symbols in this file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일에는 심볼이 없어요"
+          }
+        }
+      }
+    },
+    "Nothing to open — no definition was found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to open — no definition was found"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열 곳이 없어요 — 정의를 찾지 못했어요"
+          }
+        }
+      }
+    },
+    "Nothing to search again yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to search again yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 다시 찾을 게 없어요"
+          }
+        }
+      }
+    },
+    "Only the start of a long file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the start of a long file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "긴 파일이라 앞부분만 보여요"
+          }
+        }
+      }
+    },
+    "Open a project first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a project first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 프로젝트를 여세요"
+          }
+        }
+      }
+    },
+    "Open it there — Back (⌃-) returns (↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open it there — Back (⌃-) returns (↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그곳에서 열어요 — 뒤로(⌃-)로 돌아와요 (↩)"
+          }
+        }
+      }
+    },
+    "Open the next reference of the References tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the next reference of the References tab"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 탭의 다음 참조를 열어요"
+          }
+        }
+      }
+    },
+    "Open the previous reference of the References tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the previous reference of the References tab"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 탭의 이전 참조를 열어요"
+          }
+        }
+      }
+    },
+    "Opens it in the diff or the file view — one Back returns to where you were reading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens it in the diff or the file view — one Back returns to where you were reading"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "diff·파일 보기에서 열어요 — 뒤로 한 번이면 읽던 자리로 돌아와요"
+          }
+        }
+      }
+    },
+    "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭) — Mac 은 설정 › 리뷰 › Diff › 이름을 ⌘-클릭하면 이 \"정의로 이동\"일 때"
+          }
+        }
+      }
+    },
+    "Peek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기"
+          }
+        }
+      }
+    },
+    "Peek Definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek Definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의 미리 보기"
+          }
+        }
+      }
+    },
+    "Peek of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek of %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 미리 보기"
+          }
+        }
+      }
+    },
+    "Peek shows the definition in a band under the line, so the place you read stays where it is; Go to Definition jumps there (Back returns). F12 always jumps, ⌥F12 always peeks.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek shows the definition in a band under the line, so the place you read stays where it is; Go to Definition jumps there (Back returns). F12 always jumps, ⌥F12 always peeks."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기는 정의를 그 줄 아래 띠에 보여 줘요 — 읽던 자리는 그대로예요. 정의로 이동은 그곳으로 가요(뒤로로 돌아와요). F12 는 언제나 이동, ⌥F12 는 언제나 미리 보기예요."
+          }
+        }
+      }
+    },
+    "Pick a reference to see it in its lines": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a reference to see it in its lines"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조를 고르면 앞뒤 줄과 함께 보여요"
+          }
+        }
+      }
+    },
+    "Previous Reference": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Reference"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 참조"
+          }
+        }
+      }
+    },
+    "Previous reference": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous reference"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 참조"
+          }
+        }
+      }
+    },
+    "Previous reference (⇧F4)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous reference (⇧F4)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 참조 (⇧F4)"
+          }
+        }
+      }
+    },
+    "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 심볼을 위해 프로젝트의 모든 파일을 다시 읽어요 (ReviewGate 밖에서 크게 바꾼 뒤에)"
+          }
+        }
+      }
+    },
+    "Read the project's files for the index again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read the project's files for the index again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "색인을 위해 프로젝트 파일을 다시 읽어요"
+          }
+        }
+      }
+    },
+    "Reading the file…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the file…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 읽는 중…"
+          }
+        }
+      }
+    },
+    "Rebuild Symbol Index": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuild Symbol Index"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "심볼 색인 다시 만들기"
+          }
+        }
+      }
+    },
+    "References — where a name is used (⇧F12 on it); F4 / ⇧F4 step through them": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "References — where a name is used (⇧F12 on it); F4 / ⇧F4 step through them"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 — 이름이 쓰인 곳 (이름에서 ⇧F12); F4 / ⇧F4 로 하나씩 열어요"
+          }
+        }
+      }
+    },
+    "Search again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 찾기"
+          }
+        }
+      }
+    },
+    "Search again (the files may have changed)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search again (the files may have changed)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 찾기 (그사이 파일이 바뀌었을 수 있어요)"
+          }
+        }
+      }
+    },
+    "Show a file or a diff first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a file or a diff first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 파일이나 diff 를 보여 주세요"
+          }
+        }
+      }
+    },
+    "Still searching…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Still searching…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 찾는 중이에요…"
+          }
+        }
+      }
+    },
+    "Symbols in Project": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbols in Project"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 심볼"
+          }
+        }
+      }
+    },
+    "Symbols in Project…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbols in Project…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 심볼…"
+          }
+        }
+      }
+    },
+    "Symbols in This File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbols in This File"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일의 심볼"
+          }
+        }
+      }
+    },
+    "Symbols in This File…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbols in This File…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일의 심볼…"
+          }
+        }
+      }
+    },
+    "Symbols in this file, filtered as you type — the outline indented": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbols in this file, filtered as you type — the outline indented"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일의 심볼 — 입력하는 대로 걸러요, 들여쓰기는 구조 그대로"
+          }
+        }
+      }
+    },
+    "The classes, methods and fields of the file on screen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The classes, methods and fields of the file on screen"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "화면에 보이는 파일의 클래스·메서드·필드"
+          }
+        }
+      }
+    },
+    "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의를 그 줄 아래 띠에 보여 줘요 — 읽던 자리는 그대로예요. Mac 은 이름을 ⌘-클릭해도 돼요(기본값)"
+          }
+        }
+      }
+    },
+    "The definition of the name under the pointer, in a band under its line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The definition of the name under the pointer, in a band under its line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "포인터 아래 이름의 정의를 그 줄 아래 띠에 보여 줘요"
+          }
+        }
+      }
+    },
+    "The definition, at line %lld — double-click or ↩ to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The definition, at line %lld — double-click or ↩ to open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의, %lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
+          }
+        }
+      }
+    },
+    "The results fill the bottom panel's References tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The results fill the bottom panel's References tab"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "결과는 아래 패널의 참조 탭에 나와요"
+          }
+        }
+      }
+    },
+    "Type part of a name — UsrSvc finds UserService": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type part of a name — UsrSvc finds UserService"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름의 일부를 입력하세요 — UsrSvc 로 UserService 를 찾아요"
+          }
+        }
+      }
+    },
+    "Where %@ is declared (F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where %@ is declared (F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 선언된 곳으로 가요 (F12)"
+          }
+        }
+      }
+    },
+    "Your earlier searches show here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your earlier searches show here"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앞서 찾은 것들이 여기 보여요"
           }
         }
       }
@@ -14663,22 +15655,6 @@
         }
       }
     },
-    "Or ⌘-click a name (Ctrl+click on Windows)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Or ⌘-click a name (Ctrl+click on Windows)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭)"
-          }
-        }
-      }
-    },
     "Other (MCP server)": {
       "localizations": {
         "en": {
@@ -14771,6 +15747,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "출력"
+          }
+        }
+      }
+    },
+    "panel.references": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "References"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조"
           }
         }
       }
@@ -16691,22 +17683,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 세션이 메시지를 보내면"
-          }
-        }
-      }
-    },
-    "Where %@ is declared (⌘-click)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Where %@ is declared (⌘-click)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@이(가) 선언된 곳으로 가요 (⌘-클릭)"
           }
         }
       }
@@ -37685,6 +38661,22 @@
         }
       }
     },
+    "↑ ↓ to move · ↩ to open · Esc to close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ ↓ to move · ↩ to open · Esc to close"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑ ↓ 이동 · ↩ 열기 · Esc 닫기"
+          }
+        }
+      }
+    },
     "↑ ↓ to move · ↩ to open · Esc to close · Name.java:120 opens at a line": {
       "localizations": {
         "en": {
@@ -37863,6 +38855,22 @@
     },
     "−%lld": {
       "shouldTranslate": false
+    },
+    "⌘-click on a name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘-click on a name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름을 ⌘-클릭하면"
+          }
+        }
+      }
     },
     "⌘↩": {
       "localizations": {

@@ -199,8 +199,8 @@ export function App() {
             {/* MARK: task-start — §63.4: over the diff and chat area (the sidebar, menus and bottom panel stay usable) */}
             {tab !== "prs" && hasProject && <ErrorBoundary name="Start screen"><StartScreen /></ErrorBoundary>}
           </div>
-          {/* §62: Find References / Find in Project results under the panes */}
-          {hasProject && <ErrorBoundary name="References"><NavRefsPanel /></ErrorBoundary>}
+          {/* §62: Find References / Find in Project results under the panes — §65.8: elsewhere the bottom panel's References tab */}
+          {hasProject && tab === "prs" && <ErrorBoundary name="References"><NavRefsPanel /></ErrorBoundary>}
           {/* §57.17: the bottom terminal panel (PowerShell / Command Prompt) — no Claude, no preview needed */}
           {tab !== "prs" && hasProject && <ErrorBoundary name="Terminal panel"><ShellPanel /></ErrorBoundary>}
           {tab !== "prs" && hasProject && <ErrorBoundary name="Panel status bar"><PanelStatusBar /></ErrorBoundary>}{/* MARK: c-panel (§57.18) */}

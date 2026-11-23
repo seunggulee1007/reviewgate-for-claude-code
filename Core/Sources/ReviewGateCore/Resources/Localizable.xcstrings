@@ -6823,6 +6823,38 @@
         }
       }
     },
+    "Indexing…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "색인 만드는 중…"
+          }
+        }
+      }
+    },
+    "Indexing… %lld / %lld files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexing… %lld / %lld files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "색인 만드는 중… %1$lld / %2$lld 파일"
+          }
+        }
+      }
+    },
     "Log in…": {
       "localizations": {
         "en": {
@@ -7223,6 +7255,22 @@
         }
       }
     },
+    "Showing the first %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the first %lld"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처음 %lld개만 보여요"
+          }
+        }
+      }
+    },
     "Shows the first file waiting for your review": {
       "localizations": {
         "en": {
@@ -7235,6 +7283,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 기다리는 첫 파일을 보여 줘요"
+          }
+        }
+      }
+    },
+    "The project is larger than the index — some symbols are missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project is larger than the index — some symbols are missing"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트가 색인보다 커요 — 빠진 심볼이 있어요"
           }
         }
       }

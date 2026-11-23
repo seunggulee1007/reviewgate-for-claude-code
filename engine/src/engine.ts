@@ -217,6 +217,8 @@ import { remoteBranches, type BranchSwitchBlocker } from "./git/branches.js";
 import { runGit } from "./git/exec.js";
 import { readProjectFile, searchProject } from "./files/browse.js"; // MARK: code-browser (§47)
 import { findDefinition, findReferences } from "./files/navigate.js"; // MARK: code-nav (§62)
+import { SymbolIndex } from "./files/symbolIndex.js"; // MARK: ide-nav (§65)
+import { definitionPreview } from "./files/symbols.js";
 import { cleanCommitDraft, COMMIT_DRAFT_DIFF_LINES, COMMIT_DRAFT_SUBJECTS, COMMIT_DRAFT_SYSTEM, commitDraftPrompt, renderCommitTemplate } from "./review/commitDraft.js";
 import { roundPatch } from "./review/roundPatch.js";
 // MARK: wave4 w4-longwork
@@ -749,6 +751,8 @@ export class ReviewEngine {
   private readonly parkedGoing = new Map<string, Promise<void>>();
   /** `list_files` index of the open project (invalidated at turn end, refresh, rewind, branch switch). */
   private fileIndex: FileIndex | null = null;
+  /** MARK: ide-nav — §65: the open project's symbol index (built on first use; refreshed where `fileIndex` is invalidated). */
+  private symbolIndex: SymbolIndex | null = null;
   /** Turn checkpoints of the current chat (`<gitdir>/reviewgate/checkpoints/<chatId>.json`, §26). */
   private checkpoints: CheckpointFile = { version: 1, records: [] };
   /** The record of the running turn (null between turns). */
@@ -1055,6 +1059,7 @@ export class ReviewEngine {
       await this.side.stopAll().catch(() => undefined);
       for (const stop of this.setupStops) stop(); // MARK: wave3 engine-flow — §36.12: no setup outlives the engine
       this.codeGraph.stop(); // MARK: wave5 w5-graph — §43.3: nor a graphify build
+      this.symbolIndex?.stop(); // MARK: ide-nav — §65: nor a symbol index build
       this.statusLine.dispose(); // MARK: wave6 w6-statusline — §44.2: nor a status line run
       // §31 (daily-01): a review with only accepted files left is done — like close_project, it goes now instead of
       // coming back days later. Kept while a turn was running (its changes are not collected yet: the crash path).
@@ -1616,7 +1621,7 @@ export class ReviewEngine {
         return;
       // ---- §23–27
       case "list_files":
-        return this.listFiles(cmd.query, cmd.limit);
+        return this.listFiles(cmd.query, cmd.limit, cmd.filesOnly === true);
       case "attachment_get":
         return this.attachmentGet(cmd.hash);
       case "set_model":
@@ -1721,17 +1726,44 @@ export class ReviewEngine {
       case "status_line":
         return this.statusLine.request(cmd.columns, cmd.visible);
       // MARK: code-browser — §47: read-only, any file of the project
-      case "project_file":
-        return { type: "project_file", ...readProjectFile(this.requireProject().root, cmd.path) };
+      case "project_file": {
+        const file = readProjectFile(this.requireProject().root, cmd.path);
+        this.symbolIndex?.refresh([file.path]); // MARK: ide-nav — §65: a file read is a file the index re-checks
+        return { type: "project_file", ...file };
+      }
       case "project_search": {
         const found = await searchProject(this.requireProject().root, { query: cmd.query, caseSensitive: cmd.caseSensitive, wholeWord: cmd.wholeWord, limit: cmd.limit });
         return { type: "project_search", query: found.query, matches: found.matches, truncated: found.truncated, ...(found.timedOut ? { timedOut: true as const } : {}) };
       }
       // MARK: code-nav — §62: read-only, search-based
-      case "find_definition":
-        return { type: "definitions", ...(await findDefinition(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line })) };
+      case "find_definition": {
+        const root = this.requireProject().root;
+        const index = this.symbolIndex; // MARK: ide-nav — §65: containers from the index (files read on demand, never the whole build)
+        return {
+          type: "definitions",
+          ...(await findDefinition(root, {
+            symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, receiver: cmd.receiver,
+            ...(index ? { symbolsOf: (p: string) => index.fileSymbols(p) } : {}),
+          })),
+        };
+      }
       case "find_references":
         return { type: "references", ...(await findReferences(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })) };
+      // MARK: ide-nav — §65: read-only, lane "nav"
+      case "document_symbols":
+        this.requireProject();
+        return { type: "document_symbols", ...(await this.navIndex().documentSymbols(cmd.path)) };
+      case "workspace_symbols":
+        this.requireProject();
+        return { type: "workspace_symbols", ...(await this.navIndex().search(cmd.query, cmd.limit)) };
+      case "definition_preview":
+        return { type: "definition_preview", ...definitionPreview(this.requireProject().root, cmd) };
+      case "nav_index_build": {
+        this.requireProject();
+        const index = this.navIndex();
+        void index.build(cmd.full === true).catch(() => undefined);
+        return { type: "nav_index", index: index.state };
+      }
       case "task_fetch": // MARK: task-start — §63
         return { type: "task_fetched", task: await this.taskFetch(cmd.ref) };
       case "shutdown":
@@ -2395,6 +2427,8 @@ export class ReviewEngine {
     this.pruneTurnRefs();
     this.pruneRangeRefs();
     this.fileIndex = new FileIndex(() => listRepoFiles(cp));
+    this.symbolIndex?.stop(); // MARK: ide-nav — §65: idle until a query needs it
+    this.symbolIndex = new SymbolIndex({ root: cp.root, onChange: () => this.touch() });
     this.refreshPlanCandidates(); // MARK: wave4d w4d-plan (§42.1)
     if (this.gate.refNs === "main") void this.pruneWorktreeNamespaces(cp);
     this.restoreAgentHistory(); // MARK: wave4d w4d-agents2 (§42.4)
@@ -3403,7 +3437,10 @@ export class ReviewEngine {
   private async refresh(scope: RefreshScope[] | null): Promise<void> {
     const wants = (s: RefreshScope) => scope === null || scope.includes(s);
     const cp = this.gate.checkpoint;
-    if (wants("review")) this.fileIndex?.invalidate();
+    if (wants("review")) {
+      this.fileIndex?.invalidate();
+      this.symbolIndex?.refresh(); // MARK: ide-nav — §65: every file whose mtime / size changed
+    }
     if (cp && wants("review") && gatePhase(this.slices()) === "reviewing") {
       try {
         await this.followHeadMove(false);
@@ -3954,6 +3991,8 @@ export class ReviewEngine {
     this.mcpLast = [];
     this.mcpLastJson = "";
     this.fileIndex = null;
+    this.symbolIndex?.stop(); // MARK: ide-nav (§65)
+    this.symbolIndex = null;
     this.checkpoints = { version: 1, records: [] };
     this.turnRecord = null;
     this.modelChoice = {};
@@ -4611,6 +4650,8 @@ export class ReviewEngine {
       this.scheduleCollectRetry(); // M30 (§3)
     }
     this.fileIndex?.invalidate();
+    // MARK: ide-nav — §65: the review's files again (the rest at the next query's 30 s re-check)
+    this.symbolIndex?.refresh(this.gate.changedFiles.flatMap((f) => (f.oldPath ? [f.path, f.oldPath] : [f.path])));
     this.touch();
     await this.refreshBranches();
     await this.refreshWorkbenches(false);
@@ -5042,10 +5083,20 @@ export class ReviewEngine {
       throw new CommandRefused(errorMessage(e), { code: "branch_failed" });
     }
     this.fileIndex?.invalidate();
+    this.symbolIndex?.refresh(); // MARK: ide-nav (§65)
     await this.refreshBranches();
   }
 
   // ------------------------------------------------------------------ workbenches (docs/M10-WORKBENCHES.md)
+
+  /** MARK: ide-nav — §65: the open project's symbol index (`requireProject` first). */
+  private navIndex(): SymbolIndex {
+    if (!this.symbolIndex) {
+      const cp = this.requireProject();
+      this.symbolIndex = new SymbolIndex({ root: cp.root, onChange: () => this.touch() });
+    }
+    return this.symbolIndex;
+  }
 
   private requireProject(): GitCheckpoint {
     const cp = this.gate.checkpoint;
@@ -5683,14 +5734,14 @@ export class ReviewEngine {
   }
 
   /** `list_files {query, limit?}` → `files`: fuzzy matches over the repository's files + directories, review files first. */
-  private async listFiles(query: unknown, limit: unknown): Promise<FilesEvent> {
+  private async listFiles(query: unknown, limit: unknown, filesOnly = false): Promise<FilesEvent> {
     const cp = this.requireProject();
     const q = typeof query === "string" ? query.slice(0, 500) : "";
     this.fileIndex ??= new FileIndex(() => listRepoFiles(cp));
     const changed = new Set(this.gate.changedFiles.filter((f) => f.status !== "D").map((f) => f.path));
     const n = typeof limit === "number" && limit > 0 ? limit : LIST_FILES_MAX;
     try {
-      return { type: "files", query: q, items: await this.fileIndex.search(q, changed, n) };
+      return { type: "files", query: q, items: await this.fileIndex.search(q, changed, n, filesOnly) };
     } catch (e) {
       throw new CommandRefused(`list_files_failed:${firstLineOf(errorMessage(e))}`, { code: "list_files_failed" });
     }
@@ -6071,6 +6122,7 @@ export class ReviewEngine {
     } finally {
       this.gate.reverting = false;
       this.fileIndex?.invalidate();
+      this.symbolIndex?.refresh(); // MARK: ide-nav (§65)
     }
     try {
       const end = await cp.snapshot(this.settings.ignorePatterns);
@@ -9418,6 +9470,7 @@ export class ReviewEngine {
       },
       storage: { saveFailed: this.saveHealth.view, disk: this.disk ? { ...this.disk } : null }, // MARK: wave4b w4b-bigturn (§39.1)
       autoAcceptRules: this.autoAcceptRules, // MARK: wave4c w4c-trust (§41.2)
+      ...(this.project && this.symbolIndex ? { nav: { index: this.symbolIndex.state } } : {}), // MARK: ide-nav (§65)
     };
   }
 
@@ -9739,6 +9792,10 @@ function laneOf(cmd: EngineCommand): Lane {
     // MARK: code-nav — §62: a click on a name never waits behind a turn, a commit or a Find in Project.
     case "find_definition":
     case "find_references":
+    case "document_symbols": // MARK: ide-nav — §65
+    case "workspace_symbols":
+    case "definition_preview":
+    case "nav_index_build":
       return "nav";
     case "live_changes":
     case "live_diff":
@@ -9886,6 +9943,10 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "project_search":
     case "find_definition": // MARK: code-nav (§62)
     case "find_references":
+    case "document_symbols": // MARK: ide-nav (§65)
+    case "workspace_symbols":
+    case "definition_preview":
+    case "nav_index_build":
       return "git";
     default:
       return "engine";
