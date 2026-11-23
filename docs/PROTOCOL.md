@@ -153,6 +153,8 @@ type EngineCommand =
   | Cmd<"workbench_preview", { branch: string; from?: string; location?: "managed" | "sibling" }>   // → workbench_preview (§36.12)
   | Cmd<"prereview_start", { scope: "round" | "files"; paths?: string[]; effort: "low" | "medium" | "high" }>   // → prereview (§36.13)
   | Cmd<"prereview_cancel", { prereviewId: string }> | Cmd<"prereview_dismiss", { prereviewId: string; findingId: string }>
+  | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>   // → definitions: ranked candidates, ≤ 50 (§62; lane "nav")
+  | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>  // → references: whole-word hits, ≤ limit (§62; lane "nav")
   | Cmd<"shutdown">;                                       // result (if id) → dispose → in stdio mode the process exits 0
 ```
 
@@ -9912,3 +9914,131 @@ review" whatever the reason.
   and a `dirtyWorktree` footer is followed by Commit… (the commit dialog; off with `commitBeforeSwitchBlocker`'s reason).
   The PR dialog lists `defaultBranch` first (even when only the remote has it), and `prBaseBlocker` turns Create PR off
   with the reason under the fields — New Branch… beside it when the base is the branch itself.
+
+## 62. Go to definition and find references
+
+Reviewing a diff or a file of the code browser (§47), the user wants an IDE's "go to definition" (⌘-click / F12) and
+"find references" (⇧F12) on a name — in Java / Spring, Kotlin, JavaScript / TypeScript, JSP and Vue projects above all.
+There is no language server: the engine searches the project with `git grep` and recognises definition lines by per-language
+patterns, ranked by what the clicked file imports and where it lives. Fast (one `git grep`: 0.1–0.3 s for a definition and
+its references in ReviewGate's own repository), dependency-free, approximate — "best guess first, the rest in a list". Additive on the wire: two
+commands with one reply each; nothing is written.
+
+```ts
+// commands
+find_definition { symbol: string; fromPath?: string; line?: number }   → definitions   // lane "nav"
+find_references { symbol: string; fromPath?: string; limit?: number }  → references    // lane "nav"
+// replies
+type DefinitionsEvent = { type: "definitions"; id?; symbol: string; candidates: DefinitionCandidate[]; truncated: boolean; timedOut?: true };
+type DefinitionCandidate = { path: string; line: number; column: number; kind: DefinitionKind; preview: string; score: number };
+type ReferencesEvent  = { type: "references"; id?; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true };
+type ReferenceHit     = { path: string; line: number; column: number; preview: string; kind?: DefinitionKind };
+type DefinitionKind = "class" | "interface" | "enum" | "record" | "annotation" | "object" | "type" | "module"
+  | "function" | "method" | "constructor" | "field" | "property" | "variable" | "constant" | "component" | "tag" | "file";
+```
+
+- **Fields.** `path` repo-relative (as `list_files` / `project_search` / `project_file` name it), `line` and `column`
+  1-based (`column` in UTF-16 code units of the line — the symbol's first character), `preview` the line without its indent,
+  at most 200 characters around the symbol ("…" where cut). `score` only orders the candidates (higher is better; no
+  meaning across replies). `symbol` echoes the trimmed symbol. A candidate found by its **file name** (a Vue component, a
+  JSP tag file, an include path) has `line: 1, column: 1` and the file name as `preview`.
+- **`symbol`** — what the user clicked, trimmed, 1–200 characters, one of: an identifier (`[A-Za-z_$][A-Za-z0-9_$]*`:
+  `total`, `CartService`, `$store`); a qualified name `a.b.C` (searched as `C`, the file `a/b/C.*` first); a kebab-case
+  name (`my-widget`: a Vue component / tag file by name only); `prefix:name` (a JSP custom tag: `ui:panel`); a path
+  (contains `/` or ends in `.jsp .jspf .jspx .tag .tagx .vue .js .jsx .ts .tsx .mjs .cjs .html .css .scss .less .xml .json
+  .properties .yml .yaml`: a `<jsp:include page>` / `<%@ include file %>` / import target). Anything else (spaces,
+  parentheses, a newline, non-ASCII, longer than 200) is refused `bad_symbol`. Clients send the word under the cursor;
+  for an include / import string, the string's contents.
+- **`fromPath` / `line`** — the file (repo-relative) and 1-based line the user clicked in; optional hints for ranking. A
+  `fromPath` that is not a readable file inside the repository is ignored, never refused. Only its first 3 000 lines are
+  read (Java / Kotlin `package` and `import`, JSP `<%@ page import %>` and `<%@ taglib prefix tagdir %>`, JS / TS / Vue
+  `import … from` / `require()` / `export … from` lines naming the symbol, Python `from x import`).
+
+**Which files.** As `project_search` (§47): `git grep -n -z -I --untracked` over tracked files and untracked ones git does
+not ignore (binary files skipped; never `.git`, `.gitignore`d output or submodules), `--threads` = min(8, CPUs), the
+user's grep config neutralised. In a folder tracked without git (§59) the same search runs on the hidden repository.
+`find_definition` greps the symbol as a whole word, fixed string, case-sensitive (`-w -F`) only in files of the languages
+below (`*.java *.kt *.kts *.js *.jsx *.mjs *.cjs *.ts *.tsx *.mts *.cts *.vue *.jsp *.jspf *.jspx *.tag *.tagx *.tld *.swift
+*.py *.pyi *.go`) and tests every matching line against its language's patterns; file-name lookups use `git ls-files
+--cached --others --exclude-standard` with pathspecs. Lines over 2 000 characters (minified code) and comment-only lines
+(`//`, `/*`, `*`, `#` in Python, `<!--`, `<%--`) are never definitions.
+
+**Definition patterns** (the first that matches a line decides its `kind`; "loose" ones rank lower — see Ranking):
+
+| Language | Recognised |
+| --- | --- |
+| Java (`.java`) | `class / interface / enum / record X`, `@interface X`; methods (`[modifiers] [<T>] Type name(` — overloads each a candidate; a statement such as `return name(…)` is not one); constructors (`[modifiers] Name(` not ending in `;`, the name capitalised; loose without a modifier or `{`); fields (`[modifiers] Type name =` / `;` / `,`; loose without a modifier — a local); enum constants (`NAME,` / `NAME(…)`, ALL_CAPS; loose) |
+| Kotlin (`.kt .kts`) | `[enum / data / sealed / annotation / value / inline / abstract / open / inner / companion …] class / interface / object X` (`enum class` → `enum`, `object` → `object`); `fun name(`, `fun <T> name(`, extensions `fun Type.name(` / `fun List<T>.name(`; `val` / `var` (top-level, members, constructor parameters, extension properties) → `property`; `typealias X`; enum entries (loose) |
+| JS / TS (`.js .jsx .mjs .cjs .ts .tsx .mts .cts`) | `function name(` (also `async`, `function*`, `export default function name`); `const / let / var name =` (`function` when the value is an arrow / function expression, else `variable`); `class X`; TS `interface X`, `type X =`, `enum X`, `namespace / module X {`; `module.exports.name =` / `exports.name =`; methods `name(…) {` in classes / objects (`static / async / get / set / public / private / protected / readonly / override / abstract` before; a call taking a callback such as `foo(function () {` is not one); `name: function` / `name: (…) =>` / `name: async (…) =>`; class fields with a modifier; loose: TS method signatures `name(…): T;`, `name = (…) =>`, destructuring `const { name } =`, object keys / interface members `name: …` |
+| Vue (`.vue`) | the JS / TS patterns on every line — `methods` / `computed` / `watch` entries, `<script setup>` consts and functions, `defineProps({ name: … })` keys (loose `property`), `name: 'X'` → `component`. A **capitalised identifier or a kebab-case name resolves to component files**: `MyWidget` ↔ `MyWidget.vue`, `my-widget.vue`, `MyWidget/index.vue`, `my-widget/index.vue` anywhere (case-insensitive) → `component` |
+| JSP (`.jsp .jspf .jspx .tag .tagx`) | `<%! … %>` declarations and scriptlets read as Java (methods → `method`, fields → `field`) and inline `<script>` as JS; `<c:set var="x">`, `<jsp:useBean id="x">` → `variable`; in tag files `<%@ attribute name="x">` → `property`, `<%@ variable name-given="x">` → `variable`. **Includes**: a path symbol resolves relative to `fromPath`'s folder (`row.jsp` → that folder's `row.jsp`), an absolute one (`/WEB-INF/views/x.jspf`, the web root's) by its ending anywhere → `file`. **Custom tags**: `prefix:name` → `name.tag` / `name.tagx` files (`tag`; the `tagdir` of `fromPath`'s `<%@ taglib prefix>` first) and TLD `<name>name</name>` lines (`*.tld`); a plain identifier clicked in a JSP also looks for `name.tag(x)`. A Java class used in a JSP is found in the `.java` files (the page's imports rank it). |
+| Swift | `class / struct / actor / enum / protocol / typealias X` (`protocol` → `interface`; `extension X` loose), `func name(` (`method` when indented), `let / var name`, `case name` (loose) |
+| Python | `def name(` (`method` when indented), `class X`, module-level `NAME =`; loose `self.name =` |
+| Go | `func name(`, `func (r T) name(` → `method`, `type X struct / interface / …`, `var / const name`; loose `name :=` |
+
+**Ranking** (`score`; ties by path, then line). Each candidate starts at 100 for a pattern above, 40 for a loose one; +10
+when the case fits the kind (a capitalised name and a type-like kind — `class`…`module`, `component`, `tag`, `file`,
+`constructor` — or a lower-case name and a function / variable kind); then the **best** of these locality bonuses:
+the clicked file itself +50; the file `fromPath` imports the symbol from +60 (a Java / Kotlin / JSP `import a.b.C` whose
+last part is the symbol — or its alias — → `…/a/b/C.*`, a static import's class too; a JS / TS / Vue relative import
+resolved against `fromPath`'s folder, `index.*` included; an alias `@/…`, `~/…`, `@@/…` or a path-like package matched by its
+ending; a Python `from x.y import`); the taglib's `tagdir` for a custom tag +60; a Java wildcard import's package folder
++30; the same folder +25; the same Java / Kotlin package (a folder ending in the package path — `src/main` and `src/test`
+alike) +20. Further: +5 in the clicked file at or above `line` (a declaration above the click over one below it); +15 when the candidate's language family matches `fromPath`'s (JVM: Java, Kotlin, JSP, TLD; web: JS / TS,
+Vue, JSP); +80 for `a.b.C` whose file is `…/a/b/C.*`; −40 under `node_modules / bower_components / vendor / third_party /
+dist / build / out / target / generated / .gradle / Pods / DerivedData` or a `.min.js`; −20 for a test file (`test/`,
+`tests/`, `__tests__/`, `spec/`, `*.test.*`, `*.spec.*`, `*Test.java`, `*_test.go`, `test_*.py` …) unless `fromPath` is one;
+−10 for a `.d.ts`. One candidate per path:line (the stronger reading kept).
+
+**Limits.** `find_definition`: at most **50** candidates (`truncated` when there were more); it reads at most 100 000
+lines holding the word (then stops git, ranks what it read, `truncated`); after **10 s** git is stopped and what was found
+is ranked (`timedOut`). `find_references`: `git grep -n -z -I --untracked -w -F` over every text file (any language),
+case-sensitive, at most `limit` hits (default **500**, at most **2 000**; then git is stopped, `truncated`), **15 s**
+(`timedOut`). Hits are ordered: `fromPath`'s own lines first, then its folder's files, then everything else by path; line
+order within a file (one hit per line, `column` at the first whole-word occurrence). `files` counts the files among the
+hits. A hit whose line is a definition by the patterns above carries its `kind` (for an identifier symbol) — clients may
+mark it.
+
+**Refusals** (`result{ok:false, code}`): `no_project` (no project open, or a git-init prompt pending), `bad_symbol`,
+`search_failed:<git's first line>` (git missing or failing otherwise; a status of 1 — nothing found — is an empty
+answer, not a refusal). An older engine refuses both `unknown_command`: clients say to update ReviewGate.
+
+**Lanes.** Both run on a lane of their own (`nav`): never behind (or holding up) a turn, a commit, the composer's reads
+on the query lane or a Find in Project (lane `search`). Two `nav` commands run one after the other; each is bounded by its
+time budget.
+
+**Opening a result.** Every candidate / hit is a repo-relative path and line; the clients open it exactly as a Find in
+Project match: **`project_file {path}` (§47)** reads any file of the project (tracked or untracked, read-only; the reply's
+`lines` are the whole file up to 2 MB / 20 000 lines), shown in the code browser at `line` (the symbol at `column` marked).
+On the Mac that is `AppState.openProjectFile(path:line:)`; when the path is one of the review's changed files, the client
+may show it in the review's diff instead (`selectFile(path:)`, as a chat link does) — the definition line then is a new-side
+line of that diff. Nothing new is needed for this; the Windows client gets `project_file` on its allow list with this
+section.
+
+**How clients present it** (both clients):
+- **Go to Definition** (⌘-click / F12 on Mac — Ctrl+click / F12 on Windows — and "Go to Definition" in a code row's context
+  menu, on the identifier under the pointer / caret): send `find_definition {symbol, fromPath, line}` with the file and line
+  being viewed (the new side's path and line in a diff; on the old side the same path and the old line is fine — it is only
+  a hint). **One candidate → open it directly.** **Several → a peek list** (an inline popover or a small panel under the
+  line): one row per candidate — file name, folder, `line`, `kind` as a small label, `preview` with the symbol marked — the
+  first one selected, ↑ / ↓ / ↩ / Esc, a click opens. **None →** a short note "No definition found for X" with a "Find
+  References" / "Find in Project" button (the latter `project_search {query: symbol, wholeWord: true, caseSensitive: true}`).
+  `truncated` → "showing the best 50"; `timedOut` → "search stopped after 10 s".
+- **Find References** (⇧F12, the row's context menu): `find_references {symbol, fromPath}` → a list grouped by file (the
+  file's name, folder and count, then line number and `preview`, the symbol marked; a `kind` row marked as the definition),
+  in the order received; "N references in M files", "only the first 500" when `truncated`. It can share the Search sidebar
+  tab's list view (§47).
+- **History.** Back / forward (⌃- / ⌃⇧- on Mac, Alt+← / Alt+→ on Windows, and buttons on the code browser's header) is
+  client-side: each jump pushes `{path, line}` of where the user was; the engine keeps no navigation state.
+- **Approximate by design.** Name the feature's limits in the UI's tooltip or empty state ("search-based: may list
+  look-alikes"); a newer request's reply replaces an older one's (match on `id`).
+
+- **Security.** Reads only, inside the repository: git runs without a shell, the symbol as one `-e` argument (a fixed
+  string), pathspecs built from validated characters only; `fromPath` goes through `repoRelativeInside` (§23) and
+  `project_file`'s checks (no `..`, no symlink out, nothing under `.git`, no FIFO / device). Nothing leaves the machine.
+- **Not in this pass.** Real type resolution (overloads by argument types, inheritance, `this.x` vs a local), cross-language
+  bindings beyond the rules above (Spring bean names, MyBatis mapper XML ↔ interface), non-ASCII identifiers, a persisted
+  index, the Mac and Windows UI.
+- Owner: code-nav (engine `files/navigate.ts`, `engine.ts`, `protocol.ts`; Windows `clients/desktop/src/main/ipcGuard.ts`).
+  Tests: `engine/test/engine.navigate.test.ts` (per-language fixtures, ranking, references, §59 shadow mode, refusals, the
+  lane), `clients/desktop/src/main/ipcGuard.test.ts`.
