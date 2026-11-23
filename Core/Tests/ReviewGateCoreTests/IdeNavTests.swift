@@ -201,7 +201,8 @@ import Testing
         store.pointer(key("b"), receiver: nil, using: request)
         store.pointer(key("c"), receiver: "repo", using: request)
         store.pointer(key("c"), receiver: "repo", using: request)
-        try await Task.sleep(for: .milliseconds(250))
+        // Waits for the card rather than a fixed time: the suites run in parallel and the main actor may be busy.
+        for _ in 0..<300 where store.card == nil { try await Task.sleep(for: .milliseconds(10)) }
         #expect(asked == [.findDefinition(symbol: "c", fromPath: "A.kt", line: 3, column: 5, receiver: "repo"),
                           .definitionPreview(path: "a/c.kt", line: 4, after: CodeNavHoverStore.lines)])
         #expect(store.card?.key == key("c") && store.card?.others == 1)
@@ -211,7 +212,7 @@ import Testing
         // Moving away before the rest is over asks nothing.
         store.pointer(key("d"), receiver: nil, using: request)
         store.pointer(nil, receiver: nil, using: request)
-        try await Task.sleep(for: .milliseconds(120))
+        try await Task.sleep(for: .milliseconds(200))
         #expect(asked.count == 2 && store.card == nil)
     }
 
