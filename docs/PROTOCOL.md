@@ -9619,6 +9619,18 @@ type ClientCapabilities = {
   as their paths (`webUtils.getPathForFile`), each in double quotes when it holds a space or a cmd character, as Windows
   Terminal writes them (POSIX backslashes on macOS / Linux); review-list rows (`application/x-reviewgate-paths`) as
   `@path` — one bracketed paste, never Enter, the refusal as the paste's toast.
+- **The edge tab** (`TerminalSplit.tsx` `ReviewEdgeTab`, as the Mac §57.5): it reads "리뷰" with a badge of the files
+  waiting for a verdict (none when nothing waits); its accessible name is "리뷰 패널 열기 · 대기 N개" / "리뷰 패널 닫기 · 대기
+  N개", its tooltip adds where the panel opens and Ctrl+Shift+D.
+- **The file list steps aside** (as the Mac §57.5, `terminalLayout.ts` `reviewHidesSidebar`): while the open review panel
+  would be a drawer beside the file list, the sidebar hides — side by side where that makes room, else a wider drawer — and
+  comes back when the panel closes or fits beside it, or the terminal split goes (a chat-kind chat on screen); shown again
+  by the user it stays until the panel closes. The edge tab's right-click "리뷰하는 동안 사이드바 숨기기" turns it off (per
+  user, `localStorage` `rg.terminalReviewHidesSidebar`, default on).
+- **The drawer and the keyboard** (as the Mac §57.5): the drawer the user opens (Ctrl+Shift+D, the edge tab — the store's
+  `diffToggleSeq`) takes the keyboard: ↑ / ↓ scroll its diff, Ctrl+Enter clicks its Accept (the same reasons keep it off),
+  Esc closes it. One that opens by itself for a review leaves the keyboard in the terminal; closing the drawer that held it
+  gives it back to the terminal. The Windows diff header keeps its two rows in the drawer (it has no "⋯" menu yet).
 
 ## 58. Accept N & Continue
 

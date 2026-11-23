@@ -423,6 +423,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   cachedCapabilities: SessionCapabilities | null;
   tab: Tab;
   sidebarVisible: boolean;
+  /** §57.5: bumped by each ⌘⇧D / edge-tab toggle — the user's own, so a terminal chat's drawer it opens takes the keyboard. */
+  diffToggleSeq: number;
   dialog: Dialog | null;
   /** The folder whose `open_project` was refused with `locked_by_other_session` (drives the takeover dialog). */
   lockedProjectPath: string | null;
@@ -1217,6 +1219,7 @@ export const useStore = create<Store>((set, get, api) => {
     cachedCapabilities: null,
     tab: "changes",
     sidebarVisible: true,
+    diffToggleSeq: 0,
     dialog: null,
     lockedProjectPath: null,
     openingPath: null,
@@ -2373,6 +2376,7 @@ export const useStore = create<Store>((set, get, api) => {
     },
     toggleDiffPane(collapsedNow) {
       const { state, ui, selectedPath } = get();
+      set((s) => ({ diffToggleSeq: s.diffToggleSeq + 1 }));
       get().setUI({ diffCollapsed: !(collapsedNow ?? isDiffCollapsed(state, ui, selectedPath)) });
     },
     openDialog(d) {
