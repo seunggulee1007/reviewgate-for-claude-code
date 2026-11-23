@@ -49,9 +49,11 @@ ReviewGate는 턴과 턴 사이에 관문을 두는 macOS 앱입니다. Claude�
 **안전장치.** 프로젝트 밖 수정은 먼저 묻고, `.git/` 쓰기는 거부하며, 권한 요청은 터미널 프롬프트 대신 앱 안의 카드로
 뜹니다. 임시 폴더의 버리는 파일은 조용히 통과합니다.
 
-**리뷰하면서 코드 탐색.** diff나 파일에서 이름을 ⌘-클릭하면 정의로 이동합니다 — Java, Kotlin, JavaScript·TypeScript,
-Vue, JSP를 먼저 챙겼습니다. 참조를 모아 보고, 뒤로·앞으로 오가고, 그 줄을 IntelliJ IDEA·VS Code·Xcode에서 엽니다.
-검색으로 찾기 때문에 따로 설정할 language server가 없습니다.
+**리뷰하면서 코드 탐색.** diff나 파일에서 이름을 ⌘-클릭하면 정의를 그 줄 아래 띠로 미리 봅니다 — 읽던 자리는 그대로이고,
+F12 는 그곳으로 이동합니다. ⌘ 를 누른 채 이름 위에 두면 시그니처가 뜹니다. Java, Kotlin, JavaScript·TypeScript, Vue,
+JSP를 먼저 챙겼습니다. 참조는 아래 패널의 참조 탭에 모이고(F4 로 하나씩), 파일로 이동(⌘P)·이 파일의 심볼(⌘F12)·
+프로젝트 심볼(⌥⌘⇧N)로 찾고, 뒤로·앞으로 오가고, 그 줄을 IntelliJ IDEA·VS Code·Xcode에서 엽니다. 검색과 메모리 속
+심볼 색인으로 찾기 때문에 따로 설정할 language server가 없습니다.
 
 **에디터처럼 아래쪽 패널.** diff와 채팅 아래에 프로젝트 폴더의 셸 탭(⌃`), ReviewGate 로그와 Claude가 실행한 Bash
 명령·출력을 모아 보는 출력 탭, 프로젝트 명령을 돌리는 실행 탭이 있습니다. package.json과 빌드 wrapper에서 찾은
