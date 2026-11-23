@@ -82,13 +82,42 @@ export function stripStatus(i: StripInput): StripStatus {
 /** How long a running turn may go without a change in the live terminal chat before "Review now" shows. */
 export const REVIEW_NOW_IDLE_MS = 60_000;
 
+/** §57.4: after an Esc the window saw, how long it waits for a hook before offering "Review now". */
+export const ESCAPE_GRACE_MS = 2000;
+
+/** §57.4: an Esc the user pressed in the live terminal chat while its turn ran, and the engine's `hookCount` then. */
+export type EscapeMark = { atMs: number; hookCount: number };
+
 /**
- * "Review now": a tool call ended by Esc (Claude Code sends no end of turn then), or the turn has run 60 s with nothing
- * changing in the live terminal chat (`terminalActivityKey`). Only while a turn runs in a running terminal.
+ * §57.4: `data` (what xterm sends to the PTY) is the Esc key alone — a lone ESC, or its kitty form (`CSI 27 u`). Alt+key
+ * comes as one write (ESC and the key together), so a lone ESC is never a Meta prefix here.
  */
-export function showsReviewNow(i: { working: boolean; info: TerminalSessionState | null | undefined; lastActivityMs: number; nowMs: number }): boolean {
+export function isEscapeKey(data: string): boolean {
+  return data === "\x1b" || data === "\x1b[27u" || data === "\x1b[27;1u" || data === "\x1b[27;1:1u";
+}
+
+/** §57.4: an Esc counts only while a turn runs in a running terminal (between turns it closes a TUI menu: nothing). */
+export function escapeMark(i: { working: boolean; info: TerminalSessionState | null | undefined; nowMs: number }): EscapeMark | null {
+  if (!i.working || !i.info?.running) return null;
+  return { atMs: i.nowMs, hookCount: i.info.hookCount ?? 0 };
+}
+
+/**
+ * "Review now": a tool call ended by Esc (Claude Code sends no end of turn then), Esc pressed in the terminal 2 s ago with
+ * no hook since (`hookCount` unchanged), or the turn has run 60 s with nothing changing in the live terminal chat
+ * (`terminalActivityKey`). Only while a turn runs in a running terminal.
+ */
+export function showsReviewNow(i: {
+  working: boolean;
+  info: TerminalSessionState | null | undefined;
+  lastActivityMs: number;
+  nowMs: number;
+  escape?: EscapeMark | null;
+}): boolean {
   if (!i.working || !i.info?.running) return false;
-  return i.info.interruptSuspected || i.nowMs - i.lastActivityMs >= REVIEW_NOW_IDLE_MS;
+  if (i.info.interruptSuspected || i.nowMs - i.lastActivityMs >= REVIEW_NOW_IDLE_MS) return true;
+  const e = i.escape;
+  return !!e && (i.info.hookCount ?? 0) === e.hookCount && i.nowMs - e.atMs >= ESCAPE_GRACE_MS;
 }
 
 /** What counts as activity of the live terminal chat (the Mac's rule — the app has no per-hook timestamp): the state's seq, its terminal state, the gate's phase. */

@@ -14,6 +14,7 @@
 import type { ITerminalAddon, ITerminalOptions, Terminal } from "@xterm/xterm";
 import type { PtyBridge, PtyExit, ShellKind } from "../../shared/ipc";
 import { sanitizePaste } from "../terminalPaste";
+import { isEscapeKey } from "../terminalStrip";
 import { ackStep, isOpenableLink, steppedFontSize, terminalOptions, terminalTheme, usesWebgl, type TermOptionsInput } from "./termHostOptions";
 import { terminalKeyAction, xtermHandles } from "./terminalKeys";
 
@@ -60,6 +61,8 @@ type Entry = {
 
 const entries = new Map<string, Entry>();
 const listeners = new Set<() => void>();
+/** §57.4: told when the user presses Esc in a terminal (the terminal chat's "Review now" rule). */
+const escapeListeners = new Set<(ptyId: string) => void>();
 /** Output / exits for a ptyId the registry does not know yet (the open reply can come after its first bytes). */
 const early = new Map<string, { data: string[]; size: number; exit: PtyExit | null }>();
 const EARLY_LIMIT = 1 << 20;
@@ -237,7 +240,10 @@ async function start(e: Entry): Promise<void> {
   term.loadAddon(e.fit);
   m.addons(term, { openLink: (uri) => isOpenableLink(uri) && deps.openLink(uri), copy: (text) => deps.copy(text) });
   term.attachCustomKeyEventHandler((ev) => onKey(e, ev));
-  term.onData((data) => bridge?.input(e.ptyId, data));
+  term.onData((data) => {
+    if (isEscapeKey(data)) for (const l of escapeListeners) l(e.ptyId);
+    bridge?.input(e.ptyId, data);
+  });
   term.onBinary((data) => bridge?.input(e.ptyId, data));
   term.open(e.host);
   watchFocus(e);
@@ -476,6 +482,14 @@ export function terminalHasFocus(ptyId?: string): boolean {
   if (ptyId === undefined) return active.closest?.(".xterm") != null;
   const e = entries.get(ptyId);
   return !!e && e.host.contains(active);
+}
+
+/** §57.4: `listener` hears each Esc the user presses in a terminal (its PTY id); returns the unsubscribe. */
+export function onTerminalEscape(listener: (ptyId: string) => void): () => void {
+  escapeListeners.add(listener);
+  return () => {
+    escapeListeners.delete(listener);
+  };
 }
 
 /** Bytes typed for the user (Stop's Esc). */

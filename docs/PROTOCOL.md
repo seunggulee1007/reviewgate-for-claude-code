@@ -9606,6 +9606,9 @@ type ClientCapabilities = {
   panel; hiding it or switching tabs never ends a shell. Ctrl+` (the physical Backquote key, also from inside a
   terminal): hidden → shown and focused (a first tab of Settings' default shell if none); shown and focused → hidden, the
   keyboard back to the chat's terminal or message box; shown elsewhere → focused.
+- **The strip's terminal-friction rules** (as the Mac, `TerminalChatColumn.tsx`). *Review now* also 2 s after an Esc the
+  user pressed in the terminal while the turn ran and no hook since (`terminalStrip.ts` `isEscapeKey` / `escapeMark` /
+  `showsReviewNow`; xterm sends Alt+key in one write, so a lone `ESC` is always the key; Ctrl+.'s Esc is not counted).
 
 ## 58. Accept N & Continue
 

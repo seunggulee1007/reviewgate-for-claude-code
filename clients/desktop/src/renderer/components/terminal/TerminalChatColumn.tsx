@@ -9,9 +9,9 @@ import { t, usesMacKeys } from "../../i18n";
 import { Icon } from "../../icons";
 import { isEnter } from "../../ime";
 import { useStore } from "../../store";
-import { showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal } from "../../terminalStrip";
+import { escapeMark, showsReviewNow, stripStatus, terminalActivityKey, terminalOverlay, terminalStartRefusal, type EscapeMark } from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
-import { clearTerminalFind, findInTerminal, focusTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
 import { useViewing } from "../../viewedChat";
 import { ViewingChatBar } from "../chat/ViewingChat";
 import { engineRequest, refusalOf } from "../../engineRequest";
@@ -54,14 +54,31 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
   const info = state.session.terminal ?? null;
   const working = state.gate.phase === "running";
   const status = terminalStatus(props.ptyId);
-  const now = useNow(5000);
+  // Each second: "Review now" shows 2 s after an Esc with no hook since (§57.4).
+  const now = useNow(1000);
+  // §57.4: the Esc pressed here while the turn ran (with the engine's hookCount then); the turn's end clears it.
+  const [escape, setEscape] = useState<EscapeMark | null>(null);
+  const latest = useRef({ working, info });
+  latest.current = { working, info };
+  useEffect(
+    () =>
+      onTerminalEscape((ptyId) => {
+        if (ptyId !== props.ptyId) return;
+        const mark = escapeMark({ ...latest.current, nowMs: Date.now() });
+        if (mark) setEscape(mark);
+      }),
+    [props.ptyId],
+  );
+  useEffect(() => {
+    if (!working) setEscape(null);
+  }, [working]);
   // "Review now" after 60 s without a change in the live terminal chat (the Mac's rule: no per-hook timestamp).
   const activity = useRef({ key: "", at: Date.now() });
   const key = terminalActivityKey(state);
   if (activity.current.key !== key) activity.current = { key, at: Date.now() };
   const disconnected = status.running && info?.running !== true && props.startedAt > 0 && now - props.startedAt >= DISCONNECT_GRACE_MS;
   const strip = stripStatus({ disconnected, info, working });
-  const reviewNow = showsReviewNow({ working, info, lastActivityMs: activity.current.at, nowMs: now });
+  const reviewNow = showsReviewNow({ working, info, lastActivityMs: activity.current.at, nowMs: now, escape });
   const overlay = terminalOverlay({ exit: status.running ? null : status.exit, failed: props.failed, disconnected });
   const [finding, setFinding] = useState(false);
   const redraw = usesMacKeys() ? t("Stale lines on the screen? ⌃L redraws it") : t("Stale lines on the screen? Ctrl+L redraws it");
