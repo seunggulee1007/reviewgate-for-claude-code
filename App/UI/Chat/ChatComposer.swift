@@ -1421,7 +1421,7 @@ struct ChatComposer: View {
 
 /// Sending answers a question; it never accepts. Say so, so nobody sends to "get past" the review — and (wave2 mac-flow,
 /// comp-04) that Claude's next changes join this review rather than a review of their own. r1-composer M11: one line
-/// ("검토 대기 N개 · 질문은 수락 없이 가능") with the explanation in its ⓘ popover — it took five lines of a narrow chat.
+/// ("리뷰 대기 N개 · 질문은 수락 없이 가능") with the explanation in its ⓘ popover — it took five lines of a narrow chat.
 private struct PendingReviewNotice: View {
     @Environment(\.colorScheme) private var colorScheme
     let count: Int

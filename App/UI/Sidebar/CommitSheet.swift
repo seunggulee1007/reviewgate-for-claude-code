@@ -49,7 +49,7 @@ func commitWebURL(remote: String?, sha: String, ghHost: String) -> URL? {
 /// "Push to origin" → `commit{message, paths, push}`. The result lands in the Changes banner (`state.commit.lastCommit`).
 /// §53: "나눠서 커밋" turns the ticked files into several commits, down to hunks (`CommitSplitPanel`).
 /// r2-review-flow M28: pending files are listed too (after the accepted ones) — ticked, they are accepted as the commit goes
-/// ("검토 완료로 표시하고 커밋", one action instead of accept → sheet → commit); "push after commit" is kept per project.
+/// ("리뷰 끝냄으로 표시하고 커밋", one action instead of accept → sheet → commit); "push after commit" is kept per project.
 struct CommitSheet: View {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model

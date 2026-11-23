@@ -1244,7 +1244,7 @@ path re-used).
 rode along. It now runs `git commit --only -- <paths>` (renames: both paths; deletions: the removed path), which commits
 just those paths on top of HEAD and leaves the rest of the user's index as it was. No wire change.
 M28 (clients): the commit sheet lists the pending files after the accepted ones; a ticked pending file is accepted first
-(`accept {paths}`, awaited) and then committed with the rest — "검토 완료로 표시하고 커밋", one action instead of accept → sheet →
+(`accept {paths}`, awaited) and then committed with the rest — "리뷰 끝냄으로 표시하고 커밋", one action instead of accept → sheet →
 commit. With no accepted file every pending one is ticked. "Push after commit" is kept per project (the global default until
 the user chose). Still accepted paths only on the wire: `commit` refuses anything else `nothing_to_commit`.
 
@@ -7421,7 +7421,7 @@ lists the lines and exits 1 (a BLANK beside Claude's question had passed unnotic
   - 변경 요청 (N) shows only with notes to send (`AppState.showsRequestChanges`; it can do nothing without);
   - beside the diff, the chat keeps 380 pt as long as the diff keeps 240 (the split's minimums are 420 / 380; below that
     they share the room in proportion as before — Core `PaneSplit.leadingWidth`);
-  - the pending-review notice is one line, "검토 대기 N개 · 질문은 수락 없이 가능 ⓘ" (it took five lines of a narrow
+  - the pending-review notice is one line, "리뷰 대기 N개 · 질문은 수락 없이 가능 ⓘ" (it took five lines of a narrow
     chat); its ⓘ popover says that sending never accepts or rejects a file and that Claude's new changes join this review.
   Mac: `ChatComposer` measures the row (its width, the secondary controls at their own width in a hidden copy that takes no
   key, Stop and the send button) and draws the full or the folded controls; `SplitPane(leadingFloor:)`. The layout check

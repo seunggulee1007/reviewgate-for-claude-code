@@ -222,7 +222,7 @@ struct ChangedFilesList: View {
                     .accessibilityIdentifier("Accept all")
                 Spacer(minLength: 4)
                 // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
-                // r2-review-flow M28: the sheet takes pending files too ("검토 완료로 표시하고 커밋").
+                // r2-review-flow M28: the sheet takes pending files too ("리뷰 끝냄으로 표시하고 커밋").
                 Button(accepted > 0 ? String(localized: "Commit (\(accepted))…") : String(localized: "Commit…"), systemImage: "checkmark.seal") { model.showCommit = true }
                     .labelStyle(.titleOnly)
                     .controlSize(.small)

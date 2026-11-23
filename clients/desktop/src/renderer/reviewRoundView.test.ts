@@ -161,7 +161,7 @@ describe("review round 2 on screen (wave2 desktop-flow)", () => {
     useStore.setState({ viewedPaths: { "a.ts": "a1", "b.ts": "b1" }, dialog: { kind: "acceptAll" } });
     const { Dialogs } = await import("./components/dialogs/Dialogs");
     const html = render(Dialogs);
-    expect(html).toContain("아직 확인하지 않은 파일 1개.");
+    expect(html).toContain("아직 안 본 파일 1개.");
     expect(html).toContain('data-testid="Accept all changed since viewed">본 뒤 바뀜 1개');
     expect(html).toContain("Claude가 아직 작업 중이에요: 이번 턴이 다시 바꾼 파일은 대기로 돌아와요(수락 뒤 바뀜).");
   });

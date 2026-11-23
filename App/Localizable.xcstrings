@@ -1194,7 +1194,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "검토 대기 %lld개 · 질문은 수락 없이 가능"
+            "value": "리뷰 대기 %lld개 · 질문은 수락 없이 가능"
           }
         }
       }
@@ -1561,7 +1561,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld/%2$lld 확인"
+            "value": "%1$lld/%2$lld 봤음"
           }
         }
       }
@@ -8770,7 +8770,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "커밋 — 체크한 파일은 검토 완료로 표시하고 커밋해요 (⌘⇧K)"
+            "value": "커밋 — 체크한 파일은 리뷰 끝냄으로 표시하고 커밋해요 (⌘⇧K)"
           }
         }
       }
@@ -8818,7 +8818,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@에 체크한 파일을 커밋해요. 대기 중인 파일을 체크하면 먼저 검토 완료(수락)로 표시해요. 거절한 파일은 그대로 둬요."
+            "value": "%@에 체크한 파일을 커밋해요. 대기 중인 파일을 체크하면 먼저 리뷰 끝냄(수락)으로 표시해요. 거절한 파일은 그대로 둬요."
           }
         }
       }
@@ -16491,7 +16491,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "검토 완료로 표시하고 커밋"
+            "value": "리뷰 끝냄으로 표시하고 커밋"
           }
         }
       }
@@ -16507,7 +16507,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "검토 완료로 표시하고 커밋·푸시"
+            "value": "리뷰 끝냄으로 표시하고 커밋·푸시"
           }
         }
       }
@@ -18865,7 +18865,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아직 검토하지 않았어요 — 커밋하면 먼저 검토 완료(수락)로 표시해요"
+            "value": "아직 리뷰하지 않았어요 — 커밋하면 먼저 리뷰 끝냄(수락)으로 표시해요"
           }
         }
       }
@@ -18897,7 +18897,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "미확인"
+            "value": "안 봤음"
           }
         }
       }
@@ -18929,7 +18929,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "아직 확인 안 함"
+            "value": "아직 안 봤음"
           }
         }
       }
@@ -31665,7 +31665,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "확인함"
+            "value": "봤음"
           }
         }
       }
@@ -33843,7 +33843,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 파일을 다시 검토 대기로 돌려요 (디스크의 파일은 바뀌지 않아요)"
+            "value": "이 파일을 다시 리뷰 대기로 돌려요 (디스크의 파일은 바뀌지 않아요)"
           }
         }
       }
@@ -34079,7 +34079,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "확인 안 한 파일부터 보기"
+            "value": "안 본 파일부터 보기"
           }
         }
       }
@@ -35615,7 +35615,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld/%2$lld 확인 · 대기 %3$lld개"
+            "value": "%1$lld/%2$lld 봤음 · 대기 %3$lld개"
           }
         }
       }

@@ -21,7 +21,7 @@ import { commitListed, commitPushFor, commitToAccept, setCommitPushFor } from ".
 
 /**
  * MARK: r2-review-flow — M28: the pending files are listed after the accepted ones — ticked, they are accepted as the commit goes
- * ("검토 완료로 표시하고 커밋", one action instead of accept → dialog → commit); with nothing accepted every pending file is
+ * ("리뷰 끝냄으로 표시하고 커밋", one action instead of accept → dialog → commit); with nothing accepted every pending file is
  * ticked. "Push after commit" is kept per project.
  */
 export function CommitDialog({ onClose }: { onClose: () => void }) {

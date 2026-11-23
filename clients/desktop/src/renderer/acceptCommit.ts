@@ -1,6 +1,6 @@
 /**
  * MARK: r2-review-flow — M28: "Accept all" applies at once with an undo toast — the summary dialog only for files not looked at or sensitive;
- * the commit dialog takes pending files too ("검토 완료로 표시하고 커밋"); "push after commit" is kept per project (the Mac's
+ * the commit dialog takes pending files too ("리뷰 끝냄으로 표시하고 커밋"); "push after commit" is kept per project (the Mac's
  * Core ReviewFlow+Accept.swift).
  */
 import type { ChangedFileState } from "@reviewgate/engine";
@@ -23,7 +23,7 @@ export function commitListed(committable: readonly string[], files: readonly Com
   return [...committable, ...pending.filter((p) => !committable.includes(p))];
 }
 
-/** The ticked files still pending: accepted first by "검토 완료로 표시하고 커밋" (accepting writes nothing). */
+/** The ticked files still pending: accepted first by "리뷰 끝냄으로 표시하고 커밋" (accepting writes nothing). */
 export function commitToAccept(ticked: ReadonlySet<string>, files: readonly CommitFile[]): string[] {
   return files.filter((f) => f.state === "pending" && ticked.has(f.path) && f.ignored !== true && f.tooLarge !== true).map((f) => f.path);
 }

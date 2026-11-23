@@ -9,6 +9,8 @@ Mac(App/·Core 의 Localizable.xcstrings)과 Electron(ko.extra.json → gen-i18n
 |---|---|---|
 | Review | 리뷰 | 파일 리뷰 전체. "검토"는 쓰지 않는다. 그냥 "살펴보다"는 "확인" |
 | Pending (review) | 리뷰 대기 / 대기 | 아직 판정하지 않은 파일 |
+| Finish review · Mark reviewed | 리뷰 끝내기 · 리뷰 끝냄 | "리뷰 끝냄으로 표시하고 커밋". "검토 완료"는 쓰지 않는다 |
+| Viewed | 봤음 / 안 봤음 | diff를 열어 본 파일(§34.5). 개수는 "0/2 봤음", 그 뒤 바뀐 파일은 "본 뒤 바뀜". "확인"은 쓰지 않는다 |
 | Accept | 수락 | 리뷰 판정. 디스크는 그대로. "승인"은 쓰지 않는다 |
 | Reject | 거절 | 리뷰 판정. 파일을 턴 시작 상태로 되돌린다. "되돌리기"라고 하지 않는다 |
 | Revert (part / hunk) | 되돌리기 · 부분 되돌리기 | 디스크의 파일(일부)을 되돌림 |
