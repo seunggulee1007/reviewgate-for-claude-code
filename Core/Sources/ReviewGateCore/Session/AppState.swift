@@ -431,6 +431,9 @@ public final class AppState {
     public let scriptPath: String
 
     private var selectedPathValue: String?
+    /// The user cleared the list's selection: the diff pane stays empty (`selectFirstPendingIfNoneSelected`) until a file is
+    /// selected again or a new review comes.
+    var selectionClearedByUser = false
     /// The file the last accept was for — ⌘⇧A has moved the selection on, so Review › Undo Accept finds it here. Cleared by
     /// undoing that accept and with a new review.
     public internal(set) var lastAcceptedPath: String?
@@ -595,6 +598,7 @@ public final class AppState {
         set {
             codeBrowser.close()   // MARK: code-browser (§47): a file picked in the list shows its diff, not the open project file
             selectFile(changedFiles.first { $0.path == newValue })
+            if newValue == nil { selectionClearedByUser = true }
         }
     }
 
@@ -1332,6 +1336,7 @@ public final class AppState {
         diffLoadTask = nil
         if hunkRefusal?.path != file?.path { hunkRefusal = nil }
         selectedPathValue = file?.path
+        if file != nil { selectionClearedByUser = false }
         selectedDiff = nil
         selectedDiffEndTree = nil
         selectedDiffTruncated = false
