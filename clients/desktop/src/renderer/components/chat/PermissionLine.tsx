@@ -4,7 +4,7 @@
  * and a click brings the card into view. Five answered cards no longer push Claude's report out of a 637 px window, and an
  * open card is never pushed below the window's edge by the conversation.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ChatItem } from "../../store";
 import { useStore } from "../../store";
 import { t } from "../../i18n";
@@ -12,6 +12,7 @@ import { isPermissionPending, pendingPermissionsOf, reasonView } from "../../per
 import { permissionLineHelp, permissionLineStatus, permissionLineText } from "../../permissionLine";
 import { useViewing } from "../../viewedChat";
 import { PermissionCard } from "./PermissionCard";
+import { handledDetail, handledSummary, type HandledRun } from "../../handledCards";
 
 type PermissionItem = Extract<ChatItem, { kind: "permission" }>;
 
@@ -49,6 +50,36 @@ export function PermissionLine({ item }: { item: PermissionItem }) {
         <span className="pl-chev" aria-hidden="true">{open ? "↓" : expanded ? "▴" : "▾"}</span>
       </button>
       {expanded && !open && <PermissionCard request={item.request} decision={item.allowed} />}
+    </div>
+  );
+}
+
+/**
+ * §56.6: decided cards one after another as one quiet line — "권한 3건 처리됨 · 허용 2 · 거부 1" — that opens to their lines
+ * (each still opens to its card).
+ */
+export function HandledCardsRow<E>({ run, children }: { run: HandledRun<E>; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const summary = handledSummary(run.counts);
+  const detail = handledDetail(run.counts);
+  return (
+    <div className={`handled-run ${open ? "open" : ""}`} data-testid="Handled cards">
+      <button
+        type="button"
+        className="plain handled-head"
+        aria-expanded={open}
+        aria-label={detail ? `${summary} · ${detail}` : summary}
+        title={open ? t("Fold the decided cards into one line") : t("Show each decided card")}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="chev" aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <span className="pl-icon" aria-hidden="true">✓</span>
+        <span className="truncate">
+          {summary}
+          {detail && <span className="faint"> · {detail}</span>}
+        </span>
+      </button>
+      {open && <div className="handled-body">{children}</div>}
     </div>
   );
 }

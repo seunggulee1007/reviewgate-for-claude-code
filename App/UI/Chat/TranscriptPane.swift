@@ -21,6 +21,8 @@ final class TranscriptViewState {
     var planRowExpansion: [UUID: Bool] = [:]
     /// r2-review-flow M27: decided permission cards the user opened from their one-line row (by request id).
     var permissionExpansion: [String: Bool] = [:]
+    /// §56.6: runs of decided cards the user opened / closed (by the run's first row); others stay one line.
+    var handledExpansion: [UUID: Bool] = [:]
     /// The tool row "Why it changed" just revealed; highlighted briefly.
     var flashToolUseId: String?
     /// MARK: wave7 w7-chat — §45.1: the agent groups around the row the last reveal / ⌘F jump went to. Their rows are drawn
@@ -219,9 +221,16 @@ struct TranscriptPane: View {
                             DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
                         }
                     }
-                    ForEach(entries[split..<end]) { entry in
-                        TranscriptEntryView(entry: shown.live(entry), context: context, restored: restored.contains(entry.id)).equatable()
-                            .transcriptRowFrame(entry.id)
+                    // §56.6: decided cards one after another are one line ("권한 3건 처리됨"), over the rows as they are now.
+                    ForEach(handledFold(entries[split..<end].map(shown.live), viewing: context.viewing)) { piece in
+                        switch piece {
+                        case let .single(_, entry):
+                            TranscriptEntryView(entry: entry, context: context, restored: restored.contains(entry.id)).equatable()
+                                .transcriptRowFrame(entry.id)
+                        case let .run(run):
+                            HandledCardsRow(run: run, context: context, restored: restored)
+                                .transcriptRowFrame(run.id)
+                        }
                     }
                     if end < entries.count {
                         // After a jump far back: the rows after the last one shown, a page at a time ("↓ Latest": the newest).
@@ -380,6 +389,15 @@ struct TranscriptPane: View {
     /// market-12: opens (and keeps open) the folded runs `matching` picks.
     private func openRuns(_ matching: (ExploreRun) -> Bool) {
         for case let .run(run) in cache.shown(store).model.entries where matching(run) { view.exploreExpansion[run.id] = true }
+    }
+
+    /// §56.6: the shown entries with runs of decided cards folded — a card still open above the composer never folds.
+    private func handledFold(_ entries: [ExploreFold.Entry], viewing: Bool) -> [HandledCardFold.Piece<ExploreFold.Entry>] {
+        HandledCardFold.fold(entries, id: \.id) { entry in
+            guard case let .node(.row(item)) = entry else { return nil }
+            guard case let .permission(_, request, _) = item else { return nil }
+            return HandledCardFold.card(item, isOpen: !viewing && store.isPermissionOpen(request.requestId))
+        }
     }
 
     // MARK: Find (⌘F)

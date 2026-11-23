@@ -32,42 +32,12 @@ struct PermissionModeMenuItems: View {
     }
 }
 
-/// What the picker and the chip say about the mode.
+/// What the composer's mode menu says about the mode on hover (§56.6: the menu itself reads the mode line).
 @MainActor enum PermissionModeLabels {
-    /// "자동", or "기본 → 자동" while a pick waits for the turn to end.
-    static func title(_ store: AppState) -> String {
-        guard let next = store.scheduledPermissionMode else { return store.permissionMode.displayName }
-        return "\(store.permissionMode.displayName) → \(next.displayName)"
-    }
-
     /// The tooltip: why the last switch was refused, else the waiting pick, else the mode's help.
     static func help(_ store: AppState) -> String {
         if let refusal = store.permissionModeRefusal { return refusal }
         if let next = store.scheduledPermissionMode { return AutoModeText.scheduledText(next) }
         return String(localized: "Permission mode: \(store.permissionMode.helpText)")
-    }
-}
-
-/// The HUD's mode chip (shown while the mode is not `default` or a pick waits): the same menu as the composer's picker.
-struct HUDModeChip: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(AppState.self) private var store
-
-    var body: some View {
-        Menu {
-            PermissionModeMenuItems()
-        } label: {
-            Label(PermissionModeLabels.title(store), systemImage: (store.scheduledPermissionMode ?? store.permissionMode).symbolName)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize().layoutPriority(1)
-        .padding(.horizontal, 6).padding(.vertical, 1)
-        .background(Color.accentColor.wash(colorScheme, light: 0.15, dark: 0.25), in: Capsule())
-        .foregroundStyle(Color.accentColor)
-        .disabled(!store.canPickPermissionMode)
-        .help(PermissionModeLabels.help(store))
-        .accessibilityLabel(String(localized: "Permission mode: \(PermissionModeLabels.title(store))"))
-        .accessibilityIdentifier("HUD mode")
     }
 }

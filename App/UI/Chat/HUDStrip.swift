@@ -39,12 +39,21 @@ struct HUDStrip: View {
             if store.projectInfo != nil {
                 ModelChip(measuring: measuring).layoutPriority(compact ? 0 : 1)
             }
+            // §56.6: nothing that is still zero — the meter, the cost and the turn come once there is something to count.
+            let shown = hud.shown(isRunning: store.isRunning)
+            // Kept in the layout at zero width while hidden: `/context` and `/cost` (§56.5) open their popover from it.
             contextItem(compact: compact, measuring: measuring).fixedSize().layoutPriority(1)
-            Text(verbatim: "·").foregroundStyle(.quaternary)
+                .frame(width: shown.context ? nil : 0).opacity(shown.context ? 1 : 0)
+                .accessibilityHidden(!shown.context)
+            if shown.context {
+                Text(verbatim: "·").foregroundStyle(.quaternary)
+            }
             if !compact {
-                // MARK: wave4d w4d-agents2 — §42.4: the cost opens the split by model (was a plain text).
-                HUDCostButton(measuring: measuring)
-                    .fixedSize().layoutPriority(1)
+                if shown.cost {
+                    // MARK: wave4d w4d-agents2 — §42.4: the cost opens the split by model (was a plain text).
+                    HUDCostButton(measuring: measuring)
+                        .fixedSize().layoutPriority(1)
+                }
                 if hud.sideCostUSD > 0 {
                     // §21: side questions are billed on their own, never inside the session cost.
                     Button {
@@ -58,9 +67,13 @@ struct HUDStrip: View {
                     .help("Side questions in this session: \(String(format: "$%.4f", hud.sideCostUSD)) — not part of the session cost")
                     .accessibilityIdentifier("HUD side cost")
                 }
-                Text(verbatim: "·").foregroundStyle(.quaternary)
-                turnItem.fixedSize().layoutPriority(1)
-                Text(verbatim: "·").foregroundStyle(.quaternary)
+                if shown.cost || hud.sideCostUSD > 0 {
+                    Text(verbatim: "·").foregroundStyle(.quaternary)
+                }
+                if shown.turn {
+                    turnItem.fixedSize().layoutPriority(1)
+                    Text(verbatim: "·").foregroundStyle(.quaternary)
+                }
             }
             activityItem(measuring: measuring)
             LiveChangesChip()   // wave2 mac-flow (§34.6): "진행 중: 파일 N개 · +A −D" → the list
@@ -81,9 +94,7 @@ struct HUDStrip: View {
                 PermissionPendingChip()   // wave1 mac-perms: "권한 요청 N개 대기" from two on; click → the oldest card
             }
             PeerTurnChip()   // wave1 mac-perms: "{fromNames} 요청" (§29)
-            if store.permissionMode != .default || store.scheduledPermissionMode != nil {   // wave4b w4b-auto: a pick waiting too
-                modeBadge
-            }
+            // §56.6: no mode pill — the composer's mode menu (`ComposerModeMenu`) says which mode runs, in its colour.
             if !store.rememberedAllows.isEmpty {
                 rememberedChip(measuring: measuring)
             }
@@ -150,10 +161,6 @@ struct HUDStrip: View {
         .accessibilityIdentifier(notice.kind == .retrying ? "HUD retrying" : "HUD slow start")
     }
 
-    /// M20: the session's permission mode, shown only while it is not `default` (docs/M20-MODES.md).
-    /// wave4b w4b-auto (§39.5): the chip is the mode menu — a click picks another mode (after the turn while Claude works).
-    private var modeBadge: some View { HUDModeChip() }
-
     /// M16: what "Allow for session" remembered; the popover lists the prefixes and offers Forget (`forget_allows`).
     private func rememberedChip(measuring: Bool) -> some View {
         Button {
@@ -213,9 +220,10 @@ struct HUDStrip: View {
                 .frame(width: 380)
                 .accessibilityIdentifier("Context popover")
             }
-            // §56.5: `/context` — and `/cost` while the narrow strip has no cost to open.
+            // §56.5: `/context` — and `/cost` while the strip has no cost to open (narrow, or nothing spent yet, §56.6).
             .onChange(of: model.hudPopoverTick) { _, _ in
-                if !measuring, model.hudPopover == .context || (compact && model.hudPopover == .cost) { showContext = true }
+                let noCost = compact || !hud.shown(isRunning: store.isRunning).cost
+                if !measuring, model.hudPopover == .context || (noCost && model.hudPopover == .cost) { showContext = true }
             }
     }
 

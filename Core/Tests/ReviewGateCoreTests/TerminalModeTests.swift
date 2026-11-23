@@ -79,6 +79,15 @@ import Testing
         #expect(ComposerModeLine.make(mode: .default, scheduled: nil, approvesIntoAuto: false) == ComposerModeLine(text: "Default mode (shift+tab to switch)", tone: .plain))
     }
 
+    /// §56.6: the composer's mode menu reads the line without the key (its tooltip names it).
+    @Test func theModeMenuLabelDropsTheKey() {
+        #expect(ComposerModeLine.make(mode: .auto, scheduled: nil, approvesIntoAuto: false).label == "⏵⏵ Auto mode")
+        #expect(ComposerModeLine.make(mode: .default, scheduled: nil, approvesIntoAuto: false).label == "Default mode")
+        #expect(ComposerModeLine.make(mode: .plan, scheduled: nil, approvesIntoAuto: true).label == "⏸ Plan mode — approving goes back to auto mode")
+        #expect(ComposerModeLine.make(mode: .default, scheduled: .plan, approvesIntoAuto: false).label.hasPrefix("Default mode · "))
+        #expect(ComposerModeLine(text: "Plain", tone: .plain).label == "Plain")
+    }
+
     /// Plan mode Claude entered in an auto chat: the line and the plan card follow it at once, approving goes back to auto,
     /// and the project's stored mode (also the last mode used anywhere, which seeds new projects) never becomes plan.
     @Test func claudesOwnPlanModeInAnAutoChat() {

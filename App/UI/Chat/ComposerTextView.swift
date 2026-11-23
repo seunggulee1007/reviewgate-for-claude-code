@@ -424,10 +424,19 @@ final class ComposerNSTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard string.isEmpty, !placeholder.isEmpty else { return }
-        let attributes: [NSAttributedString.Key: Any] = [.font: font ?? NSFont.preferredFont(forTextStyle: .body),
-                                                         .foregroundColor: NSColor.placeholderTextColor]
-        let origin = NSPoint(x: textContainerInset.width + (textContainer?.lineFragmentPadding ?? 5), y: textContainerInset.height)
-        (placeholder as NSString).draw(at: origin, withAttributes: attributes)
+        // §56.6: one line, cut with "…" at the box's visible edge (drawn at a point it ran on under the clip — mid-word, next to
+        // the tools beside the box).
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let padding = textContainer?.lineFragmentPadding ?? 5
+        let origin = NSPoint(x: textContainerInset.width + padding, y: textContainerInset.height)
+        let width = max(0, visibleRect.maxX - origin.x - textContainerInset.width - padding)
+        let shown = font ?? NSFont.preferredFont(forTextStyle: .body)
+        let height = ceil(layoutManager?.defaultLineHeight(for: shown) ?? shown.boundingRectForFont.height)
+        let attributes: [NSAttributedString.Key: Any] = [.font: shown, .foregroundColor: NSColor.placeholderTextColor,
+                                                         .paragraphStyle: paragraph]
+        (placeholder as NSString).draw(with: NSRect(x: origin.x, y: origin.y, width: width, height: height),
+                                       options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attributes)
     }
 
     override func didChangeText() {

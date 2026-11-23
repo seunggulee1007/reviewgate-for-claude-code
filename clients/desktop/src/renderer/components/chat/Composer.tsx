@@ -42,7 +42,7 @@ import { cannotSendReason, capabilitiesOf, hasPendingReview, isRunning, useStore
 import { Menu } from "../Menu";
 import { CapabilitiesPopover } from "./CapabilitiesPopover";
 import { mcpAttention } from "../../mcp";
-import { ComposerModeLine, ModeMenu } from "./ModeMenu";
+import { ModeMenu } from "./ModeMenu";
 import { isModeCycleKey } from "../../terminalMode"; // MARK: wave6 w6-terminal (§44.1)
 import { NextMessageModelMenu } from "./AutoModelBits"; // MARK: wave5 w5-model (§43.4)
 import { PendingBanner } from "./PendingBanner";
@@ -119,6 +119,8 @@ export function Composer() {
   const [attachErrors, setAttachErrors] = useState<string[]>([]);
   const [slashCard, setSlashCard] = useState<SlashCardKind | null>(null); // §56.5: /status, or a built-in only the terminal has
   const [dropping, setDropping] = useState(false);
+  // §56.6: the plain key hint shows only while the empty box has the focus.
+  const [inputFocused, setInputFocused] = useState(false);
   const [caret, setCaret] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionDismissedAt, setMentionDismissedAt] = useState<number | null>(null);
@@ -1170,17 +1172,27 @@ export function Composer() {
         onPaste={onPaste}
         onKeyDown={onKeyDown}
         onMouseUp={rememberDrag}
+        onFocus={() => setInputFocused(true)}
+        onBlur={() => setInputFocused(false)}
         data-testid="Composer input"
       />
-      <ComposerModeLine /* MARK: wave6 w6-terminal — §44.1 "⏵⏵ 자동 모드 (shift+tab 전환)" */ />
+      {/* §56.6: one row under the box — the mode (the terminal's mode line, now its menu), what a send does right now (the
+          plain key hint only while the empty box has the focus), the capabilities as an icon, the tools and Send. */}
       <div className="footer">
-        <span className={`hint caption truncate ${hint ? "muted" : "faint"}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
+        <ModeMenu />
+        {(hint ?? (inputFocused && draft.length === 0 ? "plain" : null)) !== null && (
+          <span className={`hint caption truncate ${hint ? "muted" : "faint"}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
+        )}
         <span className="caps" style={{ position: "relative", minWidth: 0 }}>
           <button
             type="button"
-            className="caption-btn"
-            // polish P4-composer-38: "(cached)" says what it means
-            title={cached ? `${t("Skills, slash commands, plugins and MCP servers available in this session")}\n${t("From an earlier session — replaced once this session reports")}` : t("Skills, slash commands, plugins and MCP servers available in this session")}
+            className="caption-btn caps-icon"
+            // The counts ("스킬 0개 · 커맨드 0개 · MCP 서버 0개") on hover and in the popover — no line of zeros under the box.
+            // polish P4-composer-38: "(cached)" says what it means.
+            title={[capabilitiesCaption({ caps, cached, mcpCount: mcpList.length, starting: palette.starting, loadUserSettings: palette.loadUserSettings }),
+              t("Skills, slash commands, plugins and MCP servers available in this session"),
+              ...(cached ? [t("From an earlier session — replaced once this session reports")] : [])].join("\n")}
+            aria-label={capabilitiesCaption({ caps, cached, mcpCount: mcpList.length, starting: palette.starting, loadUserSettings: palette.loadUserSettings })}
             onClick={() => setShowCaps((v) => !v)}
             data-testid="Capabilities"
           >
@@ -1192,7 +1204,8 @@ export function Composer() {
                 data-testid="MCP warning"
               />
             )}
-            {capabilitiesCaption({ caps, cached, mcpCount: mcpList.length, starting: palette.starting, loadUserSettings: palette.loadUserSettings })}
+            {/* the Mac's puzzlepiece.extension */}
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 2.5a1.5 1.5 0 0 1 3 0V4H13v3.5h-1.5a1.5 1.5 0 0 0 0 3H13V14H9.5v-1.5a1.5 1.5 0 0 0-3 0V14H3v-3.5h1.5a1.5 1.5 0 0 0 0-3H3V4h3.5z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
           </button>
           {showCaps && <CapabilitiesPopover caps={caps} onClose={closeCaps} />}
         </span>
@@ -1241,7 +1254,6 @@ export function Composer() {
           </button>
         )}
         <NextMessageModelMenu value={nextModel} onChange={setNextModel} models={state.session.availableModels ?? []} disabled={state.project === null} />
-        <ModeMenu />
         {state.session.starting && <span className="caption muted" data-testid="Session starting">{t("Starting session…")}</span>}
         {!state.session.starting && state.project !== null && !state.session.open && (
           <>

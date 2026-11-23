@@ -32,7 +32,7 @@ export type ModeTone = "plain" | "auto" | "acceptEdits" | "plan";
 export function modeLine(
   mode: PermissionMode,
   opts: { approvesIntoAuto?: boolean; scheduledLabel?: string | null; autoUnavailable?: boolean } = {},
-): { text: string; tone: ModeTone } {
+): { text: string; label: string; tone: ModeTone } {
   let text: string;
   let tone: ModeTone;
   switch (mode) {
@@ -54,7 +54,8 @@ export function modeLine(
       tone = "plain";
   }
   if (opts.scheduledLabel) text += ` · ${scheduledModeText(opts.scheduledLabel)}`;
-  return { text: `${text} ${t("(shift+tab to switch)")}`, tone };
+  // §56.6: `label` is the composer's mode menu (the switch key in its tooltip); `text` the terminal's line as it reads.
+  return { text: `${text} ${t("(shift+tab to switch)")}`, label: text, tone };
 }
 
 /**

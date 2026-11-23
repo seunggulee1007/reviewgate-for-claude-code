@@ -335,10 +335,10 @@ struct ChatComposer: View {
             ComposerSlashSlot(composer: composer)   // §56.5: /status, or a built-in only the terminal has
             ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
             inputBox
-            if store.canPickPermissionMode {
-                ComposerModeLineView()   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드 (shift+tab 전환)"
-            }
+            // §56.6: one row under the box — the mode (the terminal's mode line, now its menu), what a send does right now
+            // (the plain key hint only while the empty box has the focus), the capabilities as an icon, then the controls.
             HStack {
+                ComposerModeMenu(compact: barCompact)   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드"
                 if store.isSessionEnded {
                     Label("Session ended", systemImage: "bolt.slash")
                         .font(.caption).foregroundStyle(.orange)
@@ -389,14 +389,16 @@ struct ChatComposer: View {
                     Text(line)
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .help(line)   // polish P4-composer-14: the whole line on hover
-                } else {
+                } else if composer.inputFocused && composer.draft.isEmpty {
+                    // §56.6: the keys while the empty box has the focus — not a line read every time the window is looked at.
                     // A narrow chat pane drops the hint instead of stacking it letter by letter.
                     ViewThatFits(in: .horizontal) {
                         Text(verbatim: sendHint).font(.caption).foregroundStyle(.secondary).fixedSize()
                         Color.clear.frame(width: 0, height: 0)
                     }
+                    .accessibilityIdentifier("Send hint")
                 }
-                CapabilitiesCaption(compact: barCompact)   // r1-composer M11: an icon when the row folds
+                CapabilitiesCaption()   // §56.6: an icon, the counts in its tooltip and popover
                 Spacer(minLength: 0)
                 stopButtons
                     .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barStopWidth = $0 }
@@ -414,8 +416,11 @@ struct ChatComposer: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { barWidth = $0 }
             .background(alignment: .topLeading) {
                 // r1-composer M11: the secondary controls at their own width — hidden, never answering a key or a click. One
-                // stack: a modifier on the bare views would measure each of them apart.
-                HStack(spacing: ComposerBarFit.spacing) { secondaryControls(compact: false, measuring: true) }
+                // stack: a modifier on the bare views would measure each of them apart. §56.6: the mode menu folds with them.
+                HStack(spacing: ComposerBarFit.spacing) {
+                    ComposerModeMenu()
+                    secondaryControls(compact: false, measuring: true)
+                }
                     .fixedSize()
                     .hidden()
                     .disabled(true)
@@ -565,9 +570,9 @@ struct ChatComposer: View {
                                trailing: barPrimaryWidth + (store.isRunning ? barStopWidth + ComposerBarFit.spacing : 0))
     }
 
-    /// 변경 요청 (N), Accept N & Send, the next message's model and the mode: at their own width, or (`compact`) the first two
-    /// in one "⋯" menu and the model and the mode as icons. `measuring`: the hidden copy the row is sized by — it registers
-    /// no shortcut (SwiftUI would take the first one it finds).
+    /// 변경 요청 (N), Accept N & Send and the next message's model: at their own width, or (`compact`) the first two in one "⋯"
+    /// menu and the model as an icon (§56.6: the mode is the row's first item, `ComposerModeMenu`). `measuring`: the hidden
+    /// copy the row is sized by — it registers no shortcut (SwiftUI would take the first one it finds).
     @ViewBuilder
     private func secondaryControls(compact: Bool, measuring: Bool) -> some View {
         // wave4b w4b-tabs (§39.2): the review is the running chat's — its buttons wait for it to be shown.
@@ -608,7 +613,6 @@ struct ChatComposer: View {
                 .accessibilityIdentifier("Composer more")
             }
             NextMessageModelMenu().labelStyle(.iconOnly)   // wave5 w5-model (§43.4)
-            PermissionModePicker().labelStyle(.iconOnly)
         } else {
             if request {
                 // wave2 mac-flow (§34.4): the count is what goes out — sent notes are never sent again.
@@ -657,7 +661,6 @@ struct ChatComposer: View {
                 .accessibilityLabel("Accept and send")
             }
             NextMessageModelMenu()   // wave5 w5-model (§43.4): "이번엔 opus"
-            PermissionModePicker()
         }
     }
 
@@ -1199,7 +1202,7 @@ struct ChatComposer: View {
             HStack(alignment: .bottom, spacing: 4) {
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,
                                  caretRequest: $composer.caretRequest, contentHeight: $composer.height,
-                                 placeholder: question.map(questionPlaceholder) ?? String(localized: "Message Claude — @ mentions a file, ⌘V pastes an image"),
+                                 placeholder: question.map(questionPlaceholder) ?? String(localized: "Message Claude · @ file · ⌘V image"),   // §56.6: short
                                  onKey: handleKey, textScale: TextScale.clamped(textScale), onDrop: { composer.takeDrop($0, root: store.projectURL) },
                                  onDragHover: { composer.dropHover = $0 })
                     // polish P4-composer-16: at least the dragged height, growing with the text up to the limit
@@ -1559,72 +1562,50 @@ private struct CollectFailedNotice: View {
 private struct CapabilitiesCaption: View {
     @Environment(AppState.self) private var store
     @State private var showCapabilities = false
-    /// r1-composer M11: the row under the box folded — the counts go into the icon's tooltip (a narrow row cut them to "0 s…"
-    /// next to a hint cut the same way); the warnings stay.
-    var compact = false
 
-    private var compactHelp: String {
+    /// §56.6: the counts live in the icon's tooltip and its popover — "스킬 0개 · 커맨드 0개 · MCP 서버 0개" was a line of zeros
+    /// under every message box (r1-composer M11 cut it to "0 s…" in a narrow row); the warnings stay on the icon.
+    private var help: String {
+        let what = String(localized: "Skills, slash commands, plugins and MCP servers available in this session")
         guard let caps = store.capabilities else {
-            return store.slashPaletteEmptyState(shown: [])?.text ?? SlashPaletteEmptyState.userSettingsOff.text
+            return (store.slashPaletteEmptyState(shown: [])?.text ?? SlashPaletteEmptyState.userSettingsOff.text) + "\n" + what
         }
         let servers = store.mcp.loaded ? store.mcp.servers.count : caps.mcpServers.count
-        return String(localized: "\(caps.skills.count) skills · \(caps.slashCommands.count) commands · \(servers) MCP servers")
+        var lines = [String(localized: "\(caps.skills.count) skills · \(caps.slashCommands.count) commands · \(servers) MCP servers"), what]
+        if store.capabilitiesAreCached { lines.append(String(localized: "From an earlier session — replaced once this session reports")) }   // P4-composer-38
+        if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
+            lines.append(String(localized: "Started without your user settings — click for details"))
+        }
+        let failing = store.mcp.attentionServers
+        if !failing.isEmpty { lines.append(String(localized: "\(failing.count) MCP servers need attention — click for details")) }
+        return lines.joined(separator: "\n")
     }
 
     var body: some View {
         Button {
             showCapabilities.toggle()
         } label: {
-            if compact {
-                HStack(spacing: 3) {
-                    if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
-                        Image(systemName: "puzzlepiece.extension.fill").foregroundStyle(.orange)
-                    }
-                    let failing = store.mcp.attentionServers
-                    if !failing.isEmpty {
-                        Circle().fill(failing.contains { $0.status == .failed } ? Color.red : Color.yellow)
-                            .frame(width: 6, height: 6)
-                            .accessibilityLabel("MCP servers need attention")
-                            .accessibilityIdentifier("MCP warning dot")
-                    }
-                    Image(systemName: "puzzlepiece.extension")
+            HStack(spacing: 3) {
+                if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
+                    Image(systemName: "puzzlepiece.extension.fill").foregroundStyle(.orange)
                 }
-            } else if let caps = store.capabilities {
-                HStack(spacing: 4) {
-                    if let ext = store.extensions, !ext.loadsUserSettings, ext.fallback != nil {
-                        Image(systemName: "puzzlepiece.extension.fill").foregroundStyle(.orange)
-                            .help("Started without your user settings — click for details")
-                    }
-                    let failing = store.mcp.attentionServers
-                    if !failing.isEmpty {
-                        // §22: a failed / needs-login MCP server — the popover has the fix.
-                        Circle().fill(failing.contains { $0.status == .failed } ? Color.red : Color.yellow)
-                            .frame(width: 6, height: 6)
-                            .help("\(failing.count) MCP servers need attention — click for details")
-                            .accessibilityLabel("MCP servers need attention")
-                            .accessibilityIdentifier("MCP warning dot")
-                    }
-                    // polish PX-02: the caption's own tooltip (the button's hid the two dots' warnings)
-                    Text("\(caps.skills.count) skills · \(caps.slashCommands.count) commands · \(store.mcp.loaded ? store.mcp.servers.count : caps.mcpServers.count) MCP servers")
-                        .help("Skills, slash commands, plugins and MCP servers available in this session")
-                    if store.capabilitiesAreCached {   // wave3 mac-session: the engine's cache too
-                        Text("(cached)")
-                            .help("From an earlier session — replaced once this session reports")   // polish P4-composer-38
-                    }
+                let failing = store.mcp.attentionServers
+                if !failing.isEmpty {
+                    // §22: a failed / needs-login MCP server — the popover has the fix.
+                    Circle().fill(failing.contains { $0.status == .failed } ? Color.red : Color.yellow)
+                        .frame(width: 6, height: 6)
+                        .accessibilityLabel("MCP servers need attention")
+                        .accessibilityIdentifier("MCP warning dot")
                 }
-            } else {
-                // wave3 mac-session (§36.5): "Starting session…" while the CLI starts — never "enable" when user settings are on.
-                Text(verbatim: store.slashPaletteEmptyState(shown: [])?.text ?? SlashPaletteEmptyState.userSettingsOff.text)
+                Image(systemName: "puzzlepiece.extension")
             }
         }
         .buttonStyle(.plain)
         .font(.caption)
         .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .fixedSize(horizontal: compact, vertical: false)
-        // polish PX-02: no tooltip on the whole caption (an outer .help, even an empty one, hides the dots' own); folded, the icon's.
-        .modifier(OptionalHelp(text: compact ? compactHelp : nil))
-        .accessibilityLabel(compact ? Text(verbatim: compactHelp) : Text("Skills, slash commands, plugins and MCP servers available in this session"))   // polish P4-composer-38
+        .fixedSize()
+        .help(help)
+        .accessibilityLabel(Text(verbatim: help))
         .accessibilityIdentifier("Capabilities")
         .popover(isPresented: $showCapabilities, arrowEdge: .top) {
             if store.extensions != nil {
@@ -1640,14 +1621,6 @@ private struct CapabilitiesCaption: View {
                                     emptyText: store.slashPaletteEmptyState(shown: [])?.text ?? SlashPaletteEmptyState.userSettingsOff.text)
             }
         }
-    }
-}
-
-/// A `.help` only when there is text — an outer `.help("")` would still hide the tooltips of the views inside (polish PX-01/02).
-private struct OptionalHelp: ViewModifier {
-    let text: String?
-    func body(content: Content) -> some View {
-        if let text { content.help(text) } else { content }
     }
 }
 

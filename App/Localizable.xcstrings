@@ -7175,6 +7175,22 @@
         }
       }
     },
+    "Claude Code starts in this mode in your terminal: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code starts in this mode in your terminal: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 Claude Code는 이 모드로 시작해요: %@"
+          }
+        }
+      }
+    },
     "Claude Code status line": {
       "localizations": {
         "en": {
@@ -13607,6 +13623,22 @@
         }
       }
     },
+    "Fold the decided cards into one line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold the decided cards into one line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리된 카드를 한 줄로 접기"
+          }
+        }
+      }
+    },
     "Fold the reads and searches into one line": {
       "localizations": {
         "en": {
@@ -16860,6 +16892,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메시지"
+          }
+        }
+      }
+    },
+    "Message Claude · @ file · ⌘V image": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message Claude · @ file · ⌘V image"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 메시지 · @ 파일 · ⌘V 이미지"
           }
         }
       }
@@ -26582,6 +26630,22 @@
         }
       }
     },
+    "Show each decided card": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show each decided card"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처리된 카드 하나씩 보기"
+          }
+        }
+      }
+    },
     "Show earlier messages": {
       "localizations": {
         "en": {
@@ -29202,6 +29266,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 파일의 패치가 비어 있어요."
+          }
+        }
+      }
+    },
+    "The permission mode can be picked once the session has started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The permission mode can be picked once the session has started"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션이 시작되면 권한 모드를 고를 수 있어요"
           }
         }
       }

@@ -501,7 +501,8 @@ private struct QuestionLineRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .font(.callout)
+        .font(waiting ? .callout : .caption)   // §56.6: an answered / skipped question is a quiet line
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .help(Text(verbatim: full))
         .accessibilityElement(children: .combine)
@@ -661,7 +662,7 @@ struct PermissionLineRow: View {
                 // What a click does sits on the line's text and its chevron, not on the whole row: a row-wide .help would
                 // hide the reason icon's own tooltip.
                 Text(verbatim: PermissionLineText.text(request: request, decision: decision, isOpen: isOpen))
-                    .font(.callout)
+                    .font(status == .waiting ? .callout : .caption)   // §56.6: a decided card is a quiet line
                     .foregroundStyle(status == .waiting ? Color.primary : Color.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -673,7 +674,7 @@ struct PermissionLineRow: View {
                     .help(PermissionLineText.help(status: status))
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 8).padding(.vertical, 4)
+            .padding(.horizontal, 8).padding(.vertical, status == .waiting ? 4 : 2)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
