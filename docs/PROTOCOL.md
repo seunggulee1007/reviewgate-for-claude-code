@@ -10325,7 +10325,8 @@ section.
     this section), the results shown in the references panel. `truncated` "Showing the best 50", `timedOut` "Search stopped
     after 10 s" (a single candidate still opens, the toast says so). A refusal is said in the peek. A newer request drops an
     older one's reply (the client numbers them).
-  - **Find References** (Shift+F12, the line menu, the peek's footer): a panel under the panes, "N references in M files"
+  - **Find References** (Shift+F12, the line menu, the peek's footer): a panel under the panes (§65.8: the bottom
+    panel's References tab now; this strip only on the PRs tab), "N references in M files"
     (`Only the first 500`, `Search stopped after 15 s`), grouped by file in the order received; a row opens as above; a
     `kind` hit is labelled "Looks like the definition".
   - **Back / Forward**: Alt+← / Alt+→ (not in a text field; inside Monaco too), ← / → in the diff header (once there is a
@@ -10788,7 +10789,68 @@ other builds running):
 
 **Windows.** `document_symbols`, `workspace_symbols`, `definition_preview` and `nav_index_build` are on the renderer's
 allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
-through). The UI is the client team's follow-up.
+through).
+
+- **Column and receiver.** Every `find_definition` from a click, F12 or the line menu carries `column` (the name's first
+  character, 1-based UTF-16) and, when the line has `x.` / `x?.` / `x!!.` (spaces allowed) or `x::` / `x->` right in front
+  of a plain identifier, `receiver: "x"` (`nav/identifier.ts` `receiverBefore`; nothing after `)` / `]`, none for a
+  `pkg.Type` chain, none for a selected name other than the word).
+- **Peek** (`nav/PeekBand.tsx`, `nav/peekModel.ts`, `nav/bandSlot.ts`): Alt+F12, "Peek Definition" in the line menu and
+  Monaco's context menu, and Ctrl+click — Settings › Review › Code navigation "Ctrl+click a name": Peek (default) / Go to
+  (`AppSettings.navCtrlClick: "peek" | "jump"`); F12 always goes. `find_definition` (column, receiver), then
+  `definition_preview {path, line}` for the selected candidate (each asked once per band; a newer band drops older replies).
+  The band sits under the clicked row — in a DOM diff a sticky, pane-wide block after the row (a split row: under both
+  sides), in Monaco (the project file view, the full-file view) a view zone after the line; nothing above it moves, and a
+  band past the bottom edge scrolls in by the least amount. Header "File.kt:42 — Container.member" (the preview's
+  `symbol`, else the candidate's `container`), the kind, the folder, [Open] [References] [×]; Monaco-coloured lines
+  (`monaco.editor.colorize`), the definition line marked, 15 visible then scrolling (the wheel stays in the band). Several
+  candidates: the list on the right (name:line, kind, container · folder); ↑ / ↓ switch the preview, Enter or a double
+  click opens (§62's opening, Back returns), Esc closes (also from the diff; a text field or a terminal keeps its Esc).
+  One candidate stays in the band (peek never jumps by itself); none → "No definition found" with Find References / Find
+  in Project. Another file, pane or jump closes it.
+- **Hover** (`nav/hoverModel.ts` `HoverDebounce`, one timer for the window): Ctrl held with the pointer resting on a name
+  for 600 ms (DOM diffs and Monaco alike; the same name keeps the wait, another restarts it) → `find_definition`, then
+  `definition_preview {path, line, after: 8}` of the first candidate → a card under the name (never takes a click):
+  `symbol.signature` in bold (else the candidate's `preview`), "File.kt:5 · folder", the doc comment and the next lines,
+  the definition line marked. Nothing for no candidate or a refusal. Ctrl released, the pointer off the name, a click or
+  a scroll ends it; each request is numbered and only the newest one's reply shows.
+- **References tab** (`nav/ReferencesPanel.tsx`; the bottom panel of §57.18 gets a fourth tab, 참조, `ui.terminalPanelTab:
+  "references"`): Shift+F12, the line menu, the peek's References and "Find in Project" fill it and bring it forward.
+  Left the hits grouped by file (`referenceOrder`: files in the order their first hit came, lines as received — the
+  order F4 walks), "definition" on a `kind` row; right the selected hit's context (`definition_preview {path, line,
+  before: 4, after: 8}`, its line marked with the name). ↑ / ↓ pick, Enter / a double click opens (§62's opening; Back
+  returns), F4 / Shift+F4 anywhere but a terminal open the next / previous (wrapping; from none selected the first / the
+  last), ↻ sends the same search again, × clears it. Empty, it says what fills it. The §62 strip under the panes stays
+  only on the PRs tab (it has no bottom panel).
+- **Palettes** (`nav/QuickOpen.tsx`, `nav/quickOpenModel.ts`; at the top of the window, Esc / a click outside closes, ↑ / ↓
+  / Enter / a click, the pick opened as §62 opens a result and Back returns): **Go to File** — Ctrl+P (File › Go to File…,
+  the menu's `quick_open`) — `list_files {query, filesOnly: true, limit: 50}` 50 ms after a keystroke, the newest reply
+  wins, `kind: "dir"` dropped (an older engine), `path:42` split here and opened at the line, the basename's letters bold
+  (camel humps of the stem, else the subsequence), a review file marked. **Symbols in This File** — **Ctrl+F12** —
+  `document_symbols {path}` once for the file in front (the project file view's, a past round's, else the review's
+  selected one; none: a toast says to show one), filtered here with §65.3's ranking (exact > prefix > humps > substring >
+  subsequence; empty: file order), indented by `depth`, `kind` and `container`. **Symbols in Project** —
+  **Ctrl+Alt+Shift+N** — `workspace_symbols {query, limit: 100}` 80 ms after a keystroke (an idle index is warmed with
+  `nav_index_build {}` when the palette opens), `name` bold at `matches`, `container · folder`; "Indexing… N / M files"
+  while `state.nav.index` builds and the query sent again when it turns `ready`, `failed` → its error and Try Again
+  (`nav_index_build {}`), "Showing the first 100" / "the project is larger than the index" in the footer. **Keys:**
+  Windows keeps Ctrl+Shift+O (Switch Project) and Ctrl+T (New chat), so the symbol palettes take IntelliJ IDEA's keys;
+  Ctrl+P was File › Go to File's accelerator already (it did nothing until now). `nav/navKeys.test.ts` holds every
+  navigation key against the window's other key maps and the shortcut table; docs/SHORTCUTS.md "코드 탐색" lists them —
+  its Mac column carries §65.8's keys until the Mac app picks its own (Core's `ShortcutTable.swift` is reconciled then).
+- **Navigate menu** (탐색, Alt+N; between View and Review): Go to File… (Ctrl+P, registered in File as before), Symbols in
+  This File… (Ctrl+F12), Symbols in Project… (Ctrl+Alt+Shift+N), Next / Previous Reference (F4 / Shift+F4; none yet → a
+  toast says Shift+F12 fills them), Back / Forward (Alt+← / Alt+→) — the keys shown, the renderer's own (menu actions
+  `nav_palette`, `nav_reference`, `nav_history`) — and **Rebuild Symbol Index** (`nav_index_build {full: true}`, a toast
+  "Rebuilding…", a refusal said): off while `state.nav.index.status` is `building`, its label then "… — indexing…"
+  (a Windows menu shows no tooltip); main rebuilds the menu when the focused window's index status changes. Every item is
+  off without a project.
+- Tests: `nav/identifier.test.ts` (receivers), `nav/peekModel.test.ts` (setting, header, marked line, keys),
+  `nav/hoverModel.test.ts` (600 ms debounce, stale replies), `nav/navStore.test.ts` (column / receiver sent, peek candidate
+  switching and its previews, hover, the References tab's order and F4 / Shift+F4), `nav/navModel.test.ts`
+  (`referenceOrder`, `stepReference`), `nav/quickOpenModel.test.ts` (path:line, humps, ranking, bold runs, the index
+  line), `nav/navKeys.test.ts` (no key of another map or table row), `main/menuBar.test.ts` (Navigate, Rebuild off while
+  building), `shortcutTable.test.ts` (docs/SHORTCUTS.md).
 
 **Mac.** Core decodes the four replies (`DocumentSymbolsReply`, `WorkspaceSymbolsReply`, `SymbolPreviewReply`,
 `NavIndexReply`), `state.nav` (`ReviewState.nav`, nil from an older engine) and `candidates[].container`, leniently as

@@ -1,6 +1,6 @@
 /**
- * §62 — the DOM diff's line menu entries (components/UnifiedDiff.tsx): Go to Definition / Find References on the name under
- * the pointer, Open in IDE at the line. The store is loaded on the click, not with the diff (its tests render it alone).
+ * §62 — the DOM diff's line menu entries (components/UnifiedDiff.tsx): Go to Definition / Peek Definition (§65.8) / Find
+ * References on the name under the pointer, Open in IDE at the line. The store is loaded on the click, not with the diff (its tests render it alone).
  */
 import { t } from "../i18n";
 import type { DomNavTarget } from "./domTarget";
@@ -17,6 +17,13 @@ export function navLineMenuItems(target: DomNavTarget | null, at: { x: number; y
         onClick: () => void import("./NavViews").then((m) => m.goFromDom(target, at.x, at.y)),
         testId: "Line menu go to definition",
         title: `${target.symbol} — ${t("Search-based: may list look-alikes")}`,
+      },
+      {
+        label: t("Peek Definition"),
+        keys: "Alt+F12",
+        onClick: () => void import("./NavViews").then((m) => m.peekFromDom(target)),
+        testId: "Line menu peek definition",
+        title: `${target.symbol} — ${t("Shows the definition under this line")}`,
       },
       {
         label: t("Find References"),

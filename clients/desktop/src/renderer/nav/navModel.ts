@@ -86,6 +86,21 @@ export function groupByFile(hits: readonly RefRow[]): RefGroup[] {
   return [...groups.values()];
 }
 
+/** §65.8: the rows in the order the References tab shows them (file groups, then lines) — the order F4 / Shift+F4 walk. */
+export function referenceOrder(rows: readonly RefRow[]): RefRow[] {
+  return groupByFile(rows).flatMap((g) => g.rows);
+}
+
+/**
+ * F4 (`dir` 1) / Shift+F4 (-1) from `selected` (-1: none yet — F4 starts at the first, Shift+F4 at the last), wrapping;
+ * null when there is nothing to step to.
+ */
+export function stepReference(selected: number, count: number, dir: 1 | -1): number | null {
+  if (count === 0) return null;
+  if (selected < 0 || selected >= count) return dir === 1 ? 0 : count - 1;
+  return (selected + dir + count) % count;
+}
+
 /** `project_search` matches as reference rows (Find in Project from the "no definition" notice): the column of the first hit. */
 export function searchRows(matches: readonly { path: string; line: number; text: string }[], symbol: string): RefRow[] {
   return matches.map((m) => ({ path: m.path, line: m.line, column: Math.max(1, wholeWordIndex(m.text, symbol) + 1), preview: m.text.trim() }));

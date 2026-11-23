@@ -71,11 +71,22 @@ export function windowKey(e: ShortcutKey): WindowKey | null {
   return is("Period", ".") ? "stop" : null;
 }
 
-/** §62 code navigation: F12, Shift+F12, Alt+← / Alt+→ (Back / Forward), Ctrl+Alt+O (Open in IDE — the physical O). */
-export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde";
+/**
+ * §62 code navigation: F12, Shift+F12, Alt+← / Alt+→ (Back / Forward), Ctrl+Alt+O (Open in IDE — the physical O);
+ * §65.8 Alt+F12 (Peek Definition), F4 / Shift+F4 (next / previous reference), and the palettes: Ctrl+P (Go to File),
+ * Ctrl+F12 (Symbols in This File — Ctrl+Shift+O is Switch Project), Ctrl+Alt+Shift+N (Symbols in Project — Ctrl+T is New
+ * chat); IntelliJ IDEA's keys for the last two. The physical P / N decide (a Korean layout reads ㅔ / ㅜ).
+ */
+export type NavKey = "definition" | "references" | "back" | "forward" | "openInIde" | "peek" | "nextReference" | "previousReference" | "goToFile" | "fileSymbols" | "projectSymbols";
 
 export function navKey(e: ShortcutKey): NavKey | null {
   if (e.key === "F12" && !mod(e) && !e.altKey) return e.shiftKey ? "references" : "definition";
+  if (e.key === "F12" && !mod(e) && e.altKey && !e.shiftKey) return "peek";
+  if (e.key === "F12" && mod(e) && !e.altKey && !e.shiftKey) return "fileSymbols";
+  if (mod(e) && !e.altKey && !e.shiftKey && (e.code === "KeyP" || e.key.toLowerCase() === "p")) return "goToFile";
+  if (mod(e) && e.altKey && e.shiftKey && (e.code === "KeyN" || e.key.toLowerCase() === "n")) return "projectSymbols";
+  // §65.8: F4 / Shift+F4 step through the References tab (Alt+F4 stays Windows' own).
+  if (e.key === "F4" && !mod(e) && !e.altKey) return e.shiftKey ? "previousReference" : "nextReference";
   if (e.altKey && !mod(e) && !e.shiftKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return e.key === "ArrowLeft" ? "back" : "forward";
   if (mod(e) && e.altKey && !e.shiftKey && (e.code === "KeyO" || e.key.toLowerCase() === "o")) return "openInIde";
   return null;

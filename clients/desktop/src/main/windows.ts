@@ -283,8 +283,9 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
       if (!win.isDestroyed()) win.setTitle(name ? (branch ? `${name} — ${branch}` : name) : "ReviewGate");
       // MARK: wave3 desktop-flow — §36.11 / §36.12: the repository's commit template and workbench setup follow the window.
       if (!wb.closing && !shuttingDown) syncFlowSettings(engine, ev.state, loadSettings());
-      // MARK: polish p-lifecycle (P1-chrome-09 / P4-composer-06): the Chat menu lists the focused window's tabs.
-      const tabs = JSON.stringify([ev.state.sessions?.openTabIds ?? [], (ev.state.sessions?.list ?? []).map((m) => m.title)]);
+      // MARK: polish p-lifecycle (P1-chrome-09 / P4-composer-06): the Chat menu lists the focused window's tabs; §65.8 Navigate
+      // › Rebuild Symbol Index follows the index's status (off while it builds; not every progress step).
+      const tabs = JSON.stringify([ev.state.sessions?.openTabIds ?? [], (ev.state.sessions?.list ?? []).map((m) => m.title), ev.state.nav?.index.status ?? null]);
       if (tabs !== wb.menuTabs) {
         wb.menuTabs = tabs;
         if (!win.isDestroyed() && BrowserWindow.getFocusedWindow() === win) config.rebuildMenu();

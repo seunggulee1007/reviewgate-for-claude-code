@@ -94,6 +94,8 @@ export type AppSettings = {
   preferredEditor: "auto" | "vscode" | "idea" | "explorer";
   /** §62 "Open in" — where Open in IDE (Ctrl+Alt+O) opens a file: VS Code, IntelliJ IDEA or the system's default app (absent: VS Code). */
   openInIde?: IdeKind;
+  /** §65.8 Settings › Review › Code navigation: Ctrl+click a name peeks its definition in place, or goes to it (absent: peek). */
+  navCtrlClick?: "peek" | "jump";
   /** M12: "Push to origin" default in the commit dialog. */
   commitPushByDefault: boolean;
   /** M12: trailer line appended to every commit message ("" → none). */
@@ -224,8 +226,8 @@ export type ProjectUI = {
   terminalReviewSplit?: number;
   /** §57.17: the bottom shell panel's height in px (at least 80; the window keeps 200 above it). */
   terminalPanelHeight?: number;
-  /** MARK: c-panel — §57.18: the panel's tab (absent: the terminal). */
-  terminalPanelTab?: "terminal" | "output" | "run";
+  /** MARK: c-panel — §57.18: the panel's tab (absent: the terminal); §65.8 "references". */
+  terminalPanelTab?: "terminal" | "output" | "run" | "references";
   /** M19: the window frame this project was last seen with (clamped to a visible display on restore). */
   bounds?: WindowBounds;
 };
@@ -303,7 +305,12 @@ export type MenuAction =
   | { type: "continue_as_terminal" }
   | { type: "toggle_terminal_panel" }
   // §9 Chat › New Chat in a Workbench… (Ctrl+Alt+W, the renderer's key)
-  | { type: "new_chat_in_workbench" };
+  | { type: "new_chat_in_workbench" }
+  // §65.8 Navigate: the symbol palettes, the References tab's next / previous, Back / Forward, Rebuild Symbol Index
+  | { type: "nav_palette"; mode: "fileSymbols" | "projectSymbols" }
+  | { type: "nav_reference"; dir: 1 | -1 }
+  | { type: "nav_history"; dir: "back" | "forward" }
+  | { type: "nav_rebuild_index" };
 
 // MARK: polish p-foundation — P5-sheets-44
 /**

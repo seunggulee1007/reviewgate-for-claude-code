@@ -45,7 +45,7 @@ describe("main process in Korean (polish-07)", () => {
   it("labels every menu item — the role items too — in Korean on Windows", async () => {
     const template = await windowsMenu();
     // polish PX-13: Alt+<letter> opens each menu, the Korean Windows way; P1-chrome-09: the Mac's Review and Chat menus.
-    expect(template.map((m) => m.label)).toEqual(["파일(&F)", "편집(&E)", "보기(&V)", "리뷰(&R)", "채팅(&C)", "창(&W)", "도움말(&H)"]);
+    expect(template.map((m) => m.label)).toEqual(["파일(&F)", "편집(&E)", "보기(&V)", "탐색(&N)", "리뷰(&R)", "채팅(&C)", "창(&W)", "도움말(&H)"]); // §65.8 Navigate
     for (const item of walk(template)) {
       if (item.type === "separator") continue;
       expect(typeof item.label, JSON.stringify(item)).toBe("string");

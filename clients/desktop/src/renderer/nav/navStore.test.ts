@@ -75,6 +75,17 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().history.forward).toEqual([{ kind: "review", path: "src/B.java", line: 7 }]);
   });
 
+  it("§65.6: sends the click's column and receiver (each only when known)", async () => {
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "refresh", candidates: [], truncated: false }));
+    m.useNav.getState().goToDefinition({ symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 15, receiver: "gate", ...at, from: null });
+    m.useNav.getState().goToDefinition({ symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 0, ...at, from: null });
+    await flush();
+    expect(sent).toEqual([
+      { type: "find_definition", symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 15, receiver: "gate" },
+      { type: "find_definition", symbol: "refresh", fromPath: "src/A.ts", line: 4 },
+    ]);
+  });
+
   it("one candidate outside the review: the project file view (project_file), read-only", async () => {
     replies.set("find_definition", () => ({ type: "definitions", symbol: "C", candidates: [cand("lib/C.java", 3)], truncated: false }));
     m.useNav.getState().goToDefinition({ symbol: "C", fromPath: "src/A.java", line: 2, ...at, from: { kind: "review", path: "src/A.java", line: 2 } });
@@ -123,7 +134,7 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().peek).toMatchObject({ loading: false, rows: [], error: null });
     m.useNav.getState().findInProject("nope");
     await flush();
-    expect(sent[sent.length - 1]).toEqual({ type: "project_search", query: "nope", wholeWord: true, caseSensitive: true });
+    expect(sent.find((c) => c.type === "project_search")).toEqual({ type: "project_search", query: "nope", wholeWord: true, caseSensitive: true });
     expect(m.useNav.getState().peek).toBeNull();
     expect(m.useNav.getState().refs).toMatchObject({ mode: "search", files: 2, loading: false });
     m.useNav.getState().findReferences({ symbol: "nope", fromPath: "a.js" });
@@ -161,5 +172,148 @@ describe("Go to Definition (§62, Windows)", () => {
     m.useNav.getState().back();
     expect(m.useNav.getState().file).toBeNull();
     expect(m.useStore.getState().tab).toBe("prs");
+  });
+
+  it("§65.8 peek: the band under the line, the first preview asked; another candidate asks once, a stale preview is dropped", async () => {
+    const { useBandSlot } = await import("./bandSlot");
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "find", candidates: [cand("a/Repo.kt", 10, "method"), cand("b/Other.kt", 20, "method")], truncated: false }));
+    const asked: number[] = [];
+    let release: (() => void) | null = null;
+    replies.set("definition_preview", (cmd) => {
+      const line = (cmd as { line: number }).line;
+      asked.push(line);
+      const reply = { type: "definition_preview", path: (cmd as { path: string }).path, line, startLine: line - 1, lines: ["/** doc */", "fun find()"], totalLines: 99, language: "kotlin", truncated: false };
+      return asked.length === 1 ? new Promise((r) => (release = () => r(reply))) : reply;
+    });
+    const anchor = { kind: "dom" as const, path: "src/A.kt", rowId: 7 };
+    m.useNav.getState().peekDefinition({ symbol: "find", fromPath: "src/A.kt", line: 3, column: 12, receiver: "repo", anchor, from: { kind: "review", path: "src/A.kt", line: 3 } });
+    expect(useBandSlot.getState().anchor).toEqual(anchor);
+    expect(m.useNav.getState().band).toMatchObject({ loading: true, symbol: "find" });
+    await flush();
+    expect(sent[0]).toEqual({ type: "find_definition", symbol: "find", fromPath: "src/A.kt", line: 3, column: 12, receiver: "repo" });
+    expect(m.useNav.getState().band).toMatchObject({ loading: false, selected: 0 });
+    expect(m.useNav.getState().band!.rows.map((r) => r.path)).toEqual(["a/Repo.kt", "b/Other.kt"]);
+    // the second candidate while the first preview is still on its way
+    m.useNav.getState().setBandSelected(1);
+    await flush();
+    expect(asked).toEqual([10, 20]);
+    expect(m.useNav.getState().band!.previews[1]).toMatchObject({ line: 20 });
+    // a newer peek drops the first band's late preview
+    m.useNav.getState().peekDefinition({ symbol: "find", anchor: { kind: "dom", path: "src/A.kt", rowId: 9 }, from: null });
+    release!();
+    await flush();
+    const b = m.useNav.getState().band!;
+    expect(b.anchor).toEqual({ kind: "dom", path: "src/A.kt", rowId: 9 });
+    expect(b.previews[1]).toBeUndefined();
+    // back to the first: asked again only because it never arrived for this band; then cached
+    m.useNav.getState().setBandSelected(1);
+    m.useNav.getState().setBandSelected(0);
+    await flush();
+    const before = asked.length;
+    m.useNav.getState().setBandSelected(1);
+    m.useNav.getState().setBandSelected(0);
+    expect(asked.length).toBe(before);
+  });
+
+  it("§65.8 peek: Open goes to the candidate (the band closes and Back returns); another file closes the band", async () => {
+    const { useBandSlot } = await import("./bandSlot");
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "C", candidates: [cand("lib/C.java", 3)], truncated: false }));
+    replies.set("definition_preview", () => ({ type: "definition_preview", path: "lib/C.java", line: 3, startLine: 3, lines: ["class C {}"], totalLines: 3, language: "java", truncated: false }));
+    m.useNav.getState().peekDefinition({ symbol: "C", anchor: { kind: "dom", path: "src/A.java", rowId: 1 }, from: { kind: "review", path: "src/A.java", line: 2 } });
+    await flush();
+    expect(m.useNav.getState().band?.rows).toHaveLength(1); // one candidate stays in the band — peek never jumps by itself
+    m.useNav.getState().openBandSelected();
+    expect(m.useNav.getState().band).toBeNull();
+    expect(useBandSlot.getState().anchor).toBeNull();
+    expect(m.useNav.getState().file).toMatchObject({ path: "lib/C.java", line: 3 });
+    expect(m.useNav.getState().history.back).toEqual([{ kind: "review", path: "src/A.java", line: 2 }]);
+
+    m.useNav.getState().closeFile();
+    m.useNav.getState().peekDefinition({ symbol: "C", anchor: { kind: "dom", path: "src/A.java", rowId: 1 }, from: null });
+    await flush();
+    m.useStore.getState().selectFile("src/B.java");
+    expect(m.useNav.getState().band).toBeNull();
+  });
+
+  it("§65.8 hover: the first candidate's preview with 8 lines after; nothing for none; a newer hover drops the older reply", async () => {
+    const asked: EngineCommand[] = [];
+    let releaseFirst: (() => void) | null = null;
+    replies.set("find_definition", (cmd) => {
+      const symbol = (cmd as { symbol: string }).symbol;
+      const reply = { type: "definitions", symbol, candidates: symbol === "none" ? [] : [cand(`${symbol}.kt`, 5, "method")], truncated: false };
+      return symbol === "slow" ? new Promise((r) => (releaseFirst = () => r(reply))) : reply;
+    });
+    replies.set("definition_preview", (cmd) => {
+      asked.push(cmd);
+      const p = cmd as { path: string; line: number };
+      return { type: "definition_preview", path: p.path, line: p.line, startLine: 4, lines: ["/** Doc. */", "fun total(): Int {"], totalLines: 30, language: "kotlin", truncated: false, symbol: { name: "total", kind: "method", path: p.path, line: 5, column: 5, signature: "fun total(): Int" } };
+    });
+    m.useNav.getState().requestHover({ symbol: "total", fromPath: "src/A.kt", line: 2, column: 9, receiver: "cart", x: 1, y: 2 });
+    await flush();
+    await flush();
+    expect(asked).toEqual([{ type: "definition_preview", path: "total.kt", line: 5, after: 8 }]);
+    expect(m.useNav.getState().hover).toMatchObject({ signature: "fun total(): Int", path: "total.kt", line: 5, x: 1, y: 2 });
+    expect(m.useNav.getState().hover!.lines.map((l) => l.target)).toEqual([false, true]);
+
+    m.useNav.getState().requestHover({ symbol: "none", x: 0, y: 0 });
+    await flush();
+    expect(m.useNav.getState().hover).toBeNull();
+
+    m.useNav.getState().requestHover({ symbol: "slow", x: 0, y: 0 });
+    m.useNav.getState().requestHover({ symbol: "fast", x: 5, y: 6 });
+    await flush();
+    await flush();
+    releaseFirst!();
+    await flush();
+    await flush();
+    expect(m.useNav.getState().hover?.path).toBe("fast.kt");
+    m.useNav.getState().hideHover();
+    expect(m.useNav.getState().hover).toBeNull();
+  });
+
+  it("§65.8 References tab: rows by file, the first one's context asked; F4 / Shift+F4 open the next / previous", async () => {
+    replies.set("find_references", () => ({
+      type: "references",
+      symbol: "total",
+      hits: [
+        { path: "src/A.java", line: 3, column: 5, preview: "total();" },
+        { path: "lib/C.java", line: 8, column: 2, preview: "total()", kind: "method" },
+        { path: "src/A.java", line: 9, column: 5, preview: "x = total();" },
+      ],
+      files: 2,
+      truncated: false,
+    }));
+    const previews: EngineCommand[] = [];
+    replies.set("definition_preview", (cmd) => {
+      previews.push(cmd);
+      const p = cmd as { path: string; line: number };
+      return { type: "definition_preview", path: p.path, line: p.line, startLine: p.line - 4, lines: ["a", "b", "c", "d", "total();"], totalLines: 40, language: "java", truncated: false };
+    });
+    m.useNav.getState().findReferences({ symbol: "total", fromPath: "src/A.java" });
+    const firstSeq = m.useNav.getState().refs!.seq;
+    await flush();
+    await flush();
+    const r = m.useNav.getState().refs!;
+    expect(r.rows.map((x) => `${x.path}:${x.line}`)).toEqual(["src/A.java:3", "src/A.java:9", "lib/C.java:8"]);
+    expect(r.selected).toBe(0);
+    expect(previews).toEqual([{ type: "definition_preview", path: "src/A.java", line: 3, before: 4, after: 8 }]);
+    expect(r.preview).toMatchObject({ index: 0, error: null });
+
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // F4: A.java:9 in the review's diff
+    expect(m.useNav.getState().refs!.selected).toBe(1);
+    expect(m.useNav.getState().reveal).toMatchObject({ path: "src/A.java", line: 9 });
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // lib/C.java:8 — not under review: the file view
+    await flush();
+    expect(m.useNav.getState().file).toMatchObject({ path: "lib/C.java", line: 8 });
+    expect(m.useNav.getState().stepReferences(1)).toBe(true); // wraps to the first
+    expect(m.useNav.getState().refs!.selected).toBe(0);
+    expect(m.useNav.getState().stepReferences(-1)).toBe(true); // Shift+F4: the last
+    expect(m.useNav.getState().refs!.selected).toBe(2);
+
+    m.useNav.getState().refreshReferences();
+    expect(m.useNav.getState().refs!.seq).toBeGreaterThan(firstSeq);
+    expect(sent.filter((c) => c.type === "find_references")).toHaveLength(2);
+    m.useNav.getState().closeRefs();
+    expect(m.useNav.getState().stepReferences(1)).toBe(false);
   });
 });

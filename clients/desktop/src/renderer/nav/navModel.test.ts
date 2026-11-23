@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DefinitionCandidate } from "@reviewgate/engine";
-import { EMPTY_HISTORY, HISTORY_LIMIT, goBack, goForward, groupByFile, markSymbol, peekKey, peekRows, pushHistory, searchRows, searchedWord, type NavLocation } from "./navModel";
+import { EMPTY_HISTORY, HISTORY_LIMIT, goBack, goForward, groupByFile, markSymbol, peekKey, peekRows, pushHistory, referenceOrder, searchRows, searchedWord, stepReference, type NavLocation } from "./navModel";
 
 const review = (path: string, line: number): NavLocation => ({ kind: "review", path, line });
 const file = (path: string, line: number): NavLocation => ({ kind: "file", path, line, column: 1 });
@@ -103,5 +103,24 @@ describe("markSymbol", () => {
     expect(searchedWord("my-widget")).toBe("my-widget");
     expect(markSymbol("<my-widget />", "my-widget").filter((p) => p.mark).map((p) => p.text)).toEqual(["my-widget"]);
     expect(markSymbol("nothing here", "Cart")).toEqual([{ text: "nothing here", mark: false }]);
+  });
+});
+
+describe("the References tab's order (§65.8)", () => {
+  it("lists by file (in the order each file's first hit came), lines as received — the order F4 walks", () => {
+    const hit = (path: string, line: number) => ({ path, line, column: 1, preview: "x" });
+    const rows = referenceOrder([hit("a/A.kt", 3), hit("b/B.kt", 1), hit("a/A.kt", 9), hit("c/C.kt", 4), hit("b/B.kt", 7)]);
+    expect(rows.map((r) => `${r.path}:${r.line}`)).toEqual(["a/A.kt:3", "a/A.kt:9", "b/B.kt:1", "b/B.kt:7", "c/C.kt:4"]);
+    expect(groupByFile(rows).map((g) => [g.name, g.rows.length])).toEqual([["A.kt", 2], ["B.kt", 2], ["C.kt", 1]]);
+  });
+
+  it("F4 / Shift+F4 step forward / back, wrapping; from nothing selected F4 takes the first, Shift+F4 the last", () => {
+    expect(stepReference(-1, 3, 1)).toBe(0);
+    expect(stepReference(-1, 3, -1)).toBe(2);
+    expect(stepReference(0, 3, 1)).toBe(1);
+    expect(stepReference(2, 3, 1)).toBe(0);
+    expect(stepReference(0, 3, -1)).toBe(2);
+    expect(stepReference(7, 3, 1)).toBe(0);
+    expect(stepReference(0, 0, 1)).toBeNull();
   });
 });

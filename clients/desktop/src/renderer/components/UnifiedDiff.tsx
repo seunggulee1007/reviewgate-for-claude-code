@@ -33,6 +33,7 @@ import { domTargetAt } from "../nav/domTarget"; // §62
 import { navLineMenuItems } from "../nav/navMenu";
 import { searchedWord } from "../nav/navModel";
 import { newLineNear } from "../diffTools";
+import { setBandSlot, useDomBandRow } from "../nav/bandSlot"; // §65.8
 
 export type LineKey = { side: "old" | "new"; line: number };
 
@@ -135,6 +136,7 @@ export function UnifiedDiff(props: {
     observer.observe(pane);
     return () => observer.disconnect();
   }, [diff.isBinary, diff.hunks.length === 0]); // the pane exists only for a diff with lines
+  const bandRow = useDomBandRow(props.path); // §65.8: the peek band hangs under this row
   const splitFits = props.forceLayout ? props.forceLayout === "split" : paneWidth >= splitMinWidth();
   const layout = props.forceLayout ?? effectiveLayout(chosenLayout, paneWidth);
 
@@ -361,21 +363,25 @@ export function UnifiedDiff(props: {
     );
   };
 
+  // §65.8: the peek band's slot right under its row (a split row: under both sides), the pane's width wide.
+  const band = (ids: (number | undefined)[]) =>
+    bandRow !== null && props.path && ids.includes(bandRow) ? <BandSlot key="nav-band" path={props.path} rowId={bandRow} /> : null;
   const drawRows = (): ReactNode[] => {
-    const draw = (entry: RowEntry) => (isCode(entry) ? drawCode(entry) : entry);
-    if (layout !== "split") return rows.map(draw);
-    return splitRows(rows, (entry) => (isCode(entry) && entry.line.kind !== "hunkHeader" ? entry.line : null)).map((row) => {
+    const draw = (entry: RowEntry) => (isCode(entry) ? [drawCode(entry), band([entry.line.id])] : entry);
+    if (layout !== "split") return rows.flatMap(draw);
+    return splitRows(rows, (entry) => (isCode(entry) && entry.line.kind !== "hunkHeader" ? entry.line : null)).flatMap((row) => {
       if (row.kind === "full") return draw(row.row);
       const left = row.left as CodeEntry | null;
       const right = row.right as CodeEntry | null;
-      return (
+      return [
         <div key={`split-${(left ?? right)!.line.id}`} className="split-row">
           <div className="split-side old" aria-hidden={left !== null && left === right ? true : undefined /* an unchanged line is read once, on the right */}>
             {left ? drawCode(left, "old") : <div className="split-pad" />}
           </div>
           <div className="split-side new">{right ? drawCode(right, "new") : <div className="split-pad" />}</div>
-        </div>
-      );
+        </div>,
+        band([left?.line.id, right?.line.id]),
+      ];
     });
   };
 
@@ -491,6 +497,13 @@ export function UnifiedDiff(props: {
 }
 
 // MARK: wave2 desktop-diff — rows
+
+/** §65.8: where the peek band goes (NavViews.tsx portals it in); sticky at the left, the diff's width (nav.css). */
+function BandSlot(props: { path: string; rowId: number }) {
+  const { path, rowId } = props;
+  const ref = useCallback((el: HTMLDivElement | null) => setBandSlot(el, { kind: "dom", path, rowId }), [path, rowId]);
+  return <div ref={ref} className="nav-band-slot" data-testid="Peek band slot" />;
+}
 
 /** A code line of the list before it is drawn (one column, or a side of a split row — §34.11); other rows are drawn already. */
 type CodeEntry = { line: DiffLine; hunk: DiffHunk | null; flags: string; actions?: ReactNode };
