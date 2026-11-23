@@ -69,27 +69,55 @@ private struct TerminalStatusStrip: View {
     @Environment(WindowModel.self) private var model
     let chatId: String
     let host: TerminalHost
+    /// §57.5 (`TerminalReviewedHint`): the terminal chats that showed "변경은 왼쪽에 나와요" so far, and whether the user closed it.
+    @AppStorage(TerminalReviewedHint.countKey) private var hintCount = 0
+    @AppStorage(TerminalReviewedHint.dismissedKey) private var hintDismissed = false
+    /// The chats that counted in this run: the words stay in them while they are on screen.
+    @MainActor private static var hintChats: Set<String> = []
 
     var body: some View {
         let info = store.terminalInfo
         HStack(spacing: 8) {
             let (text, symbol, tint, help) = status(info)
-            // §57.5: beside the review panel the strip is the terminal's width — the words that fit, the shortest cut.
-            ViewThatFits(in: .horizontal) {
-                Label(text, systemImage: symbol)
-                if text == Self.reviewedText {
-                    Label(String(localized: "Reviewed by ReviewGate"), systemImage: symbol)
+            let reviewed = text == Self.reviewedText
+            if reviewed, !TerminalReviewedHint.shows(count: hintCount, dismissed: hintDismissed, countedHere: Self.hintChats.contains(chatId)) {
+                // Said often enough: the shield alone, the same tooltip.
+                Image(systemName: symbol)
+                    .font(.caption)
+                    .foregroundStyle(tint)
+                    .help(Text(verbatim: Self.reviewedText + "\n") + Text(verbatim: help))
+                    .accessibilityLabel(Text("Reviewed by ReviewGate"))
+                    .accessibilityIdentifier("Terminal chat status")
+            } else {
+                // §57.5: beside the review panel the strip is the terminal's width — the words that fit, the shortest cut.
+                ViewThatFits(in: .horizontal) {
+                    Label(text, systemImage: symbol)
+                    if reviewed {
+                        Label(String(localized: "Reviewed by ReviewGate"), systemImage: symbol)
+                    }
+                    if text == Self.trustText {
+                        Label(String(localized: "Trust this folder? Choose Yes"), systemImage: symbol)
+                    }
                 }
-                if text == Self.trustText {
-                    Label(String(localized: "Trust this folder? Choose Yes"), systemImage: symbol)
+                .font(.caption)
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(help)
+                .accessibilityIdentifier("Terminal chat status")
+                if reviewed {
+                    Button {
+                        hintDismissed = true
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.icon)
+                    .controlSize(.mini)
+                    .help(String(localized: "Don't show this again — the shield stays, with this note in its tooltip"))
+                    .accessibilityLabel(Text("Hide this hint"))
+                    .accessibilityIdentifier("Terminal chat hint close")
                 }
             }
-            .font(.caption)
-            .foregroundStyle(tint)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .help(help)
-            .accessibilityIdentifier("Terminal chat status")
             Spacer(minLength: 4)
             // MARK: terminal-friction (§57.4): ticks each second, so "Review now" shows 2 s after an Esc with no hook.
             TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -118,6 +146,15 @@ private struct TerminalStatusStrip: View {
         }
         .padding(.horizontal, 10).padding(.vertical, 4)
         .background(host.disconnected ? Color.orange.opacity(0.12) : Color.clear)
+        .onChange(of: "\(chatId)|\(status(info).0 == Self.reviewedText)", initial: true) { _, _ in countHint(info) }
+    }
+
+    /// §57.5: a terminal chat showing "변경은 왼쪽에 나와요" for the first time counts once (`TerminalReviewedHint`).
+    private func countHint(_ info: TerminalSessionInfo?) {
+        guard status(info).0 == Self.reviewedText,
+              TerminalReviewedHint.counts(count: hintCount, dismissed: hintDismissed, countedHere: Self.hintChats.contains(chatId)) else { return }
+        Self.hintChats.insert(chatId)
+        hintCount += 1
     }
 
     /// "Review now": a tool call ended by Esc, Esc pressed here with no hook after it for 2 s, or the turn has run 60 s with

@@ -77,6 +77,26 @@ public enum PaneSplit {
     }
 }
 
+/// §57.5: the strip's "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요" says where the review is only the first few times — in the first
+/// `chats` terminal chats that reach it (per user, `countKey`) — or until the user closes it (`dismissedKey`); after that the
+/// strip keeps only its shield, with the same tooltip.
+public enum TerminalReviewedHint {
+    public static let chats = 3
+    public static let countKey = "terminalReviewedHintCount"
+    public static let dismissedKey = "terminalReviewedHintDismissed"
+
+    /// `count`: terminal chats that showed it so far; `countedHere`: this chat is one of them (it keeps the words while it
+    /// is on screen, also as the last one counted).
+    public static func shows(count: Int, dismissed: Bool, countedHere: Bool) -> Bool {
+        !dismissed && (countedHere || count < chats)
+    }
+
+    /// The hint shows in a chat that has not counted yet: it counts now.
+    public static func counts(count: Int, dismissed: Bool, countedHere: Bool) -> Bool {
+        !countedHere && shows(count: count, dismissed: dismissed, countedHere: false)
+    }
+}
+
 /// §57.5: a terminal chat's review panel beside the terminal, or as a drawer over it.
 public enum TerminalReviewLayout: Equatable, Sendable {
     case sideBySide, overlay

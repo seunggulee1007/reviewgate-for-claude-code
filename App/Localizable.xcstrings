@@ -11287,6 +11287,22 @@
         }
       }
     },
+    "Don't show this again — the shield stays, with this note in its tooltip": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't show this again — the shield stays, with this note in its tooltip"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 보지 않기 — 방패 아이콘은 남고, 이 안내는 툴팁에 있어요"
+          }
+        }
+      }
+    },
     "Done": {
       "localizations": {
         "en": {
@@ -11971,6 +11987,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰하는 동안 사이드바 숨기기"
+          }
+        }
+      }
+    },
+    "Hide this hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide this hint"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 안내 숨기기"
           }
         }
       }

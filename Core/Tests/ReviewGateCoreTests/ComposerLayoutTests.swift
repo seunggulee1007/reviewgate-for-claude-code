@@ -58,6 +58,18 @@ import Testing
         #expect(!hides(1301, hidden: true))
     }
 
+    /// §57.5: the strip says where the review is in the first three terminal chats, or until closed; the third keeps it.
+    @Test func theReviewedHintShowsTheFirstFewTimes() {
+        #expect(TerminalReviewedHint.shows(count: 0, dismissed: false, countedHere: false))
+        #expect(TerminalReviewedHint.counts(count: 0, dismissed: false, countedHere: false))
+        #expect(!TerminalReviewedHint.counts(count: 1, dismissed: false, countedHere: true))   // once per chat
+        #expect(TerminalReviewedHint.shows(count: 3, dismissed: false, countedHere: true))    // the third stays while shown
+        #expect(!TerminalReviewedHint.shows(count: 3, dismissed: false, countedHere: false))  // a fourth chat: the shield only
+        #expect(!TerminalReviewedHint.counts(count: 3, dismissed: false, countedHere: false))
+        #expect(!TerminalReviewedHint.shows(count: 1, dismissed: true, countedHere: true))    // closed: never again
+        #expect(!TerminalReviewedHint.counts(count: 0, dismissed: true, countedHere: false))
+    }
+
     /// terminal-chat (§57.5): a terminal chat's terminal never goes below 80 columns (627 pt). Side by side (the review
     /// panel next to the file list, the terminal on its right) only where 80
     /// columns and the review's 360 pt fit (987 pt); there the divider moves between the two; below it the review is a drawer

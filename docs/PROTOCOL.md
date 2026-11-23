@@ -9194,7 +9194,9 @@ chat's id);
   PTYs (all at once, not one after another), and from then on nothing starts one again (claude's SessionEnd hook still changes the engine's state while it
   shuts down). A refused spec (an old CLI, hooks turned off, no CLI) shows its reason with Try Again.
 - **The strip** over the terminal: "첫 프롬프트를 기다리는 중" (no hook yet), "ReviewGate가 리뷰해요 — 변경은 왼쪽에 나와요"
-  (hooks arrive),
+  (hooks arrive — only in the first three terminal chats that reach it, or until its × "이 안내 숨기기"; per user,
+  `TerminalReviewedHint`, `terminalReviewedHintCount` / `terminalReviewedHintDismissed`; after that the shield alone with
+  the words in its tooltip),
   "Claude가 작업 중이에요" (a turn is open), what Claude Code waits for (`waiting`), and Restart (the conversation is
   resumed). **Review now** (`terminal_end_turn`) shows while a turn is open and `interruptSuspected` is set, Esc was
   pressed in the terminal 2 s ago with no hook since, or nothing changed for 60 s — Esc in the TUI sends no Stop, so the
