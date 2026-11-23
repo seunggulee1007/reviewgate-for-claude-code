@@ -215,6 +215,65 @@ import Testing
         #expect(asked.count == 2 && store.card == nil)
     }
 
+    // MARK: The References tab (§65.8)
+
+    @Test func f4StepsRoundTheEnds() {
+        #expect(CodeNavText.step(from: nil, by: 1, count: 3) == 0)
+        #expect(CodeNavText.step(from: nil, by: -1, count: 3) == 2)
+        #expect(CodeNavText.step(from: 0, by: 1, count: 3) == 1)
+        #expect(CodeNavText.step(from: 2, by: 1, count: 3) == 0)
+        #expect(CodeNavText.step(from: 0, by: -1, count: 3) == 2)
+        #expect(CodeNavText.step(from: 7, by: 1, count: 3) == 0)   // a stale pick starts over
+        #expect(CodeNavText.step(from: nil, by: 1, count: 0) == nil)
+    }
+
+    @Test func referencesGroupByFileAndF4WalksThemInThatOrder() async {
+        let store = CodeNavStore()
+        var asked: [EngineCommand] = []
+        let hits = [ReferenceHit(path: "src/Use.kt", line: 4, preview: "cart.total()"),
+                    ReferenceHit(path: "src/Use.kt", line: 9, preview: "total()"),
+                    ReferenceHit(path: "src/Cart.kt", line: 2, preview: "fun total()", kind: .method),
+                    ReferenceHit(path: "test/CartTest.kt", line: 30, preview: "total()")]
+        let request: (EngineCommand) async throws -> EngineEvent = { command in
+            asked.append(command)
+            switch command {
+            case .findReferences: return .references(ReferencesReply(symbol: "total", hits: hits))
+            case let .definitionPreview(path, line, _, _): return .definitionPreview(self.preview(path, line))
+            default: throw EngineClientError.unexpectedReply("x")
+            }
+        }
+        let reading = CodeNavLocation(view: .review, path: "src/Use.kt", line: 4)
+        store.caret = reading
+        await store.findReferences("total", from: reading, using: request)
+        #expect(store.referenceGroups.map(\.path) == ["src/Use.kt", "src/Cart.kt", "test/CartTest.kt"])
+        #expect(store.referenceGroups.map(\.hits.count) == [2, 1, 1])
+        #expect(store.referenceSelection == 0 && store.referencePreview?.path == "src/Use.kt")
+        #expect(store.referenceSearches == [ReferenceSearch(symbol: "total", from: reading)])
+
+        // F4 from the first: the second, then the next file; Back once returns to where you were reading.
+        let second = await store.stepReference(1, sameReviewFile: { $0.hasPrefix("src/") }, using: request)
+        #expect(second?.line == 9 && store.openRequest?.location == CodeNavLocation(view: .review, path: "src/Use.kt", line: 9, column: 1))
+        let third = await store.stepReference(1, sameReviewFile: { $0.hasPrefix("src/") }, using: request)
+        #expect(third?.path == "src/Cart.kt" && store.referenceSelection == 2)
+        let fourth = await store.stepReference(1, sameReviewFile: { $0.hasPrefix("src/") }, using: request)
+        #expect(fourth?.path == "test/CartTest.kt" && store.openRequest?.location.view == .projectFile)
+        let round = await store.stepReference(1, sameReviewFile: { _ in false }, using: request)
+        #expect(round?.line == 4 && store.referenceSelection == 0)
+        // ⇧F4 from the first goes round to the last.
+        let last = await store.stepReference(-1, sameReviewFile: { _ in false }, using: request)
+        #expect(last?.path == "test/CartTest.kt")
+        #expect(store.history.back == [reading])
+        #expect(store.goBack() == reading)
+
+        // Picking a row reads its lines once; a newer search forgets the pick and keeps the history of searches.
+        let previews = asked.filter { if case .definitionPreview = $0 { true } else { false } }.count
+        await store.selectReference(3, using: request)
+        #expect(asked.filter { if case .definitionPreview = $0 { true } else { false } }.count == previews)
+        await store.findReferences("price", from: nil) { _ in .references(ReferencesReply(symbol: "price", hits: [])) }
+        #expect(store.referenceSelection == nil && store.referenceHits.isEmpty)
+        #expect(store.referenceSearches.map(\.symbol) == ["price", "total"])
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))

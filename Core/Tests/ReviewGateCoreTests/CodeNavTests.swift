@@ -219,8 +219,10 @@ import Testing
                                                                         ReferenceHit(path: "b.js", line: 3, preview: "total", kind: .function)]))
         }
         await app.findReferences("total", from: CodeNavLocation(view: .projectFile, path: "a.js", line: 1))
-        #expect(asked == [.findReferences(symbol: "total", fromPath: "a.js")])
-        #expect(app.codeNav.referencesShown && app.codeNav.referenceGroups.map(\.path) == ["a.js", "b.js"] && !app.codeNav.referencesLoading)
+        // §65.8: the first hit is picked and its lines read for the References tab's preview.
+        #expect(asked == [.findReferences(symbol: "total", fromPath: "a.js"), .definitionPreview(path: "a.js", line: 1, before: 6, after: 10)])
+        #expect(app.codeNav.referencesTick == 1 && app.codeNav.referenceGroups.map(\.path) == ["a.js", "b.js"] && !app.codeNav.referencesLoading)
+        #expect(app.codeNav.referenceSelection == 0)
         app.replySink = { _ in throw EngineClientError.refused("unknown command: find_references", code: "unknown_command") }
         await app.findReferences("total", from: nil)
         #expect(app.codeNav.referencesError == SessionToolsSupport.updateReason && app.codeNav.references == nil)

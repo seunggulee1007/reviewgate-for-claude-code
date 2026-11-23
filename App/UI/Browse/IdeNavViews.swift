@@ -30,7 +30,8 @@ struct CodeNavPreviewLines: View {
     let preview: SymbolPreviewReply
     /// The 1-based line to mark (the definition, the reference); nil marks none.
     var marked: Int?
-    var visible = 15
+    /// How many lines tall (nil: as tall as the space it is given, the marked line centred — the References tab).
+    var visible: Int? = 15
     @State private var highlighted: [AttributedString]?
 
     static let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
@@ -48,7 +49,7 @@ struct CodeNavPreviewLines: View {
                 }
                 .padding(.vertical, 4)
             }
-            .frame(height: CGFloat(max(1, min(lines.count, visible))) * Self.lineHeight + 8)
+            .frame(height: visible.map { CGFloat(max(1, min(lines.count, $0))) * Self.lineHeight + 8 })
             .onAppear { reveal(proxy) }
             .onChange(of: preview) { _, _ in reveal(proxy) }
         }
@@ -94,8 +95,14 @@ struct CodeNavPreviewLines: View {
 
     /// The marked line in view: the lines above it (a doc comment) stay unless they would push it out.
     private func reveal(_ proxy: ScrollViewProxy) {
-        guard let marked, marked - preview.startLine >= visible - 3 else { return }
-        DispatchQueue.main.async { proxy.scrollTo(max(0, marked - preview.startLine - 3), anchor: .top) }
+        guard let marked else { return }
+        let index = marked - preview.startLine
+        guard let visible else {
+            DispatchQueue.main.async { proxy.scrollTo(index, anchor: .center) }
+            return
+        }
+        guard index >= visible - 3 else { return }
+        DispatchQueue.main.async { proxy.scrollTo(max(0, index - 3), anchor: .top) }
     }
 }
 

@@ -9842,7 +9842,7 @@ type ClientCapabilities = {
 ### 57.18 The bottom panel: 출력 and 실행
 
 The panel of §57.6 (Windows: §57.17's shell panel) has three tabs — **터미널** (the shells, unchanged), **출력**,
-**실행** — so a dev server, a test run or what Claude's commands printed sit under the diff and the chat as in VS Code /
+**실행** (the Mac adds **참조**, §65.8) — so a dev server, a test run or what Claude's commands printed sit under the diff and the chat as in VS Code /
 Cursor. Client only: no engine command or event is added; the engine already sends what 출력 shows.
 
 - **Finding it.** While the panel is hidden, a thin bar under the window (project open, not the PRs tab) holds
@@ -9862,6 +9862,7 @@ Cursor. Client only: no engine command or event is added; the engine already sen
     failed one ends with "✗ 명령이 실패했어요". Results restored from a transcript are not replayed.
   - Search keeps the lines holding the text (case-insensitive). Copy puts the lines shown on the clipboard; Clear empties
     the window's output (not the log file). Both are disabled, with the reason in the tooltip, when there is nothing.
+- **참조** (ide-nav, §65.8; Mac) — Find References' results with a preview; F4 / ⇧F4 step through them.
 - **실행** — named commands per repository, each in its own PTY. Left: the list (state dot, name, command, ▶ or ■,
   context menu 실행 / 중지 / 명령 복사 / 제거) with "명령 추가…" and "다시 찾기"; right: the selected command's bar (state,
   ▶ / ■ / ↻) over its terminal.
@@ -10365,8 +10366,8 @@ Find References / Find in Project (`project_search`, whole word, case-sensitive)
 shows "Looking for X…" there. **Opening** (`CodeNavStore.openRequest`, `CodeNavObservers`): a changed file of the review,
 reached from the review or the code browser, shows its diff at the line (`WindowModel.showReviewDiff(path:line:orFile:)`);
 a line outside the diff's hunks — and every other file, and every jump from a past round's / PR / live diff — opens
-read-only in the code browser at the line. **Find References** (the row's menu, ⇧F12, a peek's or note's button): a sheet
-grouped by file in the order received, "N references in M files", a `kind` row labelled "definition"; a click opens as
+read-only in the code browser at the line. **Find References** (the row's menu, ⇧F12, a peek's or note's button): the bottom
+panel's 참조 tab (§65.8; on the PRs tab, which has no panel, a sheet) grouped by file in the order received, "N references in M files", a `kind` row labelled "definition"; a click opens as
 above. **Back / Forward** (Navigate menu ⌃- / ⌃⇧-, chevrons in the code browser's header and in the review header once
 there is history, each saying why it is off): `CodeNavHistory`, ≤ 50 places of `{view: review | projectFile | other, path,
 line}`; a jump pushes where it started, Back to `other` (a past round's / PR / live diff) closes the code browser in front
@@ -10813,6 +10814,16 @@ through). The UI is the client team's follow-up.
   kind, the lines (the definition line marked), "N more — ⌥F12 shows them all". A new name restarts the wait (only the
   newest wait's replies count, `CodeNavHoverDebounce`); leaving the name, releasing ⌘ or a click closes it; nothing is
   asked while the pointer only passes over names. Core `IdeNavHover.swift`.
+- *References tab*: the bottom panel's fourth tab **참조** (§57.18; its status-bar button too). Find References (⇧F12,
+  the row's menu, the peek's 참조 찾기) shows the panel on it — or, on the PRs tab where the window has no panel, §62's
+  sheet as before. Left: the hits by file (name, folder, count; line and `preview` with the name bold, a `kind` hit
+  labelled 정의) in the order received; right: the picked hit in its lines (`definition_preview {before: 6, after: 10}`,
+  the hit's line marked and centred), "n / N" and 열기. The first hit is picked when the reply comes. A click picks, ↩ /
+  a double-click opens (§62's opening, Back returns), **F4 / ⇧F4** (Navigate › 다음 참조 / 이전 참조, the bar's ⌃ / ⌄)
+  pick and open the next / previous hit round the ends — the first step remembers where the user was, the next ones push
+  nothing, so one Back returns there. The bar: the name, "N references in M files", ↻ (the same request again) and a menu
+  of the window's last 8 searches. Core `CodeNavStore` (`referenceSelection`, `stepReference`, `CodeNavText.step`), App
+  `Terminal/ReferencesPanel.swift`.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

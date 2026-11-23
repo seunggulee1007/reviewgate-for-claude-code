@@ -703,6 +703,7 @@ struct CodeNavCommands: Commands {
     let focused: WorkbenchWindowEntry?
 
     private static let f12 = KeyEquivalent(Character(UnicodeScalar(UInt32(NSF12FunctionKey))!))
+    private static let f4 = KeyEquivalent(Character(UnicodeScalar(UInt32(NSF4FunctionKey))!))
 
     var body: some Commands {
         CommandMenu("Navigate") {
@@ -728,6 +729,18 @@ struct CodeNavCommands: Commands {
             .keyboardShortcut(Self.f12, modifiers: .shift)
             .disabled(!hasProject)
             .accessibilityIdentifier("Navigate menu Find references")
+            // MARK: ide-nav (§65.8): the References tab's hits, one after the other.
+            let hasHits = store.map { !$0.codeNav.referenceGroups.isEmpty } ?? false
+            Button("Next Reference") { if let store { Task { await store.stepReference(1) } } }
+                .keyboardShortcut(Self.f4, modifiers: [])
+                .disabled(!hasHits)
+                .help(hasHits ? Text("Open the next reference of the References tab") : Text("No references to step through — Find References (⇧F12) on a name first"))
+                .accessibilityIdentifier("Navigate menu Next reference")
+            Button("Previous Reference") { if let store { Task { await store.stepReference(-1) } } }
+                .keyboardShortcut(Self.f4, modifiers: .shift)
+                .disabled(!hasHits)
+                .help(hasHits ? Text("Open the previous reference of the References tab") : Text("No references to step through — Find References (⇧F12) on a name first"))
+                .accessibilityIdentifier("Navigate menu Previous reference")
             Divider()
             Button("Back") { store?.codeNav.goBack() }
                 .keyboardShortcut("-", modifiers: .control)
@@ -779,11 +792,16 @@ struct CodeNavHistoryButtons: View {
 struct CodeNavObservers: ViewModifier {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
+    /// §65.8: the window shows the bottom panel (not on the PRs tab) — Find References fills its 참조 tab; else the sheet.
+    let panelAvailable: Bool
 
     func body(content: Content) -> some View {
         @Bindable var nav = store.codeNav
         content
             .sheet(isPresented: $nav.referencesShown) { CodeNavReferencesSheet() }
+            .onChange(of: nav.referencesTick) { _, _ in
+                if panelAvailable { model.shell.show(.references) } else { nav.referencesShown = true }
+            }
             .onChange(of: nav.openRequest?.tick) { _, _ in
                 if let request = nav.openRequest { open(request.location) }
             }

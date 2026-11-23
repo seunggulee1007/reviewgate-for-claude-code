@@ -99,6 +99,18 @@ public enum CodeNavOutcome: Sendable, Equatable {
     case notFound
 }
 
+/// A Find References request of the window (the References tab's history runs one again).
+public struct ReferenceSearch: Sendable, Equatable, Identifiable {
+    public var symbol: String
+    public var from: CodeNavLocation?
+    public var id: String { "\(symbol)@\(from?.path ?? ""):\(from?.line ?? 0)" }
+
+    public init(symbol: String, from: CodeNavLocation?) {
+        self.symbol = symbol
+        self.from = from
+    }
+}
+
 /// References of one file, in the order received.
 public struct ReferenceGroup: Sendable, Equatable, Identifiable {
     public var path: String
@@ -122,6 +134,14 @@ public enum CodeNavText {
         case 1: .open(reply.candidates[0])
         default: .peek(reply.candidates)
         }
+    }
+
+    /// §65.8 F4 / ⇧F4: the hit after (or before) `current` among `count`, round the ends; the first (or last) when none
+    /// is picked yet; nil when there are none.
+    public static func step(from current: Int?, by delta: Int, count: Int) -> Int? {
+        guard count > 0 else { return nil }
+        guard let current, (0..<count).contains(current) else { return delta >= 0 ? 0 : count - 1 }
+        return ((current + delta) % count + count) % count
     }
 
     /// The hits grouped by file, in the order received.
@@ -390,7 +410,22 @@ public final class CodeNavStore {
     /// Where the user is: the place last opened or clicked (Back's Forward, Open in IDE's line).
     public var caret: CodeNavLocation?
     // Find References
+    /// The fallback sheet is shown (§65.8: only where the window has no bottom panel — the PRs tab).
     public var referencesShown = false
+    /// Bumped by every Find References: the window shows the References tab (or the sheet).
+    public private(set) var referencesTick = 0
+    /// §65.8: the hit picked in the References tab (an index of `referenceHits`) and its lines around it.
+    public private(set) var referenceSelection: Int?
+    public private(set) var referencePreview: SymbolPreviewReply?
+    public private(set) var referencePreviewError: String?
+    /// The window's searches, newest first (at most `searchesLimit`).
+    public private(set) var referenceSearches: [ReferenceSearch] = []
+    public static let searchesLimit = 8
+    /// Lines before / after a reference its preview shows.
+    public static let referenceContext = (before: 6, after: 10)
+    @ObservationIgnored private var referencePreviewSeq = 0
+    /// F4 has jumped since the search: the next steps do not push Back again (one Back returns to where you read).
+    @ObservationIgnored private var steppedSinceSearch = false
     public private(set) var referencesSymbol = ""
     public private(set) var referencesFrom: CodeNavLocation?
     public private(set) var references: ReferencesReply?
@@ -479,13 +514,22 @@ public final class CodeNavStore {
         referencesSeq += 1
         let seq = referencesSeq
         popup = nil
-        referencesShown = true
+        referencesTick += 1
         referencesSymbol = symbol
         referencesFrom = from
         references = nil
         referenceGroups = []
         referencesError = nil
         referencesLoading = true
+        referenceSelection = nil
+        referencePreview = nil
+        referencePreviewError = nil
+        referencePreviewSeq += 1
+        steppedSinceSearch = false
+        let search = ReferenceSearch(symbol: symbol, from: from)
+        referenceSearches.removeAll { $0.id == search.id }
+        referenceSearches.insert(search, at: 0)
+        if referenceSearches.count > Self.searchesLimit { referenceSearches.removeLast(referenceSearches.count - Self.searchesLimit) }
         defer { if seq == referencesSeq { referencesLoading = false } }
         do {
             let reply = try await request(.findReferences(symbol: symbol, fromPath: from?.path))
@@ -493,10 +537,66 @@ public final class CodeNavStore {
             guard case let .references(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             references = r
             referenceGroups = CodeNavText.groups(r.hits)
+            if !r.hits.isEmpty {
+                referencesLoading = false
+                await selectReference(0, using: request)
+            }
         } catch {
             guard seq == referencesSeq else { return }
             referencesError = CodeNavText.message(error)
         }
+    }
+
+    /// Every hit in the order the References tab lists them (file by file).
+    public var referenceHits: [ReferenceHit] { referenceGroups.flatMap(\.hits) }
+
+    /// Picks hit `index` of `referenceHits` and reads its lines around it (the tab's preview).
+    func selectReference(_ index: Int, using request: (EngineCommand) async throws -> EngineEvent) async {
+        let hits = referenceHits
+        guard hits.indices.contains(index) else { return }
+        referenceSelection = index
+        let hit = hits[index]
+        if let p = referencePreview, p.path == hit.path, p.line == hit.line { return }
+        referencePreviewSeq += 1
+        let seq = referencePreviewSeq
+        referencePreviewError = nil
+        do {
+            let reply = try await request(.definitionPreview(path: hit.path, line: hit.line, before: Self.referenceContext.before,
+                                                             after: Self.referenceContext.after))
+            guard seq == referencePreviewSeq else { return }
+            guard case let .definitionPreview(p) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
+            referencePreview = p
+        } catch {
+            guard seq == referencePreviewSeq else { return }
+            referencePreview = nil
+            referencePreviewError = CodeNavText.message(error)
+        }
+    }
+
+    /// F4 / ⇧F4: the next / previous hit picked and opened in the diff or the code browser. The first step since the
+    /// search remembers where the user was (`caret`) for Back; the next ones do not, so one Back returns there.
+    @discardableResult
+    func stepReference(_ delta: Int, sameReviewFile: (String) -> Bool,
+                       using request: (EngineCommand) async throws -> EngineEvent) async -> ReferenceHit? {
+        let hits = referenceHits
+        guard let index = CodeNavText.step(from: referenceSelection, by: delta, count: hits.count) else { return nil }
+        let hit = hits[index]
+        let from = steppedSinceSearch ? nil : (caret ?? referencesFrom)
+        steppedSinceSearch = true
+        open(DefinitionCandidate(path: hit.path, line: hit.line, column: hit.column, kind: hit.kind ?? .file, preview: hit.preview),
+             from: from, sameReviewFile: sameReviewFile)
+        await selectReference(index, using: request)
+        return hit
+    }
+
+    /// ↩ / a double-click in the References tab: the hit opened, Back returning to where the user was.
+    func openReference(_ index: Int, sameReviewFile: (String) -> Bool) {
+        let hits = referenceHits
+        guard hits.indices.contains(index) else { return }
+        let hit = hits[index]
+        referenceSelection = index
+        open(DefinitionCandidate(path: hit.path, line: hit.line, column: hit.column, kind: hit.kind ?? .file, preview: hit.preview),
+             from: caret ?? referencesFrom, sameReviewFile: sameReviewFile)
     }
 
     /// The project changed or closed.
@@ -505,6 +605,11 @@ public final class CodeNavStore {
         referencesSeq += 1
         popup = nil
         peek.reset()
+        referenceSelection = nil
+        referencePreview = nil
+        referencePreviewError = nil
+        referencePreviewSeq += 1
+        referenceSearches = []
         hover.dismiss()
         openRequest = nil
         history.clear()
@@ -533,6 +638,26 @@ extension AppState {
     public func findReferences(_ symbol: String, from: CodeNavLocation?) async {
         guard projectInfo != nil else { return }
         await codeNav.findReferences(symbol, from: from) { [weak self] cmd in
+            guard let self else { throw EngineClientError.stopped }
+            return try await self.reply(cmd)
+        }
+    }
+
+    /// The References tab: pick hit `index` (its preview), open it (↩), or step to the next / previous one (F4 / ⇧F4).
+    public func selectReference(_ index: Int) async {
+        await codeNav.selectReference(index) { [weak self] cmd in
+            guard let self else { throw EngineClientError.stopped }
+            return try await self.reply(cmd)
+        }
+    }
+
+    public func openReference(_ index: Int) {
+        codeNav.openReference(index, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil })
+    }
+
+    @discardableResult
+    public func stepReference(_ delta: Int) async -> ReferenceHit? {
+        await codeNav.stepReference(delta, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil }) { [weak self] cmd in
             guard let self else { throw EngineClientError.stopped }
             return try await self.reply(cmd)
         }
