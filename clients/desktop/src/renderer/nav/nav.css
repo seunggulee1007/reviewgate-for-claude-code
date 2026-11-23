@@ -49,7 +49,8 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .nav-history button { padding: 0 6px; }
 
 /* §65.8 The peek band: inline under the clicked line (a DOM diff row or a Monaco view zone), the pane's width. */
-.nav-band-slot { position: sticky; left: 0; max-width: 100%; }
+/* `.unified` is an inline-size container: 100cqw is the diff's visible width, unwrapped or not (as its folds use). */
+.unified .nav-band-slot { position: sticky; left: 0; width: 100cqw; }
 .nav-band-zone { z-index: 5; }
 .nav-band {
   margin: 2px 0 4px; display: flex; flex-direction: column; background: var(--elevated); font-family: var(--font); white-space: normal;

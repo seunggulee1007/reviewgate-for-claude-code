@@ -365,7 +365,7 @@ export function UnifiedDiff(props: {
 
   // §65.8: the peek band's slot right under its row (a split row: under both sides), the pane's width wide.
   const band = (ids: (number | undefined)[]) =>
-    bandRow !== null && props.path && ids.includes(bandRow) ? <BandSlot key="nav-band" path={props.path} rowId={bandRow} width={paneWidth} /> : null;
+    bandRow !== null && props.path && ids.includes(bandRow) ? <BandSlot key="nav-band" path={props.path} rowId={bandRow} /> : null;
   const drawRows = (): ReactNode[] => {
     const draw = (entry: RowEntry) => (isCode(entry) ? [drawCode(entry), band([entry.line.id])] : entry);
     if (layout !== "split") return rows.flatMap(draw);
@@ -498,11 +498,11 @@ export function UnifiedDiff(props: {
 
 // MARK: wave2 desktop-diff — rows
 
-/** §65.8: where the peek band goes (NavViews.tsx portals it in); sticky at the left so a wide unwrapped diff keeps it in view. */
-function BandSlot(props: { path: string; rowId: number; width: number }) {
+/** §65.8: where the peek band goes (NavViews.tsx portals it in); sticky at the left, the diff's width (nav.css). */
+function BandSlot(props: { path: string; rowId: number }) {
   const { path, rowId } = props;
   const ref = useCallback((el: HTMLDivElement | null) => setBandSlot(el, { kind: "dom", path, rowId }), [path, rowId]);
-  return <div ref={ref} className="nav-band-slot" style={props.width > 0 ? { width: props.width } : undefined} data-testid="Peek band slot" />;
+  return <div ref={ref} className="nav-band-slot" data-testid="Peek band slot" />;
 }
 
 /** A code line of the list before it is drawn (one column, or a side of a split row — §34.11); other rows are drawn already. */
