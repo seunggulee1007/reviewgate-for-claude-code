@@ -128,20 +128,27 @@ public enum SlashCommandCatalog {
 
     /// Every command the session knows, once each: `commands` (with descriptions and source) first, then the bare names of
     /// `skills` / `slashCommands` the list did not have (an engine before §36 sends names only). Sorted by name. `offersMcp`:
-    /// the app's own /mcp (§56.4) is listed too.
-    public static func entries(_ caps: SessionCapabilities?, offersMcp: Bool = false) -> [SlashCommandEntry] {
+    /// the app's own /mcp (§56.4) is listed too. `offersAppCommands` (a classic chat, §56.5): the terminal's built-ins the app
+    /// answers itself (/model, /resume …) are listed with what they do here, and the ones only a terminal chat has say so.
+    public static func entries(_ caps: SessionCapabilities?, offersMcp: Bool = false, offersAppCommands: Bool = false) -> [SlashCommandEntry] {
         guard let caps else { return [] }
         let skills = Set(caps.skills)
         let plugins = Set(caps.plugins)
         var seen = Set<String>()
         var out: [SlashCommandEntry] = []
         for command in caps.commands where seen.insert(command.name).inserted {
+            let builtin = command.source == .builtin || command.source == .unknown
+            let app = offersAppCommands && builtin ? SlashAppCommand.description(command.name) : nil   // §56.5
+            let terminalOnly = offersAppCommands && builtin && SlashAppCommand.terminalOnly.contains(command.name)
             // wave4c w4c-commit (§41.1): /clear is the app's new chat — the palette says so.
             out.append(SlashCommandEntry(name: command.name,
                                          description: command.name == "clear" ? TeamFormat.clearDescription
                                              : command.name == BtwCommand.name ? BtwCommand.description
-                                             : offersMcp && command.name == McpCommand.name ? McpCommand.description : firstLine(command.description),
-                                         argumentHint: command.argumentHint.trimmingCharacters(in: .whitespacesAndNewlines),
+                                             : offersMcp && command.name == McpCommand.name ? McpCommand.description
+                                             : app ?? (terminalOnly ? SlashAppCommand.terminalOnlyDescription(firstLine(command.description))
+                                                 : firstLine(command.description)),
+                                         argumentHint: app != nil ? SlashAppCommand.argumentHint(command.name)
+                                             : command.argumentHint.trimmingCharacters(in: .whitespacesAndNewlines),
                                          isSkill: skills.contains(command.name), aliases: command.aliases,
                                          group: group(for: command)))
         }
@@ -156,6 +163,14 @@ public enum SlashCommandCatalog {
         if offersMcp, seen.insert(McpCommand.name).inserted {
             out.append(SlashCommandEntry(name: McpCommand.name, description: McpCommand.description, argumentHint: McpCommand.argumentHint,
                                          group: .builtin))
+        }
+        // §56.5: the terminal's built-ins the app answers in a classic chat.
+        if offersAppCommands {
+            for name in SlashAppCommand.names where seen.insert(name).inserted {
+                out.append(SlashCommandEntry(name: name, description: SlashAppCommand.description(name) ?? "",
+                                             argumentHint: SlashAppCommand.argumentHint(name),
+                                             aliases: SlashAppCommand.aliases.filter { $0.value == name }.map(\.key).sorted(), group: .builtin))
+            }
         }
         return out.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
@@ -289,7 +304,7 @@ public extension AppSettings {
 
 public extension AppState {
     /// The palette's commands (`capabilities`, the cache until this session's arrive).
-    var slashEntries: [SlashCommandEntry] { SlashCommandCatalog.entries(capabilities, offersMcp: offersMcpCommand) }
+    var slashEntries: [SlashCommandEntry] { SlashCommandCatalog.entries(capabilities, offersMcp: offersMcpCommand, offersAppCommands: !isTerminalChat) }
 
     /// This project's recently used commands, most recent first.
     var slashRecents: [String] {

@@ -3073,6 +3073,22 @@
         }
       }
     },
+    "Choose the model — or type one: /model sonnet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the model — or type one: /model sonnet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델을 골라요 — 바로 정하려면 /model sonnet"
+          }
+        }
+      }
+    },
     "Claude Code is still working — this is offered once the turn ends": {
       "localizations": {
         "en": {
@@ -4723,6 +4739,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트 닫기"
+          }
+        }
+      }
+    },
+    "Close this chat tab — it stays in the chat history": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this chat tab — it stays in the chat history"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅 탭을 닫아요 — 채팅 기록에는 남아요"
           }
         }
       }
@@ -6615,6 +6647,38 @@
         }
       }
     },
+    "Open Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정을 열어요"
+          }
+        }
+      }
+    },
+    "Open Settings › permissions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings › permissions"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 › 권한을 열어요"
+          }
+        }
+      }
+    },
     "Open a pull request first": {
       "localizations": {
         "en": {
@@ -6631,6 +6695,166 @@
         }
       }
     },
+    "Open the chat history to resume an earlier chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the chat history to resume an earlier chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "채팅 기록을 열어 이전 채팅을 이어가요"
+          }
+        }
+      }
+    },
+    "Rename this chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename this chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅 이름을 바꿔요"
+          }
+        }
+      }
+    },
+    "Rewind to before your last message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rewind to before your last message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마지막 메시지 전으로 되돌려요"
+          }
+        }
+      }
+    },
+    "Show CLAUDE.md and the memory files Claude reads": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show CLAUDE.md and the memory files Claude reads"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLAUDE.md와 Claude가 읽는 메모리 파일을 보여 줘요"
+          }
+        }
+      }
+    },
+    "Show how full the context is — and compact it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show how full the context is — and compact it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "컨텍스트가 얼마나 찼는지 보여 주고 compact할 수 있어요"
+          }
+        }
+      }
+    },
+    "Show the agent panel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the agent panel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에이전트 패널을 열어요"
+          }
+        }
+      }
+    },
+    "Show the keyboard shortcuts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the keyboard shortcuts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "키보드 단축키를 보여 줘요"
+          }
+        }
+      }
+    },
+    "Show the model, effort, session and MCP servers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the model, effort, session and MCP servers"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델, effort, 세션, MCP 서버를 보여 줘요"
+          }
+        }
+      }
+    },
+    "Show the session cost by model": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the session cost by model"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션 비용을 모델별로 보여 줘요"
+          }
+        }
+      }
+    },
+    "Terminal chats only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal chats only"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서만 돼요"
+          }
+        }
+      }
+    },
     "This branch has no commits since %@": {
       "localizations": {
         "en": {
@@ -6643,6 +6867,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 이후 이 브랜치에 커밋이 없어요"
+          }
+        }
+      }
+    },
+    "This command works in a terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This command works in a terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 명령은 터미널 채팅에서 써요"
           }
         }
       }
