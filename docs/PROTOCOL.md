@@ -8843,6 +8843,17 @@ Extensions › MCP servers only (§22). No engine command is new: the list is `m
   the filter, ⇥ and Esc; "No server matches" once both were removed ("No MCP servers" when the account has none)
   (`composer /mcp` lines, `composer-mcp-*.png`). Core: `McpPaletteTests`.
 
+### 56.5 The rows around the message box
+
+At the laptop's 1000 × 637 the classic chat's message box carried five rows, mostly zeros — the HUD ("기본 모델 · 0 토큰 ·
+세션 $0.00 · 턴 0 · 0.0초 · 쉬는 중"), the box, the mode line, the key hint with "스킬 0개 · 커맨드 0개 · MCP 서버 0개", and the
+controls — and the conversation got what was left. Clients only; no protocol change.
+
+- **The HUD hides what is still zero.** The context meter shows once the session reported tokens, the cost once there is
+  one (a subscription may never report one), the turn and its time once a turn ran or while one runs; a fresh chat's HUD
+  is the model and "쉬는 중". Core `HUDState.shown(isRunning:)` (`HUDShownTests`), Electron `hudModel.ts` `hudShown`
+  (`hudShown.test.ts`).
+
 ## 57. Terminal chat
 
 A terminal chat runs the real interactive `claude` TUI in a terminal the Mac app owns, instead of the app's chat UI. The

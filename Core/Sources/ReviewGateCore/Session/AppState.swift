@@ -51,6 +51,25 @@ public struct HUDState: Sendable, Equatable {
         return String(localized: "Working · \(elapsed)", bundle: .module)
     }
 
+    /// docs/PROTOCOL.md §56.5: which of its numbers the HUD shows — none that is still zero. A fresh chat's HUD is the model
+    /// and "Idle", not "0 tokens · $0.00 session · turn 0 · 0.0s"; the meter comes once the session reported tokens, the cost
+    /// once there is one (a subscription may never report one), the turn and its time once a turn ran or while one runs.
+    public struct Shown: Sendable, Equatable {
+        public var context: Bool
+        public var cost: Bool
+        public var turn: Bool
+
+        public init(context: Bool, cost: Bool, turn: Bool) {
+            self.context = context
+            self.cost = cost
+            self.turn = turn
+        }
+    }
+
+    public func shown(isRunning: Bool) -> Shown {
+        Shown(context: contextTokens > 0, cost: sessionCostUSD > 0, turn: isRunning || turnCount > 0)
+    }
+
     static func localizedActivity(_ a: HUDActivity, subagentDepth: Int) -> String {
         switch a.kind {
         case .idle: return String(localized: "Idle", bundle: .module)
