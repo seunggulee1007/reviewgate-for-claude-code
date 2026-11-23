@@ -881,6 +881,15 @@ export type EngineCommand =
   | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>
   /** Every line holding `symbol` as a whole word (`git grep -w -F`), the clicked file first. Replies `references`. */
   | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>
+  // MARK: ide-nav — §65
+  /** The outline of one file (file order, `depth` = its containers); replies `document_symbols`. */
+  | Cmd<"document_symbols", { path: string }>
+  /** Fuzzy symbol search over the project's index (built on first use); replies `workspace_symbols`. */
+  | Cmd<"workspace_symbols", { query: string; limit?: number }>
+  /** Lines around `line` of a file for a peek / hover (≤ 80); replies `definition_preview`. */
+  | Cmd<"definition_preview", { path: string; line: number; before?: number; after?: number }>
+  /** Builds the symbol index now (`full`: from scratch, else only what changed); replies `nav_index`, progress in `state.nav`. */
+  | Cmd<"nav_index_build", { full?: boolean }>
   // MARK: task-start — §63
   /** One GitHub issue for "Start from a task" (`gh issue view`): `123`, `#123`, `owner/repo#123` or an issue URL. Replies `task_fetched`. */
   | Cmd<"task_fetch", { ref: string }>
@@ -1578,6 +1587,8 @@ export type ReviewState = {
   // MARK: wave4c w4c-trust
   /** §41.2: this repository's auto-accept rules — present only while a project is open and at least one rule is on. */
   autoAcceptRules?: AutoAcceptRules;
+  /** MARK: ide-nav — §65: the symbol index; present while a project is open. */
+  nav?: NavState;
 };
 
 /** Final verdict of a file in a review round; `pending` only when the round ended unresolved. */
@@ -2184,6 +2195,7 @@ export type EngineEvent =
   | ProjectSearchEvent
   | DefinitionsEvent // MARK: code-nav (§62)
   | ReferencesEvent
+  | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent; // MARK: task-start (§63)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
@@ -2234,6 +2246,10 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "project_search" } ? ProjectSearchEvent
   : C extends { type: "find_definition" } ? DefinitionsEvent // MARK: code-nav (§62)
   : C extends { type: "find_references" } ? ReferencesEvent
+  : C extends { type: "document_symbols" } ? DocumentSymbolsEvent // MARK: ide-nav (§65)
+  : C extends { type: "workspace_symbols" } ? WorkspaceSymbolsEvent
+  : C extends { type: "definition_preview" } ? SymbolPreviewEvent
+  : C extends { type: "nav_index_build" } ? NavIndexEvent
   : C extends { type: "task_fetch" } ? TaskFetchedEvent // MARK: task-start (§63)
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
@@ -2256,6 +2272,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   | ProjectFileEvent | ProjectSearchEvent // MARK: code-browser (§47)
   | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
+  | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
@@ -3190,6 +3207,46 @@ export type ReferenceHit = { path: string; line: number; column: number; preview
  * file. `files`: how many files they are in. `truncated`: more than `limit`; `timedOut`: stopped after 15 s.
  */
 export type ReferencesEvent = { type: "references"; id?: string; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true };
+
+// ---------------------------------------------------------------- MARK: ide-nav — §65 the symbol index
+// Types only (docs/PROTOCOL.md §65).
+
+/**
+ * §65: one declaration. `container`: the enclosing type / object / component, nested ones dotted (`Outer.Inner`; a Kotlin
+ * extension function: its receiver type); `signature`: its line trimmed (a trailing `{` dropped, ≤ 200 characters);
+ * `endLine`: where a container's body ends (containers only).
+ */
+export type NavSymbol = { name: string; kind: DefinitionKind; path: string; line: number; column: number; container?: string; signature?: string; endLine?: number };
+/** §65: `depth` = how many containers of the file enclose it (0 = top level); with file order it is the outline's tree. */
+export type DocumentSymbol = NavSymbol & { depth: number };
+/** §65: `matches` = 0-based UTF-16 offsets into `name` of the query's characters (for highlighting). */
+export type WorkspaceSymbol = NavSymbol & { matches: number[] };
+/** §65: `state.nav.index` — the symbol index of the open worktree. */
+export type NavIndexState = {
+  status: "idle" | "building" | "ready" | "failed";
+  files: number;
+  symbols: number;
+  /** The symbol cap (300 000) or the time budget cut the build short. */
+  truncated: boolean;
+  /** ISO-8601 of the last finished build, null before. */
+  builtAt: string | null;
+  /** While building: the files to read. */
+  filesTotal?: number;
+  /** The last build's duration. */
+  durationMs?: number;
+  /** `failed`: git's first line. */
+  error?: string;
+};
+export type NavState = { index: NavIndexState };
+export type DocumentSymbolsEvent = { type: "document_symbols"; id?: string; path: string; language: string; symbols: DocumentSymbol[]; truncated: boolean };
+export type WorkspaceSymbolsEvent = { type: "workspace_symbols"; id?: string; query: string; symbols: WorkspaceSymbol[]; truncated: boolean; index: NavIndexState };
+export type SymbolPreviewEvent = {
+  type: "definition_preview"; id?: string; path: string; line: number; startLine: number; lines: string[]; totalLines: number; language: string;
+  /** The file was longer than §47's 2 MB / 20 000 lines (`totalLines` counts what was read). */
+  truncated: boolean;
+  symbol?: NavSymbol;
+};
+export type NavIndexEvent = { type: "nav_index"; id?: string; index: NavIndexState };
 
 // ---------------------------------------------------------------- MARK: task-start — §63 start from a task
 // Types only (docs/PROTOCOL.md §63).
