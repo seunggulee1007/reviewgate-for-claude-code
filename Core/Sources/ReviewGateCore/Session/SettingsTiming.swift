@@ -84,6 +84,13 @@ public extension AppState {
     }
 }
 
+#if DEBUG
+public extension AppState {
+    /// The screenshot tour's restart banner (App/Debug/ScreenshotTour.swift, `SHOTS_LAYOUT=settings`); nil ends it.
+    func debugSetSettingsAtSessionStart(_ start: SessionStartSettings?) { settingsAtSessionStart = start }
+}
+#endif
+
 extension AppState {
     /// Keeps `settingsAtSessionStart` with the session: taken when a session starts (or the first time an open one is seen),
     /// dropped when none is open.

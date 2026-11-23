@@ -77,6 +77,9 @@
 #                  changes in the next prompt's context, a switch away and back keeping the same PTY with its unsent text
 #                  while a write from the background is denied), and no claude starting again once the window's
 #                  terminals were stopped (`terminal:` lines; terminal-chat-*.png, shell-panel-*.png).
+#                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
+#                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
+#                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt).
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
@@ -112,7 +115,7 @@ case "$(cd "$SHOTS_DIR" 2>/dev/null && pwd -P || echo "$SHOTS_DIR")/" in
   "$HOME/"|"$HOME/.reviewgate/"*|//) die "SHOTS_DIR must be a scratch folder of its own (not \$HOME, not ~/.reviewgate)";;
 esac
 command -v xcodegen >/dev/null || die "xcodegen missing (brew install xcodegen)"
-[ "${SHOTS_LAYOUT:-}" = terminal ] || command -v claude >/dev/null || die "the Claude Code CLI is missing"
+case "${SHOTS_LAYOUT:-}" in terminal|settings) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
 NODE_DIR="$("$ROOT/scripts/find-node.sh")" || die "Node.js >= 24 not found"
 PATH="$NODE_DIR:$PATH"
 
@@ -318,8 +321,8 @@ commit "2026-10-21T09:05:00+0000" "Free shipping from \$50"
 rm -rf "$DATA" "$RAW"
 mkdir -p "$DATA" "$RAW"
 CLAUDE_BIN=claude
-if [ "${SHOTS_LAYOUT:-}" = terminal ]; then
-  # §57 terminal tour: a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
+if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = settings ]; then
+  # §57 terminal tour (and §55.11's settings shots, whose window opens a terminal chat on it): a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
   # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
   # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It prints its terminal's size (the PTY's winsize)
   # on each SIGWINCH (`winsize CxR`) and when a line is `size` (`size CxR COLUMNS=…`, no turn). It never reads or writes

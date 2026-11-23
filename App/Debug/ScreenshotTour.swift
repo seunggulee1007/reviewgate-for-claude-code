@@ -69,7 +69,8 @@ enum ScreenshotTour {
         }
         // MARK: terminal-default (§57.7): the README and layout tours run in chats; `SHOTS_LAYOUT=terminal` checks the default
         // (no choice saved → a terminal chat). Only this build's own defaults domain.
-        if env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
+        // §55.11: `SHOTS_LAYOUT=settings` runs on the same fake claude — a terminal chat, which it fakes.
+        if env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" || env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "settings" {
             UserDefaults.standard.removeObject(forKey: AppSettings.Key.newChatKind)
         } else {
             AppSettings.setNewChatKind(.chat)
@@ -148,6 +149,11 @@ private final class Tour {
         // MARK: terminal-chat (§57): `SHOTS_LAYOUT=terminal` — the terminal chat and the shell panel on a fake claude.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
             do { try await terminalOnly(); finish(nil) } catch { finish(error) }
+            return
+        }
+        // §55.11 `SHOTS_LAYOUT=settings`: the Settings window's panes, its search and its restart banner (fake claude).
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "settings" {
+            do { try await settingsOnly(); finish(nil) } catch { finish(error) }
             return
         }
         // `SHOTS_LAYOUT=blank`: only the blank-chat check in tall windows.
@@ -2691,6 +2697,62 @@ private final class Tour {
         }
         try png.write(to: out.appendingPathComponent("\(name).png"))
         log("wrote \(name).png (\(image.width)×\(image.height))")
+    }
+
+    // MARK: Settings (`SHOTS_LAYOUT=settings`, §55.11)
+
+    /// The Settings window as the app opens it, in a panel of its own (quiet: transparent): each pane at its first size
+    /// (740 × 540) and its smallest (660 × 380), the search for "bash", a jump to a row (tinted) and the "다음 세션부터
+    /// 적용돼요" banner — dark and light. `settings-<what>-<appearance>.png`; the log says whether the window with its title
+    /// bar fits a 637 pt high screen ("TALLER" when not).
+    private func settingsOnly() async throws {
+        let tabKey = SettingsView.tabKey
+        let storedTab = UserDefaults.standard.string(forKey: tabKey)
+        defer { UserDefaults.standard.set(storedTab, forKey: tabKey) }
+        func shot(_ name: String, query: String = "", size: NSSize = NSSize(width: 740, height: 540), appearance: Appearance,
+                  settle: Duration = .milliseconds(900)) async throws {
+            let host = NSHostingView(rootView: SettingsView(query: query)
+                .environment(store).environment(store.pr)
+                .frame(width: size.width, height: size.height))
+            let panel = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            panel.title = "Settings"
+            panel.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
+            panel.contentView = host
+            ScreenshotTour.hideIfQuiet(panel)
+            panel.orderFrontRegardless()
+            try await Task.sleep(for: settle)
+            let rep = try render(panel)
+            let tall = panel.frame.height
+            log("settings \(name)-\(appearance.rawValue): window \(Int(panel.frame.width))×\(Int(tall)) pt with its title bar"
+                + (tall <= 637 ? " — fits 637" : " — TALLER than 637"))
+            try write(rep, "settings-\(name)-\(appearance.rawValue)")
+            panel.orderOut(nil)
+        }
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            // Not Advanced: its toolchain rows show where node was found, which may be under the home folder.
+            for pane in [SettingsPane.general, .permissions, .session, .review, .git, .extensions] {
+                UserDefaults.standard.set(pane.rawValue, forKey: tabKey)
+                try await shot(pane.rawValue, appearance: appearance)
+            }
+            UserDefaults.standard.set(SettingsPane.general.rawValue, forKey: tabKey)
+            try await shot("general-smallest", size: NSSize(width: 660, height: 380), appearance: appearance)
+            try await shot("search-bash", query: "bash", appearance: appearance)
+            try await shot("search-none", query: "zzz", appearance: appearance)
+            // A jump from a search result or "Change Limit…": the pane opens at the row, tinted.
+            SettingsNavigation.shared.show("maxTurns")
+            try await shot("jump-maxTurns", appearance: appearance, settle: .milliseconds(700))
+            // A setting the session read at its start changed: the banner on every pane.
+            var start = SessionStartSettings.current()
+            start.autoAllowBash.toggle()
+            start.systemPromptAppend += " (before)"
+            store.debugSetSettingsAtSessionStart(start)
+            UserDefaults.standard.set(SettingsPane.review.rawValue, forKey: tabKey)
+            try await shot("restart-banner", appearance: appearance)
+            log("settings restart-banner-\(appearance.rawValue): waiting \(store.settingsWaitingForRestart.joined(separator: ", "))")
+            store.debugSetSettingsAtSessionStart(nil)
+        }
+        AppSettings.setAppearance(.dark)
     }
 
     // MARK: Open Project (`SHOTS_LAYOUT=open`)

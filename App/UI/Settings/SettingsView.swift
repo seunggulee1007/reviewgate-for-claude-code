@@ -9,8 +9,13 @@ struct SettingsView: View {
     typealias Tab = SettingsPane
     static let tabKey = "settingsTab"
     @AppStorage(SettingsView.tabKey) private var tab = SettingsPane.general.rawValue
-    @State private var query = ""
+    @State private var query: String
     private var navigation: SettingsNavigation { .shared }
+
+    /// `query`: what the search field starts with (the screenshot tour's search shot); empty — the panes.
+    init(query: String = "") {
+        _query = State(initialValue: query)
+    }
 
     private var pane: SettingsPane { SettingsPane(stored: tab) }
 
