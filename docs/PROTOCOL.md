@@ -9631,6 +9631,9 @@ type ClientCapabilities = {
   `diffToggleSeq`) takes the keyboard: ↑ / ↓ scroll its diff, Ctrl+Enter clicks its Accept (the same reasons keep it off),
   Esc closes it. One that opens by itself for a review leaves the keyboard in the terminal; closing the drawer that held it
   gives it back to the terminal. The Windows diff header keeps its two rows in the drawer (it has no "⋯" menu yet).
+- **The strip's hint** (as the Mac §57.5, `terminalStrip.ts` `showsReviewedHint`): "…변경은 왼쪽에 나와요" only in the first
+  three terminal chats that reach it, or until its × (per user, `localStorage` `rg.terminalReviewedHintCount` /
+  `rg.terminalReviewedHintDismissed`); then the terminal icon alone, the words in its tooltip.
 
 ## 58. Accept N & Continue
 

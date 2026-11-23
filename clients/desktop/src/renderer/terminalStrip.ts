@@ -79,6 +79,53 @@ export function stripStatus(i: StripInput): StripStatus {
   };
 }
 
+/**
+ * §57.5: "Reviewed by ReviewGate — changes show on the left" says where the review is only in the first
+ * `REVIEWED_HINT_CHATS` terminal chats that reach it (per user) or until the user closes it; then the strip keeps its icon,
+ * the words in its tooltip. `countedHere`: this chat is one of them (it keeps the words while on screen).
+ */
+export const REVIEWED_HINT_CHATS = 3;
+export const REVIEWED_HINT_COUNT_KEY = "rg.terminalReviewedHintCount";
+export const REVIEWED_HINT_DISMISSED_KEY = "rg.terminalReviewedHintDismissed";
+
+export function showsReviewedHint(count: number, dismissed: boolean, countedHere: boolean): boolean {
+  return !dismissed && (countedHere || count < REVIEWED_HINT_CHATS);
+}
+
+/** The hint shows in a chat that has not counted yet: it counts now. */
+export function countsReviewedHint(count: number, dismissed: boolean, countedHere: boolean): boolean {
+  return !countedHere && showsReviewedHint(count, dismissed, false);
+}
+
+type HintStorage = Pick<Storage, "getItem" | "setItem">;
+
+function hintStorage(): HintStorage | null {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** The persisted count and dismissal (blocked storage: as if never shown). */
+export function readReviewedHint(storage: HintStorage | null = hintStorage()): { count: number; dismissed: boolean } {
+  try {
+    const count = Number.parseInt(storage?.getItem(REVIEWED_HINT_COUNT_KEY) ?? "0", 10);
+    return { count: Number.isFinite(count) && count > 0 ? count : 0, dismissed: storage?.getItem(REVIEWED_HINT_DISMISSED_KEY) === "1" };
+  } catch {
+    return { count: 0, dismissed: false };
+  }
+}
+
+export function writeReviewedHint(v: { count?: number; dismissed?: boolean }, storage: HintStorage | null = hintStorage()): void {
+  try {
+    if (v.count !== undefined) storage?.setItem(REVIEWED_HINT_COUNT_KEY, String(v.count));
+    if (v.dismissed !== undefined) storage?.setItem(REVIEWED_HINT_DISMISSED_KEY, v.dismissed ? "1" : "0");
+  } catch {
+    // blocked storage: the hint shows again next time
+  }
+}
+
 /** How long a running turn may go without a change in the live terminal chat before "Review now" shows. */
 export const REVIEW_NOW_IDLE_MS = 60_000;
 
