@@ -3789,6 +3789,7 @@
   "Working": "작업 중",
   "Working on “{0}” — wait for it to finish": "“{0}” 작업 중이에요 — 끝날 때까지 기다려요",
   "Working tree has uncommitted changes": "작업 트리에 커밋하지 않은 변경이 있어요",
+  "Working · {0}": "작업 중 · {0}",
   "Working…": "작업 중…",
   "Works in another worktree ({0}) — this window's review does not see it": "다른 worktree({0})에서 작업합니다 — 이 창의 리뷰에 잡히지 않습니다",
   "Works in another worktree — this window's review does not see it": "다른 worktree에서 작업합니다 — 이 창의 리뷰에 잡히지 않습니다",
