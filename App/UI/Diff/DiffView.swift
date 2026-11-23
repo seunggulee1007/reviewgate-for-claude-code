@@ -892,6 +892,10 @@ struct DiffViewHeader: View {
                 .accessibilityIdentifier("Reject")
             Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
                 .buttonStyle(.borderedProminent)
+                // The primary action also in a window that is not in front: AppKit greys a prominent button there and Accept
+                // looked like Reject beside it. macOS 26's design takes this; the older design (macOS 15, the compatibility
+                // mode the quiet tour renders in) greys every bezel of an inactive window regardless.
+                .environment(\.controlActiveState, .key)
                 .controlSize(.regular)
                 .fixedSize()
                 .disabled(store.isAcceptLocked)
