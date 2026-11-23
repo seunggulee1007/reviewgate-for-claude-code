@@ -172,6 +172,11 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "project_file",
   // §62: "Find in Project" from the "no definition found" notice (§47's search: read-only, lane "search")
   "project_search",
+  // MARK: ide-nav — §65 the symbol index (read-only, lane "nav"): ⌘⇧O / ⌘T, the peek / hover preview, a rebuild
+  "document_symbols",
+  "workspace_symbols",
+  "definition_preview",
+  "nav_index_build",
 ]);
 
 export type Validated = { ok: true; cmd: EngineCommand } | { ok: false; error: string };
