@@ -228,6 +228,19 @@ import Testing
         #expect(store.taskForComposer == nil)
     }
 
+    @Test func aDraftWaitsForItsChatsKindBeforeItGoesAnywhere() async {
+        let store = AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: defaults())
+        var pasted: [String] = []
+        store.onTerminalPaste = { pasted.append($0); return nil }
+        store.handle(.taskStarted(TaskStartedInfo(text: "Work on task 7", mode: .default, from: "/work/acme", sent: false, draft: true)))
+        await settle()
+        #expect(store.taskForComposer == nil && pasted.isEmpty)   // no chat known yet
+        store.handle(.state(snapshot(turns: 0, kind: .terminal)))
+        for _ in 0..<20 where pasted.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+        #expect(pasted == ["Work on task 7"])
+        #expect(store.taskForComposer == nil)
+    }
+
     @Test func fetchTaskReadsTheReplyAndWordsTheRefusals() async throws {
         let store = AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: defaults())
         store.handle(.state(snapshot(turns: 0)))

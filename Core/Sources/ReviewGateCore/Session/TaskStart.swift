@@ -532,12 +532,14 @@ extension AppState {
         firstPromptTask = Task { [weak self] in
             for _ in 0..<100 {
                 guard let self, !Task.isCancelled else { return }
-                let isTerminal = terminal ?? self.isTerminalChat
-                if !isTerminal {
-                    self.taskForComposer = TaskComposerText(text: text)
-                    return
+                // A draft from a new workbench can come before the snapshot that names its chat: its kind decides first.
+                if terminal != nil || self.sessions.contains(where: { $0.id == self.currentSessionId }) {
+                    if !(terminal ?? self.isTerminalChat) {
+                        self.taskForComposer = TaskComposerText(text: text)
+                        return
+                    }
+                    if self.isTerminalChat, self.pasteIntoTerminal(text) == nil { return }
                 }
-                if self.isTerminalChat, self.pasteIntoTerminal(text) == nil { return }
                 try? await Task.sleep(for: .milliseconds(300))
             }
             guard let self, !Task.isCancelled else { return }
