@@ -143,6 +143,12 @@ public enum EngineMessages {
         case "engine_disposed": return String(localized: "The engine is shutting down", bundle: .module)
         case "unknown_command": return String(localized: "The engine does not know this command — update ReviewGate", bundle: .module)
         case "unknown_pr_file": return String(localized: "This file is not part of the pull request", bundle: .module)
+        // §60: pr_comment
+        case "no_pr_selected": return String(localized: "Open a pull request first", bundle: .module)
+        case "empty_body": return String(localized: "Write the comment first", bundle: .module)
+        case "pr_comment_failed":
+            return underlying.isEmpty ? String(localized: "Could not post the comment", bundle: .module)
+                : String(localized: "Could not post the comment: \(underlying)", bundle: .module)
         case "invalid_mode": return String(localized: "Unknown permission mode", bundle: .module)
         case "unknown_permission_request": return PermissionNotice.alreadyHandled.text   // wave1 mac-perms (§33.1)
         case "invalid_branch_name": return String(localized: "Not a valid branch name: \(detail)", bundle: .module)

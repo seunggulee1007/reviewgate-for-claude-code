@@ -59,6 +59,10 @@ public final class PRStore {
     public var comments: [PRComment] { state.comments }
     /// Reviews of the opened PR (`pulls/N/reviews`); loaded with detail/files/comments, refreshed after submit.
     public var reviews: [PRReview] { state.reviews }
+    /// §60: the PR's conversation (general comments, oldest first); [] from an engine before §60.
+    public var conversation: [PRIssueComment] { state.conversation ?? [] }
+    /// §60: a `comment(_:)` is being posted.
+    public var isCommenting: Bool { state.isCommenting ?? false }
     public private(set) var selectedFile: PRFile?
     public private(set) var selectedDiff: FileDiff?
     /// M13 (audit 1.10): the engine cut `selectedDiff` at its line cap.
@@ -90,6 +94,8 @@ public final class PRStore {
     /// An inline comment or reply being written, by `commentDraftKey`; cleared when it is added / sent / cancelled or
     /// another PR opens. Not observed: a composer reads it when it opens, and a keystroke must not redraw the diff.
     @ObservationIgnored public var commentDrafts: [String: String] = [:]
+    /// §60: the conversation comment being written; kept across the PR tab's views, cleared once it was posted or another PR opens.
+    public var conversationDraft = ""
 
     /// The composer on `path`'s `side` `line`, or the reply to `replyTo` there.
     public nonisolated static func commentDraftKey(path: String, side: String, line: Int, replyTo: Int? = nil) -> String {
@@ -107,6 +113,7 @@ public final class PRStore {
             if !reviewSummaryDraft.isEmpty { reviewSummaryDraft = "" }
             if reviewEventDraft != .comment { reviewEventDraft = .comment }
             if !commentDrafts.isEmpty { commentDrafts = [:] }
+            if !conversationDraft.isEmpty { conversationDraft = "" }
         }
         let openedAnother = new.selectedSummary?.id != old.selectedSummary?.id || (old.selected == nil && new.selected != nil)
         if openedAnother || (selectedFile.map { sel in !new.files.contains { $0.id == sel.id } } ?? false) {
@@ -194,6 +201,20 @@ public final class PRStore {
         guard selectedSummary != nil else { return }
         // Replies must target the thread root; replying to a reply is rejected by GitHub.
         await app?.run(.prReply(commentId: comment.inReplyTo ?? comment.id, body: body))
+    }
+
+    /// §60: posts `body` as a general comment on the selected PR (`pr_comment`). Returns nil once it went out, else the
+    /// refusal in the user's words — the composer keeps the text and shows it (the engine leaves `errorText` alone).
+    public func comment(_ body: String) async -> String? {
+        guard let app else { return EngineClientError.stopped.userMessage }
+        do {
+            try await app.request(.prComment(body: body))
+            return nil
+        } catch let error as EngineClientError {
+            return error.userMessage
+        } catch {
+            return error.localizedDescription
+        }
     }
 
     // MARK: - Accounts
