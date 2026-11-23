@@ -16,7 +16,7 @@ struct SidePromoteSheet: View {
     private var isMessage: Bool { draft.target == .message }
     /// §57.7: a message for a terminal chat is pasted into its terminal (nothing sends into its TUI).
     private var pastesIntoTerminal: Bool { isMessage && store.isTerminalChat }
-    private var chatTitle: String? { store.openTabs.first { $0.id == store.currentSessionId }?.title }
+    private var chatTitle: String? { store.openTabs.first { $0.id == store.currentSessionId }?.displayTitle }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

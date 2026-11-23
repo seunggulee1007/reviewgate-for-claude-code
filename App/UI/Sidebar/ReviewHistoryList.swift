@@ -141,7 +141,7 @@ struct ReviewHistoryList: View {
     /// With "All chats", the chat a round ran in.
     private func sessionTitle(_ entry: ReviewHistoryEntry) -> String? {
         guard store.historyAllSessions, let id = entry.sessionId else { return nil }
-        return store.sessions.first { $0.id == id }?.title
+        return store.sessions.first { $0.id == id }?.displayTitle
     }
 }
 

@@ -68,8 +68,7 @@ extension AppState {
 
     /// A chat's title for these lines ("New chat" when it has none).
     public func chatTitle(id: String?) -> String {
-        let title = sessions.first { $0.id == id }?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return title.isEmpty ? String(localized: "New chat", bundle: .module) : title
+        SessionMeta.displayTitle(sessions.first { $0.id == id }?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
     }
 
     /// Why sending from the viewed chat cannot go there at all (a failed collection, M31); nil when it can — at once, or
