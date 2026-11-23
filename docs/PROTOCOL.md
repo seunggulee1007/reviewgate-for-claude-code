@@ -10806,6 +10806,12 @@ through).
   click opens (§62's opening, Back returns), Esc closes (also from the diff; a text field or a terminal keeps its Esc).
   One candidate stays in the band (peek never jumps by itself); none → "No definition found" with Find References / Find
   in Project. Another file, pane or jump closes it.
+- **Hover** (`nav/hoverModel.ts` `HoverDebounce`, one timer for the window): Ctrl held with the pointer resting on a name
+  for 600 ms (DOM diffs and Monaco alike; the same name keeps the wait, another restarts it) → `find_definition`, then
+  `definition_preview {path, line, after: 8}` of the first candidate → a card under the name (never takes a click):
+  `symbol.signature` in bold (else the candidate's `preview`), "File.kt:5 · folder", the doc comment and the next lines,
+  the definition line marked. Nothing for no candidate or a refusal. Ctrl released, the pointer off the name, a click or
+  a scroll ends it; each request is numbered and only the newest one's reply shows.
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.

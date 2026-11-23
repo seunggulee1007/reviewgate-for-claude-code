@@ -68,3 +68,13 @@ body.rg-nav-pointer .unified .line .text { cursor: pointer; }
 .nav-band-note { padding: 8px 10px; }
 .nav-band-list { flex: none; width: 260px; max-height: 270px; overflow: auto; border-left: 1px solid var(--border); padding: 2px 0; }
 .nav-band-list .nav-row .folder { font-size: 11px; color: var(--fg-3); }
+
+/* §65.8 The hover card (Ctrl held on a name for 600 ms): never takes a click. */
+.nav-hover {
+  position: fixed; z-index: 61; max-width: min(620px, calc(100vw - 16px)); pointer-events: none; padding: 6px 10px 8px;
+  background: var(--elevated); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow);
+}
+.nav-hover-sig { font-family: var(--mono); font-size: 12px; font-weight: 700; white-space: pre-wrap; word-break: break-word; }
+.nav-hover-where { font-size: 11px; color: var(--fg-3); margin: 2px 0 4px; }
+.nav-hover-code { font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); white-space: pre; overflow: hidden; max-height: calc(18 * 16px); line-height: 16px; }
+.nav-hover-code .target { color: var(--fg); background: color-mix(in srgb, var(--accent) 14%, transparent); }

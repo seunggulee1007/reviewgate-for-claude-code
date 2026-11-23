@@ -68,6 +68,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Go to Definition", mac: "F12", win: "F12", note: "Or ⌘-click the name (Ctrl+click on Windows)" },
       // §65.8: the definition inline under the line (Windows: Ctrl+click too unless Settings says Go to)
       { action: "Peek Definition", mac: "⌥F12", win: "Alt+F12", note: "On Windows Ctrl+click peeks too — Settings › Review › Code navigation" },
+      { action: "Show the definition on hover", mac: "⌘ (0.6 s)", win: "Ctrl (0.6 s)", note: "Hold it with the pointer resting on a name" }, // §65.8
       { action: "Find References", mac: "⇧F12", win: "Shift+F12" },
       { action: "Back", mac: "⌃-", win: "Alt+←" },
       { action: "Forward", mac: "⌃⇧-", win: "Alt+→" },

@@ -234,4 +234,40 @@ describe("Go to Definition (§62, Windows)", () => {
     m.useStore.getState().selectFile("src/B.java");
     expect(m.useNav.getState().band).toBeNull();
   });
+
+  it("§65.8 hover: the first candidate's preview with 8 lines after; nothing for none; a newer hover drops the older reply", async () => {
+    const asked: EngineCommand[] = [];
+    let releaseFirst: (() => void) | null = null;
+    replies.set("find_definition", (cmd) => {
+      const symbol = (cmd as { symbol: string }).symbol;
+      const reply = { type: "definitions", symbol, candidates: symbol === "none" ? [] : [cand(`${symbol}.kt`, 5, "method")], truncated: false };
+      return symbol === "slow" ? new Promise((r) => (releaseFirst = () => r(reply))) : reply;
+    });
+    replies.set("definition_preview", (cmd) => {
+      asked.push(cmd);
+      const p = cmd as { path: string; line: number };
+      return { type: "definition_preview", path: p.path, line: p.line, startLine: 4, lines: ["/** Doc. */", "fun total(): Int {"], totalLines: 30, language: "kotlin", truncated: false, symbol: { name: "total", kind: "method", path: p.path, line: 5, column: 5, signature: "fun total(): Int" } };
+    });
+    m.useNav.getState().requestHover({ symbol: "total", fromPath: "src/A.kt", line: 2, column: 9, receiver: "cart", x: 1, y: 2 });
+    await flush();
+    await flush();
+    expect(asked).toEqual([{ type: "definition_preview", path: "total.kt", line: 5, after: 8 }]);
+    expect(m.useNav.getState().hover).toMatchObject({ signature: "fun total(): Int", path: "total.kt", line: 5, x: 1, y: 2 });
+    expect(m.useNav.getState().hover!.lines.map((l) => l.target)).toEqual([false, true]);
+
+    m.useNav.getState().requestHover({ symbol: "none", x: 0, y: 0 });
+    await flush();
+    expect(m.useNav.getState().hover).toBeNull();
+
+    m.useNav.getState().requestHover({ symbol: "slow", x: 0, y: 0 });
+    m.useNav.getState().requestHover({ symbol: "fast", x: 5, y: 6 });
+    await flush();
+    await flush();
+    releaseFirst!();
+    await flush();
+    await flush();
+    expect(m.useNav.getState().hover?.path).toBe("fast.kt");
+    m.useNav.getState().hideHover();
+    expect(m.useNav.getState().hover).toBeNull();
+  });
 });

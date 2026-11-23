@@ -13,7 +13,8 @@ import { showToast } from "../toast";
 import { isSendableSymbol } from "./identifier";
 import { EMPTY_HISTORY, goBack, goForward, peekRows, pushHistory, referenceRows, searchRows, type NavHistory, type NavLocation, type PeekRow, type RefRow } from "./navModel";
 import { sameAnchor, useBandSlot, type BandAnchor } from "./bandSlot"; // §65.8
-import { bandRows, type BandRow } from "./peekModel";
+import { bandLines, bandRows, type BandLine, type BandRow } from "./peekModel";
+import { HoverDebounce } from "./hoverModel";
 
 export type NavTarget = { path: string; line: number; column: number; symbol?: string };
 
@@ -60,12 +61,18 @@ export type BandState = {
   previews: Record<number, SymbolPreviewEvent | string>;
 };
 
+/** §65.8: what the hover asks about — the name under the pointer with Ctrl held, and where to show the card. */
+export type HoverQuery = { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string; x: number; y: number };
+/** The hover card: the declaration's signature (bold) and its lines — the doc comment above and the next 8. */
+export type HoverState = { seq: number; x: number; y: number; signature: string; path: string; line: number; lines: BandLine[] };
+
 export type FileViewState = NavTarget & { seq: number; data: ProjectFileEvent | null; error: string | null };
 export type RevealState = NavTarget & { seq: number };
 
 type NavState = {
   peek: PeekState | null;
   band: BandState | null;
+  hover: HoverState | null;
   refs: RefsState | null;
   file: FileViewState | null;
   reveal: RevealState | null;
@@ -82,6 +89,9 @@ type NavState = {
   /** The band's candidate in the diff / the project file view (as §62 opens one); the band closes. */
   openBandSelected(): void;
   closeBand(): void;
+  /** §65.8 hover: `find_definition`, then `definition_preview {after: 8}` of the first candidate; nothing for none. */
+  requestHover(q: HoverQuery): void;
+  hideHover(): void;
   findReferences(q: { symbol: string; fromPath?: string }): void;
   findInProject(symbol: string): void;
   /** Opens a result: a changed file of the review in its diff at that line, any other file in the project file view. */
@@ -110,6 +120,7 @@ export function definitionHints(q: { fromPath?: string | undefined; line?: numbe
 
 let defSeq = 0;
 let bandSeq = 0;
+let hoverSeq = 0;
 let refSeq = 0;
 let fileSeq = 0;
 let revealSeq = 0;
@@ -175,6 +186,7 @@ export const useNav = create<NavState>((set, get) => {
   return {
     peek: null,
     band: null,
+    hover: null,
     refs: null,
     file: null,
     reveal: null,
@@ -237,6 +249,27 @@ export const useNav = create<NavState>((set, get) => {
     },
 
     closeBand: dropBand,
+
+    requestHover(q) {
+      const seq = ++hoverSeq;
+      if (get().hover) set({ hover: null });
+      if (!isSendableSymbol(q.symbol)) return;
+      const live = () => seq === hoverSeq;
+      engineRequest({ type: "find_definition", symbol: q.symbol, ...definitionHints(q) })
+        .then(async (reply) => {
+          const best = reply.candidates[0];
+          if (!live() || !best) return;
+          const preview = await engineRequest({ type: "definition_preview", path: best.path, line: best.line, after: 8 });
+          if (!live()) return;
+          set({ hover: { seq, x: q.x, y: q.y, signature: preview.symbol?.signature ?? best.preview, path: best.path, line: best.line, lines: bandLines(preview) } });
+        })
+        .catch(() => undefined); // a hover says nothing about a refusal: the click does
+    },
+
+    hideHover() {
+      hoverSeq++;
+      if (get().hover) set({ hover: null });
+    },
 
     findReferences({ symbol, fromPath }) {
       if (!isSendableSymbol(symbol)) return;
@@ -328,8 +361,9 @@ export const useNav = create<NavState>((set, get) => {
     reset() {
       defSeq++;
       refSeq++;
+      hoverSeq++;
       dropBand();
-      set({ peek: null, refs: null, file: null, reveal: null, history: EMPTY_HISTORY, here: null });
+      set({ peek: null, hover: null, refs: null, file: null, reveal: null, history: EMPTY_HISTORY, here: null });
     },
   };
 });
@@ -372,3 +406,12 @@ useStore.subscribe((s, prev) => {
   if (nav.band) nav.closeBand();
   if (nav.file && (picked || opened)) nav.closeFile();
 });
+
+/** §65.8: the one hover timer of the window (the DOM diffs and every Monaco editor move it). */
+export const hoverTimer = new HoverDebounce<HoverQuery>((q) => useNav.getState().requestHover(q));
+
+/** Ctrl released, a click, a scroll, the pointer off the name: no hover, and none on its way. */
+export function endHover(): void {
+  hoverTimer.reset();
+  useNav.getState().hideHover();
+}

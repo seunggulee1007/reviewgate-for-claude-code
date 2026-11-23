@@ -10,7 +10,7 @@ import { monaco } from "../monaco";
 import { navModifier } from "./domTarget";
 import { identifierAt, isSendableSymbol } from "./identifier";
 import type { NavLocation } from "./navModel";
-import { useNav } from "./navStore";
+import { endHover, hoverTimer, useNav } from "./navStore";
 import { setBandSlot, useBandSlot, type BandAnchor } from "./bandSlot";
 import { ctrlClickAction } from "./peekModel";
 import { useStore } from "../store";
@@ -45,7 +45,21 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
     const pos = e?.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT ? e.target.position : null;
     const found = held && pos ? symbolAt(ed, pos, opts.path, false) : null;
     link.set(found ? [{ range: new monaco.Range(found.line, found.start, found.line, found.end), options: { inlineClassName: "rg-nav-link" } }] : []);
+    // §65.8: resting on the name with Ctrl held shows its definition after 600 ms.
+    if (!found) {
+      if (hovering) {
+        hovering = false;
+        endHover();
+      }
+      return;
+    }
+    hovering = true;
+    const vis = ed.getScrolledVisiblePosition({ lineNumber: found.line, column: found.start });
+    const box = ed.getDomNode()?.getBoundingClientRect();
+    const q = { symbol: found.symbol, fromPath: opts.path, line: found.line, column: found.start, ...(found.receiver ? { receiver: found.receiver } : {}), x: (box?.left ?? 0) + (vis?.left ?? 0), y: (box?.top ?? 0) + (vis?.top ?? 0) + (vis?.height ?? 16) };
+    if (hoverTimer.move(`${ed.getId()}|${found.line}|${found.start}|${found.symbol}`, q)) useNav.getState().hideHover();
   };
+  let hovering = false;
   disposables.push(
     ed.onMouseMove((e) => {
       lastMouse = e;
@@ -54,12 +68,32 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
     ed.onMouseLeave(() => {
       lastMouse = null;
       link.clear();
+      if (hovering) {
+        hovering = false;
+        endHover();
+      }
     }),
     ed.onKeyDown((e) => {
       if (e.keyCode === monaco.KeyCode.Ctrl || e.keyCode === monaco.KeyCode.Meta) underline(lastMouse, true);
     }),
-    ed.onKeyUp(() => link.clear()),
+    ed.onKeyUp(() => {
+      link.clear();
+      if (hovering) {
+        hovering = false;
+        endHover();
+      }
+    }),
+    ed.onDidScrollChange(() => {
+      if (hovering) {
+        hovering = false;
+        endHover();
+      }
+    }),
     ed.onMouseDown((e) => {
+      if (hovering) {
+        hovering = false;
+        endHover();
+      }
       if (!e.event.leftButton || !navModifier(e.event) || e.target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT || !e.target.position) return;
       const found = symbolAt(ed, e.target.position, opts.path, false);
       if (!found) return;

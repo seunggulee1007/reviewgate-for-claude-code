@@ -11,8 +11,8 @@ import { showToast } from "../toast";
 import { navKey } from "../keymap";
 import { isTerminalTarget } from "../terminal/terminalKeys";
 import { domTargetAt, domTargetAtSelection, navModifier, type DomNavTarget } from "./domTarget";
-import { groupByFile, markSymbol, peekKey, type NavLocation, type RefRow } from "./navModel";
-import { backBlocked, currentLocation, forwardBlocked, useNav } from "./navStore";
+import { groupByFile, markSymbol, peekKey, splitPath, type NavLocation, type RefRow } from "./navModel";
+import { backBlocked, currentLocation, endHover, forwardBlocked, hoverTimer, useNav } from "./navStore";
 import { openInIde } from "./openInIde";
 import { useBandSlot } from "./bandSlot"; // §65.8
 import { PeekBand } from "./PeekBand";
@@ -67,6 +67,7 @@ function useDomNav(): void {
     const clear = () => {
       if (!shown) return;
       shown = false;
+      endHover(); // §65.8
       reg?.delete("rg-nav-link");
       document.body.classList.remove("rg-nav-pointer");
     };
@@ -76,6 +77,11 @@ function useDomNav(): void {
       shown = true;
       reg?.set("rg-nav-link", new (window as unknown as { Highlight: new (...r: Range[]) => unknown }).Highlight(target.range));
       document.body.classList.add("rg-nav-pointer");
+      // §65.8: resting on the name with Ctrl held shows its definition after 600 ms.
+      const box = target.range.getBoundingClientRect();
+      const key = `${target.path}|${target.rowId}|${target.column}|${target.symbol}`;
+      const q = { symbol: target.symbol, fromPath: target.path, ...(target.line ? { line: target.line } : {}), column: target.column, ...(target.receiver ? { receiver: target.receiver } : {}), x: box.left, y: box.bottom };
+      if (hoverTimer.move(key, q)) useNav.getState().hideHover();
     };
     const onMove = (e: MouseEvent) => {
       pointer = { x: e.clientX, y: e.clientY };
@@ -90,7 +96,11 @@ function useDomNav(): void {
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === "Control" || e.key === "Meta") clear();
     };
+    const onScroll = () => {
+      if (useNav.getState().hover) endHover();
+    };
     const onDown = (e: MouseEvent) => {
+      if (useNav.getState().hover) endHover();
       if (e.button !== 0 || !navModifier(e) || e.altKey || e.shiftKey) return;
       const target = domTargetAt(e.clientX, e.clientY);
       if (!target) return;
@@ -104,6 +114,7 @@ function useDomNav(): void {
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
     document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("scroll", onScroll, true);
     window.addEventListener("blur", clear);
     return () => {
       cancelAnimationFrame(frame);
@@ -112,6 +123,7 @@ function useDomNav(): void {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
       document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("blur", clear);
     };
   }, []);
@@ -195,11 +207,43 @@ export function NavLayer() {
   const peek = useNav((s) => s.peek);
   const band = useNav((s) => s.band !== null);
   const slot = useBandSlot((s) => s.slot);
+  const hover = useNav((s) => s.hover !== null);
   return (
     <>
       {peek && createPortal(<PeekPopover />, document.body)}
+      {hover && !peek && createPortal(<HoverCard />, document.body)}
       {band && slot && createPortal(<PeekBand />, slot)}
     </>
+  );
+}
+
+/** §65.8: the hover card under the name — the signature in bold, then the doc comment and the next lines. */
+function HoverCard() {
+  const hover = useNav((s) => s.hover)!;
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: hover.x, top: hover.y + 4 });
+  useLayoutEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const top = hover.y + 4 + r.height > window.innerHeight - 4 ? Math.max(4, hover.y - r.height - 24) : hover.y + 4;
+    setPos({ left: Math.max(4, Math.min(hover.x, window.innerWidth - r.width - 4)), top });
+  }, [hover.seq, hover.x, hover.y]);
+  const { name, folder } = splitPath(hover.path);
+  return (
+    <div ref={ref} className="nav-hover" style={pos} role="tooltip" data-testid="Hover preview">
+      <div className="nav-hover-sig">{hover.signature}</div>
+      <div className="nav-hover-where">
+        {name}:{hover.line}
+        {folder ? ` · ${folder}` : ""}
+      </div>
+      <div className="nav-hover-code">
+        {hover.lines.map((l) => (
+          <div key={l.no} className={l.target ? "target" : undefined}>
+            {l.text || " "}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
