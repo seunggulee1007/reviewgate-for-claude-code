@@ -301,7 +301,7 @@ struct ChatComposer: View {
         VStack(alignment: .leading, spacing: 6) {
             ViewingChatBar()   // MARK: wave4b w4b-tabs — §39.2 "이 채팅을 보는 중이에요 — 보내면 이 채팅으로 이어가요"
             if let rule = store.reviewFirst, rule.mode == .prompts, rule.waiting > 0, store.viewingChat == nil {
-                ReviewFirstNotice(waiting: rule.waiting)   // §63: a new message waits for the review
+                ReviewFirstNotice(waiting: rule.waiting)   // §64: a new message waits for the review
             } else if pendingReviewCount > 0 {
                 PendingReviewNotice(count: pendingReviewCount, editsBlocked: store.reviewFirst?.mode == .edits)   // r1-composer M11: one line, the why in its ⓘ
             }
@@ -1437,7 +1437,7 @@ struct ChatComposer: View {
 private struct PendingReviewNotice: View {
     @Environment(\.colorScheme) private var colorScheme
     let count: Int
-    /// §63 (`reviewFirst: edits`): the answer may not change files until the user decided.
+    /// §64 (`reviewFirst: edits`): the answer may not change files until the user decided.
     var editsBlocked = false
     @State private var showsWhy = false
 
@@ -1487,7 +1487,7 @@ private struct PendingReviewNotice: View {
     }
 }
 
-/// §63 `prompts`: a new message waits until the review is done — "리뷰를 먼저 끝내세요 — 대기 N개", and while one waits
+/// §64 `prompts`: a new message waits until the review is done — "리뷰를 먼저 끝내세요 — 대기 N개", and while one waits
 /// [N개 수락 후 보내기] (every pending file accepted, then that message; off with the reason while it cannot go).
 private struct ReviewFirstNotice: View {
     @Environment(\.colorScheme) private var colorScheme

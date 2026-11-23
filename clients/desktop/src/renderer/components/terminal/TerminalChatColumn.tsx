@@ -25,7 +25,7 @@ import {
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
 import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
 import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
-import { firstWaitingPath, openReviewTitle, reviewFirstBlockedHelp, reviewFirstBlockedText } from "../../reviewFirst"; // §63
+import { firstWaitingPath, openReviewTitle, reviewFirstBlockedHelp, reviewFirstBlockedText } from "../../reviewFirst"; // §64
 import { showToast } from "../../toast";
 import { droppedMentionPaths, MENTION_DRAG_TYPE } from "../../mentions";
 import { pasteRefusal } from "../../terminalPaste";
@@ -140,7 +140,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
             {t("Review now")}
           </button>
         )}
-        {(state.gate.reviewFirst?.blocked ?? 0) > 0 && <ReviewFirstChip /> /* §63 */}
+        {(state.gate.reviewFirst?.blocked ?? 0) > 0 && <ReviewFirstChip /> /* §64 */}
         {state.gate.pendingCount > 0 && <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />}
         <button
           type="button"
@@ -203,7 +203,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
  * §58: "Accept N & Continue" in a terminal chat — the files accepted, then "Continue." pasted into Claude Code and Enter
  * pressed (the user's click only). Off with its reason until Claude Code is idle at its prompt.
  */
-/** §63: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review. */
+/** §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review. */
 function ReviewFirstChip() {
   const path = useStore((s) => firstWaitingPath(s.state));
   const selectFile = useStore((s) => s.selectFile);

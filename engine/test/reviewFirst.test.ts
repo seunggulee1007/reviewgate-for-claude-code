@@ -21,7 +21,7 @@ import { makeFakeClaude } from "./helpers/fakeClaude.js";
 import { fakePlatform } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
-/** docs/PROTOCOL.md §63: review first — Claude's next work waits until the user reviewed its last changes. */
+/** docs/PROTOCOL.md §64: review first — Claude's next work waits until the user reviewed its last changes. */
 
 const dirs: string[] = [];
 const harnesses: Harness[] = [];

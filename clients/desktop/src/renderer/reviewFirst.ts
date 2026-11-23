@@ -1,5 +1,5 @@
 /**
- * docs/PROTOCOL.md §63 — review first: Claude's next work waits until the user reviewed its last changes. The engine
+ * docs/PROTOCOL.md §64 — review first: Claude's next work waits until the user reviewed its last changes. The engine
  * denies the edits; the client's part is the setting (Settings › Review), the quiet row when a call was denied, the
  * terminal strip's chip and — with `prompts` — the composer holding a message until the review is done (the Mac's
  * Core ReviewFirst.swift, with its words).

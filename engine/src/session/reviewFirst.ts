@@ -1,5 +1,5 @@
 /**
- * docs/PROTOCOL.md §63: review first — Claude's next work waits until the user has reviewed its last changes. One decision
+ * docs/PROTOCOL.md §64: review first — Claude's next work waits until the user has reviewed its last changes. One decision
  * for both kinds of chat: a classic chat's PreToolUse hooks (hooks.ts) and a terminal chat's (terminalSession.ts) ask the
  * engine for what waits (`reviewFirstWaiting`) and deny what would change files (`reviewFirstToolReason`); the engine
  * refuses a prompt in `prompts` mode (`reviewFirstPromptReason`) and tells Claude the rule with every prompt while files

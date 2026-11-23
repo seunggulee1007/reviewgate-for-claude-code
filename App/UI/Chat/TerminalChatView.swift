@@ -128,7 +128,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
-            if let rule = store.reviewFirst, rule.blocked > 0, store.hasPendingReview { ReviewFirstChip() }   // §63
+            if let rule = store.reviewFirst, rule.blocked > 0, store.hasPendingReview { ReviewFirstChip() }   // §64
             if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
@@ -198,7 +198,7 @@ private struct TerminalStatusStrip: View {
     }
 }
 
-/// §63: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review.
+/// §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review.
 private struct ReviewFirstChip: View {
     @Environment(AppState.self) private var store
 

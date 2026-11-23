@@ -76,7 +76,7 @@ export type TerminalSessionOptions = {
   permissionBridge?: () => boolean;
   /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
   reviewPaths?: () => ReadonlySet<string>;
-  /** §63: the paths the review-first rule waits on now (null: nothing holds Claude back). */
+  /** §64: the paths the review-first rule waits on now (null: nothing holds Claude back). */
   reviewFirst?: () => readonly string[] | null;
   emit: (ev: SessionEvent) => void;
   log: SessionLog;
@@ -648,7 +648,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     const guard = await this.guard(input);
     if (this.disposed) return retiredAnswer("PreToolUse"); // retired while the guard read the call
     if (guard?.decision === "deny") return preToolAnswer(guard);
-    // §63: earlier changes wait for the review — a call that changes files is denied before any turn opens for it.
+    // §64: earlier changes wait for the review — a call that changes files is denied before any turn opens for it.
     const held = await this.reviewFirstDeny(input);
     if (held) return held;
     if (guard?.decision === "ask") this.noteGuardAsk(input, guard.reason);
@@ -670,7 +670,7 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     return guard ? preToolAnswer(guard) : {};
   }
 
-  /** §63: the review-first deny for this call (null: the rule lets it go on). A command that only reads still runs. */
+  /** §64: the review-first deny for this call (null: the rule lets it go on). A command that only reads still runs. */
   private async reviewFirstDeny(input: Record<string, unknown>): Promise<HookOutput | null> {
     const waiting = this.opts.reviewFirst?.() ?? null;
     if (!waiting) return null;

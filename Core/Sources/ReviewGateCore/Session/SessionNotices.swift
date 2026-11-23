@@ -108,7 +108,7 @@ public enum SessionNotices {
         "git_stashed", "claude_committed", "claude_moved_head", "reject_committed",
         // MARK: r2-review-flow (M32, §34.2)
         "reject_scheduled", "reject_applied", "reject_changed_again",
-        "review_first_blocked",   // §63
+        "review_first_blocked",   // §64
     ]
 
     /// Codes whose banner means the Claude session died; `state.session.ready` turning true clears it (§30).
@@ -124,7 +124,7 @@ public enum SessionNotices {
         if quiet { return .info }   // r1x (§38.2): a failed hook, a PreToolUse hook's block — gray, no alarm
         if let git = GitNoticeText.style(code) { return git }   // r1-git (§46): gray rows
         if let flow = ReviewFlowText.style(code) { return flow }   // r2-review-flow (M32): gray rows
-        if ReviewFirstText.isRowOnly(code) { return .info }   // §63: a gray row
+        if ReviewFirstText.isRowOnly(code) { return .info }   // §64: a gray row
         switch code {
         case "resume_not_found", "resume_failed": return .info
         case "cli_version_changed": return .info   // wave3 mac-session (§36.8)
@@ -178,7 +178,7 @@ public enum SessionNotices {
         if let text = ScopeText.errorText(message: message, detail: detail) { return text }   // r1-scope (§33.4)
         if let text = GitNoticeText.errorText(message: message, detail: detail) { return text }   // r1-git (§46)
         if let text = ReviewFlowText.errorText(message: message, detail: detail) { return text }   // r2-review-flow (M32)
-        if ReviewFirstText.isRowOnly(detail.code) { return ReviewFirstText.blockedText }   // §63
+        if ReviewFirstText.isRowOnly(detail.code) { return ReviewFirstText.blockedText }   // §64
         switch detail.code {
         case "session_start_failed": return String(localized: "Claude Code quit right after it started.", bundle: .module)
         case "session_crashed": return String(localized: "The Claude session ended unexpectedly.", bundle: .module)
@@ -239,7 +239,7 @@ public enum SessionNotices {
         if AutoModeText.hidesSecondary(detail.code) { return nil }   // wave4b w4b-auto (§39.5): the row names the call and the reason
         if GitNoticeText.isRowOnly(detail.code) { return nil }   // r1-git (§46): the row names the files / commits
         if ReviewFlowText.isRowOnly(detail.code) { return nil }   // r2-review-flow (M32): the row names the files
-        if ReviewFirstText.isRowOnly(detail.code) { return nil }   // §63: the detail is a count, not words
+        if ReviewFirstText.isRowOnly(detail.code) { return nil }   // §64: the detail is a count, not words
         if detail.code == "hook_blocked", !(detail.hookName ?? "").isEmpty { return nil }   // wave4b w4b-check4 (§40.1): the row names the hook and the reason
         var parts: [String] = []
         if let words = detail.detail?.trimmingCharacters(in: .whitespacesAndNewlines), !words.isEmpty {

@@ -1,4 +1,4 @@
-// §63 settings.reviewFirst: the renderer may write one of the three modes, and it goes out with hello / set_settings (default edits).
+// §64 settings.reviewFirst: the renderer may write one of the three modes, and it goes out with hello / set_settings (default edits).
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({
@@ -10,7 +10,7 @@ vi.mock("electron", () => ({
 import { DEFAULTS, engineSettings } from "./settings";
 import { sanitizeSettingsPatch } from "./settingsGuard";
 
-describe("review first setting (§63)", () => {
+describe("review first setting (§64)", () => {
   it("is edits unless set; prompts and off go out as they are, anything else as edits", () => {
     expect(engineSettings({ ...DEFAULTS }, null).reviewFirst).toBe("edits");
     expect(engineSettings({ ...DEFAULTS, reviewFirst: "prompts" }, null).reviewFirst).toBe("prompts");

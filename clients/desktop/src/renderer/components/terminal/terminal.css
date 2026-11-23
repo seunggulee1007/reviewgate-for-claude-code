@@ -18,7 +18,7 @@
   .terminal-status .short { display: inline; }
 }
 .terminal-strip button.active { background: var(--accent-bg); }
-/* §63: the review-first chip — the chat's quiet row; the short words in a narrow column. */
+/* §64: the review-first chip — the chat's quiet row; the short words in a narrow column. */
 .terminal-review-first { color: var(--orange); min-width: 0; max-width: 45%; display: inline-flex; }
 .terminal-review-first .short { display: none; }
 @container chat (max-width: 520px) {

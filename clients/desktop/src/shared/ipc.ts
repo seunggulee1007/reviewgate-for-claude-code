@@ -154,7 +154,7 @@ export type AppSettings = {
   backgroundWork?: boolean;
   /** §52.2: subagents finish inside the turn that started them, as before 0.6 (absent = off); next session start. */
   subagentsInTurn?: boolean;
-  /** §63: what waits for the review — "edits" (absent: the default), "prompts", "off"; live. */
+  /** §64: what waits for the review — "edits" (absent: the default), "prompts", "off"; live. */
   reviewFirst?: "edits" | "prompts" | "off";
   // MARK: wave6 w6-statusline
   /** §44.2: the user's Claude Code status line under the composer (default true; live). */

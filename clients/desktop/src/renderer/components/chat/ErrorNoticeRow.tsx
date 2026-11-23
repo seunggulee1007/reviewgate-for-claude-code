@@ -10,7 +10,7 @@ import { ScopeRowActions, ScopeRowFiles } from "./ScopeRowActions"; // MARK: r1-
 import { asksStill, rejectAskedPath } from "../../rejectSchedule"; // MARK: r2-review-flow (M32)
 import { useStore } from "../../store";
 import { rejectBlockedReason } from "../../reviewRound";
-import { firstWaitingPath, openReviewHelp, openReviewTitle, REVIEW_FIRST_ROW } from "../../reviewFirst"; // §63
+import { firstWaitingPath, openReviewHelp, openReviewTitle, REVIEW_FIRST_ROW } from "../../reviewFirst"; // §64
 import "../session.css";
 
 const ICON = { fatal: "⊗", error: "ⓘ", warning: "⚠", info: "ⓘ" } as const;
@@ -49,7 +49,7 @@ export function ErrorNoticeRow({ item }: { item: ErrorRow }) {
   );
 }
 
-/** §63: a call denied while files wait for the review — [리뷰 열기] while one still waits. */
+/** §64: a call denied while files wait for the review — [리뷰 열기] while one still waits. */
 function ReviewFirstActions() {
   const path = useStore((s) => firstWaitingPath(s.state));
   const selectFile = useStore((s) => s.selectFile);

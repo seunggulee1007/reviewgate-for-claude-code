@@ -421,14 +421,14 @@ export type Settings = {
   /** §57.15: answer Claude Code's permission dialogs of a terminal chat from the app too (default true; live). */
   terminalPermissionBridge?: boolean;
   /**
-   * §63: Claude's next work waits for the review — `edits` (default; absent or unknown too): while files from a finished
+   * §64: Claude's next work waits for the review — `edits` (default; absent or unknown too): while files from a finished
    * turn are pending / changes requested, a call that changes files is denied; `prompts`: a new prompt is refused too;
    * `off`: neither (a send is a question that may edit, §3). Live.
    */
   reviewFirst?: ReviewFirstMode;
 };
 
-/** §63: the review-first rule while it holds Claude back (`gate.reviewFirst`; null / absent: it does not). */
+/** §64: the review-first rule while it holds Claude back (`gate.reviewFirst`; null / absent: it does not). */
 export type ReviewFirstState = {
   mode: Exclude<ReviewFirstMode, "off">;
   /** Files it waits on (pending + changes requested). */
@@ -1204,7 +1204,7 @@ export type GateState = {
   // MARK: wave4c w4c-trust
   /** §41.2: the last single-file reject while [되돌리기] can put it back; absent otherwise. */
   rejectUndo?: RejectUndoState;
-  /** §63: the review-first rule while it holds Claude back; null when it does not (off, nothing waits, a change request runs). */
+  /** §64: the review-first rule while it holds Claude back; null when it does not (off, nothing waits, a change request runs). */
   reviewFirst?: ReviewFirstState | null;
 };
 

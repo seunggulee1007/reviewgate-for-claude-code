@@ -24,7 +24,7 @@ export function reviewFlowNoticeText(ev: { code?: string; detail?: string }): st
       return t("Reverted as you asked while Claude worked: {0}", what);
     case "reject_changed_again":
       return t("Claude changed this again after you rejected it, so it was not reverted: {0}", what);
-    case "review_first_blocked": // §63 (`detail`: the waiting count — the row does not repeat it)
+    case "review_first_blocked": // §64 (`detail`: the waiting count — the row does not repeat it)
       return t("Claude's edits are blocked while files wait for your review");
     default:
       return null;

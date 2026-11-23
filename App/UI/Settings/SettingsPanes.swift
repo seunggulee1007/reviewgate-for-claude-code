@@ -318,13 +318,13 @@ struct SessionSettingsPane: View {
 /// The diff, checkpoint ignore patterns, test command patterns, disk space.
 struct ReviewSettingsPane: View {
     @AppStorage(AppSettings.Key.checkpointIgnorePatterns) private var ignorePatterns = AppSettings.defaultIgnorePatternsText
-    @AppStorage(AppSettings.Key.reviewFirst) private var reviewFirst = ReviewFirstMode.edits.rawValue   // §63
+    @AppStorage(AppSettings.Key.reviewFirst) private var reviewFirst = ReviewFirstMode.edits.rawValue   // §64
     /// wave2 mac-flow: the ignore patterns go to the engines when editing ends, never keystroke by keystroke.
     @FocusState private var ignorePatternsFocused: Bool
 
     var body: some View {
         Form {
-            // §63: Claude's next work waits for the review — edits blocked by default, prompts too, or neither.
+            // §64: Claude's next work waits for the review — edits blocked by default, prompts too, or neither.
             Section("Review first") {
                 Picker(selection: $reviewFirst) {
                     ForEach(ReviewFirstMode.allCases, id: \.self) { mode in

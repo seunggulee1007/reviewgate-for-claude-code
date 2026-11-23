@@ -6,7 +6,7 @@
  * and when the chat changes; the user resumes it. "Stop & send" puts the message first and interrupts the turn.
  */
 import type { ReviewFirstState, SendAttachment } from "@reviewgate/engine";
-import { reviewFirstHolds } from "./reviewFirst"; // §63
+import { reviewFirstHolds } from "./reviewFirst"; // §64
 
 /** `mentions` / `attachments` (§23 / §24) go out with the text exactly as they were when it was queued. */
 export type QueuedExtras = { mentions?: string[]; attachments?: SendAttachment[]; /** MARK: wave5 w5-model — §43.4: this message's own model. */ model?: string };
@@ -32,7 +32,7 @@ export type QueueState = {
 
 export const EMPTY_QUEUE: QueueState = { items: [], paused: null, inflight: false, awaitingTurn: false, skipInterruptPause: false, resumeAt: null, retries: 0, afterStop: false };
 
-/** The message to send now, or null. §63 `prompts`: a plain message waits while files wait for the review. */
+/** The message to send now, or null. §64 `prompts`: a plain message waits while files wait for the review. */
 export function nextToSend(q: QueueState, gate: { canSend: boolean; reviewFirst?: ReviewFirstState | null }): QueuedMessage | null {
   if (q.items.length === 0 || q.paused !== null || q.inflight || q.awaitingTurn || !gate.canSend) return null;
   if (reviewFirstHolds(gate, q.items[0]!.text)) return null;

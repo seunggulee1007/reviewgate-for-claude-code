@@ -25,7 +25,7 @@ import { DEFAULT_SYSTEM_PROMPT_APPEND } from "../../../shared/systemPrompt"; // 
 import { TerminalSettingsSection } from "./TerminalSettings"; // MARK: terminal-win (§57.17)
 import { UpdateSettingsSection } from "./UpdateSettings"; // §48 Windows
 import { AppliesBadge } from "./SettingsBits"; // §55.11
-import { REVIEW_FIRST_MODES, reviewFirstModeLabel, reviewFirstModeOf, type ReviewFirstMode } from "../../reviewFirst"; // §63
+import { REVIEW_FIRST_MODES, reviewFirstModeLabel, reviewFirstModeOf, type ReviewFirstMode } from "../../reviewFirst"; // §64
 
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
@@ -219,7 +219,7 @@ export function ReviewPane({ settings }: PaneProps) {
   const patch = usePatch();
   return (
     <div className="body" data-testid="Settings review">
-      {/* §63: Claude's next work waits for the review — edits blocked by default, prompts too, or neither */}
+      {/* §64: Claude's next work waits for the review — edits blocked by default, prompts too, or neither */}
       <section data-setting="reviewFirst">
         <h4>{t("Review first")}</h4>
         <div className="field-row">

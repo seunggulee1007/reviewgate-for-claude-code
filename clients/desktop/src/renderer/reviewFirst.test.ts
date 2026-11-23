@@ -6,7 +6,7 @@ import { EMPTY_QUEUE, enqueue, nextToSend } from "./sendQueue";
 import { errorSubline, errorTone, queueStopOf } from "./sessionErrors";
 import { settingApplies, settingEntry, searchSettings } from "./settingsIndex";
 
-// §63 review first, as on the Mac (Core ReviewFirstTests.swift).
+// §64 review first, as on the Mac (Core ReviewFirstTests.swift).
 
 const file = (path: string, state: ChangedFileState["state"] = "pending"): ChangedFileState =>
   ({ path, oldPath: null, status: "M", added: 1, deleted: 0, isBinary: false, tools: ["Edit"], toolUseIds: ["e1"], state, noteCount: 0, origin: "tool" }) as ChangedFileState;
@@ -14,7 +14,7 @@ const file = (path: string, state: ChangedFileState["state"] = "pending"): Chang
 const state = (o: { pending?: number; changesRequested?: number; canSend?: boolean; files?: ChangedFileState[] } = {}): ReviewState =>
   ({ gate: { canSend: o.canSend ?? true, pendingCount: o.pending ?? 1, changesRequestedCount: o.changesRequested ?? 0 }, changedFiles: o.files ?? [] }) as unknown as ReviewState;
 
-describe("review first (§63)", () => {
+describe("review first (§64)", () => {
   it("the setting: edits by default, its three choices in the Mac's words", () => {
     expect(reviewFirstModeOf(undefined)).toBe("edits");
     expect(reviewFirstModeOf("bogus")).toBe("edits");

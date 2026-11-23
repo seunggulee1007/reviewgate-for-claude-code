@@ -68,7 +68,7 @@ struct ErrorTranscriptRow: View {
                 }
                 if actionable { scopeActions }
                 if actionable { rejectAgainActions }   // r2-review-flow M32
-                if actionable { reviewFirstActions }   // §63
+                if actionable { reviewFirstActions }   // §64
             }
             Spacer(minLength: 0)
         }
@@ -102,7 +102,7 @@ struct ErrorTranscriptRow: View {
         }
     }
 
-    /// §63: a call denied while files wait for the review — [리뷰 열기] while one still waits.
+    /// §64: a call denied while files wait for the review — [리뷰 열기] while one still waits.
     @ViewBuilder
     private var reviewFirstActions: some View {
         if ReviewFirstText.isRowOnly(info.code), store.hasPendingReview {

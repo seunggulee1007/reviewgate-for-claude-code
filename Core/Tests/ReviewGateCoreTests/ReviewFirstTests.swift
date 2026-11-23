@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ReviewGateCore
 
-/// docs/PROTOCOL.md §63: review first — the setting, the wire, the quiet row and the composer holding a message.
+/// docs/PROTOCOL.md §64: review first — the setting, the wire, the quiet row and the composer holding a message.
 @Suite @MainActor struct ReviewFirstTests {
     private func freshDefaults() -> UserDefaults {
         UserDefaults(suiteName: "ReviewFirstTests.\(UUID().uuidString)")!

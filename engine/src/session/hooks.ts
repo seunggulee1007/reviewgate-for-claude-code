@@ -441,11 +441,11 @@ export type HookContext = {
   /** What the PreToolUse hook read before a git command ran, by tool_use id (`noteGitBefore` → `postGitCommand`). */
   gitBefore?: Map<string, GitBefore>;
   /**
-   * §63: the paths the review-first rule waits on now (reviewFirst.ts `reviewFirstWaiting`; null: nothing holds Claude
+   * §64: the paths the review-first rule waits on now (reviewFirst.ts `reviewFirstWaiting`; null: nothing holds Claude
    * back) — owned by the engine, read at every call so an accept lifts it at once.
    */
   reviewFirst?: () => readonly string[] | null;
-  /** §63: a call was denied by the review-first rule. */
+  /** §64: a call was denied by the review-first rule. */
   onReviewFirst?: (toolName: string) => void;
   emit: (msg: SessionEvent) => void;
   log: SessionLog;
@@ -680,7 +680,7 @@ async function guardUnprompted(toolName: string, input: Record<string, unknown>,
 }
 
 /**
- * §63: denies (and reports) a call that would change files while earlier changes wait for the user's review; undefined
+ * §64: denies (and reports) a call that would change files while earlier changes wait for the user's review; undefined
  * when the rule lets it go on. Plan files (plan mode) and Claude's memory are outside the review and stay writable.
  */
 function guardReviewFirst(toolName: string, input: Record<string, unknown>, ctx: HookContext, ro?: ReadOnlyContext): HookJSONOutput | undefined {
@@ -1176,7 +1176,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const ti = toolInput(input);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, undefined, input);
     if (unprompted) return unprompted;
-    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx); // §63
+    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx); // §64
     if (reviewFirst) return reviewFirst;
     const file = toolFile(ti, ctx.cwd);
     // Never into git's own data or ReviewGate's state (objects, refs, the index, HEAD, reviewgate/): checked before anything
@@ -1246,7 +1246,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     const ro = await readOnlyContextOf(ctx, cwd);
     const unprompted = await guardUnprompted(input.tool_name, ti, ctx, ro, input);
     if (unprompted) return unprompted;
-    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx, ro); // §63: a command that only reads still runs
+    const reviewFirst = guardReviewFirst(input.tool_name, ti, ctx, ro); // §64: a command that only reads still runs
     if (reviewFirst) return reviewFirst;
     const command = String(ti.command ?? "");
     await noteGitBefore(ctx, input, command); // MARK: r1-git (§46): what a git command may change, read before it runs

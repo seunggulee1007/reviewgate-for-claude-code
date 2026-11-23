@@ -212,7 +212,7 @@ describe("send while reviewing = a question (review state untouched)", () => {
     expect(own).not.toBeNull();
     expect(own).not.toBe(a);
     expect(h.session().sends[sendsBefore]).toEqual({
-      // §63: the review-first rule (default `edits`) goes first — questions only while files wait.
+      // §64: the review-first rule (default `edits`) goes first — questions only while files wait.
       text:
         "[Review gate] 2 files await review; questions only until then.\n\n" +
         "why did you change line 2?\n\n[Review gate] Notes the user left on the diff, not sent yet (act on them only if the message above asks):" +

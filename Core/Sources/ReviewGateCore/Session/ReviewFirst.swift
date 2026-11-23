@@ -1,6 +1,6 @@
 import Foundation
 
-// docs/PROTOCOL.md §63 — review first: Claude's next work waits until the user reviewed its last changes. The engine
+// docs/PROTOCOL.md §64 — review first: Claude's next work waits until the user reviewed its last changes. The engine
 // denies the edits; the Mac's part is the setting (Settings › Review), the wire (`gate.reviewFirst`), the quiet row when a
 // call was denied, the terminal strip's chip and — with `prompts` — the composer holding a message until the review is done.
 
@@ -58,7 +58,7 @@ enum ReviewFirstWire {
 }
 
 extension AppSettings.Key {
-    /// §63: `edits` / `prompts` / `off`; unset → `edits`.
+    /// §64: `edits` / `prompts` / `off`; unset → `edits`.
     public static let reviewFirst = "reviewFirst"
 }
 
@@ -68,7 +68,7 @@ extension AppSettings {
     }
 }
 
-/// The words of §63 (English keys, Korean in the catalog; Electron uses the same keys).
+/// The words of §64 (English keys, Korean in the catalog; Electron uses the same keys).
 public enum ReviewFirstText {
     /// The engine's row when a call was denied: a gray chat row only (no banner, the queue goes on).
     public static let rowCode = "review_first_blocked"
@@ -116,16 +116,16 @@ public enum ReviewFirstText {
 }
 
 public extension AppState {
-    /// §63: the rule while it holds Claude back (`gate.reviewFirst`).
+    /// §64: the rule while it holds Claude back (`gate.reviewFirst`).
     var reviewFirst: ReviewFirstInfo? { gate.reviewFirst }
 
-    /// §63 `prompts`: a plain message waits while files do (a slash command never: it starts no work on the code).
+    /// §64 `prompts`: a plain message waits while files do (a slash command never: it starts no work on the code).
     func reviewFirstHolds(_ text: String) -> Bool {
         guard let rule = reviewFirst, rule.mode == .prompts, rule.waiting > 0 else { return false }
         return !text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("/")
     }
 
-    /// §63: the composer's held message (`prompts`): the first queued one the rule holds.
+    /// §64: the composer's held message (`prompts`): the first queued one the rule holds.
     var reviewFirstHeldMessage: QueuedMessage? {
         guard let first = queuedMessages.first, reviewFirstHolds(first.text) else { return nil }
         return first
