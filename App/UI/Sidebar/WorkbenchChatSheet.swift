@@ -1,7 +1,7 @@
 import SwiftUI
 import ReviewGateCore
 
-/// docs/PROTOCOL.md §9 "New Chat in a Workbench" (워크벤치에서 새 대화): the way out of a new chat that waits for Claude. One
+/// docs/PROTOCOL.md §9 "New Chat in a Workbench" (워크벤치에서 새 채팅): the way out of a new chat that waits for Claude. One
 /// field — the branch, `wb/<yyMMdd-HHmm>` until edited — and [만들기] (Return): `workbench_create` from this worktree's HEAD
 /// with the repository's usual setup (§36.12), then the caller opens its window, whose first chat is of the default kind (a
 /// chat when a held message comes along: it waits in that composer, never sent). The held switch here is called off.

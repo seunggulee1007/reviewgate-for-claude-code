@@ -1,6 +1,6 @@
 import Foundation
 
-// docs/PROTOCOL.md §9 "New Chat in a Workbench" (워크벤치에서 새 대화). One folder is one review gate, so turns go one at a
+// docs/PROTOCOL.md §9 "New Chat in a Workbench" (워크벤치에서 새 채팅). One folder is one review gate, so turns go one at a
 // time per worktree and a new chat asked for while Claude works waits (§9 "Held switches"). The way out that does not wait
 // is a workbench (docs/M10-WORKBENCHES.md): a worktree of its own with its own branch, window and Claude. This makes one
 // from HEAD in one step — a branch name ready to accept, `workbench_create`, its window — and a message held for the

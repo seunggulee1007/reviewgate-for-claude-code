@@ -90,7 +90,7 @@ diff·파일 보기에서 이름 위에 포인터를 둔 채로 써요 (PROTOCOL
 | 새 채팅 | ⌘T | Ctrl+T | Mac 앱은 설정 › 세션 › 새 채팅 종류(기본: 터미널)를 따라요 |
 | 새 터미널 채팅 | ⌃⌘T | Ctrl+Alt+T | Windows 는 설정 › 세션 › 터미널 채팅 (미리 보기)를 켰을 때 |
 | 새 채팅 (클래식) | ⌃⌥⌘T | Ctrl+Alt+Shift+T | Windows 는 설정 › 세션 › 터미널 채팅 (미리 보기)를 켰을 때 |
-| 워크벤치에서 새 대화… | ⌥⌘T | Ctrl+Alt+W | Claude 가 이 폴더에서 일하는 동안에도 기다리지 않아요 — HEAD 에서 딴 새 브랜치의 워크벤치(자기 창·Claude)에서 열어요 (PROTOCOL §9). Windows 는 Ctrl+Alt+T 가 새 터미널 채팅이라 W 예요 |
+| 워크벤치에서 새 채팅… | ⌥⌘T | Ctrl+Alt+W | Claude 가 이 폴더에서 일하는 동안에도 기다리지 않아요 — HEAD 에서 딴 새 브랜치의 워크벤치(자기 창·Claude)에서 열어요 (PROTOCOL §9). Windows 는 Ctrl+Alt+T 가 새 터미널 채팅이라 W 예요 |
 | 채팅 탭 닫기 | ⌘⇧W | Ctrl+Shift+W | |
 | 채팅 탭 1–9 | ⌘1…⌘9 | Ctrl+1…Ctrl+9 | |
 | 닫은 채팅 탭 다시 열기 | ⌘⇧T | Ctrl+Shift+T | |

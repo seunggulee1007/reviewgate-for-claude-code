@@ -13266,7 +13266,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크벤치에서 새 대화"
+            "value": "워크벤치에서 새 채팅"
           }
         }
       }
@@ -13282,7 +13282,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "워크벤치에서 새 대화…"
+            "value": "워크벤치에서 새 채팅…"
           }
         }
       }
