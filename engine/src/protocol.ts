@@ -865,6 +865,9 @@ export type EngineCommand =
   | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number }>
   /** Every line holding `symbol` as a whole word (`git grep -w -F`), the clicked file first. Replies `references`. */
   | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>
+  // MARK: task-start — §63
+  /** One GitHub issue for "Start from a task" (`gh issue view`): `123`, `#123`, `owner/repo#123` or an issue URL. Replies `task_fetched`. */
+  | Cmd<"task_fetch", { ref: string }>
   | Cmd<"shutdown">;
 
 // ---------------------------------------------------------------- §21 side questions
@@ -1877,9 +1880,10 @@ export type PlanApprovedEvent = { type: "plan_approved"; mode: PermissionMode; p
 /**
  * §49: a task handed to this worktree by `workbench_create {task}` (in the window that made it), taken when the project
  * opened: `sent` — its text went out as the first message of a fresh chat; false — the session could not take a message,
- * the client puts `text` into the composer.
+ * the client puts `text` into the composer. MARK: task-start — §63 `draft`: the task came as a draft (`WorkbenchTask.draft`),
+ * never sent (`sent` false).
  */
-export type TaskStartedEvent = { type: "task_started"; text: string; mode: PermissionMode; from: string; sent: boolean };
+export type TaskStartedEvent = { type: "task_started"; text: string; mode: PermissionMode; from: string; sent: boolean; draft?: true };
 /**
  * Optional, additive detail of an `error` event (docs/PROTOCOL.md §19.6). `code` is the stable id clients localize on;
  * `message` stays the English fallback. `resetAt` (ISO-8601) for `usage_limit` / `rate_limited` when the CLI reports it;
@@ -2161,7 +2165,8 @@ export type EngineEvent =
   | ProjectFileEvent // MARK: code-browser (§47)
   | ProjectSearchEvent
   | DefinitionsEvent // MARK: code-nav (§62)
-  | ReferencesEvent;
+  | ReferencesEvent
+  | TaskFetchedEvent; // MARK: task-start (§63)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
 export type ReplyFor<C extends EngineCommand> =
@@ -2211,6 +2216,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "project_search" } ? ProjectSearchEvent
   : C extends { type: "find_definition" } ? DefinitionsEvent // MARK: code-nav (§62)
   : C extends { type: "find_references" } ? ReferencesEvent
+  : C extends { type: "task_fetch" } ? TaskFetchedEvent // MARK: task-start (§63)
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
@@ -2232,6 +2238,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | StatusLineEvent // MARK: wave6 w6-statusline (§44.2)
   | ProjectFileEvent | ProjectSearchEvent // MARK: code-browser (§47)
   | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
+  | TaskFetchedEvent // MARK: task-start (§63)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | TerminalSpecEvent; // §57
@@ -2430,8 +2437,12 @@ export type WorkbenchSetup = {
 /** §36.14: `workbench_create.fromPr` — check out the PR's head (`refs/pull/<number>/head`). */
 export type WorkbenchFromPr = { number: number; headRef: string };
 
-/** §49: `workbench_create.task` — the first message of the new workbench's fresh chat; `mode` its permission mode (else the default). */
-export type WorkbenchTask = { text: string; mode?: PermissionMode };
+/**
+ * §49: `workbench_create.task` — the first message of the new workbench's fresh chat; `mode` its permission mode (else the
+ * default). MARK: task-start — §63 `draft`: the text is not sent — it comes back for the composer (`task_started {sent: false,
+ * draft: true}`) and the fresh chat is of the client's default kind.
+ */
+export type WorkbenchTask = { text: string; mode?: PermissionMode; draft?: boolean };
 /** §49: a task's text is at most this many characters (`invalid_task` beyond, or when empty). */
 export const MAX_TASK_TEXT = 100_000;
 
@@ -3161,3 +3172,13 @@ export type ReferenceHit = { path: string; line: number; column: number; preview
  * file. `files`: how many files they are in. `truncated`: more than `limit`; `timedOut`: stopped after 15 s.
  */
 export type ReferencesEvent = { type: "references"; id?: string; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true };
+
+// ---------------------------------------------------------------- MARK: task-start — §63 start from a task
+// Types only (docs/PROTOCOL.md §63).
+
+/**
+ * §63: reply to `task_fetch` — one GitHub issue: `id` its number as text, `body` ≤ 65 536 characters, `labels` their names.
+ * Refused `bad_task_ref`, `gh_missing`, `no_remote` (a number without an `origin` to name the repository), `not_found`,
+ * `task_fetch_failed:<gh's first line>`.
+ */
+export type TaskFetchedEvent = { type: "task_fetched"; id?: string; task: { id: string; number: number; title: string; body: string; url: string; labels: string[] } };

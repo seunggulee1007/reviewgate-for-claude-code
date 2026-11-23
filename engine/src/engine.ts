@@ -50,7 +50,8 @@ import { CodeGraph, findGraphify } from "./board/codeGraph.js"; // MARK: wave5 w
 import { listUserMods, settingsPluginDirs } from "./board/mods.js"; // MARK: wave5 w5-graph (§43.3)
 import { locateToolchain, type Toolchain } from "./platform/toolchain.js";
 import { createPR, parseRemoteURL } from "./pr/create.js";
-import { PRStore, type ResolvedGH } from "./pr/store.js";
+import { fetchTask, parseTaskRef, type FetchedTask } from "./pr/task.js"; // MARK: task-start (§63)
+import { DEFAULT_GH_HOST, PRStore, type ResolvedGH } from "./pr/store.js";
 import type {
   ActivityKind,
   AttachmentEvent,
@@ -1720,6 +1721,8 @@ export class ReviewEngine {
         return { type: "definitions", ...(await findDefinition(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line })) };
       case "find_references":
         return { type: "references", ...(await findReferences(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })) };
+      case "task_fetch": // MARK: task-start — §63
+        return { type: "task_fetched", task: await this.taskFetch(cmd.ref) };
       case "shutdown":
         return;
       default:
@@ -2016,9 +2019,10 @@ export class ReviewEngine {
     const got = this.receivedTask;
     this.receivedTask = null;
     if (!got) return;
-    const sent = canSend(this.slices());
-    this.log("info", `task from ${got.from.path}: ${sent ? "sent in a fresh chat" : "the session cannot take it yet — back to the composer"} (${this.sessionState.permissionMode})`);
-    this.emit({ type: "task_started", text: got.text, mode: this.sessionState.permissionMode, from: got.from.path, sent });
+    // MARK: task-start — §63: a draft is never sent; it waits in the composer (or the terminal's prompt) for the user.
+    const sent = !got.draft && canSend(this.slices());
+    this.log("info", `task from ${got.from.path}: ${sent ? "sent in a fresh chat" : got.draft ? "a draft for the composer" : "the session cannot take it yet — back to the composer"} (${this.sessionState.permissionMode})`);
+    this.emit({ type: "task_started", text: got.text, mode: this.sessionState.permissionMode, from: got.from.path, sent, ...(got.draft ? { draft: true as const } : {}) });
     if (sent) void this.handle({ type: "send", text: got.text });
   }
 
@@ -2475,7 +2479,8 @@ export class ReviewEngine {
     const existing = stored.sessionId ? idx.get(stored.sessionId) : undefined;
     // MARK: terminal-default — §57.7: a project with no chat gets the client's default kind; a plan or a task handed here
     // is sent for the user, so its fresh chat stays a chat.
-    const current = received ?? (planIn || taskIn ? idx.create() : undefined) ?? existing ?? idx.create(undefined, undefined, this.firstChatKind());
+    // MARK: task-start — §63: a draft task is the user's to send — its fresh chat is of the client's default kind.
+    const current = received ?? (planIn || (taskIn && !taskIn.draft) ? idx.create() : undefined) ?? (taskIn?.draft ? idx.create(undefined, undefined, this.firstChatKind()) : undefined) ?? existing ?? idx.create(undefined, undefined, this.firstChatKind());
     this.openTabIds = [...new Set(stored.openTabIds.filter((id) => idx.get(id) !== undefined))];
     this.bindSession(current);
     await this.side.load(current.id);
@@ -5034,7 +5039,7 @@ export class ReviewEngine {
     const cp = this.requireProject();
     const name = cmd.branch.trim();
     // §49: a task is checked before anything is created.
-    const task = cmd.task === undefined ? null : { text: taskText(cmd.task?.text), mode: cmd.task?.mode };
+    const task = cmd.task === undefined ? null : { text: taskText(cmd.task?.text), mode: cmd.task?.mode, draft: cmd.task?.draft === true }; // §63 draft
     if (task && task.text === null) throw new CommandRefused("invalid_task");
     if (task && task.mode !== undefined && !isPermissionMode(task.mode)) throw new CommandRefused("invalid_mode");
     if (!(await isValidBranchName(cp.root, name))) throw new CommandRefused(`invalid_branch_name:${cmd.branch}`);
@@ -5084,7 +5089,7 @@ export class ReviewEngine {
     } finally {
       if (tempRef) await cp.git(["update-ref", "-d", tempRef], { allowFailure: true }).catch(() => undefined);
     }
-    if (task?.text) await this.handTaskTo(path, cp.root, task.text, task.mode);
+    if (task?.text) await this.handTaskTo(path, cp.root, task.text, task.mode, task.draft);
     const setupExit = cmd.setup === false ? undefined : await this.prepareWorkbench(cp.root, path, ws, progress);
     progress("done", setupExit !== undefined ? { exitCode: setupExit } : {});
     await this.refreshBranches();
@@ -5095,10 +5100,10 @@ export class ReviewEngine {
    * §49: the task goes into the new worktree's git dir, where its window's engine takes it on `open_project`. A write that
    * fails refuses the create (`task_handoff_failed`) — the worktree is there, the task text stays with the client.
    */
-  private async handTaskTo(path: string, fromRoot: string, text: string, mode: PermissionMode | undefined): Promise<void> {
+  private async handTaskTo(path: string, fromRoot: string, text: string, mode: PermissionMode | undefined, draft = false): Promise<void> {
     try {
       const gitDir = await resolveGitDir(path);
-      await writeTaskHandoff(gitDir, { version: 1, from: { path: fromRoot, name: basename(fromRoot) }, text, ...(mode ? { mode } : {}), at: new Date().toISOString() });
+      await writeTaskHandoff(gitDir, { version: 1, from: { path: fromRoot, name: basename(fromRoot) }, text, ...(mode ? { mode } : {}), ...(draft ? { draft: true as const } : {}), at: new Date().toISOString() });
       this.log("info", `task handed to ${path}${mode ? ` (${mode})` : ""}`);
     } catch (e) {
       await this.refreshWorkbenches(false).catch(() => undefined);
@@ -5205,6 +5210,40 @@ export class ReviewEngine {
       }
     }
     return names.includes("origin") ? "origin" : names.length === 1 ? names[0]! : null;
+  }
+
+  // ------------------------------------------------------------------ MARK: task-start — §63 task_fetch
+
+  /**
+   * One GitHub issue for "Start from a task": an issue URL names its host and repository; a number (`123`, `#123`) is the
+   * `origin` remote's repository, `owner/repo#123` on `origin`'s host (github.com without a remote). Every call names the
+   * host (`--repo HOST/O/R`), as the PR browser's do.
+   */
+  private async taskFetch(rawRef: unknown): Promise<FetchedTask> {
+    const ref = typeof rawRef === "string" ? parseTaskRef(rawRef) : null;
+    if (!ref) throw new CommandRefused("bad_task_ref");
+    let host = ref.host;
+    let repo = ref.repo;
+    if (host === null || repo === null) {
+      const remoteURL = this.gate.checkpoint ? await this.gate.checkpoint.remoteURL() : null;
+      const remote = remoteURL ? parseRemoteURL(remoteURL) : null;
+      if (repo === null && !remote) throw new CommandRefused("no_remote");
+      host ??= remote?.host ?? DEFAULT_GH_HOST;
+      repo ??= `${remote!.owner}/${remote!.repo}`;
+    }
+    let gh: ResolvedGH;
+    try {
+      gh = await this.resolveGH();
+    } catch {
+      throw new CommandRefused("gh_missing");
+    }
+    try {
+      return await fetchTask(gh, host, repo, ref.number);
+    } catch (e) {
+      const msg = errorMessage(e);
+      if (msg === "not_found") throw new CommandRefused("not_found", { code: "not_found" });
+      throw new CommandRefused(msg.startsWith("task_fetch_failed:") ? msg : `task_fetch_failed:${firstLineOf(msg)}`, { code: "task_fetch_failed" });
+    }
   }
 
   // ------------------------------------------------------------------ pr_create
@@ -9558,7 +9597,7 @@ function emptySession(permissionMode: PermissionMode = "default", prePlanMode: P
 }
 
 function isPrCommand(type: EngineCommand["type"]): boolean {
-  return type.startsWith("pr_") || type === "accounts" || type === "login_in_terminal";
+  return type.startsWith("pr_") || type === "accounts" || type === "login_in_terminal" || type === "task_fetch"; // §63: gh too
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
@@ -9664,7 +9703,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
 }
 
 function scopeOf(type: EngineCommand["type"]): ErrorScope {
-  if (type.startsWith("pr_") || type === "accounts" || type === "login_in_terminal") return "pr";
+  if (type.startsWith("pr_") || type === "accounts" || type === "login_in_terminal" || type === "task_fetch") return "pr"; // §63
   switch (type) {
     case "send":
     case "steer":

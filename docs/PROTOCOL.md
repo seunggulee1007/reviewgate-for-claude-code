@@ -10300,3 +10300,43 @@ the store), `ShortcutTableTests`.
   `src/main/ideOpen.ts`, `src/renderer/nav/*`).
   Tests: `engine/test/engine.navigate.test.ts` (per-language fixtures, ranking, references, §59 shadow mode, refusals, the
   lane), `clients/desktop/src/main/ipcGuard.test.ts`.
+
+## 63. Start screen and starting from a task (task-start)
+
+A project window used to open straight into whatever chat it had last. Work usually starts from one of three places: a
+fresh chat, a task in the team's tracker (a GitHub issue, a Jira or Linear ticket, `ACME-123`), or a chat to carry on. The
+start screen offers the three; "Start from a task" names the task, makes its branch (or workbench) and puts a first prompt
+into the message box. Additive on the wire: one command with one reply, and a `draft` flag on §49's task handoff.
+
+```ts
+// command (lane "pr", like every gh call)
+task_fetch { ref: string }   → task_fetched
+// reply
+type TaskFetchedEvent = { type: "task_fetched"; id?; task: { id: string; number: number; title: string; body: string; url: string; labels: string[] } };
+// §49 additions
+type WorkbenchTask    = { text: string; mode?: PermissionMode; draft?: boolean };
+type TaskStartedEvent = { type: "task_started"; text; mode; from; sent: boolean; draft?: true };
+```
+
+### 63.1 `task_fetch` — one GitHub issue
+
+- **`ref`**: `123` or `#123` (the `origin` remote's repository, on its host), `owner/repo#123` (on `origin`'s host;
+  `github.com` without a remote), or an issue link `https://<host>/<owner>/<repo>/issues/<n>` (any host — GitHub
+  Enterprise too; query, fragment, trailing slash and `www.` allowed). Anything else — a PR link, a Jira key, a tracker
+  link — is refused `bad_task_ref` before `gh` runs: those trackers are read by Claude, not by the app (63.3).
+- **How.** `gh issue view <n> --repo HOST/OWNER/REPO --json number,title,body,labels,url` (argv, no shell; the host always
+  named, as the PR browser's calls). `gh` holds the login; the app stores no token. `body` is cut to 65 536 characters,
+  `labels` are their names, `id` is the number as text.
+- **Refusals** (`result{ok:false, code}`): `bad_task_ref`; `no_remote` (a number, and no `origin` to name the repository);
+  `gh_missing` (no `gh` found); `not_found` (gh says there is no such issue — "Could not resolve to an issue", HTTP 404);
+  `task_fetch_failed:<gh's first line>` (anything else, a timeout after 90 s too). An older engine refuses
+  `unknown_command`: the clients then start without the title (the id and link only).
+- Runs on the PR lane (`gh` is slow) and needs no project for a link; a folder tracked without git (§59) can fetch by link.
+
+### 63.2 A task handed to a workbench as a draft
+
+`workbench_create {task: {text, draft: true}}` writes the handoff of §49 with `draft: true`. The new worktree's engine takes
+it as before, but **never sends it**: its fresh chat is of the client's default kind (`newChatKind`, a terminal chat too —
+the user sends the prompt), and `task_started {…, sent: false, draft: true}` hands the text to the client, which puts it
+where that chat takes text: the message box, or — in a terminal chat — the TUI's prompt as one bracketed paste, never
+Enter (§57.7). A handoff without `draft` behaves exactly as §49 says.
