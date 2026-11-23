@@ -165,6 +165,11 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   // stay out: main asks for the spec and reports the PTY itself (the hook token never reaches the renderer).
   "terminal_end_turn",
   "session_continue_terminal",
+  // §62 go to definition / find references (read-only searches, own lane); a definition outside the review opens through
+  // §47's project_file (a read of one worktree file)
+  "find_definition",
+  "find_references",
+  "project_file",
 ]);
 
 export type Validated = { ok: true; cmd: EngineCommand } | { ok: false; error: string };
