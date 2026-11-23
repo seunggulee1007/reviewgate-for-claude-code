@@ -10796,6 +10796,16 @@ through). The UI is the client team's follow-up.
 - *Go to Definition* sends the clicked name's `column` and its `receiver` — `CodeNavText.symbol` reads the identifier
   before `x.` / `x?.` / `x!!.` / `x::` / `x->` on the drawn line (`this.gate.refresh()` → `gate`; nothing after `)` / `]`
   or for a qualified `a.b.C`).
+- *Peek Definition* (Navigate › 정의 미리 보기 ⌥F12 on the name under the pointer, a row's menu, and ⌘-click while
+  Settings › Review › Diff › "이름을 ⌘-클릭하면" is 미리 보기 — the default; 정의로 이동 there makes ⌘-click jump as §62,
+  F12 always jumps): a band inside the clicked row, under its code (`CodeNavPeekSlot` in `DiffCodeText`, so every diff,
+  full file and project file has it; the half of a split row), never moving the list's scroll position. Header
+  "File.kt:42 — Container.member" (the preview's `symbol`, else the candidate's `container`), the kind, the folder, 열기
+  (jumps as §62, Back returns to the click), 참조 찾기, ×. Body: `definition_preview {path, line}` of the picked candidate,
+  highlighted as the diff, the definition line marked, ≤ 15 lines tall and scrollable; several candidates → the list on
+  the band's right (a click shows one, a double-click opens it); ↑ / ↓ switch, ↩ opens, Esc closes; none → "No definition
+  found for X" with 프로젝트에서 찾기. Previews read once per `path:line`. One band per window; a new peek replaces it.
+  A diff row is one VoiceOver element (polish-10), so in a diff the band is used with the keyboard. Core `CodeNavPeekStore` (`IdeNav.swift`), App `IdeNavViews.swift`.
 
 - **Security.** Reads only, inside the repository: the file list from git, every path through `repoRelativeInside` (§23)
   and `project_file`'s checks for the commands that name a file; files are read as UTF-8 text, never executed or written.

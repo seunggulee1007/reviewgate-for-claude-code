@@ -90,6 +90,81 @@ import Testing
         #expect(asked == [.findDefinition(symbol: "save", fromPath: "src/A.java", line: 9, column: 14, receiver: "repo")])
     }
 
+    // MARK: The peek band (§65.8)
+
+    private func candidate(_ path: String, _ line: Int, container: String? = nil) -> DefinitionCandidate {
+        DefinitionCandidate(path: path, line: line, kind: .method, preview: "fun total()", container: container)
+    }
+
+    private func preview(_ path: String, _ line: Int) -> SymbolPreviewReply {
+        SymbolPreviewReply(path: path, line: line, startLine: max(1, line - 1), lines: ["/** doc */", "fun total() = 1"])
+    }
+
+    @Test func peekShowsTheFirstCandidateAndSwitches() async {
+        let store = CodeNavPeekStore()
+        var asked: [EngineCommand] = []
+        let candidates = [candidate("a/Cart.kt", 10, container: "Cart"), candidate("b/Order.kt", 20), candidate("c/Line.kt", 5)]
+        let request: (EngineCommand) async throws -> EngineEvent = { command in
+            asked.append(command)
+            switch command {
+            case .findDefinition: return .definitions(DefinitionsReply(symbol: "total", candidates: candidates))
+            case let .definitionPreview(path, line, _, _): return .definitionPreview(self.preview(path, line))
+            default: throw EngineClientError.unexpectedReply("x")
+            }
+        }
+        let row = CodeNavLocation(view: .review, path: "src/Use.kt", line: 9)
+        var at = row
+        at.column = 12
+        await store.peek("total", row: row, rowText: "cart.total()", from: at, receiver: "cart", using: request)
+        #expect(store.band?.status == .found && store.band?.selected == 0)
+        #expect(store.band?.preview == .loaded(preview("a/Cart.kt", 10)))
+        #expect(asked == [.findDefinition(symbol: "total", fromPath: "src/Use.kt", line: 9, column: 12, receiver: "cart"),
+                          .definitionPreview(path: "a/Cart.kt", line: 10)])
+        // The band hangs under that row only.
+        #expect(store.shows(row: row, text: "cart.total()"))
+        #expect(!store.shows(row: row, text: "other text on line 9"))
+        #expect(!store.shows(row: CodeNavLocation(view: .review, path: "src/Use.kt", line: 10), text: "cart.total()"))
+        // ↓ ↓ ↓ stops at the last; back up to the first: read once each.
+        await store.move(1, using: request)
+        await store.move(1, using: request)
+        await store.move(1, using: request)
+        #expect(store.band?.selected == 2 && store.band?.current?.path == "c/Line.kt")
+        await store.move(-5, using: request)
+        #expect(store.band?.selected == 0)
+        #expect(asked.filter { if case .definitionPreview = $0 { true } else { false } }.count == 3)
+        await store.select(1, using: request)
+        #expect(store.band?.preview == .loaded(preview("b/Order.kt", 20)))
+        #expect(IdeNavText.title(candidates[0], fallback: "total") == "Cart.kt:10 — Cart.total")
+        store.close()
+        #expect(store.band == nil)
+    }
+
+    @Test func peekSaysWhenNothingIsFoundAndDropsAnOlderReply() async {
+        let store = CodeNavPeekStore()
+        let row = CodeNavLocation(view: .projectFile, path: "A.java", line: 3)
+        await store.peek("nope", row: row, rowText: "nope();", from: row, receiver: nil) { _ in
+            .definitions(DefinitionsReply(symbol: "nope", candidates: []))
+        }
+        #expect(store.band?.status == .notFound && store.band?.preview == nil)
+        await store.peek("bad", row: row, rowText: "x", from: row, receiver: nil) { _ in throw EngineClientError.refused("bad_symbol") }
+        if case .failed = store.band?.status {} else { Issue.record("not failed: \(String(describing: store.band?.status))") }
+        // A peek closed while it was looking leaves nothing behind.
+        await store.peek("late", row: row, rowText: "late()", from: row, receiver: nil) { _ in
+            store.close()
+            return .definitions(DefinitionsReply(symbol: "late", candidates: [self.candidate("x.java", 1)]))
+        }
+        #expect(store.band == nil)
+    }
+
+    @Test func commandClickDefaultsToPeek() {
+        let defaults = UserDefaults(suiteName: "IdeNavTests.\(UUID().uuidString)")!
+        #expect(CodeNavCommandClick.current(defaults) == .peek)
+        defaults.set("open", forKey: CodeNavCommandClick.defaultsKey)
+        #expect(CodeNavCommandClick.current(defaults) == .open)
+        defaults.set("odd", forKey: CodeNavCommandClick.defaultsKey)
+        #expect(CodeNavCommandClick.current(defaults) == .peek)
+    }
+
     @Test func stateCarriesTheIndex() throws {
         var s = ReviewState.empty
         s.nav = NavState(index: NavIndexState(status: .building, files: 3, filesTotal: 9))

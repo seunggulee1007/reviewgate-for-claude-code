@@ -78,7 +78,9 @@ public enum ShortcutTable {
         ]),
         // MARK: code-nav (§62)
         ShortcutSection("Code navigation", rows: [
-            ShortcutRow("Go to Definition", mac: "F12", windows: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows)"),
+            ShortcutRow("Go to Definition", mac: "F12", windows: "F12", note: "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition"),
+            // MARK: ide-nav (§65.8)
+            ShortcutRow("Peek Definition", mac: "⌥F12", windows: "Alt+F12", note: "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)"),
             ShortcutRow("Find References", mac: "⇧F12", windows: "Shift+F12"),
             ShortcutRow("Back", mac: "⌃-", windows: "Alt+←"),
             ShortcutRow("Forward", mac: "⌃⇧-", windows: "Alt+→"),

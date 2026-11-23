@@ -381,6 +381,8 @@ public final class CodeNavStore {
     }
 
     public private(set) var popup: Popup?
+    /// §65.8: the peek band under a clicked row (ide-nav, IdeNav.swift).
+    public let peek = CodeNavPeekStore()
     public private(set) var openRequest: OpenRequest?
     public private(set) var history = CodeNavHistory()
     /// Where the user is: the place last opened or clicked (Back's Forward, Open in IDE's line).
@@ -500,6 +502,7 @@ public final class CodeNavStore {
         definitionSeq += 1
         referencesSeq += 1
         popup = nil
+        peek.reset()
         openRequest = nil
         history.clear()
         caret = nil

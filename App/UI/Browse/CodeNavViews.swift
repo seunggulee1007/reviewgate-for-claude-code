@@ -51,10 +51,13 @@ final class CodeNavPointer {
         /// §65.6: `user` of `user.save()`.
         let receiver: String?
         let from: CodeNavLocation
+        /// The row's drawn text (§65.8: the peek band hangs under the row drawing it).
+        let text: String
         weak var store: AppState?
 
         static func == (a: Target, b: Target) -> Bool {
-            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.receiver == b.receiver && a.from == b.from && a.store === b.store
+            a.token == b.token && a.symbol == b.symbol && a.range == b.range && a.receiver == b.receiver && a.from == b.from
+                && a.text == b.text && a.store === b.store
         }
 
         /// The row's place with the name's column (§65.6: `find_definition`'s `column`).
@@ -82,14 +85,14 @@ final class CodeNavPointer {
         return tokens
     }
 
-    /// The pointer is at `point` of row `token`, over `hit` (nil: not over a name).
-    func hover(token: Int, hit: CodeNavSymbol?, point: CGPoint, from: CodeNavLocation, store: AppState) {
+    /// The pointer is at `point` of row `token` (drawing `text`), over `hit` (nil: not over a name).
+    func hover(token: Int, hit: CodeNavSymbol?, point: CGPoint, from: CodeNavLocation, text: String, store: AppState) {
         installIfNeeded()
         hoveringToken = token
         lastPoint = point
         let down = Self.isCommandOnly(NSEvent.modifierFlags)
         if down != commandDown { commandDown = down }
-        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, receiver: $0.receiver, from: from, store: store) }
+        let next = hit.map { Target(token: token, symbol: $0.symbol, range: $0.range, receiver: $0.receiver, from: from, text: text, store: store) }
         if next != target { target = next }
     }
 
@@ -115,6 +118,19 @@ final class CodeNavPointer {
         anchorPoint = lastPoint
         store.codeNav.caret = target.from
         Task { await store.goToDefinition(target.symbol, from: target.clickedAt, anchor: target.token, receiver: target.receiver) }
+    }
+
+    /// §65.8: Peek Definition on `target` — the band under its row; the place being read stays where it is.
+    func peek(_ target: Target) {
+        guard let store = target.store else { return }
+        Task { await store.peekDefinition(target.symbol, row: target.from, rowText: target.text, from: target.clickedAt, receiver: target.receiver) }
+    }
+
+    /// Navigate › Peek Definition (⌥F12): the name under the pointer.
+    func peekUnderPointer(in store: AppState) -> Bool {
+        guard let target, target.store === store, hoveringToken == target.token else { return false }
+        peek(target)
+        return true
     }
 
     /// Navigate › Go to Definition (F12): the name under the pointer, if the pointer is over one in `store`'s window.
@@ -151,7 +167,8 @@ final class CodeNavPointer {
         case .leftMouseDown:
             guard Self.isCommandOnly(event.modifierFlags), event.clickCount == 1, let target, hoveringToken == target.token else { break }
             swallowMouseUp = true
-            goToDefinition(target)
+            // §65.8: Settings › Review › Diff › ⌘-click — the peek band (default) or the jump.
+            if CodeNavCommandClick.current() == .peek { peek(target) } else { goToDefinition(target) }
             return true   // the row's own click (picking the line) never sees it
         case .leftMouseUp:
             if swallowMouseUp {
@@ -228,7 +245,7 @@ struct CodeNavHotspot<Content: View>: View {
                     let x = wrap ? point.x : point.x + offset
                     let hit = CodeNavHitTest.offset(at: CGPoint(x: x, y: point.y), in: text, width: wrap ? width : nil)
                         .flatMap { CodeNavText.symbol(in: text, at: $0, path: from.path) }
-                    pointer.hover(token: mine, hit: hit, point: point, from: from, store: store)
+                    pointer.hover(token: mine, hit: hit, point: point, from: from, text: text, store: store)
                 case .ended:
                     if hovered { hovered = false }
                     pointer.leave(token: token)
@@ -588,8 +605,11 @@ struct CodeNavMenuItems: View {
             let from = CodeNavLocation(view: context.view, path: context.path, line: line)
             let pointer = CodeNavPointer.shared
             if let target = pointer.target(on: from) {
+                Button("Peek Definition", systemImage: "eye") { pointer.peek(target) }   // MARK: ide-nav (§65.8)
+                    .help(String(localized: "\(target.symbol)'s definition under this line, without leaving it (⌥F12)"))
+                    .accessibilityIdentifier("Row Peek definition")
                 Button("Go to Definition", systemImage: "arrow.right.circle") { pointer.goToDefinition(target) }
-                    .help(String(localized: "Where \(target.symbol) is declared (⌘-click)"))
+                    .help(String(localized: "Where \(target.symbol) is declared (F12)"))
                     .accessibilityIdentifier("Row Go to definition")
                 Button("Find References", systemImage: "text.magnifyingglass") {
                     Task { await store.findReferences(target.symbol, from: from) }
@@ -651,6 +671,14 @@ struct CodeNavCommands: Commands {
         CommandMenu("Navigate") {
             let store = focused?.store
             let hasProject = store?.menuState.hasProject == true
+            // MARK: ide-nav (§65.8): the definition in a band under the line.
+            Button("Peek Definition") {
+                if let store, !CodeNavPointer.shared.peekUnderPointer(in: store) { NSSound.beep() }
+            }
+            .keyboardShortcut(Self.f12, modifiers: .option)
+            .disabled(!hasProject)
+            .help(hasProject ? Text("The definition of the name under the pointer, in a band under its line") : Text("Open a project first"))
+            .accessibilityIdentifier("Navigate menu Peek definition")
             Button("Go to Definition") {
                 if let store, !CodeNavPointer.shared.goToDefinitionUnderPointer(in: store) { NSSound.beep() }
             }

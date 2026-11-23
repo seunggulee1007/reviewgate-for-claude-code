@@ -493,6 +493,22 @@
         }
       }
     },
+    "%@'s definition under this line, without leaving it (⌥F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@'s definition under this line, without leaving it (⌥F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 정의를 이 줄 아래에 보여 줘요 — 읽던 자리는 그대로예요 (⌥F12)"
+          }
+        }
+      }
+    },
     "%@, not found": {
       "localizations": {
         "en": {
@@ -511,6 +527,22 @@
     },
     "%@:%lld": {
       "shouldTranslate": false
+    },
+    "%@:%lld — double-click to open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@:%lld — double-click to open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@:%2$lld — 두 번 클릭하면 열어요"
+          }
+        }
+      }
     },
     "%lld": {
       "shouldTranslate": false
@@ -5277,6 +5309,246 @@
           "stringUnit": {
             "state": "translated",
             "value": "이동하기 전 자리로 돌아가요 (⌃-)"
+          }
+        }
+      }
+    },
+    "Close the peek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the peek"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기 닫기"
+          }
+        }
+      }
+    },
+    "Close the peek (Esc)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the peek (Esc)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기 닫기 (Esc)"
+          }
+        }
+      }
+    },
+    "Definition of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definition of %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 정의"
+          }
+        }
+      }
+    },
+    "Every line that holds this name as a whole word (⇧F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every line that holds this name as a whole word (⇧F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 이름이 단어로 들어 있는 모든 줄 (⇧F12)"
+          }
+        }
+      }
+    },
+    "Jump there — Back (⌃-) returns here (↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jump there — Back (⌃-) returns here (↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그곳으로 가요 — 뒤로(⌃-)를 누르면 여기로 돌아와요 (↩)"
+          }
+        }
+      }
+    },
+    "Nothing to open — no definition was found": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing to open — no definition was found"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열 곳이 없어요 — 정의를 찾지 못했어요"
+          }
+        }
+      }
+    },
+    "Open a project first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a project first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 프로젝트를 여세요"
+          }
+        }
+      }
+    },
+    "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭) — Mac 은 설정 › 리뷰 › Diff › 이름을 ⌘-클릭하면 이 \"정의로 이동\"일 때"
+          }
+        }
+      }
+    },
+    "Peek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기"
+          }
+        }
+      }
+    },
+    "Peek Definition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek Definition"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의 미리 보기"
+          }
+        }
+      }
+    },
+    "Peek of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek of %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 미리 보기"
+          }
+        }
+      }
+    },
+    "Peek shows the definition in a band under the line, so the place you read stays where it is; Go to Definition jumps there (Back returns). F12 always jumps, ⌥F12 always peeks.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Peek shows the definition in a band under the line, so the place you read stays where it is; Go to Definition jumps there (Back returns). F12 always jumps, ⌥F12 always peeks."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "미리 보기는 정의를 그 줄 아래 띠에 보여 줘요 — 읽던 자리는 그대로예요. 정의로 이동은 그곳으로 가요(뒤로로 돌아와요). F12 는 언제나 이동, ⌥F12 는 언제나 미리 보기예요."
+          }
+        }
+      }
+    },
+    "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The definition in a band under the line — the place you read stays. Mac: ⌘-click a name too (the default)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정의를 그 줄 아래 띠에 보여 줘요 — 읽던 자리는 그대로예요. Mac 은 이름을 ⌘-클릭해도 돼요(기본값)"
+          }
+        }
+      }
+    },
+    "The definition of the name under the pointer, in a band under its line": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The definition of the name under the pointer, in a band under its line"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "포인터 아래 이름의 정의를 그 줄 아래 띠에 보여 줘요"
+          }
+        }
+      }
+    },
+    "Where %@ is declared (F12)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where %@ is declared (F12)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@이(가) 선언된 곳으로 가요 (F12)"
           }
         }
       }
@@ -14663,22 +14935,6 @@
         }
       }
     },
-    "Or ⌘-click a name (Ctrl+click on Windows)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Or ⌘-click a name (Ctrl+click on Windows)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭)"
-          }
-        }
-      }
-    },
     "Other (MCP server)": {
       "localizations": {
         "en": {
@@ -16691,22 +16947,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 세션이 메시지를 보내면"
-          }
-        }
-      }
-    },
-    "Where %@ is declared (⌘-click)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Where %@ is declared (⌘-click)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@이(가) 선언된 곳으로 가요 (⌘-클릭)"
           }
         }
       }
@@ -37863,6 +38103,22 @@
     },
     "−%lld": {
       "shouldTranslate": false
+    },
+    "⌘-click on a name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌘-click on a name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이름을 ⌘-클릭하면"
+          }
+        }
+      }
     },
     "⌘↩": {
       "localizations": {
