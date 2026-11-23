@@ -6441,7 +6441,8 @@ changed default.
   돌아가요 (shift+tab 전환)" (plan mode from auto), "기본 모드 (shift+tab 전환)"; a pick waiting for the turn adds "· 다음 턴부터:
   계획"; auto mode the engine said cannot run here reads "자동 모드를 쓸 수 없어 기본 모드로 동작해요 (shift+tab 전환)" (gray —
   the CLI runs the default mode and asks). Auto and accept edits in orange, plan in the accent colour, default gray. The
-  app keeps its own name for plan mode (계획) everywhere.
+  app keeps its own name for plan mode (계획) everywhere. §56.5: the line is the composer's mode menu now, first in the row
+  under the box, without "(shift+tab 전환)" (its tooltip names the key).
 - **Esc** in the message box, after the mention / slash palettes and the prompt history had theirs, stops a running turn as
   the terminal does (⌘. / Ctrl+. as before; never from another chat shown read-only, §39.2): with a recalled prompt on
   screen the first Esc brings the typed draft back and the next one stops.
@@ -6464,7 +6465,7 @@ changed default.
   gets auto back for a plan made in an auto chat. Keys: `docs/SHORTCUTS.md` and both tables (§42.5).
 - Owner: w6-terminal (engine `session/autoMode.ts`, `session/hooks.ts` `noteCliMode` / `askOrAllow`, `session/claude.ts`
   `followCliMode`, `engine.ts` `userMode` / `planReturnMode`; Core `TerminalMode.swift`, `TerminalModeProtocol.swift`,
-  `ComposerSupport.swift` `PromptHistoryNavigator`; Mac `ComposerTextView.swift`, `ComposerModeLineView.swift`, `ChatView.swift`,
+  `ComposerSupport.swift` `PromptHistoryNavigator`; Mac `ComposerTextView.swift`, `ComposerModeMenu.swift`, `ChatView.swift`,
   `PlanCard.swift`, `PlanReviewSheet.swift`; Electron `terminalMode.ts`, `storeAutoMode.ts`, `promptHistory.ts`, `Composer.tsx`,
   `ModeMenu.tsx`, `PlanCard.tsx`, `PlanReviewDialog.tsx`). Tests: `engine/test/autoMode.test.ts`, `engine/test/w6.terminal.test.ts`,
   `Core/Tests/ReviewGateCoreTests/{TerminalMode,DailyUX,ShortcutTable}Tests.swift`,
@@ -8853,6 +8854,19 @@ controls — and the conversation got what was left. Clients only; no protocol c
   one (a subscription may never report one), the turn and its time once a turn ran or while one runs; a fresh chat's HUD
   is the model and "쉬는 중". Core `HUDState.shown(isRunning:)` (`HUDShownTests`), Electron `hudModel.ts` `hudShown`
   (`hudShown.test.ts`).
+- **One row under the box.** The mode line and the mode picker at the row's other end said the same thing (and the HUD
+  had a third, its mode pill): the mode line is the mode menu now, first in the row, in its colour ("⏵⏵ 자동 모드", "⏸ 계획
+  모드 — 승인하면 자동 모드로 돌아가요"; Core `ComposerModeLine.label`, Electron `modeLine().label`), a click picks a mode and
+  ⇧⇥ cycles them as before (said in its tooltip; disabled until the session started, and says so); the HUD's mode pill is
+  gone. Then what a send does right now — the waiting / question / deny hints as before; the plain key hint ("↩ 보내기 · ⇧↩
+  줄바꿈 · ⌘/ 커맨드") only while the empty box has the focus. The capabilities are an icon (its warnings kept), the counts
+  in its tooltip and popover. Then the controls. A narrow row folds the mode menu into its symbol with the model menu (Mac
+  `ComposerBarFit`); Electron's row still wraps as the last resort.
+- **The placeholder** is short — "Claude에게 메시지 · @ 파일 · ⌘V 이미지" — and the Mac draws it in one line cut with "…" at the
+  box's visible edge (it ran on under the clip, mid-word, next to the tools in the box).
+- Verified: `SHOTS_LAYOUT=composerbar` (quiet, on the fake claude, 1000 × 637, dark, `SHOTS_LANG=ko`) — a fresh chat, the
+  box focused, text typed, Claude at work, a review pending, the mode offer, decided cards (`composerbar` lines give the
+  transcript's height).
 
 ## 57. Terminal chat
 

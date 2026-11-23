@@ -91,9 +91,7 @@ struct HUDStrip: View {
                 PermissionPendingChip()   // wave1 mac-perms: "권한 요청 N개 대기" from two on; click → the oldest card
             }
             PeerTurnChip()   // wave1 mac-perms: "{fromNames} 요청" (§29)
-            if store.permissionMode != .default || store.scheduledPermissionMode != nil {   // wave4b w4b-auto: a pick waiting too
-                HUDModeChip()
-            }
+            // §56.5: no mode pill — the composer's mode menu (`ComposerModeMenu`) says which mode runs, in its colour.
             if !store.rememberedAllows.isEmpty {
                 rememberedChip(measuring: measuring)
             }

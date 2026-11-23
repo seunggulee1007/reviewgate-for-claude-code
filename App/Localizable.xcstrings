@@ -16784,6 +16784,22 @@
         }
       }
     },
+    "Message Claude · @ file · ⌘V image": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message Claude · @ file · ⌘V image"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 메시지 · @ 파일 · ⌘V 이미지"
+          }
+        }
+      }
+    },
     "Message Claude — @ mentions a file, ⌘V pastes an image": {
       "localizations": {
         "en": {
@@ -29122,6 +29138,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 파일의 패치가 비어 있어요."
+          }
+        }
+      }
+    },
+    "The permission mode can be picked once the session has started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The permission mode can be picked once the session has started"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션이 시작되면 권한 모드를 고를 수 있어요"
           }
         }
       }

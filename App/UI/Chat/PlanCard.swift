@@ -163,24 +163,3 @@ struct PlanCard: View {
         onKeepPlanning(text)
     }
 }
-
-/// The composer's compact mode picker: the current mode as a menu button, every mode with its one-line help.
-/// wave4b w4b-auto (§39.5): while Claude works a pick waits for the turn to end (the engine refuses `set_permission_mode`
-/// with `session_busy` then) and the label shows it ("기본 → 자동"); a refused switch says why in the tooltip.
-struct PermissionModePicker: View {
-    @Environment(AppState.self) private var store
-
-    var body: some View {
-        Menu {
-            PermissionModeMenuItems()
-        } label: {
-            Label(PermissionModeLabels.title(store), systemImage: (store.scheduledPermissionMode ?? store.permissionMode).symbolName)
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .disabled(!store.canPickPermissionMode)
-        .help(PermissionModeLabels.help(store))
-        .accessibilityLabel("Permission mode")
-        .accessibilityIdentifier("Permission mode")
-    }
-}

@@ -28,6 +28,12 @@ public struct ComposerModeLine: Sendable, Equatable {
     public let text: String
     public let tone: ComposerModeTone
 
+    /// §56.5: the line without "(shift+tab 전환)" — the composer's mode menu, whose tooltip names the key.
+    public var label: String {
+        let suffix = " " + String(localized: "(shift+tab to switch)", bundle: .module)
+        return text.hasSuffix(suffix) ? String(text.dropLast(suffix.count)) : text
+    }
+
     /// `approvesIntoAuto`: plan mode whose "Approve & run" goes back to auto (`AppState.planApproveMode`). `autoUnavailable`:
     /// the engine said auto mode cannot run here — the CLI runs the default mode (and asks), and the line says so.
     public static func make(mode: PermissionMode, scheduled: PermissionMode?, approvesIntoAuto: Bool, autoUnavailable: Bool = false) -> ComposerModeLine {
