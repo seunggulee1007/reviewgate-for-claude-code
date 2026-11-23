@@ -53,7 +53,8 @@ type NavState = {
   /** The line the user is at in the file view / the review's diff (the caret, the last click or jump): Back's "from". */
   here: { path: string; line: number } | null;
 
-  goToDefinition(q: { symbol: string; fromPath?: string; line?: number; x: number; y: number; from: NavLocation | null }): void;
+  /** §65.6: `column` (1-based) and `receiver` of the click make members of the receiver's type win. */
+  goToDefinition(q: { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string; x: number; y: number; from: NavLocation | null }): void;
   findReferences(q: { symbol: string; fromPath?: string }): void;
   findInProject(symbol: string): void;
   /** Opens a result: a changed file of the review in its diff at that line, any other file in the project file view. */
@@ -69,6 +70,16 @@ type NavState = {
   setHere(path: string, line: number): void;
   reset(): void;
 };
+
+/** `find_definition`'s optional fields (§62 `fromPath` / `line`, §65.6 `column` / `receiver`), each only when known. */
+export function definitionHints(q: { fromPath?: string | undefined; line?: number | undefined; column?: number | undefined; receiver?: string | undefined }) {
+  return {
+    ...(q.fromPath ? { fromPath: q.fromPath } : {}),
+    ...(q.line && q.line > 0 ? { line: q.line } : {}),
+    ...(q.column && q.column > 0 ? { column: q.column } : {}),
+    ...(q.receiver ? { receiver: q.receiver } : {}),
+  };
+}
 
 let defSeq = 0;
 let refSeq = 0;
@@ -121,12 +132,12 @@ export const useNav = create<NavState>((set, get) => {
     history: EMPTY_HISTORY,
     here: null,
 
-    goToDefinition({ symbol, fromPath, line, x, y, from }) {
+    goToDefinition({ symbol, fromPath, line, column, receiver, x, y, from }) {
       if (!isSendableSymbol(symbol)) return;
       const seq = ++defSeq;
       const base = { x, y, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}) };
       set({ peek: { ...base, loading: true } });
-      engineRequest({ type: "find_definition", symbol, ...(fromPath ? { fromPath } : {}), ...(line && line > 0 ? { line } : {}) })
+      engineRequest({ type: "find_definition", symbol, ...definitionHints({ fromPath, line, column, receiver }) })
         .then((reply) => {
           if (seq !== defSeq || !get().peek) return;
           const rows = peekRows(reply.candidates);

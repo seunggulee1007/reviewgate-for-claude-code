@@ -10787,7 +10787,12 @@ other builds running):
 
 **Windows.** `document_symbols`, `workspace_symbols`, `definition_preview` and `nav_index_build` are on the renderer's
 allow list (`clients/desktop/src/main/ipcGuard.ts`; `find_definition`'s new fields and `list_files.filesOnly` pass
-through). The UI is the client team's follow-up.
+through).
+
+- **Column and receiver.** Every `find_definition` from a click, F12 or the line menu carries `column` (the name's first
+  character, 1-based UTF-16) and, when the line has `x.` / `x?.` / `x!!.` (spaces allowed) or `x::` / `x->` right in front
+  of a plain identifier, `receiver: "x"` (`nav/identifier.ts` `receiverBefore`; nothing after `)` / `]`, none for a
+  `pkg.Type` chain, none for a selected name other than the word).
 
 **Mac.** Nothing new is decoded yet; Core's `ReviewState` / `DefinitionCandidate` decoders ignore the new keys until the
 UI work adds them.

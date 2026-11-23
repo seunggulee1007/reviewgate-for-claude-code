@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identifierAt, isSendableSymbol } from "./identifier";
+import { identifierAt, isSendableSymbol, receiverBefore } from "./identifier";
 
 /** The symbol at the first `|` of `marked` (the marker removed). */
 const at = (marked: string, path = "") => {
@@ -74,5 +74,28 @@ describe("identifierAt (§62)", () => {
     expect(isSendableSymbol("f()")).toBe(false);
     expect(isSendableSymbol("한글")).toBe(false);
     expect(isSendableSymbol("x".repeat(201))).toBe(false);
+  });
+
+  it("§65.6: names the receiver written in front of the word (find_definition's receiver)", () => {
+    const rec = (marked: string, path = "A.java") => {
+      const offset = marked.indexOf("|");
+      return identifierAt(marked.replace("|", ""), offset, path)?.receiver ?? null;
+    };
+    expect(rec("        return this.tot|al;")).toBe("this");
+    expect(rec("    cartService.addI|tem(item);")).toBe("cartService");
+    expect(rec("val n = user?.na|me", "A.kt")).toBe("user");
+    expect(rec("val n = user!!.na|me", "A.kt")).toBe("user");
+    expect(rec("list.map(Repo::cre|ate)", "A.kt")).toBe("Repo");
+    expect(rec("node->ne|xt", "a.c")).toBe("node");
+    expect(rec("items.forEach { it -> sa|ve(it) }", "A.kt")).toBeNull();
+    expect(rec("this.gate . refr|esh()", "a.ts")).toBe("gate");
+    // unqualified, or after a call / index: nothing is known
+    expect(rec("    total|();")).toBeNull();
+    expect(rec("    foo().ba|r();")).toBeNull();
+    expect(rec("    items[0].pri|ce")).toBeNull();
+    // a type through its package names no receiver (the chain is the symbol)
+    expect(identifierAt("    com.acme.Money.of(1)", 15)).toEqual({ symbol: "com.acme.Money", start: 4, end: 18 });
+    expect(receiverBefore("x = 1.5", 6)).toBeUndefined();
+    expect(identifierAt("  cart.total", 9)).toEqual({ symbol: "total", start: 7, end: 12, receiver: "cart" });
   });
 });

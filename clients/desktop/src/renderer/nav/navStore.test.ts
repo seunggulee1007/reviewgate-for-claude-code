@@ -75,6 +75,17 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().history.forward).toEqual([{ kind: "review", path: "src/B.java", line: 7 }]);
   });
 
+  it("§65.6: sends the click's column and receiver (each only when known)", async () => {
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "refresh", candidates: [], truncated: false }));
+    m.useNav.getState().goToDefinition({ symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 15, receiver: "gate", ...at, from: null });
+    m.useNav.getState().goToDefinition({ symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 0, ...at, from: null });
+    await flush();
+    expect(sent).toEqual([
+      { type: "find_definition", symbol: "refresh", fromPath: "src/A.ts", line: 4, column: 15, receiver: "gate" },
+      { type: "find_definition", symbol: "refresh", fromPath: "src/A.ts", line: 4 },
+    ]);
+  });
+
   it("one candidate outside the review: the project file view (project_file), read-only", async () => {
     replies.set("find_definition", () => ({ type: "definitions", symbol: "C", candidates: [cand("lib/C.java", 3)], truncated: false }));
     m.useNav.getState().goToDefinition({ symbol: "C", fromPath: "src/A.java", line: 2, ...at, from: { kind: "review", path: "src/A.java", line: 2 } });

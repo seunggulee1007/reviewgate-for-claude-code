@@ -29,7 +29,7 @@ function fromDom(target: DomNavTarget): NavLocation | null {
 export function goFromDom(target: DomNavTarget, x: number, y: number): void {
   const from = fromDom(target);
   if (from?.kind === "review") useNav.getState().setHere(from.path, from.line);
-  useNav.getState().goToDefinition({ symbol: target.symbol, fromPath: target.path, ...(target.line ? { line: target.line } : {}), x, y, from });
+  useNav.getState().goToDefinition({ symbol: target.symbol, fromPath: target.path, ...(target.line ? { line: target.line } : {}), column: target.column, ...(target.receiver ? { receiver: target.receiver } : {}), x, y, from });
 }
 
 const editable = (el: EventTarget | null) => el instanceof HTMLElement && (el.isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");

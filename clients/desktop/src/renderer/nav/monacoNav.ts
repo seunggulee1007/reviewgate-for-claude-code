@@ -28,7 +28,7 @@ function symbolAt(ed: monaco.editor.ICodeEditor, pos: monaco.IPosition, path: st
     if (isSendableSymbol(chosen)) return { symbol: chosen, line: sel.startLineNumber, start: sel.startColumn, end: sel.endColumn };
   }
   const found = identifierAt(model.getLineContent(pos.lineNumber), pos.column - 1, path);
-  return found ? { symbol: found.symbol, line: pos.lineNumber, start: found.start + 1, end: found.end + 1 } : null;
+  return found ? { symbol: found.symbol, line: pos.lineNumber, start: found.start + 1, end: found.end + 1, ...(found.receiver ? { receiver: found.receiver } : {}) } : null;
 }
 
 export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: Opts): monaco.IDisposable {
@@ -62,7 +62,7 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
       e.event.stopPropagation();
       link.clear();
       const b = e.event.browserEvent;
-      useNav.getState().goToDefinition({ symbol: found.symbol, fromPath: opts.path, line: found.line, x: b.clientX, y: b.clientY, from: opts.from(found.line) });
+      useNav.getState().goToDefinition({ symbol: found.symbol, fromPath: opts.path, line: found.line, column: found.start, receiver: found.receiver, x: b.clientX, y: b.clientY, from: opts.from(found.line) });
     }),
   );
 
@@ -85,7 +85,7 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
       contextMenuOrder: 1,
       run: () => {
         const at = atCaret();
-        if (at) useNav.getState().goToDefinition({ symbol: at.symbol, fromPath: opts.path, line: at.line, x: at.x, y: at.y, from: opts.from(at.line) });
+        if (at) useNav.getState().goToDefinition({ symbol: at.symbol, fromPath: opts.path, line: at.line, column: at.start, receiver: at.receiver, x: at.x, y: at.y, from: opts.from(at.line) });
       },
     }),
     ed.addAction({
