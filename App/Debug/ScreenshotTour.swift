@@ -3208,6 +3208,7 @@ private final class Tour {
         await ptyFollows(host, "shell panel open")
         await sttyFollows(shell, "shell panel open")
         try write(try render(window), "shell-panel-dark")
+        try await bottomPanelTabs(entry: entry, window: window)
         for (name, frame) in [("window 1280 × 800", NSSize(width: 1280, height: 800)), ("window back to 1000 × 637", laptop)] {
             let before = host.view.terminalDimensions
             window.setFrame(NSRect(origin: window.frame.origin, size: frame), display: true)
@@ -3399,6 +3400,38 @@ private final class Tour {
 
     /// §57.5: the fake claude's own winsize (TIOCGWINSZ through Node's `stdout.columns`, asked with a `size` line) is the
     /// view's cells, and its last `winsize` line (SIGWINCH) says the same. `terminal: winsize` lines; LOST when they differ.
+    /// MARK: c-panel (§57.18): the panel's 출력 and 실행 tabs and the bar under the window while it is hidden — a command
+    /// the tour adds itself (the user's own: no question) runs in its own PTY to its exit code; back on 터미널 after.
+    private func bottomPanelTabs(entry: WorkbenchWindowEntry, window: NSWindow) async throws {
+        let shell = entry.model.shell
+        shell.show(.output)
+        try await Task.sleep(for: .milliseconds(600))
+        let lines = entry.store.output.lines.count
+        log("terminal: panel output " + (lines > 0 ? "has \(lines) lines" : "— SILENT (no line)"))
+        try write(try render(window), "panel-output-dark")
+        shell.show(.run)
+        try await Task.sleep(for: .milliseconds(400))
+        log("terminal: INFO panel run candidates \(shell.runs.configs.map(\.command))")
+        if let config = shell.runs.add(name: "Tour", command: "echo run-ok; exit 3") {
+            shell.runs.run(config)
+            let ended = await waitFor(seconds: 10) {
+                guard let run = shell.runs.run(of: config.id), case let .exited(code, _) = run.host.state else { return false }
+                return code == 3
+            }
+            let shown = shell.runs.run(of: config.id)?.host.screenText().contains("run-ok") == true
+            log("terminal: panel run " + (ended && shown ? "ran in its own terminal, exited (3)" : "— LOST (ended \(ended), output \(shown))"))
+        } else {
+            log("terminal: panel run — LOST (the command was not added)")
+        }
+        try await Task.sleep(for: .milliseconds(400))
+        try write(try render(window), "panel-run-dark")
+        shell.visible = false
+        try await Task.sleep(for: .milliseconds(400))
+        try write(try render(window), "panel-status-bar-dark")
+        shell.show(.terminal)
+        try await Task.sleep(for: .milliseconds(400))
+    }
+
     private func ptyFollows(_ host: TerminalHost, _ step: String) async {
         let asked = Self.reports(host, "size").count
         host.send(text: "size\r")
