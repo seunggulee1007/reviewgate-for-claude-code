@@ -377,6 +377,7 @@
     "accounts": [],
     "isLoading": false,
     "isSubmitting": false,
+    "isCommenting": false,
     "errorText": null,
     "lastSubmitResult": null,
     "lastCreatedPR": null
