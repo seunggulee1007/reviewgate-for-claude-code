@@ -170,6 +170,8 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "find_definition",
   "find_references",
   "project_file",
+  // §62: "Find in Project" from the "no definition found" notice (§47's search: read-only, lane "search")
+  "project_search",
 ]);
 
 export type Validated = { ok: true; cmd: EngineCommand } | { ok: false; error: string };
