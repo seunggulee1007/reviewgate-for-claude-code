@@ -30,6 +30,15 @@ export function terminalAcceptContinueBlocker(s: Pick<ReviewState, "gate" | "ses
   if (!target.shown) return t("The chat on screen is not a live terminal chat");
   if (s.gate.pendingCount === 0) return t("No file waits for review");
   if (s.gate.changesRequestedCount > 0) return t("Send your change request ({0} file(s)) to continue", s.gate.changesRequestedCount);
+  return terminalContinueBlocker(s, target);
+}
+
+/**
+ * MARK: continue-states — §58.1: why `Continue.` cannot be typed now (null: it can) — Claude Code idle at its prompt, pending
+ * files or not (the Mac's `terminalContinueBlocker`).
+ */
+export function terminalContinueBlocker(s: Pick<ReviewState, "gate" | "session">, target: ContinueTarget): string | null {
+  if (!target.shown) return t("The chat on screen is not a live terminal chat");
   const info = s.session.terminal ?? null;
   if (s.gate.phase === "running" || info?.promptId) return t("Claude Code is still working — this is offered once the turn ends");
   if (info?.waiting) return t("Claude Code waits for you in the terminal — answer it there first");
@@ -45,14 +54,15 @@ export function terminalAcceptContinueBlocker(s: Pick<ReviewState, "gate" | "ses
  * Claude continues). Nothing is typed when the accept was refused or the paste could not go.
  */
 export async function runTerminalAcceptContinue(d: {
-  accept(): Promise<void>;
+  /** Absent: "Continue" with nothing accepted (§58.1) — the paste and Enter only. */
+  accept?(): Promise<void>;
   paste(text: string): boolean;
   enter(): void;
   refusal(err: unknown): string;
   wait?(ms: number): Promise<void>;
 }): Promise<string | null> {
   try {
-    await d.accept();
+    await d.accept?.();
   } catch (err) {
     return d.refusal(err);
   }

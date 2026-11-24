@@ -24,8 +24,8 @@ import {
 } from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
 import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
-import { terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
-import { continueInTerminal } from "../../acceptAllContinue";
+import { terminalAcceptContinueBlocker, terminalContinueBlocker } from "../../terminalAcceptContinue";
+import { continueInTerminal, continuePrimary, continuePrimaryHelp, continuePrimaryTitle, continueWithoutAccepting } from "../../acceptAllContinue";
 import { firstWaitingPath, openReviewTitle, reviewFirstBlockedHelp, reviewFirstBlockedText } from "../../reviewFirst"; // §64
 import { showToast } from "../../toast";
 import { droppedMentionPaths, MENTION_DRAG_TYPE } from "../../mentions";
@@ -143,7 +143,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
           </button>
         )}
         {(state.gate.reviewFirst?.blocked ?? 0) > 0 && !state.gate.reviewFirst?.allowedThisTurn && <ReviewFirstChip /> /* §64 */}
-        {state.gate.pendingCount > 0 && <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />}
+        <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />
         <button
           type="button"
           className={`plain small ${finding ? "active" : ""}`}
@@ -228,11 +228,18 @@ function ReviewFirstChip() {
 function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
   const state = useStore((s) => s.state);
   const [busy, setBusy] = useState(false);
+  // MARK: continue-states — §58.1: the Changes list's primary (accept all / the rest and continue, or Continue); the change
+  // request keeps its own row.
+  const primary = continuePrimary(state);
+  if (!primary || primary.kind === "requestChanges") return null;
   const count = state.gate.pendingCount;
-  const blocker = terminalAcceptContinueBlocker(state, { shown: true, running: props.running, bracketed: acceptsPaste(props.ptyId) });
+  const target = { shown: true, running: props.running, bracketed: acceptsPaste(props.ptyId) };
+  const blocker = primary.kind === "continue" ? terminalContinueBlocker(state, target) : terminalAcceptContinueBlocker(state, target);
+  const chat = { viewing: false, terminal: { ...target, ptyId: props.ptyId } };
   const run = async (): Promise<void> => {
     setBusy(true);
-    await continueInTerminal(props.ptyId, count); // MARK: accept-continue-ui — shared with the Changes list's button (§58.1)
+    if (primary.kind === "continue") await continueWithoutAccepting();
+    else await continueInTerminal(props.ptyId, count); // MARK: accept-continue-ui — shared with the Changes list's button (§58.1)
     setBusy(false);
   };
   return (
@@ -240,12 +247,12 @@ function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
       type="button"
       className="small"
       disabled={blocker !== null || busy}
-      title={blocker ?? t("Accepts the {0} pending file(s), then types “Continue.” into Claude Code with Enter", count)}
-      aria-label={t("Accept and continue")}
+      title={blocker ?? continuePrimaryHelp(state, chat, false)}
+      aria-label={continuePrimaryTitle(primary)}
       onClick={() => void run()}
       data-testid="Terminal chat accept and continue"
     >
-      {t("Accept {0} & Continue", count)}
+      {continuePrimaryTitle(primary)}
     </button>
   );
 }

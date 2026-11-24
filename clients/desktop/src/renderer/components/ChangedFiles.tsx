@@ -24,7 +24,8 @@ import { acceptBlockedReason, changedSinceViewed, collectFailedReason, diffTreeO
 import { scheduledBadge, scheduledHelp } from "../rejectSchedule"; // MARK: r2-review-flow (M32)
 import { needsAcceptAllDialog, runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
 // MARK: accept-continue-ui — §58.1
-import { acceptAllContinueBlocker, acceptAllContinueHelp, liveContinueChat, runAcceptAllContinue } from "../acceptAllContinue";
+import { continueLeavingRestBlocker, continueLeavingRestHelp, continuePrimary, continuePrimaryBlocker, continuePrimaryHelp, continuePrimaryTitle, continueWithoutAccepting, liveContinueChat, runContinuePrimary } from "../acceptAllContinue";
+import { Menu } from "./Menu";
 import { subscribeTerminals, terminalsVersion } from "../terminal/termHost";
 import { useTerminalChats } from "../terminal/terminalChat";
 import { useViewing } from "../viewedChat";
@@ -86,7 +87,10 @@ export function ChangedFiles() {
   useTerminalChats((s) => s.bySession);
   useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
   const continueChat = liveContinueChat();
-  const continueBlocked = acceptAllContinueBlocker(state, continueChat);
+  // MARK: continue-states — §58.1: the primary follows the review (none when there is nothing to tell Claude).
+  const primary = continuePrimary(state);
+  const continueBlocked = continuePrimaryBlocker(state, continueChat);
+  const leaveRestBlocked = continueLeavingRestBlocker(state, continueChat);
   const viewStates = useMemo(() => new Map(state.changedFiles.map((f) => [f.path, viewStateOf(f, viewedPaths)] as const)), [state.changedFiles, viewedPaths]);
   const isViewed = (f: ChangedFileState) => viewStates.get(f.path) === "viewed" || f.state !== "pending";
   const changedAfterView = changedSinceViewed(state.changedFiles, viewedPaths).length;
@@ -135,21 +139,40 @@ export function ChangedFiles() {
         </button>
         <button type="button" className="small" disabled={pending === 0 || rejectBlocked !== null} onClick={() => openDialog({ kind: "rejectAll" })} title={rejectBlocked ?? undefined} data-testid="Reject all">{t("Reject all")}</button>
       </div>
-      {pending > 0 && (
+      {primary && (
         <div className="row" style={{ padding: "0 12px 6px", gap: 6 }}>
           {/* MARK: accept-continue-ui — §58.1: accept every pending file and let Claude go on, nothing typed; the summary
-              dialog first when a file still needs a look. Off with its reason (Claude working, a card, the terminal busy). */}
+              dialog first when a file still needs a look. Off with its reason (Claude working, a card, the terminal busy).
+              continue-states: accept the rest once some are decided, Continue once all are, the change request while
+              notes wait; ⋯ continues and leaves the pending files as they are. */}
           <button
             type="button"
             className="small primary grow"
             disabled={continueBlocked !== null}
-            onClick={runAcceptAllContinue}
-            title={continueBlocked ?? acceptAllContinueHelp(state, continueChat, needsAcceptAllDialog())}
-            aria-label={t("Accept All & Continue")}
+            onClick={runContinuePrimary}
+            title={continueBlocked ?? continuePrimaryHelp(state, continueChat, needsAcceptAllDialog())}
+            aria-label={continuePrimaryTitle(primary)}
             data-testid="Accept all and continue"
           >
-            {t("Accept All & Continue")}
+            {continuePrimaryTitle(primary)}
           </button>
+          <Menu
+            label="⋯"
+            ariaLabel={t("More ways to continue")}
+            title={t("More ways to continue")}
+            align="right"
+            testId="Continue more"
+            items={[
+              {
+                kind: "item",
+                label: t("Continue, Leave the Rest Pending"),
+                disabled: leaveRestBlocked !== null,
+                title: leaveRestBlocked ?? continueLeavingRestHelp(state, continueChat),
+                onClick: () => void continueWithoutAccepting(),
+                testId: "Continue leaving the rest pending",
+              },
+            ]}
+          />
         </div>
       )}
       <ViewingReviewNote /* MARK: wave4b w4b-tabs — §39.2 "실행 중인 채팅('…')의 리뷰예요" while another chat is shown */ />

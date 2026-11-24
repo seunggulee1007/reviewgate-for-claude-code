@@ -10051,11 +10051,13 @@ typed "continue" again. The primary button now follows the review's state. Clien
   pending again — an undo, or changed after the accept — is back in the open part by its state alone. The commit sheet
   lists accepted files as before. The author filter (§39.3) applies to the folded rows too. Core `AcceptedGroup.split`,
   `openChangedFiles`, `viewedOpenCount`.
-- **Windows (Electron).** The same button (`acceptAllContinue.ts`: the same reasons and words, Enter for Return) in a row
-  of its own under [변경 N개 · 대기 N개] [모두 수락] [모두 거절], shown while files are pending; the summary dialog's
-  confirm reads "Accept N & Continue". The pending banner ("리뷰 대기 파일 N개 — …") has it too, and Ctrl+Shift+Enter in an
-  empty message box (no text, mention or image) runs it. The terminal strip's button shares its terminal path
-  (`continueInTerminal`).
+- **Windows (Electron).** The same primary (`acceptAllContinue.ts` `continuePrimary` / `continuePrimaryBlocker` /
+  `runContinuePrimary`: the same table, reasons and words, Enter for Return) in a row of its own under [변경 N개 · 대기 N개]
+  [모두 수락] [모두 거절], shown while it is not hidden, with a "⋯" (`Menu`, AX "More ways to continue") holding Continue,
+  Leave the Rest Pending; the summary dialog's confirm reads "Accept N & Continue". The pending banner ("리뷰 대기 파일 N개
+  — …") has it too, and Ctrl+Shift+Enter in an empty message box (no text, mention or image) runs it. The terminal strip's
+  button shows it (not the change request) and shares its terminal path (`continueInTerminal`, `continueWithoutAccepting`;
+  `terminalContinueBlocker` without the pending rules).
   Accepted files fold the same way (`splitAccepted`; the group's header is a button with `aria-expanded`), and the
   progress ("3/7 viewed · N decided") counts the open files only.
 

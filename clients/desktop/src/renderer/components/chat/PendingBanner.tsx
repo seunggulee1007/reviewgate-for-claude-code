@@ -9,7 +9,7 @@ import { useStore } from "../../store";
 import { removeQueued } from "../../sendQueue";
 import { acceptAndSendHelp, acceptAndSendTitle, holdHelp, holdTitle, reviewFirstAcceptBlocker, reviewFirstHolds } from "../../reviewFirst"; // §64
 import { showToast } from "../../toast";
-import { acceptAllContinueBlocker, acceptAllContinueHelp, liveContinueChat, runAcceptAllContinue } from "../../acceptAllContinue"; // MARK: accept-continue-ui
+import { continuePrimary, continuePrimaryBlocker, continuePrimaryHelp, continuePrimaryTitle, liveContinueChat, runContinuePrimary } from "../../acceptAllContinue"; // MARK: accept-continue-ui
 import { needsAcceptAllDialog } from "../../acceptAllAction";
 import { useViewing } from "../../viewedChat";
 import "../reviewRound.css";
@@ -66,22 +66,28 @@ function ReviewFirstBanner({ waiting }: { waiting: number }) {
   );
 }
 
-/** MARK: accept-continue-ui — §58.1: the Changes list's one click here too, so nobody types "accepted, continue". */
+/**
+ * MARK: accept-continue-ui — §58.1: the Changes list's one click here too, so nobody types "accepted, continue".
+ * continue-states: the same primary as the list (accept all / the rest, or the change request).
+ */
 function ContinueButton() {
   const state = useStore((s) => s.state);
+  const primary = continuePrimary(state);
+  if (!primary) return null;
   const chat = liveContinueChat();
-  const blocked = acceptAllContinueBlocker(state, chat);
+  const blocked = continuePrimaryBlocker(state, chat);
+  const title = continuePrimaryTitle(primary);
   return (
     <button
       type="button"
       className="small"
       disabled={blocked !== null}
-      onClick={runAcceptAllContinue}
-      title={blocked ?? acceptAllContinueHelp(state, chat, needsAcceptAllDialog())}
-      aria-label={t("Accept All & Continue")}
+      onClick={runContinuePrimary}
+      title={blocked ?? continuePrimaryHelp(state, chat, needsAcceptAllDialog())}
+      aria-label={title}
       data-testid="Pending banner accept all and continue"
     >
-      {t("Accept All & Continue")}
+      {title}
     </button>
   );
 }
