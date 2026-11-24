@@ -177,6 +177,22 @@
         }
       }
     },
+    "%@ is no longer a change outside the review — reopen the commit sheet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is no longer a change outside the review — reopen the commit sheet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 파일은 이제 리뷰 밖 변경이 아니에요 — 커밋 시트를 다시 여세요"
+          }
+        }
+      }
+    },
     "%@ is no longer installed": {
       "localizations": {
         "en": {

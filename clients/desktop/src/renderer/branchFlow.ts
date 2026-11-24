@@ -5,6 +5,7 @@
  */
 import type { PRDraftEvent, ReviewState } from "@reviewgate/engine";
 import { commitListed } from "./acceptCommit";
+import { otherChangesTotal } from "./commitOthers"; // MARK: git-sync (§68.5)
 import { commitLockReason } from "./commitLock";
 import { refusalCodeText } from "./errorCodes";
 import { t } from "./i18n";
@@ -35,6 +36,6 @@ export function commitBeforeSwitchBlocker(st: Pick<ReviewState, "project" | "gat
   const lock = commitLockReason(st);
   if (lock !== null) return lock;
   const committable = st.commit?.acceptedPaths ?? [];
-  if (st.commit?.canCommit || commitListed(committable, st.changedFiles).length > 0) return null;
+  if (st.commit?.canCommit || commitListed(committable, st.changedFiles).length > 0 || otherChangesTotal(st) > 0) return null;
   return refusalCodeText("nothing_to_commit", "");
 }

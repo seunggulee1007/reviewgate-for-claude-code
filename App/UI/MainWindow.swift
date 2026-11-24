@@ -1151,6 +1151,14 @@ struct MainWindow: View {
                 .disabled(prBlocker != nil)   // §61: not a dirty tree or a pending review — what goes up is the commits
                 .help(prBlocker ?? String(localized: "Push this branch and open a pull request (gh pr create)"))
                 .accessibilityIdentifier("Create PR from this branch…")
+            // MARK: git-sync — §68.5: changes outside the review (and no review to commit from) can be committed from here too.
+            if blocker != .dirtyWorktree, (store.otherChangeCounts?.total ?? 0) > 0 {
+                Button("Commit…") { model.showCommit = true }
+                    .disabled(!store.canOpenCommitSheet)
+                    .help(store.canOpenCommitSheet ? String(localized: "Commit changed files — the review's and your own")
+                          : store.commitLockReason ?? EngineMessages.refusal(error: "nothing_to_commit"))
+                    .accessibilityIdentifier("Commit from branch menu")
+            }
             if let blocker {
                 Divider()
                 Text(verbatim: blockerReason(blocker))

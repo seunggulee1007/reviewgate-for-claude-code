@@ -47,6 +47,8 @@ public enum GitSyncText {
         case "pull_failed": return String(localized: "Pull failed: \(detail)", bundle: .module)
         case "fetch_failed":
             return detail.isEmpty ? String(localized: "Fetch failed", bundle: .module) : String(localized: "Fetch failed: \(detail)", bundle: .module)
+        case "invalid_extra":   // §68.5: a file outside the review that is not one any more (in the review now, or unchanged)
+            return String(localized: "\(detail) is no longer a change outside the review — reopen the commit sheet", bundle: .module)
         default: return nil
         }
     }

@@ -70,6 +70,8 @@ export function gitSyncRefusalText(code: string, detail: string): string | null 
       return t("Pull failed: {0}", d);
     case "fetch_failed":
       return d ? t("Fetch failed: {0}", d) : t("Fetch failed");
+    case "invalid_extra": // §68.5: a file outside the review that is not one any more (in the review now, or unchanged)
+      return t("{0} is no longer a change outside the review — reopen the commit sheet", d);
     default:
       return null;
   }

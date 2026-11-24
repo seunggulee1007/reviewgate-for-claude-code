@@ -705,7 +705,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   pruneWorkbenches(): Promise<void>;
   createPR(base: string, title: string | null, body: string | null, draft: boolean, meta?: PRCreateMeta /* wave4c w4c-commit (§41.1) */): Promise<string | null>;
   /** `commit` → resolves null on `committed`, else the refusal code (also in `lastError`). */
-  commitAccepted(opts: { message: string; paths: string[]; push: boolean }): Promise<string | null>;
+  /** §68.5 `extraPaths`: changed files outside the review committed along (nothing becomes accepted). */
+  commitAccepted(opts: { message: string; paths: string[]; push: boolean; extraPaths?: string[] }): Promise<string | null>;
   /** `push` (retry after `push_failed`) → same contract as `commitAccepted`. */
   pushNow(): Promise<string | null>;
 
@@ -2292,12 +2293,12 @@ export const useStore = create<Store>((set, get, api) => {
       }
     },
 
-    async commitAccepted({ message, paths, push }) {
+    async commitAccepted({ message, paths, push, extraPaths }) {
       if (!get().state.project) return "no_project";
       if (isShadowProject(get().state)) return "not_a_git_repo";
       try {
         // `commit` / `push` land in `@reviewgate/engine` with M12; the cast keeps older engine typings compiling.
-        await engineRequest({ type: "commit", message, paths, push } as unknown as EngineCommand);
+        await engineRequest({ type: "commit", message, paths, push, ...(extraPaths && extraPaths.length > 0 ? { extraPaths } : {}) } as unknown as EngineCommand);
         await get().settle();
         set({ dismissedCommitAt: null });
         return null;

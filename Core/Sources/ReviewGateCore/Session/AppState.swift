@@ -1737,11 +1737,14 @@ public final class AppState {
     /// `state.commit.lastCommit`) or nil on refusal with the engine's code (`nothing_to_commit`, `empty_message`,
     /// `git_identity_missing`, …) in `lastError`. `push_failed:<detail>` still returns the commit (it exists;
     /// `lastCommit.pushError` carries the detail).
-    public func commitAccepted(message: String, paths: [String]? = nil, push: Bool? = nil) async -> LastCommit? {
+    /// MARK: git-sync — §68.5 `extraPaths`: changed files outside the review committed along (nothing becomes accepted).
+    public func commitAccepted(message: String, paths: [String]? = nil, push: Bool? = nil, extraPaths: [String] = []) async -> LastCommit? {
         guard projectInfo != nil else { return nil }
         let before = lastCommit?.sha
         do {
-            let reply = try await client.request(.commit(message: message, paths: paths, push: push))
+            let command: EngineCommand = extraPaths.isEmpty ? .commit(message: message, paths: paths, push: push)
+                : .commitWithOthers(message: message, paths: paths, extraPaths: extraPaths, push: push)
+            let reply = try await client.request(command)
             engineStarted = true
             guard case let .committed(_, sha, shortSha, pushed, branch) = reply else {
                 throw EngineClientError.unexpectedReply(String(describing: reply))
@@ -2386,7 +2389,7 @@ public final class AppState {
             break
         case .taskFetched:   // MARK: task-start — §63 reply, consumed by the request that asked
             break
-        case .fetched, .pulled:   // MARK: git-sync — §68 replies, consumed by the request that asked
+        case .fetched, .pulled, .commitOthers:   // MARK: git-sync — §68 replies, consumed by the request that asked
             break
         }
     }

@@ -107,7 +107,8 @@ extension AppState {
     /// holds a commit (a turn, its collection, a revert, a failed collection).
     public var canOpenCommitSheet: Bool {
         projectInfo != nil && commitLockReason == nil
-            && (canCommit || !CommitAcceptRules.listed(committable: [], files: changedFiles).isEmpty)
+            && (canCommit || !CommitAcceptRules.listed(committable: [], files: changedFiles).isEmpty
+                || (commitState.otherChanges?.total ?? 0) > 0)   // MARK: git-sync — §68.5: files outside the review too
     }
 
     /// "검토 완료로 표시하고 커밋": accepts `paths` (pending ticked files) and waits for the engine, so the commit that follows

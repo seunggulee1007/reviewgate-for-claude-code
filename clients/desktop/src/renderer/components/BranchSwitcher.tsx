@@ -8,6 +8,7 @@
 import type { BranchInfo, BranchSwitchBlocker, RemoteSyncState, ReviewState } from "@reviewgate/engine";
 import { commitBeforeSwitchBlocker, prCreateBlocker } from "../branchFlow";
 import { refusalCodeText } from "../errorCodes";
+import { otherChangesTotal } from "../commitOthers";
 import { currentBranch, fetchDisabledReason, isDiverged, lastFetchedText, pullDisabledReason, rebaseDisabledReason, syncBadge, syncBadgeHelp, syncOf } from "../gitSync";
 import { t } from "../i18n";
 import { useStore } from "../store";
@@ -59,6 +60,18 @@ export function BranchSwitcher() {
       testId: "Create PR from this branch…",
     },
   );
+  // MARK: git-sync — §68.5: changes outside the review (and no review to commit from) can be committed from here too.
+  if (blocker?.kind !== "dirtyWorktree" && otherChangesTotal(state) > 0) {
+    const commitBlocked = commitBeforeSwitchBlocker(state);
+    items.push({
+      kind: "item",
+      label: t("Commit…"),
+      disabled: commitBlocked !== null,
+      title: commitBlocked ?? t("Commit changed files — the review's and your own"),
+      onClick: () => openDialog({ kind: "commit" }),
+      testId: "Commit from branch menu",
+    });
+  }
   if (blocker) items.push({ kind: "sep" }, { kind: "footer", label: blockerReason(blocker) });
   if (blocker?.kind === "dirtyWorktree") {
     // §61: the way forward where the block is shown.

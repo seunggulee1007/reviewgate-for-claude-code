@@ -6,7 +6,9 @@
  * §32 (wave1 desktop-review): gitignored files (`ignored`, mods files force-added to the review) are never in the
  * checklist — the engine cannot stage them — and a line says which accepted ones stay out.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { OtherChange } from "@reviewgate/engine";
+import { extraPathsOf, otherStatusLetter, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
 import { t } from "../../i18n";
 import { commitPaths } from "../../reviewGate";
 import { commitOf, refusalText, useStore } from "../../store";
@@ -44,11 +46,39 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   /** §53: "나눠서 커밋" — the accepted changes as several commits (the files are fixed while it is open). */
   const [split, setSplit] = useState(false);
+  // MARK: git-sync — §68.5: changed files outside the review, none ticked; untracked ones only when asked for.
+  const [others, setOthers] = useState<OtherChange[]>([]);
+  const [othersTruncated, setOthersTruncated] = useState(false);
+  const [showUntracked, setShowUntracked] = useState(false);
+  const [extraSelected, setExtraSelected] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    let live = true;
+    engineRequest({ type: "commit_others" })
+      .then((r) => {
+        if (!live) return;
+        setOthers(r.files);
+        setOthersTruncated(r.truncated);
+      })
+      .catch(() => undefined); // an older engine: no second group
+    return () => {
+      live = false;
+    };
+  }, []);
+  const shownOthers = visibleOthers(others, showUntracked);
+  const extras = extraPathsOf(extraSelected, others, showUntracked);
+  const untrackedCount = others.filter((f) => f.untracked).length;
+  const toggleExtra = (path: string) =>
+    setExtraSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
 
   const identityMissing = !commit.identity.name || !commit.identity.email;
   const paths = candidates.paths.filter((p) => selected.has(p));
   const toAccept = commitToAccept(selected, changedFiles);
-  const canSubmit = !busy && locked === null && (commit.canCommit || toAccept.length > 0) && paths.length > 0 && message.trim().length > 0;
+  const canSubmit = !busy && locked === null && (commit.canCommit || toAccept.length > 0 || extras.length > 0) && paths.length + extras.length > 0 && message.trim().length > 0;
 
   const toggle = (path: string) =>
     setSelected((prev) => {
@@ -74,7 +104,7 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
         return;
       }
     }
-    const code = await commitAccepted({ message: message.trim(), paths, push });
+    const code = await commitAccepted({ message: message.trim(), paths, push, extraPaths: extras });
     setBusy(false);
     const landed = (commitOf(useStore.getState().state).lastCommit?.at ?? null) !== before;
     if (code === null || landed) onClose();
@@ -127,6 +157,34 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
             );
           })}
         </ul>
+        {!split && (others.length > 0 || othersTruncated) && (
+          // MARK: git-sync — §68.5 "Other changes": committed as they are, never reviewed or marked accepted
+          <div className="col" style={{ gap: 4, marginTop: 6 }} data-testid="Commit other changes">
+            <div className="row" style={{ gap: 6 }}>
+              <span className="grow" title={t("Files changed outside the review — your own edits, or files changed before Claude's turn. Ticked, they go into this commit as they are: they are not reviewed and nothing is marked accepted.")}>
+                {t("Other changes ({0} of {1})", extras.length, shownOthers.length)}
+              </span>
+              {untrackedCount > 0 && (
+                <label className="check tiny" title={t("Also list new files git does not track yet")}>
+                  <input type="checkbox" checked={showUntracked} onChange={(e) => setShowUntracked(e.target.checked)} data-testid="Commit show untracked" />
+                  {t("Untracked ({0})", untrackedCount)}
+                </label>
+              )}
+            </div>
+            <ul className="candidates" data-testid="Commit other files">
+              {shownOthers.map((f) => (
+                <li key={f.path} onClick={() => toggleExtra(f.path)} title={f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}>
+                  <input type="checkbox" checked={extraSelected.has(f.path)} onChange={() => toggleExtra(f.path)} onClick={(e) => e.stopPropagation()} data-testid={`Commit other ${f.path}`} aria-label={f.path} />
+                  <span className="tiny mono bold muted" title={f.untracked ? t("Untracked — a new file git does not track yet") : t("Changed outside the review")}>{otherStatusLetter(f)}</span>
+                  <span className="mono truncate grow">{f.oldPath ? `${f.oldPath} → ${f.path}` : f.path}</span>
+                  {f.hidden && <span className="tiny muted" title={t("An ignore pattern in Settings hides this file from the review; it can still be committed")}>{t("Hidden from the review")}</span>}
+                </li>
+              ))}
+              {shownOthers.length === 0 && <li className="muted">{t("No tracked changes outside the review")}</li>}
+            </ul>
+            {othersTruncated && <div className="hint">{t("Only the first 500 files are listed")}</div>}
+          </div>
+        )}
         {candidates.ignored.length > 0 && (
           <div className="hint" title={candidates.ignored.join("\n")} data-testid="Commit ignored">
             {t("{0} gitignored file(s) are not committed: {1}", candidates.ignored.length, candidates.ignored.join(", "))}

@@ -684,6 +684,10 @@ public enum EngineCommand: Sendable, Equatable {
     case gitFetch(all: Bool = false, auto: Bool = false)
     /// §68.2: the current branch from its upstream, fast-forward only (`rebase`: §68.3) → `.pulled`.
     case gitPull(rebase: Bool = false)
+    /// §68.5: the changed files outside the review → `.commitOthers`.
+    case commitOthers
+    /// §68.5: `commit` with `extraPaths` — files outside the review committed along (nothing is marked accepted) → `.committed`.
+    case commitWithOthers(message: String, paths: [String]?, extraPaths: [String], push: Bool?)
     /// §41.1: `pr_create` with the assignee / labels / reviewers / projects (→ `.prCreated`).
     case prCreateMeta(base: String, title: String?, body: String?, draft: Bool?, meta: PRCreateMeta)
     // MARK: wave4c w4c-review
@@ -875,6 +879,8 @@ public enum EngineCommand: Sendable, Equatable {
         case .commitSeries: "commit_series"
         case .gitFetch: "git_fetch"   // MARK: git-sync (§68)
         case .gitPull: "git_pull"
+        case .commitOthers: "commit_others"
+        case .commitWithOthers: "commit"
         case .prCreateMeta: "pr_create"
         case .historyFileLines: "history_file_lines"   // wave4c w4c-review
         case .prFileLines: "pr_file_lines"
@@ -1266,6 +1272,8 @@ extension EngineCommand: Encodable {
             try encodeCommitSeriesFields(to: encoder)
         case .gitFetch, .gitPull:   // MARK: git-sync (§68)
             try encodeGitSyncFields(to: encoder)
+        case .commitOthers, .commitWithOthers:   // §68.5
+            try encodeCommitOthersFields(to: encoder)
         case let .accept(paths), let .unaccept(paths):
             try c.encode(paths, forKey: .paths)
         case let .reject(paths, force, to):
@@ -2442,19 +2450,22 @@ public struct CommitState: Codable, Sendable, Equatable {
     public var identity: CommitIdentity
     /// The engine's `suggestCommitMessage()`: first line of the last instruction + `Files:` list.
     public var suggestedMessage: String
+    /// MARK: git-sync — §68.5: changed files outside the review (nil from an older engine).
+    public var otherChanges: OtherChangeCounts?
 
     public init(lastCommit: LastCommit? = nil, canCommit: Bool = false, acceptedPaths: [String] = [],
-                identity: CommitIdentity = CommitIdentity(), suggestedMessage: String = "") {
+                identity: CommitIdentity = CommitIdentity(), suggestedMessage: String = "", otherChanges: OtherChangeCounts? = nil) {
         self.lastCommit = lastCommit
         self.canCommit = canCommit
         self.acceptedPaths = acceptedPaths
         self.identity = identity
         self.suggestedMessage = suggestedMessage
+        self.otherChanges = otherChanges
     }
 
     public static let empty = CommitState()
 
-    private enum CodingKeys: String, CodingKey { case lastCommit, canCommit, acceptedPaths, identity, suggestedMessage }
+    private enum CodingKeys: String, CodingKey { case lastCommit, canCommit, acceptedPaths, identity, suggestedMessage, otherChanges }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -2463,7 +2474,8 @@ public struct CommitState: Codable, Sendable, Equatable {
             canCommit: try c.decodeIfPresent(Bool.self, forKey: .canCommit) ?? false,
             acceptedPaths: try c.decodeIfPresent([String].self, forKey: .acceptedPaths) ?? [],
             identity: try c.decodeIfPresent(CommitIdentity.self, forKey: .identity) ?? CommitIdentity(),
-            suggestedMessage: try c.decodeIfPresent(String.self, forKey: .suggestedMessage) ?? "")
+            suggestedMessage: try c.decodeIfPresent(String.self, forKey: .suggestedMessage) ?? "",
+            otherChanges: lenientValue(OtherChangeCounts.self, c, .otherChanges))
     }
 }
 
@@ -3079,6 +3091,8 @@ public enum EngineEvent: Sendable, Equatable {
     case fetched(FetchedReply)
     /// Reply to `git_pull`.
     case pulled(PulledReply)
+    /// Reply to `commit_others` (§68.5).
+    case commitOthers(CommitOthersReply)
     // MARK: §52 background work
     /// A turn Claude started itself (`turn` is its number); its row opens the turn.
     case autoTurn(turn: Int, info: AutoTurnInfo)
@@ -3165,6 +3179,7 @@ public enum EngineEvent: Sendable, Equatable {
         case let .committedSeries(reply): reply.id
         case let .fetched(reply): reply.id   // MARK: git-sync (§68)
         case let .pulled(reply): reply.id
+        case let .commitOthers(reply): reply.id
         case let .taskOutput(reply): reply.id   // §52
         case let .taskBackground(reply): reply.id
         case let .fileLines(reply): reply.id   // wave4c w4c-review
@@ -3442,6 +3457,8 @@ extension EngineEvent: Decodable {
             self = .fetched(try FetchedReply(from: decoder))
         case "pulled":
             self = .pulled(try PulledReply(from: decoder))
+        case "commit_others":
+            self = .commitOthers(try CommitOthersReply(from: decoder))
         case "plan_proposed":
             self = .planProposed(
                 path: try c.decodeIfPresent(String.self, forKey: .path),

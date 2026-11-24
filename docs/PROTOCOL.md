@@ -11283,3 +11283,25 @@ review again, extras-only with a pending review and with none.
   refusal words through `EngineMessages.refusal`. Windows: `gitSync.ts` (words and rules), `storeGitSync.ts` (the slice),
   `BranchSwitcher.tsx` (`syncItems`), `Sidebar.tsx` (`GitSyncNoticeRow`, the automatic fetch), `GeneralTab.tsx`; refusal
   words through `errorCodes.ts` `refusalCodeText`. Tests: Core `GitSyncTests`, Windows `gitSync.test.ts`.
+
+### 68.8 Clients: other changes in the commit sheet
+
+- The commit sheet (Mac `CommitSheet`, Windows `CommitDialog`) asks `commit_others` as it opens. Under the review's files
+  (accepted, then pending — M28) comes a second group, **Other changes (N of M)**: the changed files outside the review,
+  **none ticked**. Untracked files are listed only after ticking **Untracked (N)** beside the group's title (an untracked
+  file ticked and then hidden again is not committed). Each row: git's status letter (`U` for untracked, its tooltip says
+  what it is), the path (a rename `old → new`), "Hidden from the review" for a file an app ignore pattern hides, and on
+  the Mac the file's context menu. The group's tooltip says the files go in as they are: not reviewed, nothing marked
+  accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group.
+- Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
+  "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads
+  "<path> is no longer a change outside the review — reopen the commit sheet". "Commit in parts" (§53) stays for the
+  review's accepted files only.
+- The sheet opens when `canCommit`, pending files exist (M28) or `state.commit.otherChanges` is non-zero (Mac
+  `canOpenCommitSheet`, Windows the Changes header's Commit… and `commitBeforeSwitchBlocker`). The branch menu offers
+  **Commit…** whenever there are other changes and no "uncommitted changes" footer item already offers it — so a commit of
+  the user's own files works with no review at all.
+- Mac: Core `CommitOthersProtocol.swift` (`CommitOthersRules`, `loadOtherChanges`), `AppState.commitAccepted(…,
+  extraPaths:)`, App `CommitSheet.swift` (`otherChangesGroup`), `MainWindow.swift`. Windows: `commitOthers.ts`,
+  `CommitDialog.tsx`, `store.commitAccepted({extraPaths})`, `BranchSwitcher.tsx`, `ChangedFiles.tsx`, `branchFlow.ts`.
+  Tests: Core `CommitOthersTests`, Windows `commitOthers.test.ts`.

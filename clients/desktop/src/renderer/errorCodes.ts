@@ -140,6 +140,7 @@ export const REFUSAL_CODES = [
   "pull_rebase_blocked",
   "pull_rebase_failed",
   "pull_failed",
+  "invalid_extra", // §68.5 commit.extraPaths
   "push_failed",
   "request_changes_unavailable",
   "refresh_failed",

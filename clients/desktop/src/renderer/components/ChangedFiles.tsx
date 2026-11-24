@@ -33,6 +33,7 @@ import { commitLockReason } from "../commitLock";
 // accept-baseline — §66: "수락 이후 변경", the since-accepted letter, reject's words, the engine's accepted count
 import { acceptedGroupCount, badgeStatus, sinceAcceptedHelp, sinceAcceptedLabel, sinceAcceptedRejectHelp } from "../sinceAccepted";
 import { commitListed } from "../acceptCommit";
+import { otherChangesTotal } from "../commitOthers"; // MARK: git-sync (§68.5)
 import { tKey } from "../shortcutKeys";
 import { LiveChanges } from "./LiveChanges";
 import { staleBannerShown } from "./diff/DiffRound";
@@ -69,7 +70,7 @@ export function ChangedFiles() {
   const commit = commitOf(state);
   // MARK: r2-review-flow — M28: the commit dialog takes pending files too (accepted as the commit goes).
   const canOpenCommit = state.project !== null && commitLockReason(state) === null
-    && (commit.canCommit || commitListed([], state.changedFiles).length > 0);
+    && (commit.canCommit || commitListed([], state.changedFiles).length > 0 || otherChangesTotal(state) > 0); // §68.5: files outside the review too
   // §34.4: 💬 counts the notes still to send; the sent ones ("요청함") apart.
   const noteCount = (path: string) => state.reviewNotes.filter((n) => n.path === path && !n.sent).length;
   const sentCount = (path: string) => state.reviewNotes.filter((n) => n.path === path && n.sent).length;
