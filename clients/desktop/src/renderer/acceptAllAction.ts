@@ -16,16 +16,21 @@ import { showToast } from "./toast";
 /** The list's button and the key: the dialog when a file needs a look, else at once. */
 export function runAcceptAll(): void {
   const s = useStore.getState();
+  if (pendingFiles(s.state).length === 0) return;
+  if (needsAcceptAllDialog()) s.openDialog({ kind: "acceptAll" });
+  else acceptAllNow();
+}
+
+/** A pending file was never looked at, changed since, or is sensitive: the summary dialog comes first (§58.1 too). */
+export function needsAcceptAllDialog(): boolean {
+  const s = useStore.getState();
   const pending = pendingFiles(s.state);
-  if (pending.length === 0) return;
   const views = pending.map((f) => viewStateOf(f, s.viewedPaths));
-  const needs = acceptAllNeedsDialog({
+  return acceptAllNeedsDialog({
     unviewed: views.filter((v) => v === "unviewed").length,
     changedSinceViewed: views.filter((v) => v === "changed").length,
     sensitive: pending.filter((f) => isSensitivePath(f.path)).length,
   });
-  if (needs) s.openDialog({ kind: "acceptAll" });
-  else acceptAllNow();
 }
 
 /** Accepts every pending file and offers the undo (nothing when accepting waits — the store says why, as before). */

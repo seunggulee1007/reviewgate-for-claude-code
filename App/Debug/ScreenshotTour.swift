@@ -970,6 +970,10 @@ private final class Tour {
         store.debugShowHUD(turnStartedAt: nil, agents: [])
         store.debugShowComposerState(working: false, files: files)
         try await shoot("review")
+        // MARK: accept-continue-ui (§58.1): one file accepted — it folds into "Accepted · not committed (1)" below the other.
+        store.debugShowComposerState(working: false, files: [files[0], ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified,
+                                                                                   added: 9, deleted: 3, isBinary: false, state: .accepted)])
+        try await shoot("review-accepted")
         store.debugShowGate(.idle)
         // The mode offer above the composer.
         store.debugShowDefaultModeOffer(.auto)

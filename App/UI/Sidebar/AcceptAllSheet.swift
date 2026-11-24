@@ -54,6 +54,20 @@ enum AcceptAllAction {
         if store.isTerminalChat { return store.terminalAcceptContinueBlocker }
         return store.canAcceptAndContinue ? nil : (store.cannotSendReason ?? "")
     }
+
+    /// MARK: accept-continue-ui (§58.1): "Accept All & Continue"'s tooltip while it is on — a terminal chat's words name the
+    /// paste and Return; with a file still to look at, the summary comes first.
+    static func continueHelp(store: AppState) -> String {
+        let count = store.pendingFiles.count
+        if store.isTerminalChat {
+            return store.acceptAllNeedsSheet
+                ? String(localized: "Shows a summary of the \(count) pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)")
+                : String(localized: "Accepts the \(count) pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)")
+        }
+        return store.acceptAllNeedsSheet
+            ? String(localized: "Shows a summary of the \(count) pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)")
+            : String(localized: "Accepts the \(count) pending file(s), then tells Claude to continue (⌘⇧↩)")
+    }
 }
 
 /// polish P2-review-23: Edit › Undo (⌘Z, outside a text field) takes a review decision back, as the menu names it

@@ -5489,6 +5489,22 @@
         }
       }
     },
+    "Fold the accepted files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fold the accepted files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락한 파일 접기"
+          }
+        }
+      }
+    },
     "Indexing… — it can be rebuilt once this build ends": {
       "localizations": {
         "en": {
@@ -5533,6 +5549,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
+          }
+        }
+      }
+    },
+    "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 모두 수락, 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
           }
         }
       }
@@ -6045,6 +6077,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "먼저 파일이나 diff 를 보여 주세요"
+          }
+        }
+      }
+    },
+    "Show the accepted files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the accepted files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락한 파일 보기"
           }
         }
       }

@@ -18,6 +18,9 @@ struct ChangedFilesList: View {
     // MARK: wave4b w4b-files
     /// §40.2: bumped when "묶기" changes (the choice lives in UserDefaults per project, `AppState.fileGroupBy`).
     @State private var groupByTick = 0
+    // MARK: accept-continue-ui
+    /// §58.1: the folded "Accepted · not committed" group is open.
+    @State private var acceptedExpanded = false
 
     var body: some View {
         @Bindable var model = model
@@ -86,7 +89,10 @@ struct ChangedFilesList: View {
                 // folder's "<folder>/ N" counts what it opens to and a folder with none of them is not listed.
                 // MARK: wave4b w4b-files — §40.2: + the "묶기" sections inside each group (`groupByTick`: a new choice redraws).
                 let _ = groupByTick
-                let sections = store.groupedListSections(riskOrder: riskOrder, keep: shownAuthor == nil ? nil : keep)
+                // MARK: accept-continue-ui (§58.1): accepted files (not committed yet) fold into one group at the bottom.
+                let split = AcceptedGroup.split(store.groupedListSections(riskOrder: riskOrder, keep: shownAuthor == nil ? nil : keep))
+                let sections = split.open
+                let accepted = split.accepted.filter(keep)
                 AuthorFilterBar(offered: offered, selection: $model.changesAuthorFilter)
                 List(selection: listSelection) {
                     LiveChangesSection()   // wave2 mac-flow (§34.6): read-only, above the review
@@ -102,58 +108,22 @@ struct ChangedFilesList: View {
                     ForEach(sections) { section in
                         Section {
                             ForEach((section.folder == nil || model.changesExpandedFolders.contains(section.id) ? section.files : []).filter(keep)) { file in
-                                // MARK: wave4d w4d-speed — polish-09: the row under the pointer shows "Why?" (§21) from its
-                                // own hover, so a move over the list no longer re-runs this body (sections, risk order, authors).
-                                HoverRow { hovered in row(file, authors: authors[file.path] ?? [], hovered: hovered) }
-                                    .tag(file.path)
-                                    .contextMenu {
-                                        // polish P2-review-03: the keys the menu bar has, shown in the row's menu too.
-                                        if file.state == .accepted {
-                                            Button("Undo Accept", systemImage: "arrow.uturn.left") { store.unaccept(file) }
-                                                .keyboardShortcut("u", modifiers: [.command, .shift])
-                                                .disabled(store.isReviewLocked)
-                                        } else {
-                                            // polish P2-review-23: Edit › Undo (⌘Z) takes it back.
-                                            Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
-                                                .keyboardShortcut("a", modifiers: [.command, .shift])
-                                                .disabled(file.state != .pending || store.isAcceptLocked)
-                                        }
-                                        // r2-review-flow M32: while Claude works the reject waits for the turn's end.
-                                        Button(file.rejectScheduled ? ReviewFlowText.scheduledBadge : String(localized: "Reject"), systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
-                                            .keyboardShortcut("r", modifiers: [.command, .shift])
-                                            .disabled(file.state != .pending || store.isRejectLocked || file.uncaptured || file.rejectScheduled)
-                                        Divider()
-                                        Button("Mention in Chat", systemImage: "at") {
-                                            model.mentionPaths = [file.path]
-                                            model.mentionTick &+= 1
-                                        }
-                                        .disabled(file.status == .deleted)
-                                        SideQuestionMenuItems(anchor: SideAnchor(path: file.path))
-                                        Divider()
-                                        // The file itself, without opening its diff first (a deleted one is not on disk).
-                                        Button("Open in Editor", systemImage: "arrow.up.forward.app") { openInEditor(file) }
-                                            .disabled(file.status == .deleted)
-                                        Button("Reveal in Finder", systemImage: "folder") { revealInFinder(file) }
-                                            .disabled(file.status == .deleted)
-                                        // polish P2-review-03 / P2-review-08: the relative and the full path, each said copied.
-                                        Button("Copy Path", systemImage: "doc.on.doc") { Clipboard.copy(file.path, toast: String(localized: "Path copied")) }
-                                        Button("Copy Full Path", systemImage: "doc.on.doc") {
-                                            if let path = absolutePath(file) { Clipboard.copy(path, toast: String(localized: "Path copied")) }
-                                        }
-                                    }
-                                    .onDrag {
-                                        // §23: dropped on the composer it becomes a mention (a file URL inside the repository).
-                                        guard file.status != .deleted, let root = store.projectURL else { return NSItemProvider() }
-                                        return NSItemProvider(object: root.appendingPathComponent(file.path) as NSURL)
-                                    }
-                                    // No tap gesture on the row: with one (even simultaneous, 0.5.2) the row's clicks stopped reaching
-                                    // the List and only its very edges selected. The way back from the code browser is `listSelection`.
+                                fileRow(file, authors: authors[file.path] ?? [])
                             }
                         } header: {
                             // One plain "Claude changes N" group says nothing the progress row above does not — no header then.
                             if !(sections.count == 1 && section.kind == .claude && section.folder == nil) {
                                 sectionHeader(section)
                             }
+                        }
+                    }
+                    if !accepted.isEmpty {
+                        Section {
+                            if acceptedExpanded {
+                                ForEach(accepted) { file in fileRow(file, authors: authors[file.path] ?? []) }
+                            }
+                        } header: {
+                            acceptedHeader(count: accepted.count)
                         }
                     }
                 }
@@ -201,25 +171,25 @@ struct ChangedFilesList: View {
         return Binding(get: { shown }, set: { store.selectedPath = $0 })
     }
 
-    /// Two rows above the list: what has been looked at, then the two actions used most — Accept all and Commit — and a
-    /// "⋯" with the rest (Reject all, AI pre-review, Finish review, the order and the grouping). Every item keeps its
-    /// reason for being disabled as a tooltip.
+    /// Two rows above the list: what has been looked at, then the two actions used most — Accept All & Continue and Commit —
+    /// and a "⋯" with the rest (Accept all, Reject all, AI pre-review, Finish review, the order and the grouping). Every
+    /// item keeps its reason for being disabled as a tooltip.
     private var header: some View {
         let pending = store.pendingFiles.count
         let accepted = store.acceptedPaths.count
+        let continueBlocker = store.acceptAllContinueBlocker
         return VStack(alignment: .leading, spacing: 6) {
             reviewProgress(pending: pending)
             HStack(spacing: 6) {
-                // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
-                // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
-                Button("Accept all") { AcceptAllAction.run(store: store, model: model) }
+                // MARK: accept-continue-ui (§58.1): accept every pending file and let Claude go on — nothing to type. The
+                // summary sheet first when a file still needs a look (`runContinuing`); a terminal chat pastes "Continue.".
+                Button(AcceptAllContinueText.title) { AcceptAllAction.runContinuing(store: store, model: model) }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(pending == 0 || store.isAcceptLocked)
-                    .help(pending == 0 ? String(localized: "No pending files") : (store.acceptLockReason ?? String.withKey(
-                        store.acceptAllNeedsSheet ? String(localized: "Review a summary, then accept every pending file")
-                            : String(localized: "Accept every pending file — the notice that follows can undo it"), action: "Accept All…")))
-                    .accessibilityLabel("Accept all")
-                    .accessibilityIdentifier("Accept all")
+                    .disabled(continueBlocker != nil)
+                    .help(continueBlocker ?? AcceptAllAction.continueHelp(store: store))
+                    .accessibilityLabel(Text(verbatim: AcceptAllContinueText.title))
+                    .accessibilityIdentifier("Accept all and continue")
                 Spacer(minLength: 4)
                 // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
                 // r2-review-flow M28: the sheet takes pending files too ("리뷰 끝냄으로 표시하고 커밋").
@@ -249,9 +219,20 @@ struct ChangedFilesList: View {
         .padding(.horizontal, 12).padding(.vertical, 6)
     }
 
-    /// "⋯": what the header does not show all the time. The rejects, the finish and the pre-review keep their tooltips.
+    /// "⋯": what the header does not show all the time. The accept, the rejects, the finish and the pre-review keep their
+    /// tooltips.
     private func moreMenu(pending: Int) -> some View {
         Menu {
+            // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
+            // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
+            // accept-continue-ui (§58.1): here since "Accept All & Continue" took its place — it accepts and stops.
+            Button("Accept all", systemImage: "checkmark") { AcceptAllAction.run(store: store, model: model) }
+                .disabled(pending == 0 || store.isAcceptLocked)
+                .help(pending == 0 ? String(localized: "No pending files") : (store.acceptLockReason ?? String.withKey(
+                    store.acceptAllNeedsSheet ? String(localized: "Review a summary, then accept every pending file")
+                        : String(localized: "Accept every pending file — the notice that follows can undo it"), action: "Accept All…")))
+                .accessibilityLabel("Accept all")
+                .accessibilityIdentifier("Accept all")
             // §31 (M3): reverts Claude's pending changes; the confirmation names what stays.
             Button("Reject all", systemImage: "arrow.uturn.backward") { model.showRejectAll = true }
                 .disabled(pending == 0 || store.isRejectLocked)
@@ -296,7 +277,7 @@ struct ChangedFilesList: View {
         .menuIndicator(.hidden)
         .controlSize(.small)
         .fixedSize()
-        .help("More: Reject all, AI pre-review, Finish review, order and grouping of the list")
+        .help("More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list")
         .accessibilityLabel("More review actions")
         .accessibilityIdentifier("Changes header more")
     }
@@ -304,9 +285,10 @@ struct ChangedFilesList: View {
     /// "3/7 viewed · 2 pending": how much of the review the user has actually looked at (diffs shown this review).
     @ViewBuilder
     private func reviewProgress(pending: Int) -> some View {
-        let total = store.changedFiles.count
+        // accept-continue-ui (§58.1): accepted files are in their folded group — out of "3/7 viewed".
+        let total = store.openChangedFiles.count
         if total > 0 {
-            let viewed = store.viewedChangedCount
+            let viewed = store.viewedOpenCount
             HStack(spacing: 8) {
                 ProgressView(value: Double(viewed), total: Double(total))
                     .progressViewStyle(.linear)
@@ -458,6 +440,79 @@ struct ChangedFilesList: View {
     private func revealInFinder(_ file: ChangedFile) {
         guard let path = absolutePath(file) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// One file of the list: its row ("Why?" on hover), its menu and its drag.
+    private func fileRow(_ file: ChangedFile, authors: [AgentGlance.FileAuthor]) -> some View {
+        // MARK: wave4d w4d-speed — polish-09: the row under the pointer shows "Why?" (§21) from its
+        // own hover, so a move over the list no longer re-runs this body (sections, risk order, authors).
+        HoverRow { hovered in row(file, authors: authors, hovered: hovered) }
+            .tag(file.path)
+            .contextMenu {
+                // polish P2-review-03: the keys the menu bar has, shown in the row's menu too.
+                if file.state == .accepted {
+                    Button("Undo Accept", systemImage: "arrow.uturn.left") { store.unaccept(file) }
+                        .keyboardShortcut("u", modifiers: [.command, .shift])
+                        .disabled(store.isReviewLocked)
+                } else {
+                    // polish P2-review-23: Edit › Undo (⌘Z) takes it back.
+                    Button("Accept", systemImage: "checkmark") { ReviewUndo.accept(file, store: store) }
+                        .keyboardShortcut("a", modifiers: [.command, .shift])
+                        .disabled(file.state != .pending || store.isAcceptLocked)
+                }
+                // r2-review-flow M32: while Claude works the reject waits for the turn's end.
+                Button(file.rejectScheduled ? ReviewFlowText.scheduledBadge : String(localized: "Reject"), systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
+                    .keyboardShortcut("r", modifiers: [.command, .shift])
+                    .disabled(file.state != .pending || store.isRejectLocked || file.uncaptured || file.rejectScheduled)
+                Divider()
+                Button("Mention in Chat", systemImage: "at") {
+                    model.mentionPaths = [file.path]
+                    model.mentionTick &+= 1
+                }
+                .disabled(file.status == .deleted)
+                SideQuestionMenuItems(anchor: SideAnchor(path: file.path))
+                Divider()
+                // The file itself, without opening its diff first (a deleted one is not on disk).
+                Button("Open in Editor", systemImage: "arrow.up.forward.app") { openInEditor(file) }
+                    .disabled(file.status == .deleted)
+                Button("Reveal in Finder", systemImage: "folder") { revealInFinder(file) }
+                    .disabled(file.status == .deleted)
+                // polish P2-review-03 / P2-review-08: the relative and the full path, each said copied.
+                Button("Copy Path", systemImage: "doc.on.doc") { Clipboard.copy(file.path, toast: String(localized: "Path copied")) }
+                Button("Copy Full Path", systemImage: "doc.on.doc") {
+                    if let path = absolutePath(file) { Clipboard.copy(path, toast: String(localized: "Path copied")) }
+                }
+            }
+            .onDrag {
+                // §23: dropped on the composer it becomes a mention (a file URL inside the repository).
+                guard file.status != .deleted, let root = store.projectURL else { return NSItemProvider() }
+                return NSItemProvider(object: root.appendingPathComponent(file.path) as NSURL)
+            }
+            // No tap gesture on the row: with one (even simultaneous, 0.5.2) the row's clicks stopped reaching
+            // the List and only its very edges selected. The way back from the code browser is `listSelection`.
+    }
+
+    /// MARK: accept-continue-ui (§58.1): "수락함 · 커밋 전 N" — folded until clicked; Commit… takes these files as before.
+    private func acceptedHeader(count: Int) -> some View {
+        Button {
+            acceptedExpanded.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: acceptedExpanded ? "chevron.down" : "chevron.right").frame(width: 12)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text(verbatim: AcceptedGroup.title(count))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(AcceptedGroup.help)
+        .accessibilityLabel(Text(verbatim: AcceptedGroup.title(count)))
+        .accessibilityValue(acceptedExpanded ? Text("Expanded") : Text("Collapsed"))
+        .accessibilityHint(acceptedExpanded ? Text("Fold the accepted files") : Text("Show the accepted files"))
+        .accessibilityIdentifier("Accepted group")
     }
 
     /// "설정·훅 (Claude 동작 변경) N" / "Claude 변경 N" / "앱 밖 변경 M"; the first group carries the order picker.

@@ -27,6 +27,7 @@ import { addMentions, changedMentionPaths, droppedMentionPaths, MAX_MENTIONS, ME
 import { DraftChips } from "./ComposerChips";
 import { CHANGED_SHORTCUT_LABEL, MentionPopover } from "./MentionPopover";
 import { canAcceptAndSend } from "../../friction";
+import { runAcceptAllContinue } from "../../acceptAllContinue"; // MARK: accept-continue-ui (§58.1)
 import { t } from "../../i18n";
 import { draftOf, historyEscape, historyStep, IDLE_NAV, loadHistory, pushHistory, saveHistory, type HistoryNav } from "../../promptHistory";
 import { newChatRefusal, projectRootHash } from "../../sessions";
@@ -806,6 +807,12 @@ export function Composer() {
 
   /** "Accept N & Send" (⌘⇧↩): only ever reached by choosing it explicitly. r2-review-flow M28: at once, never behind a dialog. */
   const doAcceptAndSend = () => {
+    // MARK: accept-continue-ui — §58 / §58.1: with nothing in the box (no text, mention or image) the key is the Changes
+    // list's "Accept All & Continue", as on the Mac — the summary dialog first when a file still needs a look.
+    if (acceptAndSend && draft.trim().length === 0 && mentions.length === 0 && images.length === 0) {
+      runAcceptAllContinue();
+      return;
+    }
     if (!acceptAndSend || draft.trim().length === 0) return;
     sendAccepting();
   };

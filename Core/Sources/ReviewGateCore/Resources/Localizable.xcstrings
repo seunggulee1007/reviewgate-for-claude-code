@@ -1617,6 +1617,22 @@
         }
       }
     },
+    "Accept All & Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept All & Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모두 수락하고 계속"
+          }
+        }
+      }
+    },
     "Accepted %lld files": {
       "localizations": {
         "en": {
@@ -1645,6 +1661,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 세션 메시지로 시작한 턴"
+          }
+        }
+      }
+    },
+    "Accepted · not committed (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accepted · not committed (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락함 · 커밋 전 %lld"
           }
         }
       }
@@ -6679,6 +6711,22 @@
         }
       }
     },
+    "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락했지만 아직 커밋하지 않은 파일이에요 — 커밋…에서 함께 커밋되고, 수락 취소하면 다시 리뷰 대기로 돌아가요"
+          }
+        }
+      }
+    },
     "Finds files: %@": {
       "localizations": {
         "en": {
@@ -7299,6 +7347,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트가 색인보다 커요 — 빠진 심볼이 있어요"
+          }
+        }
+      }
+    },
+    "This review belongs to the running chat — show it to continue Claude there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This review belongs to the running chat — show it to continue Claude there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 채팅의 리뷰예요 — 그 채팅을 열면 이어서 계속할 수 있어요"
           }
         }
       }
