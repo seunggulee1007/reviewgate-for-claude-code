@@ -980,6 +980,27 @@ private final class Tour {
         store.debugShowComposerState(working: false, files: [files[0], ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified,
                                                                                    added: 9, deleted: 3, isBinary: false, state: .accepted)])
         try await shoot("review-accepted")
+        // MARK: continue-states (§58.1): the Changes header's primary in each state — accept all (the "review" shot), the
+        // rest once one is decided, Continue once every file is, and Request changes while a note waits.
+        let accepted = ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false, state: .accepted)
+        func primaryLog(_ step: String) {
+            log("composerbar \(step): primary " + (store.continuePrimary.map { ContinueText.title($0) } ?? "hidden")
+                + (store.continuePrimaryBlocker.map { " — off: \($0)" } ?? ""))
+        }
+        store.debugShowComposerState(working: false, files: files)
+        primaryLog("continue-all")
+        try await shoot("continue-all")
+        store.debugShowComposerState(working: false, files: [files[0], accepted], untold: UntoldDecisions(accepted: 1, rejected: 0))
+        primaryLog("continue-rest")
+        try await shoot("continue-rest")
+        store.debugShowComposerState(working: false, files: [accepted], untold: UntoldDecisions(accepted: 1, rejected: 1))
+        primaryLog("continue-only")
+        try await shoot("continue-only")
+        let note = ReviewNote(id: "tour-note", path: "src/pricing.ts", line: 3, side: .new, excerpt: "WELCOME10", body: "Keep SAVE10 as an alias")
+        store.debugShowComposerState(working: false, files: [files[0], accepted], untold: UntoldDecisions(accepted: 1, rejected: 0), notes: [note])
+        primaryLog("continue-request")
+        try await shoot("continue-request")
+        store.debugShowComposerState(working: false, files: [])
         store.debugShowGate(.idle)
         // The mode offer above the composer.
         store.debugShowDefaultModeOffer(.auto)

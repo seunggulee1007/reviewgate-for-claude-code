@@ -88,13 +88,18 @@ extension AppState {
     /// The layout check (r1-composer): a review with `files` pending, or (`working`) a turn that runs beside it — the gate
     /// closed as the engine closes it then, so the composer shows Stop and 바로 보내기. The engine's next snapshot puts its
     /// own back.
-    public func debugShowComposerState(working: Bool, files: [ChangedFile]) {
+    /// `untold` / `notes`: the decisions the next message would tell Claude and the review notes (continue-states, §58.1).
+    public func debugShowComposerState(working: Bool, files: [ChangedFile], untold: UntoldDecisions? = nil, notes: [ReviewNote] = []) {
         var snapshot = state
         snapshot.gate.phase = working ? .running : .reviewing
         snapshot.gate.canSend = !working
         snapshot.gate.blockedReason = working ? .running : nil
         snapshot.gate.pendingCount = files.filter { $0.state == .pending }.count
+        snapshot.gate.untoldDecisions = untold
+        snapshot.gate.lastReviewSummary = untold == nil ? nil : "[Review gate] …"
+        snapshot.gate.canRequestChanges = !working && notes.contains { $0.sent == nil }
         snapshot.changedFiles = files
+        snapshot.reviewNotes = notes
         state = snapshot
     }
     #endif
