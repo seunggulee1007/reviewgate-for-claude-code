@@ -81,6 +81,8 @@ export type PersistedReview = {
   rejectedPaths: string[];
   /** Files `reject_hunks` partly reverted (docs/PROTOCOL.md §17); absent in older files. */
   partiallyRejectedPaths?: string[];
+  /** §66: files whose later changes `reject` reverted to the accepted content (the summary prefix); absent in older files. */
+  revertedToAcceptedPaths?: string[];
   lastReviewSummary: string | null;
   isRequestingChanges: boolean;
   /** A plain `send` was in flight over this review (docs/PROTOCOL.md §10): accepted files are re-verified on restore. */
@@ -169,6 +171,7 @@ export async function loadReview(gitDir: string): Promise<PersistedReview | null
     acceptedPaths: Array.isArray(o.acceptedPaths) ? o.acceptedPaths : [],
     rejectedPaths: Array.isArray(o.rejectedPaths) ? o.rejectedPaths : [],
     partiallyRejectedPaths: Array.isArray(o.partiallyRejectedPaths) ? o.partiallyRejectedPaths : [],
+    revertedToAcceptedPaths: Array.isArray(o.revertedToAcceptedPaths) ? o.revertedToAcceptedPaths : [],
     lastReviewSummary: typeof o.lastReviewSummary === "string" ? o.lastReviewSummary : null,
     isRequestingChanges: o.isRequestingChanges === true,
     isAnsweringReview: o.isAnsweringReview === true,

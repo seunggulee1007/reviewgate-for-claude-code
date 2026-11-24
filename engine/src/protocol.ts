@@ -27,7 +27,10 @@ export type Budget = {
   hardMultiplier?: number;
 };
 
-/** `state.gate.reviewSummary`: totals over `changedFiles` (every state) for the composer label. */
+/**
+ * `state.gate.reviewSummary`: totals over `changedFiles` (every state) for the composer label — `added` / `deleted` of a
+ * file with an `acceptedBase` are its since-accepted lines (§66).
+ */
 export type ReviewSummary = { files: number; added: number; deleted: number };
 
 export type BudgetUsage = { files: number; lines: number; denied: boolean };
@@ -451,6 +454,36 @@ export function isDiffSince(v: unknown): v is DiffSince {
   return typeof v === "string" && (DIFF_SINCE as readonly string[]).includes(v);
 }
 
+/**
+ * §66: what `select_file` / `full_file` take — a `DiffSince`, or `round` (= `review`: A → B, the whole round). Absent: the
+ * file's default range — `accepted` when it has an `acceptedBase`, else `review`. Replies never echo `round` (they say `review`).
+ */
+export type DiffSinceRequest = DiffSince | "round";
+
+/**
+ * §66: the content the user accepted of a file a later turn changed again (`changedFiles[].acceptedBase`, present exactly
+ * when `changedSinceAccepted` is): the default diff, `reject`, `reject_hunks` and the file's `added` / `deleted` / risk are
+ * "since accepted" (accepted content → B).
+ */
+export type AcceptedBase = {
+  /** The tree entry id of `path` in the accepted tree; null = the file was deleted when accepted (a tombstone). */
+  blob: string | null;
+  /** The accepted tree (the B of the accept): the `baseTree` of the since-accepted diff and `reject_hunks.expectedBaseTree`. */
+  tree: string;
+  /** ISO-8601: when the user accepted it; null when unknown (a review saved before §66). */
+  at: string | null;
+  /** The collected turn whose result was accepted; null when unknown. */
+  turn: number | null;
+  /** The change accepted → B: `M`, `A` (deleted when accepted, here again) or `D` (deleted since). */
+  status: "A" | "M" | "D";
+  /** The whole round's lines (A → B); the file's `added` / `deleted` are the since-accepted ones. */
+  roundAdded: number;
+  roundDeleted: number;
+};
+
+/** §66 `reject.to`: what a reject of a file with an `acceptedBase` restores (default `accepted`); `round` = A, as before §66. */
+export type RejectTarget = "accepted" | "round";
+
 /** §34.1: a count of changed files with their added / deleted lines. */
 export type ChangeTotals = { files: number; added: number; deleted: number };
 
@@ -510,6 +543,8 @@ export type ChangedFileReview = {
   blob?: string;
   /** Accepted earlier in this review, then a later turn changed it (it is pending again): `since: "accepted"` applies. */
   changedSinceAccepted?: true;
+  /** §66: with `changedSinceAccepted`, what was accepted — the default range, reject target and counts are "since accepted". */
+  acceptedBase?: AcceptedBase;
   /** Changed since the last `request_changes` of this review (or new since): `since: "request"` shows it. */
   changedSinceRequest?: true;
   generated?: GeneratedKind;
@@ -655,21 +690,23 @@ export type EngineCommand =
   | Cmd<"unaccept", { paths: string[] }> // accepted → pending again (nothing on disk changes)
   | Cmd<"accept_all">
   /** `force: true` reverts even files the user edited after the review was collected (otherwise refused `file_changed_since_review`). */
-  | Cmd<"reject", { paths: string[]; force?: boolean }>
+  /** §66 `to`: a file with an `acceptedBase` goes back to the accepted content (default) or to A (`round`); others always to A. */
+  | Cmd<"reject", { paths: string[]; force?: boolean; to?: RejectTarget }>
   /** §31: without `includeExternal` only the pending files Claude changed (`origin` tool / bash) are reverted. */
   | Cmd<"reject_all", { force?: boolean; includeExternal?: boolean }>
   /**
    * Reverts only these hunks (`FileDiff.hunks[].id` of the file's current diff) of a pending modified file (§17).
-   * §34.1 `expectedBaseTree`: the `file_diff.baseTree` the ids came from — anything but A refuses `stale_diff`.
+   * §34.1 `expectedBaseTree`: the `file_diff.baseTree` the ids came from — A, or (§66) the file's `acceptedBase.tree` for the
+   * since-accepted diff; anything else refuses `stale_diff`. Absent: the file's default range (§66).
    */
   | Cmd<"reject_hunks", { path: string; hunks: number[]; expectedEndTree?: string; expectedBaseTree?: string }>
   | Cmd<"retry_collect">
   | Cmd<"add_note", { path: string; line: number | null; side: DiffSide; excerpt: string; body: string }>
   | Cmd<"remove_note", { noteId: string }>
   | Cmd<"edit_note", { noteId: string; body: string }> // an unsent note's text
-  /** §34.1 `since`: which part of the change (default `review`, A → B); also served while a turn runs (§34.2, `stale`). */
-  | Cmd<"select_file", { path: string; since?: DiffSince; /** MARK: wave4c w4c-review — §41.3: the diff with whitespace ignored (`-w`); its hunk ids are not `reject_hunks` ids. */ ignoreWhitespace?: boolean }>
-  | Cmd<"full_file", { path: string; since?: DiffSince }>
+  /** §34.1 `since`: which part of the change (default: §66 — `accepted` with an `acceptedBase`, else `review`); also served while a turn runs (§34.2, `stale`). */
+  | Cmd<"select_file", { path: string; since?: DiffSinceRequest; /** MARK: wave4c w4c-review — §41.3: the diff with whitespace ignored (`-w`); its hunk ids are not `reject_hunks` ids. */ ignoreWhitespace?: boolean }>
+  | Cmd<"full_file", { path: string; since?: DiffSinceRequest }>
   /** §34.6: the running turn's changes so far (read-only); replies `live_changes`. */
   | Cmd<"live_changes">
   /** §34.6: one file of `live_changes`; replies `file_diff {scope: "live"}`. */
@@ -1657,9 +1694,10 @@ export type StateEvent = { type: "state"; state: ReviewState };
 export type ResultEvent = { type: "result"; id: string; ok: true } | { type: "result"; id: string; ok: false; error: string; code?: string; paths?: string[]; partial?: PartialSeries };
 /**
  * `endTree` (scope `turn`): the B the diff was computed for (`gate.reviewEndTree`) — what `reject_hunks.expectedEndTree` must
- * echo (§17); scope `live`: the live snapshot. §34: `since` echoes the range (absent = `review`), `baseTree` is the old side
- * (A for `review` — what `reject_hunks.expectedBaseTree` echoes; hunk ids of any other range are not valid for
- * `reject_hunks`), `stale` = served while a turn runs on the held B (read-only, §34.2).
+ * echo (§17); scope `live`: the live snapshot. §34: `since` echoes the range (absent = `review`; §66: always present for a
+ * file with an `acceptedBase`, so the reply says which base it used), `baseTree` is the old side (A for `review` — what
+ * `reject_hunks.expectedBaseTree` echoes; hunk ids of `review` and, §66, of `accepted` are valid for `reject_hunks`, those
+ * of `turn` / `request` are not), `stale` = served while a turn runs on the held B (read-only, §34.2).
  */
 export type FileDiffEvent = {
   type: "file_diff";

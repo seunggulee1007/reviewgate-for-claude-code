@@ -1047,7 +1047,7 @@ describe("ReviewGate.restoreSummary (§57.4)", () => {
     raw.rejectedPaths = [];
     raw.partiallyRejectedPaths = [];
     const { taken } = g.beginSendParts();
-    expect(taken).toEqual({ accepted: ["b.txt"], rejected: [], partial: [] });
+    expect(taken).toEqual({ accepted: ["b.txt"], rejected: [], partial: [], toAccepted: [] });
     raw.acceptedPaths = ["c.txt"];
     raw.rejectedPaths = ["b.txt"];
     g.restoreSummary({ accepted: ["a.txt", "b.txt"], rejected: ["c.txt", "d.txt"], partial: ["b.txt", "e.txt"] });

@@ -38,6 +38,8 @@ import type { StorageState } from "./protocol.js"; // MARK: wave4b w4b-bigturn
 import type { AutoModelChoice } from "./protocol.js"; // MARK: wave5 w5-model
 import { suggestCommitMessage } from "./review/commitMessage.js";
 import type { ReviewGate } from "./review/gate.js";
+import type { ChangedFile } from "./git/checkpoint.js";
+import type { AcceptedBase, ReviewSummary } from "./protocol.js"; // §66
 import { originOf } from "./session/provenance.js";
 import { isModsGroup } from "./git/mods.js";
 import { fileRiskFields } from "./review/fileRisk.js"; // MARK: wave4b w4b-files
@@ -297,11 +299,7 @@ export function buildState(s: EngineSlices): ReviewState {
       ignoredTouched: [...g.ignoredTouched],
       filteredByPattern: [...g.filteredByPattern],
       restored: g.restored,
-      reviewSummary: {
-        files: g.changedFiles.length,
-        added: g.changedFiles.reduce((n, f) => n + f.added, 0),
-        deleted: g.changedFiles.reduce((n, f) => n + f.deleted, 0),
-      },
+      reviewSummary: reviewSummaryOf(g),
       externalPendingCount: g.externalPendingCount,
       headMoved: g.headMoved ? { from: { ...g.headMoved.from }, to: { ...g.headMoved.to } } : null,
       concurrentClaude: g.concurrentClaude.map((c) => ({ ...c })),
@@ -321,6 +319,7 @@ export function buildState(s: EngineSlices): ReviewState {
     },
     changedFiles: g.changedFiles.map((f) => ({
       ...f,
+      ...sinceAcceptedFields(g, f), // §66: an accepted file changed again counts (and is weighed) since the accept
       tools: [...f.tools],
       toolUseIds: [...f.toolUseIds],
       ...(f.risk ? { risk: [...f.risk] } : {}),
@@ -328,7 +327,7 @@ export function buildState(s: EngineSlices): ReviewState {
       ...sentNotes(g.sentNoteCount(f.path)),
       origin: originOf(f),
       ...(isModsGroup(f.path) ? { group: "mods" as const } : {}),
-      ...fileRiskFields(f), // MARK: wave4b w4b-files — §40.2
+      ...fileRiskFields({ ...f, ...sinceAcceptedFields(g, f) }), // MARK: wave4b w4b-files — §40.2
       ...(g.isRejectScheduled(f.path) ? { rejectScheduled: true as const } : {}), // M32 (§34.2)
     })),
     reviewNotes: g.reviewNotes.map((n) => ({ ...n })),
@@ -353,6 +352,28 @@ export function buildState(s: EngineSlices): ReviewState {
     ...(s.project && s.autoAcceptRules && anyAutoAcceptRule(s.autoAcceptRules) ? { autoAcceptRules: normalizeAutoAcceptRules(s.autoAcceptRules) } : {}), // MARK: wave4c w4c-trust (§41.2)
     ...(s.project && s.nav ? { nav: { index: { ...s.nav.index } } } : {}), // MARK: ide-nav (§65)
   };
+}
+
+/**
+ * §66: a file with an `acceptedBase` — its `added` / `deleted` are the since-accepted lines (the round's go in the base), so
+ * the list, the totals and the risk badges weigh what is left to review. Nothing for any other file.
+ */
+function sinceAcceptedFields(g: ReviewGate, f: ChangedFile): { added?: number; deleted?: number; acceptedBase?: AcceptedBase } {
+  const b = g.acceptedBaseOf(f);
+  if (!b) return {};
+  const { sinceAdded, sinceDeleted, ...base } = b;
+  return { added: sinceAdded, deleted: sinceDeleted, acceptedBase: base };
+}
+
+/** `state.gate.reviewSummary`: the totals (since-accepted lines for a file changed after its accept, §66). */
+function reviewSummaryOf(g: ReviewGate): ReviewSummary {
+  const out = { files: g.changedFiles.length, added: 0, deleted: 0 };
+  for (const f of g.changedFiles) {
+    const counts = { added: f.added, deleted: f.deleted, ...sinceAcceptedFields(g, f) };
+    out.added += counts.added;
+    out.deleted += counts.deleted;
+  }
+  return out;
 }
 
 /** MARK: wave4c w4c-trust — §41.2: `gate.rejectUndo`, present only while a single-file reject can be (or was) put back. */
