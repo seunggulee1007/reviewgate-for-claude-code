@@ -1992,7 +1992,8 @@ export const useStore = create<Store>((set, get, api) => {
         return;
       }
       set({ diffLoading: true });
-      engineRequest({ type: "select_file", path: file.path, ...(since !== "review" ? { since } : {}) })
+      // §66: a file changed after its accept defaults to "since accepted" on the engine — its whole review is asked by name.
+      engineRequest({ type: "select_file", path: file.path, ...(since !== "review" || file.changedSinceAccepted ? { since } : {}) })
         .then((reply) => {
           if (diffTreeOf(get().state.gate) !== tree) {
             if (seq === diffSeq) set({ diffLoading: false, diffUnavailable: unavailable() });
@@ -2205,7 +2206,8 @@ export const useStore = create<Store>((set, get, api) => {
       const key = rangeCacheKey(path, since);
       const cached = get().fullFileCache[key];
       if (cached) return cached;
-      const reply = await engineRequest({ type: "full_file", path, ...(since !== "review" ? { since } : {}) });
+      const named = since !== "review" || get().state.changedFiles.some((f) => f.path === path && f.changedSinceAccepted); // §66
+      const reply = await engineRequest({ type: "full_file", path, ...(named ? { since } : {}) });
       set((st) => ({ fullFileCache: { ...st.fullFileCache, [key]: reply } }));
       return reply;
     },

@@ -36,13 +36,15 @@ export function WhitespaceToggle(props: { file: Pick<ChangedFileState, "whitespa
 type Loaded = { key: string; diff: FileDiff | null; truncated: boolean; error: string | null };
 
 /** `select_file {path, since, ignoreWhitespace: true}`, kept per (path, range, B). */
-function useWhitespaceDiff(path: string, since: DiffSince, tree: string | null): Loaded | null {
+function useWhitespaceDiff(path: string, since: DiffSince, tree: string | null, sinceAccepted: boolean): Loaded | null {
   const key = `${tree ?? ""}\u0000${since}\u0000${path}`;
   const [box, setBox] = useState<Loaded | null>(null);
   useEffect(() => {
     let live = true;
     setBox({ key, diff: null, truncated: false, error: null });
-    engineRequest({ type: "select_file", path, ...(since !== "review" ? { since } : {}), ignoreWhitespace: true })
+    // §66: a file changed after its accept defaults to "since accepted" on the engine — its whole review is asked by name.
+    const named = since !== "review" || sinceAccepted;
+    engineRequest({ type: "select_file", path, ...(named ? { since } : {}), ignoreWhitespace: true })
       .then((reply) => {
         // An engine before §41.3 ignores the field: its reply is the normal diff — say so instead of passing it off.
         if (reply.ignoreWhitespace !== true) throw new Error(t("This engine cannot ignore whitespace — update ReviewGate"));
@@ -54,13 +56,13 @@ function useWhitespaceDiff(path: string, since: DiffSince, tree: string | null):
     return () => {
       live = false;
     };
-  }, [key, path, since]);
+  }, [key, path, since, sinceAccepted]);
   return box && box.key === key ? box : null;
 }
 
 export function WhitespaceDiffBody(props: { file: ChangedFileState; since: DiffSince; tree: string | null }) {
   const { file } = props;
-  const loaded = useWhitespaceDiff(file.path, props.since, props.tree);
+  const loaded = useWhitespaceDiff(file.path, props.since, props.tree, file.changedSinceAccepted === true);
   const context = useFullFileContext(file.path);
   const toolbar = (
     <>
