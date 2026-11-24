@@ -1,15 +1,16 @@
 <p align="center">
-  <img src="App/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" height="128" alt="ReviewGate icon">
+  <img src="App/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="112" height="112" alt="ReviewGate icon">
 </p>
 
 <h1 align="center">ReviewGate</h1>
 
 <p align="center">
-  <b>Review every Claude Code turn before the next one starts.</b>
+  <b>Review every change Claude Code makes — before it continues.</b>
 </p>
 
 <p align="center">
   <img alt="macOS 15+" src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple">
+  <img alt="Windows (preview)" src="https://img.shields.io/badge/Windows-preview-0078d4">
   <img alt="Works with Claude Code" src="https://img.shields.io/badge/works%20with-Claude%20Code-d97757">
   <a href="https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/seunggulee1007/reviewgate-for-claude-code?color=2ea043"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -20,64 +21,90 @@
 </p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/review-dark.png">
-    <img alt="ReviewGate after a Claude Code turn: the changed files on the left, the diff of one file, Accept and Revert for each file" src="docs/images/review-light.png">
-  </picture>
-  <br><sub>After a turn: the changed files, the diff, and Accept or Revert for each file or hunk.</sub>
+  <img src="docs/images/demo.gif" width="100%" alt="ReviewGate demo: Claude Code edits four files in the terminal chat; the review opens beside it; one file is accepted, an unrequested version bump is rejected; Accept 2 &amp; Continue lets Claude carry on, and it knows what was rejected">
+  <br><sub>Recorded from the app itself; Claude's side is a scripted session, so it plays the same every time.</sub>
 </p>
 
-Claude Code writes code faster than anyone can read it. Let it run for an hour and you are left with forty changed
-files and no idea which line came from which request.
+## Install
 
-ReviewGate is a macOS app that puts a gate between turns. When Claude finishes a turn you see exactly what changed and
-why, you accept or revert each file, and only then does your next instruction go out.
+```sh
+brew install --cask seunggulee1007/tap/reviewgate
+```
 
-## Features
+If Homebrew says the tap is untrusted, run `brew trust seunggulee1007/tap` once.
 
-**A gate after every turn.** The changed files and their diffs, with Accept or Revert for each file — or for a single
-hunk. Accepting never touches your files. Reverting restores the file from a snapshot taken when the turn started, and
-leaves your index and commits alone. Until you have decided, Claude may answer questions but not change files — its
-edits are denied through the hooks, in chats and in the terminal (Settings › Review can also hold new prompts, or turn
-this off). Done looking? Accept All & Continue accepts what is left and lets Claude go on — nothing to type.
+Or download the app from [**Releases**](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest):
 
-**Turn budgets that hold, when you want one.** Turn on a cap on how many files and changed lines one turn may touch
-(off by default). The cap is enforced through Claude Code's hooks: an edit over budget is denied, not merely discouraged.
+- **macOS 15+** — `ReviewGate-x.y.z.dmg`. Drag it to Applications; it is notarized, so it opens like any downloaded app.
+- **Windows (preview)** — `ReviewGate-Setup-x.y.z.exe`. Not code-signed yet: SmartScreen asks once (**More info › Run anyway**).
 
-**Know why it changed.** Every file links back to the tool calls and the reasoning that produced it. A turn summary
-compares the plan with what was actually done, marks risky changes and shows the test results.
+Both update themselves from a banner in the app. You also need Claude Code, Node.js 24+ and Git — see [Requirements](#requirements).
 
-**Guard rails.** Edits outside the project ask first, writes into `.git/` are refused, and permission requests become
-cards in the app instead of terminal prompts. Throwaway files in temporary folders pass quietly.
+## Why ReviewGate
 
-**Code navigation while you review.** ⌘-click a name in any diff or file to peek its definition in a band under the
-line — the place you read never moves — or F12 to jump there; hold ⌘ over a name for its signature. Java, Kotlin,
-JavaScript / TypeScript, Vue and JSP above all. References fill a tab of the bottom panel (F4 steps through them), Go to
-File (⌘P), Symbols in This File (⌘F12) and Symbols in Project (⌥⌘⇧N) find the rest; step Back and Forward, and open
-the line in IntelliJ IDEA, VS Code or Xcode. Search-based with an in-memory symbol index, no language server to set up.
+Claude Code writes code faster than anyone can read it. Leave it for an hour and you have forty changed files and no
+idea which line came from which request. ReviewGate puts a review between Claude's turns.
 
-**A bottom panel, as in your editor.** Under the diff and the chat: shell tabs in the project folder (⌃`), an Output
-tab with ReviewGate's log and every Bash command Claude ran with its output, and a Run tab for the project's own
-commands — `npm run dev`, `./gradlew bootRun`, `./mvnw test` found in package.json and the build wrappers, or your own —
-each in its own terminal with Run, Stop and Restart. Nothing runs until you click; a found command asks once.
+- **A gate after every turn.** When Claude finishes, you see exactly what this turn changed — not your own uncommitted
+  work, not an earlier turn — and accept or reject each file, or revert single hunks.
+- **Review first.** While files wait for review, Claude may fix those files (ask in the chat, or leave notes and request
+  changes) but not start on other files. **Accept All & Continue** accepts what's left and lets Claude carry on in one
+  click; a file you accepted and Claude changes again shows only what changed since you accepted it.
+- **The real Claude Code, in a terminal chat.** Your own Claude Code TUI — slash commands, settings, login — runs inside
+  the app, with the review beside it. Prefer a chat view? A classic chat is one setting away.
+- **Notes → Request changes.** Leave notes on lines and send them back to Claude as one message. Claude is told what
+  you accepted and rejected.
+- **Works without git.** A plain folder is tracked through a hidden copy outside it. In a git repository you also get
+  commits, branches and workbenches (parallel sessions, each in its own worktree).
+- **PR review and code navigation.** Open GitHub pull requests in the same diff viewer and comment on them; ⌘-click to
+  peek a definition, find references, jump to a file or symbol.
 
-**Workbenches.** Run several Claude sessions on one project at once — each in its own git worktree and branch, each
-with its own gate. Waiting for Claude to finish before a new chat? "New Chat in a Workbench" (⌥⌘T) opens one in a fresh
-workbench right away.
+## How it works
 
-**Start from a task.** A project window opens on a start screen: start straight away, start from a task, or continue a
-recent chat. Give a task's id or link — a GitHub issue is read with `gh`, Jira, Linear and other trackers by Claude
-through the MCP server you pick — and ReviewGate makes its branch (or workbench) and puts a first prompt in the message
-box for you to send.
+1. **Ask Claude.** Open a project and talk to Claude Code as usual — in the terminal chat or in the chat view.
+2. **Claude's turn ends; the review opens.** ReviewGate snapshots the working tree when a turn starts and when it ends,
+   and shows the difference: each changed file, its diff and the tool call behind it.
+3. **Decide, then continue.** Accept, reject, revert hunks, or leave notes and request changes. Rejected files go back to
+   how the turn found them. Then Claude continues — and its next prompt says what you accepted and rejected.
 
-**Pull requests in the same viewer.** Open your GitHub or GitHub Enterprise PRs in the same diff viewer, leave line
-comments, or hand a comment thread to Claude.
+Nothing is committed for you; committing stays your call. The snapshots are `git write-tree` on a temporary index, so
+your index, branches and commits are never touched.
 
-**Rewind, side questions, sessions.** Edit and retry from an earlier turn, ask a side question without derailing the
-turn in progress, and resume earlier sessions together with their review history.
+## Privacy
 
-**Keeps itself current.** ReviewGate notices a new release and updates itself in place, after checking the download's
-checksum and signature.
+Your code and your chats stay on your machine. ReviewGate has no server, no account and no telemetry. It talks only to
+Claude Code (which talks to Anthropic exactly as it does in your terminal) and to GitHub, for pull requests (through
+your own `gh`) and update checks.
+
+## Requirements
+
+- **macOS 15** or later, or **Windows** (preview)
+- **[Claude Code](https://claude.com/claude-code)**, installed and logged in:
+  `curl -fsSL https://claude.ai/install.sh | bash`, then run `claude` once and `/login`
+- **Node.js 24** or later — the engine runs on it. Any install works: nvm, Homebrew, volta, fnm, asdf or the official
+  installer.
+- **Git**
+- **[GitHub CLI](https://cli.github.com)** (`gh`), optional — for pull requests, and for in-app updates on the Mac
+
+## FAQ
+
+**Does it replace Claude Code?** No. It runs the Claude Code you already have, with your login, settings, skills and MCP
+servers. ReviewGate adds the review around it.
+
+**Does accepting change my files or commit anything?** No. Accept only records your decision; the files stay as Claude
+left them. Reject puts a file back from the snapshot taken when the turn started. Commits are yours (**Commit…** in the
+app, or your own tools).
+
+**Can I turn the gate down?** Yes. Settings › Review: only files under review may change (default), block new prompts
+too, or off; a blocked turn can be let through with **Allow for this turn**. A per-turn budget (max files and changed lines, off by default) is in Settings › Session › Limits.
+
+**Does it cost anything?** ReviewGate is free and MIT-licensed. Claude usage is billed by your Claude Code plan, as
+always.
+
+**Is Windows supported?** As a preview: the same engine and review in an Electron client. It updates itself from the app;
+the installer is not code-signed yet.
+
+## More features
 
 <p align="center">
   <picture>
@@ -87,55 +114,39 @@ checksum and signature.
   <br><sub>Why each file changed, beside the turn summary with its cost.</sub>
 </p>
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/budget-dark.png">
-    <img alt="The turn budget in the status bar and the review that waits before the next instruction" src="docs/images/budget-light.png" width="560">
-  </picture>
-  <br><sub>The turn budget in the status bar — 3 of 10 files, 100 of 400 lines — and the review waiting before the next instruction.</sub>
-</p>
+**Know why it changed.** Every file links back to the tool calls and the reasoning that produced it. A turn summary
+compares the plan with what was actually done, marks risky changes and shows the test results.
 
-## How it works
+**Turn budgets that hold, when you want one.** A cap on how many files and changed lines one turn may touch, enforced
+through Claude Code's hooks: an edit over budget is denied, not merely discouraged.
 
-```mermaid
-flowchart LR
-    I([Your instruction]) --> T[Claude Code turn]
-    T -.->|budget, scope and permission hooks| T
-    T --> S[Snapshot and diff]
-    S --> G{Review gate}
-    G -- Accept --> N([Next instruction])
-    G -- Revert file or hunk --> R[Restore from the turn-start snapshot]
-    R --> N
-```
+**Guard rails.** Edits outside the project ask first, writes into `.git/` are refused, and permission requests become
+cards in the app. Throwaway files in temporary folders pass quietly.
 
-At the start of a turn ReviewGate snapshots the working tree (`git write-tree` on a temporary index). When the turn
-ends it snapshots again and diffs the two, so the review shows exactly this turn — not your own uncommitted work, not an
-earlier turn. Nothing is committed for you; committing stays your call.
+**Code navigation while you review.** ⌘-click a name in any diff or file to peek its definition in a band under the
+line — the place you read never moves — or F12 to jump there; hold ⌘ over a name for its signature. Java, Kotlin,
+JavaScript / TypeScript, Vue and JSP above all. References fill a tab of the bottom panel (F4 steps through them); Go to
+File (⌘P), Symbols in This File (⌘F12) and Symbols in Project (⌥⌘⇧N) find the rest; open the line in IntelliJ IDEA,
+VS Code or Xcode. Search-based with an in-memory symbol index — no language server to set up.
 
-All the logic lives in a TypeScript engine that drives the Claude Code CLI. The macOS app (SwiftUI) is a thin client
-over the engine's protocol, and so is the Windows client (Electron, preview).
+**A bottom panel, as in your editor.** Shell tabs in the project folder (⌃`), an Output tab with every Bash command
+Claude ran, and a Run tab for the project's own commands — `npm run dev`, `./gradlew bootRun`, `./mvnw test` or your
+own — each with Run, Stop and Restart. Nothing runs until you click.
 
-## Requirements
+**Workbenches.** Several Claude sessions on one project at once, each in its own git worktree and branch, each with its
+own gate. "New Chat in a Workbench" (⌥⌘T) starts one without waiting for the current chat.
 
-- **macOS 15** or later
-- **[Claude Code](https://claude.com/claude-code)**, installed and logged in:
-  `curl -fsSL https://claude.ai/install.sh | bash`, then run `claude` once and `/login`
-- **Node.js 24** or later — the engine runs on it. Any install works: nvm, Homebrew, volta, fnm, asdf or the official
-  installer.
-- **Git**
-- **[GitHub CLI](https://cli.github.com)** (`gh`), optional — for pull requests and in-app updates
+**Start from a task.** Give a GitHub issue (read with `gh`) or a Jira, Linear or other tracker link (read by Claude
+through the MCP server you pick): ReviewGate makes its branch or workbench and drafts the first prompt for you to send.
 
-## Install
+**Pull requests in the same viewer.** Your GitHub or GitHub Enterprise PRs with their conversation, line comments and
+files; hand a comment thread to Claude.
 
-1. Download `ReviewGate-x.y.z.dmg` from [Releases](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest).
-2. Open it and drag **ReviewGate** to **Applications**. The app is notarized by Apple, so it opens like any other
-   downloaded app.
+**Rewind, side questions, sessions.** Edit and retry from an earlier turn, ask a side question without derailing the
+turn in progress, and resume earlier sessions with their review history.
 
-After that, updates arrive in the app: a banner offers **Install and Restart**.
-
-**Windows (preview).** The same release has `ReviewGate-Setup-x.y.z.exe`. It is not code-signed, so SmartScreen asks
-before the first run (**More info › Run anyway**). It has not been tried on a real Windows machine yet and does not
-update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
+**Keeps itself current.** A new release shows as a banner; the download's checksum and signature are checked before it
+installs in place.
 
 ## Quick start
 
@@ -145,14 +156,12 @@ update itself; [docs/M11-WINDOWS.md](docs/M11-WINDOWS.md) lists what to check.
    open -a ReviewGate ~/work/my-app
    ```
 
-   A folder that is not a git repository can be made one, or tracked without git: ReviewGate then keeps a hidden
-   repository outside the folder (no `.git` is added); commits, branches, workbenches and PRs need a real repository.
+   A folder that is not a git repository can be made one, or tracked without git (no `.git` is added to it).
 
-2. **Tell Claude what to do** in the chat at the bottom. Return sends; Shift-Return starts a new line.
-3. **Review the turn.** Go through the changed files and accept or revert each one. Your next instruction goes out once
-   the turn is reviewed.
-4. **Optionally, limit each turn** in Settings › Session › Limits › Limit changes per reply (max files, max changed
-   lines; off by default) to keep turns small enough to review.
+2. **Tell Claude what to do** — in the terminal chat (new chats are terminal chats by default) or the chat view.
+3. **Review the turn** — accept or reject each file, then continue.
+
+Keyboard shortcuts are listed in [docs/SHORTCUTS.md](docs/SHORTCUTS.md).
 
 ## Build from source
 
@@ -163,9 +172,10 @@ make test    # Swift, engine and sidecar tests
 ```
 
 Signing without a developer certificate, versions and releases, the Windows client, the real-CLI test drivers and the
-screenshot script are covered in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+screenshot and demo scripts are covered in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-## Project layout
+All the logic lives in a TypeScript engine that drives the Claude Code CLI. The macOS app (SwiftUI) is a thin client
+over the engine's protocol, and so is the Windows client (Electron).
 
 | Path | What lives there |
 | --- | --- |
@@ -175,6 +185,8 @@ screenshot script are covered in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 | [`App/`](App) | The SwiftUI app (English and Korean) |
 | [`clients/desktop/`](clients/desktop) | The Electron client for Windows, on the same engine |
 | [`docs/PROTOCOL.md`](docs/PROTOCOL.md) | The contract between the apps and the engine |
+
+<!-- The development story (in Korean): a link line goes here once the blog series is public. -->
 
 ## License
 

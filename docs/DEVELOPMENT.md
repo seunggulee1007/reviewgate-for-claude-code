@@ -172,3 +172,20 @@ ReviewGate window shows for a few minutes. The installed app, its settings and `
 turn leaves a session record under `~/.claude/projects`, as any Claude Code run does. Options (`SHOTS_DIR`, `DEMO_DIR`,
 `SHOTS_PROMPT`, `SHOTS_MODEL`, `SHOTS_WIDTH`, `SHOTS_TIMEOUT`) are listed at the top of the script. Claude's output
 differs from run to run, so look at every image before committing it.
+
+### The demo GIF
+
+```sh
+SHOTS_DIR=/tmp/rg-demo SHOTS_LAYOUT=demo ./scripts/screenshots.sh
+xcrun swift scripts/make-gif.swift scripts/demo-gif.en.tsv /tmp/rg-demo/raw docs/images/demo.gif
+
+SHOTS_DIR=/tmp/rg-demo-ko SHOTS_LAYOUT=demo SHOTS_LANG=ko ./scripts/screenshots.sh
+xcrun swift scripts/make-gif.swift scripts/demo-gif.ko.tsv /tmp/rg-demo-ko/raw docs/images/demo-ko.gif
+```
+
+The `demo` layout runs quietly (no window shows) on the script's fake `claude` in its demo mode: no real Claude Code,
+no `~/.claude`, the same output every run. The tour types a prompt into the terminal chat, the fake edits four files of
+the demo project through the hooks, and the tour accepts one, rejects one and presses Accept N & Continue the way the
+app does, writing `demo-<nn>-<step>.png` at each step. `scripts/make-gif.swift` scales the frames named in a manifest
+(`scripts/demo-gif.*.tsv`: frame, seconds, step, caption, an optional ring around what the step clicks) onto a caption
+band and writes the looping GIF with ImageIO — nothing to install. Keep it under 5 MB; look at every frame first.

@@ -1,0 +1,12 @@
+# The README demo GIF (docs/images/demo.gif): frames from `SHOTS_LAYOUT=demo scripts/screenshots.sh`, put together by
+# scripts/make-gif.swift. Tab-separated: frame, seconds, step, caption|second part, ring x,y,w,h (window points).
+@points 1360
+demo-01-prompt.png	1.6	1	Ask Claude Code|in ReviewGate’s terminal chat
+demo-02-working.png	1.3	1	Claude edits files|ReviewGate tracks every change
+demo-03-review.png	2.2	2	The turn ends, the review opens|every file and its diff — Claude waits
+demo-03-review.png	1.0	3	Accept what’s right	626,60,82,20
+demo-04-accepted.png	1.4	3	Accept what’s right|src/pricing.ts accepted
+demo-05-unasked.png	2.0	3	Reject what you didn’t ask for|a version bump nobody wanted	589,60,31,20
+demo-06-rejected.png	1.5	3	Reject what you didn’t ask for|package.json is back as it was
+demo-06-rejected.png	1.4	4	Accept the rest and continue	1198,131,120,16
+demo-07-continued.png	3.0	4	Claude carries on|and knows what you rejected
