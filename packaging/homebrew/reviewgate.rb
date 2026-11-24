@@ -1,6 +1,6 @@
 cask "reviewgate" do
-  version "0.5.27"
-  sha256 "828ca7de3482a15e5ac3de826c51776e3cb5cea4f623b8888aa15927482457ae"
+  version "0.5.28"
+  sha256 "e80115a4383fcda0ab97926e572b09e46612ac7e6552cfb7071d1f38b476bbcf"
 
   url "https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/download/v#{version}/ReviewGate-#{version}.dmg"
   name "ReviewGate"
