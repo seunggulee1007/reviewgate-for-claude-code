@@ -36,6 +36,7 @@ import type { RemoteBranchInfo } from "./protocol.js"; // MARK: wave3 engine-flo
 import type { BackgroundTask } from "./protocol.js"; // §52
 import type { StorageState } from "./protocol.js"; // MARK: wave4b w4b-bigturn
 import type { AutoModelChoice } from "./protocol.js"; // MARK: wave5 w5-model
+import type { FetchBlocker, GitOperation, PullBlocker, RemoteSyncState } from "./protocol.js"; // MARK: git-sync (§68)
 import { suggestCommitMessage } from "./review/commitMessage.js";
 import type { ReviewGate } from "./review/gate.js";
 import type { ChangedFile } from "./git/checkpoint.js";
@@ -111,7 +112,15 @@ export type EngineSlices = {
     blocksSwitch?: boolean;
     /** §61: `origin/HEAD`'s branch, else main / master (absent until the first refresh). */
     defaultBranch?: string | null;
+    // MARK: git-sync — §68 (absent until the first refresh)
+    /** `git remote`. */
+    remoteNames?: string[];
+    /** The current branch's upstream (`origin/main`). */
+    upstream?: string | null;
+    operation?: GitOperation | null;
   };
+  /** MARK: git-sync — §68: a fetch / pull of this engine (absent: none yet, auto fetch on). */
+  sync?: { fetching: boolean; pulling: boolean; lastFetchAt: string | null; lastFetchError: string | null; autoFetch: boolean };
   pr: PRStore;
   lastError: string | null;
   workbenches: WorkbenchesState;
@@ -209,6 +218,35 @@ export function createBlocker(s: EngineSlices): BranchSwitchBlocker | null {
   const g = s.gate;
   if (g.running || s.session.starting || g.collecting || g.reverting) return { kind: "running" };
   return null;
+}
+
+// MARK: git-sync — §68
+
+/** §68.2: why `git_pull` is refused right now; null: a pull may run. */
+export function pullBlocker(s: EngineSlices): PullBlocker | null {
+  const g = s.gate;
+  if (g.running || s.session.starting || g.collecting || g.reverting) return { kind: "running" };
+  if (s.sync?.fetching || s.sync?.pulling) return { kind: "busy" };
+  if (s.branches.operation) return { kind: "operation", operation: s.branches.operation };
+  if (!s.branches.list.some((b) => b.isCurrent)) return { kind: "detached" };
+  if (!s.branches.upstream) return { kind: "noUpstream" };
+  return null;
+}
+
+/** §68.1: why `git_fetch` is refused right now; null: a fetch may run. */
+export function fetchBlocker(s: EngineSlices): FetchBlocker | null {
+  if ((s.branches.remoteNames ?? []).length === 0) return { kind: "noRemote" };
+  if (s.sync?.fetching || s.sync?.pulling) return { kind: "busy" };
+  return null;
+}
+
+export function syncState(s: EngineSlices): RemoteSyncState {
+  const sync = s.sync ?? { fetching: false, pulling: false, lastFetchAt: null, lastFetchError: null, autoFetch: true };
+  return {
+    fetching: sync.fetching, pulling: sync.pulling, lastFetchAt: sync.lastFetchAt, lastFetchError: sync.lastFetchError,
+    remotes: [...(s.branches.remoteNames ?? [])], upstream: s.branches.upstream ?? null, operation: s.branches.operation ?? null,
+    pullBlocker: pullBlocker(s), fetchBlocker: fetchBlocker(s), autoFetch: sync.autoFetch,
+  };
 }
 
 /**
@@ -339,6 +377,7 @@ export function buildState(s: EngineSlices): ReviewState {
     branches: {
       list: s.branches.list, isWorktreeDirty: s.branches.isWorktreeDirty, switchBlocker: switchBlocker(s), remotes: (s.branches.remotes ?? []).map((r) => ({ ...r })),
       createBlocker: createBlocker(s), defaultBranch: s.branches.defaultBranch ?? null, // MARK: a-gitflow — §61
+      ...(s.project && s.project.vcs !== "shadow" ? { sync: syncState(s) } : {}), // MARK: git-sync (§68)
     },
     pr: prState(s.pr),
     lastError: s.lastError,

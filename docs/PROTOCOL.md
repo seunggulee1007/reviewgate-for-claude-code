@@ -11149,3 +11149,90 @@ type AcceptedBase = {
   counts; reject to the accepted content and `to: "round"`; hunk reject of the new hunk only; `since: "round"`; restart;
   deleted after the accept and re-created after an accepted delete; an untouched accepted file committed; request
   changes, Accept & Continue and finish).
+
+## 68. Fetch and pull (git-sync)
+
+The app could branch (§61), commit (M12) and open PRs, but not bring the branch up to date: users went back to a
+terminal for `git pull`, and pulled files then showed up in the review as if Claude had written them.
+
+### 68.1 `git_fetch {all?, prune?, auto?}` → `fetched`
+
+- `git fetch --prune <remote>` (`prune: false` leaves stale remote-tracking branches): the current branch's upstream
+  remote, else `origin`, else the first remote; `all: true` fetches every remote (`--all`). Never asks on a terminal
+  (`GIT_TERMINAL_PROMPT=0`), at most 2 minutes, the user's hooks off. Its own lane (`remote`): it only moves
+  remote-tracking refs, so it never waits behind — or holds up — a turn. One at a time: a second fetch (or a pull's)
+  shares the one in flight.
+- Reply `fetched { remotes, ahead, behind, skipped? }` — the current branch against its upstream after the fetch (null
+  without one); `state.branches.list` (ahead / behind of every branch) and `state.branches.sync` are refreshed.
+- Refused: `no_remote`, `fetch_failed:<git's fatal/error line>` (also kept as `sync.lastFetchError` until a fetch
+  succeeds), `not_a_git_repo` (§59).
+
+### 68.2 `git_pull {rebase?}` → `pulled`
+
+The current branch from its upstream, **fast-forward only** by default. On the main lane (it moves the working tree).
+
+1. Checked before anything runs — each its own refusal, nothing changed: `pull_blocked:running` (a turn, its start, a
+   collection or a revert — also re-checked after the fetch), `pull_blocked:busy` (a pull runs), `pull_blocked:detached`,
+   `pull_in_progress:<merge|rebase|cherry-pick|revert>` (an unfinished operation: `MERGE_HEAD`, `rebase-merge` /
+   `rebase-apply`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`), `pull_no_upstream:<branch>`.
+2. `git fetch --prune <upstream's remote>` (as §68.1; `fetch_failed:<line>`).
+3. `rev-list --left-right --count HEAD...@{u}`: nothing behind → `pulled {mode: "up_to_date"}`. Ahead and behind →
+   `pull_diverged:<ahead>,<behind>` (without `rebase`): the branch has commits the upstream lacks — merge or rebase
+   yourself, or ask for the safe rebase below.
+4. The working tree must not lose anything: the paths `HEAD..@{u}` changes, against `git status` (a changed tracked file,
+   staged or not, or an untracked file of that name) → `pull_would_overwrite:<first five>` with `paths` = every one
+   (review files and the user's own alike). Nothing is stashed, reset or discarded, ever — commit, accept + commit or
+   reject first. Git's own "would be overwritten" refusal (a race) is reported the same way.
+5. `git merge --ff-only --no-stat @{u}` (the user's hooks run, as for their own pull; never killed half-way). Any other
+   failure: `pull_failed:<line>`.
+
+Reply `pulled { branch, upstream, mode: "up_to_date"|"fast_forward"|"rebase", from, to, commits, files (≤ 200), fileCount }`.
+
+**The review baseline.** What a pull brings in is the upstream's, never Claude's. A HEAD move made before the pull is
+followed first (`followHead`, so A's HEAD is `from`); then `ReviewGate.followPull(from, to)` applies the whole
+`from..to` to A — merge commits on the way included, whose own changes (a conflict resolution) `followHead`'s §46 rule
+would have left in the review — and to the base a turn with background work keeps (§52.2); B is re-snapshotted. The list
+keeps exactly what it had: Claude's pending file stays pending with Claude's lines only, accepted files stay accepted
+(§66 bases are per path and untouched). When the commits do not apply on A (A holds content the pull also changes),
+A stays and `state.gate.headMoved` says so (as for any outside move). Without a review nothing is needed: the next turn
+snapshots A after the pull.
+
+### 68.3 `git_pull {rebase: true}`
+
+Only for a diverged branch, and only when it is safe to rewrite it: no review file at all (`pull_rebase_blocked:review`)
+and no tracked change (`pull_rebase_blocked:dirty`; untracked files are fine — git refuses by itself if one is in the
+way). `git rebase @{u}` with no editor; when it stops (a conflict, a hook) it is aborted at once — branch, index and files
+as before — and refused `pull_rebase_failed:<line>`. `mode: "rebase"`; the review baseline follows as in §68.2.
+
+### 68.4 State and the automatic fetch
+
+```ts
+// state.branches.sync (absent from an older engine and in a folder tracked without git)
+type RemoteSyncState = {
+  fetching: boolean; pulling: boolean;
+  lastFetchAt: string | null;      // ISO-8601 of the last successful fetch of this engine
+  lastFetchError: string | null;   // "fetch_failed:<line>" of the last one, null after a success
+  remotes: string[];               // git remote
+  upstream: string | null;         // the current branch's (its ahead / behind: the current entry of branches.list)
+  operation: "merge" | "rebase" | "cherry-pick" | "revert" | null;
+  pullBlocker: { kind: "running" | "busy" | "detached" | "noUpstream" } | { kind: "operation"; operation } | null;
+  fetchBlocker: { kind: "noRemote" | "busy" } | null;
+  autoFetch: boolean;              // settings.autoFetch !== false
+};
+```
+
+`git_fetch {auto: true}` is what clients send when the project opens and when the window comes back to the front. It runs
+at most every 5 minutes (any fetch attempt counts, so an offline machine is not hammered), never with
+`settings.autoFetch: false` (Settings → Git), without a remote or while a fetch / pull runs — then it replies
+`fetched {skipped: true}` — and it tells Git Credential Manager not to open a sign-in window (`GCM_INTERACTIVE=never`).
+Clients never show an automatic fetch's refusal as an error; `lastFetchError` is shown quietly in the branch menu.
+
+### 68.6 Engine tests
+
+`engine/test/engine.gitSync.test.ts` (temp repos with a local bare `origin` and a second clone; never a network remote):
+fetch refreshes ahead / behind and `sync`; no remote; the auto throttle and `autoFetch: false`; a failing fetch; a
+fast-forward while a review stands — a plain commit and a merge commit whose resolution changes a file — leaves only
+Claude's file in the list with Claude's lines, after a refresh and through accept + commit; a pull while idle; the
+overwrite refusal (a review file, the user's edit, an untracked file in the way) with nothing touched and nothing
+stashed; diverged → refused, rebase refused with a review / a dirty tree, a clean rebase, a conflicting rebase aborted;
+running, a merge in progress, no upstream, detached.

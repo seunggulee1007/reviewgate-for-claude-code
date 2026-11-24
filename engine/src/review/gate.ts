@@ -561,6 +561,40 @@ export class ReviewGate {
   }
 
   /**
+   * MARK: git-sync — §68.2: the app's own pull moved HEAD `from` → `to`. Everything that came in is the upstream's, so the
+   * whole `from..to` goes into A — a merge commit on the way included (unlike `followHead`, whose merge rule keeps a
+   * resolution Claude made in the review) — and into the base a turn with background work keeps (§52.2). Call it with
+   * `baseHead` at `from` (`followHead` first); `refresh()` after a true. When the commits do not apply on A, A stays and
+   * `headMoved` says so.
+   */
+  async followPull(from: string, to: string): Promise<boolean> {
+    const cp = this.checkpoint;
+    if (!cp || this.running || this.collecting || this.reverting) return false;
+    const head = await cp.head().catch(() => null);
+    if (head?.sha !== to) return false;
+    if (this.carryBase && this.carryBase.baseHead?.sha === from) {
+      const tree = await cp.carryCommits(this.carryBase.tree, from, to).catch(() => null);
+      if (tree !== null) this.carryBase = { ...this.carryBase, tree, baseHead: head };
+    }
+    const start = this.turnStartTree;
+    if (start === null || this.turnEndTree === null || this.baseHead?.sha !== from) return false;
+    const before = this.baseHead;
+    const carried = await cp.carryCommits(start, from, to).catch(() => null);
+    this.baseHead = head;
+    if (carried === null) {
+      this.headMoved = { from: { ...before }, to: { ...head } };
+      this.onChange();
+      return false;
+    }
+    if (carried === start) return false;
+    this.turnStartTree = carried;
+    if (this.round) this.round.turnStartTree = carried;
+    this.diffCache = new Map();
+    await this.pinRefs();
+    return true;
+  }
+
+  /**
    * `trees` with what git brought in since A was snapshotted carried into each: the commits since `baseHead` (a pull, a
    * merge, a commit — into all of them or none; else `headMoved` says so), then §46 the incoming side of an unfinished merge
    * (`merge-base(HEAD, MERGE_HEAD)..MERGE_HEAD`, once per `MERGE_HEAD`): a file whose change conflicts keeps its content,

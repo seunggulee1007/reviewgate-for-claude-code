@@ -375,7 +375,23 @@
     },
     "remotes": [],
     "createBlocker": null,
-    "defaultBranch": "main"
+    "defaultBranch": "main",
+    "sync": {
+      "fetching": false,
+      "pulling": false,
+      "lastFetchAt": null,
+      "lastFetchError": null,
+      "remotes": [],
+      "upstream": null,
+      "operation": null,
+      "pullBlocker": {
+        "kind": "noUpstream"
+      },
+      "fetchBlocker": {
+        "kind": "noRemote"
+      },
+      "autoFetch": true
+    }
   },
   "pr": {
     "host": "github.com",
