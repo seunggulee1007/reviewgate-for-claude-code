@@ -4,7 +4,7 @@ import Foundation
 // docs/PROTOCOL.md §48: the app notices a new release and offers to install it. Releases are GitHub releases of a private
 // repository, so the app cannot ask the public API anonymously: it asks through the user's own `gh` (logged in to
 // github.com) — the path the engine resolved (`state.toolchain.gh`), else the login shell's PATH. Checks at launch, every
-// 6 hours and from "Check for Updates…"; a closed banner stays closed for that version. The install (download, checksum,
+// 6 hours, on coming back to the app after an hour and from "Check for Updates…"; a closed banner stays closed for that version. The install (download, checksum,
 // signature, the restart helper) is `AppUpdateInstall.swift`. Every external program goes through an injected runner, so
 // the tests never reach the network.
 
@@ -220,6 +220,15 @@ public typealias UpdateRun = @Sendable (_ executable: String, _ arguments: [Stri
 
 public enum AppUpdateChecker {
     public static let interval: Duration = .seconds(6 * 60 * 60)
+    /// Coming back to the app with the last check (done or failed) older than this checks again.
+    public static let focusCheckAfter: Duration = .seconds(60 * 60)
+
+    /// Whether coming back to the app (`didBecomeActive`) checks now: automatic checks on, none running, and the last
+    /// check at least `focusCheckAfter` ago. No check yet (nil): the launch check is coming, so no.
+    public static func shouldCheckOnActivation(automatic: Bool, checking: Bool, lastCheck: Date?, now: Date) -> Bool {
+        guard automatic, !checking, let lastCheck else { return false }
+        return now.timeIntervalSince(lastCheck) >= Double(focusCheckAfter.components.seconds)
+    }
     static let checkTimeout: Duration = .seconds(30)
 
     /// `gh api …/releases/latest` compared with `currentVersion` (the running bundle's CFBundleShortVersionString).
@@ -302,7 +311,7 @@ public enum UpdateGHLocator {
 // MARK: - Settings: automatic checks, the closed banner
 
 public extension AppSettings.Key {
-    /// Check for updates at launch and every 6 hours (Bool, unset → on).
+    /// Check for updates at launch, every 6 hours and on coming back after an hour (Bool, unset → on).
     static let checkForUpdatesAutomatically = "checkForUpdatesAutomatically"
     /// The highest release version whose banner was closed (String); a newer release shows again.
     static let dismissedUpdateVersion = "dismissedUpdateVersion"
@@ -396,7 +405,7 @@ public enum AppUpdateText {
 
     /// Settings › General › Updates, under the toggle.
     public static var settingsNote: String {
-        String(localized: "At launch and every 6 hours ReviewGate asks GitHub for the latest release through the GitHub CLI (gh). Nothing is installed until you click Install and Restart.", bundle: .module)
+        String(localized: "At launch, every 6 hours, and when you come back to ReviewGate after an hour, ReviewGate asks GitHub for the latest release through the GitHub CLI (gh). Nothing is installed until you click Install and Restart.", bundle: .module)
     }
 
     /// Settings: the last check's result.

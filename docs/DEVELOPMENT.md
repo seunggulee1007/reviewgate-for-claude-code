@@ -102,7 +102,7 @@ with an app-specific password from appleid.apple.com (`NOTARY_PROFILE` picks ano
 xcrun notarytool store-credentials reviewgate --apple-id <your Apple ID> --team-id QW7DJ7FBDT
 ```
 
-The app checks for a new release at launch and every 6 hours through the user's `gh`, announces it in a banner, and on
+The app checks for a new release at launch, every 6 hours and when you come back to the app after an hour, through the user's `gh`, announces it in a banner, and on
 **Install and Restart** downloads, verifies and swaps the bundle ([PROTOCOL.md §48](PROTOCOL.md)).
 
 ## Architecture

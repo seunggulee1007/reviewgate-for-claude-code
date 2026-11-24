@@ -4,7 +4,7 @@ import ReviewGateCore
 
 // MARK: app-update
 /// docs/PROTOCOL.md §48: the app notices a new GitHub release and offers to install it. One controller for the app (every
-/// window's banner shows the same state): checks at launch, every 6 hours (Settings › General › Updates turns that off)
+/// window's banner shows the same state): checks at launch, every 6 hours, on coming back after an hour (Settings › General › Updates turns that off)
 /// and from ReviewGate › Check for Updates…; installs on [Install and Restart]. The check, the gates and the helper are
 /// Core (`AppUpdate.swift`, `AppUpdateInstall.swift`, unit-tested); this holds the timers, the windows' state and AppKit.
 @MainActor @Observable
@@ -30,6 +30,9 @@ final class AppUpdateController {
     private(set) var dismissed = AppSettings.dismissedUpdateVersion()
 
     private var loop: Task<Void, Never>?
+    private var activation: NSObjectProtocol?
+    /// When the last check ended (done or failed), for the check on coming back to the app.
+    private var lastCheckAt: Date?
     /// "Check for Updates…" while an automatic check runs: that check's result is reported.
     private var reportNextResult = false
     private var prepared: PreparedUpdate?
@@ -72,6 +75,9 @@ final class AppUpdateController {
     func start() {
         guard loop == nil else { return }
         noticeRelaunch()
+        activation = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.appBecameActive() }
+        }
         loop = Task { [weak self] in
             try? await Task.sleep(for: .seconds(8))
             while !Task.isCancelled {
@@ -79,6 +85,13 @@ final class AppUpdateController {
                 try? await Task.sleep(for: AppUpdateChecker.interval)
             }
         }
+    }
+
+    /// Back in the app: a check when the last one is over an hour old (a check already running is not doubled).
+    private func appBecameActive() {
+        guard AppUpdateChecker.shouldCheckOnActivation(automatic: AppSettings.checkForUpdatesAutomatically(), checking: checking,
+                                                       lastCheck: lastCheckAt, now: Date()) else { return }
+        Task { await runCheck(userInitiated: false) }
     }
 
     /// The update this app quit for (`AppSettings.takeUpdateInstall`, once): updated — a notification and the windows'
@@ -140,6 +153,7 @@ final class AppUpdateController {
         let (gh, run) = await Self.ghRunner()
         let outcome = await AppUpdateChecker.check(currentVersion: currentVersion, ghPath: gh, run: run)
         checking = false
+        lastCheckAt = Date()
         lastOutcome = outcome
         let report = userInitiated || reportNextResult
         reportNextResult = false

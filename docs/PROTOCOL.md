@@ -7240,8 +7240,10 @@ download whose identifier differs from the running app's, so a build with an old
   else Homebrew's; it runs with that PATH, `GH_PROMPT_DISABLED`, without `GH_HOST` / `GH_REPO`. The reply's `tag_name`
   (`v0.5.5`; a draft, a pre-release or a tag that is not a version is refused) is compared with the running bundle's
   `CFBundleShortVersionString` as semver (numbers by value, a pre-release below its release). At launch (8 s after, so a
-  window's engine has resolved `gh`), then every 6 hours while Settings › General › Updates › "Check for updates
-  automatically" is on (default on; turning it on checks right away), and from ReviewGate › Check for Updates… or
+  window's engine has resolved `gh`), then every 6 hours, and when the app becomes active
+  (`didBecomeActiveNotification`) with the last check — done or failed — over an hour old (`focusCheckAfter`;
+  `shouldCheckOnActivation`: not while one runs, not before the first check; the 6-hour timer is not reset), while Settings ›
+  General › Updates › "Check for updates automatically" is on (default on; turning it on checks right away), and from ReviewGate › Check for Updates… or
   Settings' [Check Now]. `gh` missing (`ghMissing`), not logged in (exit 4 / "gh auth login" / 401 → `notLoggedIn`), GitHub
   unreachable (`offline`), 404 (`noRelease` — nothing published yet, or the account cannot see the repository) or an
   unreadable reply show no banner; the on-demand check says which in an alert, and Settings shows the last result.
@@ -8609,7 +8611,9 @@ it, and an item that cannot run now is disabled instead of doing nothing.
 - **The Windows client notices a new release** (P5-sheets-49). The Mac's §48 check in main (src/main/update.ts): the newest
   GitHub release that is neither a draft nor a pre-release, against the running version — read with `gh api
   repos/…/releases/latest` when the GitHub CLI is there (the user's login, as the Mac), else GitHub's public API over the
-  system's proxy. At launch (after 8 s) and every 6 hours while `autoCheckUpdates` is on (absent = on; Settings › General's
+  system's proxy. At launch (after 8 s), every 6 hours and on any window's `browser-window-focus` when the last check (done or
+  failed) is over an hour old (`FOCUS_CHECK_AFTER_MS`, `InstallerRecheck.focused`; a running check is joined, none before the
+  launch check) while `autoCheckUpdates` is on (absent = on; Settings › General's
   switch is lane p-settings'), and from Help › Check for Updates…, which always says the result in a message box (a
   version closed with Later comes back then). A newer release shows a banner in every window, also the empty one —
   "ReviewGate 0.6.0 버전이 나왔어요 · 이 앱은 0.5.10 버전이고, 최신 릴리스는 0.6.0 버전이에요." [릴리스 페이지 열기] (the

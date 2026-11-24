@@ -9,6 +9,22 @@ import Testing
 @Suite struct AppUpdateTests {
     private func v(_ s: String) -> SemanticVersion { SemanticVersion(s)! }
 
+    // MARK: - Check on coming back to the app
+
+    @Test func checksOnActivationOnlyAfterAnHour() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        func should(auto: Bool = true, checking: Bool = false, ago: TimeInterval?) -> Bool {
+            AppUpdateChecker.shouldCheckOnActivation(automatic: auto, checking: checking,
+                                                     lastCheck: ago.map { now.addingTimeInterval(-$0) }, now: now)
+        }
+        #expect(should(ago: 3600))
+        #expect(should(ago: 7 * 3600))
+        #expect(!should(ago: 3599))
+        #expect(!should(auto: false, ago: 7200))     // "check automatically" off
+        #expect(!should(checking: true, ago: 7200))  // one in flight
+        #expect(!should(ago: nil))                   // before the launch check
+    }
+
     // MARK: - Versions
 
     @Test func parsesVersionsAndTags() {
