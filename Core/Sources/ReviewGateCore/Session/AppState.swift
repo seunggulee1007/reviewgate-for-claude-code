@@ -1620,7 +1620,7 @@ public final class AppState {
     /// while a turn runs (§34.2, `stale`).
     public func fullFile(for file: ChangedFile) async throws -> FullFileView {
         guard reviewTree != nil else { throw FullFileViewError.noReview }
-        let reply = try await typedReply(.fullFile(path: file.path, since: diffSince(for: file).wire))
+        let reply = try await typedReply(.fullFile(path: file.path, since: diffSince(for: file).wire(for: file)))
         guard case let .fullFileContent(_, view) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
         return view
     }

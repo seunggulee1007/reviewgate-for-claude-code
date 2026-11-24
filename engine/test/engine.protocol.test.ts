@@ -168,7 +168,7 @@ describe("protocol v2 wire goldens", () => {
       ignoredTouched: [],
       filteredByPattern: [],
       restored: false,
-      reviewSummary: { files: 0, added: 0, deleted: 0 },
+      reviewSummary: { files: 0, added: 0, deleted: 0, pending: 0, changesRequested: 0, acceptedUncommitted: 0 },
       externalPendingCount: 0,
       headMoved: null,
       concurrentClaude: [],

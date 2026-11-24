@@ -215,7 +215,7 @@ type ReviewState = {
     ignoredTouched: string[];                    // repo-relative paths the turn's edit tools wrote that are gitignored (invisible to the snapshot; §8)
     filteredByPattern: string[];                 // repo-relative changed paths hidden from changedFiles by settings.ignorePatterns (§8)
     restored: boolean;                           // true after open_project restored a persisted review; cleared by the next turn (§8)
-    reviewSummary: { files: number; added: number; deleted: number };   // totals over changedFiles (every state) for the composer label (§10)
+    reviewSummary: { files: number; added: number; deleted: number; pending?: number; changesRequested?: number; acceptedUncommitted?: number };   // totals over changedFiles (every state) for the composer label (§10); the split by state (§66)
     externalPendingCount: number;                // §31: pending files with origin "external" (reject_all leaves them out)
     headMoved: { from: HeadInfo; to: HeadInfo } | null;     // §31: HEAD / branch moved while the last turn ran
     concurrentClaude: ConcurrentClaude[];        // §31: other Claude processes in this worktree (open / last send)
@@ -420,7 +420,7 @@ Golden samples of `state`, `file_diff` and `full_file_content` live in `engine/t
   `reviewFirst: "edits"`): the message starts with `[Review gate] N files await review; questions only until then.` and every
   call of that turn that would change files (edit tools, Bash that is not read-only) is denied with the reason naming the
   waiting files, until the user accepts or rejects them (during the turn too, §34.2); `reviewFirst: "off"` lets the answer
-  edit as before. A is kept and, after the turn, the list is rebuilt from that same A and **merged** into the standing review — every file keeps the state (`pending` / `changesRequested`) and the `tools[]` it already had, files the answer touched are added `pending`, and an `accepted` file goes back to `pending` only when the answer actually changed its patch (the same patch-hash rule as `request_changes`; `gate.isAnsweringReview` in the persisted review marks the turn so a crash mid-answer re-verifies the same way). A turn that changes nothing leaves `changedFiles` byte-identical (but for the §34.3 per-turn marks it clears). `request_changes` is unaffected: files marked `changesRequested` still go back through it. The message Claude gets ends with the unsent notes (`unsentNotesContext`: "[Review gate] Notes the user left on the diff, not sent yet (act on them only if the message above asks):" + one `- path[:line] (side) [`excerpt`] — body` per note), so "메모 반영해줘" in the chat reaches them; they stay unsent and the transcript row shows only the user's text. Edits into Claude's own memory folder (`~/.claude/projects/<project>/memory/`) are outside the per-turn budget: never counted, never denied by it (they keep the outside-the-project card).
+  edit as before. A is kept and, after the turn, the list is rebuilt from that same A and **merged** into the standing review — every file keeps the state (`pending` / `changesRequested`) and the `tools[]` it already had, files the answer touched are added `pending`, and an `accepted` file goes back to `pending` only when the answer actually changed its patch (the same patch-hash rule as `request_changes`; `gate.isAnsweringReview` in the persisted review marks the turn so a crash mid-answer re-verifies the same way). §66: such a file carries `acceptedBase` — its default diff, `+/-`, risk and `reject` start from what the user accepted, not from A (a file Claude created, accepted, then extended shows only the extension). A turn that changes nothing leaves `changedFiles` byte-identical (but for the §34.3 per-turn marks it clears). `request_changes` is unaffected: files marked `changesRequested` still go back through it. The message Claude gets ends with the unsent notes (`unsentNotesContext`: "[Review gate] Notes the user left on the diff, not sent yet (act on them only if the message above asks):" + one `- path[:line] (side) [`excerpt`] — body` per note), so "메모 반영해줘" in the chat reaches them; they stay unsent and the transcript row shows only the user's text. Edits into Claude's own memory folder (`~/.claude/projects/<project>/memory/`) are outside the per-turn budget: never counted, never denied by it (they keep the outside-the-project card).
 - `user_message.text` is the transcript text: the trimmed user text for `send` (the review-summary prefix is *not* included), the full generated message for `request_changes`.
 - Permission `ask`-hook semantics, auto-allowed edit tools, the read-only set, `stopReason: "interrupted"`, `loadUserSettings` — carried over verbatim from v1 (§4). `permission_request` blocks the tool until `permission_response` with the same `requestId`. Several can be open at once (parallel subagents): `state.session.pendingPermissions` lists them oldest first, `state.session.pendingPermission` is the oldest, and `blockedReason` is `awaiting_permission` while any is open (§33). Read-only Bash commands, `bashAllowPatterns` matches and session-remembered allows never produce a `permission_request` (§10).
 - Activity folding (`state.hud.activity`): `tool_start` → `{kind:"tool", toolName, detail?}`; `tool_end` → `subagent` if `subagentDepth > 0` else `working`; `subagent_start` → `{kind:"subagent", toolName?, detail?}`; `subagent_end` → `subagent`/`working` (`subagentDepth` itself is the number of running foreground `hud.agents`, §13); `thinking` → `{kind:"thinking", detail?}` (also emitted for the CLI's `status` system messages — `detail` = `"compacting"` during `/compact` / auto-compaction, `"requesting"` while waiting for the model — and `"compacted"` at a compact boundary); `idle` → `{kind:"idle"}`. The raw `activity` events are still emitted for finer HUD use.
@@ -825,7 +825,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   soft warning stays at 100 %.
 - **`state.gate.reviewSummary`** = `{files: changedFiles.length, added: Σ added, deleted: Σ deleted}` over every changed file
   regardless of its state (`{0, 0, 0}` when nothing is under review); recomputed with every snapshot (accept keeps a file
-  counted, reject / commit drop it).
+  counted, reject / commit drop it). §66 adds the split `pending` / `changesRequested` / `acceptedUncommitted`.
 - **Capabilities cache.** Every `session_info` writes `<gitdir>/reviewgate/capabilities.json`
   (`{version: 1, capabilities: {slashCommands, skills, plugins, mcpServers}, savedAt}`, atomic, behind the persist chain).
   `open_project` / `init_repo` read it before the session starts: when present the first project `state` already carries it as
@@ -1172,6 +1172,11 @@ and leaves the rest under review. Accept semantics are unchanged (`accept` takes
   screen: if B moved since (another reject, a refresh, a turn), the command is refused with `stale_diff` instead of
   reverting different hunks. (A diff is never cached under a B that moved while git computed it.) §34.1: pass
   `expectedBaseTree` = that reply's `baseTree` too — hunk ids of another range (`since`) are refused `stale_diff`.
+  §66: a file with an `acceptedBase` also takes the ids of its since-accepted diff (`expectedBaseTree` =
+  `acceptedBase.tree`): the selected hunks go back to the **accepted** content (`partial_reject_unsupported` then looks
+  at `acceptedBase.status`, so a file Claude created and the user accepted can be cut hunk by hunk); every hunk selected
+  (or the rest cancelling out) is the whole-file reject to the accepted content — the file is `accepted` again. Without
+  `expectedBaseTree` the ids are the file's default range's (§66).
 - **Refusals** (`result{ok:false}`, no `error` event, nothing written): `session_running` while a turn runs or its
   collection is in flight (the same lock as `accept`/`reject`, §3), `reverting`, `no_review`, `stale_diff`,
   `not_a_changed_file:<path>`, `not_pending:<path>` (accepted / changes-requested files), `binary_file`,
@@ -2900,18 +2905,21 @@ type GeneratedKind = "lockfile" | "generated" | "minified";
 
 | `since` | old side | client label |
 | --- | --- | --- |
-| `review` (absent) | A | 전체 |
+| `review` (absent; `round` too, §66) | A | 전체 |
 | `turn` | turn base | 이번 턴 |
 | `request` | request tree | 요청 이후 |
 | `accepted` | the file's accepted tree | 수락 이후 |
 
+- §66: absent `since` is the file's default range — `accepted` for a file with an `acceptedBase`, else `review` — and the
+  reply then always names its `since`; clients that show the whole review of such a file send `since: "review"`.
 - A range whose base is known always answers (possibly with no hunks: "이 범위에는 변경 없음"); otherwise refused
   `range_unavailable:<since>` (`code: "range_unavailable"`) — `turn` before a review's first collection, `request` without a
   request in this review, `accepted` for a file that was never accepted. Any other `since` value: `invalid_since`. The path
   must be in `changedFiles` (`not_a_changed_file`); renames are followed (`-M`) between the two trees.
 - `file_diff` (scope `turn`) carries `baseTree` (always), `endTree` = `reviewEndTree`, `since` (omitted for `review`) and the
   usual 20 000-line `truncated`. Clients key caches on (path, since, `reviewEndTree`).
-- **Hunk ids of a `since` other than `review` are not `reject_hunks` ids.** `reject_hunks.expectedBaseTree` (new clients
+- **Hunk ids of a `since` other than `review` are not `reject_hunks` ids** — but for `accepted` of a file with an
+  `acceptedBase` (§66). `reject_hunks.expectedBaseTree` (new clients
   send the `baseTree` of the diff they show) must equal A, else `stale_diff`; clients offer hunk reject in the 전체 view only.
 - `full_file { path, since }`: `lines` as before (the worktree, falling back to B — the held B's content while `stale`),
   `changedNewLines` / `deletedAfterNewLine` / `oldText` from the range; it echoes `since`, `stale`, `endTree`.
@@ -10955,3 +10963,66 @@ through).
   `engine/test/symbols.extract.test.ts` (containers per language), `engine/test/engine.symbolIndex.test.ts` (fuzzy
   ranking, Go to File, the index's build / refresh / limits / failure, container-aware go to definition, the preview, the
   engine's commands and state, a turn's refresh, §59 shadow mode, the lane), `clients/desktop/src/main/ipcGuard.test.ts`.
+
+## 66. Since accepted: the accepted content is the baseline of a file changed again
+
+A review keeps A across a question, a change request, an accept during a turn (§34.2) or a turn that carries background
+work (§52.2). When the user accepted a file and a later turn of that same review changes it again, the file is `pending`
+with `changedSinceAccepted` (as before) — but until §66 its default diff, its `+/-` and `reject` still measured from A: a
+file Claude created and the user accepted came back "entirely added", and rejecting the new edit deleted the file. Now
+the content the user accepted is that file's baseline.
+
+```ts
+type AcceptedBase = {
+  blob: string | null;   // tree entry id of `path` in the accepted tree; null: deleted when accepted (a tombstone)
+  tree: string;          // the accepted tree (B of the accept; the held B for an accept during a turn)
+  at: string | null;     // ISO-8601 of the accept (null: a review saved before §66)
+  turn: number | null;   // the collected turn whose result was accepted
+  status: "A" | "M" | "D"; // the change accepted → B (A: re-created after an accepted delete, D: deleted since)
+  roundAdded: number; roundDeleted: number; // the whole round's lines (A → B)
+};
+// state.changedFiles[]: acceptedBase?: AcceptedBase   — present exactly with changedSinceAccepted (a pending /
+//                       changes-requested file); its added / deleted are then accepted → B
+// state.gate.reviewSummary: { files, added, deleted, pending?, changesRequested?, acceptedUncommitted? }
+// select_file / full_file: since?: DiffSince | "round"    (absent: the file's default; "round" = "review")
+// file_diff / full_file_content: since always present for a file with an acceptedBase ("accepted" | "review" | …)
+// reject: { paths, force?, to?: "accepted" | "round" }     reject_hunks: expectedBaseTree may be acceptedBase.tree
+```
+
+- **What is recorded.** Every accept (`accept`, `accept_all`, Accept N & Send / Continue, an auto-accept rule, an accept
+  during a turn) keeps the file's accepted tree (§34.1, pinned under `refs/reviewgate/<ns>/range/`) and now also when
+  (`at`) and which collected turn it took (`turn`). Persisted with the review (`ranges.acceptedAt` beside
+  `ranges.acceptedTrees`), restored after a restart, gone with the file (commit, reject, finish, the round's end).
+  `blob` / `status` / the counts are derived at every B change (collection, reject, refresh, commit, restore); a git
+  failure there leaves the file without `acceptedBase` (it then shows the whole round, as before §66).
+- **Default diff.** `select_file` / `full_file` without `since` answer `since: "accepted"` (accepted tree → B) for a file
+  with an `acceptedBase`, `review` otherwise; `since: "round"` (or `"review"`) gives the whole round from A. The reply
+  names the range it used. Both clients already open such a file in "수락 이후" (§34.1) and now ask for "전체" by name.
+- **Counts.** The file's `added` / `deleted` in `state` — and so `reviewSummary.added` / `deleted` and the risk badges
+  (`risks`, `riskScore`, §40.2) — are the since-accepted lines; `acceptedBase.roundAdded` / `roundDeleted` keep A → B.
+  The file's `status` stays the round's (A → B: a created file is still `A`); `acceptedBase.status` is the change since
+  the accept. The review history (§14) and `turn_summary.reviewAdds` keep counting A → B.
+- **Reject restores the accepted content.** The user accepted those bytes, so `reject` (and `reject_all`, a reject
+  scheduled during a turn, §34.2) of a file with an `acceptedBase` writes the accepted content back (removes the file
+  when it was deleted at the accept), re-snapshots B and leaves the file **`accepted`** with the same accepted tree; its
+  history verdict stays `accepted`. Claude learns it in the next summary prefix: `Later changes rejected (reverted on disk
+  to the version the user accepted earlier, do not redo them unless asked): a.ts.` (persisted as
+  `revertedToAcceptedPaths`). `reject { to: "round" }` is the explicit way back to A (the file leaves the list, as any
+  reject); a scheduled reject always uses the default. `file_changed_since_review` guards the same way (on disk must be
+  B or already the accepted content). Not offered: the single-file undo (§41.2 [되돌리기]) of a reject to the accepted
+  content.
+- **Hunk reject** (§17) works on the since-accepted diff (`expectedBaseTree` = `acceptedBase.tree`); A's ids still work
+  in the whole-round view.
+- **The split for the review list.** `reviewSummary.pending`, `changesRequested` and `acceptedUncommitted` (accepted and
+  still listed — not committed yet; files leave the list when committed), so the list can group "수락함 · 커밋 전 N".
+  Accepted files a later turn left alone stay `accepted` without an `acceptedBase` and commit as before.
+- **Unchanged.** Accept N & Send / Continue, `accept_all`, `commit`, `finish_review`, request changes and review first
+  (§64: a file with an `acceptedBase` is pending, so it waits like any) behave as before; accepting such a file again
+  takes the new content and drops the base. A file Claude created, the user accepted and a later turn deleted is
+  identical in A and B and simply leaves the list (as before §66).
+- Owner: accept-baseline (engine `review/gate.ts`, `review/ranges.ts`, `review/persist.ts`, `state.ts`, `engine.ts`,
+  `protocol.ts`; Core `ReviewRound.swift` `wire(for:)`; Windows `store.ts`, `WhitespaceDiff.tsx` — the "전체" request by
+  name). Tests: `engine/test/engine.acceptedBase.test.ts` (accept → change again → pending with the since-accepted diff and
+  counts; reject to the accepted content and `to: "round"`; hunk reject of the new hunk only; `since: "round"`; restart;
+  deleted after the accept and re-created after an accepted delete; an untouched accepted file committed; request
+  changes, Accept & Continue and finish).

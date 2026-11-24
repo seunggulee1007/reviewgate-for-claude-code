@@ -262,7 +262,7 @@ describe("plan mode proposal flow (docs/M20-MODES.md)", () => {
     const s = h.engine.state;
     expect(s.gate.changedOutside).toEqual([]);
     expect(s.changedFiles.map((f) => f.path)).toEqual([]);
-    expect(s.gate.reviewSummary).toEqual({ files: 0, added: 0, deleted: 0 });
+    expect(s.gate.reviewSummary).toEqual({ files: 0, added: 0, deleted: 0, pending: 0, changesRequested: 0, acceptedUncommitted: 0 });
     expect(s.budgetUsage).toEqual({ files: 0, lines: 0, denied: false });
     expect(s.gate.phase).toBe("idle");
   });

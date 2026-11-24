@@ -25,6 +25,10 @@ public extension DiffSince {
 
     /// What `select_file` / `full_file` carry: nothing for the whole review (an older engine never sees the field).
     var wire: DiffSince? { self == .review ? nil : self }
+
+    /// `wire` for `file`: §66 — a file changed after its accept defaults to "since accepted" on the engine, so its whole
+    /// review is asked for by name.
+    func wire(for file: ChangedFile) -> DiffSince? { file.changedSinceAccepted ? self : wire }
 }
 
 /// The ranges of one file's diff (§34.1) and the one it opens in.

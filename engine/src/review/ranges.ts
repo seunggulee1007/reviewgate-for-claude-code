@@ -12,9 +12,13 @@ import type { ReviewNote } from "./notes.js";
  * pins of the range trees and what the review file keeps of them. The gate (`review/gate.ts`) owns the state.
  */
 
-/** `select_file.since` / `full_file.since`: absent (or null) = `review`; any other value is refused `invalid_since`. */
-export function sinceOf(raw: unknown): DiffSince {
-  if (raw === undefined || raw === null) return "review";
+/**
+ * `select_file.since` / `full_file.since`: absent (or null) = null — the file's default range (§66, `ReviewGate.defaultSince`);
+ * `round` = `review`; any other value is refused `invalid_since`.
+ */
+export function sinceOf(raw: unknown): DiffSince | null {
+  if (raw === undefined || raw === null) return null;
+  if (raw === "round") return "review";
   if (isDiffSince(raw)) return raw;
   throw new CommandRefused(`invalid_since:${String(raw)}`, { code: "invalid_since" });
 }
@@ -137,7 +141,12 @@ export type PersistedRanges = {
   lastRequest: ReviewRequestInfo | null;
   lastTurnChanges: LastTurnChanges | null;
   acceptedTrees: Record<string, string>;
+  /** §66: when each file of `acceptedTrees` was accepted (absent in files written before it: unknown). */
+  acceptedAt?: Record<string, AcceptedAt>;
 };
+
+/** §66: when a file was accepted — the time and the collected turn whose result it was. */
+export type AcceptedAt = { at: string; turn: number | null };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
 const int = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
@@ -155,6 +164,13 @@ export function parsePersistedRanges(raw: unknown): PersistedRanges | null {
       if (t) accepted[path] = t;
     }
   }
+  const acceptedAt: Record<string, AcceptedAt> = {};
+  if (o.acceptedAt && typeof o.acceptedAt === "object") {
+    for (const [path, v] of Object.entries(o.acceptedAt as Record<string, unknown>)) {
+      const a = v as Partial<AcceptedAt> | null;
+      if (a && typeof a.at === "string") acceptedAt[path] = { at: a.at, turn: int(a.turn) ? a.turn : null };
+    }
+  }
   return {
     turnBaseTree: str(o.turnBaseTree),
     heldEndTree: str(o.heldEndTree),
@@ -162,6 +178,7 @@ export function parsePersistedRanges(raw: unknown): PersistedRanges | null {
     lastRequest: req && int(req.turn) && typeof req.at === "string" && int(req.notes) ? { turn: req.turn, at: req.at, notes: req.notes } : null,
     lastTurnChanges: ltc && int(ltc.turn) && int(ltc.files) && int(ltc.added) && int(ltc.deleted) ? { turn: ltc.turn, files: ltc.files, added: ltc.added, deleted: ltc.deleted } : null,
     acceptedTrees: accepted,
+    acceptedAt,
   };
 }
 

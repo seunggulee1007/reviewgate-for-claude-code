@@ -253,7 +253,8 @@ describe("review round 2 in the store (wave2 desktop-flow)", () => {
     useStore.getState().setDiffSince("review");
     await flush();
     expect(shownText(useStore)).toBe("a.ts@review");
-    expect(selects().at(-1)).toEqual({ type: "select_file", path: "a.ts" });
+    // §66: the engine's default for this file is "since accepted" — the whole review is asked for by name.
+    expect(selects().at(-1)).toEqual({ type: "select_file", path: "a.ts", since: "review" });
     sent.length = 0;
     useStore.getState().setDiffSince("accepted");
     expect(shownText(useStore)).toBe("a.ts@accepted"); // cached per (path, range)
