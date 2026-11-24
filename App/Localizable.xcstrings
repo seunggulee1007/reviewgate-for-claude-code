@@ -40959,7 +40959,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Commit (%lld)…"
+            "value": "커밋 (%lld)…"
           }
         }
       }
