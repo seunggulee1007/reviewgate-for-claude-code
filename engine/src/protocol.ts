@@ -29,9 +29,11 @@ export type Budget = {
 
 /**
  * `state.gate.reviewSummary`: totals over `changedFiles` (every state) for the composer label — `added` / `deleted` of a
- * file with an `acceptedBase` are its since-accepted lines (§66).
+ * file with an `acceptedBase` are its since-accepted lines (§66) — and the split by state the review list groups by (§66):
+ * `pending`, `changesRequested`, and `acceptedUncommitted` (accepted, still in the list: not committed yet) — always sent by
+ * this engine, absent from an older one.
  */
-export type ReviewSummary = { files: number; added: number; deleted: number };
+export type ReviewSummary = { files: number; added: number; deleted: number; pending?: number; changesRequested?: number; acceptedUncommitted?: number };
 
 export type BudgetUsage = { files: number; lines: number; denied: boolean };
 

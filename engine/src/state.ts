@@ -365,13 +365,16 @@ function sinceAcceptedFields(g: ReviewGate, f: ChangedFile): { added?: number; d
   return { added: sinceAdded, deleted: sinceDeleted, acceptedBase: base };
 }
 
-/** `state.gate.reviewSummary`: the totals (since-accepted lines for a file changed after its accept, §66). */
+/** `state.gate.reviewSummary`: the totals (since-accepted lines for a file changed after its accept, §66) and the split by state. */
 function reviewSummaryOf(g: ReviewGate): ReviewSummary {
-  const out = { files: g.changedFiles.length, added: 0, deleted: 0 };
+  const out = { files: g.changedFiles.length, added: 0, deleted: 0, pending: 0, changesRequested: 0, acceptedUncommitted: 0 };
   for (const f of g.changedFiles) {
     const counts = { added: f.added, deleted: f.deleted, ...sinceAcceptedFields(g, f) };
     out.added += counts.added;
     out.deleted += counts.deleted;
+    if (f.state === "pending") out.pending += 1;
+    else if (f.state === "changesRequested") out.changesRequested += 1;
+    else if (f.state === "accepted") out.acceptedUncommitted += 1;
   }
   return out;
 }

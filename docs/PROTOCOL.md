@@ -215,7 +215,7 @@ type ReviewState = {
     ignoredTouched: string[];                    // repo-relative paths the turn's edit tools wrote that are gitignored (invisible to the snapshot; §8)
     filteredByPattern: string[];                 // repo-relative changed paths hidden from changedFiles by settings.ignorePatterns (§8)
     restored: boolean;                           // true after open_project restored a persisted review; cleared by the next turn (§8)
-    reviewSummary: { files: number; added: number; deleted: number };   // totals over changedFiles (every state) for the composer label (§10)
+    reviewSummary: { files: number; added: number; deleted: number; pending?: number; changesRequested?: number; acceptedUncommitted?: number };   // totals over changedFiles (every state) for the composer label (§10); the split by state (§66)
     externalPendingCount: number;                // §31: pending files with origin "external" (reject_all leaves them out)
     headMoved: { from: HeadInfo; to: HeadInfo } | null;     // §31: HEAD / branch moved while the last turn ran
     concurrentClaude: ConcurrentClaude[];        // §31: other Claude processes in this worktree (open / last send)
@@ -825,7 +825,7 @@ docs/M16-FRICTION.md, engine part. Everything here is additive: new optional set
   soft warning stays at 100 %.
 - **`state.gate.reviewSummary`** = `{files: changedFiles.length, added: Σ added, deleted: Σ deleted}` over every changed file
   regardless of its state (`{0, 0, 0}` when nothing is under review); recomputed with every snapshot (accept keeps a file
-  counted, reject / commit drop it).
+  counted, reject / commit drop it). §66 adds the split `pending` / `changesRequested` / `acceptedUncommitted`.
 - **Capabilities cache.** Every `session_info` writes `<gitdir>/reviewgate/capabilities.json`
   (`{version: 1, capabilities: {slashCommands, skills, plugins, mcpServers}, savedAt}`, atomic, behind the persist chain).
   `open_project` / `init_repo` read it before the session starts: when present the first project `state` already carries it as
@@ -10983,7 +10983,7 @@ type AcceptedBase = {
 };
 // state.changedFiles[]: acceptedBase?: AcceptedBase   — present exactly with changedSinceAccepted (a pending /
 //                       changes-requested file); its added / deleted are then accepted → B
-// state.gate.reviewSummary: { files, added, deleted }   — added / deleted count such files since the accept
+// state.gate.reviewSummary: { files, added, deleted, pending?, changesRequested?, acceptedUncommitted? }
 // select_file / full_file: since?: DiffSince | "round"    (absent: the file's default; "round" = "review")
 // file_diff / full_file_content: since always present for a file with an acceptedBase ("accepted" | "review" | …)
 // reject: { paths, force?, to?: "accepted" | "round" }     reject_hunks: expectedBaseTree may be acceptedBase.tree
@@ -11013,7 +11013,9 @@ type AcceptedBase = {
   content.
 - **Hunk reject** (§17) works on the since-accepted diff (`expectedBaseTree` = `acceptedBase.tree`); A's ids still work
   in the whole-round view.
-- Accepted files a later turn left alone stay `accepted` without an `acceptedBase` and commit as before.
+- **The split for the review list.** `reviewSummary.pending`, `changesRequested` and `acceptedUncommitted` (accepted and
+  still listed — not committed yet; files leave the list when committed), so the list can group "수락함 · 커밋 전 N".
+  Accepted files a later turn left alone stay `accepted` without an `acceptedBase` and commit as before.
 - **Unchanged.** Accept N & Send / Continue, `accept_all`, `commit`, `finish_review`, request changes and review first
   (§64: a file with an `acceptedBase` is pending, so it waits like any) behave as before; accepting such a file again
   takes the new content and drops the base. A file Claude created, the user accepted and a later turn deleted is

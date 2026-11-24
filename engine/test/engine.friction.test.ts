@@ -88,18 +88,18 @@ describe("gate.reviewSummary (M16 §5)", () => {
     const h = harness();
     await h.hello();
     const opened = await h.open(dir);
-    expect(opened.gate.reviewSummary).toEqual({ files: 0, added: 0, deleted: 0 });
+    expect(opened.gate.reviewSummary).toEqual({ files: 0, added: 0, deleted: 0, pending: 0, changesRequested: 0, acceptedUncommitted: 0 });
     await reviewedTurn(h, dir);
     let s = h.engine.state;
     expect(s.changedFiles.map((f) => [f.path, f.added, f.deleted])).toEqual([["README.md", 2, 1], ["new.txt", 1, 0]]);
-    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 3, deleted: 1 });
+    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 3, deleted: 1, pending: 2, changesRequested: 0, acceptedUncommitted: 0 });
     await h.engine.handle({ type: "accept", paths: ["new.txt"] });
     await h.settle();
     s = h.engine.state;
-    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 3, deleted: 1 }); // accepted files still count
+    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 3, deleted: 1, pending: 1, changesRequested: 0, acceptedUncommitted: 1 }); // accepted files still count
     await h.engine.handle({ type: "reject", paths: ["README.md"] });
     await h.waitFor((x) => x.gate.phase !== "reverting" && !x.changedFiles.some((f) => f.path === "README.md"), "reverted");
-    expect(h.engine.state.gate.reviewSummary).toEqual({ files: 1, added: 1, deleted: 0 });
+    expect(h.engine.state.gate.reviewSummary).toEqual({ files: 1, added: 1, deleted: 0, pending: 0, changesRequested: 0, acceptedUncommitted: 1 });
   });
 });
 

@@ -91,7 +91,7 @@ describe("§66 since accepted", () => {
     expect(f.acceptedBase).toMatchObject({ tree: b1, blob: sh(dir, "rev-parse", `${b1}:new.ts`).trim(), turn: 1, status: "M", roundAdded: 20, roundDeleted: 0 });
     expect(Date.parse(f.acceptedBase!.at!)).toBeGreaterThan(0);
     expect(fileOf(h, "Svc.java")?.acceptedBase).toBeUndefined();
-    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 2, deleted: 1 });
+    expect(s.gate.reviewSummary).toEqual({ files: 2, added: 2, deleted: 1, pending: 2, changesRequested: 0, acceptedUncommitted: 0 });
 
     // No `since`: the since-accepted diff, and the reply says so.
     const byDefault = await h.engine.request({ type: "select_file", path: "new.ts" });
@@ -110,7 +110,7 @@ describe("§66 since accepted", () => {
     await h.engine.request({ type: "accept", paths: ["new.ts"] });
     expect(fileOf(h, "new.ts")).toMatchObject({ state: "accepted", added: 20, deleted: 0 });
     expect(fileOf(h, "new.ts")?.acceptedBase).toBeUndefined();
-    expect(h.engine.state.gate.reviewSummary).toEqual({ files: 2, added: 21, deleted: 0 });
+    expect(h.engine.state.gate.reviewSummary).toMatchObject({ pending: 1, acceptedUncommitted: 1 });
     expect((await h.engine.request({ type: "select_file", path: "new.ts" })).since).toBeUndefined();
   });
 
@@ -245,9 +245,11 @@ describe("§66 since accepted", () => {
     await acceptThenChange(h, dir, () => write(dir, "Svc.java", text([...lines(5), "l6", "l7"])), ["Svc.java"]);
     expect(fileOf(h, "new.ts")).toMatchObject({ state: "accepted", added: 20 });
     expect(fileOf(h, "new.ts")?.acceptedBase).toBeUndefined();
+    expect(h.engine.state.gate.reviewSummary).toMatchObject({ pending: 1, acceptedUncommitted: 1 });
     await h.engine.request({ type: "commit", message: "Add new.ts", push: false });
     expect(sh(dir, "show", "--name-status", "--format=", "HEAD").trim()).toBe("A\tnew.ts");
     expect(fileOf(h, "new.ts")).toBeUndefined();
+    expect(h.engine.state.gate.reviewSummary).toMatchObject({ files: 1, pending: 1, acceptedUncommitted: 0 });
 
     // Request changes on a file with a base keeps it; the follow-up's change is still measured from the accept.
     const dir2 = makeRepo();
