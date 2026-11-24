@@ -305,6 +305,7 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     worktreeRoot: expandTilde(s.worktreeRoot.trim().length > 0 ? s.worktreeRoot.trim() : DEFAULT_WORKTREE_ROOT),
     commitPushByDefault: s.commitPushByDefault === true,
     commitTrailer: s.commitTrailer.trim(),
+    autoFetch: s.autoFetch !== false, // MARK: git-sync (§68.4)
     autoRestartSession: s.autoRestartSession !== false,
     permissionMode: isPermissionMode(s.permissionMode) ? s.permissionMode : "default",
     disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((p) => typeof p === "string" && p.trim().length > 0) : [],

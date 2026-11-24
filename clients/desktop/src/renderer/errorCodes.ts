@@ -14,6 +14,7 @@ import { gitNoticeText } from "./gitNotices"; // MARK: r1-git
 import { reviewFlowNoticeText } from "./rejectSchedule"; // MARK: r2-review-flow (M32)
 import { terminalStartRefusal } from "./terminalStrip"; // MARK: terminal-win (§57.17)
 import { folderTooLargeText, notGitRepoReason, trackFailedText } from "./noGit"; // §59
+import { gitSyncRefusalText } from "./gitSync"; // MARK: git-sync (§68)
 
 /** `error` event codes (§19.6 "Claude CLI / API failures" + "Other engine error codes"). */
 export const ERROR_EVENT_CODES = [
@@ -129,6 +130,16 @@ export const REFUSAL_CODES = [
   // MARK: a-gitflow — §61 pr_create
   "pr_no_commits",
   "pr_same_branch",
+  // MARK: git-sync — §68 git_fetch / git_pull (gitSync.ts has their words)
+  "fetch_failed",
+  "pull_blocked",
+  "pull_no_upstream",
+  "pull_in_progress",
+  "pull_diverged",
+  "pull_would_overwrite",
+  "pull_rebase_blocked",
+  "pull_rebase_failed",
+  "pull_failed",
   "push_failed",
   "request_changes_unavailable",
   "refresh_failed",
@@ -534,6 +545,8 @@ export function switchBlockedText(kind: string): string {
 /** A refusal (`result{ok:false}`) in words, or null for a code this client does not know. */
 export function refusalCodeText(code: string, detail: string, paths?: string[]): string | null {
   const d = detail.trim();
+  const sync = gitSyncRefusalText(code, d); // MARK: git-sync (§68)
+  if (sync !== null) return sync;
   switch (code) {
     case "terminal_chat":
     case "terminal_unsupported":

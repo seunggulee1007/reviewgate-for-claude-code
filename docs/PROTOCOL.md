@@ -11257,3 +11257,29 @@ stashed; diverged → refused, rebase refused with a review / a dirty tree, a cl
 running, a merge in progress, no upstream, detached. `engine/test/engine.commitOthers.test.ts`: the list (rename,
 untracked, hidden), extras with accepted files, `invalid_extra`, the pending file untouched, committed extras never in the
 review again, extras-only with a pending review and with none.
+
+### 68.7 Clients: Fetch and Pull where the branch is shown
+
+- **The branch chip** (sidebar project header) carries `↑ahead ↓behind` of the current branch against its upstream
+  (nothing when level or without an upstream) and a small spinner while a fetch or pull runs; its tooltip adds "2
+  commit(s) to push · 3 commit(s) to pull — origin/main" and "Fetched 3 min ago".
+- **The branch menu**, after New Branch… / Refresh: **Fetch** (`git_fetch`; "Fetching…" while it runs), **Fetch All
+  Remotes** (only with more than one remote), **Pull** — "Pull 3 commit(s)" when behind — (`git_pull`, fast-forward only),
+  and, only when the branch has diverged, **Rebase onto origin/main** (`git_pull {rebase: true}`). Every item is disabled
+  with its reason as its tooltip: `fetchBlocker` / `pullBlocker` (a turn running, a fetch or pull running, detached, no
+  upstream — "push it first (git push -u)", a merge / rebase / cherry-pick / revert in progress), Pull on a diverged
+  branch with `pull_diverged`'s words, Rebase with "Finish the review before rebasing" (any review file) or "Commit your
+  changes before rebasing" (`switchBlocker` dirtyWorktree). The menu's footer is the last fetch ("Fetched 3 min ago") or
+  its failure ("Fetch failed: <git's line>").
+- **The outcome** of a Fetch / Pull the user asked for is one line under the branch line until dismissed (✕) or the
+  next one: green "Pulled 2 commit(s) from origin/main · 5 file(s) changed", "Already up to date with origin/main",
+  "Fetched origin — 3 incoming commit(s) to pull", or the refusal in words (orange) — `pull_would_overwrite` names the
+  files (all of them in the tooltip) and says nothing was changed. A project switch clears it.
+- **The automatic fetch** (§68.4): on project open and when the window comes back to the front, `git_fetch {auto:
+  true}` — quiet whatever happens. Settings › Git › "Fetch and Pull" › "Fetch automatically" (default on; Mac
+  `AppSettings.autoFetch`, Windows `settings.autoFetch`), also sent to the engine as `settings.autoFetch`.
+- Mac: Core `GitSync.swift` (`GitSyncText`, `GitSyncRules`, `AppState.fetch / pull / autoFetch`, `gitSyncNotice`),
+  `GitSyncProtocol.swift` (wire), App `MainWindow.swift` (`syncMenuItems`, `gitSyncNoticeRow`), `SettingsPanes.swift`;
+  refusal words through `EngineMessages.refusal`. Windows: `gitSync.ts` (words and rules), `storeGitSync.ts` (the slice),
+  `BranchSwitcher.tsx` (`syncItems`), `Sidebar.tsx` (`GitSyncNoticeRow`, the automatic fetch), `GeneralTab.tsx`; refusal
+  words through `errorCodes.ts` `refusalCodeText`. Tests: Core `GitSyncTests`, Windows `gitSync.test.ts`.

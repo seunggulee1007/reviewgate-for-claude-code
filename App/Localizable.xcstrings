@@ -2209,6 +2209,22 @@
         }
       }
     },
+    "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열 때와 창이 앞으로 올 때 조용히 git fetch해서(최대 5분에 한 번) 브랜치가 얼마나 뒤처졌는지 보여줘요. pull은 하지 않고, 파일을 건드리지 않고, 비밀번호도 묻지 않아요. Fetch와 Pull은 브랜치 메뉴에 있어요."
+          }
+        }
+      }
+    },
     "A review note on this line — sent to Claude with Request changes (⌘⇧C)": {
       "localizations": {
         "en": {
@@ -5441,6 +5457,102 @@
         }
       }
     },
+    "Fetch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch"
+          }
+        }
+      }
+    },
+    "Fetch All Remotes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch All Remotes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 원격 저장소 fetch"
+          }
+        }
+      }
+    },
+    "Fetch and Pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch and Pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch와 Pull"
+          }
+        }
+      }
+    },
+    "Fetch automatically": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch automatically"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동으로 fetch"
+          }
+        }
+      }
+    },
+    "Fetches, then fast-forwards this branch to %@ — never a merge, and uncommitted changes are never overwritten": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetches, then fast-forwards this branch to %@ — never a merge, and uncommitted changes are never overwritten"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch한 뒤 이 브랜치를 %@까지 fast-forward해요 — merge는 하지 않고, 커밋하지 않은 변경은 절대 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
+    "Fetching…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetching…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch하는 중…"
+          }
+        }
+      }
+    },
     "Find References (⇧F12) on a name lists every line that uses it here — F4 / ⇧F4 step through them, ↩ opens one.": {
       "localizations": {
         "en": {
@@ -5501,6 +5613,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락한 파일 접기"
+          }
+        }
+      }
+    },
+    "git fetch --prune: updates the remote branches and the ↑↓ counts; your files are not touched": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git fetch --prune: updates the remote branches and the ↑↓ counts; your files are not touched"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git fetch --prune: 원격 브랜치와 ↑↓ 개수를 새로 받아요. 내 파일은 건드리지 않아요"
           }
         }
       }
@@ -5969,6 +6097,54 @@
         }
       }
     },
+    "Pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull"
+          }
+        }
+      }
+    },
+    "Pull %lld commit(s)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull %lld commit(s)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 %lld개 pull"
+          }
+        }
+      }
+    },
+    "Pulling…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulling…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull하는 중…"
+          }
+        }
+      }
+    },
     "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)": {
       "localizations": {
         "en": {
@@ -6017,6 +6193,22 @@
         }
       }
     },
+    "Rebase onto %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebase onto %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 위로 rebase"
+          }
+        }
+      }
+    },
     "Rebuild Symbol Index": {
       "localizations": {
         "en": {
@@ -6045,6 +6237,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조 — 이름이 쓰인 곳 (이름에서 ⇧F12); F4 / ⇧F4 로 하나씩 열어요"
+          }
+        }
+      }
+    },
+    "Replays this branch's %lld commit(s) on top of %@; a conflict undoes the rebase and nothing changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replays this branch's %lld commit(s) on top of %@; a conflict undoes the rebase and nothing changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치의 커밋 %1$lld개를 %2$@ 위에 다시 쌓아요. 충돌이 나면 rebase를 되돌려서 아무것도 바뀌지 않아요"
           }
         }
       }

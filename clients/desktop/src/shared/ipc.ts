@@ -100,6 +100,8 @@ export type AppSettings = {
   commitPushByDefault: boolean;
   /** M12: trailer line appended to every commit message ("" → none). */
   commitTrailer: string;
+  /** MARK: git-sync — §68.4: the quiet fetch on project open / window focus (absent: on). */
+  autoFetch?: boolean;
   /** Restart the Claude session once (2 s backoff, at most once per turn) when it dies unexpectedly (default true; §8). */
   autoRestartSession: boolean;
   /** M20: permission mode a NEW session starts in (docs/M20-MODES.md); the live session is switched with `set_permission_mode`. */

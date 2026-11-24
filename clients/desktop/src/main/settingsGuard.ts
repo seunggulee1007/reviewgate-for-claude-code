@@ -99,6 +99,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   navCtrlClick: oneOf("peek", "jump"), // §65.8
   commitPushByDefault: bool,
   commitTrailer: text(1000, { singleLine: true }),
+  autoFetch: bool, // MARK: git-sync (§68.4)
   autoRestartSession: bool,
   permissionMode: (v) => isPermissionMode(v),
   disabledPlugins: pluginIds,

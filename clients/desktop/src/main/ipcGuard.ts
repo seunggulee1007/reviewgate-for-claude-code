@@ -80,6 +80,9 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "commit_hunks",
   "commit_split_draft",
   "commit_series",
+  // MARK: git-sync — §68 fetch (its own lane) and a safe pull of the current branch
+  "git_fetch",
+  "git_pull",
   "workbench_preview",
   "prereview_start",
   "prereview_cancel",

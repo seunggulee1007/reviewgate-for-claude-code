@@ -97,6 +97,7 @@ import { createSafetySlice, type SafetySlice } from "./storeSafety";
 import { TurnStopTracker } from "./workSafety";
 import { createLongWorkSlice, type LongWorkSlice } from "./storeLongWork"; // MARK: wave4 w4-longwork
 import { createAutoModeSlice, type AutoModeSlice } from "./storeAutoMode"; // MARK: wave4b w4b-auto
+import { createGitSyncSlice, type GitSyncSlice } from "./storeGitSync"; // MARK: git-sync (§68)
 import { hookDeniedOf, longWorkRowFacts, RESUME_DELAY_MS } from "./longWork"; // MARK: wave4 w4-longwork
 import { stopReasonWords } from "./stopWords"; // MARK: wave4b w4b-check4 (§40.1)
 import { compactedField, type CompactedRowFacts } from "./commitFormat"; // MARK: wave4c w4c-commit (§41.1)
@@ -422,7 +423,7 @@ export const EMPTY_STATE = {
   sessions: EMPTY_SESSIONS,
 } as ReviewState;
 
-export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & BackgroundSlice & SessionToolsSlice & SafetySlice & LongWorkSlice & AutoModeSlice & PolishWindowSlice & PolishTranscriptSlice & PolishDiffSlice & PolishPrSlice & {
+export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & BackgroundSlice & SessionToolsSlice & SafetySlice & LongWorkSlice & AutoModeSlice & GitSyncSlice & PolishWindowSlice & PolishTranscriptSlice & PolishDiffSlice & PolishPrSlice & {
   state: ReviewState;
   transcript: ChatItem[];
   logs: string[];
@@ -1107,7 +1108,7 @@ export const useStore = create<Store>((set, get, api) => {
     if (snapshot.project?.root && snapshot.project.root !== previous.project?.root) {
       // M15: per-project UI preferences (pane widths, sidebar tab, last selected file).
       const ui = get().settings?.ui?.[projectRootHash(snapshot.project.root)] ?? {};
-      set({ ui, tab: ui.tab ?? "changes", wantedPath: ui.selectedPath ?? null });
+      set({ ui, tab: ui.tab ?? "changes", wantedPath: ui.selectedPath ?? null, gitSyncNotice: null }); // git-sync (§68): another project's outcome is not this one's
       if (ui.tab === "history") void get().loadReviewHistory();
     }
     const sel = get().selectedPath;
@@ -1215,6 +1216,7 @@ export const useStore = create<Store>((set, get, api) => {
     ...createSafetySlice(set, get, api), // MARK: wave4 w4-safety
     ...createLongWorkSlice(set, get, api), // MARK: wave4 w4-longwork
     ...createAutoModeSlice(set, get, api), // MARK: wave4b w4b-auto
+    ...createGitSyncSlice(set, get, api), // MARK: git-sync (§68)
     // MARK: polish p-foundation — the polish lanes' slices
     ...createPolishWindowSlice(set, get, api),
     ...createPolishTranscriptSlice(set, get, api),

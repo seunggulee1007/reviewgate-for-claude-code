@@ -42,6 +42,8 @@ public enum AppSettings {
         public static let commitPushByDefault = "commitPushByDefault"
         /// M12: trailer line appended to every commit message (e.g. `Co-Authored-By: …`); empty → none.
         public static let commitTrailer = "commitTrailer"
+        /// MARK: git-sync — §68.4: the quiet fetch on project open / window focus (Bool, default true).
+        public static let autoFetch = "autoFetch"
         /// M13 (audit 1.4): restart the Claude session once when it dies unexpectedly (Bool, default true).
         public static let autoRestartSession = "autoRestartSession"
         /// M15: JSON `[root: ProjectUIState]` — split position, sidebar tab and selected file per project.
@@ -275,6 +277,7 @@ public enum AppSettings {
         settings.applyUserAllowRules = applyUserAllowRules(defaults: defaults)
         settings.applyUserBashRules = applyUserBashRules(defaults: defaults)   // MARK: r2-skills-side (§33.5, M20)
         settings.persistSessionAllows = persistSessionAllows(defaults: defaults)
+        settings.autoFetch = autoFetch(defaults: defaults)   // MARK: git-sync (§68.4, GitSync.swift)
         settings.chatMoveFollowUp = ChatMoveText.followUpTemplate   // M05b (§39.4): the engine's own moves speak the app's language
         // MARK: wave3 check-clients — §34.9 the user's test commands (TestCommandSettings.swift)
         settings.testCommandPatterns = testCommandPatterns(defaults: defaults)

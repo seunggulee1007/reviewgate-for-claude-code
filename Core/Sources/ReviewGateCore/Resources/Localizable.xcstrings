@@ -145,6 +145,22 @@
         }
       }
     },
+    "%@ has no upstream — push it first (git push -u) to pull into it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ has no upstream — push it first (git push -u) to pull into it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 브랜치에는 upstream이 없어요 — 먼저 푸시해서(git push -u) upstream을 만든 뒤 pull하세요"
+          }
+        }
+      }
+    },
     "%@ is in two commits — a part can only be in one": {
       "localizations": {
         "en": {
@@ -509,6 +525,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "커맨드 %lld개"
+          }
+        }
+      }
+    },
+    "%lld commit(s) to pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld commit(s) to pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull할 커밋 %lld개"
+          }
+        }
+      }
+    },
+    "%lld commit(s) to push": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld commit(s) to push"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "푸시할 커밋 %lld개"
           }
         }
       }
@@ -1137,6 +1185,22 @@
         }
       }
     },
+    "A %@ is in progress — finish or abort it in a terminal, then pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A %@ is in progress — finish or abort it in a terminal, then pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 작업이 진행 중이에요 — 터미널에서 끝내거나 중단한 뒤 pull하세요"
+          }
+        }
+      }
+    },
     "A background agent failed — Claude went on": {
       "localizations": {
         "en": {
@@ -1293,6 +1357,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "삭제된 파일은 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "A fetch or pull is already running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A fetch or pull is already running"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch나 pull이 이미 진행 중이에요"
           }
         }
       }
@@ -1837,6 +1917,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "허용함 · %@"
+          }
+        }
+      }
+    },
+    "Already up to date with %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already up to date with %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 %@의 최신 상태예요"
           }
         }
       }
@@ -3601,6 +3697,22 @@
         }
       }
     },
+    "Claude is working — pull when the turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — pull when the turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 턴이 끝나면 pull하세요"
+          }
+        }
+      }
+    },
     "Claude is working — switch branches when the turn ends": {
       "localizations": {
         "en": {
@@ -5303,6 +5415,22 @@
         }
       }
     },
+    "Commit your changes before rebasing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit your changes before rebasing"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rebase하기 전에 변경을 커밋하세요"
+          }
+        }
+      }
+    },
     "Committed %@": {
       "localizations": {
         "en": {
@@ -6759,6 +6887,134 @@
         }
       }
     },
+    "Fetch failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch failed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch하지 못했어요"
+          }
+        }
+      }
+    },
+    "Fetch failed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch failed: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch하지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Fetched %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ fetch 완료"
+          }
+        }
+      }
+    },
+    "Fetched %@ — %lld incoming commit(s) to pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %@ — %lld incoming commit(s) to pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ fetch 완료 — pull할 커밋 %2$lld개"
+          }
+        }
+      }
+    },
+    "Fetched %@ — up to date": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %@ — up to date"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ fetch 완료 — 최신 상태예요"
+          }
+        }
+      }
+    },
+    "Fetched %lld h ago": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %lld h ago"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld시간 전에 fetch함"
+          }
+        }
+      }
+    },
+    "Fetched %lld min ago": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %lld min ago"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld분 전에 fetch함"
+          }
+        }
+      }
+    },
+    "Fetched just now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched just now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "방금 fetch함"
+          }
+        }
+      }
+    },
     "File mode changed %@→%@": {
       "localizations": {
         "en": {
@@ -6851,6 +7107,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "파일 찾기: %1$@ · 범위 %2$@"
+          }
+        }
+      }
+    },
+    "Finish the review before rebasing — a rebase rewrites the files under review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish the review before rebasing — a rebase rewrites the files under review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rebase하기 전에 리뷰를 마치세요 — rebase는 리뷰 중인 파일을 다시 써요"
           }
         }
       }
@@ -7239,6 +7511,86 @@
         }
       }
     },
+    "Pull failed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull failed: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull하지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Pull is not possible right now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull is not possible right now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금은 pull할 수 없어요"
+          }
+        }
+      }
+    },
+    "Pull would overwrite your uncommitted changes: %@ — commit them (or finish their review) first. Nothing was changed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull would overwrite your uncommitted changes: %@ — commit them (or finish their review) first. Nothing was changed."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull하면 커밋하지 않은 변경이 덮어써져요: %@ — 먼저 커밋하거나 리뷰를 마치세요. 아무것도 바뀌지 않았어요."
+          }
+        }
+      }
+    },
+    "Pulled %lld commit(s) from %@ · %lld file(s) changed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulled %lld commit(s) from %@ · %lld file(s) changed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@에서 커밋 %1$lld개를 pull했어요 · 파일 %3$lld개 바뀜"
+          }
+        }
+      }
+    },
+    "Rebased onto %@: %lld incoming commit(s) · %lld file(s) changed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebased onto %@: %lld incoming commit(s) · %lld file(s) changed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 위로 rebase했어요 · 받은 커밋 %2$lld개 · 파일 %3$lld개 바뀜"
+          }
+        }
+      }
+    },
     "Rename this chat": {
       "localizations": {
         "en": {
@@ -7571,6 +7923,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트가 색인보다 커요 — 빠진 심볼이 있어요"
+          }
+        }
+      }
+    },
+    "The rebase stopped and was undone — nothing changed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The rebase stopped and was undone — nothing changed: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rebase가 멈춰서 되돌렸어요 — 바뀐 것은 없어요: %@"
+          }
+        }
+      }
+    },
+    "This branch and its upstream have diverged (%lld local, %lld incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch and its upstream have diverged (%lld local, %lld incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치와 upstream이 갈라졌어요(내 커밋 %1$lld개, 받을 커밋 %2$lld개) — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하세요."
+          }
+        }
+      }
+    },
+    "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치와 upstream이 갈라졌어요 — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하세요."
+          }
+        }
+      }
+    },
+    "This branch has no upstream — push it first (git push -u) to pull into it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch has no upstream — push it first (git push -u) to pull into it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치에는 upstream이 없어요 — 먼저 푸시해서(git push -u) upstream을 만든 뒤 pull하세요"
           }
         }
       }

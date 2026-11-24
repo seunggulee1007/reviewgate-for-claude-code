@@ -146,6 +146,8 @@ public final class AppState {
     /// Subagents still pending / running / paused.
     public private(set) var liveAgentCount = 0
     public private(set) var branchesInfo: BranchesInfo = ReviewState.empty.branches
+    /// MARK: git-sync — §68: what the last Fetch / Pull the user asked for came to (the line under the branch chip).
+    public internal(set) var gitSyncNotice: GitSyncNotice?
     /// `state.workbenches`; `.empty` on engines without M10.
     public private(set) var workbenches: WorkbenchesInfo = .empty
     public private(set) var engineLockConflict: LockConflict?
@@ -501,7 +503,7 @@ public final class AppState {
     var replySink: ((EngineCommand) async throws -> EngineEvent)?
     /// The project whose `open_project` was refused with `locked_by_other_session` (M10); drives the takeover alert.
     private var lockedProjectURL: URL?
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     let client: EngineClient
     private var eventTask: Task<Void, Never>?
 
@@ -1372,6 +1374,14 @@ public final class AppState {
     public func updateCommitSettings(pushByDefault: Bool, trailer: String) {
         guard engineStarted else { return }
         fire(.setSettings(EngineSettings(commitPushByDefault: pushByDefault, commitTrailer: trailer)))
+    }
+
+    /// MARK: git-sync — `set_settings{autoFetch}` (§68.4) on a running engine (Settings › Git).
+    public func updateAutoFetch(_ on: Bool) {
+        guard engineStarted else { return }
+        var settings = EngineSettings()
+        settings.autoFetch = on
+        fire(.setSettings(settings))
     }
 
     /// `set_settings{autoRestartSession}` (M13) on a running engine.
@@ -2375,6 +2385,8 @@ public final class AppState {
         case .documentSymbols, .workspaceSymbols, .definitionPreview, .navIndex:   // MARK: ide-nav — §65 replies, consumed by the request that asked
             break
         case .taskFetched:   // MARK: task-start — §63 reply, consumed by the request that asked
+            break
+        case .fetched, .pulled:   // MARK: git-sync — §68 replies, consumed by the request that asked
             break
         }
     }

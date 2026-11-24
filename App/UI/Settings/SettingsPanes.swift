@@ -376,6 +376,7 @@ struct GitSettingsPane: View {
     @AppStorage(AppSettings.Key.runAsTaskEnabled) private var runAsTaskEnabled = true   // §49
     @AppStorage(AppSettings.Key.commitPushByDefault) private var commitPushByDefault = false
     @AppStorage(AppSettings.Key.commitTrailer) private var commitTrailer = ""
+    @AppStorage(AppSettings.Key.autoFetch) private var autoFetch = true   // MARK: git-sync (§68.4)
 
     var body: some View {
         Form {
@@ -396,6 +397,12 @@ struct GitSettingsPane: View {
                     .accessibilityIdentifier("Commit trailer")
                     .settingAnchor("commitTrailer")
             }
+            // MARK: git-sync — §68.4
+            Section("Fetch and Pull") {
+                Toggle(isOn: $autoFetch) { SettingLabel("autoFetch") }
+                    .accessibilityIdentifier("Fetch automatically")
+                    .settingAnchor("autoFetch")
+            }
             Section {
                 Text("The commit message template, workbench setup and PR command of the open repository are in Project.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -408,6 +415,9 @@ struct GitSettingsPane: View {
         }
         .onChange(of: commitPushByDefault) { _, _ in pushCommitSettings() }
         .onChange(of: commitTrailer) { _, _ in pushCommitSettings() }
+        .onChange(of: autoFetch) { _, on in
+            for store in WorkbenchRegistry.shared.allStores { store.updateAutoFetch(on) }
+        }
     }
 
     private func pushCommitSettings() {
