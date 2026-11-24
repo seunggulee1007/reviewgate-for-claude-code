@@ -435,6 +435,8 @@ export type ReviewFirstState = {
   waiting: number;
   /** Calls it denied in the current (or, between turns, the last) turn. */
   blocked: number;
+  /** The user lifted it for the running turn (`review_first_allow_turn`); absent otherwise. */
+  allowedThisTurn?: true;
 };
 
 // ---------------------------------------------------------------- §34 review round 2
@@ -654,6 +656,8 @@ export type EngineCommand =
   | Cmd<"accept", { paths: string[] }>
   | Cmd<"unaccept", { paths: string[] }> // accepted → pending again (nothing on disk changes)
   | Cmd<"accept_all">
+  /** §64: "Allow for this turn" — the review-first rule lets Claude's calls through until the running turn ends; refused `no_turn`. */
+  | Cmd<"review_first_allow_turn">
   /** `force: true` reverts even files the user edited after the review was collected (otherwise refused `file_changed_since_review`). */
   | Cmd<"reject", { paths: string[]; force?: boolean }>
   /** §31: without `includeExternal` only the pending files Claude changed (`origin` tool / bash) are reverted. */

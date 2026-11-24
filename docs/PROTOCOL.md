@@ -80,6 +80,7 @@ type EngineCommand =
   | Cmd<"set_permission_mode", { mode: "default" | "acceptEdits" | "plan" | "auto" }>  // live switch; refused session_busy / no_session (§11)
   | Cmd<"plan_response", { approve: boolean; mode?: "default" | "acceptEdits" | "plan" | "auto"; message?: string }>  // answers plan_proposed; refused no_plan / session_busy / no_session (§11)
   | Cmd<"accept", { paths: string[] }> | Cmd<"accept_all"> | Cmd<"unaccept", { paths: string[] }>   // unaccept: accepted → pending again, disk untouched; refused with session_running while a turn runs or collects
+  | Cmd<"review_first_allow_turn">                         // §64 "이번 턴만 허용": the review-first rule lets the running turn through; refused no_turn between turns
   | Cmd<"reject", { paths: string[]; force?: boolean }> | Cmd<"reject_all", { force?: boolean; includeExternal?: boolean }>  // reverts on disk, re-snapshots B after every file; refused file_changed_since_review unless force (§19.1); reject_all leaves origin "external" files alone unless includeExternal (§31)
   | Cmd<"reject_hunks", { path: string; hunks: number[]; expectedEndTree?: string; expectedBaseTree?: string }>   // revert only these hunk ids of a pending modified file (§17); expectedBaseTree §34.1
   | Cmd<"retry_collect">                                   // after gate.phase == "collect_failed"
@@ -10606,17 +10607,22 @@ settings keep working); its label is now "리뷰 중인 파일만 고치기 (기
   everything that could allow the call). Terminal chats: the hook server's PreToolUse (`terminalSession.ts`, after the
   guard's deny, before a turn is adopted for the call) and UserPromptSubmit (`adoptTerminalPrompt`, after the gate's checks).
   A background terminal chat (§57.10) denies every write anyway.
-- **What the user sees.** `state.gate.reviewFirst = {mode, waiting, blocked} | null` — null when nothing holds Claude back
-  (off, nothing waits, a change request runs); `blocked` counts the calls denied in the current (between turns: the last)
-  turn. The first deny of a turn is also a quiet row: `error {fatal:false, scope:"session", code:"review_first_blocked",
-  detail: "<waiting count>"}` — clients show "리뷰 대기 중이라 수정을 막았어요 · [리뷰 열기]" as a gray row (no banner, the
-  queue goes on), and a terminal chat's strip the same as a chip while `blocked > 0`. With `prompts`, a chat's composer
+- **Allow for this turn.** `review_first_allow_turn` (the row's / chip's [이번 턴만 허용], "Allow for this turn") lifts the rule
+  — both modes, every call — until the running turn ends (engine: the turn's number; the next turn is held again);
+  refused `no_turn` (code `no_turn`) when no turn runs. `gate.reviewFirst.allowedThisTurn: true` while it holds. Claude is
+  not told: the user's own next words say what it should do.
+- **What the user sees.** `state.gate.reviewFirst = {mode, waiting, blocked, allowedThisTurn?} | null` — null when nothing
+  holds Claude back (off, nothing waits, a change request runs); `blocked` counts the calls denied in the current (between
+  turns: the last) turn. The first deny of a turn is also a quiet row: `error {fatal:false, scope:"session", code:"review_first_blocked",
+  detail: "<waiting count>"}` — clients show "리뷰 대기 중이라 수정을 막았어요 · [리뷰 열기] [이번 턴만 허용]" as a gray row (no
+  banner, the queue goes on; the allow button is off with the reason when no turn runs or the turn is already allowed), and
+  a terminal chat's strip the same as a chip while `blocked > 0` and the turn is not allowed. With `prompts`, a chat's composer
   holds a message while `gate.reviewFirst.waiting > 0` with a banner "리뷰를 먼저 끝내세요 — 대기 N개" and
   [N개 수락 후 보내기] (`send {acceptPending: true}`; off with the reason while a file is changes-requested — use Request
   changes). Settings › Review: "Claude가 다음 작업 전에 리뷰를 기다려요" — 리뷰 중인 파일만 고치기 (기본) / 프롬프트까지 막기 / 끄기.
 - Owner: c-gate (engine `session/reviewFirst.ts`, `hooks.ts`, `terminalSession.ts`, `engine.ts`; Core `SettingsCatalog`,
   `AppSettings`; App Settings › Review; Windows `settings.ts`, `settingsIndex.ts`). Tests: `engine/test/reviewFirst.test.ts`
-  (the decision table, the classic hooks, both kinds of chat through the engine).
+  (the decision table, the classic hooks, both kinds of chat through the engine, Allow for this turn).
 
 ## 65. The symbol index: outline, symbols in the project, peek and better go to definition (ide-nav)
 

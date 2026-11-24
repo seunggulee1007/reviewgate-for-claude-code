@@ -599,6 +599,8 @@ export class ReviewEngine {
   private reviewFirstBlocked: { turn: number; count: number } | null = null;
   /** §64: the turn whose Request changes went to Claude at a terminal Stop (§57.14) — it may edit for the rest of it. */
   private reviewFirstRequestTurn: number | null = null;
+  /** §64: the turn the user allowed with "이번 턴만 허용" (`review_first_allow_turn`) — over when it ends. */
+  private reviewFirstAllowTurn: number | null = null;
   /** What the running turn handed to `sessionUser` (message + snapshot A), for the init-timeout resend (§16). */
   private turnSent: TurnMessage | null = null;
   /** The CLI produced something for the running turn (session_info, text, a tool call…): it did receive the message. */
@@ -1253,6 +1255,12 @@ export class ReviewEngine {
         return;
       case "accept_all":
         await this.acceptFiles(null);
+        return;
+      case "review_first_allow_turn": // §64 "이번 턴만 허용"
+        if (!this.gate.running) throw new CommandRefused("no_turn", { code: "no_turn" });
+        this.reviewFirstAllowTurn = this.turn;
+        this.log("info", `review first: the user allowed turn ${this.turn}`);
+        this.touch();
         return;
       case "unaccept":
         // M28 (§34.2): like `accept`, also while a turn runs on a standing review (the undo of an accept made then).
@@ -4763,11 +4771,16 @@ export class ReviewEngine {
     return reviewFirstWaiting(this.reviewFirstModeNow(), { files: this.gate.changedFiles, requestingChanges: requesting });
   }
 
+  /** §64: the user allowed the running turn ("이번 턴만 허용") — over once it ends (the next turn has another number). */
+  private reviewFirstAllowedNow(): boolean {
+    return this.reviewFirstAllowTurn === this.turn && this.gate.running;
+  }
+
   /** §64: what the PreToolUse hooks hold Claude back with now (null: nothing) — read at every call. */
   private reviewFirstHoldNow(): ReviewFirstHold | null {
     const mode = this.reviewFirstModeNow();
     const waiting = this.reviewFirstWaitingNow();
-    if (mode === "off" || !waiting) return null;
+    if (mode === "off" || !waiting || this.reviewFirstAllowedNow()) return null;
     return { mode, waiting, fixable: reviewFirstFixable(this.gate.changedFiles), root: this.gate.checkpoint?.root ?? null };
   }
 
@@ -4777,7 +4790,7 @@ export class ReviewEngine {
     const waiting = this.reviewFirstWaitingNow();
     if (mode === "off" || !waiting) return null;
     const b = this.reviewFirstBlocked;
-    return { mode, waiting: waiting.length, blocked: b && b.turn === this.turn ? b.count : 0 };
+    return { mode, waiting: waiting.length, blocked: b && b.turn === this.turn ? b.count : 0, ...(this.reviewFirstAllowedNow() ? { allowedThisTurn: true as const } : {}) };
   }
 
   /** §64: a call the rule denied — a quiet row once per turn ("리뷰 대기 중이라 수정을 막았어요"), the count in `gate.reviewFirst`. */
@@ -9893,6 +9906,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_end_turn":
     case "terminal_request_cancel": // §57.14
     case "terminal_permission_response": // §57.15
+    case "review_first_allow_turn": // §64
       return "session";
     case "side_ask":
     case "side_list":

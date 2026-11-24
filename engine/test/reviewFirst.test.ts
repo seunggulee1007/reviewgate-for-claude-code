@@ -348,6 +348,27 @@ describe("classic chat through the engine", () => {
     expect(h.session().sends[before]!.text).toBe("go on");
   });
 
+  it("Allow for this turn: lifts the rule until the running turn ends; refused no_turn between turns", async () => {
+    const { h, dir } = await opened();
+    await reviewedTurn(h, dir);
+    expect(await result(h, { type: "review_first_allow_turn" })).toMatchObject({ ok: false, error: "no_turn", code: "no_turn" });
+    await h.engine.handle({ type: "send", text: "also add a test file" });
+    h.session().emitSessionInfo();
+    expect(h.session().opts.reviewFirst!()).not.toBeNull();
+    expect(await result(h, { type: "review_first_allow_turn" })).toMatchObject({ ok: true });
+    expect(h.session().opts.reviewFirst!()).toBeNull();
+    await h.settle();
+    expect(h.engine.state.gate.reviewFirst).toEqual({ mode: "edits", waiting: 2, blocked: 0, allowedThisTurn: true });
+    h.session().emitTurnEnd({ toolFiles: [] });
+    await h.waitFor((s) => s.gate.phase === "reviewing" && s.gate.canSend, "turn over");
+    await h.settle();
+    expect(h.session().opts.reviewFirst!()?.waiting).toEqual(["README.md", "new.txt"]);
+    expect(h.engine.state.gate.reviewFirst).toEqual({ mode: "edits", waiting: 2, blocked: 0 });
+    // The next turn is held again.
+    await h.engine.handle({ type: "send", text: "and one more" });
+    expect(h.session().opts.reviewFirst!()).not.toBeNull();
+  });
+
   it("prompts: a new message is refused while files wait; Accept N & Send accepts first and goes", async () => {
     const { h, dir } = await opened({ reviewFirst: "prompts" });
     await reviewedTurn(h, dir);
@@ -423,6 +444,19 @@ describe("terminal chat through the hook server (§57.4)", () => {
     // Accepted while the question turn runs (§34.2): lifted at once.
     await r.h.engine.handle({ type: "accept_all" });
     expect(await hook(s, preWrite(r, "x.txt", "p2"))).toEqual({});
+  });
+
+  it("Allow for this turn lifts the rule for the running terminal turn only", async () => {
+    const { r, s } = await rig();
+    await firstTurn(r, s);
+    await hook(s, ups("p2", "add a test too"));
+    expect((await hook(s, preWrite(r, "x.txt", "p2"))).hookSpecificOutput).toMatchObject({ permissionDecision: "deny" });
+    await r.h.engine.handle({ type: "review_first_allow_turn" });
+    expect(await hook(s, preWrite(r, "x.txt", "p2"))).toEqual({});
+    expect(await hook(s, { hook_event_name: "Stop", stop_hook_active: false })).toEqual({});
+    await r.h.waitFor((x) => x.gate.phase === "reviewing" && x.gate.canSend, "turn over");
+    await hook(s, ups("p3", "and more"));
+    expect((await hook(s, preWrite(r, "y.txt", "p3"))).hookSpecificOutput).toMatchObject({ permissionDecision: "deny" });
   });
 
   it("prompts: a new prompt is blocked in the TUI; Accept N & Continue (accept_all, then the prompt) goes", async () => {
