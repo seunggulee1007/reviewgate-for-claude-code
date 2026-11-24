@@ -107,6 +107,13 @@ export type ContinuePrimary =
   | { kind: "continue" }
   | { kind: "requestChanges"; notes: number };
 
+/** §58.1: what "Continue" tells Claude — "Tells Claude: 1 accepted · 2 rejected" (null: nothing to say). */
+export function continueCaption(gate: Pick<ReviewState["gate"], "untoldDecisions">): string | null {
+  const u = gate.untoldDecisions;
+  if (!u || u.accepted + u.rejected <= 0) return null;
+  return t("Tells Claude: {0} accepted · {1} rejected", u.accepted, u.rejected);
+}
+
 /** The decision table: `decided` — a file of this review was accepted or rejected; `untold` — the next message tells Claude. */
 export function continuePrimaryOf(o: { pending: number; unsentNotes: number; decided: boolean; untold: boolean }): ContinuePrimary | null {
   if (o.unsentNotes > 0) return { kind: "requestChanges", notes: o.unsentNotes };

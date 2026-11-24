@@ -46,6 +46,14 @@ public enum ContinuePrimary: Equatable, Sendable {
     case requestChanges(notes: Int)
 }
 
+/// "수락 1개 · 거절 2개를 Claude에게 알려요" under "Continue": what the button tells Claude (nil: nothing to say).
+public enum ContinueCaption {
+    public static func text(_ untold: UntoldDecisions?) -> String? {
+        guard let u = untold, u.accepted + u.rejected > 0 else { return nil }
+        return String(localized: "Tells Claude: \(u.accepted) accepted · \(u.rejected) rejected", bundle: .module)
+    }
+}
+
 public enum ContinueRules {
     /// The decision table. `decided`: a file of this review was accepted or rejected (told to Claude or not); `untold`: the
     /// next message would carry decisions. nil: no button.

@@ -19858,6 +19858,16 @@
           }
         }
       }
+    },
+    "Tells Claude: %lld accepted · %lld rejected": {
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 알려요: 수락 %1$lld개 · 거절 %2$lld개"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

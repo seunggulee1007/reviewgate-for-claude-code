@@ -203,4 +203,11 @@ import Testing
         let null = try JSONDecoder().decode(GateInfo.self, from: Data(#"{"phase":"idle","untoldDecisions":null}"#.utf8))
         #expect(null.untoldDecisions == nil)
     }
+
+    @Test func continueSaysWhatItTellsAndTheAcceptedGroupNeverCountsBelowItsRows() {
+        #expect(ContinueCaption.text(nil) == nil)
+        #expect(ContinueCaption.text(UntoldDecisions(accepted: 0, rejected: 0)) == nil)
+        #expect(ContinueCaption.text(UntoldDecisions(accepted: 1, rejected: 2)) != nil)
+        #expect(AcceptedGroup.count(summary: ReviewSummary(files: 2, added: 0, deleted: 0, acceptedUncommitted: 0), shown: 2, filtered: false) == 2)
+    }
 }

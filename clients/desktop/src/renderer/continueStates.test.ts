@@ -132,3 +132,14 @@ describe("the review's Continue (§58.1)", () => {
     expect(order).toEqual(["paste:Continue.", "enter"]);
   });
 });
+
+describe("§58.1 Continue's caption and the accepted group's count", () => {
+  it("says what Continue tells Claude, and never counts fewer accepted files than the group lists", async () => {
+    const { continueCaption } = await import("./acceptAllContinue");
+    const { acceptedGroupCount } = await import("./sinceAccepted");
+    expect(continueCaption({ untoldDecisions: undefined } as never)).toBeNull();
+    expect(continueCaption({ untoldDecisions: { accepted: 0, rejected: 0 } } as never)).toBeNull();
+    expect(continueCaption({ untoldDecisions: { accepted: 1, rejected: 2 } } as never)).toMatch(/1.*2/);
+    expect(acceptedGroupCount({ reviewSummary: { acceptedUncommitted: 0 } } as never, 2)).toBe(2);
+  });
+});

@@ -9992,6 +9992,10 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
 
 ### 58.1 The Changes header's Continue follows the review; accepted files folded apart
 
+Under **Continue** one caption says what it tells Claude — "Claude에게 알려요: 수락 1개 · 거절 2개" from
+`gate.untoldDecisions` — and the folded "Accepted · not committed (N)" group never counts fewer files than it lists (an
+engine's `reviewSummary.acceptedUncommitted` lower than the rows is taken as the rows).
+
 The user still typed "I accepted, continue": the Changes list offered only 모두 수락 (accept and stop), and a file accepted
 but not committed stayed in the list among the pending ones. Then "Accept All & Continue" covered only "accept everything":
 a user who decided the files one by one (some accepted, some rejected) had nothing pending, the button was off, and they

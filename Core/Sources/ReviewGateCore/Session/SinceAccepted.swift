@@ -122,7 +122,7 @@ public extension AcceptedGroup {
     /// filter hiding some rows — the engine does not know it) the rows the group holds.
     static func count(summary: ReviewSummary?, shown: Int, filtered: Bool) -> Int {
         guard !filtered, let engine = summary?.acceptedUncommitted else { return shown }
-        return engine
+        return max(engine, shown)   // never fewer than the rows the group lists
     }
 }
 

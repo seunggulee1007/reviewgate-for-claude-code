@@ -24,7 +24,7 @@ import { acceptBlockedReason, changedSinceViewed, collectFailedReason, diffTreeO
 import { scheduledBadge, scheduledHelp } from "../rejectSchedule"; // MARK: r2-review-flow (M32)
 import { needsAcceptAllDialog, runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
 // MARK: accept-continue-ui — §58.1
-import { continueLeavingRestBlocker, continueLeavingRestHelp, continuePrimary, continuePrimaryBlocker, continuePrimaryHelp, continuePrimaryTitle, continueWithoutAccepting, liveContinueChat, runContinuePrimary } from "../acceptAllContinue";
+import { continueCaption, continueLeavingRestBlocker, continueLeavingRestHelp, continuePrimary, continuePrimaryBlocker, continuePrimaryHelp, continuePrimaryTitle, continueWithoutAccepting, liveContinueChat, runContinuePrimary } from "../acceptAllContinue";
 import { Menu } from "./Menu";
 import { subscribeTerminals, terminalsVersion } from "../terminal/termHost";
 import { useTerminalChats } from "../terminal/terminalChat";
@@ -174,6 +174,9 @@ export function ChangedFiles() {
             ]}
           />
         </div>
+      )}
+      {primary?.kind === "continue" && continueCaption(state.gate) && (
+        <div className="caption muted" style={{ padding: "0 12px 6px" }} data-testid="Continue tells Claude">{continueCaption(state.gate)}</div>
       )}
       <ViewingReviewNote /* MARK: wave4b w4b-tabs — §39.2 "실행 중인 채팅('…')의 리뷰예요" while another chat is shown */ />
       {/* wave2 desktop-flow — a blocked action stays visible, disabled, with its reason in one line (once on screen: the

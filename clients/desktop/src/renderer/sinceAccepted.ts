@@ -62,4 +62,4 @@ export const roundRejectMessage = (f: Pick<ChangedFileState, "status">): string 
     : t("The content you accepted goes too. The file on disk goes back to how it was before this round and leaves the review list.");
 
 /** "수락함 · 커밋 전 N": the engine's count (`reviewSummary.acceptedUncommitted`, §66), else (an older engine) the client's own. */
-export const acceptedGroupCount = (gate: Partial<Pick<GateState, "reviewSummary">>, own: number): number => gate.reviewSummary?.acceptedUncommitted ?? own;
+export const acceptedGroupCount = (gate: Partial<Pick<GateState, "reviewSummary">>, own: number): number => Math.max(gate.reviewSummary?.acceptedUncommitted ?? 0, own); // never fewer than the rows the group lists

@@ -208,6 +208,13 @@ struct ChangedFilesList: View {
                     .accessibilityIdentifier("Commit accepted")
                 moreMenu(pending: pending)
             }
+            // continue-states (§58.1): what "Continue" tells Claude, so the button is never a guess.
+            if store.continuePrimary == .continueOnly, let line = ContinueCaption.text(store.gate.untoldDecisions) {
+                Text(verbatim: line)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("Continue tells Claude")
+            }
             if pending > 0, store.isRunning, !store.isShowingStaleDiff, let reason = store.rejectLockReason {
                 // A blocked action is never only greyed out: one line says why — here unless the diff's banner says it.
                 Text(verbatim: reason)
