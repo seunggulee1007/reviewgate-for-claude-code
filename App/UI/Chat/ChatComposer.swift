@@ -1436,6 +1436,8 @@ struct ChatComposer: View {
 /// ("리뷰 대기 N개 · 질문은 수락 없이 가능") with the explanation in its ⓘ popover — it took five lines of a narrow chat.
 private struct PendingReviewNotice: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
     let count: Int
     /// §64 (`reviewFirst: edits`): the answer may not change files until the user decided.
     var editsBlocked = false
@@ -1451,6 +1453,18 @@ private struct PendingReviewNotice: View {
                 // polish P4-composer-37: the review's keys (Electron's words)
                 .help("Next pending file ⌘] · previous ⌘[ · Accept ⌘⇧A · Reject ⌘⇧R · Request changes ⌘⇧C")
             Spacer(minLength: 0)
+            // MARK: accept-continue-ui (§58.1): the Changes header's one click, here too — no "accepted, go on" to type.
+            if !store.pendingFiles.isEmpty {
+                let blocker = store.acceptAllContinueBlocker
+                Button(AcceptAllContinueText.title) { AcceptAllAction.runContinuing(store: store, model: model) }
+                    .buttonStyle(.link)
+                    .font(.callout.weight(.medium))
+                    .fixedSize()
+                    .disabled(blocker != nil)
+                    .help(blocker ?? AcceptAllAction.continueHelp(store: store))
+                    .accessibilityLabel(Text(verbatim: AcceptAllContinueText.title))
+                    .accessibilityIdentifier("Pending banner accept all and continue")
+            }
             Button {
                 showsWhy.toggle()
             } label: {

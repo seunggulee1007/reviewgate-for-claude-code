@@ -1617,6 +1617,22 @@
         }
       }
     },
+    "Accept All & Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept All & Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모두 수락하고 계속"
+          }
+        }
+      }
+    },
     "Accepted %lld files": {
       "localizations": {
         "en": {
@@ -7299,6 +7315,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트가 색인보다 커요 — 빠진 심볼이 있어요"
+          }
+        }
+      }
+    },
+    "This review belongs to the running chat — show it to continue Claude there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This review belongs to the running chat — show it to continue Claude there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 채팅의 리뷰예요 — 그 채팅을 열면 이어서 계속할 수 있어요"
           }
         }
       }

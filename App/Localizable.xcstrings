@@ -5537,6 +5537,22 @@
         }
       }
     },
+    "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "더 보기: 모두 수락, 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
+          }
+        }
+      }
+    },
     "Next Reference": {
       "localizations": {
         "en": {

@@ -201,25 +201,25 @@ struct ChangedFilesList: View {
         return Binding(get: { shown }, set: { store.selectedPath = $0 })
     }
 
-    /// Two rows above the list: what has been looked at, then the two actions used most — Accept all and Commit — and a
-    /// "⋯" with the rest (Reject all, AI pre-review, Finish review, the order and the grouping). Every item keeps its
-    /// reason for being disabled as a tooltip.
+    /// Two rows above the list: what has been looked at, then the two actions used most — Accept All & Continue and Commit —
+    /// and a "⋯" with the rest (Accept all, Reject all, AI pre-review, Finish review, the order and the grouping). Every
+    /// item keeps its reason for being disabled as a tooltip.
     private var header: some View {
         let pending = store.pendingFiles.count
         let accepted = store.acceptedPaths.count
+        let continueBlocker = store.acceptAllContinueBlocker
         return VStack(alignment: .leading, spacing: 6) {
             reviewProgress(pending: pending)
             HStack(spacing: 6) {
-                // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
-                // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
-                Button("Accept all") { AcceptAllAction.run(store: store, model: model) }
+                // MARK: accept-continue-ui (§58.1): accept every pending file and let Claude go on — nothing to type. The
+                // summary sheet first when a file still needs a look (`runContinuing`); a terminal chat pastes "Continue.".
+                Button(AcceptAllContinueText.title) { AcceptAllAction.runContinuing(store: store, model: model) }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(pending == 0 || store.isAcceptLocked)
-                    .help(pending == 0 ? String(localized: "No pending files") : (store.acceptLockReason ?? String.withKey(
-                        store.acceptAllNeedsSheet ? String(localized: "Review a summary, then accept every pending file")
-                            : String(localized: "Accept every pending file — the notice that follows can undo it"), action: "Accept All…")))
-                    .accessibilityLabel("Accept all")
-                    .accessibilityIdentifier("Accept all")
+                    .disabled(continueBlocker != nil)
+                    .help(continueBlocker ?? AcceptAllAction.continueHelp(store: store))
+                    .accessibilityLabel(Text(verbatim: AcceptAllContinueText.title))
+                    .accessibilityIdentifier("Accept all and continue")
                 Spacer(minLength: 4)
                 // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
                 // r2-review-flow M28: the sheet takes pending files too ("리뷰 끝냄으로 표시하고 커밋").
@@ -249,9 +249,20 @@ struct ChangedFilesList: View {
         .padding(.horizontal, 12).padding(.vertical, 6)
     }
 
-    /// "⋯": what the header does not show all the time. The rejects, the finish and the pre-review keep their tooltips.
+    /// "⋯": what the header does not show all the time. The accept, the rejects, the finish and the pre-review keep their
+    /// tooltips.
     private func moreMenu(pending: Int) -> some View {
         Menu {
+            // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
+            // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
+            // accept-continue-ui (§58.1): here since "Accept All & Continue" took its place — it accepts and stops.
+            Button("Accept all", systemImage: "checkmark") { AcceptAllAction.run(store: store, model: model) }
+                .disabled(pending == 0 || store.isAcceptLocked)
+                .help(pending == 0 ? String(localized: "No pending files") : (store.acceptLockReason ?? String.withKey(
+                    store.acceptAllNeedsSheet ? String(localized: "Review a summary, then accept every pending file")
+                        : String(localized: "Accept every pending file — the notice that follows can undo it"), action: "Accept All…")))
+                .accessibilityLabel("Accept all")
+                .accessibilityIdentifier("Accept all")
             // §31 (M3): reverts Claude's pending changes; the confirmation names what stays.
             Button("Reject all", systemImage: "arrow.uturn.backward") { model.showRejectAll = true }
                 .disabled(pending == 0 || store.isRejectLocked)
@@ -296,7 +307,7 @@ struct ChangedFilesList: View {
         .menuIndicator(.hidden)
         .controlSize(.small)
         .fixedSize()
-        .help("More: Reject all, AI pre-review, Finish review, order and grouping of the list")
+        .help("More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list")
         .accessibilityLabel("More review actions")
         .accessibilityIdentifier("Changes header more")
     }
