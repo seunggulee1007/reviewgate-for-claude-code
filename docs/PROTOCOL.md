@@ -9996,6 +9996,13 @@ but not committed stayed in the list among the pending ones. Clients only (no en
   registers none (one key, one owner).
 - **The composer's pending banner** ("리뷰 대기 N개 · 질문은 수락 없이 가능") carries the same action as a small link
   button, with the same reason when off. Not on §64's "리뷰를 먼저 끝내세요" banner (its button sends the held message).
+- **Accepted files folded apart.** In the review list a file whose state is `accepted` (not committed yet) leaves its group
+  and goes into one folded group at the bottom: "Accepted · not committed (N)" (수락함 · 커밋 전 N), closed until clicked
+  (the whole header toggles; AX "Accepted group"). Its rows are the usual ones (Undo Accept in their menu). The progress
+  ("3/7 viewed · 2 pending") counts the open files only; a group left with nothing open is not listed. A file that is
+  pending again — an undo, or changed after the accept — is back in the open part by its state alone. The commit sheet
+  lists accepted files as before. The author filter (§39.3) applies to the folded rows too. Core `AcceptedGroup.split`,
+  `openChangedFiles`, `viewedOpenCount`.
 
 ## 59. Folders that are not git repositories (track without git)
 

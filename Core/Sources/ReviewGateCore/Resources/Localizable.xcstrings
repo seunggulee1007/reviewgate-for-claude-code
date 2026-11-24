@@ -1665,6 +1665,22 @@
         }
       }
     },
+    "Accepted · not committed (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accepted · not committed (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락함 · 커밋 전 %lld"
+          }
+        }
+      }
+    },
     "Accepts every pending file, then sends the waiting message": {
       "localizations": {
         "en": {
@@ -6691,6 +6707,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모든 변경이 공백뿐인 파일 — 공백이 코드인 Python·YAML·Makefile 은 빼요."
+          }
+        }
+      }
+    },
+    "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락했지만 아직 커밋하지 않은 파일이에요 — 커밋…에서 함께 커밋되고, 수락 취소하면 다시 리뷰 대기로 돌아가요"
           }
         }
       }

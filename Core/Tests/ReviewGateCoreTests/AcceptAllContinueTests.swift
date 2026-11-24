@@ -3,7 +3,7 @@ import Testing
 @testable import ReviewGateCore
 
 /// docs/PROTOCOL.md §58.1: the Changes header's "Accept All & Continue" — on per chat kind under that kind's rule, off with
-/// the reason.
+/// the reason — and the review list's folded "Accepted · not committed (N)" group.
 @Suite @MainActor struct AcceptAllContinueTests {
     private func makeStore() -> AppState {
         AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: UserDefaults(suiteName: "AcceptAllContinueTests.\(UUID().uuidString)")!)
@@ -67,5 +67,36 @@ import Testing
         app.handle(.state(snapshot(seq: 4, files: [file("a.txt"), file("c.txt", .changesRequested)], current: "t1")))
         #expect(app.acceptAllContinueBlocker == app.terminalAcceptContinueBlocker)
         #expect(app.acceptAllContinueBlocker != nil)
+    }
+
+    @Test func acceptedFilesFoldApartAndLeaveTheCounts() {
+        let app = makeStore()
+        app.handle(.state(snapshot(seq: 1, files: [file("a.txt"), file("b.txt", .accepted), file("c.txt", .rejected), file("d.txt", .accepted)])))
+        #expect(app.openChangedFiles.map(\.path) == ["a.txt", "c.txt"])
+        #expect(app.acceptedChangedFiles.map(\.path) == ["b.txt", "d.txt"])
+        app.viewedContent["b.txt"] = ViewedKey.content(file("b.txt", .accepted))
+        app.viewedContent["a.txt"] = ViewedKey.content(file("a.txt"))
+        #expect(app.viewedChangedCount == 2)
+        #expect(app.viewedOpenCount == 1)   // the accepted one is out of "1/2 viewed"
+
+        let split = AcceptedGroup.split(ChangedFileSection.build(app.changedFiles, riskOrder: false))
+        #expect(split.open.flatMap(\.files).map(\.path) == ["a.txt", "c.txt"])
+        #expect(split.accepted.map(\.path) == ["b.txt", "d.txt"])
+        #expect(AcceptedGroup.title(2).contains("2"))
+
+        // A file that is pending again (undo, or changed after it was accepted) is back in the open part.
+        app.handle(.state(snapshot(seq: 2, files: [file("a.txt"), file("b.txt"), file("c.txt", .rejected), file("d.txt", .accepted)])))
+        #expect(app.openChangedFiles.map(\.path) == ["a.txt", "b.txt", "c.txt"])
+        #expect(app.acceptedChangedFiles.map(\.path) == ["d.txt"])
+    }
+
+    @Test func aSectionWithOnlyAcceptedFilesIsNotListed() {
+        var mods = file(".claude/settings.json", .accepted)
+        mods.group = .mods
+        let sections = ChangedFileSection.build([mods, file("a.txt")], riskOrder: false)
+        #expect(sections.map(\.kind) == [.mods, .claude])
+        let split = AcceptedGroup.split(sections)
+        #expect(split.open.map(\.kind) == [.claude])
+        #expect(split.accepted.map(\.path) == [".claude/settings.json"])
     }
 }
