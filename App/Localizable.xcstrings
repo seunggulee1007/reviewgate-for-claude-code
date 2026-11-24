@@ -5377,6 +5377,22 @@
         }
       }
     },
+    "Copy Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 복사"
+          }
+        }
+      }
+    },
     "Definition of %@": {
       "localizations": {
         "en": {
@@ -5969,6 +5985,22 @@
         }
       }
     },
+    "Ran in %@ — its output goes to Claude with your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ran in %@ — its output goes to Claude with your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 실행했어요 — 출력은 다음 메시지와 함께 Claude에게 가요"
+          }
+        }
+      }
+    },
     "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)": {
       "localizations": {
         "en": {
@@ -6049,6 +6081,22 @@
         }
       }
     },
+    "Running in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 실행 중"
+          }
+        }
+      }
+    },
     "Search again": {
       "localizations": {
         "en": {
@@ -6097,6 +6145,38 @@
         }
       }
     },
+    "Show less": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show less"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "접기"
+          }
+        }
+      }
+    },
+    "Show only the last lines of the output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only the last lines of the output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력의 마지막 줄만 보여요"
+          }
+        }
+      }
+    },
     "Show the accepted files": {
       "localizations": {
         "en": {
@@ -6109,6 +6189,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락한 파일 보기"
+          }
+        }
+      }
+    },
+    "Show the whole output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the whole output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 전체를 보여요"
           }
         }
       }
@@ -6301,6 +6397,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "정의, %lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
+          }
+        }
+      }
+    },
+    "The output of the shell commands you ran goes in front of your next message, as in Claude Code — Claude is not asked anything until then": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The output of the shell commands you ran goes in front of your next message, as in Claude Code — Claude is not asked anything until then"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행한 셸 명령의 출력은 Claude Code처럼 다음 메시지 앞에 붙어서 가요 — 그때까지 Claude에게는 아무것도 묻지 않아요"
           }
         }
       }
