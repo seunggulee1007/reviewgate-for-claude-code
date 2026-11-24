@@ -232,6 +232,10 @@
       "mode": "edits",
       "waiting": 1,
       "blocked": 0
+    },
+    "untoldDecisions": {
+      "accepted": 1,
+      "rejected": 0
     }
   },
   "changedFiles": [

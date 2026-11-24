@@ -182,6 +182,7 @@ describe("protocol v2 wire goldens", () => {
       lastRequest: null,
       prereviews: [], // §36.13: always sent by this engine (an older one sends none: clients disable the pre-review)
       reviewFirst: null, // §64: null while the rule holds nothing back
+      untoldDecisions: null, // §58.1: nothing to tell Claude yet
     });
     expect(s.session.canRestart).toBe(false);
     expect(s.session.capabilitiesCached).toBe(false);

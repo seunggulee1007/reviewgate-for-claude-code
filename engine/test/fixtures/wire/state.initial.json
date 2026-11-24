@@ -127,7 +127,8 @@
     "lastTurnChanges": null,
     "lastRequest": null,
     "prereviews": [],
-    "reviewFirst": null
+    "reviewFirst": null,
+    "untoldDecisions": null
   },
   "changedFiles": [],
   "reviewNotes": [],
