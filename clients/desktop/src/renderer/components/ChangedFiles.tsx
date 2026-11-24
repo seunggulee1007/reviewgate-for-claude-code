@@ -29,6 +29,8 @@ import { subscribeTerminals, terminalsVersion } from "../terminal/termHost";
 import { useTerminalChats } from "../terminal/terminalChat";
 import { useViewing } from "../viewedChat";
 import { commitLockReason } from "../commitLock";
+// accept-baseline — §66: "수락 이후 변경", the since-accepted letter, reject's words, the engine's accepted count
+import { acceptedGroupCount, badgeStatus, sinceAcceptedHelp, sinceAcceptedLabel, sinceAcceptedRejectHelp } from "../sinceAccepted";
 import { commitListed } from "../acceptCommit";
 import { tKey } from "../shortcutKeys";
 import { LiveChanges } from "./LiveChanges";
@@ -247,7 +249,7 @@ export function ChangedFiles() {
           </Fragment>
         ))}
         {acceptedFiles.length > 0 && (
-          <AcceptedGroup count={acceptedFiles.length} open={acceptedOpen} onToggle={() => setAcceptedOpen((v) => !v)} />
+          <AcceptedGroup count={acceptedGroupCount(state.gate, acceptedFiles.length)} open={acceptedOpen} onToggle={() => setAcceptedOpen((v) => !v)} />
         )}
         {acceptedOpen && acceptedFiles.filter((f) => authorFilter.keep(f.path)).map((f) => (
           <FileRow
@@ -361,8 +363,8 @@ function FileRow(props: {
           <span className={`viewed-dot ${viewed ? "on" : ""}`} title={viewed ? t("Viewed") : t("Not viewed yet")} aria-label={viewed ? t("Viewed") : t("Not viewed yet")} data-testid={viewed ? "Viewed" : "Not viewed"} />
         )}
         {/* MARK: wave4d w4d-speed — polish-10: "수정됨", not "M"; "12줄 추가, 3줄 삭제"; the review mark has a name */}
-        <span className={`glyph ${statusColor(f.status)}`} aria-hidden="true">{f.status}</span>
-        <span className="sr-only" data-find-skip>{statusWord(f.status)}</span>
+        <span className={`glyph ${statusColor(badgeStatus(f))}`} aria-hidden="true">{badgeStatus(f)}</span>
+        <span className="sr-only" data-find-skip>{statusWord(badgeStatus(f))}</span>
         <div className="grow col" style={{ gap: 2 }}>
           <div className="path">
             <PathText path={compactPath(f.path) /* MARK: wave4b w4b-files — §40.2: the module kept, the title has it all */} />
@@ -389,7 +391,9 @@ function FileRow(props: {
               <span className="pill red risk" title={scheduledHelp()} data-testid={`Reject scheduled ${f.path}`}>{scheduledBadge()}</span>
             )}
             {/* MARK: wave2 desktop-flow — §34.2 / §34.4 / §34.5 */}
-            {pending && f.changedSinceAccepted && (
+            {f.acceptedBase ? (
+              <span className="pill orange risk" title={sinceAcceptedHelp()} data-testid={`Changed since accepted ${f.path}`}>{sinceAcceptedLabel()}</span>
+            ) : pending && f.changedSinceAccepted && (
               <span className="pill orange risk" title={t("Accepted earlier, then changed again — “Since accepted” shows what changed")} data-testid={`Changed after accept ${f.path}`}>{t("Changed after accept")}</span>
             )}
             {changedAfterView && (
@@ -443,7 +447,7 @@ function FileRow(props: {
             <button
               type="button"
               className="plain small"
-              title={uncaptured ? uncapturedText(f, props.gate) : f.rejectScheduled === true ? scheduledHelp() : (props.rejectBlocked ?? t("Reject (⌘⇧R)"))}
+              title={uncaptured ? uncapturedText(f, props.gate) : f.rejectScheduled === true ? scheduledHelp() : (props.rejectBlocked ?? sinceAcceptedRejectHelp(f) ?? t("Reject (⌘⇧R)"))}
               aria-label={t("Reject (⌘⇧R)")}
               disabled={props.rejectBlocked !== null || uncaptured || f.rejectScheduled === true}
               onClick={(e) => {

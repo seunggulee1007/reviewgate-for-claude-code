@@ -7,7 +7,8 @@
  */
 import { refusalOf } from "./engineRequest";
 
-export type RejectCommand = { type: "reject"; paths: string[] } | { type: "reject_all"; includeExternal?: true };
+/** §66 `to: "round"`: a file reviewed since its accept goes back to the round's start instead of the accepted content. */
+export type RejectCommand = { type: "reject"; paths: string[]; to?: "round" } | { type: "reject_all"; includeExternal?: true };
 
 export type RejectOutcome =
   | { kind: "done"; forced: boolean }

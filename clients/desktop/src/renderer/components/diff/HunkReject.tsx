@@ -12,6 +12,7 @@ import { useStore, type ReviewDiff } from "../../store";
 import { ConfirmDialog } from "../dialogs/ConfirmDialog";
 // MARK: wave2 desktop-flow — §34.1 hunk ids are the whole review's; §34.2 reject waits for the turn's end
 import { diffTreeOf, hunkRejectBlockedReason } from "../../reviewRound";
+import { hunkRejectBase, hunkStatus } from "../../sinceAccepted"; // accept-baseline — §66: parts since the accept
 
 export type HunkReject = {
   /** Per-hunk header controls (undefined when the file cannot be reverted in parts). */
@@ -28,7 +29,8 @@ function unsupportedReason(file: ChangedFileState, diff: ReviewDiff | null): str
   // §32 (wave1 desktop-review): a stub stands for the content — no part of it can be put back (`partial_reject_unsupported:uncaptured`).
   if (file.uncaptured) return t("This file's content was not captured, so no part of it can be reverted either");
   if (file.isBinary || diff?.isBinary) return t("Binary files cannot be reverted in parts — reject the whole file instead.");
-  switch (file.status) {
+  // §66: the since-accepted view judges by the change since the accept (a created, accepted, then edited file is `M` there).
+  switch (hunkStatus(file, diff?.since)) {
     case "M":
       return null;
     case "A":
@@ -59,8 +61,10 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
 
   const hunks = diff?.hunks ?? [];
   const pending = file?.state === "pending";
-  // §34.1: the ids of a range other than the whole review are not `reject_hunks` ids — revert parts from 전체 only.
-  const otherRange = diff?.since !== undefined && diff.since !== "review";
+  // §34.1: the ids of a range other than the whole review are not `reject_hunks` ids — revert parts from 전체 only;
+  // §66: but the since-accepted view of a file with an `acceptedBase` (they go back to the accepted content).
+  const otherRange = file !== null && hunkRejectBase(file, diff?.since, diff?.baseTree) === null;
+  const sinceAccepted = file !== null && diff?.since === "accepted" && !otherRange;
   const reason = file && pending ? (unsupportedReason(file, diff) ?? (otherRange ? t("Parts can be reverted in the “Whole review” view") : null)) : null;
   const enabled = file !== null && pending && reason === null && hunks.length > 0 && diff !== null;
   const locked = blocked !== null;
@@ -98,7 +102,7 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
           className="small hunk-revert"
           disabled={disabled}
           onClick={() => void run([h.id])}
-          title={blocked ?? t("Put this part back as it was before the turn; the rest of the file stays under review")}
+          title={blocked ?? (sinceAccepted ? t("Put this part back as you accepted it; the rest of the file stays under review") : t("Put this part back as it was before the turn; the rest of the file stays under review"))}
           data-testid={`Revert hunk ${h.id}`}
         >
           ↶ {t("Revert this part")}
@@ -106,7 +110,7 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
       </span>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, selected, disabled, blocked, file?.path]);
+  }, [enabled, selected, disabled, blocked, file?.path, sinceAccepted]);
 
   let bar: ReactNode = null;
   if (file && pending && diff && !diff.isBinary && hunks.length > 0) {
@@ -152,9 +156,13 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
       <ConfirmDialog
         title={t("Revert {0} parts of {1}?", confirm.length, file.path.slice(file.path.lastIndexOf("/") + 1))}
         message={
-          confirm.length >= hunks.length
-            ? t("Every part is selected, so the whole file goes back to how it was before the turn and leaves the review.")
-            : t("The selected parts go back to how they were before the turn; the other {0} part(s) stay under review.", hunks.length - confirm.length)
+          sinceAccepted
+            ? confirm.length >= hunks.length
+              ? t("Every part is selected, so the whole file goes back to the content you accepted.")
+              : t("The selected parts go back to the content you accepted; the other {0} part(s) stay under review.", hunks.length - confirm.length)
+            : confirm.length >= hunks.length
+              ? t("Every part is selected, so the whole file goes back to how it was before the turn and leaves the review.")
+              : t("The selected parts go back to how they were before the turn; the other {0} part(s) stay under review.", hunks.length - confirm.length)
         }
         confirmLabel={t("Revert {0} parts", confirm.length)}
         danger

@@ -49,6 +49,7 @@ import { createSideSlice, type SideSlice } from "./storeSide";
 import { createComposerSlice, seedAttachment, type ComposerSlice } from "./storeComposer";
 import { planAfterFollowupFailure } from "./planLock";
 import { changedPathsOf, runReject, type RejectCommand } from "./rejectFlow";
+import { hunkRejectBase, roundRejectBlocked } from "./sinceAccepted"; // accept-baseline (§66)
 import { setAppearance } from "./theme";
 import { notificationFor } from "./attention";
 import { addPatternLine } from "./bashPattern";
@@ -634,7 +635,8 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   /** ⌘] / ⌘[: selects the next / previous pending file after the current selection (wraps). */
   selectPending(dir: 1 | -1): void;
   accept(path: string): void;
-  reject(path: string): void;
+  /** §66 `to: "round"`: a file reviewed since its accept goes back to the round's start (default: the accepted content). */
+  reject(path: string, to?: "round"): void;
   acceptAll(): void;
   /** §31.2: Claude's pending changes only; `includeExternal` also reverts the outside ones, after a second confirm. */
   rejectAll(includeExternal?: boolean): void;
@@ -2053,11 +2055,13 @@ export const useStore = create<Store>((set, get, api) => {
       if (!file || file.state !== "pending" || hunks.length === 0) return "not_pending";
       if (blockedNotice(hunkRejectBlockedReason(s))) return "session_running"; // r2-review-flow M32: hunks still wait for the turn
       // The tree the diff on screen was computed for (file_diff.endTree): if B moved since, the engine says stale_diff.
-      // wave2 desktop-flow — §34.1: hunk ids are the whole review's (the only view that offers them); `baseTree` guards that.
+      // wave2 desktop-flow — §34.1: hunk ids are the whole review's; `baseTree` guards that. accept-baseline — §66: or the
+      // since-accepted view's of a file with an `acceptedBase`, whose base is the accepted tree.
       const selected = get().selectedPath === path ? get().selectedDiff : null;
-      const shown = selected && !selected.since ? selected : null;
+      const range = selected ? hunkRejectBase(file, selected.since, selected.baseTree) : null;
+      const shown = selected && range ? selected : null;
       const tree = (shown ?? get().diffCache[path])?.endTree ?? s.gate.turnEndTree;
-      const base = (shown ?? get().diffCache[path])?.baseTree;
+      const base = shown ? range?.base : get().diffCache[path]?.baseTree;
       try {
         await engineRequest({ type: "reject_hunks", path, hunks, ...(tree ? { expectedEndTree: tree } : {}), ...(base ? { expectedBaseTree: base } : {}) });
         await get().settle();
@@ -2160,17 +2164,20 @@ export const useStore = create<Store>((set, get, api) => {
       advanceFrom(path);
     },
 
-    reject(path) {
+    reject(path, to) {
       const s = get().state;
       if (!s.changedFiles.some((f) => f.path === path && f.state === "pending") || blockedNotice(rejectBlockedReason(s))) return;
       // wave1 desktop-review — §32: an uncaptured file is never reverted; §31.2: an outside change is confirmed first.
       const file = s.changedFiles.find((f) => f.path === path && f.state === "pending");
       if (file?.uncaptured) return notCapturedNotice([path]);
+      // accept-baseline — §66: back to the round's start only for a file reviewed since its accept, never during a turn.
+      if (to === "round" && (!file?.acceptedBase || blockedNotice(roundRejectBlocked(file, s.gate, null)))) return;
+      const cmd: RejectCommand = { type: "reject", paths: [path], ...(to ? { to } : {}) };
       if (file && isExternalChange(file)) {
-        void rejectCommand({ type: "reject", paths: [path] }, [path]).then((outcome) => outcome.kind === "done" && advanceFrom(path));
+        void rejectCommand(cmd, [path]).then((outcome) => outcome.kind === "done" && advanceFrom(path));
         return;
       }
-      void rejectCommand({ type: "reject", paths: [path] });
+      void rejectCommand(cmd);
       advanceFrom(path);
     },
 

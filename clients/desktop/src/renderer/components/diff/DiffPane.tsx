@@ -10,6 +10,7 @@ import { isReviewLocked, useStore } from "../../store";
 import type { LineKey } from "../UnifiedDiff";
 import { ChangeCause } from "./ChangeCause";
 import { DiffHeader } from "./DiffHeader";
+import { roundRejectBlocked } from "../../sinceAccepted"; // accept-baseline (§66)
 import { FileNotices } from "./FileNotices";
 import { useHunkReject } from "./HunkReject";
 import { FullFilePlaceholder, MonacoDiffView } from "./MonacoDiffView";
@@ -209,6 +210,8 @@ export default function DiffPane() {
         rejectBlocked={rejectBlocked}
         onAccept={() => accept(file.path)}
         onReject={() => reject(file.path)}
+        roundRejectBlocked={roundRejectBlocked(file, state.gate, rejectBlocked)}
+        onRejectToRound={() => reject(file.path, "round")}
       />
       <DiffRound file={file} />
       <FileNotices file={file} />

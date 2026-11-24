@@ -8,6 +8,7 @@ import { t } from "../../i18n";
 import { isDiffCollapsed } from "../../friction";
 import { availableRanges, diffTreeOf, isTurnActive, rangeLabel, rejectBlockedReason } from "../../reviewRound";
 import { pendingFiles, useStore, type ReviewDiff, type Store } from "../../store";
+import { wholeRoundLabel } from "../../sinceAccepted"; // accept-baseline (§66): "수락 이후 / 라운드 전체"
 import "../reviewRound.css";
 
 /**
@@ -58,11 +59,12 @@ export function DiffRound({ file }: { file: ChangedFileState }) {
           <div className="range-seg" role="radiogroup" aria-label={t("Diff range")} data-testid="Diff range">
             {ranges.map((r) => (
               <button key={r} type="button" role="radio" aria-checked={r === since} className={r === since ? "active" : ""} onClick={() => setSince(r)} data-testid={`Range ${r}`}>
-                {rangeLabel(r)}
+                {wholeRoundLabel(file, r) ?? rangeLabel(r)}
               </button>
             ))}
           </div>
-          {file.state === "pending" && file.changedSinceAccepted && (
+          {/* §66: a file with an `acceptedBase` says "수락 이후 변경" in the header above instead */}
+          {file.state === "pending" && file.changedSinceAccepted && !file.acceptedBase && (
             <span className="pill orange" title={t("Accepted earlier, then changed again — “Since accepted” shows what changed")} data-testid="Diff changed after accept">
               {t("Changed after accept")}
             </span>

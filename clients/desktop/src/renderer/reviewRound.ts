@@ -74,7 +74,8 @@ export function collectFailedReason(s: Pick<ReviewState, "gate">): string | null
 // ---------------------------------------------------------------- §34.1 ranges
 
 type RangeGate = Partial<Pick<GateState, "reviewTurns" | "lastTurnChanges" | "lastRequest">>;
-type RangeFile = Pick<ChangedFileState, "state" | "changedThisTurn" | "changedSinceAccepted" | "changedSinceRequest" | "sentNoteCount">;
+type RangeFile = Pick<ChangedFileState, "state" | "changedThisTurn" | "changedSinceAccepted" | "changedSinceRequest" | "sentNoteCount"> &
+  Partial<Pick<ChangedFileState, "acceptedBase">>;
 
 /** The follow-up of the last `request_changes` has been collected (its numbers are in `lastTurnChanges`). */
 const requestCollected = (g: RangeGate): boolean => !!g.lastRequest && !!g.lastTurnChanges && g.lastTurnChanges.turn >= g.lastRequest.turn;
@@ -84,16 +85,17 @@ const requestCollected = (g: RangeGate): boolean => !!g.lastRequest && !!g.lastT
  * does not (the Mac's ReviewRange rules): "이번 턴" when the review spans more than one turn and the last one changed the
  * file, but not when that turn is the change request's own follow-up and "요청 이후" is offered (the two show the same
  * lines); "요청 이후" after a request in this review for a file changed since; "수락 이후" for a file that was accepted and
- * changed again. A file with sent notes the follow-up left alone says so in the list ("요청 후 바뀌지 않음").
+ * changed again. A file with sent notes the follow-up left alone says so in the list ("요청 후 바뀌지 않음"). §66: a file with
+ * an `acceptedBase` puts "수락 이후" first — "수락 이후 / 라운드 전체", its counts and status are since the accept.
  */
 export function availableRanges(f: RangeFile, g: RangeGate): DiffSince[] {
-  const out: DiffSince[] = ["review"];
+  const out: DiffSince[] = f.changedSinceAccepted === true && f.acceptedBase ? ["accepted", "review"] : ["review"];
   const request = !!g.lastRequest && f.changedSinceRequest === true;
   const lastTurn = g.lastTurnChanges?.turn ?? g.reviewTurns?.[g.reviewTurns.length - 1];
   const turnIsTheRequestsFollowUp = request && lastTurn !== undefined && g.lastRequest?.turn === lastTurn;
   if (f.changedThisTurn === true && (g.reviewTurns?.length ?? 0) > 1 && !turnIsTheRequestsFollowUp) out.push("turn");
   if (request) out.push("request");
-  if (f.changedSinceAccepted === true) out.push("accepted");
+  if (f.changedSinceAccepted === true && !out.includes("accepted")) out.push("accepted");
   return out;
 }
 
