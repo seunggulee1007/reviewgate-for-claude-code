@@ -70,7 +70,8 @@ enum ScreenshotTour {
         // MARK: terminal-default (§57.7): the README and layout tours run in chats; `SHOTS_LAYOUT=terminal` checks the default
         // (no choice saved → a terminal chat). Only this build's own defaults domain.
         // §55.11: `SHOTS_LAYOUT=settings` runs on the same fake claude — a terminal chat, which it fakes.
-        if env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" || env["REVIEWGATE_SCREENSHOT_LAYOUT"] == "settings" {
+        // The README demo (`SHOTS_LAYOUT=demo`) shows the default too: a terminal chat.
+        if ["terminal", "settings", "demo"].contains(env["REVIEWGATE_SCREENSHOT_LAYOUT"] ?? "") {
             UserDefaults.standard.removeObject(forKey: AppSettings.Key.newChatKind)
         } else {
             AppSettings.setNewChatKind(.chat)
@@ -154,6 +155,11 @@ private final class Tour {
         // MARK: terminal-chat (§57): `SHOTS_LAYOUT=terminal` — the terminal chat and the shell panel on a fake claude.
         if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "terminal" {
             do { try await terminalOnly(); finish(nil) } catch { finish(error) }
+            return
+        }
+        // `SHOTS_LAYOUT=demo`: the README demo GIF's frames, on the fake claude's demo script.
+        if ProcessInfo.processInfo.environment["REVIEWGATE_SCREENSHOT_LAYOUT"] == "demo" {
+            do { try await demoOnly(); finish(nil) } catch { finish(error) }
             return
         }
         // §55.11 `SHOTS_LAYOUT=settings`: the Settings window's panes, its search and its restart banner (fake claude).
@@ -3323,6 +3329,138 @@ private final class Tour {
         try await Task.sleep(for: .seconds(3))
         let respawned = hub.host(for: chatId).map { "\($0.state)" } ?? (hub.spawning.isEmpty ? nil : "spawning")
         log("terminal: window close → " + (respawned == nil ? "no claude started again" : "— LOST (\(respawned!))"))
+    }
+
+    // MARK: README demo (`SHOTS_LAYOUT=demo`)
+
+    /// The README demo GIF's frames (`demo-<nn>-<step>.png`, put together by scripts/make-gif.swift): the project's terminal
+    /// chat on the fake claude's demo script at 1360 × 850 (the file list, the diff and the terminal side by side), dark.
+    /// A prompt typed, Claude editing four files, the review beside the terminal, src/pricing.ts accepted, package.json (a
+    /// version bump nobody asked for) rejected, Accept N & Continue, and Claude carrying on with README.md. Every step is
+    /// the app's own path — the hooks, the engine's review, the store's accept / reject, the button's action.
+    private func demoOnly() async throws {
+        try await wait("project open", timeout: 180) { $0.projectURL != nil && !$0.isStarting }
+        guard let window = entry.window else { throw TourError("no window") }
+        let size = NSSize(width: 1360, height: 850)
+        window.setFrame(NSRect(origin: window.frame.origin, size: size), display: true)
+        // On a Retina screen when there is one (the shots have the screen's scale), and away from the mouse pointer when the
+        // screen has room: the window lets clicks through, but a diff row under the pointer still shows its hover buttons.
+        let screen = NSScreen.screens.filter { $0.visibleFrame.width >= size.width && $0.visibleFrame.height >= size.height }
+            .max { $0.backingScaleFactor < $1.backingScaleFactor } ?? window.screen ?? NSScreen.main
+        if let v = screen?.visibleFrame {
+            let corners = [NSPoint(x: v.minX, y: v.maxY - size.height), NSPoint(x: v.maxX - size.width, y: v.maxY - size.height),
+                           NSPoint(x: v.minX, y: v.minY), NSPoint(x: v.maxX - size.width, y: v.minY)]
+            if let origin = corners.first(where: { !NSRect(origin: $0, size: size).contains(NSEvent.mouseLocation) }) {
+                window.setFrameOrigin(origin)
+            }
+        }
+        AppSettings.setAppearance(.dark)
+        UserDefaults.standard.removeObject(forKey: "terminalReviewSplit")
+        let hub = entry.model.terminals
+        let model = entry.model
+        let korean = Locale.preferredLanguages.first?.hasPrefix("ko") == true
+        var n = 0
+        func shoot(_ step: String, settle: Double = 0.9) async throws {
+            try await Task.sleep(for: .milliseconds(Int(settle * 1000)))
+            n += 1
+            try write(try renderWithTerminals(window), String(format: "demo-%02d-", n) + step)
+        }
+        // The project's first chat is a terminal chat (§57.7); a new one when it shows no terminal (the start screen).
+        let first = store.currentSessionId
+        var found = await waitFor(seconds: 15) { first.flatMap { hub.host(for: $0) }?.screenText().contains("scripted demo") == true }
+            ? first.flatMap { hub.host(for: $0) } : nil
+        if found == nil {
+            log("demo: the first chat shows no terminal — a new chat")
+            guard await store.newChat() else { throw TourError("New Chat refused") }
+            try await wait("a new chat", timeout: 30) { $0.currentSessionId != first }
+            try await wait("terminal chat is the live chat", timeout: 30) { $0.isTerminalChat && $0.shownChatIsTerminal }
+            let id = store.currentSessionId
+            _ = await waitFor(seconds: 15) { id.flatMap { hub.host(for: $0) }?.screenText().contains("scripted demo") == true }
+            found = id.flatMap { hub.host(for: $0) }
+        }
+        guard let host = found, host.screenText().contains("scripted demo") else { throw TourError("the demo script's banner never showed") }
+        // A quiet window is never visible, and SwiftTerm draws a hidden terminal's text from the last frame it rendered
+        // while visible: this terminal renders on, so each shot has what it shows now.
+        host.view.suspendsRenderingWhenNotVisible = false
+        host.focus()
+
+        // 1. The prompt typed into Claude Code, 2. Claude at work.
+        let prompt = korean ? "할인 코드를 넣어 줘: SAVE10은 10% 할인, FREESHIP은 배송비 무료"
+                            : "Add discount codes: SAVE10 takes 10% off, FREESHIP removes shipping"
+        host.send(text: prompt)
+        try await shoot("prompt")
+        host.send(text: "\r")
+        _ = await waitFor(seconds: 20) { host.screenText().contains("Update(src/cart.ts)") }
+        try await shoot("working", settle: 0.3)
+
+        // 3. The turn ends: the review opens beside the terminal with the four files, src/pricing.ts first.
+        let reviewed = await waitFor(seconds: 40) { [store] in store.gatePhase == .reviewing && store.pendingFiles.count >= 4 }
+        guard reviewed else { throw TourError("no review of four files (phase \(store.gatePhase), \(store.changedFiles.map(\.path)))") }
+        _ = await waitFor(seconds: 5) { model.reviewPanelOpen }
+        log("demo: review \(store.changedFiles.map { "\($0.path) +\($0.added) -\($0.deleted)" }.joined(separator: ", ")), layout \(model.terminalReviewLayout), file list \(Self.sidebarItem(window)?.isCollapsed == true ? "hidden" : "shown")")
+        func show(_ path: String) async throws {
+            store.selectFile(path: path)
+            guard await waitFor(seconds: 10, { [store] in store.selectedPath == path && store.selectedDiff != nil }) else {
+                throw TourError("no diff of \(path)")
+            }
+        }
+        try await show("src/pricing.ts")
+        try await shoot("review")
+
+        // 4. Accept src/pricing.ts (the diff header's Accept): the selection moves on to the next file.
+        guard let pricing = store.changedFiles.first(where: { $0.path == "src/pricing.ts" }) else { throw TourError("no src/pricing.ts") }
+        ReviewUndo.accept(pricing, store: store, window: window)
+        _ = await waitFor(seconds: 10) { [store] in store.changedFiles.first { $0.path == "src/pricing.ts" }?.state == .accepted }
+        try await show("src/cart.ts")
+        try await shoot("accepted")
+
+        // 5. package.json: a version bump nobody asked for — 6. rejected, put back on disk.
+        try await show("test/cart.test.ts")
+        try await show("package.json")
+        try await shoot("unasked")
+        guard let bump = store.changedFiles.first(where: { $0.path == "package.json" }) else { throw TourError("no package.json") }
+        ReviewUndo.reject(bump, store: store, window: window)
+        let rejected = await waitFor(seconds: 20) { [store] in store.changedFiles.first { $0.path == "package.json" }?.state != .pending }
+        log("demo: package.json " + (rejected ? "rejected" : "— LOST (still pending)"))
+        try await show("src/cart.ts")
+        try await shoot("rejected")
+
+        // 7. Accept 2 & Continue (the button above the terminal): the rest accepted, "Continue." typed into Claude Code, whose
+        // next prompt carries the review's summary — 8. Claude carries on.
+        let blocker = AcceptAllAction.continueBlocker(store: store)
+        log("demo: Accept \(store.pendingFiles.count) & Continue " + (blocker.map { "— LOST (off: \($0))" } ?? "on")
+            + (store.acceptAllNeedsSheet ? " — INFO the summary sheet would open first" : ""))
+        // What the button runs in a terminal chat once no sheet is needed (AcceptAllAction.continueNow), with its answer.
+        let why = await store.terminalAcceptAndContinue()
+        log("demo: Accept & Continue " + (why.map { "— LOST (\($0))" } ?? "accepted the rest and typed Continue."))
+        let carried = await waitFor(seconds: 30) { host.screenText().contains("Update(README.md)") }
+        log("demo: Claude carried on " + (carried ? "with README.md" : "— LOST (\(Self.lastLines(host, 6)))"))
+        let next = await waitFor(seconds: 30) { [store] in store.gatePhase == .reviewing && store.changedFiles.contains { $0.path == "README.md" && $0.state == .pending } }
+        if next { try await show("README.md") }
+        try await shoot("continued", settle: 1.2)
+        await hub.stopAll()
+    }
+
+    /// `render`, with each terminal painted on its own background: SwiftTerm paints that with its layer's colour, which
+    /// `cacheDisplay` leaves out (the terminal came out white, its light text faint on it). Only for a terminal nothing lies
+    /// over — the demo keeps the review beside the terminal, never as the drawer over it.
+    private func renderWithTerminals(_ window: NSWindow) throws -> NSBitmapImageRep {
+        let rep = try render(window)
+        guard let frame = window.contentView?.superview, let context = NSGraphicsContext(bitmapImageRep: rep) else { return rep }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        for terminal in try views(ReviewTerminalView.self, in: window, minSize: 40) {
+            let visible = terminal.visibleRect
+            guard !visible.isEmpty, let own = terminal.bitmapImageRepForCachingDisplay(in: visible) else { continue }
+            terminal.cacheDisplay(in: visible, to: own)
+            var rect = terminal.convert(visible, to: frame)
+            if frame.isFlipped { rect.origin.y = frame.bounds.height - rect.maxY }
+            terminal.nativeBackgroundColor.setFill()
+            rect.fill()
+            own.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
+        return rep
     }
 
     // MARK: terminal-stage2 (§57.10–57.15)

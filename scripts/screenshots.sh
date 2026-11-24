@@ -14,7 +14,7 @@
 #   the home folder's path fails the run (HOME PATH);
 # - the session loads no user settings (no ~/.claude skills, plugins, hooks, MCP servers or CLAUDE.md); the app starts
 #   from launchd (`open`), not with this shell's environment, in English (SHOTS_LANG=ko: in Korean, layout check only);
-# - a layout on the fake claude (SHOTS_LAYOUT=terminal, composerbar, settings) never reads ~/.claude at all: the app and its engine get
+# - a layout on the fake claude (SHOTS_LAYOUT=terminal, composerbar, settings, demo) never reads ~/.claude at all: the app and its engine get
 #   CLAUDE_CONFIG_DIR=SHOTS_DIR/claude-config, a fresh folder whose settings.json holds only a harmless status line
 #   (`printf TOUR`) for the terminal chat's status line tee (§57.13) to wrap — the fake runs it only when it is exactly that;
 # - the layouts on the real claude (the README run and every other SHOTS_LAYOUT, composer among them) keep the user's
@@ -84,6 +84,11 @@
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt).
+#                  demo: the README's demo GIF frames (demo-<nn>-<step>.png; scripts/make-gif.swift puts them together) on the
+#                  fake claude in its demo script (a `fake-demo` file next to it): a prompt typed into the terminal chat at
+#                  1360 × 850, dark, Claude editing four files, the review beside the terminal, one file accepted, one
+#                  rejected, Accept N & Continue, and Claude carrying on with the next file. With SHOTS_LANG=ko the prompt is
+#                  Korean and so are Claude's lines.
 #                  A shot marked TALLER, CUT, OUT OF THE WINDOW, LOST, BLANK, SILENT, JUMP, OVERLAP or ENDLESS in tour.log fails the run (exit 1)
 #   SHOTS_LANG     en (default) or ko: the app's language — ko only with SHOTS_LAYOUT (docs/images stays English), for
 #                  checking the Korean words at the laptop size
@@ -119,7 +124,7 @@ case "$(cd "$SHOTS_DIR" 2>/dev/null && pwd -P || echo "$SHOTS_DIR")/" in
   "$HOME/"|"$HOME/.reviewgate/"*|//) die "SHOTS_DIR must be a scratch folder of its own (not \$HOME, not ~/.reviewgate)";;
 esac
 command -v xcodegen >/dev/null || die "xcodegen missing (brew install xcodegen)"
-case "${SHOTS_LAYOUT:-}" in terminal|composerbar|settings) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
+case "${SHOTS_LAYOUT:-}" in terminal|composerbar|settings|demo) ;; *) command -v claude >/dev/null || die "the Claude Code CLI is missing";; esac
 NODE_DIR="$("$ROOT/scripts/find-node.sh")" || die "Node.js >= 24 not found"
 PATH="$NODE_DIR:$PATH"
 
@@ -325,13 +330,15 @@ commit "2026-10-21T09:05:00+0000" "Free shipping from \$50"
 rm -rf "$DATA" "$RAW"
 mkdir -p "$DATA" "$RAW"
 CLAUDE_BIN=claude
-if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = composerbar ] || [ "${SHOTS_LAYOUT:-}" = settings ]; then
+if [ "${SHOTS_LAYOUT:-}" = terminal ] || [ "${SHOTS_LAYOUT:-}" = composerbar ] || [ "${SHOTS_LAYOUT:-}" = settings ] \
+   || [ "${SHOTS_LAYOUT:-}" = demo ]; then
   # §57 terminal tour (and the composer bar check, and §55.11's settings shots, whose window opens a terminal chat on it): a fake claude. --version passes the engine's preflight; in the terminal chat's PTY it prints its
   # session, and for each line typed posts the hooks a real turn would (UserPromptSubmit, a Write to notes.txt in its cwd,
   # Stop) to the URL in its --settings with the token from RG_HOOK_TOKEN. It prints its terminal's size (the PTY's winsize)
   # on each SIGWINCH (`winsize CxR`) and when a line is `size` (`size CxR COLUMNS=…`, no turn). It never reads or writes
   # ~/.claude. Run as the app's chat CLI (stream-json) it fails at once — but for composerbar, below.
   mkdir -p "$SHOTS_DIR/fakebin"
+  rm -f "$SHOTS_DIR/fakebin/fake-chat" "$SHOTS_DIR/fakebin/fake-demo"   # a marker from an earlier layout
   CLAUDE_BIN="$SHOTS_DIR/fakebin/claude"
   cat > "$CLAUDE_BIN" <<'EOF'
 #!/usr/bin/env node
@@ -366,9 +373,11 @@ let settings = {};
 try { settings = JSON.parse(value("--settings") ?? "{}"); url = settings.hooks.Stop[0].hooks[0].url; } catch { url = undefined; }
 const token = process.env.RG_HOOK_TOKEN ?? "";
 if (!session || !url) { console.error("fake-claude: no session or hook url"); process.exit(2); }
-console.log(`fake-claude session=${session} resume=${resume}`);
+// SHOTS_LAYOUT=demo (a `fake-demo` file next to the fake): the README demo's script, below, instead of these lines.
+const demo = require("node:fs").existsSync(join(__dirname, "fake-demo"));
+if (!demo) console.log(`fake-claude session=${session} resume=${resume}`);
 // §57.11: the MCP servers ReviewGate passed on (`--mcp-config <file>`; inline JSON too), by name.
-try { const mcp = value("--mcp-config"); if (mcp) console.log(`mcp=${Object.keys(JSON.parse(mcp.trim().startsWith("{") ? mcp : require("node:fs").readFileSync(mcp, "utf8")).mcpServers ?? {}).join(",")}`); } catch { console.log("mcp=unreadable"); }
+try { const mcp = value("--mcp-config"); if (mcp && !demo) console.log(`mcp=${Object.keys(JSON.parse(mcp.trim().startsWith("{") ? mcp : require("node:fs").readFileSync(mcp, "utf8")).mcpServers ?? {}).join(",")}`); } catch { console.log("mcp=unreadable"); }
 const post = async (body) => {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "X-ReviewGate-Token": token },
     body: JSON.stringify({ session_id: session, cwd: process.cwd(), ...body }) });
@@ -415,6 +424,156 @@ const extra = {
     return "webfetch: posted";
   },
 };
+// The README demo's script (SHOTS_LAYOUT=demo): the first prompt edits four files of the demo project — the discount codes
+// asked for and a version bump nobody asked for —, every later one reads the review's summary in its context and documents
+// the codes in README.md. Each edit is a real write and a PostToolUse, as a turn's would be. A prompt with Korean in it
+// makes the whole script Korean (SHOTS_LANG=ko).
+if (demo) {
+  const fs = require("node:fs");
+  const bold = (s) => `\x1b[1m${s}\x1b[22m`, dim = (s) => `\x1b[2m${s}\x1b[22m`;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const say = (text) => process.stdout.write(`\r\n\x1b[37m⏺\x1b[39m ${text.replace(/\n/g, "\r\n  ")}\r\n`);
+  const prompt = () => process.stdout.write("\r\n\x1b[2m>\x1b[22m ");
+  let ko = false, turns = 0, calls = 0;
+  const t = (en, kr) => (ko ? kr : en);
+  // edit(promptId, path, [[from, to], …] or a string appended, the line under the call)
+  const edit = async (promptId, rel, change, summary) => {
+    const file = join(process.cwd(), rel);
+    let text = fs.readFileSync(file, "utf8");
+    if (typeof change === "string") text += change;
+    else for (const [from, to] of change) {
+      if (!text.includes(from)) throw new Error(`${rel}: no ${JSON.stringify(from.slice(0, 40))}`);
+      text = text.replace(from, to);
+    }
+    fs.writeFileSync(file, text);
+    process.stdout.write(`\r\n\x1b[32m⏺\x1b[39m ${bold("Update")}(${rel})\r\n  ${dim("⎿")}  ${summary}\r\n`);
+    calls += 1;
+    await post({ hook_event_name: "PostToolUse", tool_name: "Edit", tool_input: { file_path: file },
+      tool_response: { filePath: file }, tool_use_id: `toolu_demo_${calls}`, prompt_id: promptId });
+    await sleep(900);
+  };
+  const first = async (promptId) => {
+    say(t("I'll keep the codes in src/pricing.ts, apply them in the cart and add tests.",
+          "코드는 src/pricing.ts에 두고, 장바구니에 적용하고, 테스트를 추가할게요."));
+    await sleep(900);
+    await edit(promptId, "src/pricing.ts", [["export const TAX_RATE = 0.08;\n", `export const TAX_RATE = 0.08;
+
+/** Discount codes: a share of the subtotal off, or free shipping. */
+export const DISCOUNT_CODES = {
+  SAVE10: { percentOff: 10 },
+  FREESHIP: { freeShipping: true },
+} as const;
+
+export type DiscountCode = keyof typeof DISCOUNT_CODES;
+
+export function isDiscountCode(code: string): code is DiscountCode {
+  return Object.hasOwn(DISCOUNT_CODES, code);
+}
+`]], t("Added 12 lines", "12줄 추가"));
+    await edit(promptId, "src/cart.ts", [
+      ['import { shippingFor, taxFor } from "./pricing.ts";', 'import { DISCOUNT_CODES, isDiscountCode, shippingFor, taxFor, type DiscountCode } from "./pricing.ts";'],
+      ["  private readonly items = new Map<string, LineItem>();\n", "  private readonly items = new Map<string, LineItem>();\n  private code?: DiscountCode;\n"],
+      ["  remove(sku: string): void {", `  applyCode(code: string): void {
+    if (!isDiscountCode(code)) throw new RangeError(\`unknown discount code: \${code}\`);
+    this.code = code;
+  }
+
+  remove(sku: string): void {`],
+      [`    const shipping = shippingFor(subtotal);
+    const tax = taxFor(subtotal);
+    return { subtotal, shipping, tax, total: subtotal + shipping + tax };`,
+       `    const discount = this.code ? DISCOUNT_CODES[this.code] : undefined;
+    const off = discount && "percentOff" in discount ? Math.round((subtotal * discount.percentOff) / 100) : 0;
+    const shipping = discount && "freeShipping" in discount ? 0 : shippingFor(subtotal);
+    const tax = taxFor(subtotal - off);
+    return { subtotal, shipping, tax, total: subtotal - off + shipping + tax };`],
+    ], t("Added 10 lines, removed 3 lines", "10줄 추가, 3줄 삭제"));
+    await edit(promptId, "test/cart.test.ts", `
+test("SAVE10 takes 10% off the subtotal", () => {
+  const cart = new Cart();
+  cart.add(tee);
+  cart.applyCode("SAVE10");
+  assert.equal(cart.totals().total, 4800 - 480 + 599 + 346);
+});
+
+test("FREESHIP removes shipping", () => {
+  const cart = new Cart();
+  cart.add(mug);
+  cart.applyCode("FREESHIP");
+  assert.equal(cart.totals().shipping, 0);
+});
+
+test("rejects unknown codes", () => {
+  assert.throws(() => new Cart().applyCode("HALFOFF"), /unknown discount code/);
+});
+`, t("Added 18 lines", "18줄 추가"));
+    await edit(promptId, "package.json", [['"version": "0.3.0"', '"version": "0.4.0"']], t("Updated 1 line", "1줄 수정"));
+    say(t("SAVE10 and FREESHIP are in, with tests. I also bumped the version to 0.4.0.",
+          "SAVE10과 FREESHIP을 넣고 테스트도 추가했어요. 버전도 0.4.0으로 올렸어요."));
+  };
+  const next = async (promptId, context) => {
+    const rejected = /Rejected[^\]]*package\.json/.test(context);
+    say(rejected
+      ? t("Got it: keeping the codes and tests, not the version bump.\nNext, the README.",
+          "알겠어요. 코드와 테스트는 두고 버전은 0.3.0 그대로 둘게요.\n이어서 README를 쓸게요.")
+      : t("Next, the README.", "이어서 README를 쓸게요."));
+    await sleep(900);
+    await edit(promptId, "README.md", t(`
+## Discount codes
+
+| Code | Effect |
+| --- | --- |
+| \`SAVE10\` | 10% off the subtotal |
+| \`FREESHIP\` | No shipping charge |
+
+\`cart.applyCode(code)\` throws on an unknown code.
+`, `
+## 할인 코드
+
+| 코드 | 효과 |
+| --- | --- |
+| \`SAVE10\` | 상품 금액 10% 할인 |
+| \`FREESHIP\` | 배송비 없음 |
+
+없는 코드를 넣으면 \`cart.applyCode(code)\`가 오류를 던져요.
+`), t("Added 9 lines", "9줄 추가"));
+    say(t("The README lists both codes now.", "README에 두 코드를 적었어요."));
+  };
+  // As a TUI does: raw input echoed by the script itself, and bracketed paste on (the app's Accept N & Continue pastes
+  // "Continue." only into a program that turned it on); the paste markers are dropped.
+  process.stdout.write(`\x1b[?2004h\x1b[38;5;173m✻\x1b[39m ${bold("Claude Code")} ${dim("· scripted demo · " + process.cwd())}\r\n`);
+  prompt();
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  let typed = "", busy = false;
+  process.stdin.on("data", (chunk) => {
+    for (const ch of chunk.toString("utf8").replace(/\x1b\[20[01]~/g, "")) {
+      if (ch === "\x03" || ch === "\x04") process.exit(0);
+      if (busy) continue;
+      if (ch === "\r" || ch === "\n") { const line = typed; typed = ""; process.stdout.write("\r\n"); turn(line); }
+      else if (ch === "\x7f") { if (typed) { typed = typed.slice(0, -1); process.stdout.write("\b \b"); } }
+      else if (ch >= " ") { typed += ch; process.stdout.write(ch); }
+    }
+  });
+  const turn = async (line) => {
+    if (line.trim() === "/exit") process.exit(0);
+    if (!line.trim()) { prompt(); return; }
+    busy = true;
+    if (turns === 0) ko = /[가-힣]/.test(line);
+    const promptId = randomUUID();
+    const answer = await post({ hook_event_name: "UserPromptSubmit", prompt: line, prompt_id: promptId });
+    const context = (answer.hookSpecificOutput?.additionalContext ?? "").replace(/\s+/g, " ");
+    try {
+      if (turns === 0) await first(promptId); else await next(promptId, context);
+    } catch (e) {
+      say(`demo: ${e.message}`);
+    }
+    turns += 1;
+    await post({ hook_event_name: "Stop", prompt_id: promptId, stop_hook_active: false });
+    prompt();
+    busy = false;
+  };
+  return;
+}
 let n = 0;
 const winsize = () => `${process.stdout.columns}x${process.stdout.rows}`;
 process.stdout.on("resize", () => console.log(`winsize ${winsize()}`));
@@ -442,6 +601,7 @@ rl.on("line", async (line) => {
 EOF
   chmod +x "$CLAUDE_BIN"
   [ "${SHOTS_LAYOUT:-}" != composerbar ] || touch "$SHOTS_DIR/fakebin/fake-chat"   # its chat session starts (no turn)
+  [ "${SHOTS_LAYOUT:-}" != demo ] || touch "$SHOTS_DIR/fakebin/fake-demo"   # the README demo's script
 fi
 # A layout on the fake claude: the app and its engine get a Claude Code config dir of their own (CLAUDE_CONFIG_DIR), so
 # nothing reads the user's ~/.claude — no user settings, hooks, status line, skills, plugins, plans, MCP servers or
