@@ -1697,6 +1697,22 @@
         }
       }
     },
+    "Allow for this turn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow for this turn"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 턴만 허용"
+          }
+        }
+      }
+    },
     "Allow Once": {
       "localizations": {
         "en": {
@@ -3533,6 +3549,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 턴이 끝나면 브랜치를 바꾸세요"
+          }
+        }
+      }
+    },
+    "Claude isn't working on a turn right now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude isn't working on a turn right now"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금은 Claude가 작업 중인 턴이 없어요"
           }
         }
       }
@@ -6855,6 +6887,22 @@
         }
       }
     },
+    "Lets Claude change any file until this turn ends — the next turn waits for the review again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lets Claude change any file until this turn ends — the next turn waits for the review again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 턴이 끝날 때까지 Claude가 어떤 파일이든 바꿀 수 있어요 — 다음 턴은 다시 리뷰를 기다려요"
+          }
+        }
+      }
+    },
     "Log in…": {
       "localizations": {
         "en": {
@@ -7303,6 +7351,22 @@
         }
       }
     },
+    "This turn is already allowed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This turn is already allowed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 턴은 이미 허용했어요"
+          }
+        }
+      }
+    },
     "Waits until you finish the review": {
       "localizations": {
         "en": {
@@ -7315,6 +7379,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 끝내면 보내요"
+          }
+        }
+      }
+    },
+    "While files wait for your review, Claude may fix them but not change other files. Accept or reject them, allow this turn, or change this in Settings › Review.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While files wait for your review, Claude may fix them but not change other files. Accept or reject them, allow this turn, or change this in Settings › Review."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰를 기다리는 파일이 있는 동안 Claude는 그 파일들은 고칠 수 있지만 다른 파일은 바꾸지 못해요. 파일을 수락하거나 거절하거나, 이번 턴만 허용하거나, 설정 › 리뷰에서 바꿀 수 있어요."
           }
         }
       }

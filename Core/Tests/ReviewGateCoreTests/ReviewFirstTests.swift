@@ -12,12 +12,12 @@ import Testing
         ChangedFile(path: path, oldPath: nil, status: .modified, added: 1, deleted: 0, isBinary: false, tools: ["Edit"], state: state)
     }
 
-    private func reviewing(seq: Int, files: [ChangedFile], rule: ReviewFirstInfo?) -> ReviewState {
+    private func reviewing(seq: Int, files: [ChangedFile], rule: ReviewFirstInfo?, phase: GatePhase = .reviewing) -> ReviewState {
         var s = ReviewState.empty
         s.seq = seq
         s.project = ProjectInfo(path: "/work/acme", root: "/work/acme", name: "acme", branch: "main", remoteURL: nil)
         s.session = SessionInfo(open: true, starting: false, sessionId: "s", model: nil, capabilities: nil, pendingPermission: nil, canRestart: true)
-        s.gate = GateInfo(phase: .reviewing, canSend: true, canRequestChanges: false, blockedReason: nil, collectError: nil,
+        s.gate = GateInfo(phase: phase, canSend: phase != .running, canRequestChanges: false, blockedReason: nil, collectError: nil,
                           pendingCount: files.filter { $0.state == .pending }.count,
                           changesRequestedCount: files.filter { $0.state == .changesRequested }.count, isRequestingChanges: false,
                           turnStartTree: "A1", turnEndTree: "B1", lastReviewSummary: nil)
@@ -51,9 +51,47 @@ import Testing
         let decode = { (json: String) throws -> GateInfo in try JSONDecoder().decode(GateInfo.self, from: Data(json.utf8)) }
         #expect(try decode(#"{"phase":"reviewing","reviewFirst":{"mode":"prompts","waiting":3,"blocked":2}}"#).reviewFirst
                 == ReviewFirstInfo(mode: .prompts, waiting: 3, blocked: 2))
+        #expect(try decode(#"{"phase":"running","reviewFirst":{"mode":"edits","waiting":1,"blocked":1,"allowedThisTurn":true}}"#).reviewFirst
+                == ReviewFirstInfo(mode: .edits, waiting: 1, blocked: 1, allowedThisTurn: true))
         #expect(try decode(#"{"phase":"reviewing","reviewFirst":null}"#).reviewFirst == nil)
         #expect(try decode(#"{"phase":"reviewing"}"#).reviewFirst == nil)   // an older engine
         #expect(try decode(#"{"phase":"reviewing","reviewFirst":"yes"}"#).reviewFirst == nil)
+    }
+
+    @Test func theDefaultLetsTheFilesUnderReviewBeFixed() {
+        #expect(ReviewFirstMode.allCases.map(\.title) == ["Only files under review (default)", "Block prompts too", "Turn off"])
+        #expect(ReviewFirstMode.edits.rawValue == "edits")   // the stored value stays
+        #expect(ReviewFirstText.blockedHelp(.edits).contains("may fix them but not change other files"))
+        #expect(ReviewFirstText.blockedHelp(nil) == ReviewFirstText.blockedHelp(.edits))
+        #expect(ReviewFirstText.blockedHelp(.prompts).contains("it may not change files"))
+        #expect(SettingsCatalog.Info.reviewFirst.contains("may fix the files under review"))
+        #expect(SettingsCatalog.Info.reviewFirst.contains("Bash commands run"))
+    }
+
+    @Test func allowForThisTurnGoesOnlyWhileATurnRunsAndNotTwice() throws {
+        let app = AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: freshDefaults())
+        var sent: [EngineCommand] = []
+        app.commandSink = { sent.append($0) }
+        // Between turns: off, with the reason.
+        app.handle(.state(reviewing(seq: 1, files: [file("a.txt")], rule: ReviewFirstInfo(mode: .edits, waiting: 1, blocked: 1))))
+        #expect(app.reviewFirstAllowTurnBlocker == ReviewFirstText.allowTurnNoTurn)
+        app.allowReviewFirstThisTurn()
+        #expect(sent.isEmpty)
+        // A turn runs: it goes.
+        app.handle(.state(reviewing(seq: 2, files: [file("a.txt")], rule: ReviewFirstInfo(mode: .edits, waiting: 1, blocked: 1), phase: .running)))
+        #expect(app.reviewFirstAllowTurnBlocker == nil)
+        app.allowReviewFirstThisTurn()
+        #expect(sent == [.reviewFirstAllowTurn])
+        // Allowed already: off, with the reason.
+        app.handle(.state(reviewing(seq: 3, files: [file("a.txt")], rule: ReviewFirstInfo(mode: .edits, waiting: 1, blocked: 1, allowedThisTurn: true), phase: .running)))
+        #expect(app.reviewFirstAllowTurnBlocker == ReviewFirstText.allowTurnAlready)
+        app.allowReviewFirstThisTurn()
+        #expect(sent.count == 1)
+
+        let data = try JSONEncoder().encode(EngineCommandEnvelope(id: "c1", command: .reviewFirstAllowTurn))
+        let wire = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        #expect(wire?["type"] as? String == "review_first_allow_turn")
+        #expect(Set(wire?.keys.map { $0 } ?? []) == ["id", "type"])
     }
 
     @Test func theSettingIsInTheReviewPaneAndFoundInBothLanguages() {

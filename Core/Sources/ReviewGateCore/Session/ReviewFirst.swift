@@ -2,13 +2,15 @@ import Foundation
 
 // docs/PROTOCOL.md §64 — review first: Claude's next work waits until the user reviewed its last changes. The engine
 // denies the edits; the Mac's part is the setting (Settings › Review), the wire (`gate.reviewFirst`), the quiet row when a
-// call was denied, the terminal strip's chip and — with `prompts` — the composer holding a message until the review is done.
+// call was denied (with [이번 턴만 허용]), the terminal strip's chip and — with `prompts` — the composer holding a message
+// until the review is done.
 
 /// `settings.reviewFirst`: what waits for the review.
 public enum ReviewFirstMode: String, CaseIterable, Sendable, Decodable {
-    /// Claude may answer and read, but not change files, while files wait (the default).
+    /// While files wait, Claude may fix the files under review but not change other files (the default; before 0.5.26 it
+    /// blocked every change).
     case edits
-    /// A new message waits too.
+    /// Every change waits, and a new message too.
     case prompts
     /// Neither (a message during a review is a question that may edit, as before 0.5.22).
     case off
@@ -16,7 +18,7 @@ public enum ReviewFirstMode: String, CaseIterable, Sendable, Decodable {
     /// The English key of the picker's choice.
     public var title: String {
         switch self {
-        case .edits: "Block edits (default)"
+        case .edits: "Only files under review (default)"
         case .prompts: "Block prompts too"
         case .off: "Turn off"
         }
@@ -30,20 +32,24 @@ public struct ReviewFirstInfo: Decodable, Sendable, Equatable {
     public var waiting: Int
     /// Calls it denied in the current (between turns: the last) turn.
     public var blocked: Int
+    /// The user lifted it for the running turn ([이번 턴만 허용], `review_first_allow_turn`).
+    public var allowedThisTurn: Bool
 
-    public init(mode: ReviewFirstMode, waiting: Int, blocked: Int = 0) {
+    public init(mode: ReviewFirstMode, waiting: Int, blocked: Int = 0, allowedThisTurn: Bool = false) {
         self.mode = mode
         self.waiting = waiting
         self.blocked = blocked
+        self.allowedThisTurn = allowedThisTurn
     }
 
-    private enum Keys: String, CodingKey { case mode, waiting, blocked }
+    private enum Keys: String, CodingKey { case mode, waiting, blocked, allowedThisTurn }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         mode = ((try? c.decodeIfPresent(ReviewFirstMode.self, forKey: .mode)) ?? nil) ?? .edits
         waiting = ((try? c.decodeIfPresent(Int.self, forKey: .waiting)) ?? nil) ?? 0
         blocked = ((try? c.decodeIfPresent(Int.self, forKey: .blocked)) ?? nil) ?? 0
+        allowedThisTurn = ((try? c.decodeIfPresent(Bool.self, forKey: .allowedThisTurn)) ?? nil) ?? false
     }
 }
 
@@ -78,10 +84,26 @@ public enum ReviewFirstText {
     /// The row's (and the terminal chip's) words.
     public static var blockedText: String { String(localized: "Claude's edits are blocked while files wait for your review", bundle: .module) }
 
-    /// The row's / chip's tooltip.
-    public static var blockedHelp: String {
-        String(localized: "Claude can answer questions, read and plan, but it may not change files until you accept or reject the files waiting for review. Settings › Review changes this.", bundle: .module)
+    /// The chip's tooltip — what the rule lets through in `mode` (nil: the default).
+    public static func blockedHelp(_ mode: ReviewFirstMode?) -> String {
+        if mode == .prompts {
+            return String(localized: "Claude can answer questions, read and plan, but it may not change files until you accept or reject the files waiting for review. Settings › Review changes this.", bundle: .module)
+        }
+        return String(localized: "While files wait for your review, Claude may fix them but not change other files. Accept or reject them, allow this turn, or change this in Settings › Review.", bundle: .module)
     }
+
+    /// [이번 턴만 허용]
+    public static var allowTurnTitle: String { String(localized: "Allow for this turn", bundle: .module) }
+
+    public static var allowTurnHelp: String {
+        String(localized: "Lets Claude change any file until this turn ends — the next turn waits for the review again", bundle: .module)
+    }
+
+    /// Why [이번 턴만 허용] is off: no turn runs.
+    public static var allowTurnNoTurn: String { String(localized: "Claude isn't working on a turn right now", bundle: .module) }
+
+    /// Why [이번 턴만 허용] is off: this turn is allowed already.
+    public static var allowTurnAlready: String { String(localized: "This turn is already allowed", bundle: .module) }
 
     /// [리뷰 열기]
     public static var openReviewTitle: String { String(localized: "Open Review", bundle: .module) }
@@ -146,6 +168,28 @@ public extension AppState {
         queuedSendInFlight = true
         deliver(message, acceptPending: true)
         return true
+    }
+
+    /// Why [이번 턴만 허용] is off (nil: it can go).
+    var reviewFirstAllowTurnBlocker: String? {
+        if reviewFirst?.allowedThisTurn == true { return ReviewFirstText.allowTurnAlready }
+        if !isRunning { return ReviewFirstText.allowTurnNoTurn }
+        return nil
+    }
+
+    /// [이번 턴만 허용]: the rule lets Claude through until the running turn ends. A refusal (`no_turn`: it ended meanwhile)
+    /// is only logged.
+    func allowReviewFirstThisTurn() {
+        guard reviewFirstAllowTurnBlocker == nil else { return }
+        if let commandSink { commandSink(.reviewFirstAllowTurn); return }
+        Task {
+            do {
+                try await request(.reviewFirstAllowTurn)
+            } catch {
+                appendLog("[warn] review_first_allow_turn: \(error.localizedDescription)")
+                if (error as? EngineClientError)?.refusalCode != "no_turn" { fail(FlowText.refusal(error), fatal: false) }
+            }
+        }
     }
 
     /// [리뷰 열기]: the first file waiting for the review.

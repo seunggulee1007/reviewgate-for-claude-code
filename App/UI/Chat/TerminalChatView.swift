@@ -128,7 +128,7 @@ private struct TerminalStatusStrip: View {
                         .accessibilityIdentifier("Terminal chat review now")
                 }
             }
-            if let rule = store.reviewFirst, rule.blocked > 0, store.hasPendingReview { ReviewFirstChip() }   // §64
+            if let rule = store.reviewFirst, rule.blocked > 0, !rule.allowedThisTurn, store.hasPendingReview { ReviewFirstChip() }   // §64
             if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
@@ -199,25 +199,34 @@ private struct TerminalStatusStrip: View {
 }
 
 /// §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review.
+/// [이번 턴만 허용] next to it lets the running turn through (off with the reason between turns).
 private struct ReviewFirstChip: View {
     @Environment(AppState.self) private var store
 
     var body: some View {
-        Button {
-            store.openReviewFirstWaiting()
-        } label: {
-            ViewThatFits(in: .horizontal) {
-                Text(verbatim: "\(ReviewFirstText.blockedText) · \(ReviewFirstText.openReviewTitle)")
-                Text(verbatim: ReviewFirstText.openReviewTitle)
+        HStack(spacing: 4) {
+            Button {
+                store.openReviewFirstWaiting()
+            } label: {
+                ViewThatFits(in: .horizontal) {
+                    Text(verbatim: "\(ReviewFirstText.blockedText) · \(ReviewFirstText.openReviewTitle)")
+                    Text(verbatim: ReviewFirstText.openReviewTitle)
+                }
+                .lineLimit(1)
             }
-            .lineLimit(1)
+            .help(ReviewFirstText.blockedHelp(store.reviewFirst?.mode))
+            .accessibilityLabel(Text(verbatim: ReviewFirstText.blockedText))
+            .accessibilityIdentifier("Terminal review-first chip")
+            let blocker = store.reviewFirstAllowTurnBlocker
+            Button(ReviewFirstText.allowTurnTitle) { store.allowReviewFirstThisTurn() }
+                .lineLimit(1)
+                .disabled(blocker != nil)
+                .help(blocker ?? ReviewFirstText.allowTurnHelp)
+                .accessibilityIdentifier("Terminal review-first allow turn")
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .tint(.orange)
-        .help(ReviewFirstText.blockedHelp)
-        .accessibilityLabel(Text(verbatim: ReviewFirstText.blockedText))
-        .accessibilityIdentifier("Terminal review-first chip")
     }
 }
 

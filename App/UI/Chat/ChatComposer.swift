@@ -1437,7 +1437,7 @@ struct ChatComposer: View {
 private struct PendingReviewNotice: View {
     @Environment(\.colorScheme) private var colorScheme
     let count: Int
-    /// §64 (`reviewFirst: edits`): the answer may not change files until the user decided.
+    /// §64 (`reviewFirst: edits`): the answer may change only the files under review until the user decided.
     var editsBlocked = false
     @State private var showsWhy = false
 
@@ -1465,7 +1465,7 @@ private struct PendingReviewNotice: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("You can ask questions without accepting: sending never accepts or rejects a file.")
                     if editsBlocked {
-                        Text("Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review).")
+                        Text("Until you accept or reject these files, Claude may fix them but not change other files (Settings › Review).")
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("Pending banner merge note")
                     } else {

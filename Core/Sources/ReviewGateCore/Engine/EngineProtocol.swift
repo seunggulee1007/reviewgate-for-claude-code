@@ -471,6 +471,8 @@ public enum EngineCommand: Sendable, Equatable {
     /// Accepted → pending again; nothing on disk changes.
     case unaccept(paths: [String])
     case acceptAll
+    /// §64 [이번 턴만 허용]: the review-first rule lets the running turn through; refused `no_turn` between turns.
+    case reviewFirstAllowTurn
     /// §19.1: `force` reverts even files the user edited after the review (refused `file_changed_since_review` otherwise).
     case reject(paths: [String], force: Bool = false)
     /// §31: without `includeExternal` only the pending files Claude changed (origin tool / bash) are reverted; the
@@ -759,6 +761,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .accept: "accept"
         case .unaccept: "unaccept"
         case .acceptAll: "accept_all"
+        case .reviewFirstAllowTurn: "review_first_allow_turn"   // §64
         case .reject: "reject"
         case .rejectAll: "reject_all"
         // wave1 mac-review
@@ -978,7 +981,7 @@ extension EngineCommand: Encodable {
             try encodeTerminalChatFields(to: encoder)
         case .interruptTakeBack:   // §56.2
             try encodeInterruptTakeBackFields(to: encoder)
-        case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .retryCollect, .branches,
+        case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .reviewFirstAllowTurn, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
              .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges:
             break
