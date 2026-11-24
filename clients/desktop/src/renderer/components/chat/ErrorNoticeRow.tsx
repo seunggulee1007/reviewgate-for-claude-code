@@ -10,7 +10,7 @@ import { ScopeRowActions, ScopeRowFiles } from "./ScopeRowActions"; // MARK: r1-
 import { asksStill, rejectAskedPath } from "../../rejectSchedule"; // MARK: r2-review-flow (M32)
 import { useStore } from "../../store";
 import { rejectBlockedReason } from "../../reviewRound";
-import { firstWaitingPath, openReviewHelp, openReviewTitle, REVIEW_FIRST_ROW } from "../../reviewFirst"; // §64
+import { allowReviewFirstTurn, allowTurnHelp, allowTurnTitle, firstWaitingPath, openReviewHelp, openReviewTitle, REVIEW_FIRST_ROW, reviewFirstAllowTurnBlocker } from "../../reviewFirst"; // §64
 import "../session.css";
 
 const ICON = { fatal: "⊗", error: "ⓘ", warning: "⚠", info: "ⓘ" } as const;
@@ -49,7 +49,7 @@ export function ErrorNoticeRow({ item }: { item: ErrorRow }) {
   );
 }
 
-/** §64: a call denied while files wait for the review — [리뷰 열기] while one still waits. */
+/** §64: a call denied while files wait for the review — [리뷰 열기] and [이번 턴만 허용] while one still waits. */
 function ReviewFirstActions() {
   const path = useStore((s) => firstWaitingPath(s.state));
   const selectFile = useStore((s) => s.selectFile);
@@ -59,7 +59,23 @@ function ReviewFirstActions() {
       <button type="button" className="small" onClick={() => selectFile(path)} title={openReviewHelp()} data-testid="Open review from review-first row">
         {openReviewTitle()}
       </button>
+      <ReviewFirstAllowTurnButton testId="Allow this turn from review-first row" />
     </span>
+  );
+}
+
+/** §64 [이번 턴만 허용] (the row's and the terminal chip's): off with the reason between turns or once allowed. */
+export function ReviewFirstAllowTurnButton({ testId }: { testId: string }) {
+  const blocker = useStore((s) => reviewFirstAllowTurnBlocker(s.state));
+  const run = async (): Promise<void> => {
+    const refusal = await allowReviewFirstTurn();
+    if (!refusal) return;
+    useStore.setState((st) => ({ logs: [...st.logs, `[warn] review_first_allow_turn: ${refusal}`].slice(-500), lastError: refusal, errorBanner: { message: refusal, scope: "session", fatal: false } }));
+  };
+  return (
+    <button type="button" className="small" disabled={blocker !== null} onClick={() => void run()} title={blocker ?? allowTurnHelp()} data-testid={testId}>
+      {allowTurnTitle()}
+    </button>
   );
 }
 

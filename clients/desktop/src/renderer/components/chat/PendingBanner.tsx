@@ -17,9 +17,9 @@ export function PendingBanner() {
   if (waiting === 0) return null;
   if (state.gate.reviewFirst?.mode === "prompts") return <ReviewFirstBanner waiting={state.gate.reviewFirst.waiting} />; // §64
   const text = t("{0} files pending review — you can ask questions without accepting", waiting);
-  // §64 (`reviewFirst: edits`, the default): the answer may not change files until the user decided.
+  // §64 (`reviewFirst: edits`, the default): the answer may change only the files under review until the user decided.
   const merge = state.gate.reviewFirst?.mode === "edits"
-    ? t("Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review).")
+    ? t("Until you accept or reject these files, Claude may fix them but not change other files (Settings › Review).")
     : t("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.");
   return (
     <div className="pending-banner" title={t("Next pending file ⌘] · previous ⌘[ · Accept ⌘⇧A · Reject ⌘⇧R · Request changes ⌘⇧C")} data-testid="Pending review banner">

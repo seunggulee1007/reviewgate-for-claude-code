@@ -97,7 +97,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   e("showStatusLine", "session", "Claude Code status line", "Show the Claude Code status line"),
   e("systemPromptAppend", "session", "System prompt append", "System prompt append", "Added to Claude's system prompt in every session. Placeholders {maxFiles} and {maxLines} are substituted.", "nextSession"),
   // Review
-  e("reviewFirst", "review", "Review first", "Claude waits for your review before its next work", "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before."),
+  e("reviewFirst", "review", "Review first", "Claude waits for your review before its next work", "Until you accept or reject Claude's changes, it may fix the files under review — when you ask in the chat or send Request changes — but its edits to other files wait; Bash commands run. In chats and in terminal chats; a blocked edit's row can allow the rest of that turn. Block prompts too: every change and a new message wait until the review is done (Accept & Send accepts first). Turn off: a message during a review may change any file, as before."),
   e("checkpointIgnorePatterns", "review", "Checkpoint ignore patterns", "Checkpoint ignore patterns"),
   e("testCommandPatterns", "review", "Test command patterns", "Test command patterns"),
   e("navCtrlClick", "review", "Code navigation", "Ctrl+click a name", "Peek shows the definition under the line, without leaving the diff (Alt+F12 does it too); Go to opens it. F12 always goes to it."), // §65.8

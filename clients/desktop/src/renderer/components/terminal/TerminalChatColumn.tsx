@@ -32,6 +32,7 @@ import { pasteRefusal } from "../../terminalPaste";
 import { dropText, mentionText } from "../../terminalDrop";
 import { useViewing } from "../../viewedChat";
 import { ViewingChatBar } from "../chat/ViewingChat";
+import { ReviewFirstAllowTurnButton } from "../chat/ErrorNoticeRow"; // §64
 import { engineRequest, refusalOf } from "../../engineRequest";
 import { TerminalView } from "./TerminalView";
 import "./terminal.css";
@@ -140,7 +141,7 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
             {t("Review now")}
           </button>
         )}
-        {(state.gate.reviewFirst?.blocked ?? 0) > 0 && <ReviewFirstChip /> /* §64 */}
+        {(state.gate.reviewFirst?.blocked ?? 0) > 0 && !state.gate.reviewFirst?.allowedThisTurn && <ReviewFirstChip /> /* §64 */}
         {state.gate.pendingCount > 0 && <AcceptContinueButton ptyId={props.ptyId} running={status.running && !disconnected} />}
         <button
           type="button"
@@ -203,16 +204,23 @@ function LiveTerminal(props: { chatId: string; ptyId: string; opening: boolean; 
  * §58: "Accept N & Continue" in a terminal chat — the files accepted, then "Continue." pasted into Claude Code and Enter
  * pressed (the user's click only). Off with its reason until Claude Code is idle at its prompt.
  */
-/** §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review. */
+/**
+ * §64: Claude Code's edits were denied while files wait — the chat's quiet row, as a chip; a click opens the review.
+ * [이번 턴만 허용] next to it lets the running turn through (off with the reason between turns).
+ */
 function ReviewFirstChip() {
   const path = useStore((s) => firstWaitingPath(s.state));
+  const mode = useStore((s) => s.state.gate.reviewFirst?.mode);
   const selectFile = useStore((s) => s.selectFile);
   if (!path) return null;
   return (
-    <button type="button" className="small terminal-review-first" onClick={() => selectFile(path)} title={reviewFirstBlockedHelp()} aria-label={reviewFirstBlockedText()} data-testid="Terminal review-first chip">
-      <span className="long truncate">{reviewFirstBlockedText()} · {openReviewTitle()}</span>
-      <span className="short truncate">{openReviewTitle()}</span>
-    </button>
+    <>
+      <button type="button" className="small terminal-review-first" onClick={() => selectFile(path)} title={reviewFirstBlockedHelp(mode)} aria-label={reviewFirstBlockedText()} data-testid="Terminal review-first chip">
+        <span className="long truncate">{reviewFirstBlockedText()} · {openReviewTitle()}</span>
+        <span className="short truncate">{openReviewTitle()}</span>
+      </button>
+      <ReviewFirstAllowTurnButton testId="Terminal review-first allow turn" />
+    </>
   );
 }
 

@@ -33,6 +33,7 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "accept",
   "accept_all",
   "unaccept", // the Undo of "Accept all"'s toast
+  "review_first_allow_turn", // §64 [이번 턴만 허용]
   // §34.6 the running turn's changes so far (reads: the "진행 중 변경" section and its read-only diff)
   "live_changes",
   "live_diff",
