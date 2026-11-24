@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import type { PermissionReason } from "../protocol.js";
 import type { GitWorktree } from "../git/worktrees.js";
 import { HOST_FLAVOR, hasGitComponent, isInside, parseAbs, programName, realpathLenient, relativeInside, resolveShellPath, samePath, toRepoRelative } from "../platform/paths.js";
+import { addedDirOf } from "./addedDirs.js";
 import { scanCommand, type ReadOnlyContext } from "./bashClass.js";
 import { walkCommands } from "./gitDestructive.js";
 import { inlineScripts, opaqueWriters, SCRIPT_WRITE_RE, writtenFiles } from "./shellWrites.js";
@@ -83,6 +84,8 @@ export const SCOPE_MESSAGES: Record<Exclude<PermissionReason["code"], "claude_co
   worktree_isolation: "This runs outside this folder (an isolated worktree, another folder or the Workflow tool): its changes are not in this window's review.",
   // MARK: r1-git — §46: only what the review cannot bring back asks.
   git_command: "A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back.",
+  // §67.1: a directory the chat added with /add-dir — Claude may work there, and each edit asks: no snapshot sees it.
+  added_directory: "This edit is in a directory added with /add-dir: the review does not show its diff, so it asks here.",
 };
 
 /** Why a directory is outside what the review sees: a nested repository under `root`, or another worktree of the repository. */
@@ -102,12 +105,15 @@ export function dirScopeReason(dir: string, root: string, worktrees: readonly st
  * file). Null for any other path.
  */
 export function editScopeReason(file: string, root: string, isOutside: (file: string, root: string) => boolean, worktrees: readonly string[] = [],
-  scratchDirs?: readonly string[]): PermissionReason | null {
+  scratchDirs?: readonly string[], addedDirs: readonly string[] = []): PermissionReason | null {
   if (hasGitComponent(resolve(file)) || hasGitComponent(realpathLenient(file))) return { code: "outside_project", message: SCOPE_MESSAGES.outside_project };
   if (isOutside(file, root)) {
     if (isScratchPath(file, scratchDirs)) return null;
     const wt = worktrees.find((w) => isInside(file, w));
-    return wt ? { code: "other_worktree", message: SCOPE_MESSAGES.other_worktree, path: wt } : { code: "outside_project", message: SCOPE_MESSAGES.outside_project };
+    if (wt) return { code: "other_worktree", message: SCOPE_MESSAGES.other_worktree, path: wt };
+    // §67.1: in a directory the chat added — still a card (the review does not see it), saying why it is Claude's to edit.
+    const added = addedDirOf(file, addedDirs);
+    return added ? { code: "added_directory", message: SCOPE_MESSAGES.added_directory, path: added } : { code: "outside_project", message: SCOPE_MESSAGES.outside_project };
   }
   const nested = nestedRepoRoot(file, root);
   if (nested) return { code: "nested_repository", message: SCOPE_MESSAGES.nested_repository, path: nested };

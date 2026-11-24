@@ -64,9 +64,12 @@ export type PermissionAgent = {
  * localize on `code` (and show `message` for a code they do not know).
  */
 export type PermissionReason = {
-  code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command";
+  code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command" | "added_directory";
   message: string;
-  /** The nested repository / worktree root concerned (absolute, native); for `claude_config` the settings file itself. */
+  /**
+   * The nested repository / worktree root concerned (absolute, native); for `claude_config` the settings file itself; §67.1
+   * `added_directory`: the directory the chat added with `/add-dir` that holds the file.
+   */
   path?: string;
   /** §39.4 `worktree_command`: the worktree is another repository's (the command `cd`s / `-C`s there) — no chat can follow it. */
   otherRepository?: true;
@@ -741,6 +744,10 @@ export type EngineCommand =
   | Cmd<"steer_take_back", { messageId: string }>
   /** §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `btw_answer`. */
   | Cmd<"btw_ask", { question: string }>
+  /** §67.1 `/add-dir`: Claude may also work in `path` (absolute, `~/…`, or relative to the project) from the next message on. */
+  | Cmd<"add_dir", { path: string }>
+  /** §67.1: the chat's added directory `path` (as `state.session.addedDirs` lists it) is no longer Claude's to work in. */
+  | Cmd<"remove_dir", { path: string }>
   /** §57: how to start `claude` for the current terminal chat; replies `terminal_spec`. Each call issues a fresh hook token (the previous one is retired). */
   | Cmd<"terminal_spec", { sessionId: string }>
   /** §57: the app's PTY runs it (pid of the exec'd claude). */
@@ -1138,6 +1145,8 @@ export type SessionState = {
   autoModel?: AutoModelChoice | null;
   /** §57: the terminal chat's live state; null / absent for a chat-kind session. */
   terminal?: TerminalSessionState | null;
+  /** §67.1: the current chat's directories added with `/add-dir` (absolute, real paths), in the order added. */
+  addedDirs?: string[];
 };
 
 /** §57: Claude Code waits for the user in the TUI (a permission dialog, a question). */
@@ -1599,6 +1608,8 @@ export type SessionMeta = {
   continuedIn?: string;
   /** §57.16: the CLI config dir the terminal really uses (learned from a hook's `transcript_path`). */
   cliConfigDir?: string;
+  /** §67.1: directories added with `/add-dir` (absolute, real paths); the CLI starts with them (`additionalDirectories`). */
+  addedDirs?: string[];
 };
 
 export type SessionsState = {

@@ -2395,7 +2395,8 @@ its card stores nothing, §10 — r2-peers: except for a live session's known co
 type PermissionReason = {
   code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation"
       | "claude_config"          // §33.9
-      | "git_command";           // §46
+      | "git_command"            // §46
+      | "added_directory";       // §67.1: in a directory the chat added with /add-dir (path = that directory)
   message: string;               // English fallback; clients localize on code — and show it as is for a code they do not know
   path?: string;                 // the nested repository / worktree root concerned (absolute, native); claude_config: the settings file
 };
@@ -9010,7 +9011,8 @@ not touched.
   built-ins that work in stream-json (`/init`, `/review`, `/security-review`, `/pr-comments` …) and every command or skill of
   the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
   project's `/status` still goes to Claude).
-- **Only the terminal has it** (`/hooks`, `/vim`, `/add-dir`, `/doctor`, `/login`, `/theme`, `/usage` … the list is
+- **`/add-dir`** is the app's own since §67.1 (it adds a directory to the chat); before, it was among the terminal's.
+- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme`, `/usage` … the list is
   `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
   "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
   its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
@@ -11149,3 +11151,48 @@ type AcceptedBase = {
   counts; reject to the accepted content and `to: "round"`; hunk reject of the new hunk only; `since: "round"`; restart;
   deleted after the accept and re-created after an accepted delete; an untouched accepted file committed; request
   changes, Accept & Continue and finish).
+
+## 67. Claude Code's `/add-dir` and `!` in a classic chat
+
+Two things a terminal user types without thinking had no answer in a classic chat: `/add-dir <path>` (it was among the
+terminal-only built-ins, §56.5) and a message starting with `!` (Claude Code's bash mode; §56.2 said "there is no `!`
+shell mode"). Both are the app's own now. Terminal chats (§57) are the real TUI and keep theirs: the engine refuses both
+commands there (`terminal_chat`).
+
+### 67.1 `/add-dir` — directories beyond the project
+
+```ts
+// commands
+add_dir    { path: string }   // absolute, ~ / ~/x, or relative to the project folder ("../shared"); quotes around it are dropped
+remove_dir { path: string }   // as state.session.addedDirs lists it
+// refused: no_project | no_session | terminal_chat | dir_busy (starting, a turn, its collection, a revert, another session's turn)
+//          | dir_empty_path | dir_path_too_long (> 4096) | dir_not_found:<abs> | dir_not_directory:<abs>
+//          | dir_is_project:<real> (the project folder or inside it) | dir_already_added:<added dir holding it>
+//          | dir_too_many (20 per chat) | dir_not_added:<path> (remove_dir)
+// state.session.addedDirs: string[]        // the current chat's, real absolute paths, in the order added ([] when none)
+// SessionMeta.addedDirs?: string[]         // kept with the chat (sessions/index.json); a rewind fork (§26) inherits them
+// PermissionReason.code: … | "added_directory"   // path = the added directory holding the file
+```
+
+- **Kept with the chat.** `add_dir` resolves the path (`~` is the home folder, a relative path is the project folder's, as
+  the terminal resolves it against its cwd), takes its real path and checks it: it must exist and be a directory, lie
+  outside the project folder (inside it Claude works already) and not be inside a directory the chat added; a directory
+  that holds one added before replaces it. A new chat starts with none; switching chats brings each chat's own.
+- **The CLI starts with them.** The session's CLI gets them as the SDK's `additionalDirectories` (the terminal's
+  `--add-dir`) and the engine's system instruction names them: Claude may read and edit there, and every edit there asks
+  first. The CLI takes them only at its start, so `add_dir` / `remove_dir` restart a running CLI at once, resuming the
+  conversation (as `restart_session`) — the next message has them. Never while work runs (`dir_busy`): the chat's
+  directories never change under a turn. A directory gone by a later start is left out (logged), not refused.
+- **The review, decided deliberately.** The review is a snapshot of the project's worktree (§4), so nothing in an added
+  directory can reach it as a diff. Edits there are therefore **never auto-allowed**: the edit tools keep the card in the
+  default and acceptEdits modes, with the reason `added_directory` ("This edit is in a directory added with /add-dir: the
+  review does not show its diff, so it asks here." — clients localize), the card's own preview being the place to judge
+  the change; an approved one is listed in `changedOutside` (§8) like any edit outside the project. Auto mode leaves it to
+  the CLI as it does every outside edit (§39.5) and lists it in `changedOutside` all the same. The only difference from
+  `outside_project` is the reason: Claude was told it may work there, and the card says why it asks. Reads there never ask
+  (as everywhere); Bash is judged as before. A throwaway file in a temporary folder outside any repository stays the
+  scratch exception (§33.3), added or not.
+- Engine: `session/addedDirs.ts` (`validateAddDir`, `withAddedDir`, `addedDirOf`, `addedDirsInstruction`),
+  `session/reviewScope.ts` (`editScopeReason(…, addedDirs)`), `session/claude.ts` (`additionalDirectories`, the
+  instruction, `canUseTool`), `session/hooks.ts` (`postEditScope`), `review/sessions.ts`, `engine.ts` (`addDir`,
+  `removeDir`, `startAddedDirs`). Tests: `engine/test/w67.addDir.test.ts`.

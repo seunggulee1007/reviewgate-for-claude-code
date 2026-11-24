@@ -203,6 +203,7 @@ import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
 import type { BtwAnswerEvent, InterruptedEvent } from "./protocol.js";
+import { findAddedDir, validateAddDir, withAddedDir } from "./session/addedDirs.js"; // §67.1
 import { BTW_SYSTEM, BTW_TIMEOUT_MS, BtwHistory, btwForkPrompt, MAX_BTW_QUESTION } from "./side/btw.js"; // §56.1
 import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
 import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
@@ -1561,6 +1562,12 @@ export class ReviewEngine {
         return this.fileImageEvent(cmd.path);
       case "btw_ask": // §56.1
         return this.btwAsk(cmd.question);
+      case "add_dir": // §67.1
+        await this.addDir(cmd.path);
+        return;
+      case "remove_dir":
+        await this.removeDir(cmd.path);
+        return;
       // ---- §21 side questions
       case "side_ask": {
         // MARK: r2-skills-side — §21 (M18): a skill / slash command the session knows runs in the main conversation only.
@@ -4073,6 +4080,7 @@ export class ReviewEngine {
           systemPromptAppend: s.systemPromptAppend,
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
           backgroundWork: s.backgroundWork !== false, // §52
+          addedDirs: this.startAddedDirs(), // §67.1
           subagentsInTurn: s.subagentsInTurn === true, // §52.2
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
@@ -4434,6 +4442,68 @@ export class ReviewEngine {
       throw new CommandRefused("steer_already_read: Claude already read this message — it stays in the chat", { code: "steer_already_read" });
     }
     throw new CommandRefused("steer_take_back_failed: the CLI could not take the message back — Claude still reads it", { code: "steer_take_back_failed" });
+  }
+
+  // ------------------------------------------------------------------ §67.1 /add-dir
+
+  /** The current chat's `/add-dir` directories (§67.1). */
+  private currentAddedDirs(): string[] {
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    return [...(meta?.addedDirs ?? [])];
+  }
+
+  /** What a starting CLI is given: the chat's added directories that still exist (one gone is left out and logged). */
+  private startAddedDirs(): string[] {
+    return this.currentAddedDirs().filter((d) => {
+      const ok = existsSync(d);
+      if (!ok) this.log("warn", `added directory ${d} is gone: the session starts without it`);
+      return ok;
+    });
+  }
+
+  /** The chat `add_dir` / `remove_dir` change: refused without a project, for a terminal chat, and while work runs. */
+  private addedDirsChat(): SessionMeta {
+    this.requireProject();
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (!meta) throw new CommandRefused("no_session");
+    if (meta.kind === "terminal") throw new CommandRefused("terminal_chat"); // the TUI has its own /add-dir
+    const g = this.gate;
+    if (this.sessionState.starting || g.running || g.collecting || g.reverting || this.session?.isTurnActive || this.sessionState.externalTurn) {
+      throw new CommandRefused("dir_busy");
+    }
+    return meta;
+  }
+
+  /**
+   * §67.1 `add_dir {path}`: `path` joins the chat's directories (validated: an existing directory outside the project, not
+   * added yet) and is kept with the chat. The CLI takes them at its start: a running one restarts, resuming the
+   * conversation, so the next message has it.
+   */
+  private async addDir(path: unknown): Promise<void> {
+    const meta = this.addedDirsChat();
+    const dir = await validateAddDir(path, this.project!.path, meta.addedDirs ?? []);
+    meta.addedDirs = withAddedDir(meta.addedDirs ?? [], dir);
+    this.persistSessions();
+    this.log("info", `chat ${meta.id}: directory added (${meta.addedDirs.length} in all)`);
+    await this.applyAddedDirs();
+  }
+
+  /** §67.1 `remove_dir {path}`: refused `dir_not_added:<path>` when the chat has no such directory. */
+  private async removeDir(path: unknown): Promise<void> {
+    const meta = this.addedDirsChat();
+    const dir = findAddedDir(meta.addedDirs ?? [], path);
+    if (dir === null) throw new CommandRefused(`dir_not_added:${typeof path === "string" ? path : ""}`, { code: "dir_not_added" });
+    const rest = (meta.addedDirs ?? []).filter((d) => d !== dir);
+    if (rest.length > 0) meta.addedDirs = rest;
+    else delete meta.addedDirs;
+    this.persistSessions();
+    this.log("info", `chat ${meta.id}: directory removed (${rest.length} left)`);
+    await this.applyAddedDirs();
+  }
+
+  private async applyAddedDirs(): Promise<void> {
+    this.touch();
+    if (this.session && this.sessionState.open) await this.restartSession(true);
   }
 
   /**
@@ -6182,6 +6252,7 @@ export class ReviewEngine {
     const meta = idx.create();
     meta.title = old.title.endsWith(REWOUND_TITLE_SUFFIX) ? old.title.slice(0, -REWOUND_TITLE_SUFFIX.length) : old.title;
     meta.forkedFrom = { sessionId: old.id, turn };
+    if (old.addedDirs?.length) meta.addedDirs = [...old.addedDirs]; // §67.1: the fork works where its chat did
     meta.turns = Math.max(0, turn - 1);
     meta.costUSD = kept.reduce((n, r) => n + (r.kind === "turn_end" ? r.usage.costUsd ?? 0 : 0), 0);
     const lastUser = [...kept].reverse().find((r) => r.kind === "user_message");
@@ -9477,6 +9548,7 @@ export class ReviewEngine {
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,
         ...this.planSourceSlice(), // MARK: wave4d w4d-plan (§42.1)
         ...(this.terminal ? { terminal: this.terminal.state } : {}), // MARK: terminal-chat (§57)
+        addedDirs: this.currentAddedDirs(), // §67.1
       },
       toolchain: this.toolchain,
       gate: this.gate,
@@ -9916,6 +9988,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_request_cancel": // §57.14
     case "terminal_permission_response": // §57.15
     case "review_first_allow_turn": // §64
+    case "add_dir": // §67
+    case "remove_dir":
       return "session";
     case "side_ask":
     case "side_list":

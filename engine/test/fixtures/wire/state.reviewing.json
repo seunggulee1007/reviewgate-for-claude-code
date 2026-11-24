@@ -176,6 +176,7 @@
     "externalTurn": null,
     "backgroundTasks": [],
     "peerTurn": null,
+    "addedDirs": [],
     "canRestart": true
   },
   "toolchain": {

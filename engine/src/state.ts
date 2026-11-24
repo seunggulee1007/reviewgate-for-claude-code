@@ -94,6 +94,8 @@ export type EngineSlices = {
     // MARK: wave5 w5-model
     /** §43.4 (see protocol.ts SessionState). */
     autoModel?: AutoModelChoice | null;
+    /** §67.1 (see protocol.ts SessionState). */
+    addedDirs?: string[];
   };
   toolchain: ToolchainState;
   gate: ReviewGate;
