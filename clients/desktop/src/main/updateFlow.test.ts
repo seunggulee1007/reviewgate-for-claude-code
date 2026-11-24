@@ -109,13 +109,13 @@ describe("the Windows update through main (§48)", () => {
     expect(laterQuits).toBe(0);
     expect(h.settings["pendingUpdateInstall"]).toBeUndefined();
   });
-  it("a release without its installer yet: Install off and why; once it is attached, Install is on", async () => {
+  it("a release without its installer yet: Install off and why, Check Again possible; once it is attached, Install is on", async () => {
     h.mode = { kind: "user" };
     const m = await launch("0.5.17");
     await m.checkOnce(async () => ({ ok: true, json: { ...release, assets: [] } }));
-    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: "The Windows installer is still being uploaded — ReviewGate checks again by itself." });
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: "The Windows installer is still being uploaded — ReviewGate checks again by itself.", pending: true, elevated: false });
     await m.checkOnce(async () => ({ ok: true, json: release }));
-    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: null });
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: null, pending: false });
   });
 
   it("an install for all users: the installer is started elevated; the prompt declined → the record says so and the app reopens", async () => {
@@ -124,7 +124,7 @@ describe("the Windows update through main (§48)", () => {
       let quits = 0;
       const m = await launch("0.5.17", () => void quits++);
       await m.checkOnce(async () => ({ ok: true, json: release }));
-      expect(m.updateStatus().release).toMatchObject({ why: null });
+      expect(m.updateStatus().release).toMatchObject({ why: null, pending: false, elevated: true });
       await m.installNow();
       await until(() => quits > 0);
       const relaunched = h.relaunched.length;

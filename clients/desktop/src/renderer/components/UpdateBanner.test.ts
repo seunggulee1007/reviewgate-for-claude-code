@@ -19,9 +19,9 @@ beforeAll(async () => {
 });
 
 const noop = () => undefined;
-const actions: UpdateActions = { install: noop, cancel: noop, restartNow: noop, later: noop, dismiss: noop, openPage: noop, focus: noop, notes: noop };
+const actions: UpdateActions = { install: noop, cancel: noop, restartNow: noop, later: noop, dismiss: noop, openPage: noop, checkAgain: noop, focus: noop, notes: noop };
 const base: UpdateStatus = { current: "0.5.17", release: null, install: null, notice: null, downloadPage: "https://github.com/acme/app/releases/tag/v0.6.0", lastCheck: null, checking: false };
-const release = { version: "0.6.0", page: "https://github.com/acme/app/releases/tag/v0.6.0", hasNotes: true, why: null };
+const release = { version: "0.6.0", page: "https://github.com/acme/app/releases/tag/v0.6.0", hasNotes: true, why: null, pending: false, elevated: false };
 const html = (s: Partial<UpdateStatus>) => renderToStaticMarkup(createElement(View, { status: { ...base, ...s }, actions }));
 const testIds = (h: string) => [...h.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1]);
 const amp = (s: string) => s.replace(/&#x27;/g, "'").replace(/&amp;/g, "&");
@@ -42,10 +42,32 @@ describe("the update banner (§48 Windows)", () => {
     expect(h).not.toMatch(/data-testid="Install update"[^>]*disabled|disabled=""[^>]*data-testid="Install update"/);
   });
 
-  it("a release the app cannot install: the button is off and says why; the download page stays", () => {
-    const h = amp(html({ release: { ...release, hasNotes: false, why: "The release has no Windows installer with its checksum yet — try again later, or download it from the release page." } }));
-    expect(h).toMatch(/<button[^>]*disabled=""[^>]*title="The release has no Windows installer/);
-    expect(testIds(h)).toEqual(["Update banner", "Install update", "Open release page", "Dismiss update"]);
+  it("the installer not attached yet: the button is off, why is said under the title, Check Again beside it", () => {
+    const why = "The Windows installer is still being uploaded — ReviewGate checks again by itself.";
+    const h = amp(html({ release: { ...release, hasNotes: false, why, pending: true } }));
+    expect(h).toMatch(/<button[^>]*disabled=""[^>]*title="The Windows installer is still being uploaded/);
+    expect(h).toContain(`title="${why}" data-testid="Update reason">${why}</span>`);
+    expect(testIds(h)).toEqual(["Update banner", "Update reason", "Install update", "Check update again", "Open release page", "Dismiss update"]);
+    expect(h).toContain('title="Asks GitHub again whether the Windows installer is attached"');
+    // The Download Page does not lead here: Check Again does.
+    expect(h).toContain('class="small" title="Opens the release page');
+    // While a check runs Check Again is off and says so.
+    expect(amp(html({ checking: true, release: { ...release, why, pending: true } }))).toMatch(/<button[^>]*disabled=""[^>]*title="Checking for updates…" data-testid="Check update again"/);
+  });
+
+  it("a copy that cannot install: why under the title, the Download Page leads, no Check Again", () => {
+    const why = "ReviewGate was not installed by its installer here — download the new version from the release page.";
+    const h = amp(html({ release: { ...release, hasNotes: false, why } }));
+    expect(h).toContain(`data-testid="Update reason">${why}</span>`);
+    expect(testIds(h)).toEqual(["Update banner", "Update reason", "Install update", "Open release page", "Dismiss update"]);
+    expect(h).toContain('class="small primary" title="Opens the release page');
+  });
+
+  it("an install for all users: Install on, the line says Windows asks once for administrator rights", () => {
+    const h = amp(html({ release: { ...release, elevated: true } }));
+    expect(h).toContain('data-testid="Update reason">ReviewGate is installed for all users — Windows asks once for administrator rights.</span>');
+    expect(h).not.toMatch(/disabled=""[^>]*data-testid="Install update"/);
+    expect(h).toContain("reopens it — Windows asks once for administrator rights");
   });
 
   it("downloading: the title says installing, the line the megabytes, a bar named Download progress; Cancel and Download Page", () => {
@@ -103,7 +125,7 @@ describe("the update banner (§48 Windows)", () => {
   });
 
   it("in Korean", async () => {
-    const { initI18n } = await import("../i18n");
+    const { initI18n, t } = await import("../i18n");
     initI18n("ko", "win32");
     try {
       const available = amp(html({ release }));
@@ -111,6 +133,12 @@ describe("the update banner (§48 Windows)", () => {
       expect(available).toContain(">설치하고 다시 시작<");
       expect(available).toContain(">다운로드 페이지<");
       expect(available).toContain("GitHub에서 설치 파일을 내려받아 체크섬을 확인한 뒤");
+      // `why` comes from main, already in the app's language.
+      expect(t("The Windows installer is still being uploaded — ReviewGate checks again by itself.")).toBe("Windows 설치 파일을 아직 올리는 중이에요 — 자동으로 다시 확인해요.");
+      const pending = amp(html({ release: { ...release, why: "…", pending: true } }));
+      expect(pending).toContain(">다시 확인<");
+      expect(pending).toContain('title="Windows 설치 파일이 올라왔는지 GitHub에 다시 물어봐요"');
+      expect(amp(html({ release: { ...release, elevated: true } }))).toContain("관리자 권한을 한 번 물어요");
       const downloading = amp(html({ install: { kind: "downloading", received: 12_400_000, total: 115_300_000, version: "0.6.0" } }));
       expect(downloading).toContain("ReviewGate 0.6.0 설치 중");
       expect(downloading).toContain("받는 중 12.4 / 115.3 MB");

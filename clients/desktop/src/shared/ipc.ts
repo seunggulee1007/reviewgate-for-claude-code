@@ -336,8 +336,12 @@ export type UpdateInstallState =
 export type UpdateNoticeState = { kind: "updated"; version: string; from: string; hasNotes: boolean } | { kind: "failed"; version: string; why: string };
 export type UpdateStatus = {
   current: string;
-  /** A newer release (null: none, or closed with Later while nothing is under way). `why`: it cannot be installed from the app. */
-  release: { version: string; page: string; hasNotes: boolean; why: string | null } | null;
+  /**
+   * A newer release (null: none, or closed with Later while nothing is under way). `why`: it cannot be installed from the
+   * app (said under the title too). `pending`: its Windows installer is not attached yet — [Check Again] helps. `elevated`:
+   * an install for all users — Windows asks once for administrator rights.
+   */
+  release: { version: string; page: string; hasNotes: boolean; why: string | null; pending: boolean; elevated: boolean } | null;
   /** The install under way or failed, for `version`. */
   install: (UpdateInstallState & { version: string }) | null;
   notice: UpdateNoticeState | null;

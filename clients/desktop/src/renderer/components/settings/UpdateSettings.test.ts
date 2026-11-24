@@ -18,9 +18,9 @@ beforeAll(async () => {
 });
 
 const noop = () => undefined;
-const actions: UpdateActions = { install: noop, cancel: noop, restartNow: noop, later: noop, dismiss: noop, openPage: noop, focus: noop, notes: noop };
+const actions: UpdateActions = { install: noop, cancel: noop, restartNow: noop, later: noop, dismiss: noop, openPage: noop, checkAgain: noop, focus: noop, notes: noop };
 const base: UpdateStatus = { current: "0.5.17", release: null, install: null, notice: null, downloadPage: "https://github.com/acme/app/releases", lastCheck: null, checking: false };
-const release = { version: "0.6.0", page: "https://github.com/acme/app/releases/tag/v0.6.0", hasNotes: false, why: null };
+const release = { version: "0.6.0", page: "https://github.com/acme/app/releases/tag/v0.6.0", hasNotes: false, why: null, pending: false, elevated: false };
 const html = (s: Partial<UpdateStatus>) => renderToStaticMarkup(createElement(View, { status: { ...base, ...s }, actions, checkNow: noop })).replace(/&#x27;/g, "'");
 const testIds = (h: string) => [...h.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1]);
 
@@ -42,6 +42,22 @@ describe("Settings › Updates (§48 Windows)", () => {
     const h = html({ release });
     expect(h).toContain("ReviewGate 0.6.0 is available");
     expect(testIds(h)).toEqual(["Update install status", "Settings install update", "Check for updates now", "Settings open release page"]);
+  });
+
+  it("Install off: why under the status; the Download Page leads unless the installer is only not attached yet", () => {
+    const pending = html({ release: { ...release, why: "The Windows installer is still being uploaded — ReviewGate checks again by itself.", pending: true } });
+    expect(testIds(pending)).toEqual(["Update install status", "Settings update reason", "Settings install update", "Check for updates now", "Settings open release page"]);
+    expect(pending).toContain("The Windows installer is still being uploaded — ReviewGate checks again by itself.");
+    expect(pending).toMatch(/<button[^>]*disabled=""[^>]*data-testid="Settings install update"/);
+    expect(pending).toContain('class="small" title="Opens the release page');
+    const refused = html({ release: { ...release, why: "This is a development build — it does not install updates." } });
+    expect(refused).toContain("This is a development build — it does not install updates.");
+    expect(refused).toContain('class="small primary" title="Opens the release page');
+    const elevated = html({ release: { ...release, elevated: true } });
+    expect(elevated).toContain("ReviewGate is installed for all users — Windows asks once for administrator rights.");
+    expect(elevated).not.toMatch(/disabled=""[^>]*data-testid="Settings install update"/);
+    // While installing, the line is the install's own.
+    expect(testIds(html({ release: { ...release, elevated: true }, install: { kind: "verifying", version: "0.6.0" } }))).not.toContain("Settings update reason");
   });
 
   it("downloading: the banner's title, line and bar; Cancel; Check Now off", () => {

@@ -200,7 +200,7 @@ export function updateStatus(): UpdateStatus {
   const shownVersion = view ? installing : (found?.version ?? (notice ? notice.version : null));
   return {
     current: app.getVersion(),
-    release: found && !quiet ? { version: found.version, page: found.page, hasNotes: found.notes.trim() !== "", why: refusal(found) } : null,
+    release: found && !quiet ? { version: found.version, page: found.page, hasNotes: found.notes.trim() !== "", why: refusal(found), pending: !found.assets && modeHere().kind !== "refused", elevated: modeHere().kind === "elevated" } : null,
     install: view ? { ...(view.kind === "waiting" ? { kind: "waiting", blockers: view.blockers.map((b) => ({ id: b.id, line: blockerLine(b) })) } : view), version: installing } : null,
     notice: notice ? (notice.kind === "updated" ? { ...notice, hasNotes: noticeNotes !== null && noticeNotes.trim() !== "" } : notice) : null,
     downloadPage: shownVersion ? `${RELEASES_PAGE}/tag/v${shownVersion}` : RELEASES_PAGE,

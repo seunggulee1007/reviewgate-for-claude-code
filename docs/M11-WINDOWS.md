@@ -267,7 +267,7 @@ Artifacts built on macOS:
   there for doing it by hand. An all-users install (under Program Files) is updated the same way but elevated: Windows
   asks once for administrator rights (UAC) and the installer runs with `/allusers`; declined, ReviewGate reopens and says
   "Administrator rights were not given". A release whose Windows installer is not attached yet (CI adds it 10–15
-  minutes after the DMG) says so and is looked up again every 3 minutes for an hour.
+  minutes after the DMG) says so under the banner's title and is looked up again every 3 minutes for an hour.
 - **What the checksum is worth.** It comes from the same release as the installer: it catches a corrupted or truncated
   download, not a compromised release. The installer is not code-signed yet; Authenticode verification before running it
   comes with the SignPath signing.
@@ -356,14 +356,15 @@ with an older release installed (e.g. 0.5.17 per user) and a newer one published
 - [ ] Running the new installer by hand over the old one (no uninstall) upgrades in place the same way.
 - [ ] Behind a proxy (system proxy settings): the download goes through it.
 - [ ] **All-users install with UAC.** Install an older release for all users (Program Files, "Anyone who uses this
-      computer"): [Install and Restart] → the windows close → the UAC prompt (note whether it comes to the front or only
-      flashes in the taskbar) → Yes: ReviewGate reopens as X, **not elevated** (Task Manager › Details › Elevated: No),
-      still under Program Files, shortcuts kept → No: ReviewGate reopens as the old version with "… did not install —
-      Administrator rights were not given …" and [Try Again]. Also as a standard (non-admin) user: the prompt asks for an
-      administrator's password.
-- [ ] Failure paths: a release without the `.exe` (Install off, "The Windows installer is still being uploaded …";
-      once CI attaches it, Install turns on within ~3 minutes by itself); the network cut mid-download (why, [Try
-      Again]).
+      computer"): the banner's line says "Windows asks once for administrator rights"; [Install and Restart] → the windows
+      close → the UAC prompt (note whether it comes to the front or only flashes in the taskbar) → Yes: ReviewGate reopens
+      as X, **not elevated** (Task Manager › Details › Elevated: No), still under Program Files, shortcuts kept → No:
+      ReviewGate reopens as the old version with "… did not install — Administrator rights were not given …" and [Try
+      Again]. Also as a standard (non-admin) user: the prompt asks for an administrator's password.
+- [ ] Failure paths: a release without the `.exe` (Install off, the line "The Windows installer is still being
+      uploaded …" with [Check Again]; once CI attaches it, Install turns on within ~3 minutes by itself); the network cut
+      mid-download (why, [Try Again]); a copy not installed by the installer (Install off, the line says why, [Download
+      Page] primary).
 - [ ] Task Manager after the update: no `claude.exe` / `node.exe` left from the old version.
 
 Release notes (the preview's known limits, for the release that ships it)
