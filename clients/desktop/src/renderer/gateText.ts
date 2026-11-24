@@ -26,6 +26,8 @@ export function gateText(reason: string): string {
       return t("Claude is still starting — wait a moment");
     case "git_init_needed":
       return t("Initialize the Git repository first");
+    case "shell_running": // §67.2
+      return t("Wait for the shell command to end");
     default:
       return t("This cannot be sent right now");
   }

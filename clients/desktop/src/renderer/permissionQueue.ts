@@ -86,7 +86,7 @@ export function canRemember(request: Pick<PermissionRequest, "toolName" | "reaso
 // MARK: r2-peers — §33.1: several waiting cards answered at once (as the Mac's PermissionCardOptions.bundles)
 
 /** The orange reasons — a call outside what this window's review sees — that may go along with others. */
-const BUNDLED_REASONS: ReadonlySet<string> = new Set(["outside_project", "nested_repository", "other_worktree"]);
+const BUNDLED_REASONS: ReadonlySet<string> = new Set(["outside_project", "nested_repository", "other_worktree", "added_directory" /* §67.1 */]);
 
 /**
  * Whether "대기 중 N개 모두 허용" / "이 에이전트의 요청은 이번 턴 동안 허용" may answer `request` without its own click: never
@@ -227,6 +227,9 @@ export function reasonView(reason: { code: string; message: string; path?: strin
     // as on the Mac); it used to fall through to the engine's English message in orange.
     case "git_command":
       return view(t("A git command that throws away uncommitted work or rewrites the remote — the review cannot bring it back"), "red");
+    // §67.1: Claude was told it may work there, so the card says why it still asks (orange, as outside_project).
+    case "added_directory":
+      return view(t("An edit in a directory added with /add-dir — the review does not show its diff, so it asks here"), "orange");
     default:
       return view(reason.message || code, "orange");
   }

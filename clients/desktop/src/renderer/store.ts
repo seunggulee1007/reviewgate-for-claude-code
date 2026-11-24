@@ -36,6 +36,8 @@ import type {
   TurnSummaryEvent,
   WorkbenchInfo,
 } from "@reviewgate/engine";
+import type { ShellResult } from "@reviewgate/engine"; // §67.2
+import { clearShellOutput, noteShellOutput } from "./shellMode"; // §67.2: the running `!` command's output
 import type { AppSettings } from "../shared/ipc";
 import { engineRequest, refusalOf } from "./engineRequest";
 import { isShadowProject, type TrackOutcome } from "./noGit"; // §59
@@ -144,6 +146,8 @@ export type ChatItem =
   | { kind: "turnSummary"; id: number; summary: TurnSummaryEvent }
   | { kind: "planProposed"; id: number; path: string | null; plan: string }
   | { kind: "planApproved"; id: number; mode: PermissionMode; path: string | null; line?: string /* MARK: wave4d w4d-plan (§42.1: where it went) */ }
+  /** §67.2: a `!` command the user ran between turns (live `shell_result` and restored rows alike). */
+  | { kind: "shell"; id: number; result: ShellResult; turn?: number }
   | { kind: "restoredDivider"; id: number };
 
 let nextId = 1;
@@ -243,6 +247,12 @@ function transcriptItemsToChatItems(items: TranscriptItem[], budget: Budget): Ch
       case "turn_summary": {
         const summary = summaryOfRow(item);
         if (summary) out.push({ kind: "turnSummary", id: uid(), summary });
+        break;
+      }
+      // §67.2: a `!` command's row comes back with the chat.
+      case "shell": {
+        const { kind: _kind, at: _at, turn, ...result } = item;
+        out.push({ kind: "shell", id: uid(), result, turn });
         break;
       }
     }
@@ -983,6 +993,7 @@ export const useStore = create<Store>((set, get, api) => {
   };
 
   const resetProjectView = () => {
+    clearShellOutput(); // §67.2
     set({ transcript: [], lastError: null, errorBanner: null, selectedPath: null, selectedDiff: null, diffCache: {}, fullFileCache: {}, diffLoading: false, viewedPaths: {}, transcriptRestored: false, transcriptFocus: null, replaceTranscript: false, ui: {}, wantedPath: null, reviewHistory: EMPTY_HISTORY, historyView: null, queue: EMPTY_QUEUE });
     get().resetSide();
     get().resetComposer();
@@ -1398,6 +1409,16 @@ export const useStore = create<Store>((set, get, api) => {
         case "log":
           appendLog(`[${ev.level}] ${ev.message}`);
           break;
+        // §67.2: the running `!` command's output so far, then its row.
+        case "shell_output":
+          noteShellOutput(ev.id, ev.output);
+          break;
+        case "shell_result": {
+          const { type: _type, turn, at: _at, ...result } = ev;
+          clearShellOutput(ev.id);
+          set((s) => ({ transcript: [...finishStreaming(s.transcript), { kind: "shell", id: uid(), result, turn }] }));
+          break;
+        }
         default:
           break;
       }
@@ -2494,6 +2515,8 @@ export function cannotSendReason(s: ReviewState): string | null {
       return t("Review {0} pending file(s) to continue", s.gate.pendingCount);
     case "changes_requested":
       return t("Send your change request ({0} file(s)) to continue", s.gate.changesRequestedCount);
+    case "shell_running": // §67.2: the `!` command runs — a message waits in the queue
+      return t("A shell command is running — your message waits until it ends");
   }
 }
 
