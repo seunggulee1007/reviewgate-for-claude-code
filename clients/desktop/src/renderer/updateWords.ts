@@ -49,9 +49,19 @@ export function noticeDetail(notice: NonNullable<UpdateStatus["notice"]>): strin
   return notice.kind === "updated" ? t("Previously {0}.", notice.from) : t("The update to {0} did not install — {1}", notice.version, notice.why);
 }
 
+type Release = NonNullable<UpdateStatus["release"]>;
+
 /** [Install and Restart]'s tooltip: what it does, or why it is off. */
-export function installHelp(why: string | null): string {
-  return why ?? t("Downloads the installer from GitHub, checks its checksum, then quits ReviewGate, installs the new version and reopens it");
+export function installHelp(release: Release): string {
+  if (release.why) return release.why;
+  const does = t("Downloads the installer from GitHub, checks its checksum, then quits ReviewGate, installs the new version and reopens it");
+  return release.elevated ? `${does} — ${t("Windows asks once for administrator rights")}` : does;
+}
+
+/** The line under the available banner's title: why [Install and Restart] is off, or that Windows will ask for
+ * administrator rights; null when there is nothing to add. */
+export function releaseReason(release: Release): string | null {
+  return release.why ?? (release.elevated ? t("ReviewGate is installed for all users — Windows asks once for administrator rights.") : null);
 }
 
 export const downloadPageHelp = (): string => t("Opens the release page — download the installer there and run it by hand");

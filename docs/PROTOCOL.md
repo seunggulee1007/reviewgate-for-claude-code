@@ -7293,6 +7293,15 @@ download whose identifier differs from the running app's, so a build with an old
   The release's `ReviewGate-Setup-X.Y.Z.exe` and `ReviewGate-Setup-X.Y.Z.exe.sha256` (attached by
   `.github/workflows/windows-installer.yml` after the release is published — until then [Install and Restart] is off
   and says so) are installed from the banner. The installer is **not code-signed** yet (SignPath Foundation pending).
+  - **Installer not attached yet.** The release goes out with the Mac's DMG first; CI attaches the Windows installer and
+    its `.sha256` some 10–15 minutes later. A check in between finds the release without them: [Install and Restart] is
+    off and the line under the banner's title says "The Windows installer is still being uploaded — ReviewGate checks
+    again by itself." with [Check Again] (`src/main/updateRecheck.ts`). While "Check for updates automatically" is on the
+    release is looked up again every 3 minutes for at most an hour from the first miss (a newer version starts its own
+    hour), then the 6-hour schedule goes on and the line says "The release has no Windows installer with its checksum yet
+    — try again later, or download it from the release page."; a window coming to the front looks again when the miss is
+    older than 3 minutes. [Check Again] checks at once (`rg:checkUpdateAgain`; nothing within 5 s of the last check, off
+    while one runs). Once the assets are there the banner turns [Install and Restart] on by itself.
   - **Download.** The asset URLs come from the release reply (`browser_download_url`, `size`, GitHub's `digest`). Both
     files go to `<userData>/updates/<version>-<id>/` (`%APPDATA%\ReviewGate\updates`) over Electron's `net` (the
     system's proxy), https only. Redirects are not followed by the transport: each hop is checked first and must be
@@ -7309,9 +7318,11 @@ download whose identifier differs from the running app's, so a build with an old
     the installer, so it does **not** protect against a compromised release or GitHub account. Signature verification
     (Authenticode, checked before running) comes with the SignPath signing.
   - **Who can install.** Only the packaged app on Windows whose folder has `Uninstall ReviewGate.exe` (installed by the
-    NSIS installer) and is not under `%ProgramFiles%` / `%ProgramW6432%` / `%ProgramFiles(x86)%` (an all-users install
-    needs elevation, which the update never asks for). Otherwise [Install and Restart] is off and its tooltip says why;
-    [Download Page] stays.
+    NSIS installer; `updateInstall.ts` `installMode`). Under `%ProgramFiles%` / `%ProgramW6432%` / `%ProgramFiles(x86)%`
+    it is an install for all users: it updates **elevated** — the line under the title says "ReviewGate is installed for
+    all users — Windows asks once for administrator rights." before the click. Otherwise (not Windows, a development
+    build, not installed by the installer) [Install and Restart] is off, the line under the title says why (not only the
+    tooltip), and [Download Page] is the primary button. Settings › Updates shows the same line under its status.
   - **Restarting.** As on the Mac: never while a window has a turn running or a card waiting (`closeGuardReason`): "ReviewGate
     X is ready. Claude is working — ReviewGate restarts when the turn finishes." with each such window as a button
     ("acme-api: Claude is working", a click brings it forward), [Restart Now] (asks "Restart now? The turns that run are
@@ -7326,6 +7337,14 @@ download whose identifier differs from the running app's, so a build with an old
     The installer is never run by the app's own process tree while engines live, and nothing is killed by name by
     ReviewGate (the installer itself still closes a ReviewGate.exe of this user that is running after ~1.3 s, as every
     electron-builder update does). If the installer cannot start, the record gets `why` and the app reopens itself.
+    **For all users** the installer is started through Windows PowerShell by its full path
+    (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
+    PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/S','/allusers','--updated','--force-run'
+    -WorkingDirectory '<its folder>' -Verb RunAs` — Windows' UAC prompt. The script goes base64 (UTF-16LE), so no
+    command-line quoting is involved; its paths are PowerShell single-quoted strings with every quote character
+    PowerShell reads as one (`'` `‘` `’` `‚` `‛`) doubled. PowerShell exits 0 once the installer runs elevated; anything
+    else (the prompt declined, the start failed) records "Administrator rights were not given — the installer did not
+    run." and the app reopens and says it, as any installer that could not start. The checks before are the same.
   - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
     Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
     no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:
@@ -7336,8 +7355,10 @@ download whose identifier differs from the running app's, so a build with an old
     "Downloading 12.4 / 115.3 MB" beside a bar (`role=progressbar`, named "Download progress", its value the line),
     "Checking the download's checksum…" beside a spinner. Every button has a tooltip; [Download Page] ("Opens the release
     page — download the installer there and run it by hand") is on the banner at every step but the 2 s "Ready". The
-    available banner: [Install and Restart] [What's New] (the notes in a dialog) [Download Page] [Later]. Help › Check for
-    Updates… offers [Install and Restart] too. Settings › General › Updates: "Check for updates automatically", the same
+    available banner: [Install and Restart] [What's New] (the notes in a dialog) [Download Page] [Later], with
+    [Check Again] while the installer is not attached yet and a second, smaller line under the title when there is a
+    reason (why Install is off, or the administrator prompt to come). Help › Check for Updates… offers [Install and
+    Restart] too, and says the same reason. Settings › General › Updates: "Check for updates automatically", the same
     title, line and bar, [Install and Restart] / [Restart Now] / [Cancel], [Check Now] with "Last checked 14:03 — …", and
     [Download Page]. Korean through the Mac's catalog plus `ko.extra.json`.
   - **Verified** (vitest, every OS of CI including windows-latest): `updateDownload.test.ts` — the host allowlist,
@@ -7346,10 +7367,15 @@ download whose identifier differs from the running app's, so a build with an old
     version / checksum / digest / PE checks, and a fake release served from 127.0.0.1 (a 302 to its asset, a 2 MB PE)
     downloaded and verified end to end through node:http; `updateInstall.test.ts` — download → verify → ready → record
     → quit, waiting for Claude and going on, a turn started during "Ready", Restart Now (asked), Cancel (download and
-    wait), failures, the installer's argv and spawn options, who can install, the notice from the record and no loop;
-    `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, Korean),
-    `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a real installer run by
-    the app, and the relaunch — docs/M11-WINDOWS.md "Updating" lists them for a Windows device.
+    wait), failures, the installer's argv and spawn options, who can install (Program Files → elevated), the elevated
+    command (PowerShell's full path, the decoded script, paths with spaces and quotes) and its exit codes, the notice
+    from the record and no loop; `updateRecheck.test.ts` — every 3 minutes, stops after an hour or once the installer is
+    there, a newer version's own hour, off with automatic checks off, focus and [Check Again]; `updateFlow.test.ts` —
+    the missing installer through main, and the elevated start declined (the record, the relaunch, the notice);
+    `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, the reason line and
+    [Check Again], Korean), `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a
+    real installer run by the app (per user or elevated, the UAC prompt), and the relaunch — docs/M11-WINDOWS.md
+    "Updating" lists them for a Windows device.
 - **Verified.** Core `AppUpdateTests`: semver parsing and order, the `releases/latest` reply (assets, digest, drafts,
   bad tags), the check's outcomes through a fake `gh` (available, up to date, not logged in, 404, offline, timeout, gh
   missing), the closed version, the checksum file and digest, the TeamIdentifier and the signature / team / bundle /

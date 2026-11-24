@@ -1,7 +1,7 @@
 // The Windows in-app update's steps (docs/PROTOCOL.md §48, Windows): download → verify → (waiting for Claude) → ready →
 // the record and the quit; cancel and failures; the installer's argv; what the next launch says from the record, once.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blockerLine, INSTALLER_ARGS, installRefusal, launchInstaller, noticeOf, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
+import { blockerLine, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installMode, launchInstaller, noticeOf, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
 
 const target: InstallTarget = {
   version: "0.6.0",
@@ -180,17 +180,60 @@ describe("the installer's command line", () => {
     expect(await launchInstaller("x.exe", throws)).toBe("The installer could not start: EINVAL");
   });
 
-  it("only the installed Windows app updates itself, never one installed for all users", () => {
+  it("only the installed Windows app updates itself; one installed for all users does it elevated", () => {
     const base = { platform: "win32" as const, packaged: true, execPath: "C:\\Users\\dev\\AppData\\Local\\Programs\\ReviewGate\\ReviewGate.exe", env: { ProgramFiles: "C:\\Program Files", "ProgramFiles(x86)": "C:\\Program Files (x86)" }, exists: (p: string) => p === "C:\\Users\\dev\\AppData\\Local\\Programs\\ReviewGate\\Uninstall ReviewGate.exe" };
-    expect(installRefusal(base)).toBeNull();
-    expect(installRefusal({ ...base, platform: "darwin" })).toMatch(/for the Windows installer/);
-    expect(installRefusal({ ...base, packaged: false })).toMatch(/development build/);
-    expect(installRefusal({ ...base, exists: () => false })).toMatch(/not installed by its installer/);
+    const refused = (o: Parameters<typeof installMode>[0]) => {
+      const m = installMode(o);
+      return m.kind === "refused" ? m.why : null;
+    };
+    expect(installMode(base)).toEqual({ kind: "user" });
+    expect(refused({ ...base, platform: "darwin" })).toMatch(/for the Windows installer/);
+    expect(refused({ ...base, packaged: false })).toMatch(/development build/);
+    expect(refused({ ...base, exists: () => false })).toMatch(/not installed by its installer/);
     const machine = { ...base, execPath: "C:\\Program Files\\ReviewGate\\ReviewGate.exe", exists: () => true };
-    expect(installRefusal(machine)).toMatch(/installed for all users/);
-    expect(installRefusal({ ...machine, execPath: "c:\\program files (x86)\\ReviewGate\\ReviewGate.exe" })).toMatch(/for all users/);
+    expect(installMode(machine)).toEqual({ kind: "elevated" });
+    expect(installMode({ ...machine, execPath: "c:\\program files (x86)\\ReviewGate\\ReviewGate.exe" })).toEqual({ kind: "elevated" });
+    // Under Program Files but not by the installer: still refused.
+    expect(refused({ ...machine, exists: () => false })).toMatch(/not installed by its installer/);
     // A folder that only starts like Program Files is not it.
-    expect(installRefusal({ ...machine, execPath: "C:\\Program Files Tools\\ReviewGate\\ReviewGate.exe" })).toBeNull();
+    expect(installMode({ ...machine, execPath: "C:\\Program Files Tools\\ReviewGate\\ReviewGate.exe" })).toEqual({ kind: "user" });
+  });
+
+  it("per user: the installer itself; for all users: PowerShell by full path, Start-Process -Verb RunAs with /allusers, quoted", () => {
+    const file = "C:\\Users\\dev\\AppData\\Roaming\\ReviewGate\\updates\\0.6.0-a\\ReviewGate-Setup-0.6.0.exe";
+    expect(installerCommand(file, "user")).toEqual({ command: file, args: INSTALLER_ARGS });
+    expect(ELEVATED_INSTALLER_ARGS).toEqual(["/S", "/allusers", "--updated", "--force-run"]);
+    const script = (c: { args: readonly string[] }) => {
+      expect(c.args.slice(0, 3)).toEqual(["-NoProfile", "-NonInteractive", "-EncodedCommand"]);
+      return Buffer.from(c.args[3]!, "base64").toString("utf16le");
+    };
+    const elevated = installerCommand(file, "elevated", "C:\\Windows");
+    expect(elevated.command).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    expect(elevated.args).toHaveLength(4);
+    expect(script(elevated)).toBe(
+      "$ErrorActionPreference = 'Stop'\n" +
+        `try { Start-Process -FilePath '${file}' -ArgumentList '/S','/allusers','--updated','--force-run' -WorkingDirectory 'C:\\Users\\dev\\AppData\\Roaming\\ReviewGate\\updates\\0.6.0-a' -Verb RunAs } catch { exit 1 }\n` +
+        "exit 0",
+    );
+    // Spaces stay inside the quotes; every quote PowerShell knows is doubled, so the path cannot end the string.
+    const odd = "C:\\Users\\Dev O'Brien ‘x’\\App Data\\ReviewGate-Setup-0.6.0.exe";
+    const s = script(installerCommand(odd, "elevated", "D:\\WINNT"));
+    expect(s).toContain("-FilePath 'C:\\Users\\Dev O''Brien ‘‘x’’\\App Data\\ReviewGate-Setup-0.6.0.exe' -ArgumentList");
+    expect(s).toContain("-WorkingDirectory 'C:\\Users\\Dev O''Brien ‘‘x’’\\App Data' -Verb RunAs");
+    expect(installerCommand(odd, "elevated", "D:\\WINNT").command).toBe("D:\\WINNT\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+  });
+
+  it("elevated: waits for PowerShell — 0 once the installer runs, else the rights were not given", async () => {
+    const exits = (code: number | null): SpawnInstaller => () => ({ once: (e: string, cb: (c: number | null) => void) => (e === "exit" ? queueMicrotask(() => cb(code)) : undefined), unref: () => undefined }) as ReturnType<SpawnInstaller>;
+    expect(await launchInstaller("C:\\u\\ReviewGate-Setup-0.6.0.exe", exits(0), "elevated")).toBeNull();
+    expect(await launchInstaller("C:\\u\\ReviewGate-Setup-0.6.0.exe", exits(1), "elevated")).toBe("Administrator rights were not given — the installer did not run.");
+    const calls: unknown[] = [];
+    const seen: SpawnInstaller = (file, args, options) => {
+      calls.push([file, args.length, options.windowsHide]);
+      return exits(0)(file, args, options);
+    };
+    await launchInstaller("/tmp/rg/ReviewGate-Setup-0.6.0.exe", seen, "elevated", "C:\\Windows");
+    expect(calls).toEqual([["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", 4, true]]);
   });
 });
 

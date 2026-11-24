@@ -8,11 +8,11 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { INSTALLER_ARGS, type SpawnInstaller } from "./updateInstall";
 
-const h = vi.hoisted(() => ({ userData: "", version: "0.5.17", settings: {} as Record<string, unknown>, relaunched: [] as number[] }));
+const h = vi.hoisted(() => ({ userData: "", version: "0.5.17", settings: {} as Record<string, unknown>, relaunched: [] as number[], mode: { kind: "user" } as { kind: "user" | "elevated" } }));
 h.userData = mkdtempSync(join(tmpdir(), "rg-update-flow-"));
 afterAll(() => rmSync(h.userData, { recursive: true, force: true }));
 vi.mock("electron", () => ({
-  app: { getVersion: () => h.version, isPackaged: true, getPath: () => h.userData, relaunch: () => h.relaunched.push(1), quit: () => undefined },
+  app: { getVersion: () => h.version, isPackaged: true, getPath: () => h.userData, relaunch: () => h.relaunched.push(1), quit: () => undefined, on: () => undefined },
   BrowserWindow: { getAllWindows: () => [], getFocusedWindow: () => null },
   dialog: { showMessageBox: async () => ({ response: 1 }) },
   ipcMain: { handle: () => undefined },
@@ -30,7 +30,7 @@ vi.mock("./updateDownload.js", async (orig) => ({
   },
 }));
 vi.mock("./updateVerify.js", async (orig) => ({ ...(await orig<typeof import("./updateVerify")>()), verifyInstaller: async () => null }));
-vi.mock("./updateInstall.js", async (orig) => ({ ...(await orig<typeof import("./updateInstall")>()), installRefusal: () => null }));
+vi.mock("./updateInstall.js", async (orig) => ({ ...(await orig<typeof import("./updateInstall")>()), installMode: () => h.mode }));
 
 const base = "https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/download/v0.6.0/";
 const release = {
@@ -108,5 +108,40 @@ describe("the Windows update through main (§48)", () => {
     expect(next.updateStatus().install).toBeNull();
     expect(laterQuits).toBe(0);
     expect(h.settings["pendingUpdateInstall"]).toBeUndefined();
+  });
+  it("a release without its installer yet: Install off and why, Check Again possible; once it is attached, Install is on", async () => {
+    h.mode = { kind: "user" };
+    const m = await launch("0.5.17");
+    await m.checkOnce(async () => ({ ok: true, json: { ...release, assets: [] } }));
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: "The Windows installer is still being uploaded — ReviewGate checks again by itself.", pending: true, elevated: false });
+    await m.checkOnce(async () => ({ ok: true, json: release }));
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: null, pending: false });
+  });
+
+  it("an install for all users: the installer is started elevated; the prompt declined → the record says so and the app reopens", async () => {
+    h.mode = { kind: "elevated" };
+    try {
+      let quits = 0;
+      const m = await launch("0.5.17", () => void quits++);
+      await m.checkOnce(async () => ({ ok: true, json: release }));
+      expect(m.updateStatus().release).toMatchObject({ why: null, pending: false, elevated: true });
+      await m.installNow();
+      await until(() => quits > 0);
+      const relaunched = h.relaunched.length;
+      const calls: Array<[string, readonly string[]]> = [];
+      const declined: SpawnInstaller = (file, args) => {
+        calls.push([file, args]);
+        return { once: (e: string, cb: (c: number | null) => void) => (e === "exit" ? queueMicrotask(() => cb(1)) : undefined), unref: () => undefined } as ReturnType<SpawnInstaller>;
+      };
+      await m.afterEnginesStopped(declined);
+      expect(calls[0]![0]).toMatch(/powershell\.exe$/);
+      expect(Buffer.from(calls[0]![1][3]!, "base64").toString("utf16le")).toMatch(/ReviewGate-Setup-0\.6\.0\.exe' -ArgumentList '\/S','\/allusers','--updated','--force-run' .* -Verb RunAs/);
+      expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", why: "Administrator rights were not given — the installer did not run." });
+      expect(h.relaunched.length).toBe(relaunched + 1);
+      const next = await launch("0.5.17");
+      expect(next.updateStatus().notice).toEqual({ kind: "failed", version: "0.6.0", why: "Administrator rights were not given — the installer did not run." });
+    } finally {
+      h.mode = { kind: "user" };
+    }
   });
 });

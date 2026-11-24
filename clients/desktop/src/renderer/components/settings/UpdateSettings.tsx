@@ -1,11 +1,12 @@
 /**
  * §48 Windows: Settings › General › Updates (the Mac's `UpdateSettingsSection`) — automatic checks (default on), the install
- * under way or why it failed as the banner says it (with its bar), [Install and Restart] / [Cancel] / [Restart Now],
- * [Check Now] with the last result, and the download page.
+ * under way or why it failed as the banner says it (with its bar), why [Install and Restart] is off (or that Windows asks
+ * for administrator rights) under it, [Install and Restart] / [Cancel] / [Restart Now], [Check Now] with the last result,
+ * and the download page.
  */
 import type { AppSettings, UpdateStatus } from "../../../shared/ipc";
 import { t } from "../../i18n";
-import { downloadPageHelp, installDetail, installHelp, installTitle } from "../../updateWords";
+import { downloadPageHelp, installDetail, installHelp, installTitle, releaseReason } from "../../updateWords";
 import { updateActions, UpdateProgress, useUpdateStatus, type UpdateActions } from "../UpdateBanner";
 
 const time = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -14,6 +15,7 @@ const time = (at: number) => new Date(at).toLocaleTimeString(undefined, { hour: 
 export function UpdateSettingsView({ status, actions, checkNow }: { status: UpdateStatus; actions: UpdateActions; checkNow: () => void }) {
   const { install, release } = status;
   const busy = install !== null && install.kind !== "failed";
+  const reason = release && !busy ? releaseReason(release) : null;
   return (
     <>
       <div className="field-row" data-testid="Update install status">
@@ -28,9 +30,14 @@ export function UpdateSettingsView({ status, actions, checkNow }: { status: Upda
           <span className="grow">{release ? t("ReviewGate {0} is available", release.version) : t("This is ReviewGate {0}.", status.current)}</span>
         )}
       </div>
+      {reason && (
+        <div className="note" data-testid="Settings update reason">
+          {reason}
+        </div>
+      )}
       <div className="field-row">
         {release && !busy && (
-          <button type="button" className="small primary" onClick={actions.install} disabled={release.why !== null} title={installHelp(release.why)} data-testid="Settings install update">
+          <button type="button" className="small primary" onClick={actions.install} disabled={release.why !== null} title={installHelp(release)} data-testid="Settings install update">
             {install?.kind === "failed" ? t("Try Again") : t("Install and Restart")}
           </button>
         )}
@@ -47,7 +54,7 @@ export function UpdateSettingsView({ status, actions, checkNow }: { status: Upda
         <button type="button" className="small" onClick={checkNow} disabled={status.checking || busy} title={busy ? t("The update is being installed — the banner at the top of the window shows its progress.") : t("Asks GitHub for the latest release now")} data-testid="Check for updates now">
           {t("Check Now")}
         </button>
-        <button type="button" className="small" onClick={actions.openPage} title={downloadPageHelp()} data-testid="Settings open release page">
+        <button type="button" className={release && !busy && release.why !== null && !release.pending ? "small primary" : "small"} onClick={actions.openPage} title={downloadPageHelp()} data-testid="Settings open release page">
           {t("Download Page")}
         </button>
         {status.checking ? (

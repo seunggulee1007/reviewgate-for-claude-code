@@ -9,7 +9,8 @@
  * `.sha256` (src/main/updateDownload.ts — GitHub hosts only, capped), checks them (src/main/updateVerify.ts), waits for
  * Claude, records {from, to} and quits; once every engine has stopped the installer runs silently and reopens the app
  * (src/main/updateInstall.ts). The next launch says "Updated to X" or why it did not install, once. [Download Page] is
- * always there.
+ * always there. An install for all users runs the installer elevated (Windows asks once). A release still without its
+ * installer is looked up again every 3 minutes for an hour (src/main/updateRecheck.ts).
  */
 import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -25,7 +26,8 @@ import { t } from "../renderer/i18n";
 import type { UpdateStatus } from "../shared/ipc.js";
 import { downloadTo, MAX_CHECKSUM_BYTES, MAX_INSTALLER_BYTES, type HttpGet } from "./updateDownload.js";
 import { installerAssets, verifyInstaller, type InstallerAssets } from "./updateVerify.js";
-import { blockerLine, installRefusal, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
+import { InstallerRecheck } from "./updateRecheck.js";
+import { blockerLine, installMode, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type InstallMode, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
 
 export type ReleaseInfo = { version: string; tag: string; page: string; notes: string; assets: InstallerAssets | null };
 export type UpdateOutcome = { kind: "available"; release: ReleaseInfo } | { kind: "upToDate"; latest: string } | { kind: "unavailable"; why: string };
@@ -173,11 +175,20 @@ const installer = new UpdateInstaller({
   changed: () => broadcast(),
 });
 
+const autoCheck = () => loadSettings().autoCheckUpdates !== false;
+const recheck = new InstallerRecheck({ check: () => void checkOnce(), now: () => Date.now(), auto: autoCheck });
+
+/** How this copy installs an update (src/main/updateInstall.ts). */
+const modeHere = (): InstallMode => installMode({ platform: process.platform, packaged: app.isPackaged, execPath: process.execPath, env: process.env, exists: existsSync });
+
 /** Why the found release cannot be installed from the app; null: it can. */
 function refusal(release: ReleaseInfo): string | null {
-  const why = installRefusal({ platform: process.platform, packaged: app.isPackaged, execPath: process.execPath, env: process.env, exists: existsSync });
-  if (why) return why;
-  return release.assets ? null : t("The release has no Windows installer with its checksum yet — try again later, or download it from the release page.");
+  const mode = modeHere();
+  if (mode.kind === "refused") return mode.why;
+  if (release.assets) return null;
+  return recheck.watching
+    ? t("The Windows installer is still being uploaded — ReviewGate checks again by itself.")
+    : t("The release has no Windows installer with its checksum yet — try again later, or download it from the release page.");
 }
 
 /** What every window's banner and Settings › Updates show. */
@@ -189,7 +200,7 @@ export function updateStatus(): UpdateStatus {
   const shownVersion = view ? installing : (found?.version ?? (notice ? notice.version : null));
   return {
     current: app.getVersion(),
-    release: found && !quiet ? { version: found.version, page: found.page, hasNotes: found.notes.trim() !== "", why: refusal(found) } : null,
+    release: found && !quiet ? { version: found.version, page: found.page, hasNotes: found.notes.trim() !== "", why: refusal(found), pending: !found.assets && modeHere().kind !== "refused", elevated: modeHere().kind === "elevated" } : null,
     install: view ? { ...(view.kind === "waiting" ? { kind: "waiting", blockers: view.blockers.map((b) => ({ id: b.id, line: blockerLine(b) })) } : view), version: installing } : null,
     notice: notice ? (notice.kind === "updated" ? { ...notice, hasNotes: noticeNotes !== null && noticeNotes.trim() !== "" } : notice) : null,
     downloadPage: shownVersion ? `${RELEASES_PAGE}/tag/v${shownVersion}` : RELEASES_PAGE,
@@ -215,6 +226,7 @@ export function checkOnce(fetch: FetchLatest = fetchLatest): Promise<UpdateOutco
     else if (outcome.kind === "upToDate") found = null;
     lastCheck = { at: Date.now(), text: outcome.kind === "available" ? t("ReviewGate {0} is available", outcome.release.version) : outcome.kind === "upToDate" ? t("ReviewGate is up to date") : outcome.why };
     logLine("main", "main", `update check: ${outcome.kind}${outcome.kind === "available" ? ` ${outcome.release.version}${outcome.release.assets ? "" : " (no Windows installer yet)"}` : ""}`);
+    recheck.checked(found && !found.assets ? found.version : null);
     return outcome;
   })().finally(() => {
     checking = null;
@@ -251,7 +263,7 @@ export async function afterEnginesStopped(spawnInstaller: SpawnInstaller = spawn
   const ready = pendingInstaller;
   if (!ready) return;
   pendingInstaller = null;
-  const why = await launchInstaller(ready.file, spawnInstaller);
+  const why = await launchInstaller(ready.file, spawnInstaller, modeHere().kind === "elevated" ? "elevated" : "user", process.env["SystemRoot"]);
   if (why === null) {
     logLine("main", "main", `update: installer started (${ready.file})`);
     return;
@@ -278,7 +290,7 @@ export async function checkForUpdatesNow(): Promise<void> {
     }
     const why = refusal(outcome.release);
     const buttons = why ? [t("Download Page"), t("Later")] : [t("Install and Restart"), t("Download Page"), t("Later")];
-    const detail = [t("This app is {0}; the latest release is {1}.", app.getVersion(), outcome.release.version), ...(why ? [why] : [])].join("\n\n");
+    const detail = [t("This app is {0}; the latest release is {1}.", app.getVersion(), outcome.release.version), ...(why ? [why] : modeHere().kind === "elevated" ? [t("ReviewGate is installed for all users — Windows asks once for administrator rights.")] : [])].join("\n\n");
     const r = await show({ type: "info", message: t("ReviewGate {0} is available", outcome.release.version), detail, buttons, defaultId: 0, cancelId: buttons.length - 1, noLink: true });
     const picked = buttons[r.response];
     if (picked === t("Install and Restart")) void installNow();
@@ -328,6 +340,8 @@ export function installUpdates(h: UpdateHooks): void {
     broadcast();
   });
   ipcMain.handle("rg:checkUpdatesNow", async () => void (await checkOnce()));
+  ipcMain.handle("rg:checkUpdateAgain", () => recheck.checkAgain());
+  app.on("browser-window-focus", () => recheck.focused());
   ipcMain.handle("rg:focusUpdateBlocker", (_e, id: unknown) => {
     if (typeof id === "number" && Number.isInteger(id)) hooks.focus(id);
   });
@@ -337,11 +351,10 @@ export function installUpdates(h: UpdateHooks): void {
     if (notice?.kind === "updated" && notice.version === version) return noticeNotes;
     return null;
   });
-  const auto = () => loadSettings().autoCheckUpdates !== false;
   setTimeout(() => {
-    if (auto()) void checkOnce();
+    if (autoCheck()) void checkOnce();
     setInterval(() => {
-      if (auto()) void checkOnce();
+      if (autoCheck()) void checkOnce();
     }, CHECK_EVERY_MS).unref();
   }, FIRST_CHECK_MS).unref();
 }

@@ -1,6 +1,7 @@
 /**
  * MARK: polish p-lifecycle — P5-sheets-49 / §48 Windows: the update in every window's banner stack (src/main/update.ts) —
- *   "ReviewGate 0.6.0 is available" [Install and Restart] [What's New] [Download Page] [Later]
+ *   "ReviewGate 0.6.0 is available" [Install and Restart] [What's New] [Download Page] [Later] — when Install is off, why
+ *   under the title ("The Windows installer is still being uploaded …" with [Check Again]; else [Download Page] leads)
  *   "Installing ReviewGate 0.6.0" · "Downloading 12.4 / 115.3 MB" ▬▬▭ [Cancel] [Download Page]
  *   "… is ready. Claude is working — …" · "acme-api: Claude is working" [Restart Now] [Cancel]
  *   "Ready — ReviewGate closes and reopens as 0.6.0"
@@ -11,7 +12,7 @@
 import { useEffect, useState } from "react";
 import type { UpdateStatus } from "../../shared/ipc";
 import { t } from "../i18n";
-import { downloadFraction, downloadPageHelp, installDetail, installHelp, installTitle, noticeDetail, noticeTitle } from "../updateWords";
+import { downloadFraction, downloadPageHelp, installDetail, installHelp, installTitle, noticeDetail, noticeTitle, releaseReason } from "../updateWords";
 import { Markdown } from "./chat/Markdown";
 import { Modal } from "./Menu";
 
@@ -38,6 +39,8 @@ export type UpdateActions = {
   later: () => void;
   dismiss: (which: "install" | "notice") => void;
   openPage: () => void;
+  /** [Check Again] while the release's Windows installer is not attached yet. */
+  checkAgain: () => void;
   focus: (id: number) => void;
   notes: (version: string) => void;
 };
@@ -49,6 +52,7 @@ export const updateActions = (showNotes: (version: string) => void): UpdateActio
   later: () => void window.rg.dismissUpdate?.(),
   dismiss: (which) => void window.rg.dismissUpdateNotice?.(which),
   openPage: () => void window.rg.openUpdate?.(),
+  checkAgain: () => void window.rg.checkUpdateAgain?.(),
   focus: (id) => void window.rg.focusUpdateBlocker?.(id),
   notes: showNotes,
 });
@@ -88,6 +92,7 @@ function Close({ onClick, testId }: { onClick: () => void; testId: string }) {
 /** The banners for a status (props only — tested with react-dom/server). */
 export function UpdateBannerView({ status, actions }: { status: UpdateStatus; actions: UpdateActions }) {
   const { install, notice, release } = status;
+  const reason = release && releaseReason(release);
   return (
     <>
       {notice && !(notice.kind === "failed" && install) && (
@@ -144,18 +149,30 @@ export function UpdateBannerView({ status, actions }: { status: UpdateStatus; ac
       )}
       {!install && release && !(notice?.kind === "failed" && notice.version === release.version) && (
         <div className="banner blue" role="status" data-testid="Update banner">
-          <span className="grow truncate" title={t("This app is {0}; the latest release is {1}.", status.current, release.version)}>
-            <strong>{t("ReviewGate {0} is available", release.version)}</strong> · {t("This app is {0}; the latest release is {1}.", status.current, release.version)}
+          <span className="grow update-text">
+            <span className="truncate" title={t("This app is {0}; the latest release is {1}.", status.current, release.version)}>
+              <strong>{t("ReviewGate {0} is available", release.version)}</strong> · {t("This app is {0}; the latest release is {1}.", status.current, release.version)}
+            </span>
+            {reason && (
+              <span className="update-reason truncate" title={reason} data-testid="Update reason">
+                {reason}
+              </span>
+            )}
           </span>
-          <button type="button" className="small primary" onClick={actions.install} disabled={release.why !== null} title={installHelp(release.why)} aria-label={`${t("Install and Restart")} — ${installHelp(release.why)}`} data-testid="Install update">
+          <button type="button" className="small primary" onClick={actions.install} disabled={release.why !== null} title={installHelp(release)} aria-label={`${t("Install and Restart")} — ${installHelp(release)}`} data-testid="Install update">
             {t("Install and Restart")}
           </button>
+          {release.pending && (
+            <button type="button" className="small" onClick={actions.checkAgain} disabled={status.checking} title={status.checking ? t("Checking for updates…") : t("Asks GitHub again whether the Windows installer is attached")} data-testid="Check update again">
+              {t("Check Again")}
+            </button>
+          )}
           {release.hasNotes && (
             <button type="button" className="small" onClick={() => actions.notes(release.version)} title={t("Release notes of ReviewGate {0}", release.version)} data-testid="Update notes">
               {t("What's New")}
             </button>
           )}
-          <DownloadPage actions={actions} />
+          <DownloadPage actions={actions} primary={release.why !== null && !release.pending} />
           <button type="button" className="small" onClick={actions.later} title={t("Hide this version — the next one is announced again")} data-testid="Dismiss update">
             {t("Later")}
           </button>

@@ -6,7 +6,9 @@
  *
  * The installer is electron-builder's assisted NSIS installer. Run with `INSTALLER_ARGS` it installs silently for the
  * current user over the installed version (its uninstaller is run with --updated: settings and shortcuts stay) and starts
- * the app when it is done (`--force-run`, honoured by the assisted installer only together with `/S`).
+ * the app when it is done (`--force-run`, honoured by the assisted installer only together with `/S`). An install for all
+ * users (under Program Files) gets `ELEVATED_INSTALLER_ARGS`, started through Windows PowerShell's `Start-Process -Verb
+ * RunAs`: Windows asks once for administrator rights (UAC); declined, the update says so after the relaunch.
  */
 import { dirname, join, win32 } from "node:path";
 import { compareVersions } from "@reviewgate/engine";
@@ -16,6 +18,8 @@ import type { InstallerAssets } from "./updateVerify.js";
 /** `/S` silent · `/currentuser` the per-user install, never elevated · `--updated` an update (no "app is running" box, the
  * old uninstaller keeps app data) · `--force-run` start ReviewGate when done (with `--updated` passed to it). */
 export const INSTALLER_ARGS: readonly string[] = ["/S", "/currentuser", "--updated", "--force-run"];
+/** The same for an install for all users (`/allusers`), run elevated. */
+export const ELEVATED_INSTALLER_ARGS: readonly string[] = ["/S", "/allusers", "--updated", "--force-run"];
 /** How long "Ready — ReviewGate closes and reopens as X" shows before the quit. */
 export const READY_MS = 2000;
 /** While Claude works the windows are looked at again this often. */
@@ -47,19 +51,22 @@ export function noticeOf(raw: unknown, running: string): UpdateNotice | null {
   return { kind: "failed", version: r.to, why: r.why ?? t("ReviewGate {0} is still installed.", running) };
 }
 
+/** How this copy updates itself: this user's install, an install for all users (Windows asks for administrator rights
+ * once), or why it cannot. */
+export type InstallMode = { kind: "user" } | { kind: "elevated" } | { kind: "refused"; why: string };
+
 /**
- * Why this copy cannot update itself (null: it can). Only the packaged app on Windows installed by the NSIS installer
- * (its uninstaller beside it), and not under Program Files — an install for all users needs elevation, which the in-app
- * update never asks for.
+ * Only the packaged app on Windows installed by the NSIS installer (its uninstaller beside it); under Program Files it is
+ * an install for all users, updated elevated.
  */
-export function installRefusal(o: { platform: NodeJS.Platform; packaged: boolean; execPath: string; env: Record<string, string | undefined>; exists: (p: string) => boolean }): string | null {
-  if (o.platform !== "win32") return t("Installing from the app is for the Windows installer — download the new version from the release page.");
-  if (!o.packaged) return t("This is a development build — it does not install updates.");
+export function installMode(o: { platform: NodeJS.Platform; packaged: boolean; execPath: string; env: Record<string, string | undefined>; exists: (p: string) => boolean }): InstallMode {
+  const refused = (why: string): InstallMode => ({ kind: "refused", why });
+  if (o.platform !== "win32") return refused(t("Installing from the app is for the Windows installer — download the new version from the release page."));
+  if (!o.packaged) return refused(t("This is a development build — it does not install updates."));
   const dir = win32.dirname(win32.resolve(o.execPath));
-  if (!o.exists(win32.join(dir, "Uninstall ReviewGate.exe"))) return t("ReviewGate was not installed by its installer here — download the new version from the release page.");
+  if (!o.exists(win32.join(dir, "Uninstall ReviewGate.exe"))) return refused(t("ReviewGate was not installed by its installer here — download the new version from the release page."));
   const machine = [o.env["ProgramFiles"], o.env["ProgramW6432"], o.env["ProgramFiles(x86)"]].filter((p): p is string => !!p).map((p) => win32.resolve(p).toLowerCase().replace(/\\?$/, "\\"));
-  if (machine.some((root) => (dir.toLowerCase() + "\\").startsWith(root))) return t("ReviewGate is installed for all users — run the new installer from the release page.");
-  return null;
+  return machine.some((root) => (dir.toLowerCase() + "\\").startsWith(root)) ? { kind: "elevated" } : { kind: "user" };
 }
 
 /** A window the restart waits for. */
@@ -213,18 +220,44 @@ export class UpdateInstaller {
 export type SpawnInstaller = (file: string, args: readonly string[], options: { detached: true; stdio: "ignore"; cwd: string; windowsHide: boolean }) => {
   once(event: "spawn", cb: () => void): unknown;
   once(event: "error", cb: (e: Error) => void): unknown;
+  once(event: "exit", cb: (code: number | null) => void): unknown;
   unref(): void;
 };
 
-/** Starts the installer, detached; resolves null once it runs, else why it could not start. */
-export function launchInstaller(file: string, spawn: SpawnInstaller): Promise<string | null> {
+/** A PowerShell single-quoted string: each quote character PowerShell reads as one (' ‘ ’ ‚ ‛) doubled. */
+export const psQuote = (s: string): string => `'${s.replace(/['\u2018\u2019\u201A\u201B]/g, "$&$&")}'`;
+
+/**
+ * What starts the installer: the installer itself for this user's install; for all users Windows PowerShell (by its full
+ * path, never PATH) running `Start-Process -Verb RunAs` — the UAC prompt — given as -EncodedCommand (UTF-16LE, base64),
+ * so no command-line quoting is involved: only the script's single-quoted strings. Its exit code is 0 once the installer
+ * runs elevated, 1 when it did not (the prompt declined, or the start failed).
+ */
+export function installerCommand(file: string, mode: "user" | "elevated", systemRoot = "C:\\Windows"): { command: string; args: readonly string[] } {
+  if (mode === "user") return { command: file, args: INSTALLER_ARGS };
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `try { Start-Process -FilePath ${psQuote(file)} -ArgumentList ${ELEVATED_INSTALLER_ARGS.map(psQuote).join(",")} -WorkingDirectory ${psQuote(win32.dirname(file))} -Verb RunAs } catch { exit 1 }`,
+    "exit 0",
+  ].join("\n");
+  return { command: win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), args: ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")] };
+}
+
+/**
+ * Starts the installer, detached; resolves null once it runs, else why it could not start. Elevated: once PowerShell
+ * ends — the UAC prompt answered.
+ */
+export function launchInstaller(file: string, spawn: SpawnInstaller, mode: "user" | "elevated" = "user", systemRoot?: string): Promise<string | null> {
   return new Promise((done) => {
     try {
-      const child = spawn(file, INSTALLER_ARGS, { detached: true, stdio: "ignore", cwd: dirname(file), windowsHide: false });
-      child.once("spawn", () => {
-        child.unref();
-        done(null);
-      });
+      const { command, args } = installerCommand(file, mode, systemRoot);
+      const child = spawn(command, args, { detached: true, stdio: "ignore", cwd: dirname(file), windowsHide: mode === "elevated" });
+      if (mode === "user")
+        child.once("spawn", () => {
+          child.unref();
+          done(null);
+        });
+      else child.once("exit", (code) => done(code === 0 ? null : t("Administrator rights were not given — the installer did not run.")));
       child.once("error", (e) => done(t("The installer could not start: {0}", e.message)));
     } catch (e) {
       done(t("The installer could not start: {0}", e instanceof Error ? e.message : String(e)));

@@ -254,6 +254,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
 .progress.update-progress { width: 120px; flex: none; }
 .progress.update-progress > div { background: var(--accent); transition: width 0.2s ease; }
 .update-notes { max-height: 55vh; overflow: auto; }
+.update-text { display: flex; flex-direction: column; gap: 1px; }
+.update-reason { font-size: 11.5px; opacity: 0.85; }
 
 /* ---------------------------------------------------------------- layout */
 .app-shell { display: flex; flex-direction: column; height: 100%; }
