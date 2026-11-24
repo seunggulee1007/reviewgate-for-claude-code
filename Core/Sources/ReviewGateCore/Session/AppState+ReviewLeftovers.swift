@@ -32,7 +32,7 @@ extension AppState {
 
     /// §41.3: `file`'s diff over its current range with whitespace ignored.
     public func whitespaceIgnoredDiff(for file: ChangedFile) async throws -> WhitespaceIgnoredDiff {
-        let reply = try await typedReply(.selectFileIgnoringWhitespace(path: file.path, since: diffSince(for: file).wire))
+        let reply = try await typedReply(.selectFileIgnoringWhitespace(path: file.path, since: diffSince(for: file).wire(for: file)))
         guard case let .fileDiff(_, _, _, diff, truncated, endTree, info) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
         guard info.ignoreWhitespace else { throw WhitespaceUnsupported() }
         return WhitespaceIgnoredDiff(diff: diff, truncated: truncated, endTree: endTree)

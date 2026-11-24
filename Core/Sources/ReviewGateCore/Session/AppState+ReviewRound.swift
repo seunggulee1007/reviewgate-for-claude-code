@@ -133,7 +133,7 @@ extension AppState {
         let path = file.path
         diffLoadTask = Task {
             do {
-                let event = try await typedReply(.selectFile(path: path, since: since.wire))
+                let event = try await typedReply(.selectFile(path: path, since: since.wire(for: file)))
                 guard case let .fileDiff(_, _, _, diff, truncated, endTree, info) = event else {
                     throw EngineClientError.unexpectedReply(String(describing: event))
                 }
