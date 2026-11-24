@@ -93,7 +93,7 @@ extension AppState {
         snapshot.gate.phase = working ? .running : .reviewing
         snapshot.gate.canSend = !working
         snapshot.gate.blockedReason = working ? .running : nil
-        snapshot.gate.pendingCount = files.count
+        snapshot.gate.pendingCount = files.filter { $0.state == .pending }.count
         snapshot.changedFiles = files
         state = snapshot
     }
