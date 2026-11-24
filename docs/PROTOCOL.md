@@ -7309,9 +7309,10 @@ download whose identifier differs from the running app's, so a build with an old
     the installer, so it does **not** protect against a compromised release or GitHub account. Signature verification
     (Authenticode, checked before running) comes with the SignPath signing.
   - **Who can install.** Only the packaged app on Windows whose folder has `Uninstall ReviewGate.exe` (installed by the
-    NSIS installer) and is not under `%ProgramFiles%` / `%ProgramW6432%` / `%ProgramFiles(x86)%` (an all-users install
-    needs elevation, which the update never asks for). Otherwise [Install and Restart] is off and its tooltip says why;
-    [Download Page] stays.
+    NSIS installer; `updateInstall.ts` `installMode`). Under `%ProgramFiles%` / `%ProgramW6432%` / `%ProgramFiles(x86)%`
+    it is an install for all users: it updates **elevated** (Windows asks once for administrator rights; Help › Check
+    for Updates… says so). Otherwise (not Windows, a development build, not installed by the installer) [Install and
+    Restart] is off and its tooltip says why; [Download Page] stays.
   - **Restarting.** As on the Mac: never while a window has a turn running or a card waiting (`closeGuardReason`): "ReviewGate
     X is ready. Claude is working — ReviewGate restarts when the turn finishes." with each such window as a button
     ("acme-api: Claude is working", a click brings it forward), [Restart Now] (asks "Restart now? The turns that run are
@@ -7326,6 +7327,14 @@ download whose identifier differs from the running app's, so a build with an old
     The installer is never run by the app's own process tree while engines live, and nothing is killed by name by
     ReviewGate (the installer itself still closes a ReviewGate.exe of this user that is running after ~1.3 s, as every
     electron-builder update does). If the installer cannot start, the record gets `why` and the app reopens itself.
+    **For all users** the installer is started through Windows PowerShell by its full path
+    (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
+    PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/S','/allusers','--updated','--force-run'
+    -WorkingDirectory '<its folder>' -Verb RunAs` — Windows' UAC prompt. The script goes base64 (UTF-16LE), so no
+    command-line quoting is involved; its paths are PowerShell single-quoted strings with every quote character
+    PowerShell reads as one (`'` `‘` `’` `‚` `‛`) doubled. PowerShell exits 0 once the installer runs elevated; anything
+    else (the prompt declined, the start failed) records "Administrator rights were not given — the installer did not
+    run." and the app reopens and says it, as any installer that could not start. The checks before are the same.
   - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
     Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
     no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:
@@ -7346,10 +7355,14 @@ download whose identifier differs from the running app's, so a build with an old
     version / checksum / digest / PE checks, and a fake release served from 127.0.0.1 (a 302 to its asset, a 2 MB PE)
     downloaded and verified end to end through node:http; `updateInstall.test.ts` — download → verify → ready → record
     → quit, waiting for Claude and going on, a turn started during "Ready", Restart Now (asked), Cancel (download and
-    wait), failures, the installer's argv and spawn options, who can install, the notice from the record and no loop;
+    wait), failures, the installer's argv and spawn options, who can install (Program Files → elevated), the elevated
+    command (PowerShell's full path, the decoded script, paths with spaces and quotes) and its exit codes, the notice
+    from the record and no loop; `updateFlow.test.ts` — the elevated start declined (the record, the relaunch, the
+    notice);
     `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, Korean),
     `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a real installer run by
-    the app, and the relaunch — docs/M11-WINDOWS.md "Updating" lists them for a Windows device.
+    the app (per user or elevated, the UAC prompt), and the relaunch — docs/M11-WINDOWS.md "Updating" lists them for a
+    Windows device.
 - **Verified.** Core `AppUpdateTests`: semver parsing and order, the `releases/latest` reply (assets, digest, drafts,
   bad tags), the check's outcomes through a fake `gh` (available, up to date, not logged in, 404, offline, timeout, gh
   missing), the closed version, the checksum file and digest, the TeamIdentifier and the signature / team / bundle /
