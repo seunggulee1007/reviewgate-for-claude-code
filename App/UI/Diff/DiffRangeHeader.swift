@@ -26,7 +26,7 @@ struct DiffRangePicker: View {
     private func picker(_ ranges: [DiffSince]) -> some View {
         Picker("Diff range", selection: Binding(get: { store.diffSince(for: file) }, set: { store.setDiffRange($0, for: file) })) {
             ForEach(ranges, id: \.self) { since in
-                Text(verbatim: since.label).tag(since)
+                Text(verbatim: since.label(for: file)).tag(since)   // accept-baseline (§66): "수락 이후 / 라운드 전체"
             }
         }
         .labelsHidden()
@@ -84,6 +84,33 @@ struct ChangedAfterAcceptChip: View {
     var body: some View {
         TagChip("Changed after accept", systemImage: "arrow.triangle.2.circlepath", tint: .orange)
             .help("You accepted this file earlier in this review; a later turn changed it again")
+    }
+}
+
+/// accept-baseline (§66): accepted, then changed again — its +/− and status letter are since the accept ("수락 이후 변경").
+struct SinceAcceptedChip: View {
+    let path: String
+
+    var body: some View {
+        TagChip(Text(verbatim: SinceAcceptedText.label), systemImage: "arrow.triangle.2.circlepath", tint: .orange)
+            .help(SinceAcceptedText.labelHelp)
+            .accessibilityIdentifier("Changed since accepted \(path)")
+    }
+}
+
+/// accept-baseline (§66): "라운드 시작으로 되돌리기" — a reject to A for a file reviewed since its accept (the plain reject
+/// restores the accepted content). It only asks: the window's confirm sends it.
+struct RoundRejectMenuItem: View {
+    @Environment(AppState.self) private var store
+    @Environment(WindowModel.self) private var model
+    let file: ChangedFile
+
+    var body: some View {
+        let blocker = store.roundRejectBlocker(file)
+        Button(SinceAcceptedText.roundReject + "…", systemImage: "arrow.uturn.backward.circle") { model.roundRejectPath = file.path }
+            .disabled(blocker != nil)
+            .help(blocker ?? SinceAcceptedText.roundRejectHelp)
+            .accessibilityIdentifier("Revert to the start of the round")
     }
 }
 

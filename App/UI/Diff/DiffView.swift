@@ -195,7 +195,11 @@ struct DiffView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Those parts of \(file?.path ?? "") go back to how they were at the start of the turn, on disk. The rest of the file stays under review.")
+            if let file, store.selectedDiffSince == .accepted, file.acceptedBase != nil {
+                Text(verbatim: SinceAcceptedText.revertPartsMessage(file.path))   // accept-baseline (§66)
+            } else {
+                Text("Those parts of \(file?.path ?? "") go back to how they were at the start of the turn, on disk. The rest of the file stays under review.")
+            }
         }
         .task(id: highlightKey) {
             highlighted = nil
@@ -327,7 +331,8 @@ struct DiffView: View {
     /// the whole-file reject.
     private func showsHunkControls(_ file: ChangedFile) -> Bool {
         // wave2 mac-flow (§34.1): a range's hunk ids are not reject_hunks ids — parts are reverted from the whole review.
-        file.supportsHunkReject && !showFullFile && diff?.isBinary == false && (diff?.hunks.count ?? 0) > 0 && store.showsWholeReview
+        // accept-baseline (§66): + the since-accepted view of a file with an `acceptedBase` (its ids name the accepted tree).
+        store.showsHunkRejectRange(for: file) && !showFullFile && diff?.isBinary == false && (diff?.hunks.count ?? 0) > 0
             && !ignoreWhitespace   // wave4c w4c-review — §41.3: a -w diff's hunks are not the review's
     }
 
@@ -741,11 +746,12 @@ struct DiffViewHeader: View {
             HStack(spacing: oneLine ? 6 : 8) {
                 // MARK: code-nav (§62): Back / Forward once a jump was made.
                 if store.codeNav.history.canGoBack || store.codeNav.history.canGoForward { CodeNavHistoryButtons() }
-                Text(file.status.rawValue)
+                Text(file.badgeStatus.rawValue)   // accept-baseline (§66): the change since the accept
                     .font(.caption.weight(.bold).monospaced())
-                    .foregroundStyle(statusColor(file.status))
+                    .foregroundStyle(statusColor(file.badgeStatus))
                     .frame(width: 14)
-                    .accessibilityLabel(ReviewSpeech.status(file.status))   // MARK: wave4d w4d-speed — polish-10
+                    .help(ReviewSpeech.status(file.badgeStatus))
+                    .accessibilityLabel(ReviewSpeech.status(file.badgeStatus))   // MARK: wave4d w4d-speed — polish-10
                 VStack(alignment: .leading, spacing: 1) {
                     Text(file.path).font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle)
                     if let old = file.oldPath, old != file.path {
@@ -798,7 +804,7 @@ struct DiffViewHeader: View {
     }
 
     private func hasBadges(noteCount: Int) -> Bool {
-        noteCount > 0 || file.partial || (file.changedSinceAccepted && file.state == .pending) || file.whitespaceOnly
+        noteCount > 0 || file.partial || (file.changedSinceAccepted && file.state == .pending) || file.acceptedBase != nil || file.whitespaceOnly
     }
 
     @ViewBuilder
@@ -815,7 +821,11 @@ struct DiffViewHeader: View {
                         .help("Some parts were reverted on disk; the rest is still under review")
                         .accessibilityIdentifier("Partial revert badge")
                 }
-                if file.changedSinceAccepted, file.state == .pending { ChangedAfterAcceptChip() }   // wave2 mac-flow
+                if file.acceptedBase != nil {
+                    SinceAcceptedChip(path: file.path)   // accept-baseline (§66): "수락 이후 변경"
+                } else if file.changedSinceAccepted, file.state == .pending {
+                    ChangedAfterAcceptChip()   // wave2 mac-flow
+                }
                 if file.whitespaceOnly {   // wave4c w4c-review — §34.7 / §41.3, as Electron's badge
                     TagChip(Text("Only whitespace changed"), systemImage: "space", tint: .secondary)
                         .help("Every change of this file is whitespace — “Ignore whitespace” shows nothing is left")
@@ -871,7 +881,7 @@ struct DiffViewHeader: View {
             if range, store.availableRanges(for: file).count > 1 {
                 let ranges = store.availableRanges(for: file)
                 Picker("Diff range", selection: Binding(get: { store.diffSince(for: file) }, set: { store.setDiffRange($0, for: file) })) {
-                    ForEach(ranges, id: \.self) { since in Text(verbatim: since.label).tag(since) }
+                    ForEach(ranges, id: \.self) { since in Text(verbatim: since.label(for: file)).tag(since) }
                 }
                 .accessibilityIdentifier("Diff range")
                 Divider()
@@ -892,6 +902,11 @@ struct DiffViewHeader: View {
             Toggle("Full file", systemImage: "doc.text", isOn: $showFullFile)
                 .disabled(file.status == .deleted)
                 .accessibilityIdentifier("Full file")
+            // accept-baseline (§66): Reject restores the accepted content; back to the round's start asks first.
+            if file.acceptedBase != nil, file.state == .pending {
+                Divider()
+                RoundRejectMenuItem(file: file)
+            }
             Divider()
             DiffEditorMenuItems(file: file, line: editorLine)
         } label: {
@@ -990,6 +1005,7 @@ struct DiffViewHeader: View {
     private var rejectHelp: String {
         if file.uncaptured { return ReviewProvenanceText.uncaptured }
         if file.isExternal { return String(localized: "Changed outside the app — you confirm before it is reverted (⌘⇧R)") }
+        if file.acceptedBase != nil { return SinceAcceptedText.rejectHelp }   // accept-baseline (§66): never "deleted"
         return String(localized: "Reject and move to the next pending file (⌘⇧R)")
     }
 

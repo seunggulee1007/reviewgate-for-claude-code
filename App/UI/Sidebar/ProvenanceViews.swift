@@ -121,6 +121,20 @@ struct ReviewProvenanceModals: ViewModifier {
             } message: { request in
                 Text(verbatim: request.message)
             }
+            // accept-baseline (§66): "라운드 시작으로 되돌리기" — the accepted content goes too, so it asks first.
+            .alert(Text(verbatim: SinceAcceptedText.roundRejectQuestion(model.roundRejectPath ?? "")),
+                   isPresented: Binding(get: { roundRejectFile != nil }, set: { if !$0 { model.roundRejectPath = nil } }),
+                   presenting: roundRejectFile) { file in
+                Button(SinceAcceptedText.roundReject, role: .destructive) {
+                    model.roundRejectPath = nil
+                    store.rejectToRoundStart(file)
+                }
+                .accessibilityIdentifier("Round reject confirm")
+                Button("Cancel", role: .cancel) { model.roundRejectPath = nil }
+                    .accessibilityIdentifier("Round reject cancel")
+            } message: { file in
+                Text(verbatim: SinceAcceptedText.roundRejectMessage(file))
+            }
             .confirmationDialog(Text("Finish the review?"), isPresented: $model.showFinishReview, titleVisibility: .visible) {
                 Button("Finish review") { Task { await store.finishReview() } }
                     .accessibilityIdentifier("Finish review confirm")
@@ -130,6 +144,12 @@ struct ReviewProvenanceModals: ViewModifier {
             }
             // r2-review-flow M29: a stale review is the kept orange banner of `ReviewNoticesBar` (정리… / 이어서 리뷰), never a
             // sheet that blocks the window every morning.
+    }
+
+    /// The file "라운드 시작으로 되돌리기" asks about, while it is still pending with an `acceptedBase` (§66).
+    private var roundRejectFile: ChangedFile? {
+        guard let path = model.roundRejectPath else { return nil }
+        return store.changedFiles.first { $0.path == path && $0.state == .pending && $0.acceptedBase != nil }
     }
 
     /// "…도" when "Reject all" adds the external files to Claude's changes; one external file is asked about on its own.

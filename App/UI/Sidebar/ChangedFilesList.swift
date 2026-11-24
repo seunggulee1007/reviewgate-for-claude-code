@@ -123,7 +123,9 @@ struct ChangedFilesList: View {
                                 ForEach(accepted) { file in fileRow(file, authors: authors[file.path] ?? []) }
                             }
                         } header: {
-                            acceptedHeader(count: accepted.count)
+                            // accept-baseline (§66): the engine's "accepted, not committed yet" when it says it.
+                            acceptedHeader(count: AcceptedGroup.count(summary: store.gate.reviewSummary, shown: accepted.count,
+                                                                      filtered: shownAuthor != nil))
                         }
                     }
                 }
@@ -326,13 +328,14 @@ struct ChangedFilesList: View {
                 .padding(.top, 6)
                 .help(viewed ? String(localized: "Viewed") : String(localized: "Not viewed yet"))
                 .accessibilityLabel(viewed ? String(localized: "Viewed") : String(localized: "Not viewed yet"))
-            Text(file.status.rawValue)
+            // accept-baseline (§66): a file reviewed since its accept shows the change since the accept (M, not the round's A).
+            Text(file.badgeStatus.rawValue)
                 .font(.caption.weight(.bold).monospaced())
-                .foregroundStyle(statusColor(file.status))
+                .foregroundStyle(statusColor(file.badgeStatus))
                 .frame(width: 14, alignment: .center)
                 .padding(.top, 2)
-                .help(ReviewSpeech.status(file.status))   // polish P2-review-01: "수정됨", not a bare letter
-                .accessibilityLabel(ReviewSpeech.status(file.status))   // MARK: wave4d w4d-speed — polish-10: "Modified", not "M"
+                .help(ReviewSpeech.status(file.badgeStatus))   // polish P2-review-01: "수정됨", not a bare letter
+                .accessibilityLabel(ReviewSpeech.status(file.badgeStatus))   // MARK: wave4d w4d-speed — polish-10: "Modified", not "M"
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
                     pathText(FileGroups.compactPath(file.path))   // MARK: wave4b w4b-files — §40.2: the module kept
@@ -391,7 +394,11 @@ struct ChangedFilesList: View {
                             .help(ReviewFlowText.scheduledHelp)
                             .accessibilityIdentifier("Reject scheduled \(file.path)")
                     }
-                    if file.changedSinceAccepted, file.state == .pending { ChangedAfterAcceptChip() }
+                    if file.acceptedBase != nil {
+                        SinceAcceptedChip(path: file.path)   // accept-baseline (§66): "수락 이후 변경"
+                    } else if file.changedSinceAccepted, file.state == .pending {
+                        ChangedAfterAcceptChip()
+                    }
                     if store.showsChangedSinceViewed(file) { ChangedSinceViewedChip() }   // wave3 check-clients: pending only
                     if store.unchangedSinceRequest(file) { UnchangedSinceRequestChip() }   // wave3 check-clients (as Electron)
                     if file.state == .accepted { AutoAcceptedChip(rule: file.autoAccepted, path: file.path) }   // MARK: wave4c w4c-trust (§41.2)
@@ -464,6 +471,11 @@ struct ChangedFilesList: View {
                 Button(file.rejectScheduled ? ReviewFlowText.scheduledBadge : String(localized: "Reject"), systemImage: "arrow.uturn.backward") { ReviewUndo.reject(file, store: store) }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(file.state != .pending || store.isRejectLocked || file.uncaptured || file.rejectScheduled)
+                    .help(file.acceptedBase != nil ? SinceAcceptedText.rejectHelp : String(localized: "Reject and move to the next pending file (⌘⇧R)"))
+                // accept-baseline (§66): the plain reject restores the accepted content; back to the round's start asks first.
+                if file.acceptedBase != nil, file.state == .pending {
+                    RoundRejectMenuItem(file: file)
+                }
                 Divider()
                 Button("Mention in Chat", systemImage: "at") {
                     model.mentionPaths = [file.path]
