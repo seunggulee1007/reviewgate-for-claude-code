@@ -75,7 +75,7 @@ extension PermissionCardOptions {
         if request.toolName == AskUserQuestions.toolName || request.toolName == "SendMessage" || request.toolName == "ExitPlanMode" { return false }
         guard let reason = request.reason else { return true }
         switch reason.code {
-        case .outsideProject, .nestedRepository, .otherWorktree: return true
+        case .outsideProject, .nestedRepository, .otherWorktree, .addedDirectory: return true
         default: return false
         }
     }
@@ -196,6 +196,8 @@ public enum PermissionReasonText {
         switch reason.code {
         case .outsideProject:
             return String(localized: "Outside the project — the review does not see this file", bundle: .module)
+        case .addedDirectory:   // §67.1
+            return String(localized: "An edit in a directory added with /add-dir — the review shows no diff for it, so it asks here", bundle: .module)
         case .nestedRepository:
             if let path {
                 return String(localized: "Inside a nested repository (submodule · worktree · clone) — the review does not see it (\(path))", bundle: .module)
@@ -238,7 +240,7 @@ public enum PermissionReasonText {
     public static func level(_ reason: PermissionReason) -> PermissionWarningLevel {
         switch reason.code {
         case .worktreeCommand, .worktreeIsolation, .claudeConfig, .gitCommand: .danger
-        case .outsideProject, .nestedRepository, .otherWorktree, .other: .caution
+        case .outsideProject, .nestedRepository, .otherWorktree, .addedDirectory, .other: .caution
         }
     }
 
