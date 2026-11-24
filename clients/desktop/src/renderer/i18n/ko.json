@@ -3442,6 +3442,7 @@
   "Tell a terminal Claude to send to this name and the message comes to this window. {0}": "터미널 Claude 에게 이 이름으로 보내라고 하면 이 창으로 메시지가 와요. {0}",
   "Tells Claude to continue without deciding the {0} pending file(s) — they stay in the review; what you decided goes with it": "대기 중인 파일 {0}개는 정하지 않은 채 Claude에게 계속하라고 해요 — 그 파일들은 리뷰에 남고, 이미 정한 결과는 함께 알려요",
   "Tells Claude to continue — the files you accepted ({0}) and rejected ({1}) go with it (⌘⇧↩)": "Claude에게 계속하라고 해요 — 수락한 파일 {0}개와 거절한 파일 {1}개도 함께 알려요 (⌘⇧↩)",
+  "Tells Claude: {0} accepted · {1} rejected": "Claude에게 알려요: 수락 {0}개 · 거절 {1}개",
   "Terminal": "터미널",
   "Terminal (Claude Code) allow rules": "터미널(Claude Code) 허용 규칙",
   "Terminal GPU acceleration": "터미널 GPU 가속",
