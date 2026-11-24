@@ -472,7 +472,7 @@ public enum EngineCommand: Sendable, Equatable {
     case unaccept(paths: [String])
     case acceptAll
     /// §19.1: `force` reverts even files the user edited after the review (refused `file_changed_since_review` otherwise).
-    case reject(paths: [String], force: Bool = false)
+    case reject(paths: [String], force: Bool = false, to: RejectTarget? = nil)
     /// §31: without `includeExternal` only the pending files Claude changed (origin tool / bash) are reverted; the
     /// client sends it only after the user confirmed the list of external files.
     case rejectAll(force: Bool = false, includeExternal: Bool = false)
@@ -913,6 +913,7 @@ extension EngineCommand: Encodable {
         case acceptPending, remember
         case skip   // r2-chats-cards M25 (§33.10)
         case includeExternal   // wave1 mac-review
+        case to   // §66 reject
         case toolUseId
         case mode, approve
         case hunks, expectedEndTree, all, entryId
@@ -1253,9 +1254,10 @@ extension EngineCommand: Encodable {
             try encodeCommitSeriesFields(to: encoder)
         case let .accept(paths), let .unaccept(paths):
             try c.encode(paths, forKey: .paths)
-        case let .reject(paths, force):
+        case let .reject(paths, force, to):
             try c.encode(paths, forKey: .paths)
             if force { try c.encode(true, forKey: .force) }
+            try c.encodeIfPresent(to, forKey: .to)   // §66: absent = the default (the accepted content, or A)
         case let .addNote(path, line, side, excerpt, body):
             try c.encode(path, forKey: .path)
             try c.encode(line, forKey: .line)   // explicit null for whole-file notes
@@ -1546,20 +1548,24 @@ public struct ReviewSummary: Codable, Sendable, Equatable {
     public var files: Int
     public var added: Int
     public var deleted: Int
+    /// §66: accepted files still listed (not committed yet) — the "수락함 · 커밋 전 N" count; nil on older engines.
+    public var acceptedUncommitted: Int?
 
-    public init(files: Int, added: Int, deleted: Int) {
+    public init(files: Int, added: Int, deleted: Int, acceptedUncommitted: Int? = nil) {
         self.files = files
         self.added = added
         self.deleted = deleted
+        self.acceptedUncommitted = acceptedUncommitted
     }
 
-    private enum CodingKeys: String, CodingKey { case files, added, deleted }
+    private enum CodingKeys: String, CodingKey { case files, added, deleted, acceptedUncommitted }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(files: try c.decodeIfPresent(Int.self, forKey: .files) ?? 0,
                   added: try c.decodeIfPresent(Int.self, forKey: .added) ?? 0,
-                  deleted: try c.decodeIfPresent(Int.self, forKey: .deleted) ?? 0)
+                  deleted: try c.decodeIfPresent(Int.self, forKey: .deleted) ?? 0,
+                  acceptedUncommitted: lenientValue(Int.self, c, .acceptedUncommitted))
     }
 }
 
@@ -1769,6 +1775,10 @@ public struct ChangedFile: Codable, Identifiable, Sendable, Hashable {
     // MARK: r2-review-flow — M32 (§34.2; false on older engines)
     /// Rejected while Claude works: reverted right after the turn's collection ("거절 예정"); still `.pending` until then.
     public var rejectScheduled = false
+    // MARK: accept-baseline — §66 (nil on older engines)
+    /// What the user accepted of a file a later turn changed again: `added` / `deleted`, the default range, reject and
+    /// hunk reject are "since accepted"; `status` stays the round's.
+    public var acceptedBase: AcceptedBase?
 
     public init(path: String, oldPath: String?, status: ChangeStatus, added: Int, deleted: Int,
                 isBinary: Bool, tools: [String] = [], toolUseIds: [String] = [], state: FileReviewState = .pending, noteCount: Int = 0,
@@ -1840,6 +1850,7 @@ public struct ChangedFile: Codable, Identifiable, Sendable, Hashable {
         autoAccepted = TrustWire.autoAccepted(from: decoder)   // MARK: wave4c w4c-trust (§41.2)
         committedIn = GitWire.committedIn(from: decoder)   // MARK: r1-git (§46)
         rejectScheduled = ReviewFlowWire.rejectScheduled(from: decoder)   // MARK: r2-review-flow (M32, §34.2)
+        acceptedBase = AcceptedBaseWire.acceptedBase(from: decoder)   // MARK: accept-baseline (§66)
     }
 }
 

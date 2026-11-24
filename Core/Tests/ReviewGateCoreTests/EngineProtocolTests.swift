@@ -648,7 +648,7 @@ import Testing
         // The M16 golden carries both fields.
         let golden = try NDJSON.decode(ReviewState.self, from: fixture("state.reviewing.json"))
         #expect(golden.session.rememberedAllows.isEmpty)
-        #expect(golden.gate.reviewSummary == ReviewSummary(files: 2, added: 3, deleted: 1))
+        #expect(golden.gate.reviewSummary == ReviewSummary(files: 2, added: 3, deleted: 1, acceptedUncommitted: 1))   // §66
 
         // Absent on older engines: strip them from the golden.
         let stripped = try fixture("state.reviewing.json")

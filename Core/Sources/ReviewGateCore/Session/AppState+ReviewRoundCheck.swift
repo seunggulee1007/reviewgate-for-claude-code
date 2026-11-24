@@ -115,10 +115,11 @@ extension AppState {
     /// said next to the range picker instead of the controls just going away (Electron's range row and hunk bar): the
     /// line / part side questions, and for a file that could be reverted in parts, that.
     public func rangeHints(for file: ChangedFile) -> [String] {
-        guard diffSince(for: file) != .review else { return [] }
+        let since = diffSince(for: file)
+        guard since != .review else { return [] }
         var hints: [String] = []
         if side.isSupported { hints.append(String(localized: "Line side questions are in the “Whole review” view", bundle: .module)) }
-        if file.supportsHunkReject { hints.append(String(localized: "Parts can be reverted in the “Whole review” view", bundle: .module)) }
+        if file.supportsHunkReject, !file.allowsHunkReject(in: since) { hints.append(String(localized: "Parts can be reverted in the “Whole review” view", bundle: .module)) }
         return hints
     }
 }

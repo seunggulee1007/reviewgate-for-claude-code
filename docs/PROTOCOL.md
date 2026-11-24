@@ -1176,7 +1176,9 @@ and leaves the rest under review. Accept semantics are unchanged (`accept` takes
   `acceptedBase.tree`): the selected hunks go back to the **accepted** content (`partial_reject_unsupported` then looks
   at `acceptedBase.status`, so a file Claude created and the user accepted can be cut hunk by hunk); every hunk selected
   (or the rest cancelling out) is the whole-file reject to the accepted content — the file is `accepted` again. Without
-  `expectedBaseTree` the ids are the file's default range's (§66).
+  `expectedBaseTree` the ids are the file's default range's (§66). Both clients offer the parts in that "수락 이후" view
+  (judged by `acceptedBase.status`) and send `expectedBaseTree: acceptedBase.tree` from it; their confirm says the parts go
+  back to the content the user accepted.
 - **Refusals** (`result{ok:false}`, no `error` event, nothing written): `session_running` while a turn runs or its
   collection is in flight (the same lock as `accept`/`reject`, §3), `reverting`, `no_review`, `stale_diff`,
   `not_a_changed_file:<path>`, `not_pending:<path>` (accepted / changes-requested files), `binary_file`,
@@ -2920,7 +2922,8 @@ type GeneratedKind = "lockfile" | "generated" | "minified";
   usual 20 000-line `truncated`. Clients key caches on (path, since, `reviewEndTree`).
 - **Hunk ids of a `since` other than `review` are not `reject_hunks` ids** — but for `accepted` of a file with an
   `acceptedBase` (§66). `reject_hunks.expectedBaseTree` (new clients
-  send the `baseTree` of the diff they show) must equal A, else `stale_diff`; clients offer hunk reject in the 전체 view only.
+  send the `baseTree` of the diff they show) must equal A, else `stale_diff`; clients offer hunk reject in the 전체 view only
+  — and (§66) in the 수락 이후 view of a file with an `acceptedBase`.
 - `full_file { path, since }`: `lines` as before (the worktree, falling back to B — the held B's content while `stale`),
   `changedNewLines` / `deletedAfterNewLine` / `oldText` from the range; it echoes `since`, `stale`, `endTree`.
 - Every tree a range refers to is pinned under `refs/reviewgate/<ns>/range/…` while referenced and persisted with the review
@@ -11060,6 +11063,23 @@ type AcceptedBase = {
   (§64: a file with an `acceptedBase` is pending, so it waits like any) behave as before; accepting such a file again
   takes the new content and drops the base. A file Claude created, the user accepted and a later turn deleted is
   identical in A and B and simply leaves the list (as before §66).
+- **Clients.** A file with an `acceptedBase` carries a small **"수락 이후 변경"** (Changed since accepted) label in its row and
+  in the diff header (it replaces "수락 뒤 바뀜", which stays for an engine without `acceptedBase`), and its status letter is
+  `acceptedBase.status` — a file Claude created, the user accepted and a later turn edited reads `M`, not the round's `A`; the
+  row's `+/-` are the engine's (since accepted). The diff's range picker reads **"수락 이후 / 라운드 전체"** for it — 수락
+  이후 first and the default (`since: "accepted"`), 라운드 전체 = `since: "review"` by name; other ranges (이번 턴, 요청 이후)
+  follow as before. Reject's tooltip says **"수락한 내용으로 되돌려요"** (never that the file is deleted); **"라운드 시작으로
+  되돌리기…"** (`reject {paths, to: "round"}`) is only in a menu — the row's context menu and the diff header's "⋯" on the
+  Mac, a "⋯" beside Reject in the Windows diff header — and asks first (a created file: "…이번 라운드 전에는 없던 파일이라
+  디스크에서 삭제돼요"); it is off while a turn runs or is collected (a scheduled reject always restores the accepted content)
+  and for an uncaptured file, with the reason as its tooltip. Hunk reject (§17) is offered in the 수락 이후 view too, judged by
+  `acceptedBase.status`, with `expectedBaseTree: acceptedBase.tree`; its confirm says the parts go back to the accepted
+  content. The folded "수락함 · 커밋 전 N" (§58.1) counts `reviewSummary.acceptedUncommitted` when the engine sends it (the
+  client's own count for an older engine; on the Mac also while the author filter hides some rows). Mac Core
+  `SinceAccepted.swift` (`badgeStatus`, `allowsHunkReject(in:)`, `DiffSince.label(for:)`, `SinceAcceptedText`,
+  `AcceptedGroup.count`, `rejectToRoundStart`), App `DiffRangeHeader.swift` (`SinceAcceptedChip`, `RoundRejectMenuItem`),
+  the confirm in `ProvenanceViews.swift`; Windows `sinceAccepted.ts`, `DiffHeader.tsx` (`RoundRejectMenu`), `HunkReject.tsx`,
+  store `reject(path, "round")`. Tests: Core `SinceAcceptedTests`, Windows `sinceAccepted.test.ts`.
 - Owner: accept-baseline (engine `review/gate.ts`, `review/ranges.ts`, `review/persist.ts`, `state.ts`, `engine.ts`,
   `protocol.ts`; Core `ReviewRound.swift` `wire(for:)`; Windows `store.ts`, `WhitespaceDiff.tsx` — the "전체" request by
   name). Tests: `engine/test/engine.acceptedBase.test.ts` (accept → change again → pending with the since-accepted diff and

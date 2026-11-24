@@ -1586,7 +1586,7 @@ public final class AppState {
         forceRejectRequest = nil
         let forced: EngineCommand
         switch request.command {
-        case let .reject(paths, _): forced = .reject(paths: paths, force: true)
+        case let .reject(paths, _, to): forced = .reject(paths: paths, force: true, to: to)
         case let .rejectAll(_, includeExternal): forced = .rejectAll(force: true, includeExternal: includeExternal)
         case let .rewind(toTurn, mode, editText, mentions, attachments, _):
             // §26: the same rewind again, overwriting the user's own edits of those files.
@@ -1957,13 +1957,17 @@ public final class AppState {
             return false
         }
         hunkRefusal = nil
-        // wave2 mac-flow (§34.1): hunk ids are the whole review's; a range's ids are never sent.
-        if selectedPathValue == file.path, selectedDiffSince != .review { return false }
+        // wave2 mac-flow (§34.1): hunk ids are the whole review's; a range's ids are never sent — but §66's since-accepted
+        // view of a file with an `acceptedBase`, whose old side is the accepted tree.
+        let current = changedFiles.first { $0.path == file.path } ?? file
+        let since: DiffSince = selectedPathValue == file.path ? selectedDiffSince : .review
+        if !current.allowsHunkReject(in: since), since != .review { return false }
         // The tree of the diff on screen, not the latest snapshot's B: if B moved since, the engine answers stale_diff;
-        // its old side (`baseTree`, §34.1) must still be A.
-        let shown = wholeReviewDiff(path: file.path)
+        // its old side (`baseTree`, §34.1) must still be A — or the accepted tree (§66).
+        let shown = reviewDiff(path: file.path, since: since)
+        let base = since == .accepted ? current.acceptedBase?.tree : shown?.info.baseTree
         let command = EngineCommand.rejectHunks(path: file.path, hunks: hunks.sorted(), expectedEndTree: shown?.endTree ?? state.gate.turnEndTree,
-                                                expectedBaseTree: shown?.info.baseTree)
+                                                expectedBaseTree: base)
         if let commandSink { commandSink(command); return true }
         isRejectingHunks = true
         defer { isRejectingHunks = false }
@@ -1973,7 +1977,7 @@ public final class AppState {
             return true
         } catch let EngineClientError.refused(code, errorCode, paths, _) {
             // Every hunk of the file = a whole-file reject: parity with the other client, ask before discarding the user's edit.
-            let allHunks = Set(wholeReviewDiff(path: file.path)?.diff.hunks.map(\.id) ?? [])
+            let allHunks = Set(shown?.diff.hunks.map(\.id) ?? [])
             if (errorCode ?? HunkRefusal.from(code).code) == "file_changed_since_review", !allHunks.isEmpty, Set(hunks) == allHunks {
                 forceRejectRequest = ForceRejectRequest(command: .reject(paths: [file.path]), paths: paths.isEmpty ? [file.path] : paths)
                 appendLog("[warn] reject_hunks \(file.path): \(code) — asking to force")
