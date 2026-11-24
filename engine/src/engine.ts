@@ -138,7 +138,7 @@ import { cliSessionExists, cliSessionFile, cliSessionGone, codeOfStartFailure, S
 import { rememberKeys, type ReadOnlyContext } from "./session/bashClass.js";
 import { isExploreCall, markExplore } from "./session/explore.js"; // MARK: wave4b w4b-tabs (§39.2)
 import { autoAllowReason, EDIT_TOOLS_MATCHER } from "./session/hooks.js";
-import { reviewFirstContext, reviewFirstMode, reviewFirstPromptDecision, reviewFirstWaiting } from "./session/reviewFirst.js"; // §64
+import { reviewFirstContext, reviewFirstFixable, reviewFirstMode, reviewFirstPromptDecision, reviewFirstWaiting, type ReviewFirstHold } from "./session/reviewFirst.js"; // §64
 import { readOnlyContext, scopeNoticeMessage } from "./session/reviewScope.js";
 import { skillAllowedTools, slashCommandName } from "./session/skillTools.js"; // MARK: r2-skills-side (§33.5, M20)
 import { classifyRules, loadPermissionRules, matchesToolPattern, rememberable, sessionUserRules, userRuleAllows, type LoadedRules, type UserRules } from "./session/permissionRules.js";
@@ -2896,7 +2896,7 @@ export class ReviewEngine {
       ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
-      reviewFirst: () => this.reviewFirstWaitingNow(), // §64
+      reviewFirst: () => this.reviewFirstHoldNow(), // §64
       // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
       // §64: that turn is a change request from then on — it may edit.
       stopFeedback: (q) => {
@@ -3273,7 +3273,7 @@ export class ReviewEngine {
         const { summary, notes } = sendParts;
         taken = sendParts.taken;
         // §64: files still wait — Claude knows the rule before it tries.
-        const rule = reviewWaiting && !command ? reviewFirstContext(reviewWaiting) : null;
+        const rule = reviewWaiting && !command ? reviewFirstContext(this.reviewFirstModeNow(), reviewWaiting) : null;
         parts = [summary, rule, notes].filter((p): p is string => p !== null);
       }
       // §54: the budget Claude was told in this terminal changed (it was told none at first) — said with the prompt.
@@ -4089,7 +4089,7 @@ export class ReviewEngine {
         // MARK: wave4d w4d-peers — §42.2: whom a SendMessage address reaches (the registry, only read).
         resolvePeer: (address) => peerAtAddress({ configDir: claudeConfigDir(this.childEnv()), address }),
         reviewPaths: () => this.pathsUnderReview(), // MARK: r1-git (§46)
-        reviewFirst: () => this.reviewFirstWaitingNow(), // §64
+        reviewFirst: () => this.reviewFirstHoldNow(), // §64
         skillAllowedTools: (name, since) => this.skillAllowedTools(name, since), // MARK: r2-skills-side (§33.5, M20)
       });
       this.session = session;
@@ -4317,7 +4317,7 @@ export class ReviewEngine {
     // §64: files still wait (a question during a review) — Claude knows the rule before it tries; read before `beginSend`.
     const waiting = opts.command === true ? null : this.reviewFirstWaitingNow();
     let outgoing = this.gate.beginSend(trimmed, opts.command === true);
-    if (waiting) outgoing = `${reviewFirstContext(waiting)}\n\n${outgoing}`;
+    if (waiting) outgoing = `${reviewFirstContext(this.reviewFirstModeNow(), waiting)}\n\n${outgoing}`;
     // MARK: wave4 w4-longwork — daily-18: a budget Claude was not told about yet goes in front of the message.
     const budgetNote = opts.command === true ? null : budgetChangeNote(this.toldBudget, this.settings.budget);
     if (budgetNote) outgoing = `${budgetNote}\n\n${outgoing}`;
@@ -4761,6 +4761,14 @@ export class ReviewEngine {
   private reviewFirstWaitingNow(): string[] | null {
     const requesting = this.gate.isRequestingChanges || (this.reviewFirstRequestTurn === this.turn && this.gate.running);
     return reviewFirstWaiting(this.reviewFirstModeNow(), { files: this.gate.changedFiles, requestingChanges: requesting });
+  }
+
+  /** §64: what the PreToolUse hooks hold Claude back with now (null: nothing) — read at every call. */
+  private reviewFirstHoldNow(): ReviewFirstHold | null {
+    const mode = this.reviewFirstModeNow();
+    const waiting = this.reviewFirstWaitingNow();
+    if (mode === "off" || !waiting) return null;
+    return { mode, waiting, fixable: reviewFirstFixable(this.gate.changedFiles), root: this.gate.checkpoint?.root ?? null };
   }
 
   /** §64: `gate.reviewFirst` — while the rule holds Claude back. */

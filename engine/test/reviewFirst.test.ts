@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { HookInput } from "@anthropic-ai/claude-agent-sdk";
@@ -7,13 +7,17 @@ import type { SessionEvent } from "../src/session/events.js";
 import { buildHooks, type HookContext } from "../src/session/hooks.js";
 import {
   changesFiles,
+  isFixable,
   reviewFirstContext,
+  reviewFirstFixable,
+  reviewFirstFixReason,
   reviewFirstMode,
   reviewFirstPromptDecision,
   reviewFirstPromptReason,
   reviewFirstToolDecision,
   reviewFirstToolReason,
   reviewFirstWaiting,
+  type ReviewFirstHold,
   type ReviewFirstMode,
 } from "../src/session/reviewFirst.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
@@ -102,18 +106,72 @@ describe("the decision (reviewFirst.ts)", () => {
     expect(changesFiles("Write", { file_path: "/p/plan.md" }, { file: "/p/plan.md", exempt: (f) => f.startsWith("/p/") })).toBe(false);
   });
 
-  it("the tool decision: denied only while files wait, with a reason that names them", () => {
+  it("the tool decision (edits): files of the review may be fixed in any state but rejected; other files, new ones and unknown paths wait; Bash runs", () => {
+    const root = makeRepo();
+    write(root, "src/a.ts", "a\n");
+    const files = [file("src/a.ts", "pending"), file("b.ts", "changesRequested"), file("c.ts", "accepted"), file("d.ts", "rejected")];
+    const hold: ReviewFirstHold = { mode: "edits", waiting: ["src/a.ts", "b.ts"], fixable: reviewFirstFixable(files), root };
+    expect(hold.fixable).toEqual(["src/a.ts", "b.ts", "c.ts"]);
+    const deny = reviewFirstFixReason(["src/a.ts", "b.ts"]);
+    const edit = (tool: string, f: string) => reviewFirstToolDecision(hold, tool, { file_path: join(root, f) }, { file: join(root, f) });
+    // In the list (pending, changes requested, accepted): each edit tool goes on.
+    for (const tool of ["Write", "Edit", "MultiEdit", "NotebookEdit"]) for (const f of ["src/a.ts", "b.ts", "c.ts"]) expect(edit(tool, f), `${tool} ${f}`).toBeNull();
+    // A rejected file, a file not in the list, a new file: denied with the reason that names the waiting files.
+    expect(edit("Write", "d.ts")).toBe(deny);
+    expect(edit("Edit", "README.md")).toBe(deny);
+    expect(edit("Write", "src/new.ts")).toBe(deny);
+    // A path outside the repository, or none at all.
+    expect(reviewFirstToolDecision(hold, "Write", { file_path: "/elsewhere/a.ts" }, { file: "/elsewhere/a.ts" })).toBe(deny);
+    expect(reviewFirstToolDecision(hold, "Write", {})).toBe(deny);
+    // Plan files and Claude's memory are outside the review.
+    expect(reviewFirstToolDecision(hold, "Write", {}, { file: "/p/plan.md", exempt: (f) => f.startsWith("/p/") })).toBeNull();
+    // Bash runs (tests, builds, formatters go with a fix); reads and every other tool too.
+    for (const command of ["touch x", "npm test", "sed -i s/a/b/ README.md", "git commit -m x", "git status"]) {
+      expect(reviewFirstToolDecision(hold, "Bash", { command }), command).toBeNull();
+    }
+    expect(reviewFirstToolDecision(hold, "Read", { file_path: join(root, "README.md") })).toBeNull();
+    // Nothing held: everything goes on.
+    expect(reviewFirstToolDecision(null, "Write", {}, { file: join(root, "README.md") })).toBeNull();
+    expect(reviewFirstToolDecision({ ...hold, waiting: [] }, "Write", {}, { file: join(root, "README.md") })).toBeNull();
+    expect(deny).toBe(
+      "[Review gate] 2 files are waiting for the user's review (src/a.ts, b.ts). You may fix those files; changes to other files wait until the user has reviewed them.",
+    );
+    expect(reviewFirstFixReason(["a", "b", "c", "d"])).toContain("4 files are waiting for the user's review (a, b, c, …)");
+  });
+
+  it("the path is resolved as the gate resolves it: relative spellings, a symlink into the repository, the case on macOS / Windows", () => {
+    const root = makeRepo();
+    write(root, "src/a.ts", "a\n");
+    expect(isFixable(join(root, "src", "..", "src", "a.ts"), ["src/a.ts"], root)).toBe(true);
+    const link = join(temp("rg-rf-link"), "repo");
+    symlinkSync(root, link);
+    expect(isFixable(join(link, "src", "a.ts"), ["src/a.ts"], root)).toBe(true);
+    // A case-only spelling names the same file where the file system is case-insensitive (the default on macOS / Windows).
+    const insensitive = process.platform === "darwin" || process.platform === "win32";
+    expect(isFixable(join(root, "SRC", "A.ts"), ["src/a.ts"], root)).toBe(insensitive);
+    mkdirSync(join(root, "gone"));
+    expect(isFixable(join(root, "gone", "Deleted.ts"), ["gone/deleted.ts"], root)).toBe(insensitive);
+    expect(isFixable(join(root, "src", "a.ts"), ["src/a.ts"], null)).toBe(false);
+    expect(isFixable(join(root, "src", "b.ts"), ["src/a.ts"], root)).toBe(false);
+  });
+
+  it("the tool decision (prompts): every call that changes files is denied while files wait, as before 0.5.26", () => {
+    const hold: ReviewFirstHold = { mode: "prompts", waiting: ["a.ts"], fixable: ["a.ts"], root: "/r" };
     const write_ = { file_path: "/r/a.ts", content: "x" };
-    expect(reviewFirstToolDecision(null, "Write", write_)).toBeNull();
-    expect(reviewFirstToolDecision([], "Write", write_)).toBeNull();
-    expect(reviewFirstToolDecision(["a.ts"], "Read", { file_path: "/r/a.ts" })).toBeNull();
-    expect(reviewFirstToolDecision(["a.ts"], "Bash", { command: "git diff" })).toBeNull();
-    expect(reviewFirstToolDecision(["a.ts"], "Write", write_)).toBe(reviewFirstToolReason(["a.ts"]));
+    expect(reviewFirstToolDecision(hold, "Read", { file_path: "/r/a.ts" })).toBeNull();
+    expect(reviewFirstToolDecision(hold, "Bash", { command: "git diff" })).toBeNull();
+    expect(reviewFirstToolDecision(hold, "Bash", { command: "touch x" })).toBe(reviewFirstToolReason(["a.ts"]));
+    expect(reviewFirstToolDecision(hold, "Write", write_, { file: "/r/a.ts" })).toBe(reviewFirstToolReason(["a.ts"]));
     expect(reviewFirstToolReason(["a.ts"])).toBe(
       "[Review gate] 1 file is waiting for the user's review (a.ts). Do not change files until the user accepts or rejects them — answer questions, read and plan only.",
     );
     expect(reviewFirstToolReason(["a.ts", "b.ts", "c.ts", "d.ts"])).toContain("4 files are waiting for the user's review (a.ts, b.ts, c.ts, …)");
-    expect(reviewFirstContext(["a.ts", "b.ts", "c.ts"])).toBe("[Review gate] 3 files await review; questions only until then.");
+  });
+
+  it("the line every prompt carries while files wait", () => {
+    expect(reviewFirstContext("edits", ["a.ts", "b.ts", "c.ts"])).toBe("[Review gate] 3 files await review. Fixing them is fine; other changes wait until the user reviewed them.");
+    expect(reviewFirstContext("edits", ["a.ts"])).toBe("[Review gate] 1 file awaits review. Fixing it is fine; other changes wait until the user reviewed it.");
+    expect(reviewFirstContext("prompts", ["a.ts", "b.ts", "c.ts"])).toBe("[Review gate] 3 files await review; questions only until then.");
   });
 
   it("the prompt decision: only in prompts mode, never a slash command", () => {
@@ -126,8 +184,11 @@ describe("the decision (reviewFirst.ts)", () => {
   });
 });
 
+/** What the engine holds Claude back with while `waiting` files wait in a review of `listed` (default: the waiting ones). */
+const holdOf = (root: string, waiting: string[], listed = waiting, mode: ReviewFirstHold["mode"] = "edits"): ReviewFirstHold => ({ mode, waiting, fixable: listed, root });
+
 /** The classic chat's hooks with the engine's live answer. */
-function hookCtx(root: string, waiting: () => readonly string[] | null): HookContext & { events: SessionEvent[]; denied: string[] } {
+function hookCtx(root: string, waiting: () => ReviewFirstHold | null): HookContext & { events: SessionEvent[]; denied: string[] } {
   const events: SessionEvent[] = [];
   const denied: string[] = [];
   return {
@@ -154,34 +215,47 @@ function decision(out: unknown): { decision?: string; reason?: string } {
 }
 
 describe("classic chat: PreToolUse (hooks.ts)", () => {
-  it("edit tools and writing Bash are denied while files wait — subagents' calls too; reads and read-only Bash run; an accept lifts it", async () => {
+  it("edits: a file under review may be fixed — by subagents too; other files are denied; Bash and reads run; an accept lifts it", async () => {
     const root = makeRepo();
-    let waiting: string[] | null = ["README.md", "new.txt"];
-    const ctx = hookCtx(root, () => waiting);
+    let hold: ReviewFirstHold | null = holdOf(root, ["README.md", "new.txt"]);
+    const ctx = hookCtx(root, () => hold);
     const hooks = buildHooks(ctx);
     const preEdit = hooks.PreToolUse![0]!.hooks[0]!;
     const preBash = hooks.PreToolUse![1]!.hooks[0]!;
     const preOther = hooks.PreToolUse![2]!.hooks[0]!;
     const opts = { signal: new AbortController().signal };
-    const reason = reviewFirstToolReason(["README.md", "new.txt"]);
+    const reason = reviewFirstFixReason(["README.md", "new.txt"]);
 
     expect(decision(await preEdit(pre("Write", { file_path: join(root, "x.ts"), content: "x" }, root), "t", opts))).toEqual({ decision: "deny", reason });
-    expect(decision(await preEdit(pre("Edit", { file_path: join(root, "README.md"), old_string: "a", new_string: "b" }, root, { agent_id: "sub-1" }), "t", opts))).toEqual({ decision: "deny", reason });
+    expect(decision(await preEdit(pre("Edit", { file_path: join(root, "README.md"), old_string: "a", new_string: "b" }, root, { agent_id: "sub-1" }), "t", opts)).decision).not.toBe("deny");
+    expect(decision(await preEdit(pre("Write", { file_path: "new.txt", content: "x" }, root), "t", opts)).decision).not.toBe("deny");
+    expect(decision(await preBash(pre("Bash", { command: "touch x" }, root), "t", opts)).decision).not.toBe("deny");
+    expect(decision(await preOther(pre("Read", { file_path: join(root, "README.md") }, root), "t", opts)).decision).not.toBe("deny");
+    expect(ctx.denied).toEqual(["Write"]);
+
+    hold = null; // every file accepted / rejected
+    expect(decision(await preEdit(pre("Write", { file_path: join(root, "x.ts"), content: "x" }, root), "t", opts)).decision).not.toBe("deny");
+    expect(ctx.denied).toHaveLength(1);
+  });
+
+  it("prompts: edit tools and writing Bash are denied, the files under review too; read-only Bash runs", async () => {
+    const root = makeRepo();
+    const ctx = hookCtx(root, () => holdOf(root, ["README.md"], ["README.md"], "prompts"));
+    const hooks = buildHooks(ctx);
+    const preEdit = hooks.PreToolUse![0]!.hooks[0]!;
+    const preBash = hooks.PreToolUse![1]!.hooks[0]!;
+    const opts = { signal: new AbortController().signal };
+    const reason = reviewFirstToolReason(["README.md"]);
+    expect(decision(await preEdit(pre("Edit", { file_path: join(root, "README.md"), old_string: "a", new_string: "b" }, root), "t", opts))).toEqual({ decision: "deny", reason });
     expect(decision(await preBash(pre("Bash", { command: "touch x" }, root), "t", opts))).toEqual({ decision: "deny", reason });
     expect(decision(await preBash(pre("Bash", { command: "git status" }, root), "t", opts)).decision).not.toBe("deny");
-    expect(decision(await preOther(pre("Read", { file_path: join(root, "README.md") }, root), "t", opts)).decision).not.toBe("deny");
-    expect(ctx.denied).toEqual(["Write", "Edit", "Bash"]);
-
-    waiting = null; // every file accepted / rejected
-    expect(decision(await preEdit(pre("Write", { file_path: join(root, "x.ts"), content: "x" }, root), "t", opts)).decision).not.toBe("deny");
-    expect(decision(await preBash(pre("Bash", { command: "touch x" }, root), "t", opts)).decision).not.toBe("deny");
-    expect(ctx.denied).toHaveLength(3);
+    expect(ctx.denied).toEqual(["Edit", "Bash"]);
   });
 
   it("a plan file in plan mode stays writable", async () => {
     const root = makeRepo();
     const plans = temp("rg-plans");
-    const ctx = { ...hookCtx(root, () => ["README.md"]), permissionMode: "plan" as const, plansDir: plans };
+    const ctx = { ...hookCtx(root, () => holdOf(root, ["README.md"])), permissionMode: "plan" as const, plansDir: plans };
     const preEdit = buildHooks(ctx).PreToolUse![0]!.hooks[0]!;
     const out = await preEdit(pre("Write", { file_path: join(plans, "plan.md"), content: "# plan" }, root), "t", { signal: new AbortController().signal });
     expect(decision(out).decision).toBe("allow");
@@ -217,7 +291,7 @@ describe("classic chat through the engine", () => {
 
   it("the turn that makes the files is not held back; the next one is (default edits): its message says so, a denied call leaves a row once", async () => {
     const { h, dir } = await opened();
-    const waiting = (): readonly string[] | null => h.session().opts.reviewFirst!();
+    const waiting = (): readonly string[] | null => h.session().opts.reviewFirst!()?.waiting ?? null;
     // A fresh turn: what it changes is not in the review until it ends.
     await h.engine.handle({ type: "send", text: "Change README" });
     h.session().emitSessionInfo();
@@ -229,12 +303,13 @@ describe("classic chat through the engine", () => {
     await h.waitFor((s) => s.gate.phase === "reviewing", "review");
     await h.settle();
     expect(waiting()).toEqual(["README.md", "new.txt"]);
+    expect(h.session().opts.reviewFirst!()).toEqual({ mode: "edits", waiting: ["README.md", "new.txt"], fixable: ["README.md", "new.txt"], root: realpathSync(dir) });
     expect(h.engine.state.gate.reviewFirst).toEqual({ mode: "edits", waiting: 2, blocked: 0 });
 
     // A question during the review: allowed, Claude is told the rule, the files still wait.
     const before = h.session().sends.length;
     await h.engine.handle({ type: "send", text: "why line 2?" });
-    expect(h.session().sends[before]!.text).toBe("[Review gate] 2 files await review; questions only until then.\n\nwhy line 2?");
+    expect(h.session().sends[before]!.text).toBe("[Review gate] 2 files await review. Fixing them is fine; other changes wait until the user reviewed them.\n\nwhy line 2?");
     expect(waiting()).toEqual(["README.md", "new.txt"]);
     // The hooks deny (the session reports it): one quiet row per turn, the count in the state.
     h.session().opts.emit({ type: "review_first_denied", toolName: "Write" });
@@ -248,6 +323,7 @@ describe("classic chat through the engine", () => {
     // Accepting lifts it at once (during the turn: §34.2), one file is not enough.
     await h.engine.handle({ type: "accept", paths: ["README.md"] });
     expect(waiting()).toEqual(["new.txt"]);
+    expect(h.session().opts.reviewFirst!()?.fixable).toEqual(["README.md", "new.txt"]); // the accepted file may still be fixed
     await h.engine.handle({ type: "accept_all" });
     expect(waiting()).toBeNull();
     await h.settle();
@@ -331,17 +407,18 @@ describe("terminal chat through the hook server (§57.4)", () => {
     await r.h.waitFor((x) => x.gate.phase === "reviewing" && x.changedFiles.length === 2, "collected");
   }
 
-  it("edits: the next prompt is told the rule; Write and writing Bash are denied, reads run; accept_all lifts it", async () => {
+  it("edits: the next prompt is told the rule; a file under review may be fixed, other files are denied, Bash runs; accept_all lifts it", async () => {
     const { r, s } = await rig();
     await firstTurn(r, s);
-    const answer = await hook(s, ups("p2", "why?"));
-    expect(context(answer)).toContain("[Review gate] 2 files await review; questions only until then.");
+    const answer = await hook(s, ups("p2", "fix the note"));
+    expect(context(answer)).toContain("[Review gate] 2 files await review. Fixing them is fine; other changes wait until the user reviewed them.");
     const denied = await hook(s, preWrite(r, "x.txt", "p2"));
-    expect(denied).toEqual({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reviewFirstToolReason(["more.txt", "notes.txt"]) } });
-    expect((await hook(s, preBash("touch y", "p2"))).hookSpecificOutput).toMatchObject({ permissionDecision: "deny" });
+    expect(denied).toEqual({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reviewFirstFixReason(["more.txt", "notes.txt"]) } });
+    expect(await hook(s, preWrite(r, "notes.txt", "p2"))).toEqual({});
+    expect((await hook(s, preBash("touch y", "p2"))).hookSpecificOutput).toBeUndefined();
     expect(await hook(s, preBash("git status", "p2"))).toEqual({});
     await r.h.settle();
-    expect(r.h.engine.state.gate.reviewFirst).toEqual({ mode: "edits", waiting: 2, blocked: 2 });
+    expect(r.h.engine.state.gate.reviewFirst).toEqual({ mode: "edits", waiting: 2, blocked: 1 });
     expect(r.h.ofType("error").filter((e) => e.code === "review_first_blocked")).toHaveLength(1);
     // Accepted while the question turn runs (§34.2): lifted at once.
     await r.h.engine.handle({ type: "accept_all" });
@@ -371,9 +448,9 @@ describe("terminal chat through the hook server (§57.4)", () => {
     await firstTurn(r, s);
     await r.h.engine.handle({ type: "add_note", path: "notes.txt", line: 1, side: "new", excerpt: "note", body: "rename it" });
     await hook(s, ups("p2", "a question"));
-    expect((await hook(s, preWrite(r, "notes.txt", "p2"))).hookSpecificOutput).toMatchObject({ permissionDecision: "deny" });
+    expect((await hook(s, preWrite(r, "other.txt", "p2"))).hookSpecificOutput).toMatchObject({ permissionDecision: "deny" });
     await r.h.engine.handle({ type: "request_changes" });
     expect((await hook(s, { hook_event_name: "Stop", stop_hook_active: false })).decision).toBe("block");
-    expect(await hook(s, preWrite(r, "notes.txt", "p2"))).toEqual({});
+    expect(await hook(s, preWrite(r, "other.txt", "p2"))).toEqual({});
   });
 });

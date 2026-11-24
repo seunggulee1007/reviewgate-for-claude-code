@@ -422,8 +422,8 @@ export type Settings = {
   terminalPermissionBridge?: boolean;
   /**
    * §64: Claude's next work waits for the review — `edits` (default; absent or unknown too): while files from a finished
-   * turn are pending / changes requested, a call that changes files is denied; `prompts`: a new prompt is refused too;
-   * `off`: neither (a send is a question that may edit, §3). Live.
+   * turn are pending / changes requested, only the files under review may be edited (Bash runs); `prompts`: every call
+   * that changes files is denied and a new prompt is refused; `off`: neither (a send is a question that may edit, §3). Live.
    */
   reviewFirst?: ReviewFirstMode;
 };

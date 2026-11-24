@@ -42,6 +42,7 @@ import {
   type HookContext,
 } from "./hooks.js";
 import { AsyncQueue } from "./queue.js";
+import type { ReviewFirstHold } from "./reviewFirst.js"; // §64
 import { defaultScratchDirs, editScopeReason, GIT_INSTRUCTION, isolatedCall, SCOPE_MESSAGES, scopeInstruction, worktreeToolBlocked } from "./reviewScope.js";
 import { settingsEditRisk } from "./settingsDiff.js";
 import { allowPatternSuggestions, cliSuggestionPatterns, mcpToolName, type McpToolHints, type UserRules } from "./permissionRules.js";
@@ -158,8 +159,8 @@ export type ClaudeSessionOptions = {
   resolvePeer?: (address: string) => Promise<PeerSessionInfo | null>;
   /** MARK: r1-git — §46: repo-relative paths still under review (the hooks' git card); owned by the engine. */
   reviewPaths?: () => ReadonlySet<string>;
-  /** §64: the paths the review-first rule waits on now (null: nothing holds Claude back); owned by the engine. */
-  reviewFirst?: () => readonly string[] | null;
+  /** §64: what the review-first rule holds Claude back with now (null: nothing); owned by the engine. */
+  reviewFirst?: () => ReviewFirstHold | null;
   /** MARK: r2-skills-side — §33.5 (M20): a skill's `allowed-tools` by name (skillTools.ts); owned by the engine. */
   skillAllowedTools?: (name: string, since?: number) => Promise<readonly string[]>;
 };
