@@ -118,6 +118,8 @@ export type EngineSlices = {
     /** The current branch's upstream (`origin/main`). */
     upstream?: string | null;
     operation?: GitOperation | null;
+    /** §68.5: `git status` entries (paths, untracked) — the count of changes outside the review. */
+    entries?: { paths: string[]; untracked: boolean }[];
   };
   /** MARK: git-sync — §68: a fetch / pull of this engine (absent: none yet, auto fetch on). */
   sync?: { fetching: boolean; pulling: boolean; lastFetchAt: string | null; lastFetchError: string | null; autoFetch: boolean };
@@ -249,6 +251,19 @@ export function syncState(s: EngineSlices): RemoteSyncState {
   };
 }
 
+/** §68.5: `git status` entries none of whose paths is a review file (both names of a rename). */
+function otherChangeCount(s: EngineSlices): { tracked: number; untracked: number } {
+  const review = new Set(s.gate.changedFiles.flatMap((f) => (f.oldPath !== null && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path])));
+  let tracked = 0;
+  let untracked = 0;
+  for (const e of s.branches.entries ?? []) {
+    if (e.paths.some((p) => review.has(p))) continue;
+    if (e.untracked) untracked++;
+    else tracked++;
+  }
+  return { tracked, untracked };
+}
+
 /**
  * Paths accepted in the current review — what `commit` commits by default (a gitignored mods file cannot be staged, §32).
  * MARK: wave4b w4b-bigturn — §39.1: nor is a large file whose content the review never held (`tooLarge`).
@@ -271,6 +286,7 @@ export function commitState(s: EngineSlices): CommitState {
   const paths = acceptedPaths(s.gate);
   return {
     lastCommit: s.commit.lastCommit ? { ...s.commit.lastCommit, files: [...s.commit.lastCommit.files] } : null,
+    otherChanges: otherChangeCount(s), // MARK: git-sync (§68.5)
     canCommit: canCommit(s),
     acceptedPaths: paths,
     suggestedMessage: suggestCommitMessage(s.commit.lastUserText, paths),

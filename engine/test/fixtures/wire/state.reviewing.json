@@ -435,6 +435,10 @@
   "lockConflict": null,
   "commit": {
     "lastCommit": null,
+    "otherChanges": {
+      "tracked": 0,
+      "untracked": 0
+    },
     "canCommit": true,
     "acceptedPaths": [
       "new.txt"

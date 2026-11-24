@@ -11150,10 +11150,11 @@ type AcceptedBase = {
   deleted after the accept and re-created after an accepted delete; an untouched accepted file committed; request
   changes, Accept & Continue and finish).
 
-## 68. Fetch and pull (git-sync)
+## 68. Fetch and pull, and committing files outside the review (git-sync)
 
 The app could branch (§61), commit (M12) and open PRs, but not bring the branch up to date: users went back to a
-terminal for `git pull`, and pulled files then showed up in the review as if Claude had written them.
+terminal for `git pull`, and pulled files then showed up in the review as if Claude had written them. And the commit
+sheet only took the review's accepted files; a file the user edited by hand needed a terminal too.
 
 ### 68.1 `git_fetch {all?, prune?, auto?}` → `fetched`
 
@@ -11227,6 +11228,24 @@ at most every 5 minutes (any fetch attempt counts, so an offline machine is not 
 `fetched {skipped: true}` — and it tells Git Credential Manager not to open a sign-in window (`GCM_INTERACTIVE=never`).
 Clients never show an automatic fetch's refusal as an error; `lastFetchError` is shown quietly in the branch menu.
 
+### 68.5 Committing files outside the review
+
+- `commit_others {}` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
+  --untracked-files=all` entry whose path — or a rename's either path — is not a review file; unmerged entries left out.
+  `OtherChange = { path, oldPath, status: "M"|"A"|"D"|"R"|"T"|"?", untracked, hidden? }` (`hidden`: an app ignore pattern
+  matches it — still the user's file to commit). A read (`query` lane).
+- `commit { message, paths?, extraPaths?, push? }`: `extraPaths` are committed in the same commit (`git add -A` of each,
+  then `git commit --only` of the accepted paths and the extras — a `git mv` rename's old name included). Each must be in
+  `commit_others` now, else `invalid_extra:<path>` (`paths`: it) — a review file is accepted, not slipped in as an extra.
+  `nothing_to_commit` only when no accepted path and no extra is given: an extras-only commit works with a pending review,
+  and with no review at all.
+- Nothing is marked accepted: `acceptedPaths`, the review history and Claude's summary (`Accepted: …`) name only the
+  review's files. Pending files stay pending and unstaged. A takes the extras' worktree content (`dropCommitted(…, others)`),
+  so a committed extra never shows up in the review afterwards — not after a refresh, not as an "external" edit.
+  `lastCommit.files` lists the accepted paths, then the extras.
+- `state.commit.otherChanges = { tracked, untracked }`: `git status` entries outside the review as of the last branches
+  refresh (a new folder is one untracked entry). Clients open the commit sheet when `canCommit` or `tracked + untracked > 0`.
+
 ### 68.6 Engine tests
 
 `engine/test/engine.gitSync.test.ts` (temp repos with a local bare `origin` and a second clone; never a network remote):
@@ -11235,4 +11254,6 @@ fast-forward while a review stands — a plain commit and a merge commit whose r
 Claude's file in the list with Claude's lines, after a refresh and through accept + commit; a pull while idle; the
 overwrite refusal (a review file, the user's edit, an untracked file in the way) with nothing touched and nothing
 stashed; diverged → refused, rebase refused with a review / a dirty tree, a clean rebase, a conflicting rebase aborted;
-running, a merge in progress, no upstream, detached.
+running, a merge in progress, no upstream, detached. `engine/test/engine.commitOthers.test.ts`: the list (rename,
+untracked, hidden), extras with accepted files, `invalid_extra`, the pending file untouched, committed extras never in the
+review again, extras-only with a pending review and with none.

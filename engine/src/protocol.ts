@@ -768,7 +768,8 @@ export type EngineCommand =
   | Cmd<"workbench_remove", { path: string; force?: boolean }>
   | Cmd<"workbench_prune">
   | Cmd<"pr_create", { base: string; title?: string; body?: string; draft?: boolean } & PRCreateMeta>
-  | Cmd<"commit", { message: string; paths?: string[]; push?: boolean }>
+  /** §68.5 `extraPaths`: changed files outside the review (`commit_others`) committed along; never marked accepted. */
+  | Cmd<"commit", { message: string; paths?: string[]; extraPaths?: string[]; push?: boolean }>
   | Cmd<"push">
   | Cmd<"refresh", { scope?: RefreshScope[] }>
   | Cmd<"session_list">
@@ -896,6 +897,8 @@ export type EngineCommand =
   | Cmd<"git_fetch", { all?: boolean; prune?: boolean; auto?: boolean }>
   /** §68.2: the current branch from its upstream — fast-forward only; `rebase` (§68.3) only on a clean tree with no review; replies `pulled`. */
   | Cmd<"git_pull", { rebase?: boolean }>
+  /** §68.5: changed files outside the review (the commit sheet's second group); replies `commit_others`. */
+  | Cmd<"commit_others">
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1549,6 +1552,12 @@ export type PulledEvent = {
   fileCount: number;
 };
 
+/** §68.5: a changed file outside the review. `status` as `git status` (`?` untracked); `hidden`: an ignore pattern of the app matches it. */
+export type OtherChange = { path: string; oldPath: string | null; status: "M" | "A" | "D" | "R" | "T" | "?"; untracked: boolean; hidden?: true };
+
+/** §68.5: reply to `commit_others` (≤ 500 files; `truncated` when there were more). */
+export type CommitOthersEvent = { type: "commit_others"; id?: string; files: OtherChange[]; truncated: boolean };
+
 export type SubmitResultState = { reviewURL: string; inlineCount: number; event: ReviewEvent; submittedAt: string };
 
 /** Another engine holds the worktree's `reviewgate.lock` (docs/M10-WORKBENCHES.md); `open_project{takeover:true}` overrides. */
@@ -1617,6 +1626,8 @@ export type CommitIdentity = { name: string | null; email: string | null };
 
 export type CommitState = {
   lastCommit: LastCommitState | null;
+  /** MARK: git-sync — §68.5: changed files outside the review (as of the last branches refresh); absent from an older engine. */
+  otherChanges?: { tracked: number; untracked: number };
   /** Accepted files exist and the gate is not running / collecting / reverting. */
   canCommit: boolean;
   /** Paths with state "accepted" in the current review (the default `commit.paths`). */
@@ -2321,7 +2332,7 @@ export type EngineEvent =
   | ReferencesEvent
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
-  | FetchedEvent | PulledEvent; // MARK: git-sync (§68)
+  | FetchedEvent | PulledEvent | CommitOthersEvent; // MARK: git-sync (§68)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
 export type ReplyFor<C extends EngineCommand> =
@@ -2378,6 +2389,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "task_fetch" } ? TaskFetchedEvent // MARK: task-start (§63)
   : C extends { type: "git_fetch" } ? FetchedEvent // MARK: git-sync (§68)
   : C extends { type: "git_pull" } ? PulledEvent
+  : C extends { type: "commit_others" } ? CommitOthersEvent
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
@@ -2401,7 +2413,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
-  | FetchedEvent | PulledEvent // MARK: git-sync (§68)
+  | FetchedEvent | PulledEvent | CommitOthersEvent // MARK: git-sync (§68)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | TerminalSpecEvent; // §57

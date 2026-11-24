@@ -172,7 +172,8 @@ import { ENGINE_VERSION } from "./version.js";
 // MARK: git-sync — §68
 import { aheadBehind, fastForward, fetchRemotes, gitOperation, pullOverlap, rebaseOnto, remoteList, upstreamOf, type FetchRun, type Upstream } from "./git/remoteSync.js";
 import { nulSplit } from "./git/exec.js";
-import type { FetchedEvent, PulledEvent } from "./protocol.js";
+import { MAX_OTHER_CHANGES, otherChanges, otherSpecs } from "./git/otherChanges.js";
+import type { CommitOthersEvent, FetchedEvent, OtherChange, PulledEvent } from "./protocol.js";
 // MARK: wave2 engine-why
 import type { FileWhy, LiveChangesEvent } from "./protocol.js";
 import type { ChangedFile } from "./git/checkpoint.js";
@@ -363,7 +364,7 @@ const SHADOW_REFUSED: ReadonlySet<string> = new Set([
   "branches", "switch_branch", "create_branch",
   "workbench_list", "workbench_create", "workbench_preview", "workbench_remove", "workbench_prune", "chat_move",
   "commit", "commit_hunks", "commit_series", "commit_draft", "commit_split_draft", "commit_format", "push",
-  "git_fetch", "git_pull", // MARK: git-sync (§68)
+  "git_fetch", "git_pull", "commit_others", // MARK: git-sync (§68)
   "pr_list", "pr_open", "pr_select_file", "pr_add_draft", "pr_remove_draft", "pr_submit", "pr_reply", "pr_reload_comments",
   "pr_comment", "pr_file_lines", "pr_create", "pr_draft", "pr_ai_draft",
 ]);
@@ -1466,11 +1467,13 @@ export class ReviewEngine {
       case "pr_create":
         return this.prCreate(cmd.base, cmd.title ?? null, cmd.body ?? null, cmd.draft === true, cmd); // wave4c w4c-commit: + §41.1 meta
       case "commit":
-        return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true);
+        return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true, Array.isArray(cmd.extraPaths) ? cmd.extraPaths : []);
       case "git_fetch": // MARK: git-sync — §68
         return this.gitFetch(cmd.all === true, cmd.prune !== false, cmd.auto === true);
       case "git_pull":
         return this.gitPull(cmd.rebase === true);
+      case "commit_others":
+        return this.commitOthers();
       case "commit_hunks": // §53
         return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
       case "commit_series":
@@ -5119,7 +5122,7 @@ export class ReviewEngine {
       const base = await defaultBranch(cp, list, remotes).catch(() => null);
       const upstream = list.find((b) => b.isCurrent)?.upstream ?? null;
       if (this.gate.checkpoint !== cp) return;
-      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base, remoteNames, upstream, operation };
+      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base, remoteNames, upstream, operation, entries: status.entries };
       if (this.project) this.project = { ...this.project, branch: name };
     } catch (e) {
       this.log("warn", `refreshBranches: ${errorMessage(e)}`);
@@ -5476,16 +5479,19 @@ export class ReviewEngine {
   /**
    * Stages `paths` (default: every accepted file; renames stage both paths), commits with `message`
    * (+ `settings.commitTrailer`), drops the committed files from the review and optionally pushes.
-   * A push failure keeps the commit (`state.commit.lastCommit.pushError`) and is a refusal.
+   * A push failure keeps the commit (`state.commit.lastCommit.pushError`) and is a refusal. MARK: git-sync — §68.5
+   * `extraPaths`: changed files outside the review (`commit_others`) go into the same commit; nothing is marked accepted.
    */
-  private async commit(rawMessage: string, requested: string[] | null, push: boolean): Promise<CommittedEvent> {
+  private async commit(rawMessage: string, requested: string[] | null, push: boolean, extraPaths: unknown[] = []): Promise<CommittedEvent> {
     const cp = this.requireProject();
     if (this.gate.running || this.gate.collecting || this.gate.reverting) throw new CommandRefused("session_running");
     // MARK: wave3 check-engine — §37.1: a commit re-snapshots B too; the failed collection is retried first.
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
     const accepted = acceptedPaths(this.gate);
     const paths = requested === null ? accepted : [...new Set(requested)];
-    if (paths.length === 0 || paths.some((p) => !accepted.includes(p))) throw new CommandRefused("nothing_to_commit");
+    if (paths.some((p) => !accepted.includes(p))) throw new CommandRefused("nothing_to_commit");
+    const extras = await this.commitExtras(cp, extraPaths); // §68.5
+    if (paths.length === 0 && extras.length === 0) throw new CommandRefused("nothing_to_commit");
     let message = rawMessage.trim();
     if (!message) throw new CommandRefused("empty_message");
     const identity = await gitIdentity(cp.root);
@@ -5512,11 +5518,12 @@ export class ReviewEngine {
     const rest = paths.filter((p) => !already.includes(p));
     let sha: string;
     try {
-      if (rest.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
+      if (rest.length === 0 && extras.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
       else {
         // `--only`: entries the user staged for other paths stay staged and out of this commit.
-        const specs = await stagePaths(cp.root, rest, this.gate.changedFiles);
-        sha = await gitCommit(cp.root, message, merging ? null : specs);
+        // §68.5: an extra's rename is git's own (`git mv`): its old name is gone from the index already — committed, not added.
+        const specs = await stagePaths(cp.root, [...rest, ...extras.map((f) => f.path)], this.gate.changedFiles);
+        sha = await gitCommit(cp.root, message, merging ? null : [...new Set([...specs, ...otherSpecs(extras)])]);
       }
     } catch (e) {
       this.fail(`Failed to commit: ${errorMessage(e)}`, false, "git", { code: "commit_failed" });
@@ -5524,12 +5531,16 @@ export class ReviewEngine {
     }
     const branch = await cp.branchName();
     const made: HistoryCommit = { sha, subject: firstLineOf(message).slice(0, 200) };
-    if (rest.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
-    this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files: paths, at: new Date().toISOString() };
+    if (rest.length === 0 && extras.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
+    const files = [...paths, ...extras.map((f) => f.path)];
+    this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files, at: new Date().toISOString() };
     this.touch();
     try {
-      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 ? made : null) : null;
-      await this.gate.dropCommitted(paths, by ?? made); // MARK: wave4 w4-history (§38.3)
+      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 || extras.length > 0 ? made : null) : null;
+      // §68.5: files outside the review go into A too (not an ignored one: A never holds those), so they never come up in it.
+      const others = otherSpecs(extras.filter((f) => f.hidden !== true));
+      // MARK: wave4 w4-history (§38.3); with no review standing there is nothing to drop (an extras-only commit).
+      if (paths.length > 0 || this.gate.turnStartTree !== null) await this.gate.dropCommitted(paths, by ?? made, undefined, others);
     } catch (e) {
       this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
     }
@@ -5538,6 +5549,30 @@ export class ReviewEngine {
     await this.refreshWorkbenches(false);
     if (push) await this.pushLastCommit();
     return { ...this.committedEvent(), ...(already.length > 0 ? { alreadyCommitted: already } : {}) };
+  }
+
+  /**
+   * MARK: git-sync — §68.5: `commit.extraPaths` as the changes outside the review they name (`commit_others` now); refused
+   * `invalid_extra:<path>` for a path that is not one — a review file (accept it instead), an unmerged or unchanged one.
+   */
+  private async commitExtras(cp: GitCheckpoint, raw: readonly unknown[]): Promise<OtherChange[]> {
+    if (raw.length === 0) return [];
+    const others = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    const byPath = new Map(others.map((f) => [f.path, f]));
+    const out: OtherChange[] = [];
+    for (const p of new Set(raw)) {
+      const f = typeof p === "string" ? byPath.get(p) : undefined;
+      if (!f) throw new CommandRefused(`invalid_extra:${String(p).slice(0, 300)}`, { code: "invalid_extra", paths: [String(p)] });
+      out.push(f);
+    }
+    return out;
+  }
+
+  /** MARK: git-sync — §68.5 `commit_others`: the changed files outside the review (≤ `MAX_OTHER_CHANGES`). Reads only. */
+  private async commitOthers(): Promise<CommitOthersEvent> {
+    const cp = this.requireProject();
+    const files = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    return { type: "commit_others", files: files.slice(0, MAX_OTHER_CHANGES), truncated: files.length > MAX_OTHER_CHANGES };
   }
 
   /** MARK: r1-git — §46: the review `paths` whose file (both names of a rename) has no change against HEAD — committed already. */
@@ -10005,9 +10040,11 @@ function laneOf(cmd: EngineCommand): Lane {
     case "workbench_preview":
       return "query";
     // MARK: git-sync — §68.1: a fetch waits on the network and only moves remote-tracking refs: never behind (or holding up)
-    // a turn. A pull moves the working tree: the main lane.
+    // a turn. A pull moves the working tree: the main lane. The list outside the review is a `git status` read.
     case "git_fetch":
       return "remote";
+    case "commit_others":
+      return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
   }
@@ -10127,6 +10164,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "push":
     case "git_fetch": // MARK: git-sync (§68)
     case "git_pull":
+    case "commit_others":
     case "refresh":
     case "rewind":
     case "list_files":

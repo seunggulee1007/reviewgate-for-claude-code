@@ -1617,9 +1617,10 @@ export class ReviewGate {
    * follow-up turn (whose list is rebuilt from A) does not resurface them; B is re-snapshotted.
    * §53 after a series (`series`): `commit` per path, HEAD moved by `series.commits`; A takes HEAD's content of every
    * touched path (what was committed, not the worktree) and the files committed only partly (`series.kept`) stay in the
-   * review, accepted, with the rest of their hunks as their diff.
+   * review, accepted, with the rest of their hunks as their diff. MARK: git-sync — §68.5 `others`: pathspecs of files outside
+   * the review committed along — A takes their worktree content too, so they never show up in the review afterwards.
    */
-  async dropCommitted(paths: string[], commit?: HistoryCommit | ReadonlyMap<string, HistoryCommit>, series?: { commits: number; kept: string[] }): Promise<void> {
+  async dropCommitted(paths: string[], commit?: HistoryCommit | ReadonlyMap<string, HistoryCommit>, series?: { commits: number; kept: string[] }, others: readonly string[] = []): Promise<void> {
     const cp = this.requireCheckpoint();
     this.lastReject = null; // MARK: wave4c w4c-trust — §41.2: a commit moves A
     const prevEnd = this.turnEndTree;
@@ -1640,7 +1641,7 @@ export class ReviewGate {
     if (this.turnStartTree !== null) {
       this.turnStartTree = series
         ? await overlayTree(cp, this.turnStartTree, [...specs, ...kept.map((f) => f.path)], "HEAD")
-        : await cp.overlayWorktree(this.turnStartTree, specs);
+        : await cp.overlayWorktree(this.turnStartTree, [...new Set([...specs, ...others])]); // §68.5: files committed along
     }
     // A holds what the commit holds now: when HEAD moved by just this commit (a merge it concluded included; §53: these
     // commits), there is nothing of it left to carry. Any other move (a pull before it) is still carried by `followHead`.

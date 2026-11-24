@@ -193,6 +193,10 @@
   "lockConflict": null,
   "commit": {
     "lastCommit": null,
+    "otherChanges": {
+      "tracked": 0,
+      "untracked": 0
+    },
     "canCommit": false,
     "acceptedPaths": [],
     "suggestedMessage": "Apply accepted changes",
