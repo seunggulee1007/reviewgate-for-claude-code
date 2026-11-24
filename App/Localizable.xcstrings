@@ -5569,6 +5569,22 @@
         }
       }
     },
+    "Go back to the running chat to run a shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to run a shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령은 실행 중인 채팅으로 돌아가서 실행하세요"
+          }
+        }
+      }
+    },
     "Indexing… — it can be rebuilt once this build ends": {
       "localizations": {
         "en": {
@@ -6161,6 +6177,38 @@
         }
       }
     },
+    "Run the command in the project folder — its output goes to Claude with your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the command in the project folder — its output goes to Claude with your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 명령을 실행해요 — 출력은 다음 메시지와 함께 Claude에게 가요"
+          }
+        }
+      }
+    },
+    "Run the shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령 실행"
+          }
+        }
+      }
+    },
     "Running in %@": {
       "localizations": {
         "en": {
@@ -6301,6 +6349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "아직 찾는 중이에요…"
+          }
+        }
+      }
+    },
+    "Stop the shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop the shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령 중지"
           }
         }
       }

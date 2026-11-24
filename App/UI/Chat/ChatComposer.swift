@@ -352,6 +352,7 @@ struct ChatComposer: View {
             ComposerBtwSlot()   // §56.1: the /btw answer, over the box
             ComposerSlashSlot(composer: composer)   // §56.5: /status, or a built-in only the terminal has
             ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
+            ShellPendingCaption()   // §67.2: "셸 결과 N개가 다음 메시지와 함께 Claude에게 가요"
             inputBox
             // §56.6: one row under the box — the mode (the terminal's mode line, now its menu), what a send does right now
             // (the plain key hint only while the empty box has the focus), the capabilities as an icon, then the controls.
@@ -385,6 +386,13 @@ struct ChatComposer: View {
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         .help(viewingHint)
                         .accessibilityIdentifier("Viewing chat hint")
+                } else if shellMode {
+                    // §67.3: ↩ runs the `!` command — never sent to Claude, never queued.
+                    let hint = ShellMode.hint(key: KeyHint.sendKey)
+                    Text(verbatim: hint)
+                        .font(.caption).foregroundStyle(Color.shellAccent).lineLimit(1)
+                        .help(hint)
+                        .accessibilityIdentifier("Shell hint")
                 } else if question != nil {
                     // r1-composer M08: ↩ answers Claude's open question (the card above); ⌥↩ sends the text apart from it.
                     Text(verbatim: questionHint)
@@ -584,13 +592,20 @@ struct ChatComposer: View {
                     .accessibilityIdentifier("Stop")
             }
             .fixedSize()
+        } else if store.shellRun != nil, store.viewingChat == nil {
+            // §67.2: the `!` command running between turns stops the same way.
+            Button("Stop", systemImage: "stop.fill") { store.cancelShell() }
+                .help(ShellMode.stopHelp)
+                .accessibilityLabel("Stop the shell command")
+                .accessibilityIdentifier("Composer stop shell command")
+                .fixedSize()
         }
     }
 
     /// The row folds its secondary controls before the send button would be pushed out of the window (Core `ComposerBarFit`).
     private var barCompact: Bool {
         ComposerBarFit.compact(rowWidth: barWidth, secondary: barSecondaryWidth,
-                               trailing: barPrimaryWidth + (store.isRunning ? barStopWidth + ComposerBarFit.spacing : 0))
+                               trailing: barPrimaryWidth + (store.isRunning || store.shellRun != nil ? barStopWidth + ComposerBarFit.spacing : 0))
     }
 
     /// 변경 요청 (N), Accept N & Send and the next message's model: at their own width, or (`compact`) the first two in one "⋯"
@@ -691,7 +706,19 @@ struct ChatComposer: View {
     /// 대기열에 추가 while it cannot, else Send.
     @ViewBuilder
     private var primaryButton: some View {
-        if let card = cardForDraft {
+        if shellMode {
+            // §67.3: a `!` draft runs as a shell command in the project folder (never sent to Claude, never queued).
+            let empty = ShellMode.command(in: composer.draft)?.isEmpty ?? true
+            Button("Run", systemImage: "terminal.fill") { _ = takeShell() }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.shellAccent)
+                .disabled(empty || store.projectInfo == nil)
+                .help(store.projectInfo == nil ? String(localized: "Open a project first (⌘O)")
+                      : empty ? emptyShellCommand
+                      : String.withKey(String(localized: "Run the command in the project folder — its output goes to Claude with your next message"), key: KeyHint.sendKey))
+                .accessibilityLabel("Run the shell command")
+                .accessibilityIdentifier("Run shell command")
+        } else if let card = cardForDraft {
             // r2-chats-cards M24 (§33.10): the text answers the waiting card — denied with it as the instruction, Claude follows
             // it in the same turn. The menu sends it apart from the card (it waits behind it), queues it or stops the turn.
             Menu {
@@ -798,6 +825,9 @@ struct ChatComposer: View {
     // MARK: State
 
     private var projectOpen: Bool { store.projectInfo != nil }
+    /// §67.3: a draft starting with `!` is a shell command (Claude Code's bash mode) — classic chats only.
+    private var shellMode: Bool { !store.isTerminalChat && ShellMode.isShellDraft(composer.draft) }
+    private var emptyShellCommand: String { AddDirShellText.refusal(code: "empty_command", detail: "") ?? "" }
     private var mentionQuery: (range: NSRange, query: String)? { composer.mentionQuery(projectOpen: projectOpen) }
     private var mentionVisible: Bool { composer.mentionVisible(projectOpen: projectOpen) }
     private var mentionEntries: [MentionEntry] { composer.mentionEntries(changedFiles: store.changedFiles, projectOpen: projectOpen) }
@@ -870,7 +900,7 @@ struct ChatComposer: View {
     /// r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as the instruction (no interrupt: Claude
     /// follows it in the same turn); the text leaves the box like a sent message.
     private func denyWithDraft(_ card: PermissionRequest) {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         let text = trimmedDraft
         guard !text.isEmpty else { return }
         store.denyPermission(requestId: card.requestId, .instruction(text))
@@ -904,7 +934,7 @@ struct ChatComposer: View {
 
     /// Plain Send: the message goes out and the review list stays exactly as it is.
     private func send() {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         let text = composer.draft
         if store.viewingChat != nil { sendInViewedChat(text); return }   // wave4b w4b-tabs (§39.2)
         guard store.canSend, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -934,7 +964,7 @@ struct ChatComposer: View {
 
     /// §50 "바로 보내기": the draft goes into the running turn (refused by the engine, it waits in the queue).
     private func steerDraft() {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         guard !trimmedDraft.isEmpty else { return }
         let text = composer.draft
         let (mentions, _) = composer.takeInputs(history: store.promptHistory)
@@ -949,7 +979,7 @@ struct ChatComposer: View {
     /// card goes out once every question has an answer), or with an empty box the card goes as it is. Never steered: a
     /// message in the turn would only wait behind the open question. Mentions and images stay for the next message.
     private func answerQuestion(_ open: OpenQuestion) {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         let id = open.requestId
         var draft = transcript.questionDrafts[id] ?? QuestionDraft()
         guard !trimmedDraft.isEmpty else {
@@ -979,7 +1009,7 @@ struct ChatComposer: View {
     }
 
     private func queueDraft() {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         guard !trimmedDraft.isEmpty else { return }
         let (queuedMentions, queuedImages) = composer.takeInputs(history: store.promptHistory)
         store.enqueue(composer.draft, mentions: queuedMentions, images: queuedImages)
@@ -990,7 +1020,7 @@ struct ChatComposer: View {
 
     /// "중단하고 보내기" (§28): interrupt, then this message right behind it.
     private func stopAndSend() {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §56.1 / §56.4 / §56.5
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return }   // §67.2 / §56.1 / §56.4 / §56.5
         guard store.isRunning, !trimmedDraft.isEmpty else { return }
         let (sentMentions, sentImages) = composer.takeInputs(history: store.promptHistory)
         store.interruptAndSend(composer.draft, mentions: sentMentions, images: sentImages)
@@ -1049,7 +1079,7 @@ struct ChatComposer: View {
     /// queued while it restarts). It never answers a permission card — a stray Return must not allow a command — and an empty
     /// draft stays as it is. r2-review-flow M30: false when nothing could take the text (the caller says why).
     private func sendFromReturn() -> Bool {
-        if takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return true }   // §56.1 / §56.4 / §56.5: before a question or a card takes the text
+        if takeShell() || takeBtw() || takeMcp() || composer.takeSlashCommand(store) { return true }   // §67.2 / §56.1 / §56.4 / §56.5: before a question or a card takes the text
         // r1-composer M08: ↩ answers Claude's open question (with an empty box: sends its card as it is).
         if let question {
             answerQuestion(question)
@@ -1063,6 +1093,38 @@ struct ChatComposer: View {
             return true
         }
         return perform(sendAction)
+    }
+
+    /// §67.2: a `!` draft runs as `shell_run` — never sent, queued or put into the turn; it joins the prompt history. A
+    /// refusal says why in the notice line and gives the draft back. False for any other text.
+    private func takeShell() -> Bool {
+        guard shellMode else { return false }
+        guard store.projectInfo != nil else {
+            composer.notice = String(localized: "Open a project first (⌘O)")
+            return true
+        }
+        guard store.viewingChat == nil else {
+            composer.notice = String(localized: "Go back to the running chat to run a shell command")
+            return true
+        }
+        let typed = composer.draft
+        guard let command = ShellMode.command(in: typed), !command.isEmpty else {
+            NSSound.beep()
+            composer.notice = emptyShellCommand
+            return true
+        }
+        composer.draft = ""
+        composer.closePalette()
+        transcript.follow = true
+        composer.inputFocused = true
+        Task {
+            let refusal = await store.runShell(typed)
+            composer.history.reset(entries: store.promptHistory)
+            guard let refusal else { return }
+            composer.notice = refusal
+            if composer.draft.isEmpty { composer.draft = typed; composer.caretRequest = (typed as NSString).length }
+        }
+        return true
     }
 
     /// §56.1: `/btw <question>` is the app's command, whatever the turn does: asked on the side (the answer opens over the
@@ -1246,6 +1308,17 @@ struct ChatComposer: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 4) {
+                if shellMode {
+                    // §67.3: Claude Code's bash mode — the box runs a shell command.
+                    Text(verbatim: "! " + ShellMode.badge)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.shellAccent, in: Capsule())
+                        .padding(.bottom, 3)
+                        .help(ShellMode.placeholder + " — " + ShellMode.hint(key: KeyHint.sendKey))
+                        .accessibilityIdentifier("Shell mode badge")
+                }
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,
                                  caretRequest: $composer.caretRequest, contentHeight: $composer.height,
                                  placeholder: question.map(questionPlaceholder) ?? String(localized: "Message Claude · @ file · ⌘V image"),   // §56.6: short
@@ -1262,8 +1335,9 @@ struct ChatComposer: View {
             // polish P4-composer-15: where typing goes — an accent border while the box has the focus (the drop's dashes win).
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(composer.dropHover ? AnyShapeStyle(Color.accentColor)
+                                : shellMode ? AnyShapeStyle(Color.shellAccent.opacity(composer.inputFocused ? 0.9 : 0.6))   // §67.3
                                 : composer.inputFocused ? AnyShapeStyle(Color.accentColor.opacity(0.6)) : AnyShapeStyle(.quaternary),
-                              style: StrokeStyle(lineWidth: composer.dropHover || composer.inputFocused ? 1.5 : 1, dash: composer.dropHover ? [5, 3] : []))
+                              style: StrokeStyle(lineWidth: composer.dropHover || composer.inputFocused || shellMode ? 1.5 : 1, dash: composer.dropHover ? [5, 3] : []))
         }
         .overlay(alignment: .top) {
             InputHeightHandle(shown: min(max(composer.height, inputHeightLimits.min), inputHeightLimits.max), window: windowHeight,
@@ -1464,6 +1538,8 @@ struct ChatComposer: View {
             if paletteVisible { composer.closePalette(); return true }
             if let restored = composer.history.cancel() { composer.setDraftFromHistory(restored); return true }
             if store.btwOverlay != nil { store.dismissBtw(); return true }   // §56.1: the side answer first, then the turn
+            // §67.2: Esc stops the `!` command running between turns (as it stops a turn).
+            if store.shellRun != nil, !store.isRunning, store.viewingChat == nil { store.cancelShell(); return true }
             // MARK: wave6 w6-terminal — §44.1: Esc stops Claude's running turn, as in the terminal (⌘. does too).
             // §56.2: with messages waiting, what Claude has not read comes back into the box with the stop.
             if store.isRunning, store.viewingChat == nil {
