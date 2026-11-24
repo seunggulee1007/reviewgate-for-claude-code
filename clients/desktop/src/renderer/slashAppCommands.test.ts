@@ -18,6 +18,7 @@ describe("parseSlashAppCommand", () => {
       "/model": { kind: "model", name: "" }, "/resume": { kind: "resume" }, "/rewind": { kind: "rewind" }, "/context": { kind: "context" },
       "/cost": { kind: "cost" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
+      "/add-dir": { kind: "addDir", path: "" },
     };
     for (const [text, cmd] of Object.entries(expected)) expect(parseSlashAppCommand(text, []), text).toEqual(cmd);
     expect(new Set(APP_COMMAND_NAMES)).toEqual(new Set(Object.keys(expected).map((k) => k.slice(1))));
@@ -39,7 +40,14 @@ describe("parseSlashAppCommand", () => {
 
   it("keeps a built-in only the terminal has out of the chat", () => {
     expect(parseSlashAppCommand("/hooks", [])).toEqual({ kind: "terminalOnly", name: "hooks" });
-    expect(parseSlashAppCommand("/add-dir ../other", [])).toEqual({ kind: "terminalOnly", name: "add-dir" });
+  });
+
+  it("§67.1: /add-dir is the app's own — with its path, or alone for the folder picker", () => {
+    expect(parseSlashAppCommand("/add-dir ../other", [])).toEqual({ kind: "addDir", path: "../other" });
+    expect(parseSlashAppCommand("  /add-dir   C:\\work\\shared lib  ", [])).toEqual({ kind: "addDir", path: "C:\\work\\shared lib" });
+    expect(parseSlashAppCommand("/ADD-DIR", [])).toEqual({ kind: "addDir", path: "" });
+    expect(parseSlashAppCommand("/add-dir a\nb", [])).toBeNull();
+    expect(parseSlashAppCommand("/add-dirs", [])).toBeNull();
   });
 
   it("sends everything else to Claude as before", () => {
@@ -75,6 +83,8 @@ describe("the palette", () => {
       expect(by.get(name)?.description, name).toBe(appCommandDescription(name));
     }
     expect(by.get("model")?.argumentHint).toBe("[model]");
+    expect(by.get("add-dir")?.argumentHint).toBe("[path]"); // §67.1
+    expect(by.get("add-dir")?.description).toBe("Let Claude work in a directory outside the project too");
     expect(by.get("exit")?.aliases).toEqual(["quit"]);
     expect(by.get("status")?.group).toEqual({ kind: "project" });
     expect(by.get("status")?.description).toBe("Project status");

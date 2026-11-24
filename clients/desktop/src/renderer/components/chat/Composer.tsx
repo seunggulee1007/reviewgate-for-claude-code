@@ -58,6 +58,8 @@ import { McpPalette } from "./McpPalette"; // §56.4
 import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
 import { parseSlashAppCommand } from "../../slashAppCommands";
 import { runSlashAppCommand } from "../../slashAppRun";
+import { addDir } from "../../addedDirs"; // §67.1
+import { AddedDirsChip } from "./AddedDirsChip";
 import { actionDoneAll, actionProgress, actionProgressAll, commandFilter, completing, disabledReason, isAll, mcpRows, mcpTarget, noServerText, parseMcpCommand, primaryAction, rowStatus, toggleAction, unavailableReason, type McpAction, type McpCommand } from "../../mcpPalette";
 import type { McpServerInfo } from "@reviewgate/engine";
 import { capabilitiesCaption, slashEntries } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
@@ -99,6 +101,7 @@ export function Composer() {
   const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
   const root = useStore((s) => s.state.project?.root ?? null);
+  const hasAddedDirs = useStore((s) => (s.state.session.addedDirs?.length ?? 0) > 0); // §67.3
   // MARK: wave1 desktop-session — §30 "세션 종료됨" offers a new chat too; polish-03 keeps the draft across a reload.
   const newChat = useStore((s) => s.newChat);
   const switchRefusal = useStore((s) => newChatRefusal(s.state)); // r2-chats-cards M31 (§9): while Claude works it waits
@@ -665,6 +668,13 @@ export function Composer() {
     setSplitOpen(false);
     closePalette();
     setSlashCard(null);
+    if (cmd.kind === "addDir") {
+      // §67.1 / §67.3: ok empties the box (unless edited meanwhile) and says so; a refusal keeps the draft and says why.
+      palette.record("add-dir");
+      if (viewing) setAttachErrors([t("Go back to the running chat to add a directory to it")]);
+      else runAddDir(cmd.path, draft);
+      return true;
+    }
     if (cmd.kind !== "terminalOnly") {
       palette.record(cmd.kind);
       setDraft("");
@@ -677,6 +687,19 @@ export function Composer() {
     return true;
   };
   useEffect(() => setSlashCard(null), [liveChatId]); // the card was the other chat's
+
+  /** §67.1: `add_dir` (`path` "" opens the picker); `typed` is the draft that asked — it leaves the box once it worked. */
+  const runAddDir = (path: string, typed: string | null) => {
+    void addDir(path).then((r) => {
+      if (r === null) return; // the picker was cancelled
+      setAttachErrors([r.notice]);
+      if (r.ok && typed !== null) {
+        setDraft((d) => (d === typed ? "" : d));
+        setNav(IDLE_NAV);
+      }
+    });
+    inputRef.current?.focus();
+  };
 
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
@@ -1133,7 +1156,15 @@ export function Composer() {
       {!viewing && <CollectFailedLine />}
       <WaitingLine />
       <QueueBar />
-      <DraftChips mentions={mentions} images={images} dirs={mentionDirs} onRemoveMention={removeMention} onRemoveImage={removeImage} />
+      <DraftChips
+        mentions={mentions}
+        images={images}
+        dirs={mentionDirs}
+        onRemoveMention={removeMention}
+        onRemoveImage={removeImage}
+        // §67.3: the live chat's /add-dir directories (a chat shown read-only is not the one they belong to)
+        lead={!viewing && hasAddedDirs ? <AddedDirsChip onAdd={() => runAddDir("", null)} onNotice={(text) => setAttachErrors([text])} /> : null}
+      />
       {attachErrors.length > 0 && (
         <div className="attach-errors" role="alert" data-testid="Attach errors">
           <span className="grow">{attachErrors.map((m, i) => <div key={i}>{m}</div>)}</span>
