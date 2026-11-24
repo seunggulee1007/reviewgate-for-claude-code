@@ -10008,6 +10008,8 @@ but not committed stayed in the list among the pending ones. Clients only (no en
   confirm reads "Accept N & Continue". The pending banner ("리뷰 대기 파일 N개 — …") has it too, and Ctrl+Shift+Enter in an
   empty message box (no text, mention or image) runs it. The terminal strip's button shares its terminal path
   (`continueInTerminal`).
+  Accepted files fold the same way (`splitAccepted`; the group's header is a button with `aria-expanded`), and the
+  progress ("3/7 viewed · N decided") counts the open files only.
 
 ## 59. Folders that are not git repositories (track without git)
 

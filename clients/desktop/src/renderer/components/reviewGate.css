@@ -26,6 +26,8 @@
 .list .section.group-head { display: flex; align-items: center; gap: 6px; padding-top: 10px; text-transform: none; letter-spacing: 0; font-size: 11.5px; }
 .list .section.group-head.mods { color: var(--red); }
 .list .section.group-head.external { color: var(--orange); }
+/* accept-continue-ui (§58.1): the folded "Accepted · not committed (N)" group — the whole header is the toggle */
+.list .section.group-head.accepted .accepted-toggle { gap: 6px; padding: 0; color: inherit; font: inherit; text-align: left; min-width: 0; }
 .list .section.group-head .group-count { flex: none; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--bg-3); color: var(--fg-2); font-size: 10.5px; line-height: 16px; text-align: center; }
 .list .group-hint { padding: 0 6px 2px; cursor: default; }
 .list .group-hint:hover { background: transparent; }

@@ -13,7 +13,7 @@ import type { ChangedFileState, ChangeStatus, GateState, SideThread } from "@rev
 import { t } from "../i18n";
 import { committedBadge, committedHelp } from "../gitNotices"; // MARK: r1-git
 import { MENTION_DRAG_TYPE } from "../mentions";
-import { finishReviewBlocked, groupChanges, groupHelp, groupLabel, modsRiskHelp, modsRiskLabel, modsRisksOf, showsGroupHeaders, uncapturedText, type ChangeGroup, type ChangeGroupKind } from "../reviewGate";
+import { finishReviewBlocked, groupChanges, groupHelp, groupLabel, modsRiskHelp, modsRiskLabel, modsRisksOf, showsGroupHeaders, splitAccepted, uncapturedText, type ChangeGroup, type ChangeGroupKind } from "../reviewGate";
 import { ALL_RISKS, riskHelp, riskKinds, riskLabel, riskTone, sortByRisk } from "../risk";
 import { commitOf, pendingFiles, useStore } from "../store";
 import { GateNotices } from "./GateNotices";
@@ -73,7 +73,11 @@ export function ChangedFiles() {
   const viewedPaths = useStore((s) => s.viewedPaths);
   const riskFirst = useStore((s) => s.riskFirst);
   const setRiskFirst = useStore((s) => s.setRiskFirst);
-  const groups = useMemo(() => groupChanges(state.changedFiles).map((g) => (riskFirst ? { ...g, files: sortByRisk(g.files) } : g)), [riskFirst, state.changedFiles]);
+  // MARK: accept-continue-ui — §58.1: accepted files (not committed yet) fold into one group at the bottom, out of the progress.
+  const split = useMemo(() => splitAccepted(state.changedFiles), [state.changedFiles]);
+  const groups = useMemo(() => groupChanges(split.open).map((g) => (riskFirst ? { ...g, files: sortByRisk(g.files) } : g)), [riskFirst, split.open]);
+  const acceptedFiles = useMemo(() => groupChanges(split.accepted).flatMap((g) => (riskFirst ? sortByRisk(g.files) : g.files)), [riskFirst, split.accepted]);
+  const [acceptedOpen, setAcceptedOpen] = useState(false);
   const headers = showsGroupHeaders(groups);
   // §58.1: "Accept All & Continue" — the live chat's kind decides how Claude is told (the terminal's PTY and prompt too).
   useViewing();
@@ -186,7 +190,7 @@ export function ChangedFiles() {
       )}
       <LiveChanges />
       <ReviewListNotices />{/* MARK: wave4b w4b-bigturn — §39.1 large files left out, "대량 변경: 파일 N개" */}
-      {state.changedFiles.length > 0 && <ReviewProgress files={state.changedFiles} isViewed={isViewed} changedAfterView={changedAfterView} />}
+      {split.open.length > 0 && <ReviewProgress files={split.open} isViewed={isViewed} changedAfterView={changedAfterView} />}
       {/* MARK: wave3 desktop-flow — §36.13 AI 사전 리뷰: status, cancel, effort */}
       <PreReviewHead />
       <ul
@@ -242,6 +246,29 @@ export function ChangedFiles() {
             )} />
           </Fragment>
         ))}
+        {acceptedFiles.length > 0 && (
+          <AcceptedGroup count={acceptedFiles.length} open={acceptedOpen} onToggle={() => setAcceptedOpen((v) => !v)} />
+        )}
+        {acceptedOpen && acceptedFiles.filter((f) => authorFilter.keep(f.path)).map((f) => (
+          <FileRow
+            authors={authorFilter.authors.get(f.path)}
+            key={f.path}
+            f={f}
+            group={groupChanges([f])[0]?.kind ?? "claude"}
+            gate={state.gate}
+            selected={selectedPath === f.path}
+            viewed={isViewed(f)}
+            viewState={viewStates.get(f.path) ?? "unviewed"}
+            notes={noteCount(f.path)}
+            sentNotes={sentCount(f.path)}
+            threads={threadsOnFile(sideThreads, f.path)}
+            acceptBlocked={acceptBlocked}
+            rejectBlocked={rejectBlocked}
+            onSelect={selectFile}
+            onAccept={accept}
+            onReject={reject}
+          />
+        ))}
       </ul>
     </div>
   );
@@ -259,6 +286,26 @@ function GroupHeader({ group }: { group: ChangeGroup }) {
       </li>
       {group.kind === "external" && <li className="group-hint caption faint">{t("Reject all leaves these as they are")}</li>}
     </>
+  );
+}
+
+/** §58.1: "수락함 · 커밋 전 N" — folded until clicked; the commit dialog takes these files as before. */
+function AcceptedGroup({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+  return (
+    <li className="section row group-head accepted" data-testid="Accepted group">
+      <button
+        type="button"
+        className="plain row grow accepted-toggle"
+        aria-expanded={open}
+        onClick={onToggle}
+        title={t("Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again")}
+        data-testid="Accepted group toggle"
+      >
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <span className="tiny bold green" aria-hidden="true">✓</span>
+        <span className="grow truncate">{t("Accepted · not committed ({0})", count)}</span>
+      </button>
+    </li>
   );
 }
 

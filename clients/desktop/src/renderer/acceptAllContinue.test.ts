@@ -1,7 +1,8 @@
 /** §58.1: the Changes list's "Accept All & Continue" — on per chat kind under that kind's rule, off with the reason. */
 import { beforeAll, describe, expect, it } from "vitest";
-import type { ReviewState, TerminalSessionState } from "@reviewgate/engine";
+import type { ChangedFileState, ReviewState, TerminalSessionState } from "@reviewgate/engine";
 import type { ContinueChat } from "./acceptAllContinue";
+import { splitAccepted } from "./reviewGate";
 
 // The module reads the store (the send's reasons), which needs a window to load.
 let mod: typeof import("./acceptAllContinue");
@@ -58,5 +59,19 @@ describe("Accept All & Continue", () => {
     expect(acceptAllContinueBlocker(state(), { viewing: false, terminal: { ptyId: "", shown: true, running: false, bracketed: false } })).toMatch(/not running/);
     expect(acceptAllContinueHelp(state(), terminal, false)).toMatch(/Continue\.” into Claude Code with Enter/);
     expect(acceptAllContinueHelp(state(), chat, true)).toMatch(/summary/);
+  });
+});
+
+describe("the accepted group", () => {
+  const f = (path: string, s: ChangedFileState["state"]) => ({ path, state: s }) as ChangedFileState;
+
+  it("folds accepted files apart; a file pending again is back in the open part", () => {
+    const files = [f("a.ts", "pending"), f("b.ts", "accepted"), f("c.ts", "rejected"), f("d.ts", "accepted")];
+    const split = splitAccepted(files);
+    expect(split.open.map((x) => x.path)).toEqual(["a.ts", "c.ts"]);
+    expect(split.accepted.map((x) => x.path)).toEqual(["b.ts", "d.ts"]);
+    const again = splitAccepted([f("a.ts", "pending"), f("b.ts", "pending"), f("d.ts", "accepted")]);
+    expect(again.open.map((x) => x.path)).toEqual(["a.ts", "b.ts"]);
+    expect(again.accepted.map((x) => x.path)).toEqual(["d.ts"]);
   });
 });
