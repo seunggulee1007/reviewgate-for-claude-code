@@ -31,6 +31,8 @@
 brew install --cask seunggulee1007/tap/reviewgate
 ```
 
+Homebrew 가 신뢰하지 않은 tap 이라고 하면 `brew trust seunggulee1007/tap` 을 한 번 실행합니다.
+
 또는 [**Releases**](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest)에서 내려받습니다.
 
 - **macOS 15 이상** — `ReviewGate-x.y.z.dmg`. **응용 프로그램**으로 끌어 놓으면 됩니다. Apple 공증을 받은 앱이라 내려받은

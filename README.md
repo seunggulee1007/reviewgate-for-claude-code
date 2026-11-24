@@ -31,6 +31,8 @@
 brew install --cask seunggulee1007/tap/reviewgate
 ```
 
+If Homebrew says the tap is untrusted, run `brew trust seunggulee1007/tap` once.
+
 Or download the app from [**Releases**](https://github.com/seunggulee1007/reviewgate-for-claude-code/releases/latest):
 
 - **macOS 15+** — `ReviewGate-x.y.z.dmg`. Drag it to Applications; it is notarized, so it opens like any downloaded app.
