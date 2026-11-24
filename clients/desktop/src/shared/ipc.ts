@@ -492,6 +492,8 @@ export type RGBridge = {
   dismissUpdateNotice?(which: "install" | "notice"): Promise<void>;
   /** Settings › Updates [Check Now] (the result lands in `lastCheck`). */
   checkUpdatesNow?(): Promise<void>;
+  /** [Check Again] while the release's Windows installer is not attached yet (not twice within a few seconds). */
+  checkUpdateAgain?(): Promise<void>;
   /** A window the restart waits for, brought to the front. */
   focusUpdateBlocker?(id: number): Promise<void>;
   /** [What's New]: that version's release notes (Markdown), null when they could not be read. */

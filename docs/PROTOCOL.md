@@ -7293,6 +7293,15 @@ download whose identifier differs from the running app's, so a build with an old
   The release's `ReviewGate-Setup-X.Y.Z.exe` and `ReviewGate-Setup-X.Y.Z.exe.sha256` (attached by
   `.github/workflows/windows-installer.yml` after the release is published — until then [Install and Restart] is off
   and says so) are installed from the banner. The installer is **not code-signed** yet (SignPath Foundation pending).
+  - **Installer not attached yet.** The release goes out with the Mac's DMG first; CI attaches the Windows installer and
+    its `.sha256` some 10–15 minutes later. A check in between finds the release without them: [Install and Restart] is
+    off and says "The Windows installer is still being uploaded — ReviewGate checks again by itself."
+    (`src/main/updateRecheck.ts`). While "Check for updates automatically" is on the
+    release is looked up again every 3 minutes for at most an hour from the first miss (a newer version starts its own
+    hour), then the 6-hour schedule goes on and the line says "The release has no Windows installer with its checksum yet
+    — try again later, or download it from the release page."; a window coming to the front looks again when the miss is
+    older than 3 minutes. [Check Again] checks at once (`rg:checkUpdateAgain`; nothing within 5 s of the last check, off
+    while one runs). Once the assets are there the banner turns [Install and Restart] on by itself.
   - **Download.** The asset URLs come from the release reply (`browser_download_url`, `size`, GitHub's `digest`). Both
     files go to `<userData>/updates/<version>-<id>/` (`%APPDATA%\ReviewGate\updates`) over Electron's `net` (the
     system's proxy), https only. Redirects are not followed by the transport: each hop is checked first and must be
@@ -7357,8 +7366,9 @@ download whose identifier differs from the running app's, so a build with an old
     → quit, waiting for Claude and going on, a turn started during "Ready", Restart Now (asked), Cancel (download and
     wait), failures, the installer's argv and spawn options, who can install (Program Files → elevated), the elevated
     command (PowerShell's full path, the decoded script, paths with spaces and quotes) and its exit codes, the notice
-    from the record and no loop; `updateFlow.test.ts` — the elevated start declined (the record, the relaunch, the
-    notice);
+    from the record and no loop; `updateRecheck.test.ts` — every 3 minutes, stops after an hour or once the installer is
+    there, a newer version's own hour, off with automatic checks off, focus and [Check Again]; `updateFlow.test.ts` —
+    the missing installer through main, and the elevated start declined (the record, the relaunch, the notice);
     `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, Korean),
     `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a real installer run by
     the app (per user or elevated, the UAC prompt), and the relaunch — docs/M11-WINDOWS.md "Updating" lists them for a

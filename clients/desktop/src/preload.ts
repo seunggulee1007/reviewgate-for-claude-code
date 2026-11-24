@@ -141,6 +141,7 @@ const bridge: RGBridge = {
   restartNowForUpdate: () => ipcRenderer.invoke("rg:restartNowForUpdate"),
   dismissUpdateNotice: (which: "install" | "notice") => ipcRenderer.invoke("rg:dismissUpdateNotice", which),
   checkUpdatesNow: () => ipcRenderer.invoke("rg:checkUpdatesNow"),
+  checkUpdateAgain: () => ipcRenderer.invoke("rg:checkUpdateAgain"),
   focusUpdateBlocker: (id: number) => ipcRenderer.invoke("rg:focusUpdateBlocker", id),
   updateNotes: (version: string) => ipcRenderer.invoke("rg:updateNotes", version),
   notify: (req: NotifyRequest) => ipcRenderer.invoke("rg:notify", req),

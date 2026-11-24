@@ -266,7 +266,8 @@ Artifacts built on macOS:
   as X and says "Updated to ReviewGate X" (or why it did not install, with [Try Again]). [Download Page] is always
   there for doing it by hand. An all-users install (under Program Files) is updated the same way but elevated: Windows
   asks once for administrator rights (UAC) and the installer runs with `/allusers`; declined, ReviewGate reopens and says
-  "Administrator rights were not given".
+  "Administrator rights were not given". A release whose Windows installer is not attached yet (CI adds it 10–15
+  minutes after the DMG) says so and is looked up again every 3 minutes for an hour.
 - **What the checksum is worth.** It comes from the same release as the installer: it catches a corrupted or truncated
   download, not a compromised release. The installer is not code-signed yet; Authenticode verification before running it
   comes with the SignPath signing.
@@ -360,7 +361,8 @@ with an older release installed (e.g. 0.5.17 per user) and a newer one published
       still under Program Files, shortcuts kept → No: ReviewGate reopens as the old version with "… did not install —
       Administrator rights were not given …" and [Try Again]. Also as a standard (non-admin) user: the prompt asks for an
       administrator's password.
-- [ ] Failure paths: a release without the `.exe` (Install off, says why); the network cut mid-download (why, [Try
+- [ ] Failure paths: a release without the `.exe` (Install off, "The Windows installer is still being uploaded …";
+      once CI attaches it, Install turns on within ~3 minutes by itself); the network cut mid-download (why, [Try
       Again]).
 - [ ] Task Manager after the update: no `claude.exe` / `node.exe` left from the old version.
 

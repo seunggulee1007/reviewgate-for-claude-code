@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({ userData: "", version: "0.5.17", settings: {} as R
 h.userData = mkdtempSync(join(tmpdir(), "rg-update-flow-"));
 afterAll(() => rmSync(h.userData, { recursive: true, force: true }));
 vi.mock("electron", () => ({
-  app: { getVersion: () => h.version, isPackaged: true, getPath: () => h.userData, relaunch: () => h.relaunched.push(1), quit: () => undefined },
+  app: { getVersion: () => h.version, isPackaged: true, getPath: () => h.userData, relaunch: () => h.relaunched.push(1), quit: () => undefined, on: () => undefined },
   BrowserWindow: { getAllWindows: () => [], getFocusedWindow: () => null },
   dialog: { showMessageBox: async () => ({ response: 1 }) },
   ipcMain: { handle: () => undefined },
@@ -109,6 +109,15 @@ describe("the Windows update through main (§48)", () => {
     expect(laterQuits).toBe(0);
     expect(h.settings["pendingUpdateInstall"]).toBeUndefined();
   });
+  it("a release without its installer yet: Install off and why; once it is attached, Install is on", async () => {
+    h.mode = { kind: "user" };
+    const m = await launch("0.5.17");
+    await m.checkOnce(async () => ({ ok: true, json: { ...release, assets: [] } }));
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: "The Windows installer is still being uploaded — ReviewGate checks again by itself." });
+    await m.checkOnce(async () => ({ ok: true, json: release }));
+    expect(m.updateStatus().release).toMatchObject({ version: "0.6.0", why: null });
+  });
+
   it("an install for all users: the installer is started elevated; the prompt declined → the record says so and the app reopens", async () => {
     h.mode = { kind: "elevated" };
     try {
