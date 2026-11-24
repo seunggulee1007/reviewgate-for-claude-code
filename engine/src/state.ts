@@ -1,5 +1,6 @@
 import type { BranchInfo, BranchSwitchBlocker } from "./git/branches.js";
 import type { PRStore } from "./pr/store.js";
+import type { ShellRunInfo } from "./protocol.js"; // §67.2
 import type {
   BlockedReason,
   Budget,
@@ -94,8 +95,10 @@ export type EngineSlices = {
     // MARK: wave5 w5-model
     /** §43.4 (see protocol.ts SessionState). */
     autoModel?: AutoModelChoice | null;
-    /** §67.1 (see protocol.ts SessionState). */
+    /** §67 (see protocol.ts SessionState). */
     addedDirs?: string[];
+    shell?: ShellRunInfo | null;
+    shellPending?: number;
   };
   toolchain: ToolchainState;
   gate: ReviewGate;
@@ -161,6 +164,7 @@ export function blockedReason(s: EngineSlices): BlockedReason | null {
   if (s.session.starting) return "starting";
   // §29: a turn the CLI runs that is not ours (`session.externalTurn`; refusals say `external_turn`).
   if (s.session.externalTurn) return "running";
+  if (s.session.shell) return "shell_running"; // §67.2: the message waits for the `!` command
   return null;
 }
 
@@ -176,7 +180,7 @@ export function canRestart(s: EngineSlices): boolean {
  */
 export function canSend(s: EngineSlices): boolean {
   const g = s.gate;
-  return s.session.open && !s.session.starting && !g.running && !g.collecting && !g.reverting && !s.session.externalTurn;
+  return s.session.open && !s.session.starting && !g.running && !g.collecting && !g.reverting && !s.session.externalTurn && !s.session.shell;
 }
 
 /**

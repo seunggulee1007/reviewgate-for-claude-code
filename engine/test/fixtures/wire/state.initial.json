@@ -83,6 +83,8 @@
     "backgroundTasks": [],
     "peerTurn": null,
     "addedDirs": [],
+    "shell": null,
+    "shellPending": 0,
     "canRestart": false
   },
   "toolchain": {

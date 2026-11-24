@@ -175,7 +175,8 @@ export function tail(text: string, max = LOG_TAIL_CHARS): string {
   return text.length > max ? text.slice(text.length - max) : text;
 }
 
-export type SetupRun = { exitCode: number | null; logTail: string };
+/** `truncated`: the log was longer than `logTail` (its start is cut). `timedOut`: stopped after `timeoutMs`. */
+export type SetupRun = { exitCode: number | null; logTail: string; truncated?: boolean; timedOut?: boolean };
 
 /**
  * Runs the user's setup command in `cwd` through their login shell (`$SHELL -lc`, `/bin/sh` without one; Windows `cmd.exe
@@ -186,18 +187,28 @@ export function runSetupCommand(
   command: string,
   cwd: string,
   env: Record<string, string | undefined>,
-  opts: { platform: Pick<Platform, "killTree" | "isWindows">; onOutput: (logTail: string) => void; timeoutMs?: number; throttleMs?: number; onStart?: (stop: () => void) => void },
+  opts: {
+    platform: Pick<Platform, "killTree" | "isWindows">; onOutput: (logTail: string) => void; timeoutMs?: number; throttleMs?: number; onStart?: (stop: () => void) => void;
+    /** §67.2: how much of the log the result keeps (default `LOG_TAIL_CHARS`); `onOutput` always gets `LOG_TAIL_CHARS`. */
+    keepChars?: number;
+    /** What the log's own lines call it ("setup"; §67.2 "command"). */
+    label?: string;
+  },
 ): Promise<SetupRun> {
   const limit = opts.timeoutMs ?? SETUP_TIMEOUT_MS;
   const throttle = opts.throttleMs ?? SETUP_PROGRESS_MS;
+  const keep = Math.max(opts.keepChars ?? LOG_TAIL_CHARS, LOG_TAIL_CHARS);
+  const label = opts.label ?? "setup";
   return new Promise<SetupRun>((resolve) => {
     let log = "";
+    let total = 0;
     let lastSent = 0;
     let pending: NodeJS.Timeout | null = null;
     let timedOut = false;
     let settled = false;
     const append = (chunk: string) => {
-      log = tail(log + chunk, LOG_TAIL_CHARS * 4);
+      total += chunk.length;
+      log = tail(log + chunk, Math.max(keep, LOG_TAIL_CHARS * 4));
       const now = Date.now();
       if (now - lastSent >= throttle) {
         lastSent = now;
@@ -220,7 +231,7 @@ export function runSetupCommand(
         ? spawn(env.ComSpec || env.COMSPEC || "cmd.exe", ["/d", "/s", "/c", `"${command}"`], { cwd, env: childEnv, windowsHide: true, windowsVerbatimArguments: true, stdio: ["ignore", "pipe", "pipe"] })
         : spawn(shell!, ["-lc", command], { cwd, env: childEnv, detached: true, stdio: ["ignore", "pipe", "pipe"] });
     } catch (e) {
-      resolve({ exitCode: null, logTail: tail(`[ReviewGate] the setup command could not start: ${e instanceof Error ? e.message : String(e)}\n`) });
+      resolve({ exitCode: null, logTail: tail(`[ReviewGate] the ${label} command could not start: ${e instanceof Error ? e.message : String(e)}\n`) });
       return;
     }
     const stop = () => {
@@ -229,7 +240,7 @@ export function runSetupCommand(
     opts.onStart?.(stop);
     const timer = setTimeout(() => {
       timedOut = true;
-      append(`\n[ReviewGate] setup timed out after ${Math.round(limit / 1000)} s — stopped.\n`);
+      append(`\n[ReviewGate] ${label} timed out after ${Math.round(limit / 1000)} s — stopped.\n`);
       stop();
     }, limit);
     timer.unref?.();
@@ -242,7 +253,7 @@ export function runSetupCommand(
       settled = true;
       clearTimeout(timer);
       if (pending) clearTimeout(pending);
-      resolve({ exitCode: timedOut ? null : code, logTail: tail(log) });
+      resolve({ exitCode: timedOut ? null : code, logTail: tail(log, keep), ...(total > keep ? { truncated: true } : {}), ...(timedOut ? { timedOut: true } : {}) });
     };
     child.on("error", (e) => {
       append(`\n[ReviewGate] ${e.message}\n`);

@@ -206,7 +206,8 @@ type ReviewState = {
     phase: "idle" | "starting" | "running" | "collecting" | "collect_failed" | "reverting" | "reviewing";
     canSend: boolean; canRequestChanges: boolean;
     blockedReason: null | "git_init_needed" | "no_session" | "starting" | "running" | "awaiting_permission"
-                 | "collecting" | "reverting" | "collect_failed" | "pending_review" | "changes_requested";   // collect_failed: before M30 (§3)
+                 | "collecting" | "reverting" | "collect_failed" | "pending_review" | "changes_requested"   // collect_failed: before M30 (§3)
+                 | "shell_running";   // §67.2: a `!` command runs
     collectError: string | null;
     pendingCount: number; changesRequestedCount: number;
     isRequestingChanges: boolean;
@@ -399,7 +400,8 @@ type TranscriptItem = { at: string /* ISO-8601 */; turn: number } & (      // §
       toolName?: string; path?: string; branch?: string; exitCode?: number | null; signal?: string | null;
       sessionId?: string; resetAt?: string; status?: number | null }                       // what the event carried (§35.3)
   | { kind: "peer_message"; id: string; from: string; fromName?: string; verifiedPeerPid?: number;                           // §29
-      state: "delivered" | "dropped"; outcome?: string; body?: string; unprompted?: true });
+      state: "delivered" | "dropped"; outcome?: string; body?: string; unprompted?: true }
+  | { kind: "shell"; …ShellResult });                                                                                        // §67.2
 ```
 
 `FileDiff` = `{ oldPath, newPath, isBinary, hunks: [{ id, header, lines: [{ id, kind: "context"|"add"|"del"|"hunkHeader", oldNo, newNo, text }] }] }`
@@ -6501,7 +6503,7 @@ changed default.
   screen. Where the walk starts: Mac — the caret on the first / last visual line (inside a recalled multi-line or wrapped
   prompt the caret moves first); Electron — an empty box, else ↑ only at the very start and ↓ only at the very end (the
   first press moves the caret there), so a long soft-wrapped paragraph keeps its arrows; after ↑ the caret sits at the
-  start, so ↑ walks on. Core `PromptHistoryNavigator`, Electron `promptHistory.ts`. There is no `!` shell mode.
+  start, so ↑ walks on. Core `PromptHistoryNavigator`, Electron `promptHistory.ts`. `!` shell mode: §67.2.
 - Verified by reading CLI 2.1.310 (the user's): `system/status` carries `permissionMode` on every change
   (`onPermissionModeChanged`, EnterPlanMode's included), EnterPlanMode's `checkPermissions` allows it in auto mode, plan mode
   keeps `prePlanMode` and runs the classifier when auto mode is available, ExitPlanMode would return to `prePlanMode` (the
@@ -11196,3 +11198,83 @@ remove_dir { path: string }   // as state.session.addedDirs lists it
   `session/reviewScope.ts` (`editScopeReason(…, addedDirs)`), `session/claude.ts` (`additionalDirectories`, the
   instruction, `canUseTool`), `session/hooks.ts` (`postEditScope`), `review/sessions.ts`, `engine.ts` (`addDir`,
   `removeDir`, `startAddedDirs`). Tests: `engine/test/w67.addDir.test.ts`.
+
+### 67.2 `!` — the user's shell command, as context for Claude
+
+```ts
+// commands
+shell_run    { command: string }   // the text after the box's "!" (a leading "!" is dropped); replies once it started
+shell_cancel {}                     // stops it (its process tree); lane of its own — never behind the main lane
+// refused: empty_command | command_too_long (> 10 000 chars) | no_project | terminal_chat
+//          | shell_busy (one runs) | turn_running (a turn, its collection, a revert, another session's turn)
+//          | no_shell_running (shell_cancel)
+// events
+type ShellOutputEvent = { type: "shell_output"; id: string; output: string };   // its last 4 000 chars, ≤ every 300 ms
+type ShellResultEvent = { type: "shell_result"; turn: number; at: string } & ShellResult;
+type ShellResult = {
+  id: string; command: string; cwd: string;     // cwd: the project folder
+  output: string; truncated?: true;             // stdout + stderr as a terminal shows them, escapes removed; its last 30 000 chars
+  exitCode: number | null;                      // null: stopped or it could not start
+  timedOut?: true; cancelled?: true; durationMs: number;
+  files?: string[]; filesTruncated?: true;      // project files it changed (repo-relative, ≤ 50)
+};
+// transcript row: { kind: "shell", …ShellResult }
+// state.session.shell: { id, command, cwd, startedAt } | null     // while it runs
+// state.session.shellPending: number                              // results that go with the next message
+// state.gate.blockedReason: … | "shell_running"                   // canSend is false while it runs
+```
+
+- **It runs.** The engine runs the command in the project folder through the user's login shell (`$SHELL -lc`, `/bin/sh`
+  without one; Windows `cmd.exe /d /s /c`, as the workbench setup command, §36.12), with the environment Claude's
+  sessions get, no stdin (an interactive command gets none — it ends or times out), stdout and stderr in one stream.
+  After 10 minutes it is stopped (`timedOut`, the output ends with "[ReviewGate] command timed out …"); `shell_cancel` —
+  and `interrupt` while no turn runs, so Esc / Stop work as for a turn — stops it (`cancelled`). One at a time, and only
+  between turns. A chat switch or another project stops it first; its row still lands in the chat it ran in.
+- **The chat.** While it runs, `state.session.shell` names it and `shell_output` carries its output so far; the send
+  gate is closed (`shell_running`), so a message typed meanwhile waits (the clients' queue) and goes out after it. When it
+  ends, its row (`kind: "shell"`) joins the chat's transcript and `shell_result` follows.
+- **Claude gets it with the next message.** Claude does not run the command and is not asked anything when it ends — as in
+  Claude Code. The results since the last message (at most 5, oldest first; `shellPending`) go in front of the next
+  `send` that is not a slash command, in Claude Code's own tags, with a line saying the user ran them:
+  `<bash-input>…</bash-input>`, `<bash-stdout>…</bash-stdout>` (the kept output; "[… earlier output cut]" first when
+  truncated), `<bash-exit-code>exit code 1 | stopped by the user | stopped: timed out</bash-exit-code>`. The user's row shows
+  only what they typed. They are dropped with a chat switch or a closed project (never written to disk except as rows).
+- **The review sees what it changed.** Before the command the engine snapshots the worktree (`gate.noteShellBase`); with
+  no review standing it becomes the carried base (as a review finished while background work ran, §52.2), and the next
+  turn keeps the review's A (`bgCarry`, §52.1) — so what the command wrote reaches that turn's review as **`external`**
+  (§31.1), like any change made outside Claude, instead of being swallowed by a fresh A. "Reject all" leaves such files
+  unless `includeExternal` (§31). The row lists the files (a snapshot after it, compared). A commit the command makes is
+  carried into A like any commit made outside the app (§46). The carried base lives in memory: the app quitting before
+  the next turn leaves the command's changes outside the review, as any change made while the app was closed.
+- Engine: `session/shellRun.ts` (`shellCommandOf`, `cleanShellOutput`, `shellContext`), `git/workbenchSetup.ts`
+  (`runSetupCommand` keeps up to `keepChars`, says `truncated` / `timedOut`), `review/gate.ts` (`noteShellBase`,
+  `changedSince`), `state.ts` (`shell_running`), `engine.ts` (`shellRunStart`, `shellEnded`, `cancelShell`,
+  `stopShell`, `send`). Tests: `engine/test/w67.shell.test.ts` (row, context in front of the next message, the files in the
+  next review as `external`, cancel / interrupt, timeout, refusals).
+
+### 67.3 Clients (Mac and Windows, classic chats)
+
+- **`/add-dir <path>`** typed (one line, ↩) is the app's command, not sent to Claude: `add_dir {path}`; ok clears the box
+  and says "디렉터리를 추가했어요 — 다음 메시지부터 Claude가 여기서도 일해요"; a refusal keeps the draft and says why in the
+  notice line (every `dir_*` code translated). **`/add-dir`** alone opens a folder picker, then the same. The palette lists
+  it under Built-in ("프로젝트 밖의 디렉터리에서도 Claude가 일하게 해요", hint `[path]`); it is no longer a terminal-only
+  name (§56.5).
+- **The chip.** With directories added, the composer's chip row shows "디렉터리 N" (folder icon); its popover lists each
+  (home as `~`, full path in the tooltip) with × (`remove_dir`) and "디렉터리 추가…" (the picker). Its tooltip says edits
+  there ask every time because the review does not show them. While work runs (`dir_busy` would refuse) × and 추가 are
+  disabled with that reason as the tooltip.
+- **The card.** `reason.code: "added_directory"` reads "/add-dir로 추가한 디렉터리의 수정이에요 — 리뷰에 diff가 나오지 않아서
+  여기서 승인받아요".
+- **`!` shell mode.** A draft whose first character is `!` switches the box to shell mode, as Claude Code's bash mode: a
+  "!" / "셸" badge at its start, the box's accent in the shell colour, and the key hint "↩ 셸 명령 실행 · 출력은 다음
+  메시지와 함께 Claude에게 가요". ↩ sends `shell_run {command}` (never to Claude, never queued); it joins the prompt
+  history. A refusal keeps the draft with the reason in the notice line.
+- **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time, the streamed output
+  (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A message typed meanwhile waits in
+  the queue ("셸 명령이 끝나면 보내요").
+- **The row** (`kind: "shell"`, restored with the chat): `$ command` in monospace, how it ended (✓ 0 · ✗ 종료 코드 n ·
+  중지됨 · 시간 초과), the time, the output (monospace, long output folded to its last lines with 전체 보기; "앞부분은
+  잘렸어요" when `truncated`), "파일 N개를 바꿨어요 — 다음 리뷰에 나와요" with the names in a tooltip, and a context menu
+  (명령 복사 · 출력 복사). While `shellPending > 0` a caption over the box says "셸 결과 N개가 다음 메시지와 함께 Claude에게
+  가요".
+- Terminal chats never show any of this (their TUI has `/add-dir` and `!`).
