@@ -15,8 +15,10 @@ import { isSensitivePath } from "../../sensitive";
 import { PathText, statusColor } from "../ChangedFiles";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { acceptAllNow } from "../../acceptAllAction";
+import { acceptAllContinueNow } from "../../acceptAllContinue"; // MARK: accept-continue-ui
 
-export function AcceptAllDialog({ onClose }: { onClose: () => void }) {
+/** `continues` (§58.1, "Accept All & Continue"): the confirm accepts and lets Claude continue — no undo, the turn starts. */
+export function AcceptAllDialog({ continues = false, onClose }: { continues?: boolean; onClose: () => void }) {
   const state = useStore((s) => s.state);
   const viewedPaths = useStore((s) => s.viewedPaths);
   const pending = pendingFiles(state);
@@ -81,9 +83,10 @@ export function AcceptAllDialog({ onClose }: { onClose: () => void }) {
           )}
         </div>
       }
-      confirmLabel={t("Accept all")}
+      confirmLabel={continues ? t("Accept {0} & Continue", pending.length) : t("Accept all")}
       onConfirm={() => {
-        acceptAllNow(); // MARK: r2-review-flow M28: with the same undo toast
+        if (continues) void acceptAllContinueNow();
+        else acceptAllNow(); // MARK: r2-review-flow M28: with the same undo toast
         onClose();
       }}
       onCancel={onClose}

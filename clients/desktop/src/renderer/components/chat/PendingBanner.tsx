@@ -9,10 +9,14 @@ import { useStore } from "../../store";
 import { removeQueued } from "../../sendQueue";
 import { acceptAndSendHelp, acceptAndSendTitle, holdHelp, holdTitle, reviewFirstAcceptBlocker, reviewFirstHolds } from "../../reviewFirst"; // §64
 import { showToast } from "../../toast";
+import { acceptAllContinueBlocker, acceptAllContinueHelp, liveContinueChat, runAcceptAllContinue } from "../../acceptAllContinue"; // MARK: accept-continue-ui
+import { needsAcceptAllDialog } from "../../acceptAllAction";
+import { useViewing } from "../../viewedChat";
 import "../reviewRound.css";
 
 export function PendingBanner() {
   const state = useStore((s) => s.state);
+  useViewing(); // §58.1: the button's reason follows the chat shown
   const waiting = state.gate.pendingCount + state.gate.changesRequestedCount;
   if (waiting === 0) return null;
   if (state.gate.reviewFirst?.mode === "prompts") return <ReviewFirstBanner waiting={state.gate.reviewFirst.waiting} />; // §64
@@ -23,7 +27,10 @@ export function PendingBanner() {
     : t("Sending now adds Claude's new changes to this review (same starting point). To review them separately, accept or reject first.");
   return (
     <div className="pending-banner" title={t("Next pending file ⌘] · previous ⌘[ · Accept ⌘⇧A · Reject ⌘⇧R · Request changes ⌘⇧C")} data-testid="Pending review banner">
-      <div className="truncate">☑ {text}</div>
+      <div className="row" style={{ gap: 6 }}>
+        <div className="truncate grow">☑ {text}</div>
+        {state.gate.pendingCount > 0 && <ContinueButton />}
+      </div>
       <div className="caption pending-merge" data-testid="Pending merge note">{merge}</div>
     </div>
   );
@@ -56,5 +63,25 @@ function ReviewFirstBanner({ waiting }: { waiting: number }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** MARK: accept-continue-ui — §58.1: the Changes list's one click here too, so nobody types "accepted, continue". */
+function ContinueButton() {
+  const state = useStore((s) => s.state);
+  const chat = liveContinueChat();
+  const blocked = acceptAllContinueBlocker(state, chat);
+  return (
+    <button
+      type="button"
+      className="small"
+      disabled={blocked !== null}
+      onClick={runAcceptAllContinue}
+      title={blocked ?? acceptAllContinueHelp(state, chat, needsAcceptAllDialog())}
+      aria-label={t("Accept All & Continue")}
+      data-testid="Pending banner accept all and continue"
+    >
+      {t("Accept All & Continue")}
+    </button>
   );
 }

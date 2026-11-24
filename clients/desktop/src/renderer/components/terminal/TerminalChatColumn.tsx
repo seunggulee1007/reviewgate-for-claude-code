@@ -23,8 +23,9 @@ import {
   type EscapeMark,
 } from "../../terminalStrip";
 import { chatPtyOf, restartChatPty, useTerminalChats } from "../../terminal/terminalChat";
-import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, sendToTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
-import { runTerminalAcceptContinue, terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
+import { acceptsPaste, clearTerminalFind, findInTerminal, focusTerminal, onTerminalEscape, pasteIntoTerminal, subscribeTerminals, terminalStatus, terminalsVersion } from "../../terminal/termHost";
+import { terminalAcceptContinueBlocker } from "../../terminalAcceptContinue";
+import { continueInTerminal } from "../../acceptAllContinue";
 import { firstWaitingPath, openReviewTitle, reviewFirstBlockedHelp, reviewFirstBlockedText } from "../../reviewFirst"; // §64
 import { showToast } from "../../toast";
 import { droppedMentionPaths, MENTION_DRAG_TYPE } from "../../mentions";
@@ -223,17 +224,8 @@ function AcceptContinueButton(props: { ptyId: string; running: boolean }) {
   const blocker = terminalAcceptContinueBlocker(state, { shown: true, running: props.running, bracketed: acceptsPaste(props.ptyId) });
   const run = async (): Promise<void> => {
     setBusy(true);
-    const why = await runTerminalAcceptContinue({
-      accept: async () => {
-        await engineRequest({ type: "accept_all" });
-      },
-      paste: (text) => pasteIntoTerminal(props.ptyId, text),
-      enter: () => sendToTerminal(props.ptyId, "\r"),
-      refusal: (e) => refusalOf(e).error,
-    });
+    await continueInTerminal(props.ptyId, count); // MARK: accept-continue-ui — shared with the Changes list's button (§58.1)
     setBusy(false);
-    focusTerminal(props.ptyId);
-    showToast(why ?? t("Accepted {0} files — Claude continues", count));
   };
   return (
     <button

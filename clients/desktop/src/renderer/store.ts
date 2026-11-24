@@ -320,7 +320,8 @@ export type Dialog =
   | { kind: "agentDetail"; toolUseId: string; focus?: "report" | "instructions" /* MARK: wave4d w4d-agents2: the card menu's 보고서 / 지시 보기 */ }
   /** §19.1: the reject was refused because the user edited `paths` since the review — revert anyway (force)? */
   | { kind: "forceReject"; paths: string[]; all: boolean }
-  | { kind: "acceptAll" }
+  /** MARK: accept-continue-ui — `continues` (§58.1): the confirm accepts and lets Claude continue. */
+  | { kind: "acceptAll"; continues?: boolean }
   | { kind: "removeWorkbench"; wb: WorkbenchInfo; refusal: string | null }
   | { kind: "submitReview" }
   | { kind: "commit" }

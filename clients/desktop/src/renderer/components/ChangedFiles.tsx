@@ -8,7 +8,7 @@
  * "진행 중 변경" section, the previous round's decided files dimmed while a fresh turn runs, and the list's own order
  * (groups, risky first) shared with ⌘] / ⌘[ and the move after accept (store `riskFirst`).
  */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ChangedFileState, ChangeStatus, GateState, SideThread } from "@reviewgate/engine";
 import { t } from "../i18n";
 import { committedBadge, committedHelp } from "../gitNotices"; // MARK: r1-git
@@ -22,7 +22,12 @@ import { threadsOnFile } from "../sideThreads";
 // MARK: wave2 desktop-flow
 import { acceptBlockedReason, changedSinceViewed, collectFailedReason, diffTreeOf, hasReviewRound2, isTurnActive, rejectBlockedReason, unchangedSinceRequest, viewStateOf, type ViewState } from "../reviewRound";
 import { scheduledBadge, scheduledHelp } from "../rejectSchedule"; // MARK: r2-review-flow (M32)
-import { runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
+import { needsAcceptAllDialog, runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
+// MARK: accept-continue-ui — §58.1
+import { acceptAllContinueBlocker, acceptAllContinueHelp, liveContinueChat, runAcceptAllContinue } from "../acceptAllContinue";
+import { subscribeTerminals, terminalsVersion } from "../terminal/termHost";
+import { useTerminalChats } from "../terminal/terminalChat";
+import { useViewing } from "../viewedChat";
 import { commitLockReason } from "../commitLock";
 import { commitListed } from "../acceptCommit";
 import { tKey } from "../shortcutKeys";
@@ -70,6 +75,12 @@ export function ChangedFiles() {
   const setRiskFirst = useStore((s) => s.setRiskFirst);
   const groups = useMemo(() => groupChanges(state.changedFiles).map((g) => (riskFirst ? { ...g, files: sortByRisk(g.files) } : g)), [riskFirst, state.changedFiles]);
   const headers = showsGroupHeaders(groups);
+  // §58.1: "Accept All & Continue" — the live chat's kind decides how Claude is told (the terminal's PTY and prompt too).
+  useViewing();
+  useTerminalChats((s) => s.bySession);
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
+  const continueChat = liveContinueChat();
+  const continueBlocked = acceptAllContinueBlocker(state, continueChat);
   const viewStates = useMemo(() => new Map(state.changedFiles.map((f) => [f.path, viewStateOf(f, viewedPaths)] as const)), [state.changedFiles, viewedPaths]);
   const isViewed = (f: ChangedFileState) => viewStates.get(f.path) === "viewed" || f.state !== "pending";
   const changedAfterView = changedSinceViewed(state.changedFiles, viewedPaths).length;
@@ -118,6 +129,23 @@ export function ChangedFiles() {
         </button>
         <button type="button" className="small" disabled={pending === 0 || rejectBlocked !== null} onClick={() => openDialog({ kind: "rejectAll" })} title={rejectBlocked ?? undefined} data-testid="Reject all">{t("Reject all")}</button>
       </div>
+      {pending > 0 && (
+        <div className="row" style={{ padding: "0 12px 6px", gap: 6 }}>
+          {/* MARK: accept-continue-ui — §58.1: accept every pending file and let Claude go on, nothing typed; the summary
+              dialog first when a file still needs a look. Off with its reason (Claude working, a card, the terminal busy). */}
+          <button
+            type="button"
+            className="small primary grow"
+            disabled={continueBlocked !== null}
+            onClick={runAcceptAllContinue}
+            title={continueBlocked ?? acceptAllContinueHelp(state, continueChat, needsAcceptAllDialog())}
+            aria-label={t("Accept All & Continue")}
+            data-testid="Accept all and continue"
+          >
+            {t("Accept All & Continue")}
+          </button>
+        </div>
+      )}
       <ViewingReviewNote /* MARK: wave4b w4b-tabs — §39.2 "실행 중인 채팅('…')의 리뷰예요" while another chat is shown */ />
       {/* wave2 desktop-flow — a blocked action stays visible, disabled, with its reason in one line (once on screen: the
           diff's "이번 턴 전 기준" banner says it when it is up). */}

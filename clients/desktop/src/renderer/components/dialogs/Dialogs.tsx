@@ -87,7 +87,7 @@ export function Dialogs() {
     case "finishReview":
       return <FinishReviewDialog onClose={close} />;
     case "acceptAll":
-      return <AcceptAllDialog onClose={close} />;
+      return <AcceptAllDialog continues={dialog.continues === true} onClose={close} />;
     case "removeWorkbench":
       return <RemoveWorkbenchDialog wb={dialog.wb} refusal={dialog.refusal} onClose={close} />;
     case "rewind":

@@ -9969,8 +9969,8 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
     nothing is typed then.
   - *Tooltips:* "대기 중인 파일 N개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)", with the
     sheet "…요약을 먼저 보여 준 뒤 수락하고, …"; AX "Accept and continue".
-- **Mac only** for chats for now: the Windows client keeps "Accept N & Send" (Ctrl+Shift+Enter) as before. Its terminal
-  chat has the strip's button (§57.17).
+- **Windows**: the message box keeps "Accept N & Send" as its button; Ctrl+Shift+Enter in an empty box (no text, mention
+  or image) runs §58.1's Accept All & Continue. Its terminal chat has the strip's button (§57.17), no key.
 
 ### 58.1 Accept All & Continue in the Changes header; accepted files folded apart
 
@@ -10003,6 +10003,11 @@ but not committed stayed in the list among the pending ones. Clients only (no en
   pending again — an undo, or changed after the accept — is back in the open part by its state alone. The commit sheet
   lists accepted files as before. The author filter (§39.3) applies to the folded rows too. Core `AcceptedGroup.split`,
   `openChangedFiles`, `viewedOpenCount`.
+- **Windows (Electron).** The same button (`acceptAllContinue.ts`: the same reasons and words, Enter for Return) in a row
+  of its own under [변경 N개 · 대기 N개] [모두 수락] [모두 거절], shown while files are pending; the summary dialog's
+  confirm reads "Accept N & Continue". The pending banner ("리뷰 대기 파일 N개 — …") has it too, and Ctrl+Shift+Enter in an
+  empty message box (no text, mention or image) runs it. The terminal strip's button shares its terminal path
+  (`continueInTerminal`).
 
 ## 59. Folders that are not git repositories (track without git)
 
