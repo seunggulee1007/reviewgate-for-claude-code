@@ -70,6 +70,14 @@ export function groupChanges(files: readonly ChangedFileState[]): ChangeGroup[] 
     .map((kind) => ({ kind, files: by[kind], pending: by[kind].filter((f) => f.state === "pending").length }));
 }
 
+/**
+ * MARK: accept-continue-ui — §58.1: the list's open part and its folded "Accepted · not committed (N)" group at the bottom.
+ * A file that is pending again (undo, or changed after the accept) is back in the open part.
+ */
+export function splitAccepted(files: readonly ChangedFileState[]): { open: ChangedFileState[]; accepted: ChangedFileState[] } {
+  return { open: files.filter((f) => f.state !== "accepted"), accepted: files.filter((f) => f.state === "accepted") };
+}
+
 /** Group headers only when they tell something: a list of Claude's changes alone stays as it always was. */
 export const showsGroupHeaders = (groups: readonly ChangeGroup[]): boolean => !(groups.length === 1 && groups[0]!.kind === "claude");
 

@@ -25,6 +25,10 @@ public extension DiffSince {
 
     /// What `select_file` / `full_file` carry: nothing for the whole review (an older engine never sees the field).
     var wire: DiffSince? { self == .review ? nil : self }
+
+    /// `wire` for `file`: §66 — a file changed after its accept defaults to "since accepted" on the engine, so its whole
+    /// review is asked for by name.
+    func wire(for file: ChangedFile) -> DiffSince? { file.changedSinceAccepted ? self : wire }
 }
 
 /// The ranges of one file's diff (§34.1) and the one it opens in.
@@ -32,15 +36,16 @@ public enum ReviewRange {
     /// The ranges the diff header offers for `file`, the whole review first; a single entry means no picker. A range is
     /// offered only when it shows something the whole review does not: "이번 턴" once the review spans several turns and
     /// this turn touched the file (not when that turn is the change request's own follow-up — "요청 이후" says it),
-    /// "요청 이후" for a file the follow-up changed, "수락 이후" for a file changed after it was accepted.
+    /// "요청 이후" for a file the follow-up changed, "수락 이후" for a file changed after it was accepted. §66: a file with an
+    /// `acceptedBase` puts "수락 이후" first — "수락 이후 / 라운드 전체", its counts and status are since the accept.
     public static func available(for file: ChangedFile, gate: GateInfo) -> [DiffSince] {
-        var out: [DiffSince] = [.review]
+        var out: [DiffSince] = file.changedSinceAccepted && file.acceptedBase != nil ? [.accepted, .review] : [.review]
         let request = gate.lastRequest != nil && file.changedSinceRequest
         let lastTurn = gate.lastTurnChanges?.turn ?? gate.reviewTurns.last
         let turnIsTheRequestsFollowUp = request && lastTurn != nil && gate.lastRequest?.turn == lastTurn
         if file.changedThisTurn, gate.reviewTurns.count > 1, !turnIsTheRequestsFollowUp { out.append(.turn) }
         if request { out.append(.request) }
-        if file.changedSinceAccepted { out.append(.accepted) }
+        if file.changedSinceAccepted, !out.contains(.accepted) { out.append(.accepted) }
         return out
     }
 

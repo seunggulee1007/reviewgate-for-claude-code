@@ -243,7 +243,7 @@ import Testing
         var sent: [EngineCommand] = []
         app.requestSink = { command in
             sent.append(command)
-            if case .reject(_, false) = command {
+            if case .reject(_, false, _) = command {
                 throw EngineClientError.refused("file_changed_since_review:a.txt", code: "file_changed_since_review", paths: ["a.txt"])
             }
             if case .rejectAll(false, _) = command {

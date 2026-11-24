@@ -1617,6 +1617,22 @@
         }
       }
     },
+    "Accept All & Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept All & Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모두 수락하고 계속"
+          }
+        }
+      }
+    },
     "Accepted %lld files": {
       "localizations": {
         "en": {
@@ -1645,6 +1661,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 세션 메시지로 시작한 턴"
+          }
+        }
+      }
+    },
+    "Accepted · not committed (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accepted · not committed (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락함 · 커밋 전 %lld"
           }
         }
       }
@@ -3149,6 +3181,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "바뀐 허용 규칙은 다음 세션부터 조회·읽기 도구에 적용될 수 있어요 (설정 › 권한 › 터미널(Claude Code) 허용 규칙에서 확인)."
+          }
+        }
+      }
+    },
+    "Changed since accepted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed since accepted"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락 이후 변경"
           }
         }
       }
@@ -6679,6 +6727,22 @@
         }
       }
     },
+    "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락했지만 아직 커밋하지 않은 파일이에요 — 커밋…에서 함께 커밋되고, 수락 취소하면 다시 리뷰 대기로 돌아가요"
+          }
+        }
+      }
+    },
     "Finds files: %@": {
       "localizations": {
         "en": {
@@ -7095,6 +7159,54 @@
         }
       }
     },
+    "Revert %@ to the start of the round?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revert %@ to the start of the round?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 라운드 시작으로 되돌릴까요?"
+          }
+        }
+      }
+    },
+    "Revert to the content you accepted (⌘⇧R)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revert to the content you accepted (⌘⇧R)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락한 내용으로 되돌려요 (⌘⇧R)"
+          }
+        }
+      }
+    },
+    "Revert to the start of the round": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revert to the start of the round"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라운드 시작으로 되돌리기"
+          }
+        }
+      }
+    },
     "Rewind to before your last message": {
       "localizations": {
         "en": {
@@ -7287,6 +7399,38 @@
         }
       }
     },
+    "The content you accepted goes too. The file did not exist before this round, so it is deleted from disk.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The content you accepted goes too. The file did not exist before this round, so it is deleted from disk."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락한 내용도 함께 사라져요. 이번 라운드 전에는 없던 파일이라 디스크에서 삭제돼요."
+          }
+        }
+      }
+    },
+    "The content you accepted goes too. The file on disk goes back to how it was before this round and leaves the review list.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The content you accepted goes too. The file on disk goes back to how it was before this round and leaves the review list."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락한 내용도 함께 사라져요. 디스크의 파일이 이번 라운드 전 상태로 돌아가고 리뷰 목록에서 빠져요."
+          }
+        }
+      }
+    },
     "The project is larger than the index — some symbols are missing": {
       "localizations": {
         "en": {
@@ -7303,6 +7447,54 @@
         }
       }
     },
+    "This review belongs to the running chat — show it to continue Claude there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This review belongs to the running chat — show it to continue Claude there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 채팅의 리뷰예요 — 그 채팅을 열면 이어서 계속할 수 있어요"
+          }
+        }
+      }
+    },
+    "Those parts of %@ go back to the content you accepted, on disk. The rest of the file stays under review.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Those parts of %@ go back to the content you accepted, on disk. The rest of the file stays under review."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@의 그 부분들이 디스크에서 수락한 내용으로 돌아가요. 파일의 나머지는 계속 리뷰 대상으로 남아요."
+          }
+        }
+      }
+    },
+    "Undoes your accept too: the file goes back to how it was before this round and leaves the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undoes your accept too: the file goes back to how it was before this round and leaves the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "수락도 함께 되돌려요. 파일이 이번 라운드 전 상태로 돌아가고 목록에서 빠져요"
+          }
+        }
+      }
+    },
     "Waits until you finish the review": {
       "localizations": {
         "en": {
@@ -7315,6 +7507,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 끝내면 보내요"
+          }
+        }
+      }
+    },
+    "Whole round": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole round"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라운드 전체"
           }
         }
       }
@@ -7475,6 +7683,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "댓글을 먼저 써 주세요"
+          }
+        }
+      }
+    },
+    "You accepted this file earlier and a later turn changed it again. The +/− and the status letter count what changed since your accept; “Whole round” shows the whole round": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You accepted this file earlier and a later turn changed it again. The +/− and the status letter count what changed since your accept; “Whole round” shows the whole round"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앞서 수락한 파일을 이후 턴이 다시 바꿨어요. +/−와 상태 글자는 수락 이후 바뀐 만큼이에요. 라운드 전체 변경은 “라운드 전체”에서 볼 수 있어요"
           }
         }
       }

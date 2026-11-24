@@ -51,14 +51,14 @@ extension AppState {
 
     /// True when `reject(file)` must not go out now: the file was not captured (it cannot be reverted — the refusal's
     /// text is shown), or it is external (the user confirms it first, `externalRejectRequest`).
-    func holdReject(of file: ChangedFile) -> Bool {
+    func holdReject(of file: ChangedFile, to: RejectTarget? = nil) -> Bool {
         let current = changedFiles.first { $0.path == file.path } ?? file
         if current.uncaptured {
             fail(EngineMessages.refusal(code: "not_captured", error: "not_captured", paths: [current.path]), fatal: false)
             return true
         }
         if current.isExternal {
-            externalRejectRequest = ExternalRejectRequest(command: .reject(paths: [current.path]), paths: [current.path])
+            externalRejectRequest = ExternalRejectRequest(command: .reject(paths: [current.path], to: to), paths: [current.path])
             return true
         }
         return false
@@ -90,9 +90,9 @@ extension AppState {
         switch request.command {
         case .rejectAll:
             rejectAll(includeExternal: true)
-        case let .reject(paths, _):
+        case let .reject(paths, _, to):
             if rejectLockedNotice() { return }   // wave2 mac-flow: with the turn's reason
-            fireReject(.reject(paths: paths))
+            fireReject(.reject(paths: paths, to: to))
             // Like a plain reject: move on to the next pending file on screen right away (wave2 mac-flow, comp-10).
             if let path = paths.first, selectedPath == path, let next = pendingAfter(path) { selectFile(next) }
         default:

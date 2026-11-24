@@ -3,8 +3,14 @@
  * `+n −m`, note count; then Full-file toggle, side-by-side / collapse-unchanged toggles, Open in
  * Editor, Reject / Accept or the file's review-state label.
  */
+import { useState } from "react";
 import type { ChangedFileState } from "@reviewgate/engine";
 import { t } from "../../i18n";
+import { Menu } from "../Menu";
+import { ConfirmDialog } from "../dialogs/ConfirmDialog";
+// accept-baseline — §66: "수락 이후 변경", the since-accepted letter, reject's words and the way back to the round's start
+import { badgeStatus, offersRoundReject, roundRejectHelp, roundRejectLabel, roundRejectMessage, roundRejectTitle, sinceAcceptedHelp, sinceAcceptedLabel, sinceAcceptedRejectHelp } from "../../sinceAccepted";
+import { statusWord } from "../../a11yText";
 import { isExternalChange } from "../../reviewGate";
 import { statusColor } from "../ChangedFiles";
 import { OpenInEditor } from "./OpenInEditor";
@@ -33,6 +39,9 @@ export type DiffHeaderProps = {
   rejectBlocked?: string | null;
   onAccept: () => void;
   onReject: () => void;
+  /** §66: why "라운드 시작으로 되돌리기" is off (null: on) and the reject it sends after its confirm. */
+  roundRejectBlocked?: string | null;
+  onRejectToRound?: () => void;
 };
 
 export function DiffHeader(props: DiffHeaderProps) {
@@ -41,13 +50,18 @@ export function DiffHeader(props: DiffHeaderProps) {
   return (
     <div className="pane-header diff-header" data-testid="Diff header">
       <div className="row" style={{ gap: 8 }}>
-        <span className={`glyph mono bold ${statusColor(file.status)}`} style={{ width: 14, textAlign: "center" }}>{file.status}</span>
+        <span className={`glyph mono bold ${statusColor(badgeStatus(file))}`} style={{ width: 14, textAlign: "center" }} title={statusWord(badgeStatus(file))}>{badgeStatus(file)}</span>
         <div className="col grow" style={{ gap: 1 }}>
           <MiddlePath path={file.path} className="bold" testId="Diff path" />
           {renamed && <MiddlePath path={file.oldPath ?? ""} className="caption muted" prefix={t("from")} />}
         </div>
         <span className="caption num green">+{file.added}</span>
         <span className="caption num red">−{file.deleted}</span>
+        {file.acceptedBase && (
+          <span className="pill orange" style={{ flex: "none" }} title={sinceAcceptedHelp()} data-testid="Diff changed since accepted">
+            {sinceAcceptedLabel()}
+          </span>
+        )}
         {file.partial && (
           <span className="pill orange" style={{ flex: "none" }} title={t("Some parts of this file were reverted; the rest is still under review")} data-testid="Partial badge">
             {t("Partly reverted {0}", file.rejectedHunks ?? 0)}
@@ -109,6 +123,8 @@ export function DiffHeader(props: DiffHeaderProps) {
           turnRunning={props.reviewLocked}
           onAccept={props.onAccept}
           onReject={props.onReject}
+          roundRejectBlocked={props.roundRejectBlocked ?? null}
+          onRejectToRound={props.onRejectToRound}
         />
       </div>
     </div>
@@ -129,7 +145,16 @@ function MiddlePath(props: { path: string; className?: string; prefix?: string; 
   );
 }
 
-function StateControls(props: { file: ChangedFileState; acceptBlocked: string | null; rejectBlocked: string | null; turnRunning: boolean; onAccept: () => void; onReject: () => void }) {
+function StateControls(props: {
+  file: ChangedFileState;
+  acceptBlocked: string | null;
+  rejectBlocked: string | null;
+  turnRunning: boolean;
+  onAccept: () => void;
+  onReject: () => void;
+  roundRejectBlocked: string | null;
+  onRejectToRound: (() => void) | undefined;
+}) {
   switch (props.file.state) {
     case "pending":
       return (
@@ -139,11 +164,15 @@ function StateControls(props: { file: ChangedFileState; acceptBlocked: string | 
             className="small"
             disabled={props.rejectBlocked !== null || props.file.uncaptured === true}
             onClick={props.onReject}
-            title={props.file.uncaptured ? t("Content not captured (large file / binary) — cannot be reverted") : (props.rejectBlocked ?? t("Reject (⌘⇧R)"))}
+            // §66: a file reviewed since its accept goes back to the accepted content — never "deleted".
+            title={props.file.uncaptured ? t("Content not captured (large file / binary) — cannot be reverted") : (props.rejectBlocked ?? sinceAcceptedRejectHelp(props.file) ?? t("Reject (⌘⇧R)"))}
             data-testid="Reject"
           >
             ↶ {t("Reject")}
           </button>
+          {offersRoundReject(props.file) && props.onRejectToRound && (
+            <RoundRejectMenu file={props.file} blocked={props.roundRejectBlocked} onConfirm={props.onRejectToRound} />
+          )}
           <button
             type="button"
             className="primary small"
@@ -164,4 +193,45 @@ function StateControls(props: { file: ChangedFileState; acceptBlocked: string | 
     case "changesRequested":
       return <span className="orange bold" data-testid="State label">! {t("Changes requested")}</span>;
   }
+}
+
+/** §66: "⋯" › "라운드 시작으로 되돌리기…" — the accepted content goes too, so it asks first (the plain Reject restores it). */
+function RoundRejectMenu(props: { file: ChangedFileState; blocked: string | null; onConfirm: () => void }) {
+  const [asking, setAsking] = useState(false);
+  return (
+    <>
+      <Menu
+        label="⋯"
+        align="right"
+        title={t("More reject options")}
+        ariaLabel={t("More reject options")}
+        testId="Reject more"
+        items={[
+          {
+            kind: "item",
+            label: `${roundRejectLabel()}…`,
+            danger: true,
+            disabled: props.blocked !== null,
+            title: props.blocked ?? roundRejectHelp(),
+            onClick: () => setAsking(true),
+            testId: "Revert to the start of the round",
+          },
+        ]}
+      />
+      {asking && (
+        <ConfirmDialog
+          title={roundRejectTitle(props.file.path)}
+          message={roundRejectMessage(props.file)}
+          confirmLabel={roundRejectLabel()}
+          danger
+          onConfirm={() => {
+            setAsking(false);
+            props.onConfirm();
+          }}
+          onCancel={() => setAsking(false)}
+          testId="Round reject dialog"
+        />
+      )}
+    </>
+  );
 }

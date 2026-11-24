@@ -204,7 +204,10 @@
     "reviewSummary": {
       "files": 2,
       "added": 3,
-      "deleted": 1
+      "deleted": 1,
+      "pending": 1,
+      "changesRequested": 0,
+      "acceptedUncommitted": 1
     },
     "externalPendingCount": 0,
     "headMoved": null,

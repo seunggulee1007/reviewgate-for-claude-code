@@ -316,7 +316,8 @@ describe("§26 checkpoints and rewind", () => {
     await h.engine.request({ type: "rewind", toTurn: 2, mode: "files" });
     expect(read(dir, "README.md")).toBe("line1\nmore\n");
     const s = await h.waitFor((st) => st.changedFiles[0]?.state === "pending", "pending again");
-    expect(s.changedFiles.map((f) => [f.path, f.added])).toEqual([["README.md", 1]]);
+    // §66: counted since the accept (the rewind took "and more" out); the round's line stays in the base.
+    expect(s.changedFiles.map((f) => [f.path, f.added, f.deleted, f.acceptedBase?.roundAdded])).toEqual([["README.md", 0, 1, 1]]);
     expect(s.gate.phase).toBe("reviewing");
   });
 

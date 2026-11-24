@@ -8,12 +8,12 @@
  * "진행 중 변경" section, the previous round's decided files dimmed while a fresh turn runs, and the list's own order
  * (groups, risky first) shared with ⌘] / ⌘[ and the move after accept (store `riskFirst`).
  */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ChangedFileState, ChangeStatus, GateState, SideThread } from "@reviewgate/engine";
 import { t } from "../i18n";
 import { committedBadge, committedHelp } from "../gitNotices"; // MARK: r1-git
 import { MENTION_DRAG_TYPE } from "../mentions";
-import { finishReviewBlocked, groupChanges, groupHelp, groupLabel, modsRiskHelp, modsRiskLabel, modsRisksOf, showsGroupHeaders, uncapturedText, type ChangeGroup, type ChangeGroupKind } from "../reviewGate";
+import { finishReviewBlocked, groupChanges, groupHelp, groupLabel, modsRiskHelp, modsRiskLabel, modsRisksOf, showsGroupHeaders, splitAccepted, uncapturedText, type ChangeGroup, type ChangeGroupKind } from "../reviewGate";
 import { ALL_RISKS, riskHelp, riskKinds, riskLabel, riskTone, sortByRisk } from "../risk";
 import { commitOf, pendingFiles, useStore } from "../store";
 import { GateNotices } from "./GateNotices";
@@ -22,8 +22,15 @@ import { threadsOnFile } from "../sideThreads";
 // MARK: wave2 desktop-flow
 import { acceptBlockedReason, changedSinceViewed, collectFailedReason, diffTreeOf, hasReviewRound2, isTurnActive, rejectBlockedReason, unchangedSinceRequest, viewStateOf, type ViewState } from "../reviewRound";
 import { scheduledBadge, scheduledHelp } from "../rejectSchedule"; // MARK: r2-review-flow (M32)
-import { runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
+import { needsAcceptAllDialog, runAcceptAll } from "../acceptAllAction"; // MARK: r2-review-flow (M28)
+// MARK: accept-continue-ui — §58.1
+import { acceptAllContinueBlocker, acceptAllContinueHelp, liveContinueChat, runAcceptAllContinue } from "../acceptAllContinue";
+import { subscribeTerminals, terminalsVersion } from "../terminal/termHost";
+import { useTerminalChats } from "../terminal/terminalChat";
+import { useViewing } from "../viewedChat";
 import { commitLockReason } from "../commitLock";
+// accept-baseline — §66: "수락 이후 변경", the since-accepted letter, reject's words, the engine's accepted count
+import { acceptedGroupCount, badgeStatus, sinceAcceptedHelp, sinceAcceptedLabel, sinceAcceptedRejectHelp } from "../sinceAccepted";
 import { commitListed } from "../acceptCommit";
 import { tKey } from "../shortcutKeys";
 import { LiveChanges } from "./LiveChanges";
@@ -68,8 +75,18 @@ export function ChangedFiles() {
   const viewedPaths = useStore((s) => s.viewedPaths);
   const riskFirst = useStore((s) => s.riskFirst);
   const setRiskFirst = useStore((s) => s.setRiskFirst);
-  const groups = useMemo(() => groupChanges(state.changedFiles).map((g) => (riskFirst ? { ...g, files: sortByRisk(g.files) } : g)), [riskFirst, state.changedFiles]);
+  // MARK: accept-continue-ui — §58.1: accepted files (not committed yet) fold into one group at the bottom, out of the progress.
+  const split = useMemo(() => splitAccepted(state.changedFiles), [state.changedFiles]);
+  const groups = useMemo(() => groupChanges(split.open).map((g) => (riskFirst ? { ...g, files: sortByRisk(g.files) } : g)), [riskFirst, split.open]);
+  const acceptedFiles = useMemo(() => groupChanges(split.accepted).flatMap((g) => (riskFirst ? sortByRisk(g.files) : g.files)), [riskFirst, split.accepted]);
+  const [acceptedOpen, setAcceptedOpen] = useState(false);
   const headers = showsGroupHeaders(groups);
+  // §58.1: "Accept All & Continue" — the live chat's kind decides how Claude is told (the terminal's PTY and prompt too).
+  useViewing();
+  useTerminalChats((s) => s.bySession);
+  useSyncExternalStore(subscribeTerminals, terminalsVersion, terminalsVersion);
+  const continueChat = liveContinueChat();
+  const continueBlocked = acceptAllContinueBlocker(state, continueChat);
   const viewStates = useMemo(() => new Map(state.changedFiles.map((f) => [f.path, viewStateOf(f, viewedPaths)] as const)), [state.changedFiles, viewedPaths]);
   const isViewed = (f: ChangedFileState) => viewStates.get(f.path) === "viewed" || f.state !== "pending";
   const changedAfterView = changedSinceViewed(state.changedFiles, viewedPaths).length;
@@ -118,6 +135,23 @@ export function ChangedFiles() {
         </button>
         <button type="button" className="small" disabled={pending === 0 || rejectBlocked !== null} onClick={() => openDialog({ kind: "rejectAll" })} title={rejectBlocked ?? undefined} data-testid="Reject all">{t("Reject all")}</button>
       </div>
+      {pending > 0 && (
+        <div className="row" style={{ padding: "0 12px 6px", gap: 6 }}>
+          {/* MARK: accept-continue-ui — §58.1: accept every pending file and let Claude go on, nothing typed; the summary
+              dialog first when a file still needs a look. Off with its reason (Claude working, a card, the terminal busy). */}
+          <button
+            type="button"
+            className="small primary grow"
+            disabled={continueBlocked !== null}
+            onClick={runAcceptAllContinue}
+            title={continueBlocked ?? acceptAllContinueHelp(state, continueChat, needsAcceptAllDialog())}
+            aria-label={t("Accept All & Continue")}
+            data-testid="Accept all and continue"
+          >
+            {t("Accept All & Continue")}
+          </button>
+        </div>
+      )}
       <ViewingReviewNote /* MARK: wave4b w4b-tabs — §39.2 "실행 중인 채팅('…')의 리뷰예요" while another chat is shown */ />
       {/* wave2 desktop-flow — a blocked action stays visible, disabled, with its reason in one line (once on screen: the
           diff's "이번 턴 전 기준" banner says it when it is up). */}
@@ -158,7 +192,7 @@ export function ChangedFiles() {
       )}
       <LiveChanges />
       <ReviewListNotices />{/* MARK: wave4b w4b-bigturn — §39.1 large files left out, "대량 변경: 파일 N개" */}
-      {state.changedFiles.length > 0 && <ReviewProgress files={state.changedFiles} isViewed={isViewed} changedAfterView={changedAfterView} />}
+      {split.open.length > 0 && <ReviewProgress files={split.open} isViewed={isViewed} changedAfterView={changedAfterView} />}
       {/* MARK: wave3 desktop-flow — §36.13 AI 사전 리뷰: status, cancel, effort */}
       <PreReviewHead />
       <ul
@@ -214,6 +248,29 @@ export function ChangedFiles() {
             )} />
           </Fragment>
         ))}
+        {acceptedFiles.length > 0 && (
+          <AcceptedGroup count={acceptedGroupCount(state.gate, acceptedFiles.length)} open={acceptedOpen} onToggle={() => setAcceptedOpen((v) => !v)} />
+        )}
+        {acceptedOpen && acceptedFiles.filter((f) => authorFilter.keep(f.path)).map((f) => (
+          <FileRow
+            authors={authorFilter.authors.get(f.path)}
+            key={f.path}
+            f={f}
+            group={groupChanges([f])[0]?.kind ?? "claude"}
+            gate={state.gate}
+            selected={selectedPath === f.path}
+            viewed={isViewed(f)}
+            viewState={viewStates.get(f.path) ?? "unviewed"}
+            notes={noteCount(f.path)}
+            sentNotes={sentCount(f.path)}
+            threads={threadsOnFile(sideThreads, f.path)}
+            acceptBlocked={acceptBlocked}
+            rejectBlocked={rejectBlocked}
+            onSelect={selectFile}
+            onAccept={accept}
+            onReject={reject}
+          />
+        ))}
       </ul>
     </div>
   );
@@ -231,6 +288,26 @@ function GroupHeader({ group }: { group: ChangeGroup }) {
       </li>
       {group.kind === "external" && <li className="group-hint caption faint">{t("Reject all leaves these as they are")}</li>}
     </>
+  );
+}
+
+/** §58.1: "수락함 · 커밋 전 N" — folded until clicked; the commit dialog takes these files as before. */
+function AcceptedGroup({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
+  return (
+    <li className="section row group-head accepted" data-testid="Accepted group">
+      <button
+        type="button"
+        className="plain row grow accepted-toggle"
+        aria-expanded={open}
+        onClick={onToggle}
+        title={t("Files you accepted that are not committed yet — Commit… takes them; Undo Accept makes one pending again")}
+        data-testid="Accepted group toggle"
+      >
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <span className="tiny bold green" aria-hidden="true">✓</span>
+        <span className="grow truncate">{t("Accepted · not committed ({0})", count)}</span>
+      </button>
+    </li>
   );
 }
 
@@ -286,8 +363,8 @@ function FileRow(props: {
           <span className={`viewed-dot ${viewed ? "on" : ""}`} title={viewed ? t("Viewed") : t("Not viewed yet")} aria-label={viewed ? t("Viewed") : t("Not viewed yet")} data-testid={viewed ? "Viewed" : "Not viewed"} />
         )}
         {/* MARK: wave4d w4d-speed — polish-10: "수정됨", not "M"; "12줄 추가, 3줄 삭제"; the review mark has a name */}
-        <span className={`glyph ${statusColor(f.status)}`} aria-hidden="true">{f.status}</span>
-        <span className="sr-only" data-find-skip>{statusWord(f.status)}</span>
+        <span className={`glyph ${statusColor(badgeStatus(f))}`} aria-hidden="true">{badgeStatus(f)}</span>
+        <span className="sr-only" data-find-skip>{statusWord(badgeStatus(f))}</span>
         <div className="grow col" style={{ gap: 2 }}>
           <div className="path">
             <PathText path={compactPath(f.path) /* MARK: wave4b w4b-files — §40.2: the module kept, the title has it all */} />
@@ -314,7 +391,9 @@ function FileRow(props: {
               <span className="pill red risk" title={scheduledHelp()} data-testid={`Reject scheduled ${f.path}`}>{scheduledBadge()}</span>
             )}
             {/* MARK: wave2 desktop-flow — §34.2 / §34.4 / §34.5 */}
-            {pending && f.changedSinceAccepted && (
+            {f.acceptedBase ? (
+              <span className="pill orange risk" title={sinceAcceptedHelp()} data-testid={`Changed since accepted ${f.path}`}>{sinceAcceptedLabel()}</span>
+            ) : pending && f.changedSinceAccepted && (
               <span className="pill orange risk" title={t("Accepted earlier, then changed again — “Since accepted” shows what changed")} data-testid={`Changed after accept ${f.path}`}>{t("Changed after accept")}</span>
             )}
             {changedAfterView && (
@@ -368,7 +447,7 @@ function FileRow(props: {
             <button
               type="button"
               className="plain small"
-              title={uncaptured ? uncapturedText(f, props.gate) : f.rejectScheduled === true ? scheduledHelp() : (props.rejectBlocked ?? t("Reject (⌘⇧R)"))}
+              title={uncaptured ? uncapturedText(f, props.gate) : f.rejectScheduled === true ? scheduledHelp() : (props.rejectBlocked ?? sinceAcceptedRejectHelp(f) ?? t("Reject (⌘⇧R)"))}
               aria-label={t("Reject (⌘⇧R)")}
               disabled={props.rejectBlocked !== null || uncaptured || f.rejectScheduled === true}
               onClick={(e) => {

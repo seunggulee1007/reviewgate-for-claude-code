@@ -17,8 +17,8 @@ import { REF_TURN_END, REF_TURN_START, turnRefs, type PersistedReview } from "./
 import { addRoundNotes, completeRound, newRound, setVerdict, syncRound, type HistoryRound, type TurnInfo } from "./history.js";
 import type { ReviewHistoryEntry } from "../protocol.js";
 // MARK: wave2 engine-review
-import type { DiffSince, LastTurnChanges, ReviewRequestInfo } from "../protocol.js";
-import { carryNote, keptTurnMarks, rangeRefPrefix, rangeUnavailable, syncRangePins, treeEntryIds, type PersistedRanges } from "./ranges.js";
+import type { AcceptedBase, DiffSince, LastTurnChanges, RejectTarget, ReviewRequestInfo } from "../protocol.js";
+import { carryNote, keptTurnMarks, rangeRefPrefix, rangeUnavailable, syncRangePins, treeEntryIds, type AcceptedAt, type PersistedRanges } from "./ranges.js";
 import { annotateDetail } from "./detail.js";
 import { turnDelta, turnPaths, type TurnDelta } from "./turnDelta.js"; // MARK: wave3 check-engine (§37.3)
 import { recheckWhitespaceOnly } from "./detail.js"; // MARK: wave3 check-engine (§37.5)
@@ -52,7 +52,7 @@ export type TurnChanges = { files: ChangedFile[]; added: number; deleted: number
 export type PendingCollect = { toolFiles: ToolFileEntry[]; stopReason: string; usage: TurnUsage | null; windows?: ToolWindow[] };
 
 /** §57: what a review summary was made of (`beginSendParts`), to put back with `restoreSummary`. */
-export type SummaryPaths = { accepted: string[]; rejected: string[]; partial: string[] };
+export type SummaryPaths = { accepted: string[]; rejected: string[]; partial: string[]; toAccepted?: string[] };
 export type PreparedRequestChanges = { message: string; checkpointTree: string; endTree: string };
 
 // MARK: wave2 engine-why
@@ -216,6 +216,8 @@ export class ReviewGate {
   private rejectedPaths: string[] = [];
   /** Files `reject_hunks` partly reverted since the last send (→ `lastReviewSummary`). */
   private partiallyRejectedPaths: string[] = [];
+  /** §66: files whose later changes `reject` put back to the accepted content since the last send (→ `lastReviewSummary`). */
+  private revertedToAcceptedPaths: string[] = [];
   /**
    * SHA-256 of the patch of every file accepted before `requestChanges`; files whose patch is
    * unchanged after the follow-up turn are pre-marked accepted again.
@@ -257,6 +259,13 @@ export class ReviewGate {
   private acceptedTrees = new Map<string, string>();
   /** §34.2: files accepted while the running turn ran: a turn that changes them takes them out of `acceptedPaths` again. */
   private acceptedDuringTurn = new Set<string>();
+  /** §66: when each file of `acceptedTrees` was accepted (the time and the collected turn whose result it was). */
+  private acceptedAt = new Map<string, AcceptedAt>();
+  /**
+   * §66: per file a later turn changed after its accept, what was accepted and its lines accepted tree → `end` — recomputed
+   * by `followB` at every B change; `acceptedBaseOf` serves an entry only while it still describes the file.
+   */
+  private acceptedBases = new Map<string, { tree: string; end: string; blob: string | null; status: AcceptedBase["status"]; added: number; deleted: number }>();
   /** What `prepareRequestChanges` changed, for `undoRequestChanges`. */
   private requestUndo: { sent: string[]; requestTree: string | null; lastRequest: ReviewRequestInfo | null; changedSinceRequest: string[] } | null = null;
   /** Range diffs by base / end tree / path (trees never change, so entries never go stale; bounded). */
@@ -301,6 +310,7 @@ export class ReviewGate {
     this.acceptedPaths = [];
     this.rejectedPaths = [];
     this.partiallyRejectedPaths = [];
+    this.revertedToAcceptedPaths = []; // §66
     this.acceptedPatchHashes = new Map();
     this.answerEndTree = null;
     this.diffCache = new Map();
@@ -352,6 +362,7 @@ export class ReviewGate {
       acceptedPaths: [...this.acceptedPaths],
       rejectedPaths: [...this.rejectedPaths],
       partiallyRejectedPaths: [...this.partiallyRejectedPaths],
+      ...(this.revertedToAcceptedPaths.length > 0 ? { revertedToAcceptedPaths: [...this.revertedToAcceptedPaths] } : {}), // §66
       lastReviewSummary: this.lastReviewSummary,
       isRequestingChanges: this.isRequestingChanges,
       isAnsweringReview: this.isAnsweringReview,
@@ -396,6 +407,7 @@ export class ReviewGate {
       this.acceptedPaths = [];
       this.rejectedPaths = [];
       this.partiallyRejectedPaths = [];
+      this.revertedToAcceptedPaths = [];
     }
     if (this.turnStartTree !== null && this.turnEndTree !== null) this.trackRound(null);
     this.completeRound(true);
@@ -509,6 +521,7 @@ export class ReviewGate {
     this.acceptedPaths = saved.acceptedPaths.filter((p) => paths.has(p) && files.find((f) => f.path === p)?.state === "accepted");
     this.rejectedPaths = [...saved.rejectedPaths];
     this.partiallyRejectedPaths = (saved.partiallyRejectedPaths ?? []).filter((p) => paths.has(p));
+    this.revertedToAcceptedPaths = [...(saved.revertedToAcceptedPaths ?? [])]; // §66
     this.acceptedPatchHashes = new Map();
     this.isRequestingChanges = false;
     this.isAnsweringReview = false;
@@ -873,7 +886,7 @@ export class ReviewGate {
 
   /** Prefix sent with the next user message once a review round has been completed. */
   get lastReviewSummary(): string | null {
-    if (this.acceptedPaths.length === 0 && this.rejectedPaths.length === 0 && this.partiallyRejectedPaths.length === 0) return null;
+    if (this.acceptedPaths.length === 0 && this.rejectedPaths.length === 0 && this.partiallyRejectedPaths.length === 0 && this.revertedToAcceptedPaths.length === 0) return null;
     const parts: string[] = [];
     if (this.acceptedPaths.length > 0) parts.push(`Accepted: ${this.acceptedPaths.join(", ")}.`);
     if (this.rejectedPaths.length > 0) {
@@ -882,6 +895,11 @@ export class ReviewGate {
     const partial = this.partiallyRejectedPaths.filter((p) => !this.rejectedPaths.includes(p));
     if (partial.length > 0) {
       parts.push(`Partially rejected (some hunks reverted on disk, do not redo them unless asked): ${partial.join(", ")}.`);
+    }
+    // §66: the user kept the version they had accepted and rejected what came after it.
+    const back = this.revertedToAcceptedPaths.filter((p) => !this.rejectedPaths.includes(p));
+    if (back.length > 0) {
+      parts.push(`Later changes rejected (reverted on disk to the version the user accepted earlier, do not redo them unless asked): ${back.join(", ")}.`);
     }
     return "[Review gate] " + parts.join(" ");
   }
@@ -953,11 +971,12 @@ export class ReviewGate {
     if (!this.isAnsweringReview && !this.isRequestingChanges) this.completeRound();
     // `keepSummary`: a slash command (`/compact`, §27) must start with "/" — the summary waits for the next real message.
     const summary = keepSummary ? null : this.lastReviewSummary;
-    const taken = summary === null ? null : { accepted: this.acceptedPaths, rejected: this.rejectedPaths, partial: this.partiallyRejectedPaths };
+    const taken = summary === null ? null : { accepted: this.acceptedPaths, rejected: this.rejectedPaths, partial: this.partiallyRejectedPaths, toAccepted: this.revertedToAcceptedPaths };
     if (summary !== null) {
       this.acceptedPaths = [];
       this.rejectedPaths = [];
       this.partiallyRejectedPaths = [];
+      this.revertedToAcceptedPaths = [];
     }
     // A question during a review: the unsent notes go along as context ("메모 반영해줘"); they stay unsent.
     const unsent = this.isAnsweringReview && !keepSummary ? this.reviewNotes.filter((n) => !n.sent) : [];
@@ -974,11 +993,12 @@ export class ReviewGate {
    * path decided again since (in any current list) drops out of `taken`, so it is never both Accepted and Rejected.
    */
   restoreSummary(taken: SummaryPaths): void {
-    const newer = new Set([...this.acceptedPaths, ...this.rejectedPaths, ...this.partiallyRejectedPaths]);
+    const newer = new Set([...this.acceptedPaths, ...this.rejectedPaths, ...this.partiallyRejectedPaths, ...this.revertedToAcceptedPaths]);
     const merge = (a: string[], b: string[]): string[] => [...new Set([...a.filter((p) => !newer.has(p)), ...b])];
     this.acceptedPaths = merge(taken.accepted, this.acceptedPaths);
     this.rejectedPaths = merge(taken.rejected, this.rejectedPaths);
     this.partiallyRejectedPaths = merge(taken.partial, this.partiallyRejectedPaths);
+    this.revertedToAcceptedPaths = merge(taken.toAccepted ?? [], this.revertedToAcceptedPaths);
     this.onChange();
   }
 
@@ -1251,7 +1271,10 @@ export class ReviewGate {
       if (!this.acceptedPaths.includes(path)) this.acceptedPaths.push(path);
       setVerdict(this.round, path, "accepted");
       // §34.1: B now is the file's accepted tree ("수락 이후"); accepting again clears "changed after accept".
-      if (this.reviewEndTree !== null) this.acceptedTrees.set(path, this.reviewEndTree);
+      if (this.reviewEndTree !== null) {
+        this.acceptedTrees.set(path, this.reviewEndTree);
+        this.acceptedAt.set(path, this.acceptedNow()); // §66
+      }
       delete f.changedSinceAccepted;
     }
     this.onChange();
@@ -1272,6 +1295,7 @@ export class ReviewGate {
       this.acceptedPaths = this.acceptedPaths.filter((p) => p !== path);
       this.acceptedPatchHashes.delete(path);
       this.acceptedTrees.delete(path);
+      this.acceptedAt.delete(path); // §66
       this.acceptedDuringTurn.delete(path); // M28 (§34.2): an accept during the turn undone before its collection
       setVerdict(this.round, path, "pending");
     }
@@ -1282,24 +1306,28 @@ export class ReviewGate {
    * Reverts pending `paths` one by one (each success re-snapshots B and drops the file from the list);
    * the first failure stops the batch and is thrown. Non-pending paths are skipped.
    */
-  async reject(paths: string[], force = false): Promise<void> {
+  async reject(paths: string[], force = false, to: RejectTarget = "accepted"): Promise<void> {
     if (this.reverting) return;
     this.reverting = true;
     try {
-      const files: ChangedFile[] = [];
+      const all: ChangedFile[] = [];
       for (const path of paths) {
         const f = this.changedFiles.find((x) => x.path === path && x.state === "pending");
-        if (f && !files.includes(f)) files.push(f);
+        if (f && !all.includes(f)) all.push(f);
       }
       // §32: a file whose content was not captured cannot be put back — refused for the batch, force or not.
-      const uncaptured = files.filter((f) => f.uncaptured).map((f) => f.path);
+      const uncaptured = all.filter((f) => f.uncaptured).map((f) => f.path);
       if (uncaptured.length > 0) throw new CommandRefused(`not_captured:${uncaptured.join(", ")}`, { code: "not_captured", paths: uncaptured });
+      // §66: a file with an `acceptedBase` goes back to what the user accepted (unless `to: "round"`); the rest to A.
+      const toAccepted = to === "round" ? [] : all.filter((f) => this.acceptedBaseOf(f) !== undefined);
+      const files = all.filter((f) => !toAccepted.includes(f));
       // Checked for the whole batch before anything is written: each revert re-snapshots B, which would
       // silently absorb the user's edits to the files still waiting in the batch.
       if (!force) {
-        const edited = await this.editedSinceReview(files);
+        const edited = [...(await this.editedSinceReview(files)), ...(await this.editedSinceAccepted(this.requireCheckpoint(), toAccepted))];
         if (edited.length > 0) throw new CommandRefused(`file_changed_since_review:${edited.join(", ")}`, { code: "file_changed_since_review", paths: edited });
       }
+      for (const f of toAccepted) await this.revertToAccepted(f);
       if (files.length > 1) await this.revertBatch(files); // MARK: wave4b w4b-bigturn (§39.1)
       else for (const f of files) await this.revert(f);
     } finally {
@@ -1453,27 +1481,33 @@ export class ReviewGate {
     const end = this.turnEndTree;
     if (start === null || end === null) throw new CommandRefused("no_review");
     if (expectedEndTree !== null && expectedEndTree !== end) throw new CommandRefused("stale_diff");
-    // §34.1: hunk ids of a range other than A → B (`since`) are not this diff's ids.
-    if (expectedBaseTree !== null && expectedBaseTree !== start) throw new CommandRefused("stale_diff");
     const file = this.changedFiles.find((f) => f.path === path);
+    // §66: the ids come from A → B or, for a file with an `acceptedBase`, from its since-accepted diff (absent: its default).
+    const accepted = file ? (this.acceptedBaseOf(file) ?? null) : null;
+    // §34.1: hunk ids of another range (`turn`, `request`) are not this diff's ids.
+    if (expectedBaseTree !== null && expectedBaseTree !== start && expectedBaseTree !== accepted?.tree) throw new CommandRefused("stale_diff");
     if (!file) throw new CommandRefused(`not_a_changed_file:${path}`);
     if (file.state !== "pending") throw new CommandRefused(`not_pending:${path}`);
+    const base = expectedBaseTree ?? accepted?.tree ?? start;
+    const sinceAccepted = base !== start;
     if (file.uncaptured) throw new CommandRefused("partial_reject_unsupported:uncaptured");
     if (file.isBinary) throw new CommandRefused("binary_file");
-    if (file.status !== "M") throw new CommandRefused(`partial_reject_unsupported:${file.status}`);
+    const status = sinceAccepted ? accepted!.status : file.status;
+    if (status !== "M") throw new CommandRefused(`partial_reject_unsupported:${status}`);
     // The splice rewrites a regular file's bytes: a symlink's target or a submodule's commit is not
     // text on disk, and a mode-only change has no hunks to pick — all of them go through `reject`.
-    const [modeA, modeB] = await Promise.all([cp.treeMode(start, path), cp.treeMode(end, path)]);
+    const [modeA, modeB] = await Promise.all([cp.treeMode(base, path), cp.treeMode(end, path)]);
     if (modeA === "120000" || modeB === "120000") throw new CommandRefused("partial_reject_unsupported:symlink");
     if (modeA === "160000" || modeB === "160000") throw new CommandRefused("partial_reject_unsupported:submodule");
-    if (modeA !== modeB && (await cp.blobId(start, path)) === (await cp.blobId(end, path))) throw new CommandRefused("partial_reject_unsupported:mode");
+    if (modeA !== modeB && (await cp.blobId(base, path)) === (await cp.blobId(end, path))) throw new CommandRefused("partial_reject_unsupported:mode");
     const ids = [...new Set(hunkIds)];
     if (ids.length === 0) throw new CommandRefused("no_hunks");
-    const diff = parseUnifiedDiff(await cp.patch(start, end, file.path, file.oldPath));
+    // The same patch `diffFor` / `diffRange` parse, so the ids are the ones the client showed.
+    const diff = parseUnifiedDiff(sinceAccepted ? await cp.patch(base, end, file.path) : await cp.patch(start, end, file.path, file.oldPath));
     if (diff.isBinary) throw new CommandRefused("binary_file");
     for (const id of ids) if (!Number.isInteger(id) || !diff.hunks.some((h) => h.id === id)) throw new CommandRefused(`unknown_hunk:${id}`);
     if (ids.length === diff.hunks.length) {
-      await this.reject([path]);
+      await this.reject([path], false, sinceAccepted ? "accepted" : "round");
       return "whole";
     }
     this.reverting = true;
@@ -1481,7 +1515,7 @@ export class ReviewGate {
     try {
       const [reviewed, onDisk] = await Promise.all([cp.blobId(end, path), cp.worktreeBlobId(path)]);
       if (reviewed === null || onDisk !== reviewed) throw new CommandRefused(`file_changed_since_review:${path}`);
-      const [oldContent, newContent] = await Promise.all([cp.fileContent(path, start), cp.fileContent(path, end)]);
+      const [oldContent, newContent] = await Promise.all([cp.fileContent(path, base), cp.fileContent(path, end)]);
       let content: Buffer;
       try {
         content = revertHunks(oldContent, newContent, diff.hunks, new Set(ids));
@@ -1496,6 +1530,11 @@ export class ReviewGate {
         throw new Error(`Failed to revert hunks of ${path}: ${errorMessage(e)}`);
       }
       this.noteRejected(file); // MARK: wave4c w4c-trust (§41.2)
+      // §66: the kept hunks cancelled out — the file is its accepted content again.
+      if (sinceAccepted && (await cp.blobId(this.turnEndTree, path)) === accepted!.blob) {
+        await this.settleAccepted(cp, file, start, end);
+        return "whole";
+      }
       const now = (await cp.changes(start, this.turnEndTree)).find((f) => f.path === path);
       this.diffCache = new Map();
       if (!now) {
@@ -1818,6 +1857,7 @@ export class ReviewGate {
       const hash = hashes.get(f.path);
       if (hash !== undefined) this.acceptedPatchHashes.set(f.path, hash);
       this.acceptedTrees.set(f.path, held);
+      this.acceptedAt.set(f.path, this.acceptedNow()); // §66
       this.acceptedDuringTurn.add(f.path);
       setVerdict(this.round, f.path, "accepted");
     }
@@ -1934,6 +1974,132 @@ export class ReviewGate {
     return { ...shown, endTree: end, baseTree: base, stale: end !== this.turnEndTree };
   }
 
+  // §66 — since accepted
+
+  /** §66: when an accept happens now — the time and the collected turn whose result (B) it takes. */
+  private acceptedNow(): AcceptedAt {
+    return { at: new Date().toISOString(), turn: this.lastTurnChanges?.turn ?? null };
+  }
+
+  /**
+   * §66: what was accepted of `f` while a later turn's change of it waits (`changedSinceAccepted`, not accepted again), with
+   * the round's lines (A → B) — the file's `added` / `deleted` in `state` are `sinceAdded` / `sinceDeleted`. Undefined
+   * otherwise, and while the recorded lines belong to another B than `reviewEndTree` (a mark always means its range answers).
+   */
+  acceptedBaseOf(f: ChangedFile): (AcceptedBase & { sinceAdded: number; sinceDeleted: number }) | undefined {
+    if (!f.changedSinceAccepted || f.state === "accepted") return undefined;
+    const b = this.acceptedBases.get(f.path);
+    if (!b || this.acceptedTrees.get(f.path) !== b.tree || b.end !== this.reviewEndTree) return undefined;
+    const at = this.acceptedAt.get(f.path);
+    return {
+      blob: b.blob, tree: b.tree, at: at?.at ?? null, turn: at?.turn ?? null, status: b.status,
+      roundAdded: f.added, roundDeleted: f.deleted, sinceAdded: b.added, sinceDeleted: b.deleted,
+    };
+  }
+
+  /** §66: `select_file` / `full_file` without `since`: `accepted` for a file with an `acceptedBase`, else `review`. */
+  defaultSince(path: string): DiffSince {
+    const f = this.changedFiles.find((x) => x.path === path);
+    return f && this.acceptedBaseOf(f) ? "accepted" : "review";
+  }
+
+  /**
+   * §66 (from `followB`): for every listed file a later turn changed after its accept, the accepted entry (blob, or none: a
+   * tombstone) and its lines accepted tree → `to`, one diff per accepted tree. Best effort: a git failure leaves those files
+   * without an `acceptedBase` (their default range is `review` again).
+   */
+  private async followAccepted(cp: GitCheckpoint, files: readonly ChangedFile[], to: string): Promise<void> {
+    const byTree = new Map<string, ChangedFile[]>();
+    for (const f of files) {
+      const tree = this.acceptedTrees.get(f.path);
+      if (!f.changedSinceAccepted || f.state === "accepted" || tree === undefined) continue;
+      byTree.set(tree, [...(byTree.get(tree) ?? []), f]);
+    }
+    this.acceptedBases = new Map();
+    for (const [tree, list] of byTree) {
+      try {
+        const [blobs, changes] = await Promise.all([treeEntryIds(cp, tree, list.map((f) => f.path)), cp.changes(tree, to)]);
+        const byPath = new Map(changes.map((c) => [c.path, c]));
+        for (const f of list) {
+          const blob = blobs.get(f.path) ?? null;
+          const c = byPath.get(f.path);
+          const status = blob === null ? "A" : f.status === "D" ? "D" : "M";
+          this.acceptedBases.set(f.path, { tree, end: to, blob, status, added: c?.added ?? 0, deleted: c?.deleted ?? 0 });
+        }
+      } catch {
+        // those files show the whole round until the next B change
+      }
+    }
+  }
+
+  /**
+   * §66: the files among `files` (each with an `acceptedBase`) whose revert to the accepted content would destroy what the user
+   * wrote after the review was collected: on disk is neither the reviewed B nor already the accepted content.
+   */
+  private async editedSinceAccepted(cp: GitCheckpoint, files: readonly ChangedFile[]): Promise<string[]> {
+    const end = this.turnEndTree;
+    if (end === null) return [];
+    const edited: string[] = [];
+    for (const f of files) {
+      const tree = this.acceptedTrees.get(f.path)!;
+      const reviewed = this.restoredFrom?.paths.has(f.path) ? this.restoredFrom.tree : end;
+      for (const p of f.oldPath && f.oldPath !== f.path ? [f.path, f.oldPath] : [f.path]) {
+        if ((await cp.worktreeMatches(reviewed, p)) || (await cp.worktreeMatches(tree, p))) continue;
+        edited.push(f.path);
+        break;
+      }
+    }
+    return edited;
+  }
+
+  /**
+   * §66 `reject` of a file with an `acceptedBase`: the content the user accepted goes back on disk (removed when it was
+   * deleted then), B is re-snapshotted and the file is `accepted` again with its accepted tree — what Claude changed after the
+   * accept is gone. The summary prefix says so ("Later changes rejected …"). No single-file undo (§41.2) for it.
+   */
+  private async revertToAccepted(file: ChangedFile): Promise<void> {
+    const cp = this.requireCheckpoint();
+    const start = this.turnStartTree;
+    const tree = this.acceptedTrees.get(file.path);
+    if (start === null || tree === undefined) throw new Error("no accepted tree");
+    const proposal = this.turnEndTree;
+    this.lastReject = null;
+    try {
+      for (const p of file.oldPath && file.oldPath !== file.path ? [file.path, file.oldPath] : [file.path]) {
+        const there = (await cp.treeMode(tree, p)) !== null;
+        await cp.revert({ path: p, oldPath: null, status: there ? "M" : "A" }, tree);
+      }
+      this.turnEndTree = await cp.snapshot(this.ignorePatterns());
+    } catch (e) {
+      throw new Error(`Failed to revert ${file.path}: ${errorMessage(e)}`);
+    }
+    this.noteRejected(file); // MARK: wave4c w4c-trust (§41.2)
+    await this.settleAccepted(cp, file, start, proposal);
+  }
+
+  /** §66: `file` is back at its accepted content on the new B: `accepted` again (dropped when that content is A's). */
+  private async settleAccepted(cp: GitCheckpoint, file: ChangedFile, start: string, proposal: string | null): Promise<void> {
+    const end = this.turnEndTree!;
+    const now = (await cp.changes(start, end)).find((f) => f.path === file.path);
+    this.diffCache = new Map();
+    if (!now) {
+      this.changedFiles = this.changedFiles.filter((f) => f.path !== file.path);
+      this.dropNotesOf(file.path);
+    } else {
+      Object.assign(file, { status: now.status, oldPath: now.oldPath, added: now.added, deleted: now.deleted, isBinary: now.isBinary });
+      file.state = "accepted";
+      delete file.changedSinceAccepted;
+      await recheckWhitespaceOnly(cp, file, start, end);
+    }
+    if (!this.revertedToAcceptedPaths.includes(file.path)) this.revertedToAcceptedPaths.push(file.path);
+    setVerdict(this.round, file.path, "accepted");
+    this.trackRound(null);
+    if (this.round) this.round.turnEndTree = end;
+    await this.followB(cp, this.changedFiles, proposal, end);
+    this.completeRoundIfResolved();
+    this.onChange();
+  }
+
   /** §34.4: the round in progress as a history entry (`inProgress`, `endedAt` = `updatedAt`, B = `reviewEndTree`); null without one. */
   roundInProgress(updatedAt: string | null): ReviewHistoryEntry | null {
     const round = this.round;
@@ -2009,6 +2175,8 @@ export class ReviewGate {
     const paths = files.map((f) => f.path);
     const listed = new Set(paths);
     for (const p of [...this.acceptedTrees.keys()]) if (!listed.has(p)) this.acceptedTrees.delete(p);
+    for (const p of [...this.acceptedAt.keys()]) if (!this.acceptedTrees.has(p)) this.acceptedAt.delete(p); // §66
+    await this.followAccepted(cp, files, to);
     try {
       const now = await treeEntryIds(cp, to, paths);
       const asked = this.requestTree !== null ? await treeEntryIds(cp, this.requestTree, paths) : null;
@@ -2079,6 +2247,7 @@ export class ReviewGate {
       lastRequest: this.lastRequest ? { ...this.lastRequest } : null,
       lastTurnChanges: this.lastTurnChanges ? { ...this.lastTurnChanges } : null,
       acceptedTrees: Object.fromEntries(this.acceptedTrees),
+      acceptedAt: Object.fromEntries([...this.acceptedAt].filter(([p]) => this.acceptedTrees.has(p))), // §66
     };
   }
 
@@ -2102,6 +2271,7 @@ export class ReviewGate {
       this.lastTurnChanges = this.turnBaseTree !== null && r.lastTurnChanges ? { ...r.lastTurnChanges } : null;
       const listed = new Set(this.changedFiles.map((f) => f.path));
       for (const [path, tree] of Object.entries(r.acceptedTrees)) if (listed.has(path) && (await kept(tree)) !== null) this.acceptedTrees.set(path, tree);
+      for (const [path, at] of Object.entries(r.acceptedAt ?? {})) if (this.acceptedTrees.has(path)) this.acceptedAt.set(path, { ...at }); // §66
     }
     // A mark whose range is gone (a pruned tree, a file written before §34) would offer a diff that is refused.
     for (const f of this.changedFiles) {
@@ -2123,6 +2293,8 @@ export class ReviewGate {
     this.requestTree = null;
     this.lastRequest = null;
     this.acceptedTrees = new Map();
+    this.acceptedAt = new Map(); // §66
+    this.acceptedBases = new Map();
     this.acceptedDuringTurn = new Set();
     this.requestUndo = null;
     this.rangeCache = new Map();
@@ -2148,6 +2320,7 @@ export class ReviewGate {
       requestTree: this.requestTree,
       lastRequest: this.lastRequest,
       acceptedTrees: new Map(this.acceptedTrees),
+      acceptedAt: new Map(this.acceptedAt), // §66
       acceptedDuringTurn: new Set(this.acceptedDuringTurn),
       requestUndo: this.requestUndo,
       rangeCache: this.rangeCache,
@@ -2161,6 +2334,8 @@ export class ReviewGate {
     this.requestTree = r.requestTree;
     this.lastRequest = r.lastRequest;
     this.acceptedTrees = r.acceptedTrees;
+    this.acceptedAt = r.acceptedAt; // §66
+    this.acceptedBases = new Map();
     this.acceptedDuringTurn = r.acceptedDuringTurn;
     this.requestUndo = r.requestUndo;
     this.rangeCache = r.rangeCache;
@@ -2222,6 +2397,7 @@ export class ReviewGate {
       delete f.autoAccepted;
       this.acceptedPaths = this.acceptedPaths.filter((p) => p !== f.path);
       this.acceptedTrees.delete(f.path);
+      this.acceptedAt.delete(f.path); // §66
       this.acceptedPatchHashes.delete(f.path);
       const rf = this.round?.files.find((x) => x.path === f.path);
       if (rf) {
@@ -2375,6 +2551,7 @@ type RangeState = {
   requestTree: string | null;
   lastRequest: ReviewRequestInfo | null;
   acceptedTrees: Map<string, string>;
+  acceptedAt: Map<string, AcceptedAt>; // §66
   acceptedDuringTurn: Set<string>;
   requestUndo: { sent: string[]; requestTree: string | null; lastRequest: ReviewRequestInfo | null; changedSinceRequest: string[] } | null;
   rangeCache: Map<string, FileDiff>;

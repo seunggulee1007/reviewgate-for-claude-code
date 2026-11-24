@@ -108,6 +108,10 @@ extension AppState {
     /// its old-side numbers A's (§34.1) — parts are reverted, and old lines noted, from it.
     public var showsWholeReview: Bool { selectedDiffSince == .review }
 
+    /// §66: the selected diff's hunk ids are `reject_hunks` ids for `file` — the whole review, or the since-accepted view of
+    /// a file with an `acceptedBase`.
+    public func showsHunkRejectRange(for file: ChangedFile) -> Bool { file.allowsHunkReject(in: selectedDiffSince) }
+
     /// Shows `file`'s diff in its range: from the cache of (path, range, B), else `select_file{path, since}` — answered
     /// from the held B while a turn runs. Without a B the diff of that range shown before stays (read-only).
     func loadSelectedDiff(_ file: ChangedFile) {
@@ -133,7 +137,7 @@ extension AppState {
         let path = file.path
         diffLoadTask = Task {
             do {
-                let event = try await typedReply(.selectFile(path: path, since: since.wire))
+                let event = try await typedReply(.selectFile(path: path, since: since.wire(for: file)))
                 guard case let .fileDiff(_, _, _, diff, truncated, endTree, info) = event else {
                     throw EngineClientError.unexpectedReply(String(describing: event))
                 }
@@ -163,8 +167,11 @@ extension AppState {
     }
 
     /// The cached whole-review diff of `path` on the current B (what hunk ids and side-question anchors refer to).
-    func wholeReviewDiff(path: String) -> ReviewDiffEntry? {
-        reviewTree.flatMap { reviewDiffs[ReviewDiffKey(path: path, since: .review, tree: $0)] }
+    func wholeReviewDiff(path: String) -> ReviewDiffEntry? { reviewDiff(path: path, since: .review) }
+
+    /// The cached diff of `path` in `since` on the current B (§66: the since-accepted one's hunk ids are `reject_hunks` ids).
+    func reviewDiff(path: String, since: DiffSince) -> ReviewDiffEntry? {
+        reviewTree.flatMap { reviewDiffs[ReviewDiffKey(path: path, since: since, tree: $0)] }
     }
 
     /// Typed replies (`file_diff`, `full_file_content`, `review_history`, …) through the test seam or the engine.

@@ -63,6 +63,8 @@ final class WindowModel {
     // MARK: wave1 mac-review
     /// §31.5: the "Finish review" confirmation (the Changes header button, Review → Finish Review…).
     var showFinishReview = false
+    /// accept-baseline (§66): the file whose "라운드 시작으로 되돌리기" waits for its confirm.
+    var roundRejectPath: String?
     // MARK: wave1 mac-session
     /// §33.4: the branch the New Workbench sheet starts with (a blocked EnterWorktree's name); nil = empty.
     var newWorkbenchBranch: String?

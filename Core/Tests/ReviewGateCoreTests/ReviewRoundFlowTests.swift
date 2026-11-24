@@ -239,6 +239,8 @@ import Testing
         let decided = file("c.ts", .accepted) { $0.changedSinceAccepted = true }
         #expect(ReviewRange.defaultRange(for: decided, gate: gate) == .review)
         #expect(DiffSince.review.wire == nil && DiffSince.accepted.wire == .accepted)
+        #expect(DiffSince.review.wire(for: file("a.ts")) == nil)
+        #expect(DiffSince.review.wire(for: file("a.ts") { $0.changedSinceAccepted = true }) == .review)
     }
 
     @Test func theDiffOpensInItsRangeAndCachesPerRange() async {
@@ -256,7 +258,8 @@ import Testing
 
         app.setDiffRange(.review, for: a)
         await app.diffLoadTask?.value
-        #expect(engine.asked.last == .selectFile(path: "a.ts", since: nil))
+        // §66: the engine's default for a file changed after its accept is "since accepted" — the whole review by name.
+        #expect(engine.asked.last == .selectFile(path: "a.ts", since: .review))
         #expect(app.selectedDiffSince == .review && shownLabel(app) == "review@B1" && app.showsWholeReview)
         app.setDiffRange(.accepted, for: a)
         await app.diffLoadTask?.value

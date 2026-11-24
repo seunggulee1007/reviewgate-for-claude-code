@@ -119,6 +119,7 @@ import type {
 import { isPeerInboundMode, isPermissionMode, MAX_PLAN_BYTES, PLAN_INTO, PROTOCOL_VERSION } from "./protocol.js";
 import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
+import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
 import { withFileMeta } from "./diff/fileMeta.js"; // MARK: wave4b w4b-files
@@ -1278,7 +1279,7 @@ export class ReviewEngine {
           return;
         }
         this.guardReviewMutation();
-        await this.reject(cmd.paths, cmd.force === true);
+        await this.reject(cmd.paths, cmd.force === true, cmd.to === "round" ? "round" : "accepted"); // §66 `to`
         this.autoRetry = "rejected"; // MARK: wave5 w5-model (§43.4)
         return;
       case "reject_all": {
@@ -1325,10 +1326,10 @@ export class ReviewEngine {
         this.touch();
         return;
       case "select_file": {
-        // §34.1 / §34.2: any range, also while a turn runs (from the held B: `stale`).
-        const since = sinceOf(cmd.since);
+        // §34.1 / §34.2: any range, also while a turn runs (from the held B: `stale`). §66: no `since` = the file's default.
+        const since = sinceOf(cmd.since) ?? this.gate.defaultSince(cmd.path);
         const { diff, truncated, endTree, baseTree, stale } = await this.gate.diffRange(cmd.path, since);
-        const ev: FileDiffEvent = { type: "file_diff", scope: "turn", path: cmd.path, diff, truncated, endTree, ...(since !== "review" ? { since } : {}), baseTree, ...(stale ? { stale: true as const } : {}) };
+        const ev: FileDiffEvent = { type: "file_diff", scope: "turn", path: cmd.path, diff, truncated, endTree, ...(this.echoSince(cmd.path, since) ? { since } : {}), baseTree, ...(stale ? { stale: true as const } : {}) };
         // MARK: wave4b w4b-files — §40.2: a binary's sizes (and its modes / similarity, which no patch named).
         ev.diff = await withFileMeta(this.gate.checkpoint, this.gate.changedFiles.find((f) => f.path === cmd.path), diff, { baseTree, endTree, review: since === "review" });
         // MARK: wave4c w4c-review — §41.3: the same range with whitespace ignored (read-only: its hunks are not A's hunks).
@@ -1336,7 +1337,7 @@ export class ReviewEngine {
         return ev;
       }
       case "full_file": {
-        const since = sinceOf(cmd.since);
+        const since = sinceOf(cmd.since) ?? this.gate.defaultSince(cmd.path); // §66
         const view = await this.gate.fullFile(cmd.path, since);
         const ev: FullFileContentEvent = {
           type: "full_file_content",
@@ -1348,7 +1349,7 @@ export class ReviewEngine {
           isTooLarge: view.isTooLarge,
           oldText: view.oldText,
           newText: view.newText,
-          ...(since !== "review" ? { since } : {}),
+          ...(this.echoSince(cmd.path, since) ? { since } : {}),
           ...(view.stale ? { stale: true as const } : {}),
           endTree: view.endTree,
         };
@@ -5013,11 +5014,11 @@ export class ReviewEngine {
    * `reject` / `reject_all`: refused with `file_changed_since_review` (`paths`: every such file, nothing reverted)
    * when the user edited a file after the review was collected, unless `force`. A git failure emits `error{scope:"git"}`.
    */
-  private async reject(paths: string[], force = false): Promise<void> {
+  private async reject(paths: string[], force = false, to: RejectTarget = "accepted"): Promise<void> {
     if (this.gate.reverting) throw new CommandRefused("reverting");
     // MARK: r1-git — §46: a file Claude committed is reverted on disk like any other; its commit stays — a row says so.
     const committed = this.gate.changedFiles.filter((f) => f.committedIn && paths.includes(f.path)).map((f) => `${f.path} (${f.committedIn})`);
-    const run = this.gate.reject(paths, force);
+    const run = this.gate.reject(paths, force, to);
     this.touch();
     try {
       await run;
@@ -5034,6 +5035,14 @@ export class ReviewEngine {
       this.notice(`Reverted on disk; Claude's commit still holds the change (git reset --soft or git revert undoes it): ${detail}`, "session", { code: "reject_committed", detail });
     }
     this.touch();
+  }
+
+  /**
+   * §34.1 / §66: whether a `file_diff` / `full_file_content` reply names its range — every range but `review`, and `review`
+   * too for a file with an `acceptedBase` (its default is `accepted`, so the reply says which base it used).
+   */
+  private echoSince(path: string, since: DiffSince): boolean {
+    return since !== "review" || this.gate.defaultSince(path) === "accepted";
   }
 
   /** `reject_hunks` (§17): refusals are `result{ok:false}` only; a git failure also emits `error{scope:"git"}`. */

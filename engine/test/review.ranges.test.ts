@@ -24,9 +24,10 @@ function patch(...hunks: string[]): ReturnType<typeof parseUnifiedDiff> {
 }
 
 describe("sinceOf (§34.1)", () => {
-  it("absent / null is review; the four ranges pass; anything else is invalid_since", () => {
-    expect(sinceOf(undefined)).toBe("review");
-    expect(sinceOf(null)).toBe("review");
+  it("absent / null is the file's default (null, §66); the four ranges pass, round is review; anything else is invalid_since", () => {
+    expect(sinceOf(undefined)).toBeNull();
+    expect(sinceOf(null)).toBeNull();
+    expect(sinceOf("round")).toBe("review");
     for (const s of ["review", "turn", "request", "accepted"] as const) expect(sinceOf(s)).toBe(s);
     for (const bad of ["last_turn", "", 3, {}]) {
       let thrown: unknown;
@@ -177,6 +178,7 @@ describe("parsePersistedRanges (review file, §34.1)", () => {
         lastRequest: { turn: 3, at: "2026-10-23T00:00:00.000Z", notes: 2 },
         lastTurnChanges: { turn: 3, files: 1, added: 2, deleted: "x" },
         acceptedTrees: { "a.txt": "t2", "b.txt": 7 },
+        acceptedAt: { "a.txt": { at: "2026-10-23T00:00:00.000Z", turn: 2 }, "b.txt": { at: 7 }, "c.txt": { at: "x", turn: "y" } },
       }),
     ).toEqual({
       turnBaseTree: "t1",
@@ -185,6 +187,7 @@ describe("parsePersistedRanges (review file, §34.1)", () => {
       lastRequest: { turn: 3, at: "2026-10-23T00:00:00.000Z", notes: 2 },
       lastTurnChanges: null,
       acceptedTrees: { "a.txt": "t2" },
+      acceptedAt: { "a.txt": { at: "2026-10-23T00:00:00.000Z", turn: 2 }, "c.txt": { at: "x", turn: null } },
     });
   });
 });
