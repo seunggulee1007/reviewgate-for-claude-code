@@ -1233,7 +1233,7 @@ variable to a falsy value (`??=` keeps their value).
   ended the subagent's whole run, so it is told the call was not run and to finish without it and report what was left
   undone (`UNPROMPTED_AGENT_REASON`).
 - **Notice.** Each denied call is logged (`log{level:"warn"}`); the first one of an episode raises a non-fatal
-  `error{fatal:false, scope:"session"}` with the message `Claude가 요청 없이 작업을 시도해 차단했습니다. (…)` — the
+  `error{fatal:false, scope:"session"}` with the message `Claude가 요청 없이 작업을 시도해 차단했어요. (…)` — the
   client's existing error banner. The episode ends with the CLI's own `result` or the next send; a later unprompted
   turn raises the banner again. Exception (§29): an unprompted turn that is a peer message the CLI delivered by itself
   raises no banner — its `peer_message{unprompted: true}` card says what happened (the denials are still logged).

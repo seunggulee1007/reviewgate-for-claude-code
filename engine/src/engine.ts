@@ -425,7 +425,7 @@ export const EXTENSIONS_AUTO_RETRY_MS = 5000;
 /** MARK: wave3 engine-session — §36.9: a CLI conversation id as `cli_session_import` takes it (the CLI's are uuids). */
 const CLI_SESSION_ID_RE = /^[A-Za-z0-9-]{1,128}$/;
 /** Banner (scope session) when Claude Code tried to act without a request and the guard blocked it (§18). */
-export const UNPROMPTED_NOTICE = "Claude가 요청 없이 작업을 시도해 차단했습니다. (Claude Code continued on its own without a request; its changes were blocked and nothing was modified.)";
+export const UNPROMPTED_NOTICE = "Claude가 요청 없이 작업을 시도해 차단했어요. (Claude Code continued on its own without a request; its changes were blocked and nothing was modified.)";
 // MARK: wave4d w4d-peers — §42.2: the session's `--name` (the CLI keeps 64 code points of a peer name) and the least of the
 // chat's title worth adding after `ReviewGate · <project>`.
 const PEER_NAME_MAX = 64;
