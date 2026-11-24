@@ -102,15 +102,22 @@ struct ErrorTranscriptRow: View {
         }
     }
 
-    /// §64: a call denied while files wait for the review — [리뷰 열기] while one still waits.
+    /// §64: a call denied while files wait for the review — [리뷰 열기] and [이번 턴만 허용] while one still waits.
     @ViewBuilder
     private var reviewFirstActions: some View {
         if ReviewFirstText.isRowOnly(info.code), store.hasPendingReview {
-            Button(ReviewFirstText.openReviewTitle) { store.openReviewFirstWaiting() }
-                .controlSize(.small)
-                .help(ReviewFirstText.openReviewHelp)
-                .accessibilityIdentifier("Open review from review-first row")
-                .padding(.top, 2)
+            HStack(spacing: 6) {
+                Button(ReviewFirstText.openReviewTitle) { store.openReviewFirstWaiting() }
+                    .help(ReviewFirstText.openReviewHelp)
+                    .accessibilityIdentifier("Open review from review-first row")
+                let blocker = store.reviewFirstAllowTurnBlocker
+                Button(ReviewFirstText.allowTurnTitle) { store.allowReviewFirstThisTurn() }
+                    .disabled(blocker != nil)
+                    .help(blocker ?? ReviewFirstText.allowTurnHelp)
+                    .accessibilityIdentifier("Allow this turn from review-first row")
+            }
+            .controlSize(.small)
+            .padding(.top, 2)
         }
     }
 

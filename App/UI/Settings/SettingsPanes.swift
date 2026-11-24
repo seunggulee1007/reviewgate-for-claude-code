@@ -324,7 +324,8 @@ struct ReviewSettingsPane: View {
 
     var body: some View {
         Form {
-            // §64: Claude's next work waits for the review — edits blocked by default, prompts too, or neither.
+            // §64: Claude's next work waits for the review — only the files under review may change (default), nothing and
+            // no prompt either, or neither.
             Section("Review first") {
                 Picker(selection: $reviewFirst) {
                     ForEach(ReviewFirstMode.allCases, id: \.self) { mode in

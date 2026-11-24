@@ -139,7 +139,7 @@ import { cliSessionExists, cliSessionFile, cliSessionGone, codeOfStartFailure, S
 import { rememberKeys, type ReadOnlyContext } from "./session/bashClass.js";
 import { isExploreCall, markExplore } from "./session/explore.js"; // MARK: wave4b w4b-tabs (§39.2)
 import { autoAllowReason, EDIT_TOOLS_MATCHER } from "./session/hooks.js";
-import { reviewFirstContext, reviewFirstMode, reviewFirstPromptDecision, reviewFirstWaiting } from "./session/reviewFirst.js"; // §64
+import { reviewFirstContext, reviewFirstFixable, reviewFirstMode, reviewFirstPromptDecision, reviewFirstWaiting, type ReviewFirstHold } from "./session/reviewFirst.js"; // §64
 import { readOnlyContext, scopeNoticeMessage } from "./session/reviewScope.js";
 import { skillAllowedTools, slashCommandName } from "./session/skillTools.js"; // MARK: r2-skills-side (§33.5, M20)
 import { classifyRules, loadPermissionRules, matchesToolPattern, rememberable, sessionUserRules, userRuleAllows, type LoadedRules, type UserRules } from "./session/permissionRules.js";
@@ -600,6 +600,8 @@ export class ReviewEngine {
   private reviewFirstBlocked: { turn: number; count: number } | null = null;
   /** §64: the turn whose Request changes went to Claude at a terminal Stop (§57.14) — it may edit for the rest of it. */
   private reviewFirstRequestTurn: number | null = null;
+  /** §64: the turn the user allowed with "이번 턴만 허용" (`review_first_allow_turn`) — over when it ends. */
+  private reviewFirstAllowTurn: number | null = null;
   /** What the running turn handed to `sessionUser` (message + snapshot A), for the init-timeout resend (§16). */
   private turnSent: TurnMessage | null = null;
   /** The CLI produced something for the running turn (session_info, text, a tool call…): it did receive the message. */
@@ -1254,6 +1256,12 @@ export class ReviewEngine {
         return;
       case "accept_all":
         await this.acceptFiles(null);
+        return;
+      case "review_first_allow_turn": // §64 "이번 턴만 허용"
+        if (!this.gate.running) throw new CommandRefused("no_turn", { code: "no_turn" });
+        this.reviewFirstAllowTurn = this.turn;
+        this.log("info", `review first: the user allowed turn ${this.turn}`);
+        this.touch();
         return;
       case "unaccept":
         // M28 (§34.2): like `accept`, also while a turn runs on a standing review (the undo of an accept made then).
@@ -2897,7 +2905,7 @@ export class ReviewEngine {
       ...(meta.cliConfigDir ? { configDir: meta.cliConfigDir } : {}), // §57.16
       scratchDirs: defaultScratchDirs(),
       reviewPaths: () => this.pathsUnderReview(), // MARK: terminal-guard (§57.8)
-      reviewFirst: () => this.reviewFirstWaitingNow(), // §64
+      reviewFirst: () => this.reviewFirstHoldNow(), // §64
       // §57.14: the notes go with the running turn's Stop (marked sent with it); back when the answer never went out.
       // §64: that turn is a change request from then on — it may edit.
       stopFeedback: (q) => {
@@ -3274,7 +3282,7 @@ export class ReviewEngine {
         const { summary, notes } = sendParts;
         taken = sendParts.taken;
         // §64: files still wait — Claude knows the rule before it tries.
-        const rule = reviewWaiting && !command ? reviewFirstContext(reviewWaiting) : null;
+        const rule = reviewWaiting && !command ? reviewFirstContext(this.reviewFirstModeNow(), reviewWaiting) : null;
         parts = [summary, rule, notes].filter((p): p is string => p !== null);
       }
       // §54: the budget Claude was told in this terminal changed (it was told none at first) — said with the prompt.
@@ -4090,7 +4098,7 @@ export class ReviewEngine {
         // MARK: wave4d w4d-peers — §42.2: whom a SendMessage address reaches (the registry, only read).
         resolvePeer: (address) => peerAtAddress({ configDir: claudeConfigDir(this.childEnv()), address }),
         reviewPaths: () => this.pathsUnderReview(), // MARK: r1-git (§46)
-        reviewFirst: () => this.reviewFirstWaitingNow(), // §64
+        reviewFirst: () => this.reviewFirstHoldNow(), // §64
         skillAllowedTools: (name, since) => this.skillAllowedTools(name, since), // MARK: r2-skills-side (§33.5, M20)
       });
       this.session = session;
@@ -4318,7 +4326,7 @@ export class ReviewEngine {
     // §64: files still wait (a question during a review) — Claude knows the rule before it tries; read before `beginSend`.
     const waiting = opts.command === true ? null : this.reviewFirstWaitingNow();
     let outgoing = this.gate.beginSend(trimmed, opts.command === true);
-    if (waiting) outgoing = `${reviewFirstContext(waiting)}\n\n${outgoing}`;
+    if (waiting) outgoing = `${reviewFirstContext(this.reviewFirstModeNow(), waiting)}\n\n${outgoing}`;
     // MARK: wave4 w4-longwork — daily-18: a budget Claude was not told about yet goes in front of the message.
     const budgetNote = opts.command === true ? null : budgetChangeNote(this.toldBudget, this.settings.budget);
     if (budgetNote) outgoing = `${budgetNote}\n\n${outgoing}`;
@@ -4764,13 +4772,26 @@ export class ReviewEngine {
     return reviewFirstWaiting(this.reviewFirstModeNow(), { files: this.gate.changedFiles, requestingChanges: requesting });
   }
 
+  /** §64: the user allowed the running turn ("이번 턴만 허용") — over once it ends (the next turn has another number). */
+  private reviewFirstAllowedNow(): boolean {
+    return this.reviewFirstAllowTurn === this.turn && this.gate.running;
+  }
+
+  /** §64: what the PreToolUse hooks hold Claude back with now (null: nothing) — read at every call. */
+  private reviewFirstHoldNow(): ReviewFirstHold | null {
+    const mode = this.reviewFirstModeNow();
+    const waiting = this.reviewFirstWaitingNow();
+    if (mode === "off" || !waiting || this.reviewFirstAllowedNow()) return null;
+    return { mode, waiting, fixable: reviewFirstFixable(this.gate.changedFiles), root: this.gate.checkpoint?.root ?? null };
+  }
+
   /** §64: `gate.reviewFirst` — while the rule holds Claude back. */
   private reviewFirstSlice(): ReviewFirstState | null {
     const mode = this.reviewFirstModeNow();
     const waiting = this.reviewFirstWaitingNow();
     if (mode === "off" || !waiting) return null;
     const b = this.reviewFirstBlocked;
-    return { mode, waiting: waiting.length, blocked: b && b.turn === this.turn ? b.count : 0 };
+    return { mode, waiting: waiting.length, blocked: b && b.turn === this.turn ? b.count : 0, ...(this.reviewFirstAllowedNow() ? { allowedThisTurn: true as const } : {}) };
   }
 
   /** §64: a call the rule denied — a quiet row once per turn ("리뷰 대기 중이라 수정을 막았어요"), the count in `gate.reviewFirst`. */
@@ -9894,6 +9915,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_end_turn":
     case "terminal_request_cancel": // §57.14
     case "terminal_permission_response": // §57.15
+    case "review_first_allow_turn": // §64
       return "session";
     case "side_ask":
     case "side_list":

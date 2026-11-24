@@ -450,8 +450,8 @@ describe("§27 compact / context warning, §28 interrupt", () => {
     expect(h.session().interrupts).toBe(1);
     expect(h.ofType("turn_end").at(-1)!.stopReason).toBe("interrupted");
     await queued;
-    // §64: the interrupted turn's file waits for the review — the next message says so (questions only until then).
-    expect(h.session().sends.map((s) => s.text)).toEqual(["long job", "[Review gate] 1 file awaits review; questions only until then.\n\ndo this instead"]);
+    // §64: the interrupted turn's file waits for the review — the next message says so.
+    expect(h.session().sends.map((s) => s.text)).toEqual(["long job", "[Review gate] 1 file awaits review. Fixing it is fine; other changes wait until the user reviewed it.\n\ndo this instead"]);
     expect(h.engine.state.changedFiles.map((f) => f.path)).toEqual(["README.md"]);
   });
 });

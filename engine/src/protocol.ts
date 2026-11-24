@@ -427,8 +427,8 @@ export type Settings = {
   terminalPermissionBridge?: boolean;
   /**
    * §64: Claude's next work waits for the review — `edits` (default; absent or unknown too): while files from a finished
-   * turn are pending / changes requested, a call that changes files is denied; `prompts`: a new prompt is refused too;
-   * `off`: neither (a send is a question that may edit, §3). Live.
+   * turn are pending / changes requested, only the files under review may be edited (Bash runs); `prompts`: every call
+   * that changes files is denied and a new prompt is refused; `off`: neither (a send is a question that may edit, §3). Live.
    */
   reviewFirst?: ReviewFirstMode;
 };
@@ -440,6 +440,8 @@ export type ReviewFirstState = {
   waiting: number;
   /** Calls it denied in the current (or, between turns, the last) turn. */
   blocked: number;
+  /** The user lifted it for the running turn (`review_first_allow_turn`); absent otherwise. */
+  allowedThisTurn?: true;
 };
 
 // ---------------------------------------------------------------- §34 review round 2
@@ -691,6 +693,8 @@ export type EngineCommand =
   | Cmd<"accept", { paths: string[] }>
   | Cmd<"unaccept", { paths: string[] }> // accepted → pending again (nothing on disk changes)
   | Cmd<"accept_all">
+  /** §64: "Allow for this turn" — the review-first rule lets Claude's calls through until the running turn ends; refused `no_turn`. */
+  | Cmd<"review_first_allow_turn">
   /** `force: true` reverts even files the user edited after the review was collected (otherwise refused `file_changed_since_review`). */
   /** §66 `to`: a file with an `acceptedBase` goes back to the accepted content (default) or to A (`round`); others always to A. */
   | Cmd<"reject", { paths: string[]; force?: boolean; to?: RejectTarget }>

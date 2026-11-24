@@ -139,6 +139,10 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(forwardsToRenderer({ type: "result", id: "r2", ok: true } as EngineEvent)).toBe(true);
   });
 
+  it("§64: allows [이번 턴만 허용] (review_first_allow_turn)", () => {
+    expect(validateCommand({ type: "review_first_allow_turn" }).ok).toBe(true);
+  });
+
   it("allows what the renderer sends: unaccept (Accept all's Undo) and the live changes of a running turn (§34.6)", () => {
     for (const type of ["unaccept", "live_changes", "live_diff"]) expect(validateCommand({ type }).ok).toBe(true);
   });

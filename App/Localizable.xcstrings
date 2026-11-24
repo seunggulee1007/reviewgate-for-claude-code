@@ -5713,6 +5713,22 @@
         }
       }
     },
+    "Only files under review (default)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only files under review (default)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 중인 파일만 고치기 (기본)"
+          }
+        }
+      }
+    },
     "Only the start of a long file": {
       "localizations": {
         "en": {
@@ -6289,6 +6305,38 @@
         }
       }
     },
+    "Until you accept or reject Claude's changes, it may fix the files under review — when you ask in the chat or send Request changes — but its edits to other files wait; Bash commands run. In chats and in terminal chats; a blocked edit's row can allow the rest of that turn. Block prompts too: every change and a new message wait until the review is done (Accept & Send accepts first). Turn off: a message during a review may change any file, as before.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Until you accept or reject Claude's changes, it may fix the files under review — when you ask in the chat or send Request changes — but its edits to other files wait; Bash commands run. In chats and in terminal chats; a blocked edit's row can allow the rest of that turn. Block prompts too: every change and a new message wait until the review is done (Accept & Send accepts first). Turn off: a message during a review may change any file, as before."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 바꾼 파일을 수락하거나 거절하기 전까지, 리뷰 중인 파일은 채팅으로 부탁하거나 변경 요청을 보내서 고칠 수 있어요. 다른 파일 수정은 리뷰가 끝날 때까지 기다리고, Bash 명령은 그대로 실행돼요. 채팅과 터미널 채팅 모두 같고, 수정이 막혔다는 줄에서 그 턴만 허용할 수도 있어요. 프롬프트까지 막기: 리뷰가 끝날 때까지 모든 수정과 새 메시지가 기다려요(수락 후 보내기는 먼저 수락해요). 끄기: 리뷰 중에 보낸 메시지로도 예전처럼 어떤 파일이든 바꿀 수 있어요."
+          }
+        }
+      }
+    },
+    "Until you accept or reject these files, Claude may fix them but not change other files (Settings › Review).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Until you accept or reject these files, Claude may fix them but not change other files (Settings › Review)."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 파일들을 수락하거나 거절하기 전까지 Claude는 이 파일들만 고치고 다른 파일은 바꾸지 않아요(설정 › 리뷰)."
+          }
+        }
+      }
+    },
     "Where %@ is declared (F12)": {
       "localizations": {
         "en": {
@@ -6333,22 +6381,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "파일 목록과 터미널 사이에 열려요"
-          }
-        }
-      }
-    },
-    "Block edits (default)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Block edits (default)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "수정 막기(기본)"
           }
         }
       }
@@ -17619,38 +17651,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "입력과 채팅"
-          }
-        }
-      }
-    },
-    "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Until you accept or reject Claude's changes, it can answer questions, read and plan, but its edits and commands that change files are blocked — in chats and in terminal chats. Block prompts too: a new message waits until the review is done (Accept & Send accepts first). Turn off: a message during a review may change files, as before."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Claude가 바꾼 파일을 수락하거나 거절하기 전까지 Claude는 질문에 답하고 읽고 계획만 세울 수 있고, 파일을 바꾸는 수정과 명령은 막혀요 — 채팅에서도 터미널 채팅에서도요. 프롬프트까지 막기: 리뷰가 끝날 때까지 새 메시지도 기다려요(수락 후 보내기는 먼저 수락해요). 끄기: 리뷰 중에 보낸 메시지로도 예전처럼 파일을 바꿀 수 있어요."
-          }
-        }
-      }
-    },
-    "Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review).": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Until you accept or reject these files, Claude answers and reads but does not change files (Settings › Review)."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이 파일들을 수락하거나 거절하기 전까지 Claude는 답하고 읽기만 하고 파일은 바꾸지 않아요(설정 › 리뷰)."
           }
         }
       }

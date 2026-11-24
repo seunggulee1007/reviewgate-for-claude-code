@@ -13,7 +13,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { openCheckpoint } from "../git/checkpoint.js";
 import { normalizeForCompare } from "../platform/paths.js";
 import { isReadOnlyCommand } from "./bashClass.js";
-import { reviewFirstToolDecision } from "./reviewFirst.js";
+import { reviewFirstToolDecision, type ReviewFirstHold } from "./reviewFirst.js";
 import { BudgetState } from "./budget.js";
 import type { ClaudeSessionLike } from "./claude.js";
 import type { SessionEvent, SessionLog, ToolFileEntry } from "./events.js";
@@ -76,8 +76,8 @@ export type TerminalSessionOptions = {
   permissionBridge?: () => boolean;
   /** §57.8: repo-relative paths still under review (the guard's §46 check: a checkout over them throws work away). */
   reviewPaths?: () => ReadonlySet<string>;
-  /** §64: the paths the review-first rule waits on now (null: nothing holds Claude back). */
-  reviewFirst?: () => readonly string[] | null;
+  /** §64: what the review-first rule holds Claude back with now (null: nothing). */
+  reviewFirst?: () => ReviewFirstHold | null;
   emit: (ev: SessionEvent) => void;
   log: SessionLog;
   /** Test seams. */
@@ -671,17 +671,17 @@ export class TerminalSession implements ClaudeSessionLike, TerminalHookHandler {
     return guard ? preToolAnswer(guard) : {};
   }
 
-  /** §64: the review-first deny for this call (null: the rule lets it go on). A command that only reads still runs. */
+  /** §64: the review-first deny for this call (null: the rule lets it go on). */
   private async reviewFirstDeny(input: Record<string, unknown>): Promise<HookOutput | null> {
-    const waiting = this.opts.reviewFirst?.() ?? null;
-    if (!waiting) return null;
+    const hold = this.opts.reviewFirst?.() ?? null;
+    if (!hold) return null;
     const tool = str(input.tool_name) ?? "";
     const ti = input.tool_input && typeof input.tool_input === "object" ? (input.tool_input as Record<string, unknown>) : {};
     const cwd = str(input.cwd) ?? this.opts.cwd;
     const file = EDIT_TOOLS_RE.test(tool) ? toolFile(ti, cwd) : undefined;
-    const ro = tool === "Bash" ? await readOnlyContextOf(this.ctx, cwd).catch(() => undefined) : undefined;
+    const ro = tool === "Bash" && hold.mode === "prompts" ? await readOnlyContextOf(this.ctx, cwd).catch(() => undefined) : undefined;
     const exempt = (f: string): boolean => isPlanFile(f, this.ctx) || isClaudeMemoryFile(f);
-    const reason = reviewFirstToolDecision(waiting, tool, ti, { ...(file ? { file } : {}), exempt, ...(ro ? { ro } : {}) });
+    const reason = reviewFirstToolDecision(hold, tool, ti, { ...(file ? { file } : {}), exempt, ...(ro ? { ro } : {}) });
     if (!reason) return null;
     this.opts.emit({ type: "review_first_denied", toolName: tool });
     return preToolAnswer({ decision: "deny", reason });
