@@ -34,6 +34,8 @@ final class ComposerModel {
     var mcpIndex = 0
     /// A refused paste / drop / attachment, shown above the composer for a few seconds.
     var notice: String?
+    /// §67.1: a line that something worked ("디렉터리를 추가했어요 …"), shown like `notice` without its warning.
+    var infoNotice: String?
     /// §56.5: a typed built-in to run (`ComposerSlashHooks`) and the card it shows over the box (`ComposerSlashSlot`).
     var slashRequest: SlashRequest?
     var slashCard: SlashCard?
@@ -333,6 +335,20 @@ struct ChatComposer: View {
                 .transition(.opacity)
                 .accessibilityIdentifier("Composer notice")
             }
+            if let info = composer.infoNotice {
+                HStack(alignment: .top, spacing: 6) {
+                    Label(info, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button { composer.infoNotice = nil } label: { Image(systemName: "xmark").font(.caption2.weight(.semibold)) }
+                        .buttonStyle(.icon)
+                        .help("Close")
+                        .accessibilityLabel(Text("Close the notice"))
+                }
+                .transition(.opacity)
+                .accessibilityIdentifier("Composer info notice")
+            }
             ComposerBtwSlot()   // §56.1: the /btw answer, over the box
             ComposerSlashSlot(composer: composer)   // §56.5: /status, or a built-in only the terminal has
             ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
@@ -539,6 +555,11 @@ struct ChatComposer: View {
             guard let notice = composer.notice, !notice.contains("\n") else { return }   // polish P4-composer-17: several lines stay
             try? await Task.sleep(for: .seconds(6))
             if !Task.isCancelled { composer.notice = nil }
+        }
+        .task(id: composer.infoNotice) {   // §67.1
+            guard composer.infoNotice != nil else { return }
+            try? await Task.sleep(for: .seconds(6))
+            if !Task.isCancelled { composer.infoNotice = nil }
         }
     }
 
@@ -1214,8 +1235,15 @@ struct ChatComposer: View {
 
     private var inputBox: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !composer.mentions.isEmpty || !composer.images.isEmpty {
-                ComposerChipsRow(mentions: $composer.mentions, images: $composer.images)
+            // §67.1: the chat's added directories lead the chip row.
+            let showsDirs = !store.addedDirs.isEmpty && store.viewingChat == nil && !store.isTerminalChat
+            if showsDirs || !composer.mentions.isEmpty || !composer.images.isEmpty {
+                HStack(spacing: 6) {
+                    if showsDirs { AddedDirsChip(composer: composer) }
+                    if !composer.mentions.isEmpty || !composer.images.isEmpty {
+                        ComposerChipsRow(mentions: $composer.mentions, images: $composer.images)
+                    }
+                }
             }
             HStack(alignment: .bottom, spacing: 4) {
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,

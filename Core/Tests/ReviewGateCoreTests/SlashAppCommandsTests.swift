@@ -16,7 +16,7 @@ import Testing
         let expected: [String: SlashAppCommand] = [
             "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/cost": .cost,
             "/permissions": .permissions, "/agents": .agents, "/memory": .memory, "/config": .config, "/help": .help,
-            "/status": .status, "/exit": .exit, "/rename": .rename,
+            "/status": .status, "/exit": .exit, "/rename": .rename, "/add-dir": .addDir(""),
         ]
         for (text, command) in expected { #expect(SlashAppCommand.parse(text, entries: []) == command, "\(text)") }
         #expect(Set(SlashAppCommand.names) == Set(expected.keys.map { String($0.dropFirst()) }))
@@ -39,7 +39,24 @@ import Testing
     @Test func terminalOnlyBuiltinsAreNotSent() {
         #expect(SlashAppCommand.parse("/hooks", entries: []) == .terminalOnly("hooks"))
         #expect(SlashAppCommand.parse("/vim", entries: []) == .terminalOnly("vim"))
-        #expect(SlashAppCommand.parse("/add-dir ../other", entries: []) == .terminalOnly("add-dir"))
+        #expect(!SlashAppCommand.terminalOnly.contains("add-dir"))   // §67.1: the app's own now
+    }
+
+    /// §67.1: `/add-dir <path>` keeps the path as typed (case, spaces, quotes — the engine resolves them).
+    @Test func addDirTakesItsPath() {
+        #expect(SlashAppCommand.parse("/add-dir ../other", entries: []) == .addDir("../other"))
+        #expect(SlashAppCommand.parse("  /add-dir   ~/Work/Shared Lib  ", entries: []) == .addDir("~/Work/Shared Lib"))
+        #expect(SlashAppCommand.parse(#"/ADD-DIR "/work/acme lib""#, entries: []) == .addDir(#""/work/acme lib""#))
+        #expect(SlashAppCommand.parse("/add-dir", entries: []) == .addDir(""))
+        #expect(SlashAppCommand.parse("/add-dirx", entries: []) == nil)
+        #expect(SlashAppCommand.parse("/add-dir a\nb", entries: []) == nil)
+        #expect(SlashAppCommand.parse("/add-dir ../x", entries: [SlashCommandEntry(name: "add-dir", group: .project)]) == nil)
+        let entries = SlashCommandCatalog.entries(caps([SlashCommandInfo(name: "add-dir", description: "Add a new working directory", source: .builtin)]),
+                                                  offersAppCommands: true)
+        let entry = entries.first { $0.name == "add-dir" }
+        #expect(entry?.description == AddDirText.description)
+        #expect(entry?.argumentHint == "[path]")
+        #expect(entry?.group == .builtin)
     }
 
     @Test func everythingElseGoesToClaudeAsBefore() {

@@ -2513,6 +2513,22 @@
         }
       }
     },
+    "Add Directory…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Directory…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디렉터리 추가…"
+          }
+        }
+      }
+    },
     "Add in Settings…": {
       "localizations": {
         "en": {
@@ -2541,6 +2557,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트의 실행 명령에 추가해요"
+          }
+        }
+      }
+    },
+    "Added Directories": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added Directories"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추가한 디렉터리"
           }
         }
       }
@@ -5345,6 +5377,22 @@
         }
       }
     },
+    "Choose another directory Claude may work in (/add-dir)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another directory Claude may work in (/add-dir)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 일할 디렉터리를 하나 더 골라요 (/add-dir)"
+          }
+        }
+      }
+    },
     "Close the peek": {
       "localizations": {
         "en": {
@@ -6077,6 +6125,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조 — 이름이 쓰인 곳 (이름에서 ⇧F12); F4 / ⇧F4 로 하나씩 열어요"
+          }
+        }
+      }
+    },
+    "Remove the directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the directory"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디렉터리 빼기"
+          }
+        }
+      }
+    },
+    "Remove this directory — from your next message Claude no longer works there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this directory — from your next message Claude no longer works there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 디렉터리를 빼요 — 다음 메시지부터 Claude가 여기서 일하지 않아요"
           }
         }
       }
