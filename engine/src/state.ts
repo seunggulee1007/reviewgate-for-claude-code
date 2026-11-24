@@ -316,6 +316,7 @@ export function buildState(s: EngineSlices): ReviewState {
       prereviews: structuredClone(g.prereviews),
       ...rejectUndoField(g), // MARK: wave4c w4c-trust (§41.2)
       reviewFirst: s.reviewFirst ? { ...s.reviewFirst } : null, // §64
+      untoldDecisions: g.untoldDecisions, // §58.1
     },
     changedFiles: g.changedFiles.map((f) => ({
       ...f,

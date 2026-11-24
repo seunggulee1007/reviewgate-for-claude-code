@@ -1261,7 +1261,15 @@ export type GateState = {
   rejectUndo?: RejectUndoState;
   /** §64: the review-first rule while it holds Claude back; null when it does not (off, nothing waits, a change request runs). */
   reviewFirst?: ReviewFirstState | null;
+  /**
+   * §58.1: the decisions `lastReviewSummary` will tell Claude with the next message — files accepted, and files rejected
+   * (whole, some hunks, or later changes back to the accepted version) since the last message; null when there are none.
+   */
+  untoldDecisions?: UntoldDecisions | null;
 };
+
+/** §58.1: what the next message's review summary reports (`gate.untoldDecisions`). */
+export type UntoldDecisions = { accepted: number; rejected: number };
 
 /** §32: which parts of `.claude/settings.local.json` the turn changed (a file created / deleted counts for every part it has). */
 export type LocalSettingsChange = { path: string; hooks: boolean; permissions: boolean; env: boolean; mcp: boolean };

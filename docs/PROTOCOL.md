@@ -212,6 +212,7 @@ type ReviewState = {
     isRequestingChanges: boolean;
     turnStartTree: string | null; turnEndTree: string | null;   // snapshot A / B (git tree SHAs)
     lastReviewSummary: string | null;            // the "[Review gate] Accepted: …" prefix that the next send will use
+    untoldDecisions?: { accepted: number; rejected: number } | null;   // §58.1: what lastReviewSummary reports, counted (rejected: whole, some hunks, later changes back to the accepted version; a path once); null: nothing to tell
     changedOutside: string[];                    // absolute paths of edits outside the checkpoint root — or inside a nested repository under it (§33.3) — the user approved this turn (§8; not in changedFiles)
     ignoredTouched: string[];                    // repo-relative paths the turn's edit tools wrote that are gitignored (invisible to the snapshot; §8)
     filteredByPattern: string[];                 // repo-relative changed paths hidden from changedFiles by settings.ignorePatterns (§8)

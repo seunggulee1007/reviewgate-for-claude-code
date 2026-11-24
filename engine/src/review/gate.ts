@@ -904,6 +904,13 @@ export class ReviewGate {
     return "[Review gate] " + parts.join(" ");
   }
 
+  /** §58.1: what `lastReviewSummary` reports, counted — a file in several reject lists counts once; null: nothing to tell. */
+  get untoldDecisions(): { accepted: number; rejected: number } | null {
+    const rejected = new Set([...this.rejectedPaths, ...this.partiallyRejectedPaths, ...this.revertedToAcceptedPaths]).size;
+    if (this.acceptedPaths.length === 0 && rejected === 0) return null;
+    return { accepted: this.acceptedPaths.length, rejected };
+  }
+
   /** §34.4: the file's unsent notes (`sentNoteCount` counts the ones `request_changes` already sent). */
   noteCount(path: string): number {
     return this.reviewNotes.reduce((n, note) => (note.path === path && !note.sent ? n + 1 : n), 0);

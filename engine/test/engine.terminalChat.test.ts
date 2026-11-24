@@ -196,6 +196,32 @@ describe("terminal chats (§57)", () => {
     expect(r.h.engine.state.session.terminal?.promptId).toBe("p2");
   });
 
+  it("§58.1 Continue: files accepted and rejected one by one reach Claude Code with the pasted Continue. prompt", async () => {
+    const r = await rig();
+    const id = await newTerminal(r);
+    const s = await spec(r, id);
+    await r.h.engine.handle({ type: "terminal_started", sessionId: id, pid: 4243 });
+    expect(await hook(s, ups("p1", "two notes"))).toEqual({});
+    for (const file of ["a.txt", "b.txt"]) {
+      write(r.dir, file, `note ${file}\n`);
+      expect(await hook(s, { hook_event_name: "PreToolUse", ...write_(file, `w-${file}`) })).toEqual({});
+      await hook(s, { hook_event_name: "PostToolUse", ...write_(file, `w-${file}`), tool_response: { type: "create", filePath: join(r.dir, file) } });
+    }
+    expect(await hook(s, { hook_event_name: "Stop", stop_hook_active: false })).toEqual({});
+    await r.h.waitFor((st) => st.gate.phase === "reviewing" && st.changedFiles.length === 2, "two files collected");
+
+    await r.h.engine.handle({ type: "accept", paths: ["a.txt"] });
+    await r.h.engine.handle({ type: "reject", paths: ["b.txt"] });
+    expect(r.h.engine.state.gate.pendingCount).toBe(0);
+    expect(r.h.engine.state.gate.untoldDecisions).toEqual({ accepted: 1, rejected: 1 });
+
+    const next = await hook(s, ups("p2", "Continue."));
+    const context = String((next.hookSpecificOutput as { additionalContext: string }).additionalContext);
+    expect(context).toContain("[Review gate] Accepted: a.txt. Rejected (reverted on disk, do not redo unless asked): b.txt.");
+    expect(r.h.engine.state.gate.untoldDecisions).toBeNull();
+    expect(r.h.engine.state.session.terminal?.promptId).toBe("p2");
+  });
+
   it("refusals: chat-only commands (terminal_chat), another chat (terminal_not_current)", async () => {
     const r = await rig();
     const id = await newTerminal(r);

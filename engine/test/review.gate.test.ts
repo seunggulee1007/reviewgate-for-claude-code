@@ -198,6 +198,55 @@ describe("ReviewEngine review gate", () => {
     expect(h.session().sends[1]!.checkpointTree).not.toBe(h.session().sends[0]!.checkpointTree);
   });
 
+  it("§58.1 Continue: files decided one by one (accepted and rejected) all reach Claude with the next Continue.", async () => {
+    const dir = track(makeRepo());
+    const h = harness();
+    await openAndSend(h, dir);
+    write(dir, "README.md", "changed\n");
+    write(dir, "other.txt", "other changed\n");
+    write(dir, "new.txt", "brand new\n");
+    await endTurn(h, { toolFiles: ["README.md", "other.txt", "new.txt"].map((f, i) => ({ path: join(dir, f), tools: ["Write"], count: 1, toolUseIds: [`w${i}`] })) });
+    expect(h.engine.state.gate.untoldDecisions).toBeNull();
+
+    await h.engine.handle({ type: "accept", paths: ["other.txt"] });
+    expect(h.engine.state.gate.untoldDecisions).toEqual({ accepted: 1, rejected: 0 });
+    await h.engine.handle({ type: "reject", paths: ["new.txt"] });
+    await h.engine.handle({ type: "reject", paths: ["README.md"] });
+    const s = h.engine.state;
+    expect(s.gate.pendingCount).toBe(0);
+    expect(s.gate.canSend).toBe(true);
+    expect(s.gate.untoldDecisions).toEqual({ accepted: 1, rejected: 2 });
+
+    // "계속하기": a plain send of "Continue." — nothing pending, the decisions go in front of it.
+    await h.engine.handle({ type: "send", text: "Continue." });
+    expect(h.session().sends[1]!.text).toBe(
+      "[Review gate] Accepted: other.txt. Rejected (reverted on disk, do not redo unless asked): new.txt, README.md.\n\nContinue.",
+    );
+    expect(h.engine.state.gate.untoldDecisions).toBeNull();
+    expect(h.engine.state.gate.lastReviewSummary).toBeNull();
+  });
+
+  it("§58.1 Continue, leave the rest pending: the decisions so far go along, the undecided files stay in the review", async () => {
+    const dir = track(makeRepo());
+    const h = harness();
+    await openAndSend(h, dir);
+    write(dir, "README.md", "changed\n");
+    write(dir, "other.txt", "other changed\n");
+    write(dir, "new.txt", "brand new\n");
+    await endTurn(h, { toolFiles: ["README.md", "other.txt", "new.txt"].map((f, i) => ({ path: join(dir, f), tools: ["Write"], count: 1, toolUseIds: [`w${i}`] })) });
+    await h.engine.handle({ type: "accept", paths: ["other.txt"] });
+    await h.engine.handle({ type: "reject", paths: ["new.txt"] });
+    expect(h.engine.state.gate.untoldDecisions).toEqual({ accepted: 1, rejected: 1 });
+
+    await h.engine.handle({ type: "send", text: "Continue." });
+    const text = h.session().sends[1]!.text;
+    expect(text).toContain("[Review gate] Accepted: other.txt. Rejected (reverted on disk, do not redo unless asked): new.txt.");
+    expect(text.endsWith("Continue.")).toBe(true);
+    // An answer turn: README.md is still pending, nothing was accepted by the send.
+    expect(h.engine.state.changedFiles.find((f) => f.path === "README.md")?.state).toBe("pending");
+    expect(h.engine.state.gate.untoldDecisions).toBeNull();
+  });
+
   it("accept_all opens the gate; accepted files stay on disk", async () => {
     const dir = track(makeRepo());
     const h = harness();

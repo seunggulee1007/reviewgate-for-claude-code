@@ -130,6 +130,10 @@ describe("§66 since accepted", () => {
     );
     const history = await h.engine.request({ type: "review_history" });
     expect(history.current?.files.find((x) => x.path === "new.ts")?.verdict).toBe("accepted");
+    // §58.1: counted as a reject; with Svc.java accepted after it, Continue tells Claude both.
+    expect(h.engine.state.gate.untoldDecisions).toEqual({ accepted: 0, rejected: 1 });
+    await h.engine.request({ type: "accept", paths: ["Svc.java"] });
+    expect(h.engine.state.gate.untoldDecisions).toEqual({ accepted: 1, rejected: 1 });
 
     // The explicit round reject: back to A (new.ts did not exist), out of the list.
     const dir2 = makeRepo();
