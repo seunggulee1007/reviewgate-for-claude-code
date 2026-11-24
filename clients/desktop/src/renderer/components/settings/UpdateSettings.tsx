@@ -82,7 +82,7 @@ export function UpdateSettingsSection({ settings, patch }: { settings: AppSettin
         <input type="checkbox" checked={settings.autoCheckUpdates !== false} onChange={(e) => patch({ autoCheckUpdates: e.target.checked })} data-testid="Check for updates automatically" />
         {t("Check for updates automatically")}
       </label>
-      <div className="note">{t("At launch and every 6 hours ReviewGate asks GitHub for the latest release. Nothing is installed until you click Install and Restart.")}</div>
+      <div className="note">{t("At launch, every 6 hours, and when you come back to ReviewGate after an hour, ReviewGate asks GitHub for the latest release. Nothing is installed until you click Install and Restart.")}</div>
       {status && <UpdateSettingsView status={status} actions={updateActions(() => void window.rg.openUpdate?.())} checkNow={() => void window.rg.checkUpdatesNow?.()} />}
     </section>
   );

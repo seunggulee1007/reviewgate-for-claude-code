@@ -2,12 +2,14 @@
  * §48 Windows: a release is published with the Mac's DMG first and CI attaches the Windows installer and its `.sha256`
  * some 10–15 minutes later. A check in that window finds the release without them, so [Install and Restart] is off; this
  * looks again every 3 minutes for at most an hour from the first miss (then the 6-hour schedule goes on), on a window's
- * focus when the miss is older than 3 minutes, and at once from [Check Again] (not twice within a few seconds).
+ * focus when the miss is older than 3 minutes (and, for any last check older than an hour, on a focus), and at once from [Check Again] (not twice within a few seconds).
  * Electron-free: main passes the check and the "Check for updates automatically" setting (src/main/update.ts).
  */
 
 export const RECHECK_EVERY_MS = 3 * 60 * 1000;
 export const RECHECK_FOR_MS = 60 * 60 * 1000;
+/** Coming back to a window after the last check is this old looks again, next to the 6-hour `CHECK_EVERY_MS` (update.ts). */
+export const FOCUS_CHECK_AFTER_MS = 60 * 60 * 1000;
 /** [Check Again] right after a check does nothing. */
 export const CHECK_AGAIN_MIN_MS = 5_000;
 
@@ -50,9 +52,15 @@ export class InstallerRecheck {
     return this.missing !== null && this.deps.now() - this.missing.since < RECHECK_FOR_MS && this.deps.auto();
   }
 
-  /** A window came to the front: a miss older than 3 minutes is looked up again. */
+  /**
+   * A window came to the front: a miss older than 3 minutes is looked up again, and any last check (done or failed)
+   * older than an hour is renewed. Before the first check nothing (the launch check is coming). A check already running
+   * is joined by `check` itself, so there is never a second one.
+   */
   focused(): void {
-    if (this.missing && this.deps.auto() && this.deps.now() - this.lastAt >= RECHECK_EVERY_MS) this.deps.check();
+    if (!this.deps.auto() || this.lastAt === Number.NEGATIVE_INFINITY) return;
+    const age = this.deps.now() - this.lastAt;
+    if ((this.missing && age >= RECHECK_EVERY_MS) || age >= FOCUS_CHECK_AFTER_MS) this.deps.check();
   }
 
   /** [Check Again]: a check now, unless one ended a moment ago. */

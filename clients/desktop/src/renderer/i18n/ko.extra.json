@@ -1135,7 +1135,7 @@
   "This is ReviewGate {0}.": "지금 버전은 ReviewGate {0}이에요.",
   "Asks GitHub for the latest release now": "지금 GitHub에 최신 릴리스를 물어봐요",
   "Last checked {0} — {1}": "마지막 확인 {0} — {1}",
-  "At launch and every 6 hours ReviewGate asks GitHub for the latest release. Nothing is installed until you click Install and Restart.": "앱을 켤 때와 6시간마다 GitHub에 최신 릴리스를 물어봐요. [설치하고 다시 시작]을 누르기 전에는 아무것도 설치하지 않아요.",
+  "At launch, every 6 hours, and when you come back to ReviewGate after an hour, ReviewGate asks GitHub for the latest release. Nothing is installed until you click Install and Restart.": "앱을 켤 때, 6시간마다, 그리고 1시간 넘게 지나 ReviewGate로 돌아올 때 GitHub에 최신 릴리스를 물어봐요. [설치하고 다시 시작]을 누르기 전에는 아무것도 설치하지 않아요.",
   "Track without git": "git 없이 추적",
   "Recommended": "추천",
   "ReviewGate keeps a hidden copy outside this folder to show what Claude changed. The folder itself is not touched; commit, branches, workbenches and PRs are off.": "ReviewGate가 이 폴더 밖에 숨은 사본을 두고 Claude가 바꾼 내용을 보여줘요. 폴더 자체는 건드리지 않아요. 커밋, 브랜치, 워크벤치, PR은 쓸 수 없어요.",

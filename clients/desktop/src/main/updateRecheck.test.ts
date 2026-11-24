@@ -2,7 +2,7 @@
 // hour from the first miss, stops once the installer is there, again on a window's focus when the miss is stale, and at
 // once from [Check Again] (not twice within a few seconds); nothing by itself while automatic checks are off.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHECK_AGAIN_MIN_MS, InstallerRecheck, RECHECK_EVERY_MS, RECHECK_FOR_MS } from "./updateRecheck";
+import { CHECK_AGAIN_MIN_MS, FOCUS_CHECK_AFTER_MS, InstallerRecheck, RECHECK_EVERY_MS, RECHECK_FOR_MS } from "./updateRecheck";
 
 beforeEach(() => vi.useFakeTimers({ now: 0 }));
 afterEach(() => vi.useRealTimers());
@@ -99,5 +99,28 @@ describe("looking again for the Windows installer (§48 Windows)", () => {
     vi.setSystemTime(RECHECK_EVERY_MS * 5);
     h.r.focused();
     expect(h.checks()).toBe(3);
+  });
+
+  it("a focus an hour after the last check looks again, sooner or with automatic checks off does not", () => {
+    const h = harness();
+    h.setMissing(null);
+    h.r.focused(); // before the first check: the launch check is coming
+    expect(h.checks()).toBe(0);
+    h.r.checked(null);
+    vi.setSystemTime(FOCUS_CHECK_AFTER_MS - 1);
+    h.r.focused();
+    expect(h.checks()).toBe(0);
+    h.setAuto(false);
+    vi.setSystemTime(FOCUS_CHECK_AFTER_MS * 3);
+    h.r.focused();
+    expect(h.checks()).toBe(0);
+    h.setAuto(true);
+    h.r.focused();
+    expect(h.checks()).toBe(1);
+    h.r.focused(); // the check just ended: nothing again
+    expect(h.checks()).toBe(1);
+    vi.setSystemTime(FOCUS_CHECK_AFTER_MS * 4);
+    h.r.focused();
+    expect(h.checks()).toBe(2);
   });
 });
