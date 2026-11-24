@@ -1631,6 +1631,8 @@ public struct GateInfo: Codable, Sendable, Equatable {
     public var rejectUndo: RejectUndoInfo?
     /// §64: the review-first rule while it holds Claude back (nil: it does not, and on older engines).
     public var reviewFirst: ReviewFirstInfo?
+    /// §58.1: the decisions the next message tells Claude (nil: none, and on older engines — read `lastReviewSummary`).
+    public var untoldDecisions: UntoldDecisions?
 
     public init(phase: GatePhase, canSend: Bool, canRequestChanges: Bool, blockedReason: BlockedReason?, collectError: String?,
                 pendingCount: Int, changesRequestedCount: Int, isRequestingChanges: Bool, turnStartTree: String?,
@@ -1697,6 +1699,7 @@ public struct GateInfo: Codable, Sendable, Equatable {
         prereviews = Self.decodePreReviews(from: decoder)   // wave3 mac-flow (§36.13)
         rejectUndo = TrustWire.rejectUndo(from: decoder)   // MARK: wave4c w4c-trust (§41.2)
         reviewFirst = ReviewFirstWire.info(from: decoder)   // §64
+        untoldDecisions = UntoldDecisionsWire.info(from: decoder)   // §58.1
     }
 }
 

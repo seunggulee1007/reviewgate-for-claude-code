@@ -1617,6 +1617,22 @@
         }
       }
     },
+    "Accept %lld More & Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept %lld More & Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나머지 %lld개 수락하고 계속"
+          }
+        }
+      }
+    },
     "Accept All & Continue": {
       "localizations": {
         "en": {
@@ -5431,6 +5447,22 @@
         }
       }
     },
+    "Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계속하기"
+          }
+        }
+      }
+    },
     "Continue %@: %@": {
       "localizations": {
         "en": {
@@ -5475,6 +5507,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "풀리면 이어서 하기"
+          }
+        }
+      }
+    },
+    "Continue, Leave the Rest Pending": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue, Leave the Rest Pending"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "남은 파일은 그대로 두고 계속"
           }
         }
       }
@@ -7207,6 +7255,22 @@
         }
       }
     },
+    "Request changes (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request changes (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 요청 (%lld)"
+          }
+        }
+      }
+    },
     "Revert %@ to the start of the round?": {
       "localizations": {
         "en": {
@@ -7283,6 +7347,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "10초가 지나 검색을 멈췄어요"
+          }
+        }
+      }
+    },
+    "Settings › Review holds new messages until every file is accepted or rejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings › Review holds new messages until every file is accepted or rejected"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 › 리뷰에서 모든 파일을 수락하거나 거절할 때까지 새 메시지를 기다리게 했어요"
           }
         }
       }
@@ -7539,6 +7619,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@의 그 부분들이 디스크에서 수락한 내용으로 돌아가요. 파일의 나머지는 계속 리뷰 대상으로 남아요."
+          }
+        }
+      }
+    },
+    "Told Claude to continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Told Claude to continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 계속하라고 했어요"
+          }
+        }
+      }
+    },
+    "Told Claude to continue — %lld file(s) still wait for review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Told Claude to continue — %lld file(s) still wait for review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 계속하라고 했어요 — 파일 %lld개는 아직 리뷰를 기다려요"
           }
         }
       }
