@@ -590,7 +590,7 @@ struct ChatComposer: View {
                     }
                     if accept, continuesEmpty {
                         Button("Accept \(store.pendingFiles.count) & Continue") { acceptAndContinueTapped() }
-                            .keyboardShortcut(measuring ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
+                            .keyboardShortcut(measuring || !primaryAccepts ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
                             .help(acceptAndContinueHelp)
                             .accessibilityIdentifier("Accept and continue")
                     } else if accept {
@@ -633,7 +633,7 @@ struct ChatComposer: View {
                 // it) — no "accepted, go on" to type every turn. The menu holds the same item with its key.
                 Menu {
                     Button("Accept \(store.pendingFiles.count) & Continue") { acceptAndContinueTapped() }
-                        .keyboardShortcut(measuring ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
+                        .keyboardShortcut(measuring || !primaryAccepts ? nil : KeyboardShortcut(.return, modifiers: [.command, .shift]))
                         .accessibilityIdentifier("Accept and continue")
                 } label: {
                     Text("Accept \(store.pendingFiles.count) & Continue")
@@ -787,6 +787,13 @@ struct ChatComposer: View {
     private var trimmedDraft: String { composer.draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     /// Nothing in the box — no text, mention or image: "Accept N & Send" reads "Accept N & Continue" (nothing typed is lost).
     private var continuesEmpty: Bool { trimmedDraft.isEmpty && composer.mentions.isEmpty && composer.images.isEmpty }
+    /// ⌘⇧↩ with nothing typed runs the Changes header's primary: the accept item carries the key only while that is it.
+    private var primaryAccepts: Bool {
+        switch store.continuePrimary {
+        case .acceptAll?, .acceptRest?: true
+        default: false
+        }
+    }
     private var acceptAndContinueHelp: String {
         store.acceptAllNeedsSheet
             ? String(localized: "Shows a summary of the \(store.pendingFiles.count) pending file(s) first, then accepts them and tells Claude to continue (⌘⇧↩)")
@@ -1170,6 +1177,15 @@ struct ChatComposer: View {
         composer.inputFocused = true
     }
 
+    /// ⌘⇧↩ with nothing typed: whatever the Changes header's primary is (continue-states, §58.1).
+    private func primaryTapped() {
+        guard continuesEmpty, store.viewingChat == nil, store.continuePrimary != nil else { return }
+        composer.closePalette()
+        transcript.follow = true
+        AcceptAllAction.runPrimary(store: store, model: model)
+        composer.inputFocused = true
+    }
+
     private func sendAccepting() {
         let text = composer.draft
         guard acceptAndSend, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -1358,9 +1374,9 @@ struct ChatComposer: View {
         case .commandEnter, .optionCommandEnter, .commandDelete:
             return handleCardShortcut(key)   // wave1 mac-perms (polish-01)
         case .commandShiftEnter:
-            // ⌘⇧↩ is the explicit "Accept N & Send" — "Accept N & Continue" with nothing typed; plain ⌘↩ never accepts
-            // (`handleCardShortcut`).
-            if continuesEmpty { acceptAndContinueTapped() } else { acceptAndSendTapped() }
+            // ⌘⇧↩ is the explicit "Accept N & Send" — with nothing typed the Changes header's primary (§58.1: accept all / the
+            // rest and continue, continue, or the change request); plain ⌘↩ never accepts (`handleCardShortcut`).
+            if continuesEmpty { primaryTapped() } else { acceptAndSendTapped() }
             return true
         case .commandSlash:
             // ⌘/ again closes it (the "/" it put in an empty draft goes with it).
@@ -1454,15 +1470,16 @@ private struct PendingReviewNotice: View {
                 .help("Next pending file ⌘] · previous ⌘[ · Accept ⌘⇧A · Reject ⌘⇧R · Request changes ⌘⇧C")
             Spacer(minLength: 0)
             // MARK: accept-continue-ui (§58.1): the Changes header's one click, here too — no "accepted, go on" to type.
-            if !store.pendingFiles.isEmpty {
-                let blocker = store.acceptAllContinueBlocker
-                Button(AcceptAllContinueText.title) { AcceptAllAction.runContinuing(store: store, model: model) }
+            // continue-states: the same primary as the header (accept all / the rest, or the change request).
+            if !store.pendingFiles.isEmpty, let primary = store.continuePrimary {
+                let blocker = store.continuePrimaryBlocker
+                Button(ContinueText.title(primary)) { AcceptAllAction.runPrimary(store: store, model: model) }
                     .buttonStyle(.link)
                     .font(.callout.weight(.medium))
                     .fixedSize()
                     .disabled(blocker != nil)
-                    .help(blocker ?? AcceptAllAction.continueHelp(store: store))
-                    .accessibilityLabel(Text(verbatim: AcceptAllContinueText.title))
+                    .help(blocker ?? AcceptAllAction.primaryHelp(store: store))
+                    .accessibilityLabel(Text(verbatim: ContinueText.title(primary)))
                     .accessibilityIdentifier("Pending banner accept all and continue")
             }
             Button {

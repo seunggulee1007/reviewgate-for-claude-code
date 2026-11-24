@@ -5553,18 +5553,18 @@
         }
       }
     },
-    "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
+    "More: Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list"
+            "value": "More: Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "더 보기: 모두 수락, 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
+            "value": "더 보기: 남은 파일은 그대로 두고 계속, 모두 수락, 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
           }
         }
       }
@@ -6209,6 +6209,38 @@
         }
       }
     },
+    "Tells Claude to continue without deciding the %lld pending file(s) — they stay in the review; what you decided goes with it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tells Claude to continue without deciding the %lld pending file(s) — they stay in the review; what you decided goes with it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중인 파일 %lld개는 정하지 않은 채 Claude에게 계속하라고 해요 — 그 파일들은 리뷰에 남고, 이미 정한 결과는 함께 알려요"
+          }
+        }
+      }
+    },
+    "Tells Claude to continue — the files you accepted (%lld) and rejected (%lld) go with it (⌘⇧↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tells Claude to continue — the files you accepted (%lld) and rejected (%lld) go with it (⌘⇧↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude에게 계속하라고 해요 — 수락한 파일 %lld개와 거절한 파일 %lld개도 함께 알려요 (⌘⇧↩)"
+          }
+        }
+      }
+    },
     "The classes, methods and fields of the file on screen": {
       "localizations": {
         "en": {
@@ -6301,6 +6333,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "이름의 일부를 입력하세요 — UsrSvc 로 UserService 를 찾아요"
+          }
+        }
+      }
+    },
+    "Types “Continue.” into Claude Code with Return without deciding the %lld pending file(s) — they stay in the review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Types “Continue.” into Claude Code with Return without deciding the %lld pending file(s) — they stay in the review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대기 중인 파일 %lld개는 정하지 않은 채 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 — 그 파일들은 리뷰에 남아요"
+          }
+        }
+      }
+    },
+    "Types “Continue.” into Claude Code with Return — the files you accepted (%lld) and rejected (%lld) go with it (⌘⇧↩)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Types “Continue.” into Claude Code with Return — the files you accepted (%lld) and rejected (%lld) go with it (⌘⇧↩)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code에 “Continue.”를 입력해 Return까지 눌러요 — 수락한 파일 %lld개와 거절한 파일 %lld개도 함께 알려요 (⌘⇧↩)"
           }
         }
       }

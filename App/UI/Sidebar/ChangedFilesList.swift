@@ -173,25 +173,27 @@ struct ChangedFilesList: View {
         return Binding(get: { shown }, set: { store.selectedPath = $0 })
     }
 
-    /// Two rows above the list: what has been looked at, then the two actions used most — Accept All & Continue and Commit —
-    /// and a "⋯" with the rest (Accept all, Reject all, AI pre-review, Finish review, the order and the grouping). Every
-    /// item keeps its reason for being disabled as a tooltip.
+    /// Two rows above the list: what has been looked at, then the two actions used most — the review's Continue and Commit —
+    /// and a "⋯" with the rest (Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, the
+    /// order and the grouping). Every item keeps its reason for being disabled as a tooltip.
     private var header: some View {
         let pending = store.pendingFiles.count
         let accepted = store.acceptedPaths.count
-        let continueBlocker = store.acceptAllContinueBlocker
         return VStack(alignment: .leading, spacing: 6) {
             reviewProgress(pending: pending)
             HStack(spacing: 6) {
-                // MARK: accept-continue-ui (§58.1): accept every pending file and let Claude go on — nothing to type. The
-                // summary sheet first when a file still needs a look (`runContinuing`); a terminal chat pastes "Continue.".
-                Button(AcceptAllContinueText.title) { AcceptAllAction.runContinuing(store: store, model: model) }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(continueBlocker != nil)
-                    .help(continueBlocker ?? AcceptAllAction.continueHelp(store: store))
-                    .accessibilityLabel(Text(verbatim: AcceptAllContinueText.title))
-                    .accessibilityIdentifier("Accept all and continue")
+                // MARK: continue-states (§58.1): the primary follows the review — accept all / the rest and continue,
+                // continue with the decisions made, or the change request; none when there is nothing to tell Claude.
+                if let primary = store.continuePrimary {
+                    let blocker = store.continuePrimaryBlocker
+                    Button(ContinueText.title(primary)) { AcceptAllAction.runPrimary(store: store, model: model) }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(blocker != nil)
+                        .help(blocker ?? AcceptAllAction.primaryHelp(store: store))
+                        .accessibilityLabel(Text(verbatim: ContinueText.title(primary)))
+                        .accessibilityIdentifier("Accept all and continue")
+                }
                 Spacer(minLength: 4)
                 // M12: commits the accepted files (docs/M12-COMMIT.md); enabled by the engine's `state.commit.canCommit`.
                 // r2-review-flow M28: the sheet takes pending files too ("리뷰 끝냄으로 표시하고 커밋").
@@ -225,6 +227,14 @@ struct ChangedFilesList: View {
     /// tooltips.
     private func moreMenu(pending: Int) -> some View {
         Menu {
+            // MARK: continue-states (§58.1): Claude goes on without the pending files decided — review first (§64) then
+            // lets it fix only those; what was decided goes with it.
+            let leaveRest = store.continueLeavingRestBlocker
+            Button(ContinueText.leaveRestTitle, systemImage: "arrow.right.circle") { AcceptAllAction.continueWithoutAccepting(store: store) }
+                .disabled(leaveRest != nil)
+                .help(leaveRest ?? AcceptAllAction.leaveRestHelp(store: store))
+                .accessibilityLabel(Text(verbatim: ContinueText.leaveRestTitle))
+                .accessibilityIdentifier("Continue leaving the rest pending")
             // wave2 mac-flow (§34.2): accept all also applies while a turn runs; reject all waits and says why.
             // r2-review-flow M28: at once with an undo toast; the summary sheet only when a file still needs a look.
             // accept-continue-ui (§58.1): here since "Accept All & Continue" took its place — it accepts and stops.
@@ -279,7 +289,7 @@ struct ChangedFilesList: View {
         .menuIndicator(.hidden)
         .controlSize(.small)
         .fixedSize()
-        .help("More: Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list")
+        .help("More: Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list")
         .accessibilityLabel("More review actions")
         .accessibilityIdentifier("Changes header more")
     }

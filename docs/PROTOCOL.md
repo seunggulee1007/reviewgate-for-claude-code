@@ -9959,7 +9959,7 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
   changes-requested, a message can be sent; not from another chat shown read-only). One click on it, or ⌘⇧↩ in the box (the
   "& Send" key), runs it; its menu and the narrow row's "⋯" carry the same item with the key. The review list's 모두 수락
   (in its header's "⋯" since §58.1) and Review › Accept All… stay accepts that send nothing; the list's own primary button
-  is §58.1's "Accept All & Continue".
+  is §58.1's, which follows the review (accept all / the rest and continue, continue, request changes).
 - **What it sends.** `AcceptContinueRules.message` = `Continue.` — the engine accepts every pending file and sends
   `[Review gate] Accepted: …` + `"\n\n"` + `Continue.`, so Claude learns what was accepted and goes on. The text is fixed
   English (Claude's words, never translated); it joins the prompt history as any message. A toast says "Accepted N files —
@@ -9988,32 +9988,62 @@ is the clients' own (no engine command): one `send {text: "Continue.", acceptPen
   - *Tooltips:* "대기 중인 파일 N개를 수락한 뒤 Claude Code에 “Continue.”를 입력해 Return까지 눌러요 (⌘⇧↩)", with the
     sheet "…요약을 먼저 보여 준 뒤 수락하고, …"; AX "Accept and continue".
 - **Windows**: the message box keeps "Accept N & Send" as its button; Ctrl+Shift+Enter in an empty box (no text, mention
-  or image) runs §58.1's Accept All & Continue. Its terminal chat has the strip's button (§57.17), no key.
+  or image) runs §58.1's primary. Its terminal chat has the strip's button (§57.17), no key.
 
-### 58.1 Accept All & Continue in the Changes header; accepted files folded apart
+### 58.1 The Changes header's Continue follows the review; accepted files folded apart
 
 The user still typed "I accepted, continue": the Changes list offered only 모두 수락 (accept and stop), and a file accepted
-but not committed stayed in the list among the pending ones. Clients only (no engine command, no new state).
+but not committed stayed in the list among the pending ones. Then "Accept All & Continue" covered only "accept everything":
+a user who decided the files one by one (some accepted, some rejected) had nothing pending, the button was off, and they
+typed "continue" again. The primary button now follows the review's state. Clients only, but for one additive state field
+(`gate.untoldDecisions`).
 
-- **The button.** "Accept All & Continue" (모두 수락하고 계속) is the Changes header's primary button, in row 2 where
-  모두 수락 was — [모두 수락하고 계속] [커밋…] [⋯]; 모두 수락 moved into the "⋯" (first item, with its old tooltip and
-  ⌥⌘⇧A in it). One click accepts every pending file and lets Claude go on with nothing typed, by the chat on screen:
-  - a chat: §58's Accept N & Continue — one `send {text: "Continue.", acceptPending: true}`, the review summary in front;
-  - a terminal chat: §58's terminal path — `accept_all` awaited, then `Continue.` pasted and Return, only at the prompt.
-  The Accept all summary sheet comes first under the same rule (`acceptAllNeedsSheet`: a pending file never looked at,
-  changed since, or sensitive); its confirm reads "Accept N & Continue". The toast: "Accepted N files — Claude continues";
-  no undo (the turn has started).
-- **Off, with the reason** as the button's tooltip (Core `acceptAllContinueBlocker`): nothing pending ("No file waits for
-  review"); another chat shown read-only ("This review belongs to the running chat — show it to continue Claude there"); a
-  terminal chat: §58's terminal rule (a turn running or adopted, Claude Code waiting in the TUI, the PTY not running or no
-  bracketed paste yet); a chat: a file sent back for changes ("Send your change request (N file(s)) to continue"), else the
-  send's reason (Claude working, a card waiting, collecting, …). On: "Accepts the N pending file(s), then tells Claude to
-  continue (⌘⇧↩)" (with the sheet: "Shows a summary … first …"); a terminal chat's words say the paste and Return. AX label
-  "Accept All & Continue", identifier "Accept all and continue".
-- **The key** stays the message box's: ⌘⇧↩ with nothing typed (§58; terminal chats: the strip's ⌘⇧↩). The header button
-  registers none (one key, one owner).
-- **The composer's pending banner** ("리뷰 대기 N개 · 질문은 수락 없이 가능") carries the same action as a small link
-  button, with the same reason when off. Not on §64's "리뷰를 먼저 끝내세요" banner (its button sends the held message).
+- **The button.** The Changes header's primary, row 2 — [primary] [커밋…] [⋯]:
+
+  | review state | primary (Korean / English key) | the click |
+  | --- | --- | --- |
+  | notes waiting to be sent (unsent `reviewNotes`) | 변경 요청 (N) / "Request changes (%lld)" | `request_changes` (no extra text), as the message box's button |
+  | files pending, none decided this round | 모두 수락하고 계속 / "Accept All & Continue" | accept all → continue |
+  | some decided (an `accepted` file in the list, or `untoldDecisions`), N still pending | 나머지 N개 수락하고 계속 / "Accept %lld More & Continue" | accept the rest → continue |
+  | nothing pending, decisions not yet told to Claude | 계속하기 / "Continue" | continue (nothing to accept) |
+  | nothing pending and nothing new to tell | — (hidden; 커밋… keeps its place) | — |
+
+  "Decisions not yet told" = `gate.untoldDecisions` (accepted + rejected > 0) — exactly what `lastReviewSummary` will put in
+  front of the next message; an engine without the field: `lastReviewSummary != null`. Core `ContinueRules.primary` /
+  `continuePrimary`, Windows `continuePrimaryOf` / `continuePrimary` (`acceptAllContinue.ts`).
+- **"Continue".** A chat: §58's Accept N & Continue — one `send {text: "Continue.", acceptPending: true}` when it accepts,
+  a plain `send {text: "Continue."}` when nothing is accepted; the engine puts the review summary in front either way
+  (`[Review gate] Accepted: a. Rejected (reverted on disk, do not redo unless asked): b.` — with §17's partial and §66's
+  "Later changes rejected (…)" parts). A terminal chat: §58's terminal path — `accept_all` awaited when it accepts, then
+  `Continue.` pasted and Return, only at the prompt; the summary is that prompt's `additionalContext`. The Accept all
+  summary sheet comes first under the same rule (`acceptAllNeedsSheet`); its confirm reads "Accept N & Continue". Toasts:
+  "Accepted N files — Claude continues"; "Told Claude to continue" (Claude에게 계속하라고 했어요); no undo (the turn has started).
+- **⋯.** First "Continue, Leave the Rest Pending" (남은 파일은 그대로 두고 계속): `Continue.` with nothing accepted while files
+  are pending — the decisions so far go with it, the pending files stay in the review and §64's default lets Claude fix only
+  those; toast "Told Claude to continue — N file(s) still wait for review". Then 모두 수락 (accept only, ⌥⌘⇧A), 모두 거절,
+  AI 사전 리뷰, 리뷰 끝내기…, the order and the grouping. Off with the reason as its tooltip (Core
+  `continueLeavingRestBlocker`, Windows `continueLeavingRestBlocker`): nothing pending; another chat shown read-only;
+  §64 `prompts` holds the message ("Settings › Review holds new messages until every file is accepted or rejected"); a
+  terminal chat not at its prompt; the send's reason. Windows shows its 모두 수락 / 모두 거절 / 리뷰 끝내기 as buttons, so its
+  "⋯" next to the primary holds only this item.
+- **Off, with the reason** as the button's tooltip (Core `continuePrimaryBlocker`): accept all / the rest — another chat shown
+  read-only ("This review belongs to the running chat — show it to continue Claude there"); a terminal chat: §58's terminal
+  rule (a turn running or adopted, Claude Code waiting in the TUI, the PTY not running or no bracketed paste yet); a chat: a
+  file sent back for changes ("Send your change request (N file(s)) to continue"), else the send's reason (Claude working, a
+  card waiting, collecting, …). Continue — the same without the pending rules (Core `terminalContinueBlocker` for a terminal
+  chat). Request changes — the read-only chat, else `canRequestChanges`'s reason. On, the tooltip says what goes: accept —
+  "Accepts the N pending file(s), then tells Claude to continue (⌘⇧↩)" (with the sheet: "Shows a summary … first …"; a
+  terminal chat's words say the paste and Return); Continue — "Tells Claude to continue — the files you accepted (A) and
+  rejected (R) go with it (⌘⇧↩)"; Request changes — the message box's words (⌘⇧C). AX label = the title, identifier
+  "Accept all and continue" (Windows `data-testid` the same).
+- **The key** stays the message box's: ⌘⇧↩ with nothing typed (Windows Ctrl+Shift+Enter, empty box: no text, mention or
+  image) runs whatever the primary is — the message box's "Accept N & Continue" item carries the key only while the primary
+  accepts. Terminal chats: the strip's ⌘⇧↩. The header button registers none (one key, one owner).
+- **The composer's pending banner** ("리뷰 대기 N개 · 질문은 수락 없이 가능") carries the same primary as a small link button
+  while files are pending, with the same reason when off. Not on §64's "리뷰를 먼저 끝내세요" banner (its button sends the
+  held message).
+- **A terminal chat's strip** shows the same primary (accept all / the rest, Continue); the change request stays in its
+  notes row under the strip (§57.14).
 - **Accepted files folded apart.** In the review list a file whose state is `accepted` (not committed yet) leaves its group
   and goes into one folded group at the bottom: "Accepted · not committed (N)" (수락함 · 커밋 전 N), closed until clicked
   (the whole header toggles; AX "Accepted group"). Its rows are the usual ones (Undo Accept in their menu). The progress

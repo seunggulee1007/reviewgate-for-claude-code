@@ -129,7 +129,7 @@ private struct TerminalStatusStrip: View {
                 }
             }
             if let rule = store.reviewFirst, rule.blocked > 0, !rule.allowedThisTurn, store.hasPendingReview { ReviewFirstChip() }   // §64
-            if !store.pendingFiles.isEmpty { TerminalAcceptContinueButton() }   // MARK: terminal-friction (§58)
+            TerminalAcceptContinueButton()   // MARK: terminal-friction (§58); continue-states (§58.1): the header's primary
             if let status = info?.status { TerminalCostButton(status: status) }   // MARK: terminal-stage2 (§57.13)
             Button {
                 Task { await model.terminals.restart(chatId: chatId) }
@@ -234,22 +234,23 @@ private struct ReviewFirstChip: View {
 
 /// "Accept N & Continue" in a terminal chat: the pending files accepted, then "Continue." pasted into Claude Code and
 /// Return pressed — the user's click (or ⌘⇧↩), never by itself. On only while Claude Code is idle at its prompt.
+/// MARK: continue-states (§58.1): the Changes header's primary — accept all / the rest and continue, or "Continue" once every
+/// file is decided; the change request stays in its notes row under the strip.
 private struct TerminalAcceptContinueButton: View {
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
 
     var body: some View {
-        let count = store.pendingFiles.count
-        let blocker = store.terminalAcceptContinueBlocker
-        Button("Accept \(count) & Continue") { AcceptAllAction.runContinuing(store: store, model: model) }
-            .controlSize(.small)
-            .keyboardShortcut(.return, modifiers: [.command, .shift])
-            .disabled(blocker != nil)
-            .help(blocker ?? (store.acceptAllNeedsSheet
-                ? String(localized: "Shows a summary of the \(count) pending file(s) first, then accepts them and types “Continue.” into Claude Code with Return (⌘⇧↩)")
-                : String(localized: "Accepts the \(count) pending file(s), then types “Continue.” into Claude Code with Return (⌘⇧↩)")))
-            .accessibilityLabel(Text("Accept and continue"))
-            .accessibilityIdentifier("Terminal chat accept and continue")
+        if let primary = store.continuePrimary, primary != .requestChanges(notes: store.unsentNotes.count) {
+            let blocker = store.continuePrimaryBlocker
+            Button(ContinueText.title(primary)) { AcceptAllAction.runPrimary(store: store, model: model) }
+                .controlSize(.small)
+                .keyboardShortcut(.return, modifiers: [.command, .shift])
+                .disabled(blocker != nil)
+                .help(blocker ?? AcceptAllAction.primaryHelp(store: store))
+                .accessibilityLabel(Text(verbatim: ContinueText.title(primary)))
+                .accessibilityIdentifier("Terminal chat accept and continue")
+        }
     }
 }
 

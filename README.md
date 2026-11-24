@@ -48,8 +48,9 @@ idea which line came from which request. ReviewGate puts a review between Claude
 - **A gate after every turn.** When Claude finishes, you see exactly what this turn changed — not your own uncommitted
   work, not an earlier turn — and accept or reject each file, or revert single hunks.
 - **Review first.** While files wait for review, Claude may fix those files (ask in the chat, or leave notes and request
-  changes) but not start on other files. **Accept All & Continue** accepts what's left and lets Claude carry on in one
-  click; a file you accepted and Claude changes again shows only what changed since you accepted it.
+  changes) but not start on other files. One **Continue** button follows your review — Accept All & Continue, Accept the
+  rest & Continue once you decided some files, or just Continue after deciding them one by one — and tells Claude what you
+  accepted and rejected; a file you accepted and Claude changes again shows only what changed since you accepted it.
 - **The real Claude Code, in a terminal chat.** Your own Claude Code TUI — slash commands, settings, login — runs inside
   the app, with the review beside it. Prefer a chat view? A classic chat is one setting away.
 - **Notes → Request changes.** Leave notes on lines and send them back to Claude as one message. Claude is told what

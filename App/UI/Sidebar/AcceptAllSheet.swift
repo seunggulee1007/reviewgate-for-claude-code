@@ -55,6 +55,61 @@ enum AcceptAllAction {
         return store.canAcceptAndContinue ? nil : (store.cannotSendReason ?? "")
     }
 
+    /// MARK: continue-states (§58.1): the Changes header's primary — the same one the pending banner, ⌘⇧↩ in an empty
+    /// message box and a terminal chat's strip run: accept all / the rest and continue, continue, or request changes.
+    static func runPrimary(store: AppState, model: WindowModel) {
+        guard let primary = store.continuePrimary, store.continuePrimaryBlocker == nil else { return }
+        switch primary {
+        case .acceptAll, .acceptRest: runContinuing(store: store, model: model)
+        case .continueOnly: continueWithoutAccepting(store: store)
+        case .requestChanges: store.requestChanges(extraMessage: nil)
+        }
+    }
+
+    /// "Continue" (nothing pending) and ⋯ › "Continue, Leave the Rest Pending": `Continue.` with nothing accepted — a chat's
+    /// plain send, a terminal chat's paste and Return. The review summary goes with it.
+    static func continueWithoutAccepting(store: AppState) {
+        let pending = store.pendingFiles.count
+        guard (pending == 0 ? store.continuePrimaryBlocker : store.continueLeavingRestBlocker) == nil else { return }
+        let done = pending == 0 ? ContinueText.continuedToast : ContinueText.leftPendingToast(pending)
+        if store.isTerminalChat {
+            Task {
+                if let why = await store.terminalContinue(accepting: false) {
+                    Toast.show(why, systemImage: "exclamationmark.triangle.fill")
+                } else {
+                    Toast.show(done)
+                }
+            }
+            return
+        }
+        guard store.continueWithoutAccepting() else { return }
+        Toast.show(done)
+    }
+
+    /// The primary's tooltip while it is on.
+    static func primaryHelp(store: AppState) -> String {
+        switch store.continuePrimary {
+        case nil, .acceptAll, .acceptRest: return continueHelp(store: store)
+        case .continueOnly:
+            let told = store.gate.untoldDecisions ?? UntoldDecisions(accepted: 0, rejected: 0)
+            return store.isTerminalChat
+                ? String(localized: "Types “Continue.” into Claude Code with Return — the files you accepted (\(told.accepted)) and rejected (\(told.rejected)) go with it (⌘⇧↩)")
+                : String(localized: "Tells Claude to continue — the files you accepted (\(told.accepted)) and rejected (\(told.rejected)) go with it (⌘⇧↩)")
+        case .requestChanges:
+            return store.isTerminalChat
+                ? String(localized: "Send the review notes to Claude (⌘⇧C) — while it works they reach it before the turn ends, else with your next prompt; nothing is typed into the terminal")
+                : String(localized: "Send your notes to Claude as requested changes on this turn's diff (⌘⇧C)")
+        }
+    }
+
+    /// ⋯ › "Continue, Leave the Rest Pending"'s tooltip while it is on.
+    static func leaveRestHelp(store: AppState) -> String {
+        let pending = store.pendingFiles.count
+        return store.isTerminalChat
+            ? String(localized: "Types “Continue.” into Claude Code with Return without deciding the \(pending) pending file(s) — they stay in the review")
+            : String(localized: "Tells Claude to continue without deciding the \(pending) pending file(s) — they stay in the review; what you decided goes with it")
+    }
+
     /// MARK: accept-continue-ui (§58.1): "Accept All & Continue"'s tooltip while it is on — a terminal chat's words name the
     /// paste and Return; with a file still to look at, the summary comes first.
     static func continueHelp(store: AppState) -> String {
