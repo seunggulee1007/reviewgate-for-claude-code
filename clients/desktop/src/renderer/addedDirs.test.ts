@@ -59,7 +59,7 @@ describe("§67.1 /add-dir on Windows", () => {
     answer = () => ({ ok: false, error: "dir_is_project:C:\\work\\acme\\src", code: "dir_is_project" });
     expect(await mod.dirs.addDir("src")).toEqual({ ok: false, notice: "프로젝트 폴더이거나 그 안이에요 — Claude가 이미 일하는 곳이에요 (C:\\work\\acme\\src)" });
     answer = () => ({ ok: false, error: "dir_busy", code: "dir_busy" });
-    expect((await mod.dirs.removeDir("C:\\work\\shared"))?.notice).toBe("Claude의 작업이 끝난 뒤에 하세요 — 작업 중에는 채팅의 디렉터리가 바뀌지 않아요");
+    expect((await mod.dirs.removeDir("C:\\work\\shared"))?.notice).toBe("Claude의 작업이 끝나면 바꿀 수 있어요 — 작업 중에는 채팅의 디렉터리가 바뀌지 않아요");
     expect(sent.at(-1)).toEqual({ type: "remove_dir", path: "C:\\work\\shared" });
   });
 

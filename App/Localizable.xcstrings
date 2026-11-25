@@ -5820,7 +5820,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "셸 명령은 실행 중인 채팅으로 돌아가서 실행하세요"
+            "value": "셸 명령은 실행 중인 채팅으로 돌아가야 실행할 수 있어요"
           }
         }
       }
@@ -15170,7 +15170,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "리뷰에서 숨길 파일"
+            "value": "리뷰에서 숨김"
           }
         }
       }

@@ -156,7 +156,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 브랜치에는 upstream이 없어요 — 먼저 푸시해서(git push -u) upstream을 만든 뒤 pull하세요"
+            "value": "%@ 브랜치에는 upstream이 없어요 — 먼저 push해서(git push -u) upstream을 만들어야 pull할 수 있어요"
           }
         }
       }
@@ -204,7 +204,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 파일은 이제 리뷰 밖 변경이 아니에요 — 커밋 시트를 다시 여세요"
+            "value": "%@ 파일은 이제 리뷰 밖 변경이 아니에요 — 커밋 시트를 다시 열면 목록이 새로 나와요"
           }
         }
       }
@@ -604,7 +604,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "푸시할 커밋 %lld개"
+            "value": "push할 커밋 %lld개"
           }
         }
       }
@@ -1260,7 +1260,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ 작업이 진행 중이에요 — 터미널에서 끝내거나 중단한 뒤 pull하세요"
+            "value": "%@ 작업이 진행 중이에요 — 터미널에서 끝내거나 중단해야 pull할 수 있어요"
           }
         }
       }
@@ -1388,7 +1388,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "채팅 하나에 디렉터리는 20개까지예요 — 하나를 먼저 빼세요"
+            "value": "채팅 하나에 디렉터리는 20개까지예요 — 하나를 빼야 더 추가할 수 있어요"
           }
         }
       }
@@ -1692,7 +1692,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "셸 명령이 이미 실행 중이에요 — 기다리거나 중지하세요 (esc)"
+            "value": "셸 명령이 이미 실행 중이에요 — 끝나길 기다리거나 esc로 중지해요"
           }
         }
       }
@@ -3916,7 +3916,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 작업 중이에요 — 턴이 끝나면 pull하세요"
+            "value": "Claude가 작업 중이에요 — 턴이 끝나면 pull할 수 있어요"
           }
         }
       }
@@ -3932,7 +3932,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude가 작업 중이에요 — 턴이 끝난 뒤 셸 명령을 실행하세요"
+            "value": "Claude가 작업 중이에요 — 턴이 끝나면 셸 명령을 실행할 수 있어요"
           }
         }
       }
@@ -4306,7 +4306,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "먼저 브랜치를 체크아웃하세요 (HEAD가 분리됨)"
+            "value": "브랜치를 체크아웃해야 pull할 수 있어요 (HEAD가 분리됨)"
           }
         }
       }
@@ -5650,7 +5650,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "rebase하기 전에 변경을 커밋하세요"
+            "value": "변경을 커밋해야 rebase할 수 있어요"
           }
         }
       }
@@ -7426,7 +7426,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "rebase하기 전에 리뷰를 마치세요 — rebase는 리뷰 중인 파일을 다시 써요"
+            "value": "리뷰를 마쳐야 rebase할 수 있어요 — rebase는 리뷰 중인 파일을 다시 써요"
           }
         }
       }
@@ -7890,7 +7890,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "pull하면 커밋하지 않은 변경이 덮어써져요: %@ — 먼저 커밋하거나 리뷰를 마치세요. 아무것도 바뀌지 않았어요."
+            "value": "pull하면 커밋하지 않은 변경이 덮어써져요: %@ — 먼저 커밋하거나 리뷰를 마쳐야 해요. 아무것도 바뀌지 않았어요."
           }
         }
       }
@@ -8514,7 +8514,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 브랜치와 upstream이 갈라졌어요(내 커밋 %1$lld개, 받을 커밋 %2$lld개) — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하세요."
+            "value": "이 브랜치와 upstream이 갈라졌어요(내 커밋 %1$lld개, 받을 커밋 %2$lld개) — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하면 돼요."
           }
         }
       }
@@ -8530,7 +8530,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 브랜치와 upstream이 갈라졌어요 — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하세요."
+            "value": "이 브랜치와 upstream이 갈라졌어요 — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하면 돼요."
           }
         }
       }
@@ -8546,7 +8546,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이 브랜치에는 upstream이 없어요 — 먼저 푸시해서(git push -u) upstream을 만든 뒤 pull하세요"
+            "value": "이 브랜치에는 upstream이 없어요 — 먼저 push해서(git push -u) upstream을 만들어야 pull할 수 있어요"
           }
         }
       }
@@ -8706,7 +8706,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude의 작업이 끝날 때까지 기다리세요 — 디렉터리는 턴 사이에만 바꿀 수 있어요"
+            "value": "Claude의 작업이 끝나면 바꿀 수 있어요 — 디렉터리는 턴 사이에만 바뀌어요"
           }
         }
       }
