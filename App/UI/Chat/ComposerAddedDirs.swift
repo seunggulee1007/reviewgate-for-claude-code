@@ -93,6 +93,13 @@ struct AddedDirsPopover: View {
                     row(dir, blocker: blocker)
                 }
             }
+            // While work runs × and 추가 are off: say why where they are, not only in their tooltips.
+            if let blocker, removing == nil {
+                Label(blocker, systemImage: "hourglass")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("Added directories blocked")
+            }
             if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption).foregroundStyle(.orange)

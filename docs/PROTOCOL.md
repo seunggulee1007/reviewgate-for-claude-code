@@ -11262,7 +11262,7 @@ type ShellResult = {
 - **The chip.** With directories added, the composer's chip row shows "디렉터리 N" (folder icon); its popover lists each
   (home as `~`, full path in the tooltip) with × (`remove_dir`) and "디렉터리 추가…" (the picker). Its tooltip says edits
   there ask every time because the review does not show them. While work runs (`dir_busy` would refuse) × and 추가 are
-  disabled with that reason as the tooltip.
+  disabled with that reason as the tooltip, and the list says it too (a line over them, Mac).
 - **The card.** `reason.code: "added_directory"` reads "/add-dir로 추가한 디렉터리의 수정이에요 — 리뷰에 diff가 나오지 않아서
   여기서 승인받아요".
 - **`!` shell mode.** A draft whose first character is `!` switches the box to shell mode, as Claude Code's bash mode: a
