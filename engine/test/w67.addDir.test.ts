@@ -1,5 +1,5 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { addedDirOf, addedDirsInstruction, findAddedDir, MAX_ADDED_DIRS, resolveDirInput, validateAddDir, withAddedDir } from "../src/session/addedDirs.js";
 import { isOutsideRoot } from "../src/session/hooks.js";
@@ -37,11 +37,12 @@ function makeRepo(): string {
 
 describe("§67.1 the added directories (pure)", () => {
   it("resolves ~, quotes and a path relative to the project", () => {
-    expect(resolveDirInput("~", "/work/acme", "/Users/dev")).toBe("/Users/dev");
-    expect(resolveDirInput("~/lib", "/work/acme", "/Users/dev")).toBe("/Users/dev/lib");
-    expect(resolveDirInput("../shared", "/work/acme", "/Users/dev")).toBe("/work/shared");
-    expect(resolveDirInput('"/work/acme lib"', "/work/acme", "/Users/dev")).toBe("/work/acme lib");
-    expect(resolveDirInput("  /opt/x/  ", "/work/acme", "/Users/dev")).toBe("/opt/x");
+    // Expectations go through `resolve` so a drive-letter platform (Windows CI) resolves them the same way.
+    expect(resolveDirInput("~", "/work/acme", "/Users/dev")).toBe(resolve("/Users/dev"));
+    expect(resolveDirInput("~/lib", "/work/acme", "/Users/dev")).toBe(resolve("/Users/dev/lib"));
+    expect(resolveDirInput("../shared", "/work/acme", "/Users/dev")).toBe(resolve("/work/shared"));
+    expect(resolveDirInput('"/work/acme lib"', "/work/acme", "/Users/dev")).toBe(resolve("/work/acme lib"));
+    expect(resolveDirInput("  /opt/x/  ", "/work/acme", "/Users/dev")).toBe(resolve("/opt/x"));
   });
 
   it("validates: an existing directory outside the project, not added yet, at most MAX_ADDED_DIRS", async () => {
