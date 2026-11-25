@@ -11286,7 +11286,9 @@ type ShellResult = {
   history. A refusal keeps the draft with the reason in the notice line.
 - **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time (whole seconds as it
   ticks each second — Mac `ElapsedFormat.ticking`, Windows `formatTicking`; the finished row keeps one decimal under
-  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A
+  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same, and so
+  does Stop with no turn running (Mac ⌘. / Chat › Stop Claude, Windows Ctrl+. and the Stop menu item: they send
+  `shell_cancel` while `state.session.shell` is set, and are idle with neither). A
   message typed meanwhile waits in the queue ("셸 명령이 끝나면 보내요").
 - **The row** (`kind: "shell"`, restored with the chat): `$ command` in monospace, how it ended (✓ 0 · ✗ 종료 코드 n ·
   중지됨 · 시간 초과), the time, the output (monospace, long output folded to its last lines with 전체 보기; "앞부분은

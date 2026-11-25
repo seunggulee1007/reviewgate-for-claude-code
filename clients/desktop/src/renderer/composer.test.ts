@@ -276,6 +276,16 @@ describe("composer store flows", () => {
     expect(useStore.getState().errorBanner?.message).toBe("이 파일은 언급할 수 없어요: ../x");
   });
 
+  it("Stop stops a running ! shell command when no turn runs (§67.2)", async () => {
+    const useStore = await loadStore();
+    withProject(useStore, {});
+    useStore.getState().interrupt();
+    expect(sent).toEqual([]);
+    useStore.setState((s) => ({ state: { ...s.state, session: { ...s.state.session, shell: { id: "sh1", command: "sleep 9", cwd: "/work/acme", startedAt: "2026-11-24T12:00:00.000Z" } } } }));
+    useStore.getState().interrupt();
+    expect(sent.map((c) => c.type)).toEqual(["shell_cancel"]);
+  });
+
   it("Stop & send = interrupt, then send right behind it (§28); a refusal re-queues it paused", async () => {
     const useStore = await loadStore();
     withProject(useStore, {});

@@ -1661,7 +1661,10 @@ export const useStore = create<Store>((set, get, api) => {
     },
 
     interrupt() {
-      if (get().state.gate.phase !== "running") return;
+      if (get().state.gate.phase !== "running") {
+        if (get().state.session.shell != null) get().fire({ type: "shell_cancel" }); // §67.2: no turn, but a `!` command runs: Stop stops it
+        return;
+      }
       get().fire({ type: "interrupt" });
       get().armInterruptWatch(); // MARK: wave4 w4-safety — robustness-07: "Force restart" when the stop does not stop
     },
