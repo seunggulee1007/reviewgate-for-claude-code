@@ -1175,7 +1175,7 @@ private final class Tour {
     }
 
     /// §68.8 the commit sheet's "Other changes" on the demo project's own files (changed for it here: an edit, a rename,
-    /// two new files), with accepted review files and without a review — the default (none ticked, untracked hidden), and
+    /// two new files), with pending review files and without a review — the default (none ticked, untracked hidden), and
     /// with the untracked files listed and two ticked. `composerbar-commit-<step>.png` (+ `-sheet`).
     private func commitOthersShots(_ window: NSWindow) async throws {
         guard let root = store.projectURL else { throw TourError("no project") }
@@ -1197,9 +1197,11 @@ private final class Tour {
         await store.refreshBranches()
         log("composerbar commit-others: state.commit.otherChanges "
             + (store.otherChangeCounts.map { "\($0.tracked) tracked, \($0.untracked) untracked" } ?? "none LOST"))
-        let accepted = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false, state: .accepted),
-                        ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false, state: .accepted)]
-        store.debugShowGate(.reviewing, files: accepted)
+        // Pending review files (M28: listed and ticked, accepted as the commit goes) — the accepted list is the engine's
+        // `commit.acceptedPaths`, which a made-up gate does not set.
+        let pending = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false),
+                       ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false)]
+        store.debugShowGate(.reviewing, files: pending)
         try await sheetShot("composerbar-commit-others", on: window, CommitSheet())
         store.debugShowGate(.idle)
         try await sheetShot("composerbar-commit-others-only", on: window,
