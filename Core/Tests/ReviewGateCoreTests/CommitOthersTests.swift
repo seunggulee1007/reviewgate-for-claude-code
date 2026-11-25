@@ -56,6 +56,19 @@ import Testing
         #expect(!CommitOthersRules.othersOnly(reviewListed: 0, others: 0, truncated: false))   // nothing at all: as before
     }
 
+    @Test func aCommitOfOnlyOtherChangesSuggestsTheirMessage() throws {
+        let reply = try NDJSON.decode(CommitOthersReply.self, from: #"{"files":[{"path":"README.md","oldPath":null,"status":"M","untracked":false}],"truncated":false,"suggestedMessage":"Update README.md"}"#)
+        #expect(reply.suggestedMessage == "Update README.md")
+        #expect(try NDJSON.decode(CommitOthersReply.self, from: #"{"files":[],"truncated":false}"#).suggestedMessage == nil)   // an older engine
+        let review = "Apply accepted changes"
+        #expect(CommitOthersRules.message(current: review, reviewSuggestion: review, othersSuggestion: "Update README.md", othersOnly: true) == "Update README.md")
+        #expect(CommitOthersRules.message(current: "", reviewSuggestion: review, othersSuggestion: "Update 2 files", othersOnly: true) == "Update 2 files")
+        // A typed draft, a review file listed, an older engine: the message stays.
+        #expect(CommitOthersRules.message(current: "fix: typo", reviewSuggestion: review, othersSuggestion: "Update README.md", othersOnly: true) == nil)
+        #expect(CommitOthersRules.message(current: review, reviewSuggestion: review, othersSuggestion: "Update README.md", othersOnly: false) == nil)
+        #expect(CommitOthersRules.message(current: review, reviewSuggestion: review, othersSuggestion: nil, othersOnly: true) == nil)
+    }
+
     @Test func theSheetOpensForFilesOutsideTheReviewAlone() {
         let store = makeStore()
         var s = ReviewState.empty

@@ -67,6 +67,8 @@ struct CommitSheet: View {
     @State private var othersTruncated = false
     @State private var showUntracked = false
     @State private var extraSelected: Set<String> = []
+    /// The neutral message `commit_others` suggested and the sheet put in (not kept as a draft, as the review's is not).
+    @State private var othersSuggestion: String?
 
     /// `splitPreview`: open in "나눠서 커밋" with these files and cards; `showUntracked` / `extraTicked`: the "Other changes"
     /// group with untracked files listed and these ticked (the screenshot tour).
@@ -148,6 +150,12 @@ struct CommitSheet: View {
             if let reply = await store.loadOtherChanges() {
                 others = reply.files
                 othersTruncated = reply.truncated
+                // Only the user's own changes: not Claude's last instruction (or "Apply accepted changes") as the message.
+                if let suggested = CommitOthersRules.message(current: message, reviewSuggestion: store.suggestedCommitMessage,
+                                                            othersSuggestion: reply.suggestedMessage, othersOnly: othersOnly) {
+                    othersSuggestion = suggested
+                    message = suggested
+                }
             }
         }
         .onChange(of: push) { _, on in if let projectKey { AppSettings.setCommitPush(on, root: projectKey) } }
@@ -160,7 +168,7 @@ struct CommitSheet: View {
             }
         }
         .onChange(of: message) { _, new in
-            store.flow.commitMessageDraft = new.isEmpty || new == store.suggestedCommitMessage ? nil : new
+            store.flow.commitMessageDraft = new.isEmpty || new == store.suggestedCommitMessage || new == othersSuggestion ? nil : new
         }
     }
 

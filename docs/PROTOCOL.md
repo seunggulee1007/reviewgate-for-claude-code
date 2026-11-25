@@ -11443,7 +11443,9 @@ review again, extras-only with a pending review and with none.
   the Mac the file's context menu. The group's tooltip says the files go in as they are: not reviewed, nothing marked
   accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group. With no review file to list
   (only the user's own changes, `othersOnly`) the sheet is titled **Commit changes**, says the files go in as they are, and
-  shows no empty review list above the group.
+  shows no empty review list above the group. Its message is then `commit_others`' `suggestedMessage` when the message
+  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays (Mac
+  `CommitOthersRules.message`, Windows `othersMessage`).
 - Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
   "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads
   "<path> is no longer a change outside the review — reopen the commit sheet". "Commit in parts" (§53) stays for the
