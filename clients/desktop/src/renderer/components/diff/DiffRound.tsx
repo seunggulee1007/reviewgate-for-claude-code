@@ -41,7 +41,8 @@ export function DiffRound({ file }: { file: ChangedFileState }) {
   const stale = isStaleDiff(gate, diff, unavailable);
   // Why reject waits, once on screen: here while files are pending (the Changes list then leaves it out).
   const anyPending = useStore((s) => pendingFiles(s.state).length > 0);
-  const rejectBlocked = anyPending ? rejectBlockedReason({ gate }) : null;
+  const session = useStore((s) => s.state.session);
+  const rejectBlocked = anyPending ? rejectBlockedReason({ gate, session }) : null;
   if (!stale && ranges.length < 2) return null;
   return (
     <div className="diff-round" data-testid="Diff round">
