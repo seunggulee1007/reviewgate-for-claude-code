@@ -43,6 +43,17 @@ const NO_UPSTREAM = "This branch has no upstream — push it first (git push -u)
 const DIVERGED = "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.";
 const REVIEW_BEFORE_REBASE = "Finish the review before rebasing — a rebase rewrites the files under review";
 
+/**
+ * A list of paths ("src/cart.ts, README.md") whose names never break across lines: a word joiner (U+2060) after each "/",
+ * ".", "-" and "_" inside a path, so a line ends only between two paths — the Mac's `GitSyncText.unbrokenPaths`.
+ */
+export function unbrokenPaths(list: string): string {
+  return list
+    .split(", ")
+    .map((path) => [...path].map((ch, i, all) => ("/.-_".includes(ch) && i < all.length - 1 ? ch + "⁠" : ch)).join(""))
+    .join(", ");
+}
+
 /** The §68 refusal codes (`refusalCodeText` asks here first); null for any other code. */
 export function gitSyncRefusalText(code: string, detail: string): string | null {
   const d = detail.trim();
@@ -61,7 +72,7 @@ export function gitSyncRefusalText(code: string, detail: string): string | null 
       return t(DIVERGED);
     }
     case "pull_would_overwrite":
-      return t("Pull would overwrite your uncommitted changes: {0} — commit them (or finish their review) first. Nothing was changed.", d);
+      return t("Pull would overwrite your uncommitted changes: {0} — commit them (or finish their review) first. Nothing was changed.", unbrokenPaths(d));
     case "pull_rebase_blocked":
       return d === "review" ? t(REVIEW_BEFORE_REBASE) : t("Commit your changes before rebasing");
     case "pull_rebase_failed":

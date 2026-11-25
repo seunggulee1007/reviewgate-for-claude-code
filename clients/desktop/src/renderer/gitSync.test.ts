@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { BranchInfo, EngineCommand, RemoteSyncState, ReviewState } from "@reviewgate/engine";
 import { refusalCodeText } from "./errorCodes";
-import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, syncBadge, syncBadgeHelp, syncOf } from "./gitSync";
+import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, syncBadge, syncBadgeHelp, syncOf, unbrokenPaths } from "./gitSync";
 import { initI18n } from "./i18n";
 
 const branch = (o: Partial<BranchInfo> = {}): BranchInfo => ({ name: "main", isCurrent: true, upstream: "origin/main", ahead: 0, behind: 0, lastCommitDate: null, ...o });
@@ -26,7 +26,10 @@ describe("§68 fetch and pull — words and rules", () => {
     expect(refusalCodeText("pull_diverged", "2,3")).toBe("This branch and its upstream have diverged (2 local, 3 incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.");
     expect(refusalCodeText("pull_no_upstream", "topic")).toBe("topic has no upstream — push it first (git push -u) to pull into it");
     expect(refusalCodeText("pull_in_progress", "cherry-pick")).toBe("A cherry-pick is in progress — finish or abort it in a terminal, then pull");
-    expect(refusalCodeText("pull_would_overwrite", "a.ts, b.ts")).toBe("Pull would overwrite your uncommitted changes: a.ts, b.ts — commit them (or finish their review) first. Nothing was changed.");
+    expect(refusalCodeText("pull_would_overwrite", "a.ts, b.ts")).toBe(`Pull would overwrite your uncommitted changes: ${unbrokenPaths("a.ts, b.ts")} — commit them (or finish their review) first. Nothing was changed.`);
+    // A line never ends inside a path ("src/cart.\nts"): a word joiner after each "/" "." "-" "_" within it.
+    expect(unbrokenPaths("src/cart.ts, my-notes_1.md")).toBe("src/⁠cart.⁠ts, my-⁠notes_⁠1.⁠md");
+    expect(unbrokenPaths("a/")).toBe("a/");
     expect(refusalCodeText("pull_blocked", "running")).toBe("Claude is working — pull when the turn ends");
     expect(refusalCodeText("pull_rebase_blocked", "dirty")).toBe("Commit your changes before rebasing");
     expect(refusalCodeText("pull_rebase_failed", "CONFLICT (content)")).toBe("The rebase stopped and was undone — nothing changed: CONFLICT (content)");
