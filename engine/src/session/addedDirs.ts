@@ -19,7 +19,7 @@ export const MAX_DIR_PATH = 4096;
 /** `~`, `~/x` (the user's home), an absolute path, or a path relative to `root` (as the terminal resolves it against its cwd). */
 export function resolveDirInput(input: string, root: string, home: string = homedir()): string {
   const t = stripQuotes(input.trim());
-  if (t === "~") return home;
+  if (t === "~") return resolve(home);
   if (t.startsWith("~/") || t.startsWith("~\\")) return resolve(home, t.slice(2));
   return isAbsolute(t) ? resolve(t) : resolve(root, t);
 }
