@@ -81,6 +81,10 @@ describe("§68.5 commit_others / commit.extraPaths", () => {
 
     const others = await h.engine.request({ type: "commit_others" });
     expect(others).toMatchObject({ type: "commit_others", truncated: false, suggestedMessage: "Update 2 files" });
+    // The message follows the ticked files; unlisted or no paths: every file.
+    expect((await h.engine.request({ type: "commit_others", paths: ["other.txt"] })).suggestedMessage).toBe("Update other.txt");
+    expect((await h.engine.request({ type: "commit_others", paths: ["new-name.txt"] })).suggestedMessage).toBe("Rename old-name.txt to new-name.txt");
+    expect((await h.engine.request({ type: "commit_others", paths: ["nope.txt"] })).suggestedMessage).toBe("Update 2 files");
     expect(others.files).toEqual([
       { path: ".omc/state.json", oldPath: null, status: "?", untracked: true, hidden: true },
       { path: "new-name.txt", oldPath: "old-name.txt", status: "R", untracked: false },

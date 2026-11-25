@@ -11390,13 +11390,15 @@ Clients never show an automatic fetch's refusal as an error; `lastFetchError` is
 
 ### 68.5 Committing files outside the review
 
-- `commit_others {}` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
+- `commit_others { paths? }` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
   --untracked-files=all` entry whose path — or a rename's either path — is not a review file; unmerged entries left out.
   `OtherChange = { path, oldPath, status: "M"|"A"|"D"|"R"|"T"|"?", untracked, hidden? }` (`hidden`: an app ignore pattern
   matches it — still the user's file to commit). A read (`query` lane). `suggestedMessage` (absent from an older engine):
   a neutral message for a commit of only these files — `commit.suggestedMessage` is Claude's last instruction, which does
   not describe the user's own edits. From the tracked files (the untracked ones when none): one is named by what happened
   to it ("Update README.md", "Add notes.md", "Delete old.ts", "Rename a.ts to b.ts"), more are counted ("Update 3 files").
+  With `paths` (the files ticked in the sheet) the message names only the listed ones among them — the sheet asks again as
+  the ticks change, so the message follows the selection; none of them listed (or no `paths`): every listed file.
 - `commit { message, paths?, extraPaths?, push? }`: `extraPaths` are committed in the same commit (`git add -A` of each,
   then `git commit --only` of the accepted paths and the extras — a `git mv` rename's old name included). Each must be in
   `commit_others` now, else `invalid_extra:<path>` (`paths`: it) — a review file is accepted, not slipped in as an extra.
@@ -11465,7 +11467,8 @@ review again, extras-only with a pending review and with none.
   accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group. With no review file to list
   (only the user's own changes, `othersOnly`) the sheet is titled **Commit changes**, says the files go in as they are, and
   shows no empty review list above the group. Its message is then `commit_others`' `suggestedMessage` when the message
-  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays (Mac
+  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays. It follows the
+  ticked files (asked again with `paths` on each change of the ticks) while it is still the message last suggested (Mac
   `CommitOthersRules.message`, Windows `othersMessage`).
 - Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
   "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads

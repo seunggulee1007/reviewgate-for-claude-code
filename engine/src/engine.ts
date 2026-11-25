@@ -1485,7 +1485,7 @@ export class ReviewEngine {
       case "git_pull":
         return this.gitPull(cmd.rebase === true);
       case "commit_others":
-        return this.commitOthers();
+        return this.commitOthers(cmd.paths);
       case "commit_hunks": // §53
         return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
       case "commit_series":
@@ -5779,14 +5779,16 @@ export class ReviewEngine {
   }
 
   /** MARK: git-sync — §68.5 `commit_others`: the changed files outside the review (≤ `MAX_OTHER_CHANGES`). Reads only. */
-  private async commitOthers(): Promise<CommitOthersEvent> {
+  private async commitOthers(ticked?: unknown[]): Promise<CommitOthersEvent> {
     const cp = this.requireProject();
     const files = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    // `paths` (the ticked files): the message names those; none of them listed (or none given): every listed file.
+    const named = Array.isArray(ticked) ? files.filter((f) => ticked.includes(f.path)) : [];
     return {
       type: "commit_others",
       files: files.slice(0, MAX_OTHER_CHANGES),
       truncated: files.length > MAX_OTHER_CHANGES,
-      suggestedMessage: suggestOthersMessage(files),
+      suggestedMessage: suggestOthersMessage(named.length > 0 ? named : files),
     };
   }
 

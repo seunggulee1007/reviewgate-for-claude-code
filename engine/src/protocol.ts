@@ -908,8 +908,8 @@ export type EngineCommand =
   | Cmd<"git_fetch", { all?: boolean; prune?: boolean; auto?: boolean }>
   /** §68.2: the current branch from its upstream — fast-forward only; `rebase` (§68.3) only on a clean tree with no review; replies `pulled`. */
   | Cmd<"git_pull", { rebase?: boolean }>
-  /** §68.5: changed files outside the review (the commit sheet's second group); replies `commit_others`. */
-  | Cmd<"commit_others">
+  /** §68.5: changed files outside the review (the commit sheet's second group); replies `commit_others`. `paths`: the ticked ones — `suggestedMessage` then describes only those. */
+  | Cmd<"commit_others", { paths?: string[] }>
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
