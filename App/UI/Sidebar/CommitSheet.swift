@@ -305,7 +305,7 @@ struct CommitSheet: View {
                 .disabled(!canSubmit)
                 // polish P5-sheets-03: what it does and its key — and why it is off.
                 .help(store.commitLockReason.map { Text(verbatim: $0) }
-                      ?? (selected.isEmpty ? Text("Tick the files to commit") : trimmedMessage.isEmpty ? Text("Enter a commit message.")
+                      ?? (selected.isEmpty && extras.isEmpty ? Text("Tick the files to commit") : trimmedMessage.isEmpty ? Text("Enter a commit message.")
                           : push ? Text("Commit the ticked files and push (⌘↩)") : Text("Commit the ticked files (⌘↩)")))
                 .accessibilityLabel("Commit")
                 .accessibilityIdentifier("Commit")
