@@ -11406,7 +11406,8 @@ review again, extras-only with a pending review and with none.
 
 - **The branch chip** (sidebar project header) carries `↑ahead ↓behind` of the current branch against its upstream
   (nothing when level or without an upstream) and a small spinner while a fetch or pull runs; its tooltip adds "2
-  commit(s) to push · 3 commit(s) to pull — origin/main" and "Fetched 3 min ago".
+  commit(s) to push · 3 commit(s) to pull — origin/main" and "Fetched 3 min ago". On the Mac the badge and the spinner sit
+  just after the chip, not in its label: a macOS menu button draws only its label's first title and icon.
 - **The branch menu**, after New Branch… / Refresh: **Fetch** (`git_fetch`; "Fetching…" while it runs), **Fetch All
   Remotes** (only with more than one remote), **Pull** — "Pull 3 commit(s)" when behind — (`git_pull`, fast-forward only),
   and, only when the branch has diverged, **Rebase onto origin/main** (`git_pull {rebase: true}`). Every item is disabled

@@ -1114,7 +1114,29 @@ struct MainWindow: View {
     /// "New Branch…" and "Refresh". Switching is disabled — with the reason as a footer — while a
     /// review is pending, a tracked file has uncommitted changes, or Claude is working (§61: then Commit… is offered).
     /// A new branch takes uncommitted work along, so only Claude working disables it.
+    /// MARK: git-sync — §68.7: the ↑ahead ↓behind badge and the fetch / pull spinner sit beside the menu, not in its label:
+    /// a macOS menu button draws only its label's first title and icon, so anything else there never showed.
     private func branchSwitcher(_ info: ProjectInfo) -> some View {
+        HStack(spacing: 4) {
+            branchMenu(info)
+            let badge = GitSyncRules.badge(store.currentBranch)
+            if !badge.isEmpty {
+                Text(verbatim: badge).font(.caption2.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+                    .fixedSize()
+                    .help(branchChipHelp(store.branchSwitchBlocker()))
+                    .accessibilityLabel(GitSyncRules.badgeHelp(store.currentBranch) ?? badge)
+                    .accessibilityIdentifier("Branch ahead behind")
+            }
+            if store.gitSync?.isBusy == true {
+                ProgressView().controlSize(.mini)
+                    .help(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
+                    .accessibilityLabel(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
+                    .accessibilityIdentifier("Branch sync progress")
+            }
+        }
+    }
+
+    private func branchMenu(_ info: ProjectInfo) -> some View {
         let blocker = store.branchSwitchBlocker()
         let createBlocker = store.branchCreateBlocker()
         let prBlocker = store.prCreateBlocker
@@ -1179,18 +1201,6 @@ struct MainWindow: View {
                 }
                 .font(.caption.monospaced())
                 .lineLimit(1)
-                // MARK: git-sync — §68: ahead / behind of the upstream, and a fetch / pull in flight.
-                let badge = GitSyncRules.badge(store.currentBranch)
-                if !badge.isEmpty {
-                    Text(verbatim: badge).font(.caption2.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
-                        .accessibilityLabel(GitSyncRules.badgeHelp(store.currentBranch) ?? badge)
-                        .accessibilityIdentifier("Branch ahead behind")
-                }
-                if store.gitSync?.isBusy == true {
-                    ProgressView().controlSize(.mini)
-                        .accessibilityLabel(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
-                        .accessibilityIdentifier("Branch sync progress")
-                }
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
