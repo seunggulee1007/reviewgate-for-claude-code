@@ -87,6 +87,8 @@ public struct HunkRefusal: Sendable, Equatable {
         switch code {
         case "session_running", "session_busy":
             return HunkRefusal(code: code, message: String(localized: "Claude is working — wait for the turn to finish", bundle: .module), remedy: .none)
+        case "shell_running":
+            return HunkRefusal(code: code, message: String(localized: "Reject is available when the shell command ends", bundle: .module), remedy: .none)
         case "reverting":
             return HunkRefusal(code: code, message: String(localized: "Another revert is in progress — try again in a moment", bundle: .module), remedy: .none)
         case "no_review":

@@ -156,6 +156,18 @@ import Testing
         #expect(fired == [.shellCancel])
     }
 
+    @Test func rejectWaitsForARunningShellCommand() async {
+        let app = makeState()
+        app.handle(.state(snapshot(seq: 1)))
+        #expect(app.rejectLockReason == nil)
+        app.handle(.state(snapshot(seq: 2, shell: ShellRunInfo(id: "sh1", command: "sleep 9"))))
+        let why = String(localized: "Reject is available when the shell command ends", bundle: .module)
+        #expect(app.rejectLockReason == why)
+        #expect(app.isRejectLocked)
+        #expect(AddDirShellText.refusal(code: "shell_running", detail: "") == why)
+        #expect(HunkRefusal.from("shell_running").message == why)
+    }
+
     @Test func addDirSaysWhyItWasRefused() async {
         let app = makeState()
         app.handle(.state(snapshot(seq: 1)))

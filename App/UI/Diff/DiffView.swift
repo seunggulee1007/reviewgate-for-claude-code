@@ -337,7 +337,7 @@ struct DiffView: View {
     }
 
     private func canRejectHunks(_ file: ChangedFile) -> Bool {
-        showsHunkControls(file) && !isReviewLocked && !store.isRejectingHunks && store.collectFailedLockReason == nil
+        showsHunkControls(file) && !isReviewLocked && !store.isRejectingHunks && store.collectFailedLockReason == nil && store.shellRun == nil
     }
 
     private var revertSelectedTitle: String {

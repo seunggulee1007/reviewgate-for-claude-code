@@ -1970,6 +1970,10 @@ public final class AppState {
             hunkRefusal = (file.path, HunkRefusal.from(isReverting ? "reverting" : "session_running"))
             return false
         }
+        if shellRun != nil {   // §67.2: a `!` command is writing files
+            hunkRefusal = (file.path, HunkRefusal.from("shell_running"))
+            return false
+        }
         if collectFailedLockReason != nil {   // §37.1: the engine refuses it until the failed collection was retried
             hunkRefusal = (file.path, HunkRefusal.from("collect_failed"))
             return false

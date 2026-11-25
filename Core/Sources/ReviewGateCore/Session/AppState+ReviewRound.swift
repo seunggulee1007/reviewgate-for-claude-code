@@ -30,6 +30,7 @@ extension AppState {
 
     public var rejectLockReason: String? {
         if isReverting { return Self.sessionRefusalText("reverting") }
+        if shellRun != nil { return AddDirShellText.refusal(code: "shell_running", detail: "") }   // §67.2: a `!` command is writing files
         if isRunning, gate.reviewEndTree == nil { return String(localized: "Reject is available when this turn ends", bundle: .module) }
         if isSnapshotting { return Self.sessionRefusalText("session_running") }
         if let reason = collectFailedLockReason { return reason }
