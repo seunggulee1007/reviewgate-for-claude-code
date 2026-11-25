@@ -89,6 +89,8 @@ struct CommitSheet: View {
     private var extras: [String] { CommitOthersRules.extraPaths(ticked: extraSelected, files: others, showUntracked: showUntracked) }
     private var visibleOthers: [OtherChange] { CommitOthersRules.visible(others, showUntracked: showUntracked) }
     private var untrackedCount: Int { others.filter(\.untracked).count }
+    /// §68.8: no review file to list, only changes outside the review (a commit from the branch menu with no review).
+    private var othersOnly: Bool { CommitOthersRules.othersOnly(reviewListed: listed.count, others: others.count, truncated: othersTruncated) }
     private var canSubmit: Bool {
         !trimmedMessage.isEmpty && CommitOthersRules.canCommit(reviewTicked: selected.count, extras: extras.count) && !committing
             && store.commitLockReason == nil && (store.canCommit || !toAccept.isEmpty || !extras.isEmpty)
@@ -105,7 +107,8 @@ struct CommitSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Commit accepted changes").font(.headline)
+                // §68.8: with no review file, only the user's own changes — nothing "accepted" to commit.
+                if othersOnly { Text("Commit changes").font(.headline) } else { Text("Commit accepted changes").font(.headline) }
                 Spacer()
                 Picker("Commit mode", selection: Binding(get: { split }, set: { setSplit($0) })) {
                     Text("Commit at once").tag(false)
@@ -180,7 +183,13 @@ struct CommitSheet: View {
 
     /// "Commit at once": the message, the files, push and Commit.
     @ViewBuilder private var single: some View {
-        Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD"). A ticked pending file is marked reviewed (accepted) first; rejected files are left alone.")
+        Group {
+            if othersOnly {
+                Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD") as they are — they are not reviewed and nothing is marked accepted.")
+            } else {
+                Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD"). A ticked pending file is marked reviewed (accepted) first; rejected files are left alone.")
+            }
+        }
             .font(.callout).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         TextEditor(text: $message)
@@ -192,6 +201,7 @@ struct CommitSheet: View {
             .accessibilityIdentifier("Commit message")
         // wave3 mac-flow (§36.11): Claude drafts the message (read-only); it only fills the field above.
         CommitDraftRow(message: $message, paths: listed.filter { selected.contains($0) })
+        if !othersOnly {   // §68.8: no empty "No accepted files" box over the user's own changes
         HStack {
             Text("Files (\(selected.count) of \(listed.count))").font(.subheadline.weight(.medium))
             Spacer()
@@ -247,6 +257,7 @@ struct CommitSheet: View {
         .frame(minHeight: 60, maxHeight: 160)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
         .accessibilityIdentifier("Commit files")
+        }
         if !others.isEmpty || othersTruncated {
             otherChangesGroup   // MARK: git-sync (§68.5)
         }
@@ -355,7 +366,7 @@ struct CommitSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(6)
         }
-        .frame(minHeight: 40, maxHeight: 120)
+        .frame(minHeight: 40, maxHeight: othersOnly ? 220 : 120)   // alone in the sheet: the room the review's list leaves
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
         .accessibilityIdentifier("Commit other changes")
     }

@@ -25,3 +25,11 @@ export function extraPathsOf(ticked: ReadonlySet<string>, files: readonly OtherC
 export function otherStatusLetter(f: Pick<OtherChange, "status" | "untracked">): string {
   return f.untracked ? "U" : f.status;
 }
+
+/**
+ * The dialog holds only changes outside the review (no review file to list): titled "Commit changes" — not "Commit
+ * accepted (0)…" — with no empty review list above them (as the Mac's `CommitOthersRules.othersOnly`).
+ */
+export function othersOnly(reviewListed: number, others: number, truncated: boolean): boolean {
+  return reviewListed === 0 && (others > 0 || truncated);
+}

@@ -49,6 +49,13 @@ import Testing
         #expect(CommitOthersRules.canCommit(reviewTicked: 0, extras: 1))
     }
 
+    @Test func aSheetOfOnlyOtherChangesIsNotAboutAcceptedFiles() {
+        #expect(CommitOthersRules.othersOnly(reviewListed: 0, others: 2, truncated: false))
+        #expect(CommitOthersRules.othersOnly(reviewListed: 0, others: 0, truncated: true))   // over 500, none listed
+        #expect(!CommitOthersRules.othersOnly(reviewListed: 1, others: 2, truncated: false))   // the review's files lead
+        #expect(!CommitOthersRules.othersOnly(reviewListed: 0, others: 0, truncated: false))   // nothing at all: as before
+    }
+
     @Test func theSheetOpensForFilesOutsideTheReviewAlone() {
         let store = makeStore()
         var s = ReviewState.empty

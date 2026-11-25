@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { OtherChange, ReviewState } from "@reviewgate/engine";
 import { commitBeforeSwitchBlocker } from "./branchFlow";
-import { extraPathsOf, otherChangesTotal, otherStatusLetter, visibleOthers } from "./commitOthers";
+import { extraPathsOf, otherChangesTotal, otherStatusLetter, othersOnly, visibleOthers } from "./commitOthers";
 import { refusalCodeText } from "./errorCodes";
 import { initI18n } from "./i18n";
 
@@ -37,5 +37,12 @@ describe("§68.5 files outside the review in the commit dialog", () => {
     expect(commitBeforeSwitchBlocker(st())).toBe(refusalCodeText("nothing_to_commit", ""));
     expect(commitBeforeSwitchBlocker(st({ tracked: 1, untracked: 0 }))).toBeNull();
     expect(refusalCodeText("invalid_extra", "b.txt")).toBe("b.txt is no longer a change outside the review — reopen the commit sheet");
+  });
+
+  it("a dialog of only other changes is not about accepted files", () => {
+    expect(othersOnly(0, 2, false)).toBe(true);
+    expect(othersOnly(0, 0, true)).toBe(true); // over 500, none listed
+    expect(othersOnly(1, 2, false)).toBe(false); // the review's files lead
+    expect(othersOnly(0, 0, false)).toBe(false);
   });
 });

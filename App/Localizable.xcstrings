@@ -5505,6 +5505,38 @@
         }
       }
     },
+    "Commit changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 커밋"
+          }
+        }
+      }
+    },
+    "Commits the ticked files on %@ as they are — they are not reviewed and nothing is marked accepted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commits the ticked files on %@ as they are — they are not reviewed and nothing is marked accepted."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 체크한 파일을 지금 내용 그대로 커밋해요. 리뷰를 거치지 않고, 수락으로 표시되는 것도 없어요."
+          }
+        }
+      }
+    },
     "Copy Output": {
       "localizations": {
         "en": {

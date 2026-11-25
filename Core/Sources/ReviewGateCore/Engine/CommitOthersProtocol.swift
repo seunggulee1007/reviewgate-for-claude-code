@@ -114,6 +114,12 @@ public enum CommitOthersRules {
 
     /// The sheet can commit: a review file or a change outside it is ticked.
     public static func canCommit(reviewTicked: Int, extras: Int) -> Bool { reviewTicked + extras > 0 }
+
+    /// The sheet holds only changes outside the review (no review file to list): it is titled "Commit changes" and shows
+    /// no empty "No accepted files" list above them.
+    public static func othersOnly(reviewListed: Int, others: Int, truncated: Bool) -> Bool {
+        reviewListed == 0 && (others > 0 || truncated)
+    }
 }
 
 extension AppState {

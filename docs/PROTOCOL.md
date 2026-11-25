@@ -11438,7 +11438,9 @@ review again, extras-only with a pending review and with none.
   file ticked and then hidden again is not committed). Each row: git's status letter (`U` for untracked, its tooltip says
   what it is), the path (a rename `old → new`), "Hidden from the review" for a file an app ignore pattern hides, and on
   the Mac the file's context menu. The group's tooltip says the files go in as they are: not reviewed, nothing marked
-  accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group.
+  accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group. With no review file to list
+  (only the user's own changes, `othersOnly`) the sheet is titled **Commit changes**, says the files go in as they are, and
+  shows no empty review list above the group.
 - Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
   "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads
   "<path> is no longer a change outside the review — reopen the commit sheet". "Commit in parts" (§53) stays for the
