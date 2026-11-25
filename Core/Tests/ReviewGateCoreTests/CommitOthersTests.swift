@@ -16,7 +16,9 @@ import Testing
     }
 
     @Test func theCommandsAndRepliesOnTheWire() throws {
-        #expect(try json(.commitOthers)["type"] as? String == "commit_others")
+        #expect(try json(.commitOthers())["type"] as? String == "commit_others")
+        #expect(try json(.commitOthers())["paths"] == nil)
+        #expect(try json(.commitOthers(paths: ["a.txt"]))["paths"] as? [String] == ["a.txt"])
         let commit = try json(.commitWithOthers(message: "both", paths: [], extraPaths: ["notes.md"], push: nil))
         #expect(commit["type"] as? String == "commit")
         #expect(commit["paths"] as? [String] == [])   // no review file ticked: not "every accepted file"
@@ -84,6 +86,13 @@ import Testing
         #expect(EngineMessages.refusal(error: "invalid_extra:b.txt") == "b.txt is no longer a change outside the review — reopen the commit sheet")
     }
 
+    @Test func theMessageFollowsTheTickedFilesUntilTyped() {
+        #expect(CommitOthersRules.followingTicks(current: "Update 2 files", lastSuggestion: "Update 2 files", newSuggestion: "Update a.txt") == "Update a.txt")
+        #expect(CommitOthersRules.followingTicks(current: "my words", lastSuggestion: "Update 2 files", newSuggestion: "Update a.txt") == nil)
+        #expect(CommitOthersRules.followingTicks(current: "Update a.txt", lastSuggestion: "Update a.txt", newSuggestion: "Update a.txt") == nil)
+        #expect(CommitOthersRules.followingTicks(current: "x", lastSuggestion: nil, newSuggestion: "Update a.txt") == nil)
+    }
+
     @Test func theSheetAsksForTheOtherChanges() async {
         let store = makeStore()
         var s = ReviewState.empty
@@ -97,6 +106,6 @@ import Testing
         }
         let others = await store.loadOtherChanges()
         #expect(others?.files.map(\.path) == ["README.md"])
-        #expect(sent == [.commitOthers])
+        #expect(sent == [.commitOthers()])
     }
 }

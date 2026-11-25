@@ -158,6 +158,16 @@ struct CommitSheet: View {
                 }
             }
         }
+        .onChange(of: extras) { _, ticked in   // the message names the ticked files (§68.5)
+            guard othersOnly, othersSuggestion != nil else { return }
+            Task {
+                guard let reply = await store.loadOtherChanges(paths: ticked), ticked == extras,
+                      let next = CommitOthersRules.followingTicks(current: message, lastSuggestion: othersSuggestion,
+                                                                  newSuggestion: reply.suggestedMessage) else { return }
+                othersSuggestion = next
+                message = next
+            }
+        }
         .onChange(of: push) { _, on in if let projectKey { AppSettings.setCommitPush(on, root: projectKey) } }
         // polish P5-sheets-09: the split cards are kept for the next opening on the same files; a series that ran is not.
         .onDisappear {

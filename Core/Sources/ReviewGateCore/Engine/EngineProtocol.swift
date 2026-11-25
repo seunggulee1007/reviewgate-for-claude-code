@@ -693,8 +693,8 @@ public enum EngineCommand: Sendable, Equatable {
     case gitFetch(all: Bool = false, auto: Bool = false)
     /// §68.2: the current branch from its upstream, fast-forward only (`rebase`: §68.3) → `.pulled`.
     case gitPull(rebase: Bool = false)
-    /// §68.5: the changed files outside the review → `.commitOthers`.
-    case commitOthers
+    /// §68.5: the changed files outside the review → `.commitOthers`; `paths`: the ticked ones (the suggested message names only those).
+    case commitOthers(paths: [String] = [])
     /// §68.5: `commit` with `extraPaths` — files outside the review committed along (nothing is marked accepted) → `.committed`.
     case commitWithOthers(message: String, paths: [String]?, extraPaths: [String], push: Bool?)
     /// §41.1: `pr_create` with the assignee / labels / reviewers / projects (→ `.prCreated`).
