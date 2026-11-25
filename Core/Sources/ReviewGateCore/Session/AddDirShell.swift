@@ -186,6 +186,7 @@ public enum AddDirShellText {
         case "command_too_long": return String(localized: "The command is too long (at most 10,000 characters)", bundle: .module)
         case "shell_busy": return String(localized: "A shell command is already running — wait or stop it (esc)", bundle: .module)
         case "turn_running": return String(localized: "Claude is working — run the shell command after the turn", bundle: .module)
+        case "shell_running": return String(localized: "Reject is available when the shell command ends", bundle: .module)
         case "no_shell_running": return String(localized: "No shell command is running", bundle: .module)
         default: return nil
         }

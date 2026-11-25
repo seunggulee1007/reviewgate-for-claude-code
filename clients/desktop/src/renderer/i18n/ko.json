@@ -2802,6 +2802,7 @@
   "Reject all leaves these as they are": "모두 거절은 이 파일들을 그대로 둬요",
   "Reject all pending files?": "대기 중인 파일을 모두 거절할까요?",
   "Reject and move to the next pending file (⌘⇧R)": "거절하고 다음 대기 파일로 이동 (⌘⇧R)",
+  "Reject is available when the shell command ends": "거절은 셸 명령이 끝난 뒤에 할 수 있어요",
   "Reject is available when this turn ends": "거절은 이번 턴이 끝난 뒤에 할 수 있어요",
   "Reject scheduled": "거절 예정",
   "Reject the file as it is now — its changes go back to the start of the review": "지금 상태의 파일을 거절해요 — 변경이 리뷰를 시작한 때로 돌아가요",

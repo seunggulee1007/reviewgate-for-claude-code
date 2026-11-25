@@ -90,10 +90,14 @@ extension CommitOthersReply: Decodable {
 extension EngineCommand {
     private enum CommitOthersKeys: String, CodingKey { case message, paths, extraPaths, push }
 
-    /// `commit` with `extraPaths` (`commit_others` has no field; `type` is written by the caller).
+    /// `commit` with `extraPaths` (`commit_others` takes `paths`; `type` is written by the caller).
     func encodeCommitOthersFields(to encoder: Encoder) throws {
-        guard case let .commitWithOthers(message, paths, extraPaths, push) = self else { return }
         var c = encoder.container(keyedBy: CommitOthersKeys.self)
+        if case let .commitOthers(paths) = self {
+            if !paths.isEmpty { try c.encode(paths, forKey: .paths) }
+            return
+        }
+        guard case let .commitWithOthers(message, paths, extraPaths, push) = self else { return }
         try c.encode(message, forKey: .message)
         try c.encodeIfPresent(paths, forKey: .paths)
         if !extraPaths.isEmpty { try c.encode(extraPaths, forKey: .extraPaths) }
@@ -132,6 +136,13 @@ public enum CommitOthersRules {
         guard othersOnly, let othersSuggestion, current == reviewSuggestion || current.isEmpty else { return nil }
         return othersSuggestion
     }
+
+    /// The ticked files changed: the message the reply names them with, when the message is still the one last suggested
+    /// (a draft the user typed over it stays); nil keeps the message.
+    public static func followingTicks(current: String, lastSuggestion: String?, newSuggestion: String?) -> String? {
+        guard let lastSuggestion, let newSuggestion, current == lastSuggestion, newSuggestion != current else { return nil }
+        return newSuggestion
+    }
 }
 
 extension AppState {
@@ -139,10 +150,10 @@ extension AppState {
     public var otherChangeCounts: OtherChangeCounts? { commitState.otherChanges }
 
     /// §68.5 `commit_others`: the changed files outside the review (nil: an older engine, or it failed — logged).
-    public func loadOtherChanges() async -> CommitOthersReply? {
+    public func loadOtherChanges(paths: [String] = []) async -> CommitOthersReply? {
         guard projectInfo != nil, !isShadowProject else { return nil }
         do {
-            let reply = try await typedReply(.commitOthers)
+            let reply = try await typedReply(.commitOthers(paths: paths))
             guard case let .commitOthers(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             return r
         } catch {

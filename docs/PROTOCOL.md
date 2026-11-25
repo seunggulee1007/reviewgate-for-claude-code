@@ -11223,6 +11223,7 @@ shell_cancel {}                     // stops it (its process tree); lane of its 
 // refused: empty_command | command_too_long (> 10 000 chars) | no_project | terminal_chat
 //          | shell_busy (one runs) | turn_running (a turn, its collection, a revert, another session's turn)
 //          | no_shell_running (shell_cancel)
+// reject / reject_all / reject_hunks / reject_undo are refused shell_running while it runs (it writes files — a revert would race it)
 // events
 type ShellOutputEvent = { type: "shell_output"; id: string; output: string };   // its last 4 000 chars, ≤ every 300 ms
 type ShellResultEvent = { type: "shell_result"; turn: number; at: string } & ShellResult;
@@ -11244,7 +11245,9 @@ type ShellResult = {
   sessions get, no stdin (an interactive command gets none — it ends or times out), stdout and stderr in one stream.
   After 10 minutes it is stopped (`timedOut`, the output ends with "[ReviewGate] command timed out …"); `shell_cancel` —
   and `interrupt` while no turn runs, so Esc / Stop work as for a turn — stops it (`cancelled`). One at a time, and only
-  between turns. A chat switch or another project stops it first; its row still lands in the chat it ran in.
+  between turns. While it runs, the reverts (`reject`, `reject_all`, `reject_hunks`, `reject_undo`) are refused
+  `shell_running`; the clients disable their Reject controls with "Reject is available when the shell command ends".
+  A chat switch or another project stops it first; its row still lands in the chat it ran in.
 - **The chat.** While it runs, `state.session.shell` names it and `shell_output` carries its output so far; the send
   gate is closed (`shell_running`), so a message typed meanwhile waits (the clients' queue) and goes out after it. When it
   ends, its row (`kind: "shell"`) joins the chat's transcript and `shell_result` follows.
@@ -11286,7 +11289,9 @@ type ShellResult = {
   history. A refusal keeps the draft with the reason in the notice line.
 - **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time (whole seconds as it
   ticks each second — Mac `ElapsedFormat.ticking`, Windows `formatTicking`; the finished row keeps one decimal under
-  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A
+  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same, and so
+  does Stop with no turn running (Mac ⌘. / Chat › Stop Claude, Windows Ctrl+. and the Stop menu item: they send
+  `shell_cancel` while `state.session.shell` is set, and are idle with neither). A
   message typed meanwhile waits in the queue ("셸 명령이 끝나면 보내요").
 - **The row** (`kind: "shell"`, restored with the chat): `$ command` in monospace, how it ended (✓ 0 · ✗ 종료 코드 n ·
   중지됨 · 시간 초과), the time, the output (monospace, long output folded to its last lines with 전체 보기; "앞부분은
@@ -11390,13 +11395,15 @@ Clients never show an automatic fetch's refusal as an error; `lastFetchError` is
 
 ### 68.5 Committing files outside the review
 
-- `commit_others {}` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
+- `commit_others { paths? }` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
   --untracked-files=all` entry whose path — or a rename's either path — is not a review file; unmerged entries left out.
   `OtherChange = { path, oldPath, status: "M"|"A"|"D"|"R"|"T"|"?", untracked, hidden? }` (`hidden`: an app ignore pattern
   matches it — still the user's file to commit). A read (`query` lane). `suggestedMessage` (absent from an older engine):
   a neutral message for a commit of only these files — `commit.suggestedMessage` is Claude's last instruction, which does
   not describe the user's own edits. From the tracked files (the untracked ones when none): one is named by what happened
   to it ("Update README.md", "Add notes.md", "Delete old.ts", "Rename a.ts to b.ts"), more are counted ("Update 3 files").
+  With `paths` (the files ticked in the sheet) the message names only the listed ones among them — the sheet asks again as
+  the ticks change, so the message follows the selection; none of them listed (or no `paths`): every listed file.
 - `commit { message, paths?, extraPaths?, push? }`: `extraPaths` are committed in the same commit (`git add -A` of each,
   then `git commit --only` of the accepted paths and the extras — a `git mv` rename's old name included). Each must be in
   `commit_others` now, else `invalid_extra:<path>` (`paths`: it) — a review file is accepted, not slipped in as an extra.
@@ -11465,7 +11472,8 @@ review again, extras-only with a pending review and with none.
   accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group. With no review file to list
   (only the user's own changes, `othersOnly`) the sheet is titled **Commit changes**, says the files go in as they are, and
   shows no empty review list above the group. Its message is then `commit_others`' `suggestedMessage` when the message
-  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays (Mac
+  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays. It follows the
+  ticked files (asked again with `paths` on each change of the ticks) while it is still the message last suggested (Mac
   `CommitOthersRules.message`, Windows `othersMessage`).
 - Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
   "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads

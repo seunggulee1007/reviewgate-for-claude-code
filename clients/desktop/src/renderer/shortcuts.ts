@@ -54,7 +54,14 @@ export function useReviewShortcuts(): void {
       // (docs/SHORTCUTS.md). ⌥⌘F is the diff's own (components/UnifiedDiff.tsx).
       const wk = windowKey(e);
       if (wk === "stop") {
-        if (s.dialog || !isRunning(s.state)) return;
+        if (s.dialog) return;
+        if (!isRunning(s.state)) {
+          if (s.state.session.shell != null) {
+            e.preventDefault();
+            s.interrupt(); // §67.2: stops the running `!` command
+          }
+          return;
+        }
         // §57.17: in a terminal chat Stop is Esc to its Claude Code — unless a shell of the bottom panel has the keyboard.
         if (liveTerminalChatId(s.state) !== null) {
           if ((e.target as Element | null)?.closest?.(".shell-panel")) return;

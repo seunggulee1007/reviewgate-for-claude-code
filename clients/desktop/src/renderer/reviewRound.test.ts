@@ -100,6 +100,11 @@ describe("§34.2 accept / reject while a turn runs", () => {
     expect(rejectBlockedReason(st({ phase: "running", turnEndTree: null, reviewEndTree: null }))).toBe("거절은 이번 턴이 끝난 뒤에 할 수 있어요");
     expect(hunkRejectBlockedReason(st({ phase: "running", turnEndTree: null, reviewEndTree: "heldB" }))).toBe("거절은 이번 턴이 끝난 뒤에 할 수 있어요");
     expect(rejectBlockedReason(st({ phase: "collecting", turnEndTree: null }))).toBe("거절은 이번 턴이 끝난 뒤에 할 수 있어요");
+    // §67.2: a `!` shell command writes files — reverts wait for it
+    const shell = { id: "sh1", command: "sleep 9", cwd: "/work/acme", startedAt: "2026-11-24T12:00:00.000Z" };
+    expect(rejectBlockedReason({ ...st({ phase: "reviewing" }), session: { shell } as never })).toBe("거절은 셸 명령이 끝난 뒤에 할 수 있어요");
+    expect(hunkRejectBlockedReason({ ...st({ phase: "reviewing" }), session: { shell } as never })).toBe("거절은 셸 명령이 끝난 뒤에 할 수 있어요");
+    expect(rejectBlockedReason({ ...st({ phase: "reviewing" }), session: { shell: null } as never })).toBeNull();
     expect(rejectBlockedReason(st({ phase: "reverting" }))).toBe("되돌리는 중…");
   });
 

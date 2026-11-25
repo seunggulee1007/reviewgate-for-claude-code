@@ -61,7 +61,7 @@ struct ChatCommands: Commands {
             Divider()
             Button("Stop Claude") { store?.interrupt() }
                 .keyboardShortcut(".", modifiers: .command)
-                .disabled(!menu.isRunning)
+                .disabled(!menu.isRunning && !menu.shellRunning)
                 .accessibilityIdentifier("Chat menu Stop")
             Button("Commands…") { model?.commandsTick += 1 }
                 .keyboardShortcut("/", modifiers: .command)

@@ -249,6 +249,7 @@ export const REFUSAL_CODES = [
   "empty_command",
   "command_too_long",
   "shell_busy",
+  "shell_running",
   "turn_running",
   "no_shell_running",
 ] as const;
@@ -856,6 +857,8 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("The command is too long (at most 10,000 characters).");
     case "shell_busy":
       return t("A shell command is already running — wait for it or stop it");
+    case "shell_running":
+      return t("Reject is available when the shell command ends");
     case "turn_running":
       return t("Claude is working — run the command once the turn ends");
     case "no_shell_running":

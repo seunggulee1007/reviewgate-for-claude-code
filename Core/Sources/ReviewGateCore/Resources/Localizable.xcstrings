@@ -12871,6 +12871,22 @@
         }
       }
     },
+    "Reject is available when the shell command ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reject is available when the shell command ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "거절은 셸 명령이 끝난 뒤에 할 수 있어요"
+          }
+        }
+      }
+    },
     "Reject is available when this turn ends": {
       "localizations": {
         "en": {

@@ -1311,6 +1311,7 @@ export class ReviewEngine {
         await this.rejectUndo(cmd.path);
         return;
       case "reject":
+        this.guardNoShell();
         // M32 (§34.2): while a turn runs on a standing review the reject waits for its end; Claude is told at once.
         if (this.rejectSchedulable()) {
           await this.scheduleRejects(Array.isArray(cmd.paths) ? cmd.paths : []);
@@ -1321,6 +1322,7 @@ export class ReviewEngine {
         this.autoRetry = "rejected"; // MARK: wave5 w5-model (§43.4)
         return;
       case "reject_all": {
+        this.guardNoShell();
         const scheduled = this.rejectSchedulable(); // M32 (§34.2)
         if (!scheduled) this.guardReviewMutation();
         // §31: changes nothing of Claude's explains stay unless the user explicitly includes them.
@@ -1341,6 +1343,7 @@ export class ReviewEngine {
         return reply;
       }
       case "reject_hunks":
+        this.guardNoShell();
         this.guardReviewMutation();
         await this.rejectHunks(cmd.path, Array.isArray(cmd.hunks) ? cmd.hunks : [], cmd.expectedEndTree ?? null, cmd.expectedBaseTree ?? null);
         this.autoRetry = "rejected"; // MARK: wave5 w5-model (§43.4)
@@ -1485,7 +1488,7 @@ export class ReviewEngine {
       case "git_pull":
         return this.gitPull(cmd.rebase === true);
       case "commit_others":
-        return this.commitOthers();
+        return this.commitOthers(cmd.paths);
       case "commit_hunks": // §53
         return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
       case "commit_series":
@@ -5181,6 +5184,10 @@ export class ReviewEngine {
    * MARK: wave3 check-engine — §37.1: so are they while a collection failed (`collect_failed`): a revert moved B, and
    * `retry_collect` — which collects only while B is unset — then did nothing (the turn never reached the review).
    */
+  private guardNoShell(): void {
+    if (this.shellRun) throw new CommandRefused("shell_running"); // §67.2: a `!` command is writing files — a revert would race it
+  }
+
   private guardReviewMutation(): void {
     if (this.gate.running || this.gate.collecting) throw new CommandRefused("session_running");
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
@@ -5242,6 +5249,7 @@ export class ReviewEngine {
   /** `reject_undo`: refusals are `result{ok:false}` (and the state says why); a git failure also emits `error{scope:"git"}`. */
   private async rejectUndo(path: unknown): Promise<void> {
     if (typeof path !== "string" || path.length === 0) throw new CommandRefused("invalid_path");
+    this.guardNoShell();
     this.guardReviewMutation();
     const run = this.gate.undoReject(path);
     this.touch();
@@ -5779,14 +5787,16 @@ export class ReviewEngine {
   }
 
   /** MARK: git-sync — §68.5 `commit_others`: the changed files outside the review (≤ `MAX_OTHER_CHANGES`). Reads only. */
-  private async commitOthers(): Promise<CommitOthersEvent> {
+  private async commitOthers(ticked?: unknown[]): Promise<CommitOthersEvent> {
     const cp = this.requireProject();
     const files = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    // `paths` (the ticked files): the message names those; none of them listed (or none given): every listed file.
+    const named = Array.isArray(ticked) ? files.filter((f) => ticked.includes(f.path)) : [];
     return {
       type: "commit_others",
       files: files.slice(0, MAX_OTHER_CHANGES),
       truncated: files.length > MAX_OTHER_CHANGES,
-      suggestedMessage: suggestOthersMessage(files),
+      suggestedMessage: suggestOthersMessage(named.length > 0 ? named : files),
     };
   }
 

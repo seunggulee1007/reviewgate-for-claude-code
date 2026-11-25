@@ -51,17 +51,19 @@ export function acceptBlockedReason(s: Pick<ReviewState, "gate">): string | null
  * `collect_failed` until it succeeded. r2-review-flow — M32 (§34.2): during a turn on a standing review (the held B) a reject
  * is taken and applied right after the turn's collection; only a fresh turn (nothing pending) and the collection wait.
  */
-export function rejectBlockedReason(s: Pick<ReviewState, "gate">): string | null {
+export function rejectBlockedReason(s: Pick<ReviewState, "gate"> & Partial<Pick<ReviewState, "session">>): string | null {
   const g = s.gate;
   if (g.phase === "reverting") return t("Reverting…");
+  if (s.session?.shell != null) return t("Reject is available when the shell command ends"); // §67.2: a `!` command is writing files
   if (g.phase === "collecting") return t("Reject is available when this turn ends");
   if (g.phase === "running" && !(hasReviewRound2(g) && diffTreeOf(g) !== null)) return t("Reject is available when this turn ends");
   return collectFailedReason(s);
 }
 
 /** Why reject_hunks cannot be offered now: hunk ids belong to a diff the running turn may change — it waits for the turn's end. */
-export function hunkRejectBlockedReason(s: Pick<ReviewState, "gate">): string | null {
+export function hunkRejectBlockedReason(s: Pick<ReviewState, "gate"> & Partial<Pick<ReviewState, "session">>): string | null {
   if (s.gate.phase === "reverting") return t("Reverting…");
+  if (s.session?.shell != null) return t("Reject is available when the shell command ends");
   if (isTurnActive(s.gate)) return t("Reject is available when this turn ends");
   return collectFailedReason(s);
 }

@@ -1008,7 +1008,7 @@ public final class AppState {
 
     /// §28: `interrupt` also answers an open permission card (deny) — the card shows that right away.
     public func interrupt() {
-        guard isRunning else { return }
+        guard isRunning else { cancelShell(); return }   // §67.2: no turn, but a `!` command runs — Stop (⌘.) stops that
         // MARK: terminal-chat (§57.5): the TUI owns the turn — Esc into its PTY, as typed.
         if isTerminalChat { onTerminalInterrupt?(); return }
         markPendingPermissionInterrupted()
@@ -1968,6 +1968,10 @@ public final class AppState {
         guard !hunks.isEmpty, changedFiles.contains(where: { $0.path == file.path && $0.state == .pending }) else { return false }
         if isReviewLocked {
             hunkRefusal = (file.path, HunkRefusal.from(isReverting ? "reverting" : "session_running"))
+            return false
+        }
+        if shellRun != nil {   // §67.2: a `!` command is writing files
+            hunkRefusal = (file.path, HunkRefusal.from("shell_running"))
             return false
         }
         if collectFailedLockReason != nil {   // §37.1: the engine refuses it until the failed collection was retried
