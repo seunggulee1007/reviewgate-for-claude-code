@@ -62,8 +62,8 @@ targets:
       base:
         PRODUCT_NAME: ReviewGate
         PRODUCT_BUNDLE_IDENTIFIER: io.github.seunggulee1007.reviewgate
-        MARKETING_VERSION: "0.5.30"
-        CURRENT_PROJECT_VERSION: "604"
+        MARKETING_VERSION: "0.5.31"
+        CURRENT_PROJECT_VERSION: "609"
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_IDENTITY: "Apple Development"
