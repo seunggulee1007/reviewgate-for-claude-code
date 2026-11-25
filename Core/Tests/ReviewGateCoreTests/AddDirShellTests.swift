@@ -144,6 +144,18 @@ import Testing
         #expect(fired == [.shellCancel])
     }
 
+    @Test func stopAlsoStopsARunningShellCommand() {
+        let app = makeState()
+        var fired: [EngineCommand] = []
+        app.commandSink = { fired.append($0) }
+        app.interrupt()
+        #expect(fired.isEmpty)   // nothing runs: nothing to stop
+        app.handle(.state(snapshot(seq: 1, shell: ShellRunInfo(id: "sh1", command: "sleep 9"))))
+        #expect(!app.isRunning)
+        app.interrupt()
+        #expect(fired == [.shellCancel])
+    }
+
     @Test func addDirSaysWhyItWasRefused() async {
         let app = makeState()
         app.handle(.state(snapshot(seq: 1)))

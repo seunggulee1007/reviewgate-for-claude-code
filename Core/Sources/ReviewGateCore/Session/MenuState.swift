@@ -74,6 +74,8 @@ public struct MenuState: Equatable, Sendable {
     // MARK: r2-chats-cards — polish P4-composer-05: the Chat menu's Stop, history, next / previous tab and mode
     /// Claude works: Chat › Claude 중지 (⌘.).
     public var isRunning = false
+    /// A `!` command runs (§67.2): Stop stops it too.
+    public var shellRunning = false
     /// The engine keeps chats (M15): history and renaming.
     public var hasChatSessions = false
     /// The chat on screen (the live one, or one shown read-only), for next / previous tab.
@@ -125,6 +127,7 @@ public struct MenuState: Equatable, Sendable {
         chatTabs = store.openTabs.prefix(9).map { ChatMenuTab(id: $0.id, title: $0.title, isCurrent: $0.id == live) }
         canCloseShownTab = store.shownChatId.map { store.canCloseTab(id: $0) } ?? false
         isRunning = store.isRunning
+        shellRunning = store.shellRun != nil
         hasChatSessions = store.hasChatSessions
         shownChatId = store.shownChatId
         permissionMode = store.scheduledPermissionMode ?? store.permissionMode
