@@ -62,6 +62,11 @@ struct CommitSheet: View {
     /// §53: "나눠서 커밋" — and its cards, kept while the sheet is open (back and forth between the modes).
     @State private var split: Bool
     @State private var splitSession: CommitSplitSession?
+    // MARK: git-sync — §68.5: changed files outside the review, none ticked at first; untracked ones only when asked for.
+    @State private var others: [OtherChange] = []
+    @State private var othersTruncated = false
+    @State private var showUntracked = false
+    @State private var extraSelected: Set<String> = []
 
     /// `splitPreview`: open in "나눠서 커밋" with these files and cards (the screenshot tour).
     init(splitPreview: CommitSplitSession? = nil) {
@@ -77,9 +82,13 @@ struct CommitSheet: View {
     /// The ticked files that are still pending.
     private var toAccept: [String] { CommitAcceptRules.toAccept(ticked: selected, files: store.changedFiles) }
     private var trimmedMessage: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// §68.5: the ticked files outside the review that are still listed.
+    private var extras: [String] { CommitOthersRules.extraPaths(ticked: extraSelected, files: others, showUntracked: showUntracked) }
+    private var visibleOthers: [OtherChange] { CommitOthersRules.visible(others, showUntracked: showUntracked) }
+    private var untrackedCount: Int { others.filter(\.untracked).count }
     private var canSubmit: Bool {
-        !trimmedMessage.isEmpty && !selected.isEmpty && !committing && store.commitLockReason == nil
-            && (store.canCommit || !toAccept.isEmpty)
+        !trimmedMessage.isEmpty && CommitOthersRules.canCommit(reviewTicked: selected.count, extras: extras.count) && !committing
+            && store.commitLockReason == nil && (store.canCommit || !toAccept.isEmpty || !extras.isEmpty)
     }
     private var commitTitle: String {
         if !toAccept.isEmpty {
@@ -128,6 +137,12 @@ struct CommitSheet: View {
                 split = true
             }
             if let projectKey { push = AppSettings.commitPush(root: projectKey) }
+        }
+        .task {   // MARK: git-sync — §68.5: the second group (an older engine: none)
+            if let reply = await store.loadOtherChanges() {
+                others = reply.files
+                othersTruncated = reply.truncated
+            }
         }
         .onChange(of: push) { _, on in if let projectKey { AppSettings.setCommitPush(on, root: projectKey) } }
         // polish P5-sheets-09: the split cards are kept for the next opening on the same files; a series that ran is not.
@@ -229,6 +244,9 @@ struct CommitSheet: View {
         .frame(minHeight: 60, maxHeight: 160)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
         .accessibilityIdentifier("Commit files")
+        if !others.isEmpty || othersTruncated {
+            otherChangesGroup   // MARK: git-sync (§68.5)
+        }
         if !ignoredAccepted.isEmpty {
             Label(String(localized: "\(ignoredAccepted.count) gitignored file(s) are not committable: \(ignoredAccepted.joined(separator: ", "))"),
                   systemImage: "nosign")
@@ -287,6 +305,58 @@ struct CommitSheet: View {
         }
     }
 
+    /// MARK: git-sync — §68.5: "Other changes" — files changed outside the review (the user's own edits, files that were
+    /// dirty before the turn), none ticked; committed as they are, never reviewed or marked accepted.
+    @ViewBuilder private var otherChangesGroup: some View {
+        HStack {
+            Text("Other changes (\(extras.count) of \(visibleOthers.count))").font(.subheadline.weight(.medium))
+                .help("Files changed outside the review — your own edits, or files changed before Claude's turn. Ticked, they go into this commit as they are: they are not reviewed and nothing is marked accepted.")
+            Spacer()
+            if untrackedCount > 0 {
+                Toggle(isOn: $showUntracked) { Text("Untracked (\(untrackedCount))") }
+                    .toggleStyle(.checkbox)
+                    .controlSize(.small)
+                    .help("Also list new files git does not track yet")
+                    .accessibilityIdentifier("Commit show untracked")
+            }
+        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(visibleOthers) { file in
+                    Toggle(isOn: Binding(
+                        get: { extraSelected.contains(file.path) },
+                        set: { if $0 { extraSelected.insert(file.path) } else { extraSelected.remove(file.path) } })) {
+                        HStack(spacing: 6) {
+                            Text(verbatim: file.untracked ? "U" : file.status)
+                                .font(.caption.monospaced().weight(.semibold)).foregroundStyle(.secondary)
+                                .frame(width: 14)
+                                .help(file.untracked ? String(localized: "Untracked — a new file git does not track yet") : String(localized: "Changed outside the review"))
+                            TruncatedText(file.oldPath.map { "\($0) → \(file.path)" } ?? file.path).font(.callout.monospaced())
+                            if file.hidden {
+                                Text("Hidden from the review").font(.caption2).foregroundStyle(.secondary)
+                                    .help("An ignore pattern in Settings hides this file from the review; it can still be committed")
+                            }
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .contextMenu { FilePathMenuItems(path: file.path, showsDiff: false) }
+                    .accessibilityIdentifier("Commit other \(file.path)")
+                }
+                if visibleOthers.isEmpty {
+                    Text("No tracked changes outside the review").font(.callout).foregroundStyle(.secondary)
+                }
+                if othersTruncated {
+                    Text("Only the first 500 files are listed").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+        }
+        .frame(minHeight: 40, maxHeight: 120)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
+        .accessibilityIdentifier("Commit other changes")
+    }
+
     private func commit() {
         guard canSubmit else { return }
         committing = true
@@ -295,6 +365,7 @@ struct CommitSheet: View {
         let accepting = toAccept
         let text = trimmedMessage
         let pushNow = push
+        let extraPaths = extras   // §68.5: committed along, never accepted
         Task {
             // r2-review-flow M28: the ticked pending files are accepted first (the engine commits accepted files only).
             guard await store.acceptForCommit(accepting) else {
@@ -302,7 +373,7 @@ struct CommitSheet: View {
                 error = store.lastError.map(commitRefusalText) ?? String(localized: "Could not commit")
                 return
             }
-            let result = await store.commitAccepted(message: text, paths: paths, push: pushNow)
+            let result = await store.commitAccepted(message: text, paths: paths, push: pushNow, extraPaths: extraPaths)
             committing = false
             if result != nil {
                 store.flow.commitMessageDraft = nil   // committed: the next sheet starts from the next suggestion

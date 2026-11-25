@@ -98,6 +98,7 @@ public enum EngineMessages {
         if let text = AutoModeText.refusal(code: code) { return text }   // wave4b w4b-auto (§39.5)
         if let text = TerminalChatText.refusal(code: code) { return text }   // MARK: terminal-chat (§57.1)
         if let text = TaskStartText.refusal(code: code, detail: detail) { return text }   // MARK: task-start (§63)
+        if let text = GitSyncText.refusal(code: code, detail: detail) { return text }   // MARK: git-sync (§68)
         // Failures whose `error` is the underlying (English) text rather than `code:<detail>`.
         let underlying = plainGitFailure(detail.isEmpty && raw != code && codeWord(raw) != code ? raw : detail)
         switch code {

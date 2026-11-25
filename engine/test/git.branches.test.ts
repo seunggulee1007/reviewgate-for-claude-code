@@ -65,17 +65,17 @@ describe("git branches", () => {
   it("worktreeStatus: untracked and ignored-pattern paths never block a switch; renames count by either path", async () => {
     const dir = track(makeBranchRepo());
     const cp = await openCheckpoint(dir);
-    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: false, blocksSwitch: false });
+    expect(await worktreeStatus(cp, [".omc/"])).toMatchObject({ dirty: false, blocksSwitch: false });
     write(dir, "u.txt", "u\n");
     write(dir, ".omc/x.json", "{}\n");
-    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: false });
+    expect(await worktreeStatus(cp, [".omc/"])).toMatchObject({ dirty: true, blocksSwitch: false });
     write(dir, "a.txt", "b\n");
-    expect(await worktreeStatus(cp, [".omc/"])).toEqual({ dirty: true, blocksSwitch: true });
-    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: false });
+    expect(await worktreeStatus(cp, [".omc/"])).toMatchObject({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt"])).toMatchObject({ dirty: true, blocksSwitch: false });
     write(dir, "a.txt", "a\n");
     sh(dir, "mv", "a.txt", "renamed with space.txt");
-    expect(await worktreeStatus(cp, ["a.txt"])).toEqual({ dirty: true, blocksSwitch: true });
-    expect(await worktreeStatus(cp, ["a.txt", "renamed"])).toEqual({ dirty: true, blocksSwitch: false });
+    expect(await worktreeStatus(cp, ["a.txt"])).toMatchObject({ dirty: true, blocksSwitch: true });
+    expect(await worktreeStatus(cp, ["a.txt", "renamed"])).toMatchObject({ dirty: true, blocksSwitch: false });
   });
 
   it("defaultBranch: origin/HEAD, else main / master", async () => {

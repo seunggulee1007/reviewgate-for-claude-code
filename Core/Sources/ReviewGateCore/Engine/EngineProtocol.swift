@@ -298,6 +298,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     /// M12: the commit sheet's "Push to origin" default and the trailer line appended to every message.
     public var commitPushByDefault: Bool?
     public var commitTrailer: String?
+    /// MARK: git-sync — §68.4: `git_fetch {auto}` runs (nil: the engine's default, on).
+    public var autoFetch: Bool? = nil
     // MARK: wave3 mac-flow
     /// §36.11: the format `commit_draft` asks for, kept per project in the app ("" clears it; live).
     public var commitTemplate: String?
@@ -677,6 +679,15 @@ public enum EngineCommand: Sendable, Equatable {
     /// §53: the commits in order (the hooks run, the worktree untouched), then one push when `push` (nil: the engine's
     /// default) → `.committedSeries`.
     case commitSeries(commits: [CommitPlan], push: Bool? = nil)
+    // MARK: git-sync (§68)
+    /// §68.1: `git fetch --prune` of the upstream's remote (`all`: every remote; `auto`: the throttled, quiet one) → `.fetched`.
+    case gitFetch(all: Bool = false, auto: Bool = false)
+    /// §68.2: the current branch from its upstream, fast-forward only (`rebase`: §68.3) → `.pulled`.
+    case gitPull(rebase: Bool = false)
+    /// §68.5: the changed files outside the review → `.commitOthers`.
+    case commitOthers
+    /// §68.5: `commit` with `extraPaths` — files outside the review committed along (nothing is marked accepted) → `.committed`.
+    case commitWithOthers(message: String, paths: [String]?, extraPaths: [String], push: Bool?)
     /// §41.1: `pr_create` with the assignee / labels / reviewers / projects (→ `.prCreated`).
     case prCreateMeta(base: String, title: String?, body: String?, draft: Bool?, meta: PRCreateMeta)
     // MARK: wave4c w4c-review
@@ -866,6 +877,10 @@ public enum EngineCommand: Sendable, Equatable {
         case .commitHunks: "commit_hunks"   // §53
         case .commitSplitDraft: "commit_split_draft"
         case .commitSeries: "commit_series"
+        case .gitFetch: "git_fetch"   // MARK: git-sync (§68)
+        case .gitPull: "git_pull"
+        case .commitOthers: "commit_others"
+        case .commitWithOthers: "commit"
         case .prCreateMeta: "pr_create"
         case .historyFileLines: "history_file_lines"   // wave4c w4c-review
         case .prFileLines: "pr_file_lines"
@@ -1255,6 +1270,10 @@ extension EngineCommand: Encodable {
             try encodeTeamFormatFields(to: encoder)
         case .commitHunks, .commitSplitDraft, .commitSeries:   // §53
             try encodeCommitSeriesFields(to: encoder)
+        case .gitFetch, .gitPull:   // MARK: git-sync (§68)
+            try encodeGitSyncFields(to: encoder)
+        case .commitOthers, .commitWithOthers:   // §68.5
+            try encodeCommitOthersFields(to: encoder)
         case let .accept(paths), let .unaccept(paths):
             try c.encode(paths, forKey: .paths)
         case let .reject(paths, force, to):
@@ -2203,6 +2222,8 @@ public struct BranchesInfo: Codable, Sendable, Equatable {
     /// §36.12: remote-tracking branches (`origin/develop`) as workbench bases — never offered for switching; nil from
     /// engines before §36.12 (the workbench sheet then hides remote bases, fetch, copy and setup).
     public var remotes: RemoteBranchList? = nil
+    /// MARK: git-sync — §68: fetch / pull of the current branch; nil from an older engine (Fetch and Pull are hidden then).
+    public var sync: GitSyncState? = nil
 }
 
 /// `state.pr`: the engine's PR store (`PRFile.patch` is never on the wire; see `pr_select_file`).
@@ -2429,19 +2450,22 @@ public struct CommitState: Codable, Sendable, Equatable {
     public var identity: CommitIdentity
     /// The engine's `suggestCommitMessage()`: first line of the last instruction + `Files:` list.
     public var suggestedMessage: String
+    /// MARK: git-sync — §68.5: changed files outside the review (nil from an older engine).
+    public var otherChanges: OtherChangeCounts?
 
     public init(lastCommit: LastCommit? = nil, canCommit: Bool = false, acceptedPaths: [String] = [],
-                identity: CommitIdentity = CommitIdentity(), suggestedMessage: String = "") {
+                identity: CommitIdentity = CommitIdentity(), suggestedMessage: String = "", otherChanges: OtherChangeCounts? = nil) {
         self.lastCommit = lastCommit
         self.canCommit = canCommit
         self.acceptedPaths = acceptedPaths
         self.identity = identity
         self.suggestedMessage = suggestedMessage
+        self.otherChanges = otherChanges
     }
 
     public static let empty = CommitState()
 
-    private enum CodingKeys: String, CodingKey { case lastCommit, canCommit, acceptedPaths, identity, suggestedMessage }
+    private enum CodingKeys: String, CodingKey { case lastCommit, canCommit, acceptedPaths, identity, suggestedMessage, otherChanges }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -2450,7 +2474,8 @@ public struct CommitState: Codable, Sendable, Equatable {
             canCommit: try c.decodeIfPresent(Bool.self, forKey: .canCommit) ?? false,
             acceptedPaths: try c.decodeIfPresent([String].self, forKey: .acceptedPaths) ?? [],
             identity: try c.decodeIfPresent(CommitIdentity.self, forKey: .identity) ?? CommitIdentity(),
-            suggestedMessage: try c.decodeIfPresent(String.self, forKey: .suggestedMessage) ?? "")
+            suggestedMessage: try c.decodeIfPresent(String.self, forKey: .suggestedMessage) ?? "",
+            otherChanges: lenientValue(OtherChangeCounts.self, c, .otherChanges))
     }
 }
 
@@ -3061,6 +3086,13 @@ public enum EngineEvent: Sendable, Equatable {
     case commitSplitDraft(CommitSplitDraftReply)
     /// Reply to `commit_series`.
     case committedSeries(CommittedSeries)
+    // MARK: git-sync (§68)
+    /// Reply to `git_fetch`.
+    case fetched(FetchedReply)
+    /// Reply to `git_pull`.
+    case pulled(PulledReply)
+    /// Reply to `commit_others` (§68.5).
+    case commitOthers(CommitOthersReply)
     // MARK: §52 background work
     /// A turn Claude started itself (`turn` is its number); its row opens the turn.
     case autoTurn(turn: Int, info: AutoTurnInfo)
@@ -3145,6 +3177,9 @@ public enum EngineEvent: Sendable, Equatable {
         case let .commitHunks(reply): reply.id   // §53
         case let .commitSplitDraft(reply): reply.id
         case let .committedSeries(reply): reply.id
+        case let .fetched(reply): reply.id   // MARK: git-sync (§68)
+        case let .pulled(reply): reply.id
+        case let .commitOthers(reply): reply.id
         case let .taskOutput(reply): reply.id   // §52
         case let .taskBackground(reply): reply.id
         case let .fileLines(reply): reply.id   // wave4c w4c-review
@@ -3418,6 +3453,12 @@ extension EngineEvent: Decodable {
             self = .navIndex(try NavIndexReply(from: decoder))
         case "task_fetched":   // MARK: task-start (§63)
             self = .taskFetched(try TaskFetchedReply(from: decoder))
+        case "fetched":   // MARK: git-sync (§68)
+            self = .fetched(try FetchedReply(from: decoder))
+        case "pulled":
+            self = .pulled(try PulledReply(from: decoder))
+        case "commit_others":
+            self = .commitOthers(try CommitOthersReply(from: decoder))
         case "plan_proposed":
             self = .planProposed(
                 path: try c.decodeIfPresent(String.self, forKey: .path),

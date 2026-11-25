@@ -287,6 +287,15 @@ export function GitPane({ settings }: PaneProps) {
         </div>
         <div className="note">{t("Appended as the last line of every commit message made from here (e.g. Co-Authored-By: …). Empty adds nothing.")}</div>
       </section>
+      {/* MARK: git-sync — §68.4 */}
+      <section>
+        <h4>{t("Fetch and Pull")}</h4>
+        <label className="check" data-setting="autoFetch">
+          <input type="checkbox" checked={settings.autoFetch !== false} onChange={(e) => patch({ autoFetch: e.target.checked })} data-testid="Fetch automatically" />
+          {t("Fetch automatically")}
+        </label>
+        <div className="note">{t("A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu.")}</div>
+      </section>
       <div className="caption muted">{t("The commit message template, workbench setup and PR command of the open repository are in Project.")}</div>
     </div>
   );

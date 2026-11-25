@@ -315,6 +315,8 @@ export type Settings = {
   commitPushByDefault?: boolean;
   /** Appended to every commit message as a trailer line when non-empty (e.g. "Co-Authored-By: …"). */
   commitTrailer?: string;
+  /** MARK: git-sync — §68.4: `git_fetch {auto: true}` (window focus, project open) runs at most every 5 minutes; false: never (default true). */
+  autoFetch?: boolean;
   /** Restart the Claude session once (2 s backoff, at most once per turn) when it dies unexpectedly (default true). */
   autoRestartSession?: boolean;
   /** Read-only Bash commands (docs/M16-FRICTION.md §1) run without a permission_request (default true). */
@@ -766,7 +768,8 @@ export type EngineCommand =
   | Cmd<"workbench_remove", { path: string; force?: boolean }>
   | Cmd<"workbench_prune">
   | Cmd<"pr_create", { base: string; title?: string; body?: string; draft?: boolean } & PRCreateMeta>
-  | Cmd<"commit", { message: string; paths?: string[]; push?: boolean }>
+  /** §68.5 `extraPaths`: changed files outside the review (`commit_others`) committed along; never marked accepted. */
+  | Cmd<"commit", { message: string; paths?: string[]; extraPaths?: string[]; push?: boolean }>
   | Cmd<"push">
   | Cmd<"refresh", { scope?: RefreshScope[] }>
   | Cmd<"session_list">
@@ -889,6 +892,13 @@ export type EngineCommand =
   | Cmd<"commit_series", { commits: CommitPlan[]; push?: boolean }>
   /** §53: Claude's proposal of the split in a read-only fork (side lane); replies `commit_split_draft`. `paths` as `commit`. */
   | Cmd<"commit_split_draft", { paths?: string[] }>
+  // MARK: git-sync — §68
+  /** §68.1: `git fetch --prune` of the upstream's remote (else `origin`), every remote with `all`; `auto` is the throttled, quiet one; replies `fetched`. */
+  | Cmd<"git_fetch", { all?: boolean; prune?: boolean; auto?: boolean }>
+  /** §68.2: the current branch from its upstream — fast-forward only; `rebase` (§68.3) only on a clean tree with no review; replies `pulled`. */
+  | Cmd<"git_pull", { rebase?: boolean }>
+  /** §68.5: changed files outside the review (the commit sheet's second group); replies `commit_others`. */
+  | Cmd<"commit_others">
   // MARK: wave4d w4d-config — §42.3
   /** A CLAUDE.md / CLAUDE.local.md of this project (`path` project-relative, or absolute inside it); replies `claude_md`. */
   | Cmd<"claude_md_read", { path: string }>
@@ -1475,7 +1485,78 @@ export type BranchesState = {
   defaultBranch: string | null;
   /** §36.12: remote-tracking branches (`origin/develop`) as bases for `workbench_create`; never in `list` (no switching to them). */
   remotes?: RemoteBranchInfo[];
+  /** MARK: git-sync — §68: fetch / pull of the current branch; absent from an older engine. */
+  sync?: RemoteSyncState;
 };
+
+// ---------------------------------------------------------------- MARK: git-sync — §68 fetch and pull
+
+/** §68.2: an unfinished git operation in the worktree. */
+export type GitOperation = "merge" | "rebase" | "cherry-pick" | "revert";
+
+/** §68.2: why `git_pull` is refused right now (null: allowed). `busy`: a fetch or pull runs. */
+export type PullBlocker =
+  | { kind: "running" }
+  | { kind: "busy" }
+  | { kind: "detached" }
+  | { kind: "noUpstream" }
+  | { kind: "operation"; operation: GitOperation };
+
+/** §68.1: why `git_fetch` is refused right now (null: allowed). */
+export type FetchBlocker = { kind: "noRemote" } | { kind: "busy" };
+
+export type RemoteSyncState = {
+  /** A `git_fetch` (or the fetch of a pull) runs. */
+  fetching: boolean;
+  /** A `git_pull` runs. */
+  pulling: boolean;
+  /** ISO-8601 of the last fetch that succeeded (this engine), null before one. */
+  lastFetchAt: string | null;
+  /** `fetch_failed:<git's line>` of the last fetch when it failed (an automatic one included); null after a success. */
+  lastFetchError: string | null;
+  /** `git remote`, in git's order. */
+  remotes: string[];
+  /** The current branch's upstream (`origin/main`); null: none / detached. Its ahead / behind are the current branch's in `list`. */
+  upstream: string | null;
+  operation: GitOperation | null;
+  pullBlocker: PullBlocker | null;
+  fetchBlocker: FetchBlocker | null;
+  /** `settings.autoFetch` is not false. */
+  autoFetch: boolean;
+};
+
+/** §68.1: reply to `git_fetch`. `skipped`: an automatic fetch that did not run (off, too soon, no remote, one running). */
+export type FetchedEvent = {
+  type: "fetched";
+  id?: string;
+  remotes: string[];
+  skipped?: true;
+  /** The current branch against its upstream after the fetch; null without one. */
+  ahead: number | null;
+  behind: number | null;
+};
+
+/** §68.2: reply to `git_pull`. `mode` `up_to_date`: nothing came in (`from` = `to`). */
+export type PulledEvent = {
+  type: "pulled";
+  id?: string;
+  branch: string;
+  upstream: string;
+  mode: "up_to_date" | "fast_forward" | "rebase";
+  from: string;
+  to: string;
+  /** Commits that came in (`from..upstream`). */
+  commits: number;
+  /** Paths the pull changed (≤ 200), and how many in all. */
+  files: string[];
+  fileCount: number;
+};
+
+/** §68.5: a changed file outside the review. `status` as `git status` (`?` untracked); `hidden`: an ignore pattern of the app matches it. */
+export type OtherChange = { path: string; oldPath: string | null; status: "M" | "A" | "D" | "R" | "T" | "?"; untracked: boolean; hidden?: true };
+
+/** §68.5: reply to `commit_others` (≤ 500 files; `truncated` when there were more). */
+export type CommitOthersEvent = { type: "commit_others"; id?: string; files: OtherChange[]; truncated: boolean };
 
 export type SubmitResultState = { reviewURL: string; inlineCount: number; event: ReviewEvent; submittedAt: string };
 
@@ -1545,6 +1626,8 @@ export type CommitIdentity = { name: string | null; email: string | null };
 
 export type CommitState = {
   lastCommit: LastCommitState | null;
+  /** MARK: git-sync — §68.5: changed files outside the review (as of the last branches refresh); absent from an older engine. */
+  otherChanges?: { tracked: number; untracked: number };
   /** Accepted files exist and the gate is not running / collecting / reverting. */
   canCommit: boolean;
   /** Paths with state "accepted" in the current review (the default `commit.paths`). */
@@ -2248,7 +2331,8 @@ export type EngineEvent =
   | DefinitionsEvent // MARK: code-nav (§62)
   | ReferencesEvent
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
-  | TaskFetchedEvent; // MARK: task-start (§63)
+  | TaskFetchedEvent // MARK: task-start (§63)
+  | FetchedEvent | PulledEvent | CommitOthersEvent; // MARK: git-sync (§68)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
 export type ReplyFor<C extends EngineCommand> =
@@ -2303,6 +2387,9 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "definition_preview" } ? SymbolPreviewEvent
   : C extends { type: "nav_index_build" } ? NavIndexEvent
   : C extends { type: "task_fetch" } ? TaskFetchedEvent // MARK: task-start (§63)
+  : C extends { type: "git_fetch" } ? FetchedEvent // MARK: git-sync (§68)
+  : C extends { type: "git_pull" } ? PulledEvent
+  : C extends { type: "commit_others" } ? CommitOthersEvent
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
@@ -2326,6 +2413,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
+  | FetchedEvent | PulledEvent | CommitOthersEvent // MARK: git-sync (§68)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | TerminalSpecEvent; // §57

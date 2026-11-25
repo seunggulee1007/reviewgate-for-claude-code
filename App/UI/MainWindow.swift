@@ -922,6 +922,7 @@ struct MainWindow: View {
                     }   // no remote: nothing to say (a plain local repository is not a warning)
                 }
             }
+            gitSyncNoticeRow   // MARK: git-sync (§68)
             if let model = store.model {
                 Text(model).font(.caption2).foregroundStyle(.secondary)
             }
@@ -931,16 +932,21 @@ struct MainWindow: View {
         }
         .padding(12)
         .task(id: store.projectInfo?.root) {
+            store.dismissGitSyncNotice()   // MARK: git-sync (§68): another project's outcome is not this one's
             if store.projectInfo != nil {
                 await store.refreshBranches()
                 await store.refreshWorkbenches()
+                await store.autoFetch()   // MARK: git-sync — §68.4 (throttled by the engine, quiet)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             // Another window may have created / removed a workbench: refresh the list when this one comes back.
             guard let window = note.object as? NSWindow, WorkbenchRegistry.shared.entry(for: store)?.window === window,
                   store.projectInfo != nil else { return }
-            Task { await store.refreshWorkbenches() }
+            Task {
+                await store.refreshWorkbenches()
+                await store.autoFetch()   // MARK: git-sync — §68.4: back to the front → a quiet fetch (at most every 5 min)
+            }
         }
         .sheet(isPresented: $showNewBranch) { newBranchSheet }
     }
@@ -1136,11 +1142,23 @@ struct MainWindow: View {
                 .accessibilityIdentifier("New Branch…")
             Button("Refresh") { Task { await store.refreshBranches() } }
                 .accessibilityIdentifier("Refresh branches")
+            if let sync = store.gitSync {   // MARK: git-sync — §68
+                Divider()
+                syncMenuItems(sync)
+            }
             Divider()
             Button("Create PR from this branch…") { showCreatePR = true }
                 .disabled(prBlocker != nil)   // §61: not a dirty tree or a pending review — what goes up is the commits
                 .help(prBlocker ?? String(localized: "Push this branch and open a pull request (gh pr create)"))
                 .accessibilityIdentifier("Create PR from this branch…")
+            // MARK: git-sync — §68.5: changes outside the review (and no review to commit from) can be committed from here too.
+            if blocker != .dirtyWorktree, (store.otherChangeCounts?.total ?? 0) > 0 {
+                Button("Commit…") { model.showCommit = true }
+                    .disabled(!store.canOpenCommitSheet)
+                    .help(store.canOpenCommitSheet ? String(localized: "Commit changed files — the review's and your own")
+                          : store.commitLockReason ?? EngineMessages.refusal(error: "nothing_to_commit"))
+                    .accessibilityIdentifier("Commit from branch menu")
+            }
             if let blocker {
                 Divider()
                 Text(verbatim: blockerReason(blocker))
@@ -1161,15 +1179,109 @@ struct MainWindow: View {
                 }
                 .font(.caption.monospaced())
                 .lineLimit(1)
+                // MARK: git-sync — §68: ahead / behind of the upstream, and a fetch / pull in flight.
+                let badge = GitSyncRules.badge(store.currentBranch)
+                if !badge.isEmpty {
+                    Text(verbatim: badge).font(.caption2.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+                        .accessibilityLabel(GitSyncRules.badgeHelp(store.currentBranch) ?? badge)
+                        .accessibilityIdentifier("Branch ahead behind")
+                }
+                if store.gitSync?.isBusy == true {
+                    ProgressView().controlSize(.mini)
+                        .accessibilityLabel(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
+                        .accessibilityIdentifier("Branch sync progress")
+                }
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(blocker.map(blockerReason) ?? String(localized: "Switch branch"))
+        .help(branchChipHelp(blocker))
         .accessibilityLabel("Branch switcher")
         .accessibilityIdentifier("Branch switcher")
+    }
+
+    // MARK: git-sync — §68
+
+    /// The chip's tooltip: why switching is off, else "Switch branch", then the ahead / behind and the last fetch.
+    private func branchChipHelp(_ blocker: BranchSwitchBlocker?) -> String {
+        var lines = [blocker.map(blockerReason) ?? String(localized: "Switch branch")]
+        if let counts = GitSyncRules.badgeHelp(store.currentBranch) { lines.append(counts) }
+        if let fetched = GitSyncText.lastFetched(store.gitSync?.lastFetchAt) { lines.append(fetched) }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Fetch, Pull (fast-forward only), Rebase onto the upstream when diverged, and the last fetch — each with its reason.
+    @ViewBuilder private func syncMenuItems(_ sync: GitSyncState) -> some View {
+        let current = store.currentBranch
+        let upstream = sync.upstream ?? current?.upstream
+        Button {
+            Task { await store.fetch() }
+        } label: {
+            Label(sync.fetching ? String(localized: "Fetching…") : String(localized: "Fetch"), systemImage: "arrow.triangle.2.circlepath")
+        }
+        .disabled(store.fetchDisabledReason != nil)
+        .help(store.fetchDisabledReason ?? String(localized: "git fetch --prune: updates the remote branches and the ↑↓ counts; your files are not touched"))
+        .accessibilityIdentifier("Fetch")
+        if sync.remotes.count > 1 {
+            Button("Fetch All Remotes") { Task { await store.fetch(all: true) } }
+                .disabled(store.fetchDisabledReason != nil)
+                .help(store.fetchDisabledReason ?? "git fetch --all --prune")
+                .accessibilityIdentifier("Fetch all remotes")
+        }
+        Button {
+            Task { await store.pull() }
+        } label: {
+            let behind = current?.behind ?? 0
+            Label(sync.pulling ? String(localized: "Pulling…")
+                  : behind > 0 ? String(localized: "Pull \(behind) commit(s)") : String(localized: "Pull"),
+                  systemImage: "arrow.down.circle")
+        }
+        .disabled(store.pullDisabledReason != nil || store.isBranchDiverged)
+        .help(store.pullDisabledReason
+              ?? (store.isBranchDiverged ? EngineMessages.refusal(error: "pull_diverged:\(current?.ahead ?? 0),\(current?.behind ?? 0)")
+                  : String(localized: "Fetches, then fast-forwards this branch to \(upstream ?? "upstream") — never a merge, and uncommitted changes are never overwritten")))
+        .accessibilityIdentifier("Pull")
+        if store.isBranchDiverged, let upstream {
+            Button("Rebase onto \(upstream)") { Task { await store.pull(rebase: true) } }
+                .disabled(store.rebaseDisabledReason != nil)
+                .help(store.rebaseDisabledReason
+                      ?? String(localized: "Replays this branch's \(current?.ahead ?? 0) commit(s) on top of \(upstream); a conflict undoes the rebase and nothing changes"))
+                .accessibilityIdentifier("Rebase onto upstream")
+        }
+        if let error = sync.lastFetchError {
+            Text(verbatim: EngineMessages.refusal(error: error))
+        } else if let fetched = GitSyncText.lastFetched(sync.lastFetchAt) {
+            Text(verbatim: fetched)
+        }
+    }
+
+    /// What the last Fetch / Pull came to, under the branch line (a refused pull lists the files it would replace).
+    @ViewBuilder private var gitSyncNoticeRow: some View {
+        if let notice = store.gitSyncNotice {
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: notice.kind == .error ? "exclamationmark.triangle.fill" : notice.kind == .success ? "checkmark.circle.fill" : "info.circle")
+                    .foregroundStyle(notice.kind == .error ? Color.orange : notice.kind == .success ? Color.green : Color.secondary)
+                Text(verbatim: notice.text)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .help(notice.paths.isEmpty ? notice.text : notice.paths.joined(separator: "\n"))
+                Spacer(minLength: 4)
+                Button {
+                    store.dismissGitSyncNotice()
+                } label: {
+                    Image(systemName: "xmark").font(.caption2)
+                }
+                .buttonStyle(.borderless)
+                .help("Dismiss")
+                .accessibilityLabel("Dismiss")
+                .accessibilityIdentifier("Dismiss sync notice")
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(notice.kind == .error ? "Sync error" : "Sync notice")
+        }
     }
 
     private func branchTitle(_ branch: BranchInfo) -> String {

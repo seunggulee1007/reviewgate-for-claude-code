@@ -10,6 +10,12 @@ Command `commit { message: string; paths?: string[] /* default: all files with s
 - Default message helper in engine: `suggestCommitMessage(): string` = first line of the last user instruction (≤ 72 chars, strip "[Review gate]" prefixes) + blank line + `Files:\n- a\n- b` — exposed as `state.commit.suggestedMessage`.
 - Settings: `commitPushByDefault?: boolean` (default false), `commitTrailer?: string` (default "" — e.g. "Co-Authored-By: …" appended as a trailer line).
 
+## Files outside the review (PROTOCOL §68.5)
+- `commit_others {}` → `commit_others { files, truncated }`: changed files (`git status`, untracked included) that are not review files — what the user edited by hand, or had dirty before the turn.
+- `commit { …, extraPaths?: string[] }` commits them in the same commit. Each must be listed by `commit_others` (`invalid_extra:<path>` otherwise — a review file is accepted first). An extras-only commit is allowed (with a pending review, or none): `nothing_to_commit` only when neither accepted paths nor extras are given.
+- Nothing becomes accepted: Claude's summary and the review history name only the review's files; pending files stay pending and unstaged. A takes the extras' content, so they never come up in the review afterwards. `lastCommit.files` = accepted paths, then extras.
+- `state.commit.otherChanges = { tracked, untracked }` (as of the last branches refresh): the clients open the sheet when `canCommit` or there are other changes.
+
 ## Mac UI
 - Changes header: "Commit accepted (N)…" button (AX "Commit accepted"; ⌘⇧K) enabled when `state.commit.canCommit`; sheet: message editor prefilled with `suggestedMessage`, checklist of accepted files (default all), toggle "Push to origin" (default from settings), Commit button; refusal text localized from codes.
 - After commit: green banner "Committed <shortSha> on <branch> · pushed/not pushed" with "Create PR…" (opens the existing CreatePR sheet) and "Open" if pushed and remote is GitHub (URL = remote web URL + /commit/sha). Push error → red banner with retry ("Push now" = `commit`? no → new command `push {}` → same push logic; add it).

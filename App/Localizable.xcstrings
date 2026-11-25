@@ -2209,6 +2209,22 @@
         }
       }
     },
+    "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열 때와 창이 앞으로 올 때 조용히 git fetch해서(최대 5분에 한 번) 브랜치가 얼마나 뒤처졌는지 보여줘요. pull은 하지 않고, 파일을 건드리지 않고, 비밀번호도 묻지 않아요. Fetch와 Pull은 브랜치 메뉴에 있어요."
+          }
+        }
+      }
+    },
     "A review note on this line — sent to Claude with Request changes (⌘⇧C)": {
       "localizations": {
         "en": {
@@ -4113,6 +4129,22 @@
         }
       }
     },
+    "Also list new files git does not track yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also list new files git does not track yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git이 아직 추적하지 않는 새 파일도 보여줘요"
+          }
+        }
+      }
+    },
     "Also rewind Claude's file changes": {
       "localizations": {
         "en": {
@@ -4205,6 +4237,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트에서 항상 허용"
+          }
+        }
+      }
+    },
+    "An ignore pattern in Settings hides this file from the review; it can still be committed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An ignore pattern in Settings hides this file from the review; it can still be committed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정의 무시 패턴 때문에 리뷰에는 안 보이는 파일이에요. 커밋은 할 수 있어요"
           }
         }
       }
@@ -5345,6 +5393,22 @@
         }
       }
     },
+    "Changed outside the review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed outside the review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 밖에서 바뀜"
+          }
+        }
+      }
+    },
     "Close the peek": {
       "localizations": {
         "en": {
@@ -5373,6 +5437,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "미리 보기 닫기 (Esc)"
+          }
+        }
+      }
+    },
+    "Commit changed files — the review's and your own": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit changed files — the review's and your own"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바뀐 파일을 커밋해요 — 리뷰한 파일도, 직접 고친 파일도"
           }
         }
       }
@@ -5441,6 +5521,118 @@
         }
       }
     },
+    "Fetch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch"
+          }
+        }
+      }
+    },
+    "Fetch All Remotes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch All Remotes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 원격 저장소 fetch"
+          }
+        }
+      }
+    },
+    "Fetch and Pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch and Pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch와 Pull"
+          }
+        }
+      }
+    },
+    "Fetch automatically": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch automatically"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "자동으로 fetch"
+          }
+        }
+      }
+    },
+    "Fetches, then fast-forwards this branch to %@ — never a merge, and uncommitted changes are never overwritten": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetches, then fast-forwards this branch to %@ — never a merge, and uncommitted changes are never overwritten"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch한 뒤 이 브랜치를 %@까지 fast-forward해요 — merge는 하지 않고, 커밋하지 않은 변경은 절대 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
+    "Fetching…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetching…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch하는 중…"
+          }
+        }
+      }
+    },
+    "Files changed outside the review — your own edits, or files changed before Claude's turn. Ticked, they go into this commit as they are: they are not reviewed and nothing is marked accepted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files changed outside the review — your own edits, or files changed before Claude's turn. Ticked, they go into this commit as they are: they are not reviewed and nothing is marked accepted."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 밖에서 바뀐 파일이에요 — 직접 고친 파일이나 Claude의 턴 전부터 바뀌어 있던 파일. 체크하면 지금 내용 그대로 이 커밋에 들어가요. 리뷰를 거치지 않고, 수락으로 표시되는 것도 없어요."
+          }
+        }
+      }
+    },
     "Find References (⇧F12) on a name lists every line that uses it here — F4 / ⇧F4 step through them, ↩ opens one.": {
       "localizations": {
         "en": {
@@ -5501,6 +5693,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락한 파일 접기"
+          }
+        }
+      }
+    },
+    "git fetch --prune: updates the remote branches and the ↑↓ counts; your files are not touched": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git fetch --prune: updates the remote branches and the ↑↓ counts; your files are not touched"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git fetch --prune: 원격 브랜치와 ↑↓ 개수를 새로 받아요. 내 파일은 건드리지 않아요"
           }
         }
       }
@@ -5681,6 +5889,22 @@
         }
       }
     },
+    "No tracked changes outside the review": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tracked changes outside the review"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "리뷰 밖에서 바뀐 추적 파일이 없어요"
+          }
+        }
+      }
+    },
     "Nothing to open — no definition was found": {
       "localizations": {
         "en": {
@@ -5725,6 +5949,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰 중인 파일만 고치기 (기본)"
+          }
+        }
+      }
+    },
+    "Only the first 500 files are listed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only the first 500 files are listed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "처음 500개 파일만 보여줘요"
           }
         }
       }
@@ -5837,6 +6077,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭) — Mac 은 설정 › 리뷰 › Diff › 이름을 ⌘-클릭하면 이 \"정의로 이동\"일 때"
+          }
+        }
+      }
+    },
+    "Other changes (%lld of %lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other changes (%lld of %lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 변경 (%lld / %lld)"
           }
         }
       }
@@ -5969,6 +6225,54 @@
         }
       }
     },
+    "Pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull"
+          }
+        }
+      }
+    },
+    "Pull %lld commit(s)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull %lld commit(s)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "커밋 %lld개 pull"
+          }
+        }
+      }
+    },
+    "Pulling…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulling…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull하는 중…"
+          }
+        }
+      }
+    },
     "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)": {
       "localizations": {
         "en": {
@@ -6017,6 +6321,22 @@
         }
       }
     },
+    "Rebase onto %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebase onto %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 위로 rebase"
+          }
+        }
+      }
+    },
     "Rebuild Symbol Index": {
       "localizations": {
         "en": {
@@ -6045,6 +6365,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조 — 이름이 쓰인 곳 (이름에서 ⇧F12); F4 / ⇧F4 로 하나씩 열어요"
+          }
+        }
+      }
+    },
+    "Replays this branch's %lld commit(s) on top of %@; a conflict undoes the rebase and nothing changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replays this branch's %lld commit(s) on top of %@; a conflict undoes the rebase and nothing changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치의 커밋 %1$lld개를 %2$@ 위에 다시 쌓아요. 충돌이 나면 rebase를 되돌려서 아무것도 바뀌지 않아요"
           }
         }
       }
@@ -6397,6 +6733,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 파일들을 수락하거나 거절하기 전까지 Claude는 이 파일들만 고치고 다른 파일은 바꾸지 않아요(설정 › 리뷰)."
+          }
+        }
+      }
+    },
+    "Untracked (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untracked (%lld)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추적 안 됨 (%lld)"
+          }
+        }
+      }
+    },
+    "Untracked — a new file git does not track yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untracked — a new file git does not track yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추적 안 됨 — git이 아직 추적하지 않는 새 파일"
           }
         }
       }

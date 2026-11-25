@@ -169,6 +169,11 @@ import { loadAutoAcceptRules, saveAutoAcceptRules } from "./review/trustStore.js
 import { lastTestOf } from "./review/tests.js";
 
 import { ENGINE_VERSION } from "./version.js";
+// MARK: git-sync — §68
+import { aheadBehind, fastForward, fetchRemotes, gitOperation, pullOverlap, rebaseOnto, remoteList, upstreamOf, type FetchRun, type Upstream } from "./git/remoteSync.js";
+import { nulSplit } from "./git/exec.js";
+import { MAX_OTHER_CHANGES, otherChanges, otherSpecs } from "./git/otherChanges.js";
+import type { CommitOthersEvent, FetchedEvent, OtherChange, PulledEvent } from "./protocol.js";
 // MARK: wave2 engine-why
 import type { FileWhy, LiveChangesEvent } from "./protocol.js";
 import type { ChangedFile } from "./git/checkpoint.js";
@@ -359,9 +364,18 @@ const SHADOW_REFUSED: ReadonlySet<string> = new Set([
   "branches", "switch_branch", "create_branch",
   "workbench_list", "workbench_create", "workbench_preview", "workbench_remove", "workbench_prune", "chat_move",
   "commit", "commit_hunks", "commit_series", "commit_draft", "commit_split_draft", "commit_format", "push",
+  "git_fetch", "git_pull", "commit_others", // MARK: git-sync (§68)
   "pr_list", "pr_open", "pr_select_file", "pr_add_draft", "pr_remove_draft", "pr_submit", "pr_reply", "pr_reload_comments",
   "pr_comment", "pr_file_lines", "pr_create", "pr_draft", "pr_ai_draft",
 ]);
+
+/** MARK: git-sync — §68.4: an automatic `git_fetch` runs at most this often (any fetch attempt counts). */
+const AUTO_FETCH_INTERVAL_MS = 5 * 60_000;
+
+/** §68.2: `pull_would_overwrite:<the first five>` with every path the pull would replace. */
+function pullOverwriteRefusal(paths: readonly string[]): CommandRefused {
+  return new CommandRefused(`pull_would_overwrite:${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ", …" : ""}`, { code: "pull_would_overwrite", paths: [...paths] });
+}
 
 /** §57.15: how long "Allow and follow" waits for the EnterWorktree it allowed. */
 const TERMINAL_FOLLOW_ARM_MS = 120_000;
@@ -556,6 +570,10 @@ export class ReviewEngine {
   /** daily-18: the budget the running session's Claude was last told about (its system prompt, then each note). */
   private toldBudget: BudgetNumbers | null = null;
   private branches: EngineSlices["branches"] = { list: [], isWorktreeDirty: false };
+  /** MARK: git-sync — §68: this engine's fetch / pull (`lastAttemptMs` throttles the automatic fetch; not sent). */
+  private syncFlags = { fetching: false, pulling: false, lastFetchAt: null as string | null, lastFetchError: null as string | null };
+  private lastFetchAttemptMs = Number.NEGATIVE_INFINITY;
+  private fetchInFlight: Promise<FetchRun> | null = null;
   private lastError: string | null = null;
   /** Number of `fail` calls so far (lets a caller tell whether a step it awaited emitted an error). */
   private failCount = 0;
@@ -701,7 +719,7 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), nav: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), nav: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve(), remote: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
   /** §56.1: the current chat's /btw exchanges (in memory: the CLI keeps none for an SDK session). */
@@ -1449,7 +1467,13 @@ export class ReviewEngine {
       case "pr_create":
         return this.prCreate(cmd.base, cmd.title ?? null, cmd.body ?? null, cmd.draft === true, cmd); // wave4c w4c-commit: + §41.1 meta
       case "commit":
-        return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true);
+        return this.commit(cmd.message, cmd.paths ?? null, cmd.push ?? this.settings.commitPushByDefault === true, Array.isArray(cmd.extraPaths) ? cmd.extraPaths : []);
+      case "git_fetch": // MARK: git-sync — §68
+        return this.gitFetch(cmd.all === true, cmd.prune !== false, cmd.auto === true);
+      case "git_pull":
+        return this.gitPull(cmd.rebase === true);
+      case "commit_others":
+        return this.commitOthers();
       case "commit_hunks": // §53
         return this.commitHunks(Array.isArray(cmd.paths) ? cmd.paths : null);
       case "commit_series":
@@ -3981,6 +4005,9 @@ export class ReviewEngine {
     this.agents.reset();
     this.budgetUsage = { ...ZERO_USAGE };
     this.branches = { list: [], isWorktreeDirty: false };
+    this.syncFlags = { fetching: false, pulling: false, lastFetchAt: null, lastFetchError: null }; // MARK: git-sync (§68)
+    this.lastFetchAttemptMs = Number.NEGATIVE_INFINITY;
+    this.fetchInFlight = null;
     this.lastError = null;
     this.turn = 0;
     this.workbenches = emptyWorkbenches();
@@ -5089,10 +5116,13 @@ export class ReviewEngine {
     try {
       // MARK: wave3 engine-flow — §36.12: the remote-tracking branches ride along (bases for workbench_create).
       // MARK: a-gitflow — §61: one status for both the raw dirty flag and the switch guard (ignore patterns applied).
-      const [list, status, name, remotes] = await Promise.all([listBranches(cp), worktreeStatus(cp, this.settings.ignorePatterns), cp.branchName(), remoteBranches(cp).catch(() => [])]);
+      // MARK: git-sync — §68: the remotes, the upstream and an unfinished operation (pull's guard) ride along.
+      const [list, status, name, remotes, remoteNames, operation] = await Promise.all([listBranches(cp), worktreeStatus(cp, this.settings.ignorePatterns), cp.branchName(), remoteBranches(cp).catch(() => []),
+        remoteList(cp.root), gitOperation(cp.root)]);
       const base = await defaultBranch(cp, list, remotes).catch(() => null);
+      const upstream = list.find((b) => b.isCurrent)?.upstream ?? null;
       if (this.gate.checkpoint !== cp) return;
-      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base };
+      this.branches = { list, isWorktreeDirty: status.dirty, remotes, blocksSwitch: status.blocksSwitch, defaultBranch: base, remoteNames, upstream, operation, entries: status.entries };
       if (this.project) this.project = { ...this.project, branch: name };
     } catch (e) {
       this.log("warn", `refreshBranches: ${errorMessage(e)}`);
@@ -5449,16 +5479,19 @@ export class ReviewEngine {
   /**
    * Stages `paths` (default: every accepted file; renames stage both paths), commits with `message`
    * (+ `settings.commitTrailer`), drops the committed files from the review and optionally pushes.
-   * A push failure keeps the commit (`state.commit.lastCommit.pushError`) and is a refusal.
+   * A push failure keeps the commit (`state.commit.lastCommit.pushError`) and is a refusal. MARK: git-sync — §68.5
+   * `extraPaths`: changed files outside the review (`commit_others`) go into the same commit; nothing is marked accepted.
    */
-  private async commit(rawMessage: string, requested: string[] | null, push: boolean): Promise<CommittedEvent> {
+  private async commit(rawMessage: string, requested: string[] | null, push: boolean, extraPaths: unknown[] = []): Promise<CommittedEvent> {
     const cp = this.requireProject();
     if (this.gate.running || this.gate.collecting || this.gate.reverting) throw new CommandRefused("session_running");
     // MARK: wave3 check-engine — §37.1: a commit re-snapshots B too; the failed collection is retried first.
     if (this.gate.collectError !== null) throw new CommandRefused("collect_failed");
     const accepted = acceptedPaths(this.gate);
     const paths = requested === null ? accepted : [...new Set(requested)];
-    if (paths.length === 0 || paths.some((p) => !accepted.includes(p))) throw new CommandRefused("nothing_to_commit");
+    if (paths.some((p) => !accepted.includes(p))) throw new CommandRefused("nothing_to_commit");
+    const extras = await this.commitExtras(cp, extraPaths); // §68.5
+    if (paths.length === 0 && extras.length === 0) throw new CommandRefused("nothing_to_commit");
     let message = rawMessage.trim();
     if (!message) throw new CommandRefused("empty_message");
     const identity = await gitIdentity(cp.root);
@@ -5485,11 +5518,12 @@ export class ReviewEngine {
     const rest = paths.filter((p) => !already.includes(p));
     let sha: string;
     try {
-      if (rest.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
+      if (rest.length === 0 && extras.length === 0) sha = (await cp.git(["rev-parse", "HEAD"])).text.trim();
       else {
         // `--only`: entries the user staged for other paths stay staged and out of this commit.
-        const specs = await stagePaths(cp.root, rest, this.gate.changedFiles);
-        sha = await gitCommit(cp.root, message, merging ? null : specs);
+        // §68.5: an extra's rename is git's own (`git mv`): its old name is gone from the index already — committed, not added.
+        const specs = await stagePaths(cp.root, [...rest, ...extras.map((f) => f.path)], this.gate.changedFiles);
+        sha = await gitCommit(cp.root, message, merging ? null : [...new Set([...specs, ...otherSpecs(extras)])]);
       }
     } catch (e) {
       this.fail(`Failed to commit: ${errorMessage(e)}`, false, "git", { code: "commit_failed" });
@@ -5497,12 +5531,16 @@ export class ReviewEngine {
     }
     const branch = await cp.branchName();
     const made: HistoryCommit = { sha, subject: firstLineOf(message).slice(0, 200) };
-    if (rest.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
-    this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files: paths, at: new Date().toISOString() };
+    if (rest.length === 0 && extras.length === 0) message = (await cp.git(["log", "-1", "--format=%B", sha]).catch(() => null))?.text.trim() || message;
+    const files = [...paths, ...extras.map((f) => f.path)];
+    this.commitSlice.lastCommit = { sha, shortSha: sha.slice(0, 7), message, branch, pushed: false, pushError: null, files, at: new Date().toISOString() };
     this.touch();
     try {
-      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 ? made : null) : null;
-      await this.gate.dropCommitted(paths, by ?? made); // MARK: wave4 w4-history (§38.3)
+      const by = already.length > 0 ? await this.commitsHolding(cp, already, rest.length > 0 || extras.length > 0 ? made : null) : null;
+      // §68.5: files outside the review go into A too (not an ignored one: A never holds those), so they never come up in it.
+      const others = otherSpecs(extras.filter((f) => f.hidden !== true));
+      // MARK: wave4 w4-history (§38.3); with no review standing there is nothing to drop (an extras-only commit).
+      if (paths.length > 0 || this.gate.turnStartTree !== null) await this.gate.dropCommitted(paths, by ?? made, undefined, others);
     } catch (e) {
       this.fail(`Failed to refresh the review after the commit: ${errorMessage(e)}`, false, "git", { code: "refresh_failed" });
     }
@@ -5511,6 +5549,30 @@ export class ReviewEngine {
     await this.refreshWorkbenches(false);
     if (push) await this.pushLastCommit();
     return { ...this.committedEvent(), ...(already.length > 0 ? { alreadyCommitted: already } : {}) };
+  }
+
+  /**
+   * MARK: git-sync — §68.5: `commit.extraPaths` as the changes outside the review they name (`commit_others` now); refused
+   * `invalid_extra:<path>` for a path that is not one — a review file (accept it instead), an unmerged or unchanged one.
+   */
+  private async commitExtras(cp: GitCheckpoint, raw: readonly unknown[]): Promise<OtherChange[]> {
+    if (raw.length === 0) return [];
+    const others = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    const byPath = new Map(others.map((f) => [f.path, f]));
+    const out: OtherChange[] = [];
+    for (const p of new Set(raw)) {
+      const f = typeof p === "string" ? byPath.get(p) : undefined;
+      if (!f) throw new CommandRefused(`invalid_extra:${String(p).slice(0, 300)}`, { code: "invalid_extra", paths: [String(p)] });
+      out.push(f);
+    }
+    return out;
+  }
+
+  /** MARK: git-sync — §68.5 `commit_others`: the changed files outside the review (≤ `MAX_OTHER_CHANGES`). Reads only. */
+  private async commitOthers(): Promise<CommitOthersEvent> {
+    const cp = this.requireProject();
+    const files = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
+    return { type: "commit_others", files: files.slice(0, MAX_OTHER_CHANGES), truncated: files.length > MAX_OTHER_CHANGES };
   }
 
   /** MARK: r1-git — §46: the review `paths` whose file (both names of a rename) has no change against HEAD — committed already. */
@@ -5731,6 +5793,140 @@ export class ReviewEngine {
   private committedEvent(): CommittedEvent {
     const last = this.commitSlice.lastCommit!;
     return { type: "committed", sha: last.sha, shortSha: last.shortSha, pushed: last.pushed, branch: last.branch };
+  }
+
+  // ------------------------------------------------------------------ MARK: git-sync — §68 fetch / pull
+
+  /**
+   * §68.1 `git_fetch`: `git fetch --prune` of the current branch's upstream remote (else `origin`, else the first), every
+   * remote with `all`; then the branches (ahead / behind) again. `auto` (§68.4): skipped — `fetched {skipped}` — when
+   * `settings.autoFetch` is false, there is no remote, a fetch or pull runs or the last attempt is under
+   * `AUTO_FETCH_INTERVAL_MS` old; it never opens a credential window. Refused `no_remote`, `fetch_failed:<git's line>`.
+   */
+  private async gitFetch(all: boolean, prune: boolean, auto: boolean): Promise<FetchedEvent> {
+    const cp = this.requireProject();
+    const remotes = await remoteList(cp.root);
+    if (auto && (this.settings.autoFetch === false || remotes.length === 0 || this.fetchInFlight !== null || this.syncFlags.pulling
+      || this.now() - this.lastFetchAttemptMs < AUTO_FETCH_INTERVAL_MS)) return { type: "fetched", remotes: [], skipped: true, ...(await this.trackOfHead(cp)) };
+    if (remotes.length === 0) throw new CommandRefused("no_remote");
+    let remote: string | null = null;
+    if (!all || remotes.length === 1) {
+      const branch = await cp.branchName();
+      const up = branch ? await upstreamOf(cp.root, branch) : null;
+      remote = up?.remote && remotes.includes(up.remote) ? up.remote : remotes.includes("origin") ? "origin" : remotes[0]!;
+    }
+    const run = await this.runFetch(cp, remote, prune, auto);
+    if (!run.ok) throw new CommandRefused(`fetch_failed:${run.line}`, { code: "fetch_failed" });
+    return { type: "fetched", remotes: remote === null ? remotes : [remote], ...(await this.trackOfHead(cp)) };
+  }
+
+  /** The current branch against its upstream (`rev-list --left-right --count`); nulls without one. */
+  private async trackOfHead(cp: GitCheckpoint): Promise<{ ahead: number | null; behind: number | null }> {
+    const branch = await cp.branchName();
+    const up = branch ? await upstreamOf(cp.root, branch) : null;
+    const counts = up ? await aheadBehind(cp.root, up.ref) : null;
+    return { ahead: counts?.ahead ?? null, behind: counts?.behind ?? null };
+  }
+
+  /** One fetch at a time: a second asks for the one in flight. Updates `state.branches.sync` and the branches after. */
+  private runFetch(cp: GitCheckpoint, remote: string | null, prune: boolean, quiet: boolean): Promise<FetchRun> {
+    if (this.fetchInFlight) return this.fetchInFlight;
+    this.syncFlags = { ...this.syncFlags, fetching: true };
+    this.lastFetchAttemptMs = this.now();
+    this.touch();
+    const run = (async () => {
+      let r: FetchRun;
+      try {
+        r = await fetchRemotes(cp.root, { remote, prune, quiet });
+      } finally {
+        this.fetchInFlight = null;
+      }
+      if (this.gate.checkpoint === cp) {
+        this.syncFlags = { ...this.syncFlags, fetching: false, ...(r.ok ? { lastFetchAt: new Date().toISOString(), lastFetchError: null } : { lastFetchError: `fetch_failed:${r.line}` }) };
+        if (!r.ok) this.log("warn", `git fetch${quiet ? " (auto)" : ""}: ${r.line}`);
+        await this.refreshBranches();
+      }
+      return r;
+    })();
+    this.fetchInFlight = run;
+    return run;
+  }
+
+  /**
+   * §68.2 `git_pull`: the current branch from its upstream — fetch its remote, then a fast-forward only (`rebase`: §68.3).
+   * Refused before anything changes: `pull_blocked:<running|busy|detached>`, `pull_in_progress:<operation>`,
+   * `pull_no_upstream:<branch>`, `fetch_failed:<line>`, `pull_diverged:<ahead>,<behind>`, `pull_would_overwrite:<paths>`
+   * (`paths`: every changed file the pull would replace — never stashed or discarded), `pull_failed:<line>`. What came in
+   * goes into the review's A (`ReviewGate.followPull`): pulled files never show up as Claude's changes.
+   */
+  private async gitPull(rebase: boolean): Promise<PulledEvent> {
+    const cp = this.requireProject();
+    const running = () => this.gate.running || this.sessionState.starting || this.gate.collecting || this.gate.reverting;
+    if (running()) throw new CommandRefused("pull_blocked:running");
+    if (this.syncFlags.pulling) throw new CommandRefused("pull_blocked:busy");
+    const branch = await cp.branchName();
+    if (!branch) throw new CommandRefused("pull_blocked:detached");
+    const operation = await gitOperation(cp.root);
+    if (operation) throw new CommandRefused(`pull_in_progress:${operation}`, { code: "pull_in_progress" });
+    const up = await upstreamOf(cp.root, branch);
+    if (!up) throw new CommandRefused(`pull_no_upstream:${branch}`, { code: "pull_no_upstream" });
+    this.syncFlags = { ...this.syncFlags, pulling: true };
+    this.touch();
+    try {
+      return await this.pullFrom(cp, branch, up, rebase, running);
+    } finally {
+      this.syncFlags = { ...this.syncFlags, pulling: false };
+      await this.refreshBranches();
+    }
+  }
+
+  private async pullFrom(cp: GitCheckpoint, branch: string, up: Upstream, rebase: boolean, running: () => boolean): Promise<PulledEvent> {
+    if (up.remote) {
+      const run = await this.runFetch(cp, up.remote, true, false);
+      if (!run.ok) throw new CommandRefused(`fetch_failed:${run.line}`, { code: "fetch_failed" });
+    }
+    if (running()) throw new CommandRefused("pull_blocked:running"); // a turn started while the fetch ran
+    const from = (await cp.head().catch(() => null))?.sha ?? null;
+    if (!from) throw new CommandRefused("pull_failed:the branch has no commit yet", { code: "pull_failed" });
+    const counts = await aheadBehind(cp.root, up.ref);
+    if (!counts) throw new CommandRefused(`pull_failed:cannot compare ${branch} with ${up.ref}`, { code: "pull_failed" });
+    const done = (mode: PulledEvent["mode"], to: string, files: string[]): PulledEvent => ({
+      type: "pulled", branch, upstream: up.ref, mode, from, to, commits: mode === "up_to_date" ? 0 : counts.behind, files: files.slice(0, 200), fileCount: files.length,
+    });
+    if (counts.behind === 0) return done("up_to_date", from, []);
+    if (counts.ahead > 0 && !rebase) throw new CommandRefused(`pull_diverged:${counts.ahead},${counts.behind}`, { code: "pull_diverged" });
+    // A HEAD move before this pull (a commit in a terminal) is carried first, so A's HEAD is `from` for `followPull`.
+    await this.followHeadMove(false);
+    let mode: PulledEvent["mode"];
+    if (counts.ahead > 0) {
+      // §68.3: a rebase rewrites the branch under the files — only with nothing to review and nothing uncommitted.
+      if (this.gate.changedFiles.length > 0) throw new CommandRefused("pull_rebase_blocked:review", { code: "pull_rebase_blocked" });
+      if ((await worktreeStatus(cp, [])).blocksSwitch) throw new CommandRefused("pull_rebase_blocked:dirty", { code: "pull_rebase_blocked" });
+      const r = await rebaseOnto(cp.root, up.ref);
+      if (!r.ok) throw new CommandRefused(`pull_rebase_failed:${r.line}`, { code: "pull_rebase_failed", ...(r.overwritten.length > 0 ? { paths: r.overwritten } : {}) });
+      mode = "rebase";
+    } else {
+      const overlap = await pullOverlap(cp.root, up.ref);
+      if (overlap.length > 0) throw pullOverwriteRefusal(overlap);
+      const r = await fastForward(cp.root, up.ref);
+      if (!r.ok) throw r.overwritten.length > 0 ? pullOverwriteRefusal(r.overwritten) : new CommandRefused(`pull_failed:${r.line}`, { code: "pull_failed" });
+      mode = "fast_forward";
+    }
+    const to = (await cp.head().catch(() => null))?.sha ?? from;
+    const changed = to === from ? [] : nulSplit((await cp.git(["diff", "--name-only", "--no-renames", "-z", from, to])).stdout);
+    this.log("info", `pull (${mode}): ${branch} ${from.slice(0, 7)} → ${to.slice(0, 7)} from ${up.ref}, ${changed.length} file(s)`);
+    this.fileIndex?.invalidate();
+    this.symbolIndex?.refresh(); // MARK: ide-nav (§65)
+    try {
+      if (await this.gate.followPull(from, to)) this.log("info", "pull: its commits were carried into the review's start");
+      // B follows the working tree the pull changed (also when the carry did not apply: `headMoved` says so).
+      if (gatePhase(this.slices()) === "reviewing") await this.gate.refresh();
+    } catch (e) {
+      this.log("warn", `follow pull: ${errorMessage(e)}`);
+    }
+    this.touch();
+    await this.refreshWorkbenches(false);
+    return done(mode, to, changed);
   }
 
   // ------------------------------------------------------------------ §23 file mentions / §24 attachments
@@ -9485,6 +9681,7 @@ export class ReviewEngine {
       reviewFirst: this.reviewFirstSlice(), // §64
       hud: this.rateLimits.length > 0 ? { ...this.hud, rateLimits: this.rateLimits.map((w) => ({ ...w })) } : this.hud, // MARK: wave4 w4-longwork (§38.2)
       branches: this.branches,
+      sync: { ...this.syncFlags, autoFetch: this.settings.autoFetch !== false }, // MARK: git-sync (§68)
       pr: this.pr,
       lastError: this.lastError,
       workbenches: this.workbenches,
@@ -9764,7 +9961,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "nav" | "steer" | "btw"; // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); code-nav: nav (§62); §56.1 btw
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "nav" | "steer" | "btw" | "remote"; // MARK: git-sync — remote (§68.1) // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); code-nav: nav (§62); §56.1 btw
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -9841,6 +10038,12 @@ function laneOf(cmd: EngineCommand): Lane {
     case "btw_ask":
       return "btw";
     case "workbench_preview":
+      return "query";
+    // MARK: git-sync — §68.1: a fetch waits on the network and only moves remote-tracking refs: never behind (or holding up)
+    // a turn. A pull moves the working tree: the main lane. The list outside the review is a `git status` read.
+    case "git_fetch":
+      return "remote";
+    case "commit_others":
       return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
@@ -9959,6 +10162,9 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "commit_hunks": // §53
     case "commit_series":
     case "push":
+    case "git_fetch": // MARK: git-sync (§68)
+    case "git_pull":
+    case "commit_others":
     case "refresh":
     case "rewind":
     case "list_files":

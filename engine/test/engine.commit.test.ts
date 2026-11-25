@@ -75,7 +75,7 @@ describe("ReviewEngine commit / push (docs/M12-COMMIT.md)", () => {
     const h = harness();
     await h.hello();
     const opened = await h.open(repo);
-    expect(opened.commit).toEqual({ lastCommit: null, canCommit: false, acceptedPaths: [], suggestedMessage: "Apply accepted changes", identity: { name: "Test", email: "test@example.com" } });
+    expect(opened.commit).toEqual({ lastCommit: null, canCommit: false, acceptedPaths: [], suggestedMessage: "Apply accepted changes", identity: { name: "Test", email: "test@example.com" }, otherChanges: { tracked: 0, untracked: 0 } });
 
     await fakeTurn(h, () => {
       write(repo, "a.txt", "a\n");
@@ -378,7 +378,7 @@ describe("ReviewEngine commit / push (docs/M12-COMMIT.md)", () => {
     expect(h.engine.state.commit.lastCommit).not.toBeNull();
     await h.engine.handle({ type: "close_project" });
     await h.settle();
-    expect(h.engine.state.commit).toEqual({ lastCommit: null, canCommit: false, acceptedPaths: [], suggestedMessage: "Apply accepted changes", identity: { name: null, email: null } });
+    expect(h.engine.state.commit).toEqual({ lastCommit: null, canCommit: false, acceptedPaths: [], suggestedMessage: "Apply accepted changes", identity: { name: null, email: null }, otherChanges: { tracked: 0, untracked: 0 } });
     expect(existsSync(join(repo, "a.txt"))).toBe(true);
     expect(read(repo, "a.txt")).toBe("a\n");
   });

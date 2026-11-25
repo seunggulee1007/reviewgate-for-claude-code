@@ -68,12 +68,15 @@ function ProjectHeader() {
     if (info?.root) {
       void refreshBranches();
       void refreshWorkbenches();
+      void useStore.getState().autoFetch(); // MARK: git-sync — §68.4 (the engine throttles it; quiet)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info?.root]);
   useEffect(() => {
     const onFocus = () => {
-      if (useStore.getState().state.project) void refreshWorkbenches();
+      if (!useStore.getState().state.project) return;
+      void refreshWorkbenches();
+      void useStore.getState().autoFetch(); // MARK: git-sync — §68.4: back to the front → a quiet fetch (at most every 5 min)
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -111,6 +114,7 @@ function ProjectHeader() {
           )}
         </div>
       )}
+      <GitSyncNoticeRow />
       {state.session.model && <div className="tiny faint">{state.session.model}</div>}
       {pr && dismissedPRURL !== pr.url && (
         <div className="banner green" style={{ borderRadius: 8, marginTop: 4, padding: "6px 8px" }} data-testid="PR created banner">
@@ -122,6 +126,20 @@ function ProjectHeader() {
           <button type="button" className="plain small" onClick={dismissPRBanner} title={t("Dismiss")} aria-label={t("Dismiss")}>✕</button>{/* MARK: wave4d w4d-speed — polish-10 */}
         </div>
       )}
+    </div>
+  );
+}
+
+/** MARK: git-sync — §68: what the last Fetch / Pull came to (a refused pull names the files it would replace). */
+function GitSyncNoticeRow() {
+  const notice = useStore((s) => s.gitSyncNotice);
+  const dismiss = useStore((s) => s.dismissGitSyncNotice);
+  if (!notice) return null;
+  const tone = notice.kind === "error" ? "orange" : notice.kind === "success" ? "green" : "";
+  return (
+    <div className={`banner ${tone}`.trim()} style={{ borderRadius: 8, marginTop: 4, padding: "6px 8px" }} role={notice.kind === "error" ? "alert" : "status"} data-testid={notice.kind === "error" ? "Sync error" : "Sync notice"}>
+      <span className="caption grow" style={{ userSelect: "text" }} title={notice.paths.length > 0 ? notice.paths.join("\n") : notice.text}>{notice.text}</span>
+      <button type="button" className="plain small" onClick={dismiss} title={t("Dismiss")} aria-label={t("Dismiss")} data-testid="Dismiss sync notice">✕</button>
     </div>
   );
 }

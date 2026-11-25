@@ -99,11 +99,12 @@ export async function isWorktreeDirty(cp: GitCheckpoint): Promise<boolean> {
  * rename, either path — the app's ignore patterns do not hide. Untracked files never block a switch: git carries them
  * along, and refuses the switch by itself when the target branch tracks the same path.
  */
-export async function worktreeStatus(cp: Pick<GitCheckpoint, "git">, ignore: string[]): Promise<{ dirty: boolean; blocksSwitch: boolean }> {
+export async function worktreeStatus(cp: Pick<GitCheckpoint, "git">, ignore: string[]): Promise<WorktreeStatus> {
   const out = await cp.git(["--no-optional-locks", "status", "--porcelain", "-z"]);
   const tokens = out.text.split("\0");
   let dirty = false;
   let blocksSwitch = false;
+  const entries: WorktreeStatus["entries"] = [];
   for (let i = 0; i < tokens.length; i++) {
     const entry = tokens[i]!;
     if (entry.length < 4) continue;
@@ -111,11 +112,18 @@ export async function worktreeStatus(cp: Pick<GitCheckpoint, "git">, ignore: str
     const xy = entry.slice(0, 2);
     const paths = [entry.slice(3)];
     if (xy[0] === "R" || xy[0] === "C") paths.push(tokens[++i] ?? "");
+    entries.push({ paths: paths.filter((p) => p.length > 0), untracked: xy === "??" });
     if (xy === "??") continue;
     if (paths.some((p) => p.length > 0 && !matchesIgnore(p, ignore))) blocksSwitch = true;
   }
-  return { dirty, blocksSwitch };
+  return { dirty, blocksSwitch, entries };
 }
+
+/**
+ * `worktreeStatus`. MARK: git-sync — §68.5 `entries`: every entry's path(s) (a rename's both), as `git status` lists them
+ * (a new folder is one untracked entry) — the commit sheet's count of changes outside the review.
+ */
+export type WorktreeStatus = { dirty: boolean; blocksSwitch: boolean; entries: { paths: string[]; untracked: boolean }[] };
 
 /**
  * MARK: a-gitflow — §61: the branch pull requests usually go to: `origin/HEAD`'s target, else `main` / `master` (remote,

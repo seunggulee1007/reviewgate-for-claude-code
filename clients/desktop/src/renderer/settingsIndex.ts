@@ -108,6 +108,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   e("runAsTaskEnabled", "git", "Workbenches", "Run as Task"),
   e("commitPushByDefault", "git", "Commit", "Push by default"),
   e("commitTrailer", "git", "Commit", "Commit trailer"),
+  e("autoFetch", "git", "Fetch and Pull", "Fetch automatically", "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu."), // MARK: git-sync (§68.4)
   // Tasks — MARK: task-start (§63), the Mac's SettingsCatalog rows
   e("skipStartScreen", "tasks", "Start screen", "Show the start screen when a project opens", "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."),
   e("taskPlatform", "tasks", "Start from a task", "Task platform", "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."),

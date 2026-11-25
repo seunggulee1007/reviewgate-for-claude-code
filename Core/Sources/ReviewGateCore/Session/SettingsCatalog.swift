@@ -132,6 +132,8 @@ public enum SettingsCatalog {
         public static let runAsTask = "Adds \"Run as Task\" to the composer and the Workbenches menu: the message starts in a new workbench (its own branch, folder, window and chat), so this chat is left as it is."
         public static let pushByDefault = "Preselects \"Push to origin\" in the Commit accepted sheet."
         public static let commitTrailer = "Appended as the last line of every commit message (e.g. Co-Authored-By: …). Leave empty for none."
+        /// MARK: git-sync (§68.4)
+        public static let autoFetch = "A quiet git fetch when a project opens and when its window comes to the front — at most every 5 minutes — so the branch shows how far behind it is. It never pulls, never touches your files and never asks for a password. Fetch and Pull are in the branch menu."
         public static let loadUserSettings = "Skills, plugins, MCP servers and hooks from ~/.claude. Bash and other non-edit tools still require approval here."
         public static let userHooks = "Off: hooks in ~/.claude and project settings and plugin hooks do not run — your statusLine is turned off too. ReviewGate's own safety hooks always stay on."
         public static let cliPin = "Claude Code updates itself in the background. Pin a version to keep starting new sessions with it; ReviewGate marks the versions it was checked with."
@@ -200,6 +202,7 @@ public enum SettingsCatalog {
         SettingEntry("runAsTaskEnabled", .git, section: "Workbenches", title: "Run as Task", info: Info.runAsTask),
         SettingEntry("commitPushByDefault", .git, section: "Commit", title: "Push by default", info: Info.pushByDefault),
         SettingEntry("commitTrailer", .git, section: "Commit", title: "Commit trailer", info: Info.commitTrailer),
+        SettingEntry("autoFetch", .git, section: "Fetch and Pull", title: "Fetch automatically", info: Info.autoFetch),
         // Tasks — MARK: task-start (§63)
         SettingEntry("skipStartScreen", .tasks, section: "Start screen", title: "Show the start screen when a project opens", info: Info.startScreen),
         SettingEntry("taskPlatform", .tasks, section: "Start from a task", title: "Task platform", info: Info.taskPlatform),
