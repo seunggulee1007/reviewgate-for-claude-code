@@ -108,10 +108,27 @@ export function isDiverged(b: BranchInfo | null): boolean {
   return b !== null && b.upstream !== null && b.ahead > 0 && b.behind > 0;
 }
 
-/** §68.3: Pull's own reasons, then files under review, then tracked changes. */
+/** Pull's blockers in a rebase's own words (the Rebase item waits, not a pull) — the Mac's `GitSyncText.rebaseBlocker`. */
+export function rebaseBlockerText(b: PullBlocker): string {
+  switch (b.kind) {
+    case "running":
+      return t("Claude is working — rebase when the turn ends");
+    case "detached":
+      return t("Check out a branch to rebase it (HEAD is detached)");
+    case "noUpstream":
+      return t("This branch has no upstream to rebase onto");
+    case "operation":
+      return t("A {0} is in progress — finish or abort it in a terminal, then rebase", operationName(b.operation));
+    default:
+      return blockedText(b.kind);
+  }
+}
+
+/** §68.3: Pull's blockers in a rebase's words, then files under review, then tracked changes. */
 export function rebaseDisabledReason(st: Syncy): string | null {
-  const reason = pullDisabledReason(syncOf(st));
-  if (reason) return reason;
+  const sync = syncOf(st);
+  if (sync && (sync.fetching || sync.pulling)) return blockedText("busy");
+  if (sync?.pullBlocker) return rebaseBlockerText(sync.pullBlocker);
   if (st.changedFiles.length > 0) return t(REVIEW_BEFORE_REBASE);
   if (st.branches.switchBlocker?.kind === "dirtyWorktree") return t("Commit your changes before rebasing");
   return null;

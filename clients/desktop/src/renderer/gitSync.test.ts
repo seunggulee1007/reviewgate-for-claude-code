@@ -55,6 +55,10 @@ describe("§68 fetch and pull — words and rules", () => {
     expect(rebaseDisabledReason(st({ files: 1 }))).toBe("Finish the review before rebasing — a rebase rewrites the files under review");
     expect(rebaseDisabledReason(st({ dirty: true }))).toBe("Commit your changes before rebasing");
     expect(rebaseDisabledReason(st())).toBeNull();
+    // Pull's blockers in a rebase's own words — not "pull when the turn ends" on the Rebase item.
+    expect(rebaseDisabledReason(st({ s: { pullBlocker: { kind: "running" } } }))).toBe("Claude is working — rebase when the turn ends");
+    expect(rebaseDisabledReason(st({ s: { pullBlocker: { kind: "operation", operation: "merge" } } }))).toBe("A merge is in progress — finish or abort it in a terminal, then rebase");
+    expect(rebaseDisabledReason(st({ s: { fetching: true }, files: 1 }))).toBe("A fetch or pull is already running");
   });
 
   it("the branch menu: Fetch, Pull with the count, Rebase only when diverged, the last fetch as a footer", async () => {
