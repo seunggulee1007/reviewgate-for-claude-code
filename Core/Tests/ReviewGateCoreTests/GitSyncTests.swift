@@ -95,7 +95,12 @@ import Testing
         #expect(EngineMessages.refusal(error: "pull_diverged:2,3").contains("2 local, 3 incoming"))
         #expect(EngineMessages.refusal(error: "pull_no_upstream:topic").hasPrefix("topic has no upstream"))
         #expect(EngineMessages.refusal(error: "pull_in_progress:merge").hasPrefix("A merge is in progress"))
-        #expect(EngineMessages.refusal(error: "pull_would_overwrite:a.ts, b.ts").contains("a.ts, b.ts"))
+        let overwrite = EngineMessages.refusal(error: "pull_would_overwrite:src/cart.ts, b.ts")
+        #expect(overwrite.contains(GitSyncText.unbrokenPaths("src/cart.ts, b.ts")))
+        // A line never ends inside a path ("src/cart.\nts"): a word joiner after each "/" "." "-" "_" within it.
+        #expect(GitSyncText.unbrokenPaths("src/cart.ts, my-notes_1.md") == "src/\u{2060}cart.\u{2060}ts, my-\u{2060}notes_\u{2060}1.\u{2060}md")
+        #expect(overwrite.replacingOccurrences(of: "\u{2060}", with: "").contains("src/cart.ts, b.ts"))
+        #expect(GitSyncText.unbrokenPaths("a/") == "a/")   // nothing after the last character
         #expect(EngineMessages.refusal(error: "pull_blocked:running").hasPrefix("Claude is working"))
         #expect(EngineMessages.refusal(error: "pull_rebase_blocked:review").contains("Finish the review"))
         #expect(EngineMessages.refusal(error: "fetch_failed:fatal: could not read from remote") == "Fetch failed: fatal: could not read from remote")

@@ -38,7 +38,8 @@ public enum GitSyncText {
             }
             return String(localized: "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.", bundle: .module)
         case "pull_would_overwrite":
-            return String(localized: "Pull would overwrite your uncommitted changes: \(detail) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
+            let files = unbrokenPaths(detail)
+            return String(localized: "Pull would overwrite your uncommitted changes: \(files) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
         case "pull_rebase_blocked":
             return detail == "review" ? String(localized: "Finish the review before rebasing — a rebase rewrites the files under review", bundle: .module)
                 : String(localized: "Commit your changes before rebasing", bundle: .module)
@@ -51,6 +52,19 @@ public enum GitSyncText {
             return String(localized: "\(detail) is no longer a change outside the review — reopen the commit sheet", bundle: .module)
         default: return nil
         }
+    }
+
+    /// A list of paths ("src/cart.ts, README.md") whose names never break across lines: a word joiner (U+2060) after each
+    /// "/", ".", "-" and "_" inside a path, so a line ends only between two paths ("src/cart.\nts" read as two names).
+    public static func unbrokenPaths(_ list: String) -> String {
+        list.components(separatedBy: ", ").map { path in
+            var out = ""
+            for (i, ch) in path.enumerated() {
+                out.append(ch)
+                if "/.-_".contains(ch), i < path.count - 1 { out.append("\u{2060}") }
+            }
+            return out
+        }.joined(separator: ", ")
     }
 
     static func blockedText(_ kind: String) -> String {
