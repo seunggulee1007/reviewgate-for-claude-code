@@ -135,6 +135,19 @@ describe.runIf(posix)("§67.2 shell_run", () => {
     expect(h.ofType("shell_result").at(-1)).toMatchObject({ cancelled: true });
   });
 
+  it("reject / reject_all / reject_hunks / reject_undo are refused shell_running while it runs", async () => {
+    const { h } = await rig();
+    await h.engine.request({ type: "shell_run", command: "sleep 30" });
+    await expect(h.engine.request({ type: "reject", paths: ["a.txt"] })).rejects.toThrow("shell_running");
+    await expect(h.engine.request({ type: "reject_all" })).rejects.toThrow("shell_running");
+    await expect(h.engine.request({ type: "reject_hunks", path: "a.txt", hunks: [0] })).rejects.toThrow("shell_running");
+    await expect(h.engine.request({ type: "reject_undo", path: "a.txt" })).rejects.toThrow("shell_running");
+    await h.engine.request({ type: "shell_cancel" });
+    await h.waitFor((st) => st.session.shell === null, "stopped");
+    const after = await h.engine.request({ type: "reject", paths: ["a.txt"] }).then(() => "ok", (e: Error) => e.message);
+    expect(after).not.toContain("shell_running");
+  });
+
   it("a command past its limit is stopped (timedOut)", async () => {
     const { h } = await rig({ shellTimeoutMs: 300 });
     await h.engine.request({ type: "shell_run", command: "sleep 30" });

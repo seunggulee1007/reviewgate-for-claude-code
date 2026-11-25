@@ -11223,6 +11223,7 @@ shell_cancel {}                     // stops it (its process tree); lane of its 
 // refused: empty_command | command_too_long (> 10 000 chars) | no_project | terminal_chat
 //          | shell_busy (one runs) | turn_running (a turn, its collection, a revert, another session's turn)
 //          | no_shell_running (shell_cancel)
+// reject / reject_all / reject_hunks / reject_undo are refused shell_running while it runs (it writes files — a revert would race it)
 // events
 type ShellOutputEvent = { type: "shell_output"; id: string; output: string };   // its last 4 000 chars, ≤ every 300 ms
 type ShellResultEvent = { type: "shell_result"; turn: number; at: string } & ShellResult;
@@ -11244,7 +11245,9 @@ type ShellResult = {
   sessions get, no stdin (an interactive command gets none — it ends or times out), stdout and stderr in one stream.
   After 10 minutes it is stopped (`timedOut`, the output ends with "[ReviewGate] command timed out …"); `shell_cancel` —
   and `interrupt` while no turn runs, so Esc / Stop work as for a turn — stops it (`cancelled`). One at a time, and only
-  between turns. A chat switch or another project stops it first; its row still lands in the chat it ran in.
+  between turns. While it runs, the reverts (`reject`, `reject_all`, `reject_hunks`, `reject_undo`) are refused
+  `shell_running`; the clients disable their Reject controls with "Reject is available when the shell command ends".
+  A chat switch or another project stops it first; its row still lands in the chat it ran in.
 - **The chat.** While it runs, `state.session.shell` names it and `shell_output` carries its output so far; the send
   gate is closed (`shell_running`), so a message typed meanwhile waits (the clients' queue) and goes out after it. When it
   ends, its row (`kind: "shell"`) joins the chat's transcript and `shell_result` follows.
