@@ -11277,4 +11277,19 @@ type ShellResult = {
   잘렸어요" when `truncated`), "파일 N개를 바꿨어요 — 다음 리뷰에 나와요" with the names in a tooltip, and a context menu
   (명령 복사 · 출력 복사). While `shellPending > 0` a caption over the box says "셸 결과 N개가 다음 메시지와 함께 Claude에게
   가요".
-- Terminal chats never show any of this (their TUI has `/add-dir` and `!`).
+- Terminal chats never show any of this (their TUI has `/add-dir` and `!`). A chat shown read-only (another chat's
+  record) does not run `!` or `/add-dir`: the notice says to go back to the running chat.
+- A run that ended with `exitCode: null` and neither `cancelled` nor `timedOut` reads "시작하지 못했어요". The time on the
+  row is its duration. The `!` key sends `shell_run` from every send path (send, queue, steer, an answer), so a `!` draft
+  never reaches Claude; `!` alone is refused before the engine (`empty_command`). ⌘. / Ctrl+. (Stop Claude) stops only a
+  turn — Esc, the composer's stop and the row's 중지 stop a `!` command.
+- **Mac:** Core `Engine/AddDirShellProtocol.swift`, `Session/AddDirShell.swift` (`ShellMode`, `ShellEnd`, `AddDirText`,
+  the store's `addDir` / `removeDir` / `runShell` / `cancelShell`), `SlashAppCommand.addDir`, `BlockedReason.shellRunning`
+  (an unknown `blockedReason` now reads as nil instead of failing the state); App `ChatComposer.swift`,
+  `ComposerChips.swift` (the 디렉터리 chip), `ComposerSlashCommands.swift`, the transcript's shell rows. Tests:
+  `AddDirShellTests`, `SlashAppCommandsTests`.
+- **Windows:** `addedDirs.ts`, `shellMode.ts`, `slashAppCommands.ts` (`addDir`), `slashAppRun.ts`, the store (state,
+  `shell_output` / `shell_result`, refusal words, the gate's `shell_running`), `components/chat/Composer.tsx`,
+  `ComposerChips.tsx`, `ShellRows.tsx` (+ `shell.css`, the `--shell` colour), main `ipcGuard.ts` (the four commands) and
+  `rg:pickAddDirectory` (the folder picker). Tests: `shellMode.test.ts`, `addedDirs.test.ts`, `composerShell.test.ts`,
+  `shellRows.test.ts`, `ipcGuard.test.ts`, `slashAppCommands.test.ts`.
