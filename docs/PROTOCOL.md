@@ -7346,7 +7346,7 @@ download whose identifier differs from the running app's, so a build with an old
     X is ready. Claude is working — ReviewGate restarts when the turn finishes." with each such window as a button
     ("acme-api: Claude is working", a click brings it forward), [Restart Now] (asks "Restart now? The turns that run are
     stopped.") and [Cancel] (the download is removed). Then "Ready — ReviewGate closes and reopens as X" for 2 s (looked
-    at once more), `pendingUpdateInstall = {from, to}` and `restoreOnceAfterRelaunch` in `settings.json`, and the quit
+    at once more), `pendingUpdateInstall = {from, to, at}` (`at`: the quit, ms) and `restoreOnceAfterRelaunch` in `settings.json`, and the quit
     (no "Quit ReviewGate?" question: every window is idle, or the user said Restart Now). Only once every engine has
     stopped (`disposeAll`, at most 6 s) is the installer started, detached, from its folder:
     `ReviewGate-Setup-X.Y.Z.exe /S /currentuser --updated --force-run` — silent; this user's install; an update (the
@@ -7356,6 +7356,12 @@ download whose identifier differs from the running app's, so a build with an old
     The installer is never run by the app's own process tree while engines live, and nothing is killed by name by
     ReviewGate (the installer itself still closes a ReviewGate.exe of this user that is running after ~1.3 s, as every
     electron-builder update does). If the installer cannot start, the record gets `why` and the app reopens itself.
+    Started, the record gets the installer's `pid` (this user's install). **Opened again during the install** (the
+    Start menu, the taskbar — reproduced on windows-latest: each such launch opened a 0.5.28 window that the installer
+    then closed, and the first took the record, so the launch the installer made had nothing to say): a
+    launch that finds the record with `pid` still running, within 5 minutes of `at`, not started with `--updated` and
+    still older than `to` leaves at once, before the single-instance lock and any window, and keeps the record
+    (`updateInstall.ts` `installerStillRunning`, main.ts).
     **For all users** the installer is started through Windows PowerShell by its full path
     (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
     PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/S','/allusers','--updated','--force-run'
@@ -7388,9 +7394,10 @@ download whose identifier differs from the running app's, so a build with an old
     → quit, waiting for Claude and going on, a turn started during "Ready", Restart Now (asked), Cancel (download and
     wait), failures, the installer's argv and spawn options, who can install (Program Files → elevated), the elevated
     command (PowerShell's full path, the decoded script, paths with spaces and quotes) and its exit codes, the notice
-    from the record and no loop; `updateRecheck.test.ts` — every 3 minutes, stops after an hour or once the installer is
+    from the record and no loop, a launch while the installer runs (left, the record kept; not the installer's own
+    launch, not after 5 minutes, not once it has gone); `updateRecheck.test.ts` — every 3 minutes, stops after an hour or once the installer is
     there, a newer version's own hour, off with automatic checks off, focus and [Check Again]; `updateFlow.test.ts` —
-    the missing installer through main, and the elevated start declined (the record, the relaunch, the notice);
+    the missing installer through main (the installer's pid joins the record), and the elevated start declined (the record, the relaunch, the notice);
     `update.test.ts`, `restoreOnce.test.ts`, `UpdateBanner.test.ts` (each step, the tooltips, the reason line and
     [Check Again], Korean), `UpdateSettings.test.ts`. Not exercised: Electron's `net` transport against github.com, a
     real installer run by the app (per user or elevated, the UAC prompt), and the relaunch — docs/M11-WINDOWS.md

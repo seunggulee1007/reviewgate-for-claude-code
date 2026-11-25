@@ -189,8 +189,9 @@ export type AppSettings = {
   autoCheckUpdates?: boolean;
   /** MARK: polish p-lifecycle (P5-sheets-49): the release whose banner the user closed with Later (main writes it). */
   dismissedUpdateVersion?: string;
-  /** §48 Windows: written as the app quits to install an update, taken once by the next launch (main only). */
-  pendingUpdateInstall?: { from: string; to: string; why?: string };
+  /** §48 Windows: written as the app quits to install an update, taken once by the next launch (main only). `at`: the
+   * quit (ms); `pid`: the installer once it runs — a launch while it still runs leaves the record (src/main/updateInstall.ts). */
+  pendingUpdateInstall?: { from: string; to: string; why?: string; at?: number; pid?: number };
   /** §48 Windows (the Mac's P5-sheets-48): the launch after an update's restart reopens the windows once, whatever `reopenLastProjects` says. */
   restoreOnceAfterRelaunch?: boolean;
   // MARK: terminal-win — PROTOCOL §57.17 (terminal-stage3 plan §2.3)

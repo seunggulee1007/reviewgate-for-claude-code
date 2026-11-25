@@ -1,7 +1,7 @@
 // The Windows in-app update's steps (docs/PROTOCOL.md §48, Windows): download → verify → (waiting for Claude) → ready →
 // the record and the quit; cancel and failures; the installer's argv; what the next launch says from the record, once.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blockerLine, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installMode, launchInstaller, noticeOf, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
+import { blockerLine, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installerStillRunning, INSTALLING_MS, installMode, launchInstaller, noticeOf, processAlive, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
 
 const target: InstallTarget = {
   version: "0.6.0",
@@ -247,6 +247,39 @@ describe("after the restart", () => {
     expect(noticeOf({ from: "0.5.17" }, "0.6.0")).toBeNull();
     expect(noticeOf({ from: "x", to: "0.6.0" }, "0.6.0")).toBeNull();
     expect(validRecord({ from: "0.5.17", to: "0.6.0", why: "  " })).toEqual({ from: "0.5.17", to: "0.6.0" });
+    expect(validRecord({ from: "0.5.17", to: "0.6.0", at: 1000, pid: 42 })).toEqual({ from: "0.5.17", to: "0.6.0", at: 1000, pid: 42 });
+    expect(validRecord({ from: "0.5.17", to: "0.6.0", at: -1, pid: 4.5 })).toEqual({ from: "0.5.17", to: "0.6.0" });
+    expect(validRecord({ from: "0.5.17", to: "0.6.0", at: "1000", pid: "42" })).toEqual({ from: "0.5.17", to: "0.6.0" });
+  });
+
+  it("opened again while the installer runs: that launch leaves and keeps the record; the installer's own launch, a later one or a gone installer do not", () => {
+    const at = 1_000_000;
+    const raw = { from: "0.5.17", to: "0.6.0", at, pid: 4242 };
+    const base = { raw, running: "0.5.17", argv: ["C:\\Users\\dev\\AppData\\Local\\Programs\\ReviewGate\\ReviewGate.exe"], now: at + 20_000, alive: (pid: number) => pid === 4242 };
+    expect(installerStillRunning(base)).toBe(true);
+    // The launch the installer makes when it is done: `--updated`, and the new version.
+    expect(installerStillRunning({ ...base, argv: [...base.argv, "--updated"] })).toBe(false);
+    expect(installerStillRunning({ ...base, running: "0.6.0" })).toBe(false);
+    // The installer has gone (finished, failed): this launch takes the record and says what happened.
+    expect(installerStillRunning({ ...base, alive: () => false })).toBe(false);
+    // Long after the quit (a pid used again by something else), or a clock that went back: never held.
+    expect(installerStillRunning({ ...base, now: at + INSTALLING_MS + 1 })).toBe(false);
+    expect(installerStillRunning({ ...base, now: at - 1 })).toBe(false);
+    // No pid (the installer did not start yet, elevated) or a record that says it did not start.
+    expect(installerStillRunning({ ...base, raw: { from: "0.5.17", to: "0.6.0", at } })).toBe(false);
+    expect(installerStillRunning({ ...base, raw: { ...raw, why: "The installer could not start: spawn EACCES" } })).toBe(false);
+    expect(installerStillRunning({ ...base, raw: { from: "0.5.17", to: "0.6.0", pid: 4242 } })).toBe(false);
+    expect(installerStillRunning({ ...base, raw: undefined })).toBe(false);
+  });
+
+  it("a process is there when signal 0 reaches it (EPERM: there, not ours); ESRCH: gone", () => {
+    expect(processAlive(1, () => true)).toBe(true);
+    const fail = (code: string) => () => {
+      throw Object.assign(new Error(code), { code });
+    };
+    expect(processAlive(1, fail("EPERM"))).toBe(true);
+    expect(processAlive(1, fail("ESRCH"))).toBe(false);
+    expect(processAlive(process.pid)).toBe(true);
   });
 
   it("never loops: a failed install is said once and nothing installs again by itself", async () => {
