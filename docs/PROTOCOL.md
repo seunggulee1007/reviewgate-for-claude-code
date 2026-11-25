@@ -11426,8 +11426,10 @@ review again, extras-only with a pending review and with none.
   "Fetched origin — 3 incoming commit(s) to pull", or the refusal in words (orange) — `pull_would_overwrite` names the
   files (all of them in the tooltip) and says nothing was changed. A project switch clears it. At most four lines (the
   whole text in the tooltip): a long one must not make the sidebar's header taller than a 637 pt window. The files it
-  names never break inside a name (a word joiner after each `/ . - _` in a path; Mac `GitSyncText.unbrokenPaths`,
-  Windows `unbrokenPaths`): a line ends only between two paths.
+  names never break inside a name: the words carry a word joiner after each `/ . - _` in a path (Mac
+  `GitSyncText.unbrokenPaths`, Windows `unbrokenPaths`), and on the Mac — where a wrapped Korean sentence broke a name
+  regardless — `pull_would_overwrite` counts the files ("pull하면 커밋하지 않은 파일 6개가 덮어써져요 — …") and lists them
+  on one line of their own under it, cut at its end (`GitSyncNotice.refusal`, `listsPaths`).
 - **The automatic fetch** (§68.4): on project open and when the window comes back to the front, `git_fetch {auto:
   true}` — quiet whatever happens. Settings › Git › "Fetch and Pull" › "Fetch automatically" (default on; Mac
   `AppSettings.autoFetch`, Windows `settings.autoFetch`), also sent to the engine as `settings.autoFetch`.

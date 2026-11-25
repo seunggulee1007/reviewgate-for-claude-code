@@ -1276,12 +1276,24 @@ struct MainWindow: View {
                 // At most four lines: a pull refused over many files grew the sidebar's header past the window's height
                 // (the whole window then laid out taller than itself at 1000 × 637). The whole text and every file are
                 // in the tooltip.
-                Text(verbatim: notice.text)
-                    .font(.caption)
-                    .lineLimit(4)
-                    .truncationMode(.tail)
-                    .textSelection(.enabled)
-                    .help(notice.paths.isEmpty ? notice.text : notice.text + "\n\n" + notice.paths.joined(separator: "\n"))
+                let help = notice.paths.isEmpty ? notice.text : notice.text + "\n\n" + notice.paths.joined(separator: "\n")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: notice.text)
+                        .font(.caption)
+                        .lineLimit(4)
+                        .truncationMode(.tail)
+                        .textSelection(.enabled)
+                    if notice.listsPaths {
+                        // The files a refused pull names, on one line of their own: never a name broken across lines.
+                        Text(verbatim: notice.pathsLine)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityIdentifier("Sync notice files")
+                    }
+                }
+                .help(help)
                 Spacer(minLength: 4)
                 Button {
                     store.dismissGitSyncNotice()

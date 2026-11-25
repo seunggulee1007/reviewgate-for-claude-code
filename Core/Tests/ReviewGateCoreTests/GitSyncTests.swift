@@ -129,6 +129,12 @@ import Testing
         #expect(store.gitSyncNotice?.kind == .error)
         #expect(store.gitSyncNotice?.paths == ["a.ts"])
         #expect(store.gitSyncNotice?.text.contains("Nothing was changed") == true)
+        // The files are counted in the sentence and listed on a line of their own — never a name wrapped mid-way.
+        #expect(store.gitSyncNotice?.text == "Pull would overwrite 1 uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.")
+        #expect(store.gitSyncNotice?.listsPaths == true)
+        #expect(store.gitSyncNotice?.pathsLine == "a.ts")
+        #expect(GitSyncNotice.refusal(code: "pull_failed", text: "Pull failed: x", paths: []) == GitSyncNotice(kind: .error, text: "Pull failed: x"))
+        #expect(GitSyncNotice(kind: .success, text: "Pulled", paths: ["x.ts"]).listsPaths == false)   // a pull's files: tooltip only
         store.dismissGitSyncNotice()
         #expect(store.gitSyncNotice == nil)
 

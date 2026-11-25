@@ -18,6 +18,20 @@ public struct GitSyncNotice: Equatable, Sendable {
         self.text = text
         self.paths = paths
     }
+
+    /// A refused Fetch / Pull. `pull_would_overwrite` with its files counts them in the sentence and leaves the names to a
+    /// line of their own (`listsPaths`): inside a wrapped Korean sentence SwiftUI broke a name in two ("src/cart." / "ts")
+    /// whatever joiners it carried.
+    public static func refusal(code: String?, text: String, paths: [String]) -> GitSyncNotice {
+        guard code == "pull_would_overwrite", !paths.isEmpty else { return GitSyncNotice(kind: .error, text: text, paths: paths) }
+        return GitSyncNotice(kind: .error, text: GitSyncText.overwriteNotice(count: paths.count), paths: paths)
+    }
+
+    /// The files go on a line of their own under the text (a refusal naming them), not only in the tooltip.
+    public var listsPaths: Bool { kind == .error && !paths.isEmpty }
+
+    /// That line: the names, one after another (one line, cut at its end; every name in the tooltip).
+    public var pathsLine: String { paths.joined(separator: ", ") }
 }
 
 /// The words of §68: refusals, blockers and outcomes.
@@ -52,6 +66,11 @@ public enum GitSyncText {
             return String(localized: "\(detail) is no longer a change outside the review — reopen the commit sheet", bundle: .module)
         default: return nil
         }
+    }
+
+    /// `pull_would_overwrite` in the branch's notice: how many files, the names on the line under it.
+    public static func overwriteNotice(count: Int) -> String {
+        String(localized: "Pull would overwrite \(count) uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
     }
 
     /// A list of paths ("src/cart.ts, README.md") whose names never break across lines: a word joiner (U+2060) after each
@@ -237,9 +256,11 @@ extension AppState {
             gitSyncNotice = GitSyncNotice(kind: r.mode == .upToDate ? .info : .success, text: GitSyncText.pulled(r), paths: r.files)
         } catch {
             await settle()
-            let paths: [String]
-            if case let .refused(_, _, refusedPaths, _)? = error as? EngineClientError { paths = refusedPaths } else { paths = [] }
-            gitSyncNotice = GitSyncNotice(kind: .error, text: syncErrorText(error), paths: paths)
+            if case let .refused(_, code, refusedPaths, _)? = error as? EngineClientError {
+                gitSyncNotice = .refusal(code: code, text: syncErrorText(error), paths: refusedPaths)
+            } else {
+                gitSyncNotice = GitSyncNotice(kind: .error, text: syncErrorText(error))
+            }
         }
     }
 

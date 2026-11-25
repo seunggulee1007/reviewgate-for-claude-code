@@ -1145,7 +1145,7 @@ private final class Tour {
         let refused = EngineMessages.refusal(code: "pull_would_overwrite", error: "pull_would_overwrite:" + overwrite.prefix(5).joined(separator: ", "),
                                              paths: overwrite)
         store.debugShowGitSync(branches: branches(ahead: 0, behind: 3), sync: sync, remoteURL: remote,
-                               notice: GitSyncNotice(kind: .error, text: refused, paths: overwrite))
+                               notice: .refusal(code: "pull_would_overwrite", text: refused, paths: overwrite))   // as AppState.pull
         menuLog("behind")
         try await shoot("branch-refused")
         try headerCrop("branch-refused")

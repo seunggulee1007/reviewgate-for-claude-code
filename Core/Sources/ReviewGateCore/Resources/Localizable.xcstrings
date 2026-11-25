@@ -7927,6 +7927,22 @@
         }
       }
     },
+    "Pull would overwrite %lld uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull would overwrite %lld uncommitted file(s) — commit them (or finish their review) first. Nothing was changed."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull하면 커밋하지 않은 파일 %lld개가 덮어써져요 — 먼저 커밋하거나 리뷰를 마쳐야 해요. 아무것도 바뀌지 않았어요."
+          }
+        }
+      }
+    },
     "Pull would overwrite your uncommitted changes: %@ — commit them (or finish their review) first. Nothing was changed.": {
       "localizations": {
         "en": {
