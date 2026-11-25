@@ -1,6 +1,8 @@
 // MARK: git-sync — §68.5 committing files outside the review along with the accepted ones.
 import { realpathSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
+import type { OtherChange } from "../src/protocol.js";
+import { COMMIT_SUBJECT_MAX, suggestOthersMessage } from "../src/review/commitMessage.js";
 import { makeHarness, type Harness } from "./helpers/engine.js";
 import { makeTempDir, removeDir, sh, write } from "./helpers/repo.js";
 
@@ -42,6 +44,23 @@ async function fakeTurn(h: Harness, mutate: () => void): Promise<void> {
 
 const headFiles = (repo: string): string[] => sh(repo, "show", "--name-status", "--format=", "HEAD").trim().split("\n").filter(Boolean).map((l) => l.replace(/\t/g, " "));
 
+describe("§68.5 the suggested message of a commit of only other changes", () => {
+  const change = (path: string, status: OtherChange["status"] = "M", oldPath: string | null = null) =>
+    ({ path, oldPath, status, untracked: status === "?" });
+  it("names one file by what happened to it, counts more, and never says 'accepted'", () => {
+    expect(suggestOthersMessage([change("docs/README.md")])).toBe("Update README.md");
+    expect(suggestOthersMessage([change("src/money.ts", "R", "src/format.ts")])).toBe("Rename format.ts to money.ts");
+    expect(suggestOthersMessage([change("src/old.ts", "D")])).toBe("Delete old.ts");
+    expect(suggestOthersMessage([change("notes.md", "?")])).toBe("Add notes.md");
+    // The tracked files lead (untracked ones are listed only on request); untracked alone are counted too.
+    expect(suggestOthersMessage([change("README.md"), change("notes.md", "?"), change("seed.ts", "?")])).toBe("Update README.md");
+    expect(suggestOthersMessage([change("a.md", "?"), change("b.md", "?")])).toBe("Update 2 files");
+    expect(suggestOthersMessage([change("a.ts"), change("b.ts"), change("c.ts", "A")])).toBe("Update 3 files");
+    expect(suggestOthersMessage([])).toBe("Update files");
+    expect(suggestOthersMessage([change(`${"x".repeat(90)}.ts`)]).length).toBeLessThanOrEqual(COMMIT_SUBJECT_MAX);
+  });
+});
+
 describe("§68.5 commit_others / commit.extraPaths", () => {
   it("lists the changes outside the review; commits the ticked ones with the accepted files; the pending file keeps its review", async () => {
     const { repo, h } = setup();
@@ -61,7 +80,7 @@ describe("§68.5 commit_others / commit.extraPaths", () => {
     expect(h.engine.state.commit.otherChanges).toEqual({ tracked: 2, untracked: 2 });
 
     const others = await h.engine.request({ type: "commit_others" });
-    expect(others).toMatchObject({ type: "commit_others", truncated: false });
+    expect(others).toMatchObject({ type: "commit_others", truncated: false, suggestedMessage: "Update 2 files" });
     expect(others.files).toEqual([
       { path: ".omc/state.json", oldPath: null, status: "?", untracked: true, hidden: true },
       { path: "new-name.txt", oldPath: "old-name.txt", status: "R", untracked: false },

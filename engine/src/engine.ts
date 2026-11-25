@@ -118,6 +118,7 @@ import type {
 } from "./protocol.js";
 import { isPeerInboundMode, isPermissionMode, MAX_PLAN_BYTES, PLAN_INTO, PROTOCOL_VERSION } from "./protocol.js";
 import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
+import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-sync (§68.5)
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
@@ -5781,7 +5782,12 @@ export class ReviewEngine {
   private async commitOthers(): Promise<CommitOthersEvent> {
     const cp = this.requireProject();
     const files = await otherChanges(cp.root, this.gate.changedFiles, this.settings.ignorePatterns);
-    return { type: "commit_others", files: files.slice(0, MAX_OTHER_CHANGES), truncated: files.length > MAX_OTHER_CHANGES };
+    return {
+      type: "commit_others",
+      files: files.slice(0, MAX_OTHER_CHANGES),
+      truncated: files.length > MAX_OTHER_CHANGES,
+      suggestedMessage: suggestOthersMessage(files),
+    };
   }
 
   /** MARK: r1-git — §46: the review `paths` whose file (both names of a rename) has no change against HEAD — committed already. */

@@ -11377,7 +11377,10 @@ Clients never show an automatic fetch's refusal as an error; `lastFetchError` is
 - `commit_others {}` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
   --untracked-files=all` entry whose path — or a rename's either path — is not a review file; unmerged entries left out.
   `OtherChange = { path, oldPath, status: "M"|"A"|"D"|"R"|"T"|"?", untracked, hidden? }` (`hidden`: an app ignore pattern
-  matches it — still the user's file to commit). A read (`query` lane).
+  matches it — still the user's file to commit). A read (`query` lane). `suggestedMessage` (absent from an older engine):
+  a neutral message for a commit of only these files — `commit.suggestedMessage` is Claude's last instruction, which does
+  not describe the user's own edits. From the tracked files (the untracked ones when none): one is named by what happened
+  to it ("Update README.md", "Add notes.md", "Delete old.ts", "Rename a.ts to b.ts"), more are counted ("Update 3 files").
 - `commit { message, paths?, extraPaths?, push? }`: `extraPaths` are committed in the same commit (`git add -A` of each,
   then `git commit --only` of the accepted paths and the extras — a `git mv` rename's old name included). Each must be in
   `commit_others` now, else `invalid_extra:<path>` (`paths`: it) — a review file is accepted, not slipped in as an extra.
