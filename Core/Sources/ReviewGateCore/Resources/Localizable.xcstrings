@@ -1265,6 +1265,22 @@
         }
       }
     },
+    "A %@ is in progress — finish or abort it in a terminal, then rebase": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A %@ is in progress — finish or abort it in a terminal, then rebase"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 작업이 진행 중이에요 — 터미널에서 끝내거나 중단해야 rebase할 수 있어요"
+          }
+        }
+      }
+    },
     "A background agent failed — Claude went on": {
       "localizations": {
         "en": {
@@ -3585,6 +3601,22 @@
         }
       }
     },
+    "Check out a branch to rebase it (HEAD is detached)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check out a branch to rebase it (HEAD is detached)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치를 체크아웃해야 rebase할 수 있어요 (HEAD가 분리됨)"
+          }
+        }
+      }
+    },
     "Choose a base branch first": {
       "localizations": {
         "en": {
@@ -3917,6 +3949,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 턴이 끝나면 pull할 수 있어요"
+          }
+        }
+      }
+    },
+    "Claude is working — rebase when the turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — rebase when the turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 작업 중이에요 — 턴이 끝나면 rebase할 수 있어요"
           }
         }
       }
@@ -8531,6 +8579,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 브랜치와 upstream이 갈라졌어요 — fast-forward할 수 없어요. upstream 위로 rebase하거나 터미널에서 merge하면 돼요."
+          }
+        }
+      }
+    },
+    "This branch has no upstream to rebase onto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This branch has no upstream to rebase onto"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 브랜치에는 rebase할 upstream이 없어요"
           }
         }
       }

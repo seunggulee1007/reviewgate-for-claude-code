@@ -81,6 +81,14 @@ import Testing
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 1, worktreeDirty: false)!.contains("Finish the review"))
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 0, worktreeDirty: true) == "Commit your changes before rebasing")
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 0, worktreeDirty: false) == nil)
+        // Pull's blockers in a rebase's own words — not "pull when the turn ends" on the Rebase item.
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(pullBlocker: .running), reviewFiles: 0, worktreeDirty: false)
+                == "Claude is working — rebase when the turn ends")
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(pullBlocker: .operation(.merge)), reviewFiles: 0, worktreeDirty: false)
+                == "A merge is in progress — finish or abort it in a terminal, then rebase")
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(fetching: true), reviewFiles: 1, worktreeDirty: false)
+                == "A fetch or pull is already running")
+        #expect(GitSyncRules.pullDisabledReason(sync: GitSyncState(pullBlocker: .running)) == "Claude is working — pull when the turn ends")
     }
 
     @Test func refusalsSayWhatToDo() {

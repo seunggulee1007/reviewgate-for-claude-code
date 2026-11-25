@@ -11417,8 +11417,9 @@ review again, extras-only with a pending review and with none.
   and, only when the branch has diverged, **Rebase onto origin/main** (`git_pull {rebase: true}`). Every item is disabled
   with its reason as its tooltip: `fetchBlocker` / `pullBlocker` (a turn running, a fetch or pull running, detached, no
   upstream — "push it first (git push -u)", a merge / rebase / cherry-pick / revert in progress), Pull on a diverged
-  branch with `pull_diverged`'s words, Rebase with "Finish the review before rebasing" (any review file) or "Commit your
-  changes before rebasing" (`switchBlocker` dirtyWorktree). The menu's footer is the last fetch ("Fetched 3 min ago") or
+  branch with `pull_diverged`'s words, Rebase with the same blockers in a rebase's words ("Claude is working — rebase when
+  the turn ends"; Mac `GitSyncText.rebaseBlocker`, Windows `rebaseBlockerText`), "Finish the review before rebasing" (any
+  review file) or "Commit your changes before rebasing" (`switchBlocker` dirtyWorktree). The menu's footer is the last fetch ("Fetched 3 min ago") or
   its failure ("Fetch failed: <git's line>").
 - **The outcome** of a Fetch / Pull the user asked for is one line under the branch line until dismissed (✕) or the
   next one: green "Pulled 2 commit(s) from origin/main · 5 file(s) changed", "Already up to date with origin/main",

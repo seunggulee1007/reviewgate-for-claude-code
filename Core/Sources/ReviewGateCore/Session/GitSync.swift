@@ -83,6 +83,17 @@ public enum GitSyncText {
         }
     }
 
+    /// Why "Rebase onto <upstream>" is off for the same blockers as Pull — in its own words: the rebase is what waits.
+    public static func rebaseBlocker(_ blocker: PullBlocker) -> String {
+        switch blocker {
+        case .running: String(localized: "Claude is working — rebase when the turn ends", bundle: .module)
+        case .busy: blockedText("busy")
+        case .detached: String(localized: "Check out a branch to rebase it (HEAD is detached)", bundle: .module)
+        case .noUpstream: String(localized: "This branch has no upstream to rebase onto", bundle: .module)
+        case .operation(let op): String(localized: "A \(operationName(op.rawValue)) is in progress — finish or abort it in a terminal, then rebase", bundle: .module)
+        }
+    }
+
     /// Why Fetch is off.
     public static func fetchBlocker(_ blocker: FetchBlocker) -> String {
         switch blocker {
@@ -143,9 +154,13 @@ public enum GitSyncRules {
         return branch.ahead > 0 && branch.behind > 0
     }
 
-    /// Why "Rebase onto <upstream>" is off (§68.3): Pull's own reasons, then files under review, then uncommitted changes.
+    /// Why "Rebase onto <upstream>" is off (§68.3): Pull's blockers in a rebase's words, then files under review, then
+    /// uncommitted changes.
     public static func rebaseDisabledReason(sync: GitSyncState?, reviewFiles: Int, worktreeDirty: Bool) -> String? {
-        if let reason = pullDisabledReason(sync: sync) { return reason }
+        if let sync {
+            if sync.isBusy { return GitSyncText.rebaseBlocker(.busy) }
+            if let blocker = sync.pullBlocker { return GitSyncText.rebaseBlocker(blocker) }
+        }
         if reviewFiles > 0 { return String(localized: "Finish the review before rebasing — a rebase rewrites the files under review", bundle: .module) }
         if worktreeDirty { return String(localized: "Commit your changes before rebasing", bundle: .module) }
         return nil
