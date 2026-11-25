@@ -11,13 +11,14 @@ import { configureNodePty, nodePty } from "./pty/nodePty.js"; // MARK: terminal-
 import { runPtySelftest, selftestArg } from "./pty/selftest.js";
 import { buildMenu, type MenuHandlers } from "./menu.js";
 import { secondInstanceAction, type SecondInstanceData } from "./singleInstance.js";
-import { applyAppearance, detectWindowsClaude, loadSettings, saveSettings } from "./settings.js";
+import { applyAppearance, detectWindowsClaude, loadSettings, saveSettings, storedUpdateRecord } from "./settings.js";
 import { installE2E, type E2EMode } from "./e2e.js";
 import { e2eOutArg, e2eUserDataArg, installTerminalE2E } from "./e2eTerminal.js"; // MARK: terminal-win (§57.17)
 import { installIPC } from "./ipc.js";
 import { installNotifications } from "./notifications.js";
 import { installReadiness } from "./readiness.js"; // MARK: polish p-lifecycle (P5-sheets-44)
 import { afterEnginesStopped, checkForUpdatesNow, installUpdates } from "./update.js"; // MARK: polish p-lifecycle (P5-sheets-49), §48 Windows
+import { installerStillRunning, processAlive } from "./updateInstall.js";
 import { closeGuardReason } from "../shared/closeGuard.js";
 import { appUserModelId } from "./notify.js"; // MARK: wave4b w4-notify
 import { logDir, logLine } from "./log.js";
@@ -76,8 +77,17 @@ if (PTY_SELFTEST) {
 
 // Audit daily-19: one ReviewGate process per user — a second launch hands its project to this one and quits instead of
 // opening the same worktrees with a second set of engines (src/main/singleInstance.ts). The --e2e harness skips the lock.
+// §48 Windows: ReviewGate opened again while its update's installer still runs (updateInstall.ts `installerStillRunning`)
+// leaves at once — before the lock and any window, keeping the record; the installer shows its own progress and starts
+// ReviewGate when it is done.
+const UPDATE_INSTALLING =
+  process.platform === "win32" && app.isPackaged && E2E === null && !E2E_TERMINAL && PTY_SELFTEST === null && installerStillRunning({ raw: storedUpdateRecord(), running: app.getVersion(), argv: process.argv, now: Date.now(), alive: processAlive });
+if (UPDATE_INSTALLING) {
+  logLine("main", "main", "update: the installer is still running — this launch leaves");
+  app.exit(0);
+}
 const secondLaunchData: SecondInstanceData = { project: process.env.REVIEWGATE_PROJECT ?? "" };
-const primaryInstance = E2E !== null || E2E_TERMINAL || PTY_SELFTEST !== null || app.requestSingleInstanceLock(secondLaunchData);
+const primaryInstance = !UPDATE_INSTALLING && (E2E !== null || E2E_TERMINAL || PTY_SELFTEST !== null || app.requestSingleInstanceLock(secondLaunchData));
 if (!primaryInstance) app.exit(0);
 const isDirectory = (p: string): boolean => {
   try {

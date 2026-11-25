@@ -57,7 +57,7 @@ async function launch(version: string, quit: () => void = () => undefined) {
 }
 const started = (calls: Array<[string, readonly string[]]>): SpawnInstaller => (file, args) => {
   calls.push([file, args]);
-  return { once: (e: string, cb: () => void) => (e === "spawn" ? queueMicrotask(cb) : undefined), unref: () => undefined } as ReturnType<SpawnInstaller>;
+  return { pid: 4242, once: (e: string, cb: () => void) => (e === "spawn" ? queueMicrotask(cb) : undefined), unref: () => undefined } as ReturnType<SpawnInstaller>;
 };
 const cannotStart: SpawnInstaller = () => ({ once: (e: string, cb: (x: Error) => void) => (e === "error" ? queueMicrotask(() => cb(new Error("spawn UNKNOWN"))) : undefined), unref: () => undefined }) as ReturnType<SpawnInstaller>;
 
@@ -70,7 +70,7 @@ describe("the Windows update through main (§48)", () => {
     await m.installNow();
     await until(() => quits > 0);
     expect(quits).toBe(1);
-    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0" });
+    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number) });
     expect(h.settings["restoreOnceAfterRelaunch"]).toBe(true);
     expect(m.updateStatus().install).toEqual({ kind: "ready", version: "0.6.0" });
 
@@ -80,6 +80,8 @@ describe("the Windows update through main (§48)", () => {
     expect(calls[0]![0]).toMatch(/updates[\\/]0\.6\.0-[0-9a-f]{8}[\\/]ReviewGate-Setup-0\.6\.0\.exe$/);
     expect(calls[0]![1]).toEqual(INSTALLER_ARGS);
     expect(h.relaunched).toEqual([]);
+    // The installer's process joins the record: a launch while it runs leaves (updateInstall.ts `installerStillRunning`).
+    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number), pid: 4242 });
     await m.afterEnginesStopped(started(calls));
     expect(calls.length).toBe(1);
 
@@ -97,7 +99,7 @@ describe("the Windows update through main (§48)", () => {
     await m.installNow();
     await until(() => quits > 0);
     await m.afterEnginesStopped(cannotStart);
-    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", why: "The installer could not start: spawn UNKNOWN" });
+    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number), why: "The installer could not start: spawn UNKNOWN" });
     expect(h.relaunched).toEqual([1]);
 
     let laterQuits = 0;
@@ -135,8 +137,8 @@ describe("the Windows update through main (§48)", () => {
       };
       await m.afterEnginesStopped(declined);
       expect(calls[0]![0]).toMatch(/powershell\.exe$/);
-      expect(Buffer.from(calls[0]![1][3]!, "base64").toString("utf16le")).toMatch(/ReviewGate-Setup-0\.6\.0\.exe' -ArgumentList '\/S','\/allusers','--updated','--force-run' .* -Verb RunAs/);
-      expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", why: "Administrator rights were not given — the installer did not run." });
+      expect(Buffer.from(calls[0]![1][3]!, "base64").toString("utf16le")).toMatch(/ReviewGate-Setup-0\.6\.0\.exe' -ArgumentList '\/allusers','--updated' .* -Verb RunAs/);
+      expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number), why: "Administrator rights were not given — the installer did not run." });
       expect(h.relaunched.length).toBe(relaunched + 1);
       const next = await launch("0.5.17");
       expect(next.updateStatus().notice).toEqual({ kind: "failed", version: "0.6.0", why: "Administrator rights were not given — the installer did not run." });

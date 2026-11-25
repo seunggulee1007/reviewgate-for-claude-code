@@ -127,6 +127,15 @@ function file(): string {
   return join(app.getPath("userData"), "settings.json");
 }
 
+/** §48 Windows: the stored `pendingUpdateInstall`, read before the app is ready — not cached (`loadSettings` needs the locale). */
+export function storedUpdateRecord(): unknown {
+  try {
+    return (JSON.parse(readFileSync(file(), "utf8")) as Partial<AppSettings>).pendingUpdateInstall;
+  } catch {
+    return undefined;
+  }
+}
+
 export function loadSettings(): AppSettings {
   if (cache) return cache;
   let stored: Partial<AppSettings> = {};

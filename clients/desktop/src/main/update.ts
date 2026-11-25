@@ -166,7 +166,7 @@ const installer = new UpdateInstaller({
     const o: Electron.MessageBoxOptions = { type: "warning", message: t("Restart now?"), detail: [t("The turns that run are stopped."), ...blockers.map(blockerLine)].join("\n"), buttons: [t("Restart Now"), t("Cancel")], defaultId: 1, cancelId: 1, noLink: true };
     return (await (owner ? dialog.showMessageBox(owner, o) : dialog.showMessageBox(o))).response === 0;
   },
-  saveRecord: (record) => saveSettings({ pendingUpdateInstall: record ?? undefined, restoreOnceAfterRelaunch: record ? true : undefined }),
+  saveRecord: (record) => saveSettings({ pendingUpdateInstall: record ? { ...record, at: Date.now() } : undefined, restoreOnceAfterRelaunch: record ? true : undefined }),
   quit: (prepared) => {
     pendingInstaller = prepared;
     logLine("main", "main", `update: quitting to install ${installer.target?.version ?? "?"}`);
@@ -263,9 +263,19 @@ export async function afterEnginesStopped(spawnInstaller: SpawnInstaller = spawn
   const ready = pendingInstaller;
   if (!ready) return;
   pendingInstaller = null;
-  const why = await launchInstaller(ready.file, spawnInstaller, modeHere().kind === "elevated" ? "elevated" : "user", process.env["SystemRoot"]);
+  const mode = modeHere().kind === "elevated" ? "elevated" : "user";
+  let pid: number | undefined;
+  const keepPid: SpawnInstaller = (file, args, options) => {
+    const child = spawnInstaller(file, args, options);
+    pid = child.pid;
+    return child;
+  };
+  const why = await launchInstaller(ready.file, keepPid, mode, process.env["SystemRoot"]);
   if (why === null) {
-    logLine("main", "main", `update: installer started (${ready.file})`);
+    logLine("main", "main", `update: installer started (${ready.file}${pid ? `, pid ${pid}` : ""})`);
+    // A launch while it runs knows it (`installerStillRunning`). Elevated, `pid` is PowerShell's, gone at once.
+    const record = mode === "user" && pid ? validRecord(loadSettings().pendingUpdateInstall) : null;
+    if (record) saveSettings({ pendingUpdateInstall: { ...record, pid } });
     return;
   }
   logLine("main", "error", `update: ${why}`);

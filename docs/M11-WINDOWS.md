@@ -262,8 +262,9 @@ Artifacts built on macOS:
 - **From the app** (0.5.18 on): the banner's [Install and Restart] downloads `ReviewGate-Setup-X.Y.Z.exe` and its
   `.sha256` from the GitHub release (GitHub hosts only, ≤ 400 MB), checks the checksum, the name, the version and the PE
   header, waits until no window has Claude working or a card waiting, then quits and runs
-  `ReviewGate-Setup-X.Y.Z.exe /S /currentuser --updated --force-run` once every engine has stopped. ReviewGate reopens
-  as X and says "Updated to ReviewGate X" (or why it did not install, with [Try Again]). [Download Page] is always
+  `ReviewGate-Setup-X.Y.Z.exe /currentuser --updated` once every engine has stopped: the installer's own window shows
+  the progress (and, if a file of the install is in use, "ReviewGate cannot be closed … Retry"). ReviewGate reopens
+  as X by itself and says "Updated to ReviewGate X" (or why it did not install, with [Try Again]). [Download Page] is always
   there for doing it by hand. An all-users install (under Program Files) is updated the same way but elevated: Windows
   asks once for administrator rights (UAC) and the installer runs with `/allusers`; declined, ReviewGate reopens and says
   "Administrator rights were not given". A release whose Windows installer is not attached yet (CI adds it 10–15

@@ -4,9 +4,10 @@
  * keeps the release page one click away. Electron-free: main passes the download, the checks, the windows Claude works in
  * and the quit (src/main/update.ts).
  *
- * The installer is electron-builder's assisted NSIS installer. Run with `INSTALLER_ARGS` it installs silently for the
- * current user over the installed version (its uninstaller is run with --updated: settings and shortcuts stay) and starts
- * the app when it is done (`--force-run`, honoured by the assisted installer only together with `/S`). An install for all
+ * The installer is electron-builder's assisted NSIS installer. Run with `INSTALLER_ARGS` it installs for the current user
+ * over the installed version (its uninstaller is run with --updated: settings and shortcuts stay), with its progress
+ * window and any "cannot be closed" / "failed to uninstall" box on screen, and starts the app when it is done
+ * (build/installer.nsh skips the finish page of an update). An install for all
  * users (under Program Files) gets `ELEVATED_INSTALLER_ARGS`, started through Windows PowerShell's `Start-Process -Verb
  * RunAs`: Windows asks once for administrator rights (UAC); declined, the update says so after the relaunch.
  */
@@ -15,18 +16,21 @@ import { compareVersions } from "@reviewgate/engine";
 import { t } from "../renderer/i18n";
 import type { InstallerAssets } from "./updateVerify.js";
 
-/** `/S` silent · `/currentuser` the per-user install, never elevated · `--updated` an update (no "app is running" box, the
- * old uninstaller keeps app data) · `--force-run` start ReviewGate when done (with `--updated` passed to it). */
-export const INSTALLER_ARGS: readonly string[] = ["/S", "/currentuser", "--updated", "--force-run"];
+/** `/currentuser` the per-user install, never elevated (no install-mode page) · `--updated` an update (no directory page,
+ * no "app is running" box, the old uninstaller keeps app data, and build/installer.nsh starts ReviewGate — with
+ * `--updated` — instead of showing the finish page). Not `/S`: silent, the install showed nothing for 10–60 s, a
+ * relaunch meanwhile was closed again by it, and a file in use ended in a lone "failed to uninstall" box (§48 Windows). */
+export const INSTALLER_ARGS: readonly string[] = ["/currentuser", "--updated"];
 /** The same for an install for all users (`/allusers`), run elevated. */
-export const ELEVATED_INSTALLER_ARGS: readonly string[] = ["/S", "/allusers", "--updated", "--force-run"];
+export const ELEVATED_INSTALLER_ARGS: readonly string[] = ["/allusers", "--updated"];
 /** How long "Ready — ReviewGate closes and reopens as X" shows before the quit. */
 export const READY_MS = 2000;
 /** While Claude works the windows are looked at again this often. */
 export const WAIT_POLL_MS = 1000;
 
-/** Written before the quit (settings `pendingUpdateInstall`), taken once by the next launch. `why`: the installer did not start. */
-export type UpdateRecord = { from: string; to: string; why?: string };
+/** Written before the quit (settings `pendingUpdateInstall`), taken once by the next launch. `why`: the installer did not
+ * start · `at`: when the quit began (ms) · `pid`: the installer's process, once it runs (this user's install only). */
+export type UpdateRecord = { from: string; to: string; why?: string; at?: number; pid?: number };
 /** What the next launch says once: the version now running, or why the update did not install. */
 export type UpdateNotice = { kind: "updated"; version: string; from: string } | { kind: "failed"; version: string; why: string };
 
@@ -40,7 +44,37 @@ export function validRecord(raw: unknown): UpdateRecord | null {
   const to = r["to"];
   if (typeof from !== "string" || typeof to !== "string" || !VERSION.test(from) || !VERSION.test(to)) return null;
   const why = typeof r["why"] === "string" && r["why"].trim() !== "" ? r["why"].slice(0, 300) : undefined;
-  return why ? { from, to, why } : { from, to };
+  const count = (v: unknown): number | undefined => (typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : undefined);
+  const at = count(r["at"]);
+  const pid = count(r["pid"]);
+  return { from, to, ...(why ? { why } : {}), ...(at ? { at } : {}), ...(pid ? { pid } : {}) };
+}
+
+/** How long after the quit a launch may still find the update's installer at work. */
+export const INSTALLING_MS = 5 * 60_000;
+
+/**
+ * A launch while the update's installer still runs — ReviewGate opened again during the install (the Start menu, the
+ * taskbar). That launch leaves at once and keeps the record: it would be closed by the installer anyway, and, taking the
+ * record, the launch the installer makes when it is done could not say what happened. Not the installer's own launch
+ * (`--updated`, or already the new version), not after `INSTALLING_MS`, not once the installer has gone.
+ */
+export function installerStillRunning(o: { raw: unknown; running: string; argv: readonly string[]; now: number; alive: (pid: number) => boolean }): boolean {
+  const r = validRecord(o.raw);
+  if (!r || r.why || r.pid === undefined || r.at === undefined) return false;
+  if (o.argv.includes("--updated") || compareVersions(o.running, r.to) >= 0) return false;
+  if (o.now < r.at || o.now - r.at > INSTALLING_MS) return false;
+  return o.alive(r.pid);
+}
+
+/** `process.kill(pid, 0)`: the process is there (EPERM: there, another user's). */
+export function processAlive(pid: number, kill: (pid: number, signal: 0) => unknown = (p, s) => process.kill(p, s)): boolean {
+  try {
+    kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException | null)?.code === "EPERM";
+  }
 }
 
 /** The running version is `to` or newer → updated; still older → did not install. Said once: the caller removes the record. */
@@ -218,6 +252,7 @@ export class UpdateInstaller {
 
 /** A detached child that outlives the app (Node's `spawn`, narrowed). */
 export type SpawnInstaller = (file: string, args: readonly string[], options: { detached: true; stdio: "ignore"; cwd: string; windowsHide: boolean }) => {
+  readonly pid?: number | undefined;
   once(event: "spawn", cb: () => void): unknown;
   once(event: "error", cb: (e: Error) => void): unknown;
   once(event: "exit", cb: (code: number | null) => void): unknown;
