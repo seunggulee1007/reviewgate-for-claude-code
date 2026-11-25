@@ -59,6 +59,7 @@ const bridge: RGBridge = {
     return () => ipcRenderer.removeListener("rg:menu", listener);
   },
   chooseDirectory: () => ipcRenderer.invoke("rg:chooseDirectory"),
+  pickAddDirectory: () => ipcRenderer.invoke("rg:pickAddDirectory"), // §67.1
   openInEditor: (path: string, line: number | null, editor?: EditorKind) => ipcRenderer.invoke("rg:openInEditor", path, line, editor),
   openInIde: (ide: IdeKind, path: string, line: number, column: number) => ipcRenderer.invoke("rg:openInIde", ide, path, line, column),
   openExternal: (url: string) => ipcRenderer.invoke("rg:openExternal", url),

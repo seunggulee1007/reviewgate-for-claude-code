@@ -10,12 +10,14 @@ public enum SlashAppCommand: Equatable, Sendable {
     /// `/model` alone: the model picker; `/model <name>`: that model at once.
     case model(String)
     case resume, rewind, context, cost, permissions, agents, memory, config, help, status, exit, rename
+    /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
+    case addDir(String)
     /// A built-in of the terminal's screen the app has none for (`/hooks`, `/vim` …): never sent.
     case terminalOnly(String)
 
     /// The app's commands, as the palette lists them (each the terminal's name).
-    public static let names = ["agents", "config", "context", "cost", "exit", "help", "memory", "model", "permissions", "rename",
-                               "resume", "rewind", "status"]
+    public static let names = ["add-dir", "agents", "config", "context", "cost", "exit", "help", "memory", "model", "permissions",
+                               "rename", "resume", "rewind", "status"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
@@ -24,7 +26,7 @@ public enum SlashAppCommand: Equatable, Sendable {
 
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
-        "add-dir", "bashes", "bug", "doctor", "export", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+        "bashes", "bug", "doctor", "export", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
         "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
         "release-notes", "sandbox", "stats", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "usage", "vim",
     ]
@@ -59,6 +61,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "status": return .status
         case "exit": return .exit
         case "rename": return .rename
+        case "add-dir": return .addDir(argument)   // §67.1
         default: return terminalOnly.contains(name) ? .terminalOnly(name) : nil
         }
     }
@@ -66,6 +69,7 @@ public enum SlashAppCommand: Equatable, Sendable {
     /// The palette's line for one of `names`; nil for any other name.
     public static func description(_ name: String) -> String? {
         switch name {
+        case "add-dir": AddDirText.description   // §67.1
         case "agents": String(localized: "Show the agent panel", bundle: .module)
         case "config": String(localized: "Open Settings", bundle: .module)
         case "context": String(localized: "Show how full the context is — and compact it", bundle: .module)
@@ -84,7 +88,13 @@ public enum SlashAppCommand: Equatable, Sendable {
     }
 
     /// The palette's argument hint for one of `names`.
-    public static func argumentHint(_ name: String) -> String { name == "model" ? "[model]" : "" }
+    public static func argumentHint(_ name: String) -> String {
+        switch name {
+        case "model": "[model]"
+        case "add-dir": AddDirText.argumentHint
+        default: ""
+        }
+    }
 
     /// The palette's line for a built-in only the terminal has.
     public static func terminalOnlyDescription(_ original: String) -> String {

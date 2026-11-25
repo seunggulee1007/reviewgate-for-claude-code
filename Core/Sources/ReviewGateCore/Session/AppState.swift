@@ -312,6 +312,9 @@ public final class AppState {
     var btwAsking: UUID?
     var lastBtw: (chat: String?, answer: BtwAnswer)?
     public internal(set) var btwFailure: BtwFailure?
+    /// §67.2: the running `!` command's output so far (`shell_output`); the live row shows it while `sessionInfo.shell` has
+    /// the same id.
+    public internal(set) var shellLive: ShellLiveOutput?
     /// r2-chats-cards M31 / M33 (§9): a new chat or switch asked for while Claude works — sent once the live chat is done.
     public internal(set) var pendingChatSwitch: PendingChatSwitch?
     /// The held switch is on its way (one at a time).
@@ -679,6 +682,7 @@ public final class AppState {
         case .changesRequested:
             let requested = gate.changesRequestedCount
             return String(localized: "Send your change request (\(requested) file(s)) to continue", bundle: .module)
+        case .shellRunning: return String(localized: "Running a shell command", bundle: .module)   // §67.2
         }
     }
 
@@ -1044,6 +1048,7 @@ public final class AppState {
         if pendingPlan != nil { return String(localized: "Answer the plan first — the queue continues after it", bundle: .module) }
         if let external = externalTurnQueueHold { return external }   // wave1 mac-session (§29)
         if reviewFirstHeldMessage != nil { return ReviewFirstText.queueHold }   // §64 `prompts`
+        if sessionInfo.shell != nil { return String(localized: "Sends once the shell command ends", bundle: .module) }   // §67.2
         return nil
     }
 
@@ -2346,6 +2351,11 @@ public final class AppState {
             break
         case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
+        case let .shellOutput(id, output):   // §67.2
+            handleShellOutput(id: id, output: output)
+        case let .shellResult(_, at, result):
+            finishStreamingAssistant()
+            handleShellResult(result, at: at)
         case .terminalSpec:   // §57: consumed by `terminalSpec()`
             break
         case .interrupted:   // §56.2: consumed by `interruptGivingBack`
@@ -2658,6 +2668,8 @@ public final class AppState {
                 rows.append(.peerMessage(id: id, message: message))
             case let .autoTurn(info):   // §52.1
                 rows.append(.autoTurn(id: id, turn: item.turn, info: info))
+            case let .shell(result):   // §67.2
+                rows.append(.shell(id: id, result: result))
             // MARK: wave4 w4-history — §38.3: the turn summary card comes back with the chat (as live: none without files).
             case let .turnSummary(summary):
                 if !summary.files.isEmpty { rows.append(.turnSummary(id: id, summary: summary)) }

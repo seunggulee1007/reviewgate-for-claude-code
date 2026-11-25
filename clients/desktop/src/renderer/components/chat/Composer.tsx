@@ -58,6 +58,10 @@ import { McpPalette } from "./McpPalette"; // §56.4
 import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
 import { parseSlashAppCommand } from "../../slashAppCommands";
 import { runSlashAppCommand } from "../../slashAppRun";
+import { addDir } from "../../addedDirs"; // §67.1
+import { AddedDirsChip } from "./AddedDirsChip";
+// §67.2 `!` shell mode
+import { cancelShellCommand, isShellDraft, runShellCommand, shellBadgeTitle, shellCommandOfDraft, shellKeyHint, shellPendingCaption } from "../../shellMode";
 import { actionDoneAll, actionProgress, actionProgressAll, commandFilter, completing, disabledReason, isAll, mcpRows, mcpTarget, noServerText, parseMcpCommand, primaryAction, rowStatus, toggleAction, unavailableReason, type McpAction, type McpCommand } from "../../mcpPalette";
 import type { McpServerInfo } from "@reviewgate/engine";
 import { capabilitiesCaption, slashEntries } from "../../slashCommands"; // MARK: wave3 desktop-session — §36.5
@@ -99,6 +103,10 @@ export function Composer() {
   const steer = useStore((s) => s.steer); // MARK: §50
   const cyclePermissionMode = useStore((s) => s.cyclePermissionMode); // MARK: wave6 w6-terminal (§44.1)
   const root = useStore((s) => s.state.project?.root ?? null);
+  const hasAddedDirs = useStore((s) => (s.state.session.addedDirs?.length ?? 0) > 0); // §67.3
+  // §67.2: a `!` command runs (Esc and Stop end it), and the results that go with the next message.
+  const shellRunning = useStore((s) => s.state.session.shell != null);
+  const shellPending = useStore((s) => s.state.session.shellPending ?? 0);
   // MARK: wave1 desktop-session — §30 "세션 종료됨" offers a new chat too; polish-03 keeps the draft across a reload.
   const newChat = useStore((s) => s.newChat);
   const switchRefusal = useStore((s) => newChatRefusal(s.state)); // r2-chats-cards M31 (§9): while Claude works it waits
@@ -355,7 +363,11 @@ export function Composer() {
   const primary = primarySend({ canSend, queueMode, canSteer, question: question !== null, card: cardForText !== null });
   // polish P4-composer-13: the hint names the key in use (↩ while "Return sends the message" is on).
   const sendKey = sendKeyLabel(settings?.returnSends);
-  const hint = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null, settings?.returnSends !== false, cardForText !== null);
+  const working = workingHint(reason, canSteer, state.gate.blockedReason === "awaiting_permission" && !hasText, question !== null, settings?.returnSends !== false, cardForText !== null);
+  // §67.2: a draft starting with `!` is a shell command — the box says so (badge, colour, its own key hint).
+  const shellDraft = isShellDraft(draft) && !viewing;
+  const hint = shellDraft ? shellKeyHint(settings?.returnSends !== false) : working;
+  const pendingCaption = viewing ? null : shellPendingCaption(shellPending);
 
   const token = slashToken(draft);
   // MARK: composer parity — §56.1 /btw: the answer over the box, a question that got none, and the chat it belongs to.
@@ -665,6 +677,13 @@ export function Composer() {
     setSplitOpen(false);
     closePalette();
     setSlashCard(null);
+    if (cmd.kind === "addDir") {
+      // §67.1 / §67.3: ok empties the box (unless edited meanwhile) and says so; a refusal keeps the draft and says why.
+      palette.record("add-dir");
+      if (viewing) setAttachErrors([t("Go back to the running chat to add a directory to it")]);
+      else runAddDir(cmd.path, draft);
+      return true;
+    }
     if (cmd.kind !== "terminalOnly") {
       palette.record(cmd.kind);
       setDraft("");
@@ -678,9 +697,57 @@ export function Composer() {
   };
   useEffect(() => setSlashCard(null), [liveChatId]); // the card was the other chat's
 
+  /**
+   * §67.2: a draft starting with `!` is the user's own command — `shell_run`, never sent to Claude or queued, whatever the
+   * turn does (the engine refuses it while one runs). It joins the prompt history and leaves the box; a refusal puts it
+   * back with why. False for any other text.
+   */
+  const takeShell = (): boolean => {
+    const command = shellCommandOfDraft(draft);
+    if (command === null) return false;
+    setSplitOpen(false);
+    closePalette();
+    if (state.project === null) {
+      setAttachErrors([t("Open a project first (⌘O)")]);
+      return true;
+    }
+    if (viewing) {
+      setAttachErrors([t("Go back to the running chat to run a shell command there")]);
+      return true;
+    }
+    if (command === "") {
+      setAttachErrors([refusalCodeText("empty_command", "") ?? "empty_command"]);
+      return true;
+    }
+    const typed = draft;
+    remember(typed);
+    setDraft("");
+    setAttachErrors([]);
+    void runShellCommand(command).then((why) => {
+      if (why === null) return;
+      setAttachErrors([why]);
+      setDraft((d) => (d.length === 0 ? typed : d));
+    });
+    inputRef.current?.focus();
+    return true;
+  };
+
+  /** §67.1: `add_dir` (`path` "" opens the picker); `typed` is the draft that asked — it leaves the box once it worked. */
+  const runAddDir = (path: string, typed: string | null) => {
+    void addDir(path).then((r) => {
+      if (r === null) return; // the picker was cancelled
+      setAttachErrors([r.notice]);
+      if (r.ok && typed !== null) {
+        setDraft((d) => (d === typed ? "" : d));
+        setNav(IDLE_NAV);
+      }
+    });
+    inputRef.current?.focus();
+  };
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!canSend || draft.trim().length === 0) return;
     if (viewing) {
       // wave4b w4b-tabs (§39.2): move the session to this chat first; a refused switch gives the text back.
@@ -711,7 +778,7 @@ export function Composer() {
 
   /** "Add to queue": sent in order once a plain Send is allowed again. */
   const doQueue = () => {
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!queueMode || !hasText) return;
     setDraft("");
     closePalette();
@@ -727,7 +794,7 @@ export function Composer() {
    */
   const doSteer = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!canSteer || !hasText) return;
     const text = draft;
     const sentMentions = mentions;
@@ -748,7 +815,7 @@ export function Composer() {
    */
   const doAnswer = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!question) return;
     if (!hasText) {
       if (!questionReady) return;
@@ -775,7 +842,7 @@ export function Composer() {
   /** r2-chats-cards M24 (§33.10): the waiting card is denied with the typed text as its instruction; the text leaves the box. */
   const doDenyWithText = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     const text = draft.trim();
     if (!cardForText || text.length === 0) return;
     useStore.getState().respondPermission(cardForText, false, text);
@@ -795,7 +862,7 @@ export function Composer() {
   /** "Stop & send": interrupt the turn, then send this message first. */
   const doStopAndSend = () => {
     setSplitOpen(false);
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!running || !hasText) return;
     setDraft("");
     closePalette();
@@ -818,7 +885,7 @@ export function Composer() {
   };
 
   const sendAccepting = () => {
-    if (takeBtw() || takeMcp() || takeAppCommand()) return; // §56.1 / §56.4 / §56.5
+    if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
     if (!acceptAndSend || draft.trim().length === 0) return;
     const count = pending;
     setDraft("");
@@ -1038,6 +1105,9 @@ export function Composer() {
           e.preventDefault();
           if (unsentWaiting) void interruptGivingBack();
           else interrupt();
+        } else if (shellRunning && !viewing) {
+          e.preventDefault(); // §67.2: Esc stops the `!` command, as in the terminal
+          void cancelShellCommand();
         }
       }
       return;
@@ -1133,7 +1203,15 @@ export function Composer() {
       {!viewing && <CollectFailedLine />}
       <WaitingLine />
       <QueueBar />
-      <DraftChips mentions={mentions} images={images} dirs={mentionDirs} onRemoveMention={removeMention} onRemoveImage={removeImage} />
+      <DraftChips
+        mentions={mentions}
+        images={images}
+        dirs={mentionDirs}
+        onRemoveMention={removeMention}
+        onRemoveImage={removeImage}
+        // §67.3: the live chat's /add-dir directories (a chat shown read-only is not the one they belong to)
+        lead={!viewing && hasAddedDirs ? <AddedDirsChip onAdd={() => runAddDir("", null)} onNotice={(text) => setAttachErrors([text])} /> : null}
+      />
       {attachErrors.length > 0 && (
         <div className="attach-errors" role="alert" data-testid="Attach errors">
           <span className="grow">{attachErrors.map((m, i) => <div key={i}>{m}</div>)}</span>
@@ -1144,10 +1222,23 @@ export function Composer() {
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
       {slashCard !== null && <SlashCard card={slashCard} onClose={() => setSlashCard(null)} /* §56.5 */ />}
       <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
+      {pendingCaption && (
+        <div className="shell-pending caption" role="status" title={t("Claude reads them in front of your next message, as the terminal's ! does")} data-testid="Shell results pending">
+          <span aria-hidden="true">$</span> {pendingCaption}
+        </div>
+      )}
+      {shellDraft && (
+        // §67.2: the badge sits over the box's start; a zero-height anchor keeps the textarea a direct child of .composer
+        <div className="shell-badge-anchor">
+          <span className="shell-badge" title={shellBadgeTitle()} data-testid="Shell badge">
+            <span aria-hidden="true">!</span> {t("Shell")}
+          </span>
+        </div>
+      )}
       <textarea
         ref={inputRef}
-        className="composer-input"
-        aria-label={t("Message")}
+        className={`composer-input${shellDraft ? " shell-mode" : ""}`}
+        aria-label={shellDraft ? t("Shell command") : t("Message")}
         value={draft}
         placeholder={
           question
@@ -1188,7 +1279,7 @@ export function Composer() {
       <div className="footer">
         <ModeMenu />
         {(hint ?? (inputFocused && draft.length === 0 ? "plain" : null)) !== null && (
-          <span className={`hint caption truncate ${hint ? "muted" : "faint"}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
+          <span className={`hint caption truncate ${hint ? "muted" : "faint"}${shellDraft ? " shell" : ""}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
         )}
         <span className="caps" style={{ position: "relative", minWidth: 0 }}>
           <button
@@ -1286,6 +1377,12 @@ export function Composer() {
         {running && (
           // polish P4-composer-04: the key in its tooltip, a name for screen readers (not "black square Stop")
           <button type="button" onClick={interrupt} title={t("Stop Claude's turn (⌘. · esc)")} aria-label={t("Stop")} data-testid="Stop"><span aria-hidden="true">■</span> {t("Stop")}</button>
+        )}
+        {!running && shellRunning && !viewing && (
+          // §67.2: the composer's stop ends the `!` command (esc too)
+          <button type="button" onClick={() => void cancelShellCommand()} title={t("Stop the shell command (esc)")} aria-label={t("Stop the shell command")} data-testid="Stop shell command">
+            <span aria-hidden="true">■</span> {t("Stop")}
+          </button>
         )}
         {!viewing /* wave4b w4b-tabs: the running chat's review */ && (hasPendingReview(state) || noteCount > 0) && (
           <button type="button" disabled={!canRequest} onClick={doRequestChanges}
@@ -1406,11 +1503,13 @@ export function Composer() {
             className="primary"
             disabled={!canSend || draft.trim().length === 0}
             onClick={doSend}
-            aria-label={t("Send")}
-            title={viewBlock ?? (viewWait !== null ? viewWaitKeyHint : !canSend && reason !== null ? reason : t("Sends your message. The review list is left exactly as it is ({0})", sendKey))}
+            aria-label={shellDraft ? t("Run") : t("Send")}
+            title={viewBlock ?? (viewWait !== null ? viewWaitKeyHint : !canSend && reason !== null ? reason
+              : shellDraft ? t("Runs the command in the project folder — not sent to Claude; its output goes with your next message ({0})", sendKey) // §67.2
+              : t("Sends your message. The review list is left exactly as it is ({0})", sendKey))}
             data-testid="Send"
           >
-            {t("Send")}
+            {shellDraft ? t("Run") : t("Send")}
           </button>
         )}
       </div>

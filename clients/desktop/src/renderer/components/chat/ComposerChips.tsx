@@ -3,7 +3,7 @@
  * §23 mention chips (file / folder, the review's changed files marked) and §24 image chips (thumbnail, size,
  * remove; click to enlarge). Also the read-only chips on a transcript user message.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { formatBytes } from "../../../shared/attachments";
 import type { DraftImage } from "../../composerAttach";
 import { t } from "../../i18n";
@@ -115,12 +115,13 @@ export function ImageViewer(props: { url: string; name: string; onClose: () => v
   );
 }
 
-/** The chip row of a draft: mentions then images; nothing when both are empty. */
-export function DraftChips(props: { mentions: string[]; images: DraftImage[]; dirs?: Record<string, true>; onRemoveMention: (path: string) => void; onRemoveImage: (id: number) => void }) {
+/** The chip row of a draft: `lead` (§67.3 the chat's added directories), mentions then images; nothing when all are empty. */
+export function DraftChips(props: { mentions: string[]; images: DraftImage[]; dirs?: Record<string, true>; onRemoveMention: (path: string) => void; onRemoveImage: (id: number) => void; lead?: ReactNode }) {
   const changed = useStore((s) => s.state.changedFiles);
-  if (props.mentions.length === 0 && props.images.length === 0) return null;
+  if (props.mentions.length === 0 && props.images.length === 0 && !props.lead) return null;
   return (
     <div className="draft-chips" data-testid="Draft chips">
+      {props.lead}
       {props.mentions.map((p) => (
         <MentionChip key={p} path={p} dir={props.dirs?.[p] === true} changed={changed.some((f) => f.path === p)} onRemove={() => props.onRemoveMention(p)} />
       ))}

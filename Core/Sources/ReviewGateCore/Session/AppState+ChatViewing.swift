@@ -225,6 +225,8 @@ extension AppState {
                 rows.append(.peerMessage(id: id, message: message))
             case let .autoTurn(info):   // §52.1
                 rows.append(.autoTurn(id: id, turn: item.turn, info: info))
+            case let .shell(result):   // §67.2
+                rows.append(.shell(id: id, result: result))
             case let .turnSummary(summary):
                 if !summary.files.isEmpty { rows.append(.turnSummary(id: id, summary: summary)) }
             case .other:

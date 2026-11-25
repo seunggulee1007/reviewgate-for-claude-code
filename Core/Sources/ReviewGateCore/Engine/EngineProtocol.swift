@@ -447,6 +447,15 @@ public enum EngineCommand: Sendable, Equatable {
     case steerTakeBack(messageId: String)
     /// §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `.btwAnswer`.
     case btwAsk(question: String)
+    // MARK: §67 /add-dir and ! shell mode
+    /// §67.1 `/add-dir`: Claude may also work in `path` (absolute, `~/…`, or relative to the project) from the next message on.
+    case addDir(path: String)
+    /// §67.1: the chat's added directory `path` (as `state.session.addedDirs` lists it) is no longer Claude's to work in.
+    case removeDir(path: String)
+    /// §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message.
+    case shellRun(command: String)
+    /// §67.2: stops the running `!` command; refused `no_shell_running` when none runs.
+    case shellCancel
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -760,6 +769,10 @@ public enum EngineCommand: Sendable, Equatable {
         case .steer: "steer"   // §50
         case .steerTakeBack: "steer_take_back"   // §50.3
         case .btwAsk: "btw_ask"   // §56.1
+        case .addDir: "add_dir"   // §67.1
+        case .removeDir: "remove_dir"
+        case .shellRun: "shell_run"   // §67.2
+        case .shellCancel: "shell_cancel"
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -992,6 +1005,8 @@ extension EngineCommand: Encodable {
             try encodeSteerTakeBackFields(to: encoder)
         case .btwAsk:   // §56.1
             try encodeBtwFields(to: encoder)
+        case .addDir, .removeDir, .shellRun, .shellCancel:   // §67
+            try encodeAddDirShellFields(to: encoder)
         case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal,
              .terminalRequestCancel, .terminalPermissionResponse:   // §57
             try encodeTerminalChatFields(to: encoder)
@@ -1360,6 +1375,8 @@ public enum BlockedReason: String, Codable, Sendable {
     case collectFailed = "collect_failed"
     case pendingReview = "pending_review"
     case changesRequested = "changes_requested"
+    /// §67.2: a `!` command runs (`state.session.shell`); a message waits until it ends.
+    case shellRunning = "shell_running"
 }
 
 /// Repository facts shown in the window title / sidebar header (`state.project`).
@@ -1481,6 +1498,13 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     // MARK: terminal-chat (§57)
     /// §57.1: the terminal chat's hook link; nil for a chat-kind session and on older engines.
     public var terminal: TerminalSessionInfo?
+    // MARK: §67 /add-dir and ! shell mode
+    /// §67.1: the current chat's directories added with `/add-dir` (absolute, real paths), in the order added.
+    public var addedDirs: [String] = []
+    /// §67.2: the `!` command running now (`canSend` is false meanwhile); nil when none runs.
+    public var shell: ShellRunInfo?
+    /// §67.2: `!` results of this chat that go to Claude with the next message.
+    public var shellPending = 0
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1543,6 +1567,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         backgroundTasks = BackgroundWire.tasks(from: decoder)   // §52
         steering = SteeringWire.messages(from: decoder)   // MARK: composer (§50.2)
         terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
+        (addedDirs, shell, shellPending) = AddDirShellWire.session(from: decoder)   // §67
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
@@ -1687,7 +1712,8 @@ public struct GateInfo: Codable, Sendable, Equatable {
             phase: try c.decodeIfPresent(GatePhase.self, forKey: .phase) ?? .idle,
             canSend: try c.decodeIfPresent(Bool.self, forKey: .canSend) ?? false,
             canRequestChanges: try c.decodeIfPresent(Bool.self, forKey: .canRequestChanges) ?? false,
-            blockedReason: try c.decodeIfPresent(BlockedReason.self, forKey: .blockedReason),
+            // A reason a newer engine adds reads as nil (`canSend` still says the gate is closed) rather than failing the snapshot.
+            blockedReason: (try? c.decodeIfPresent(BlockedReason.self, forKey: .blockedReason)) ?? nil,
             collectError: try c.decodeIfPresent(String.self, forKey: .collectError),
             pendingCount: try c.decodeIfPresent(Int.self, forKey: .pendingCount) ?? 0,
             changesRequestedCount: try c.decodeIfPresent(Int.self, forKey: .changesRequestedCount) ?? 0,
@@ -2838,6 +2864,8 @@ public struct TranscriptItem: Sendable, Equatable {
         // MARK: wave4 w4-history
         /// §38.3: the turn's summary card, kept as a row (a row that does not read stays `.other`).
         case turnSummary(TurnSummary)
+        /// §67.2: a `!` command the user ran between turns.
+        case shell(ShellResult)
         case other(kind: String)
     }
 
@@ -2889,6 +2917,8 @@ extension TranscriptItem: Decodable {
                           facts: facts)
         case "auto_turn":   // §52.1
             kind = .autoTurn(try AutoTurnInfo(from: decoder))
+        case "shell":   // §67.2
+            if let result = try? ShellResult(from: decoder) { kind = .shell(result) } else { kind = .other(kind: kindName) }
         case "peer_message":
             var message = try PeerMessage(from: decoder)
             if message.receivedAt.isEmpty { message.receivedAt = (try? c.decodeIfPresent(String.self, forKey: .at)) ?? "" }
@@ -3075,6 +3105,10 @@ public enum EngineEvent: Sendable, Equatable {
     case prAiDraft(PRAiDraftReply)
     /// §56.1: reply to `btw_ask`.
     case btwAnswer(BtwAnswer)
+    /// §67.2: the running `!` command's output so far (its last few thousand characters).
+    case shellOutput(id: String, output: String)
+    /// §67.2: a `!` command ended — its row (also in the transcript).
+    case shellResult(turn: Int, at: String, result: ShellResult)
     /// §57.1: reply to `terminal_spec` (never broadcast).
     case terminalSpec(TerminalSpec)
     /// §56.2: reply to `interrupt {takeBack: true}`.
@@ -3232,6 +3266,7 @@ extension EngineEvent: Decodable {
         case cli   // wave3 mac-session
         case start, why   // wave4 w4-history
         case partial   // §53
+        case at   // §67.2
     }
 
     public init(from decoder: Decoder) throws {
@@ -3405,6 +3440,11 @@ extension EngineEvent: Decodable {
             self = .interrupted(try InterruptedReply(from: decoder))
         case "btw_answer":   // §56.1
             self = .btwAnswer(try BtwAnswer(from: decoder))
+        case "shell_output":   // §67.2
+            self = .shellOutput(id: Self.lenient(String.self, c, .id) ?? "", output: Self.lenient(String.self, c, .output) ?? "")
+        case "shell_result":
+            self = .shellResult(turn: Self.lenient(Int.self, c, .turn) ?? 0, at: Self.lenient(String.self, c, .at) ?? "",
+                                result: try ShellResult(from: decoder))
         case "terminal_spec":   // §57
             self = .terminalSpec(try TerminalSpec(from: decoder))
         case "pr_ai_draft":   // §51

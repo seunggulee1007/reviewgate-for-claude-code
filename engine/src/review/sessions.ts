@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { SessionKind, SessionMeta, TranscriptItem } from "../protocol.js";
+import { MAX_ADDED_DIRS } from "../session/addedDirs.js"; // §67.1
 import { isCliSessionId } from "../session/terminalSpec.js";
 import { readJSON, writeAtomicJSON } from "./persist.js";
 import { TRANSCRIPT_FILE, TranscriptStore } from "./transcript.js";
@@ -78,7 +79,15 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...(typeof o.continuedFrom === "string" && o.continuedFrom ? { continuedFrom: o.continuedFrom } : {}), // §57.9
     ...(typeof o.continuedIn === "string" && o.continuedIn ? { continuedIn: o.continuedIn } : {}),
     ...(typeof o.cliConfigDir === "string" && isAbsolute(o.cliConfigDir) ? { cliConfigDir: o.cliConfigDir } : {}), // §57.16
+    ...normalizeAddedDirs(o.addedDirs), // §67.1
   };
+}
+
+/** §67.1 `addedDirs` as stored: absolute paths only, no repeats, at most `MAX_ADDED_DIRS`; absent when none is left. */
+function normalizeAddedDirs(v: unknown): Pick<SessionMeta, "addedDirs"> {
+  if (!Array.isArray(v)) return {};
+  const dirs = [...new Set(v.filter((d): d is string => typeof d === "string" && d.length > 0 && isAbsolute(d)))].slice(0, MAX_ADDED_DIRS);
+  return dirs.length > 0 ? { addedDirs: dirs } : {};
 }
 
 /** MARK: wave4b w4b-follow — §39.4 `movedTo` / `movedFrom {path, name, at}` as stored; dropped when malformed (the chat still loads). */

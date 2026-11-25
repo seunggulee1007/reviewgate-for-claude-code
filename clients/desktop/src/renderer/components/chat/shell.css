@@ -1,0 +1,15 @@
+/* §67.3 the `!` command in the chat (ShellRows.tsx): the running row at the end and the finished rows, terminal-like. The
+   --shell colour is composer.css's (Claude Code's bash-mode colour). */
+.shell-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border: 1px solid var(--border); border-left: 3px solid var(--shell, var(--border-strong)); border-radius: 6px; background: var(--bg-2); min-width: 0; }
+.shell-row.error { border-left-color: var(--red); }
+.shell-row.stopped { border-left-color: var(--orange); }
+.shell-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shell-cmd { flex: 1 1 auto; min-width: 0; font-size: 12px; font-weight: 600; color: var(--fg); }
+.shell-end { flex: none; font-size: 11.5px; font-weight: 600; }
+.shell-end.ok { color: var(--green); }
+.shell-end.error { color: var(--red); }
+.shell-end.stopped { color: var(--orange); }
+.shell-time { flex: none; }
+.shell-output { margin: 0; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; user-select: text; }
+.shell-more { align-self: flex-start; }
+.shell-files { color: var(--fg-2); align-self: flex-start; cursor: default; }

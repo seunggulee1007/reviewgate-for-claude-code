@@ -5,6 +5,19 @@
    sets the height and the limit inline; this lifts the 160 px of styles.css's `.composer textarea` (the class outranks it). */
 .composer textarea.composer-input { max-height: 40vh; resize: vertical; }
 
+/* ---- §67.2 `!` shell mode: Claude Code's bash-mode colour on the box, a "! 셸" badge over its start (a zero-height anchor,
+   so the textarea stays a direct child of .composer), the key hint in the same colour, and the caption of results waiting. */
+:root { --shell: #b0277c; --shell-bg: rgba(176, 39, 124, 0.12); }
+:root[data-theme="dark"] { --shell: #ff7ac8; --shell-bg: rgba(255, 122, 200, 0.16); }
+.shell-badge-anchor { position: relative; height: 0; margin-bottom: -6px; z-index: 1; }
+.shell-badge { position: absolute; top: 7px; left: 8px; display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px; border-radius: 5px; background: var(--shell-bg); color: var(--shell); font-size: 11px; font-weight: 700; cursor: default; }
+.shell-badge > span[aria-hidden] { font-family: var(--mono); }
+.composer textarea.composer-input.shell-mode { padding-left: 58px; border-color: var(--shell); font-family: var(--mono); }
+.composer textarea.composer-input.shell-mode:focus { border-color: var(--shell); outline-color: var(--shell-bg); }
+.composer .hint.shell { color: var(--shell); }
+.shell-pending { color: var(--shell); display: flex; gap: 6px; align-items: center; }
+.shell-pending > span[aria-hidden] { font-family: var(--mono); font-weight: 700; }
+
 /* ---- chips (composer, inline editor, transcript) */
 .draft-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .mention-chip { display: inline-flex; align-items: center; gap: 1px; max-width: 100%; min-width: 0; height: 22px; padding: 0 2px 0 6px; border: 1px solid var(--border-strong); background: var(--bg-2); border-radius: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 20px; white-space: nowrap; }
@@ -16,6 +29,14 @@
 .mention-chip .name { color: var(--fg); font-weight: 600; }
 .mention-chip.changed { border-color: var(--orange-border); background: var(--orange-bg-soft); }
 .mention-chip .changed-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--orange); margin: 0 4px 0 3px; flex: none; }
+/* §67.3 the chat's /add-dir directories: a chip in front of the draft's own, its popover lists them */
+.added-dirs-chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border: 1px solid var(--border-strong); background: var(--bg-2); border-radius: 6px; font-size: 11.5px; color: var(--fg-2); white-space: nowrap; }
+.added-dirs-chip:hover { color: var(--fg); background: var(--bg-3); }
+.added-dirs { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+.added-dirs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 240px; overflow: auto; }
+.added-dir { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 2px 2px 2px 4px; border-radius: 5px; font-size: 12px; }
+.added-dir:hover { background: var(--bg-3); }
+.added-dir svg { flex: none; color: var(--fg-3); }
 .chip-x { flex: none; background: transparent; border: 0; padding: 0 5px; line-height: 18px; border-radius: 5px; color: var(--fg-3); font-family: var(--font); font-size: 13px; }
 .chip-x:hover:not(:disabled) { background: var(--bg-3); color: var(--fg); }
 .image-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; padding: 2px 2px 2px 2px; border: 1px solid var(--border-strong); background: var(--bg-2); border-radius: 8px; }

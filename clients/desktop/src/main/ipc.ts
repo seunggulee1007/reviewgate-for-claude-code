@@ -5,7 +5,7 @@
  */
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type WebContents } from "electron";
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, dirname } from "node:path";
 import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
 import type { AppSettings, EditorKind, McpConfigFileResult, OpenInIdeResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
@@ -107,6 +107,18 @@ export function installIPC(deps: Deps): void {
     const win = BrowserWindow.fromWebContents(evt.sender) ?? undefined;
     const r = await dialog.showOpenDialog(win!, { properties: ["openDirectory", "createDirectory"], title: t("Open Project") });
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
+  });
+  // §67.1 `/add-dir` alone / "디렉터리 추가…": the user picks the folder; the engine checks it (add_dir) as a typed path.
+  ipcMain.handle("rg:pickAddDirectory", async (evt) => {
+    const win = BrowserWindow.fromWebContents(evt.sender);
+    const root = deps.engineFor(evt.sender)?.state.project?.root ?? null;
+    const options: Electron.OpenDialogOptions = {
+      title: t("Add a Directory for Claude"),
+      properties: ["openDirectory", "dontAddToRecent"],
+      ...(root ? { defaultPath: dirname(root) } : {}),
+    };
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]!;
   });
   ipcMain.handle("rg:openInEditor", (_e, path: string, line: number | null, editor?: EditorKind) => openInEditor(path, line, editor ?? loadSettings().preferredEditor));
   // §62 Open in IDE: the renderer names the IDE and a repo-relative path; main builds the URL from this window's project root

@@ -235,6 +235,8 @@ struct TranscriptPane: View {
                     if end < entries.count {
                         // After a jump far back: the rows after the last one shown, a page at a time ("↓ Latest": the newest).
                         EarlierRowsButton(later: true, count: entries.count - end) { view.showLater(Self.tailRows, of: entries.count) }
+                    } else {
+                        LiveShellSlot()   // §67.2: the `!` command running now, after the newest row
                     }
                     // The marker takes the stack's bottom padding: pinned to it, the view is at the content's very end (pinned
                     // to a 1 pt marker above the padding, a reader who scrolled to the end was pulled 12 pt back up).

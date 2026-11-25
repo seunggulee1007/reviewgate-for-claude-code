@@ -329,6 +329,8 @@ struct TranscriptRowView: View, Equatable {
             PeerMessageRow(message: message)
         case let .autoTurn(_, _, info):   // §52.1
             AutoTurnRow(info: info)
+        case let .shell(_, result):   // §67.2
+            ShellResultRow(result: result)
         }
     }
 }

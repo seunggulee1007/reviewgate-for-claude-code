@@ -99,6 +99,7 @@ public enum EngineMessages {
         if let text = TerminalChatText.refusal(code: code) { return text }   // MARK: terminal-chat (§57.1)
         if let text = TaskStartText.refusal(code: code, detail: detail) { return text }   // MARK: task-start (§63)
         if let text = GitSyncText.refusal(code: code, detail: detail) { return text }   // MARK: git-sync (§68)
+        if let text = AddDirShellText.refusal(code: code, detail: detail) { return text }   // §67
         // Failures whose `error` is the underlying (English) text rather than `code:<detail>`.
         let underlying = plainGitFailure(detail.isEmpty && raw != code && codeWord(raw) != code ? raw : detail)
         switch code {
@@ -274,6 +275,7 @@ public enum EngineMessages {
         case "no_session": String(localized: "No Claude session is open — restart the session", bundle: .module)
         case "starting": String(localized: "Claude is still starting — wait a moment", bundle: .module)
         case "git_init_needed": String(localized: "Initialize the Git repository first", bundle: .module)
+        case "shell_running": String(localized: "A shell command is running — your message goes once it ends", bundle: .module)   // §67.2
         default: String(localized: "This cannot be sent right now", bundle: .module)
         }
     }

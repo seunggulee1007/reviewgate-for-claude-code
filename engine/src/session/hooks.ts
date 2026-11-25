@@ -328,6 +328,8 @@ export type HookContext = {
   claudeHome?: string;
   /** Temporary folders whose files outside any repository are throwaway (`isScratchPath`); none: every outside edit asks. */
   scratchDirs?: readonly string[];
+  /** §67.1: the chat's `/add-dir` directories — an edit there keeps the card (`added_directory`) and goes to `changedOutside`. */
+  addedDirs?: readonly string[];
   /** Override of `plansDir()` (test seam). */
   plansDir?: string;
   /** Absolute plan files written this turn, in order; reset per turn by ClaudeSession. */
@@ -1404,7 +1406,7 @@ export function buildHooks(ctx: HookContext): Partial<Record<HookEvent, HookCall
     if (input.hook_event_name !== "PostToolUse" || !ctx.onOutsideEdit) return allow();
     const file = toolFile(toolInput(input), ctx.cwd);
     if (!file || isPlanFile(file, ctx)) return allow();
-    const reason = editScopeReason(file, await containmentRoot(ctx), isOutsideRoot, [], ctx.scratchDirs);
+    const reason = editScopeReason(file, await containmentRoot(ctx), isOutsideRoot, [], ctx.scratchDirs, ctx.addedDirs);
     if (reason && reason.code !== "claude_config") ctx.onOutsideEdit(file);
     return allow();
   };

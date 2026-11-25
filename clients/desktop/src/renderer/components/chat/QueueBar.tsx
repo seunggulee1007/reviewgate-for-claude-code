@@ -36,6 +36,7 @@ export function QueueBar() {
   const clear = useStore((s) => s.clearQueue);
   // MARK: wave3 desktop-agents — §36.4: the main turn waits on subagents → the queue goes out when they are done.
   const waitingOnAgents = useStore((s) => s.state.gate.blockedReason === "running" && waitingOf(s.state.hud) !== null);
+  const waitingOnShell = useStore((s) => s.state.gate.blockedReason === "shell_running"); // §67.3
   const [editing, setEditing] = useState<number | null>(null);
   const [text, setText] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
@@ -59,7 +60,9 @@ export function QueueBar() {
         ? t("Sending next…")
         : waitingOnAgents
           ? t("Sends when the agents finish")
-          : t("Waiting — {0}", reason ?? t("Claude is working…"));
+          : waitingOnShell
+            ? t("Sends when the shell command ends")
+            : t("Waiting — {0}", reason ?? t("Claude is working…"));
 
   const commit = () => {
     if (editing !== null) edit(editing, text);

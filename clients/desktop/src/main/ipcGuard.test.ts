@@ -122,6 +122,13 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "btw_ask", question: "why?" }).ok).toBe(true); // §56.1
   });
 
+  it("§67: allows /add-dir, its chip's × and the ! command (run and stop)", () => {
+    expect(validateCommand({ type: "add_dir", path: "../shared" }).ok).toBe(true);
+    expect(validateCommand({ type: "remove_dir", path: "C:\\work\\shared" }).ok).toBe(true);
+    expect(validateCommand({ type: "shell_run", command: "npm test" }).ok).toBe(true);
+    expect(validateCommand({ type: "shell_cancel" }).ok).toBe(true);
+  });
+
   it("§57.17: the renderer may send Review now and Continue as Terminal Chat; the PTY lifecycle commands stay main's own, the Stage 2 terminal commands Mac only", () => {
     for (const type of ["terminal_end_turn", "session_continue_terminal"]) expect(validateCommand({ type, sessionId: "s" }).ok, type).toBe(true);
     // main asks for terminal_spec itself and reports the PTY: the hook token never reaches the renderer. §57.14/§57.15

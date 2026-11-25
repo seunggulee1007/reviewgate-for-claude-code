@@ -47,6 +47,7 @@ import { QuotableMarkdown } from "../side/QuoteMenu"; // MARK: wave4b w4b-side
 import { TurnEndRow } from "./TurnEndRow"; // MARK: wave4c w4c-commit (§41.1)
 import { liveAssistant, transcriptShape, type AssistantItem } from "../../transcriptShape"; // MARK: wave4d w4d-speed
 import { isTerminalTarget } from "../../terminal/terminalKeys"; // §57.17
+import { ShellRow, ShellRunningRow } from "./ShellRows"; // §67.3
 
 const STICKY_THRESHOLD = 24;
 
@@ -286,6 +287,8 @@ function Row({ item, root, nested, result, toolName }: { item: ChatItem; root: s
       return <div className="turn-end muted" data-testid="Plan approved row"><span>{item.line ?? t("Plan approved — continuing in {0} mode", item.mode)}</span></div>;
     case "restoredDivider":
       return <div className="turn-end muted" data-testid="Restored divider"><span>{t("Restored from a previous session")}</span></div>;
+    case "shell":
+      return <ShellRow result={item.result} />; // §67.2: a `!` command the user ran
   }
 }
 
@@ -437,6 +440,7 @@ export function Transcript() {
                 <PinContext.Provider value={pin}>{/* MARK: wave4d w4d-speed */}
                   {/* wave4b w4b-tabs — market-12: folded unless "자세히 보기" is on or the find bar looks through every row */}
                   <Rows items={index.top} root={root} fold={!exploreDetail && !findOpen ? { running: running && !viewing, focusId: focus?.toolUseId ?? null } : undefined} />
+                  {!viewing && <ShellRunningRow onGrow={pin} /* §67.3: the `!` command running now, at the end */ />}
                 </PinContext.Provider>
               </ContinuationContext.Provider>
             </FindContext.Provider>

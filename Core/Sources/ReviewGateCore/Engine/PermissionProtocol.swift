@@ -54,6 +54,9 @@ public struct PermissionReason: Sendable, Equatable, Hashable {
         case claudeConfig
         /// §46: a git command that throws away uncommitted work or rewrites the remote (reset --hard, clean -f, a force push …).
         case gitCommand
+        /// §67.1: in a directory the chat added with `/add-dir` (`path` = that directory) — Claude was told it may work there,
+        /// but the review cannot show the edit, so it always asks.
+        case addedDirectory
         /// A code this client does not know (a newer engine): the card shows the engine's `message`.
         case other(String)
 
@@ -66,6 +69,7 @@ public struct PermissionReason: Sendable, Equatable, Hashable {
             case "worktree_isolation": self = .worktreeIsolation
             case "claude_config": self = .claudeConfig
             case "git_command": self = .gitCommand
+            case "added_directory": self = .addedDirectory
             default: self = .other(rawValue)
             }
         }
@@ -79,6 +83,7 @@ public struct PermissionReason: Sendable, Equatable, Hashable {
             case .worktreeIsolation: "worktree_isolation"
             case .claudeConfig: "claude_config"
             case .gitCommand: "git_command"
+            case .addedDirectory: "added_directory"
             case let .other(raw): raw
             }
         }

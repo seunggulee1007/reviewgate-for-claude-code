@@ -6,7 +6,8 @@ import ReviewGateCore
 // of the last message, /context and /cost the HUD's popovers, /permissions and /config Settings, /agents the agent panel,
 // /memory the applied extensions (CLAUDE.md and memory), /help the keyboard shortcuts, /status a card over the box, /rename
 // the tab's rename, /exit closes the chat tab (it stays in the history — ⌘⇧T brings it back). A built-in only the terminal
-// has is never sent: the card offers "Continue as Terminal Chat".
+// has is never sent: the card offers "Continue as Terminal Chat". §67.1: /add-dir <path> adds a directory to the chat
+// (`add_dir`), /add-dir alone opens the folder picker first.
 
 /// A HUD popover a typed built-in opens (the HUD's chip shows it).
 enum HUDPopoverRequest: Equatable { case model, context, cost }
@@ -21,6 +22,8 @@ enum SlashCard: Equatable {
 struct SlashRequest: Equatable {
     let id = UUID()
     let command: SlashAppCommand
+    /// What was typed (§67.1: a refused /add-dir gives it back).
+    var draft = ""
 }
 
 extension ComposerModel {
@@ -30,11 +33,12 @@ extension ComposerModel {
         guard store.canUseSlashPalette, !store.isTerminalChat,
               let command = SlashAppCommand.parse(draft, entries: store.slashEntries) else { return false }
         closePalette()
+        let typed = draft
         if case .terminalOnly = command {} else {
             store.recordSlashUse(inPrompt: draft)
             draft = ""
         }
-        slashRequest = SlashRequest(command: command)
+        slashRequest = SlashRequest(command: command, draft: typed)
         inputFocused = true
         return true
     }
@@ -144,16 +148,16 @@ struct ComposerSlashHooks: ViewModifier {
             .onChange(of: composer.slashRequest) { _, request in
                 guard let request else { return }
                 composer.slashRequest = nil
-                run(request.command)
+                run(request)
             }
             .onChange(of: store.draftChatId) { _, _ in composer.slashCard = nil }   // the card was the other chat's
             .sheet(item: $rewind) { RewindSheet(checkpoint: $0) }
             .sheet(isPresented: $showExtensions) { ExtensionsSheet() }
     }
 
-    private func run(_ command: SlashAppCommand) {
+    private func run(_ request: SlashRequest) {
         composer.slashCard = nil
-        switch command {
+        switch request.command {
         case let .model(name):
             if name.isEmpty { popover(.model) } else { setModel(name) }
         case .resume: model.showChatHistoryTick += 1
@@ -174,6 +178,8 @@ struct ComposerSlashHooks: ViewModifier {
         case .rename: model.renameChatTick += 1
         case .exit: closeTab()
         case let .terminalOnly(name): composer.slashCard = .terminalOnly(name)
+        case let .addDir(path):   // §67.1
+            if path.isEmpty { composer.pickAddDir(store: store) } else { composer.addDir(path, typed: request.draft, store: store) }
         }
     }
 

@@ -2529,6 +2529,22 @@
         }
       }
     },
+    "Add Directory…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Directory…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디렉터리 추가…"
+          }
+        }
+      }
+    },
     "Add in Settings…": {
       "localizations": {
         "en": {
@@ -2557,6 +2573,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트의 실행 명령에 추가해요"
+          }
+        }
+      }
+    },
+    "Added Directories": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added Directories"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추가한 디렉터리"
           }
         }
       }
@@ -5409,6 +5441,22 @@
         }
       }
     },
+    "Choose another directory Claude may work in (/add-dir)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another directory Claude may work in (/add-dir)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 일할 디렉터리를 하나 더 골라요 (/add-dir)"
+          }
+        }
+      }
+    },
     "Close the peek": {
       "localizations": {
         "en": {
@@ -5453,6 +5501,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "바뀐 파일을 커밋해요 — 리뷰한 파일도, 직접 고친 파일도"
+          }
+        }
+      }
+    },
+    "Copy Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 복사"
           }
         }
       }
@@ -5709,6 +5773,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "git fetch --prune: 원격 브랜치와 ↑↓ 개수를 새로 받아요. 내 파일은 건드리지 않아요"
+          }
+        }
+      }
+    },
+    "Go back to the running chat to run a shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to run a shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령은 실행 중인 채팅으로 돌아가서 실행하세요"
           }
         }
       }
@@ -6273,6 +6353,22 @@
         }
       }
     },
+    "Ran in %@ — its output goes to Claude with your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ran in %@ — its output goes to Claude with your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 실행했어요 — 출력은 다음 메시지와 함께 Claude에게 가요"
+          }
+        }
+      }
+    },
     "Read every file of the project again for Symbols in Project (after a large change outside ReviewGate)": {
       "localizations": {
         "en": {
@@ -6369,6 +6465,38 @@
         }
       }
     },
+    "Remove the directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the directory"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "디렉터리 빼기"
+          }
+        }
+      }
+    },
+    "Remove this directory — from your next message Claude no longer works there": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this directory — from your next message Claude no longer works there"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 디렉터리를 빼요 — 다음 메시지부터 Claude가 여기서 일하지 않아요"
+          }
+        }
+      }
+    },
     "Replays this branch's %lld commit(s) on top of %@; a conflict undoes the rebase and nothing changes": {
       "localizations": {
         "en": {
@@ -6381,6 +6509,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 브랜치의 커밋 %1$lld개를 %2$@ 위에 다시 쌓아요. 충돌이 나면 rebase를 되돌려서 아무것도 바뀌지 않아요"
+          }
+        }
+      }
+    },
+    "Run the command in the project folder — its output goes to Claude with your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the command in the project folder — its output goes to Claude with your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더에서 명령을 실행해요 — 출력은 다음 메시지와 함께 Claude에게 가요"
+          }
+        }
+      }
+    },
+    "Run the shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run the shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령 실행"
+          }
+        }
+      }
+    },
+    "Running in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에서 실행 중"
           }
         }
       }
@@ -6433,6 +6609,38 @@
         }
       }
     },
+    "Show less": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show less"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "접기"
+          }
+        }
+      }
+    },
+    "Show only the last lines of the output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only the last lines of the output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력의 마지막 줄만 보여요"
+          }
+        }
+      }
+    },
     "Show the accepted files": {
       "localizations": {
         "en": {
@@ -6449,6 +6657,22 @@
         }
       }
     },
+    "Show the whole output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the whole output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력 전체를 보여요"
+          }
+        }
+      }
+    },
     "Still searching…": {
       "localizations": {
         "en": {
@@ -6461,6 +6685,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "아직 찾는 중이에요…"
+          }
+        }
+      }
+    },
+    "Stop the shell command": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop the shell command"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 명령 중지"
           }
         }
       }
@@ -6637,6 +6877,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "정의, %lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
+          }
+        }
+      }
+    },
+    "The output of the shell commands you ran goes in front of your next message, as in Claude Code — Claude is not asked anything until then": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The output of the shell commands you ran goes in front of your next message, as in Claude Code — Claude is not asked anything until then"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행한 셸 명령의 출력은 Claude Code처럼 다음 메시지 앞에 붙어서 가요 — 그때까지 Claude에게는 아무것도 묻지 않아요"
           }
         }
       }

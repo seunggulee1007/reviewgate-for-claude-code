@@ -991,6 +991,33 @@ export class ReviewGate {
   }
 
   /**
+   * §67.2: a `!` command is about to run between turns. Snapshots the worktree now (the tree is returned, so the caller
+   * can say which files the command changed); with no review standing and none carried, it also becomes the carried base
+   * (as a review finished while background work ran, §52.2) — so the next turn that carries (`prepareAnswer(true)`) starts
+   * from before the command and its changes reach that turn's review (as `external`, §31.1) instead of a fresh A.
+   */
+  async noteShellBase(): Promise<string | null> {
+    const cp = this.checkpoint;
+    if (!cp || this.running || this.collecting || this.reverting) return null;
+    const tree = (await cp.snapshotDetailed(this.ignorePatterns())).tree;
+    if (this.turnStartTree === null && this.turnEndTree === null && this.carryBase === null) {
+      const baseHead = await cp.head().catch(() => null);
+      const baseMerge = (await cp.mergeInProgress().catch(() => null))?.head ?? null;
+      this.carryBase = { tree, baseHead, baseMerge, ownCommits: [], replacedCommits: [], ownCopies: new Map() };
+    }
+    return tree;
+  }
+
+  /** §67.2: the project files changed since `tree` (a `noteShellBase` snapshot), repo-relative, in path order. */
+  async changedSince(tree: string): Promise<string[]> {
+    const cp = this.checkpoint;
+    if (!cp) return [];
+    const now = (await cp.snapshotDetailed(this.ignorePatterns())).tree;
+    if (now === tree) return [];
+    return (await cp.changes(tree, now)).map((f) => f.path).sort();
+  }
+
+  /**
    * Builds the outgoing text (review-summary prefix consumed), clears the notes and closes the gate.
    * An answer turn (`prepareAnswer()`) keeps the notes: they belong to the review it leaves standing.
    * Follow with `snapshotStart()`; on failure call `abortTurn()`.

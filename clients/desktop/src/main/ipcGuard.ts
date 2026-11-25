@@ -20,6 +20,11 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "steer_take_back",
   // §56.1: /btw — a side question answered apart (own lane)
   "btw_ask",
+  // §67.1 /add-dir (the chip's × too) and §67.2 the `!` command between turns
+  "add_dir",
+  "remove_dir",
+  "shell_run",
+  "shell_cancel",
   "request_changes",
   "interrupt",
   "permission_response",

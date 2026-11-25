@@ -208,6 +208,9 @@ import { sideWebMode, sideWebRuleAllows } from "./side/sideQuery.js";
 import { copySideThreads } from "./side/threads.js";
 import type { CommitDraftEvent, PRAiDraftEvent, WorkbenchPreviewEvent, WorkbenchSetup, WorkbenchStep } from "./protocol.js";
 import type { BtwAnswerEvent, InterruptedEvent } from "./protocol.js";
+import type { ShellResult, ShellRunInfo } from "./protocol.js"; // §67.2
+import { findAddedDir, validateAddDir, withAddedDir } from "./session/addedDirs.js"; // §67.1
+import { cleanShellOutput, shellCommandOf, shellContext, SHELL_FILES_MAX, SHELL_OUTPUT_CHARS, SHELL_OUTPUT_MS, SHELL_TIMEOUT_MS, withPendingShell } from "./session/shellRun.js"; // §67.2
 import { BTW_SYSTEM, BTW_TIMEOUT_MS, BtwHistory, btwForkPrompt, MAX_BTW_QUESTION } from "./side/btw.js"; // §56.1
 import type { CommitHunksEvent, CommitSplitDraftEvent, CommittedSeriesEvent, HistoryCommit, SeriesCommit } from "./protocol.js"; // §53
 import { COMMIT_SPLIT_LINES, COMMIT_SPLIT_SYSTEM, commitSplitPrompt, hunkLines, parseCommitSplit, validateSplit } from "./review/commitSplit.js";
@@ -218,7 +221,7 @@ import { autoTurnPrompt, readTail } from "./session/background.js";
 import { cutPatch, findPRTemplate, parsePRAiDraft, PR_AI_DIFF_LINES, PR_AI_DRAFT_SYSTEM, prAiDraftPrompt } from "./review/prAiDraft.js";
 import { isAbsolute } from "node:path";
 import { PreReviewRunner } from "./review/prereview.js";
-import { copyFiles, copyLog, copyPatternsFor, fetchRef, filesToCopy, firstLogLine, matchingFiles, PREVIEW_MAX_ENTRIES, refExists, remoteNames, runSetupCommand, siblingPath, splitRemoteRef } from "./git/workbenchSetup.js";
+import { copyFiles, copyLog, copyPatternsFor, fetchRef, filesToCopy, firstLogLine, matchingFiles, PREVIEW_MAX_ENTRIES, refExists, remoteNames, runSetupCommand, siblingPath, splitRemoteRef, type SetupRun } from "./git/workbenchSetup.js";
 import { remoteBranches, type BranchSwitchBlocker } from "./git/branches.js";
 import { runGit } from "./git/exec.js";
 import { readProjectFile, searchProject } from "./files/browse.js"; // MARK: code-browser (§47)
@@ -306,6 +309,8 @@ export type EngineOptions = {
   runClaude?: (args: string[], cwd: string) => Promise<{ status: number | null; stdout: string; stderr: string }>;
   /** How long `interrupt` waits for the turn to end and its changes to be collected before it replies (default 15 000 ms; §28). */
   interruptWaitMs?: number;
+  /** §67.2: a `!` command is stopped after this long (default `SHELL_TIMEOUT_MS`; test seam). */
+  shellTimeoutMs?: number;
   /** M30 (§3): how long after a failed collection the engine retries it once by itself (default 2000 ms; 0 = never; test seam). */
   collectRetryMs?: number;
   /** r2-chats-cards M33 — §9.1: how long the chat switched away from keeps its idle CLI (default 5 min; 0 = stop it at once). */
@@ -764,6 +769,7 @@ export class ReviewEngine {
   private closed = false;
   // ---- §23–28
   private readonly interruptWaitMs: number;
+  private readonly shellTimeoutMs: number; // §67.2
   private readonly autoTurnWaitMs: number; // MARK: r2-peers (§52.1)
   /** r2-chats-cards M33 — §9.1: the chat switched away from, its CLI idle and kept (at most one besides the live one). */
   private parked: ParkedSession | null = null;
@@ -811,6 +817,10 @@ export class ReviewEngine {
   private adoptQueue: { source: ClaudeSessionLike; ev: SessionEvent }[] | null = null;
   /** A background task was live when the last turn was collected (or after): the next turn keeps A (§52.1). */
   private bgCarry = false;
+  /** §67.2: the `!` command running now; `dropped`: its chat or project went away before it ended (no row). */
+  private shellRun: { info: ShellRunInfo; stop: () => void; cancelled: boolean; dropped: boolean; done: Promise<void> } | null = null;
+  /** §67.2: this chat's `!` results that go to Claude with the next message (oldest first). */
+  private shellPending: ShellResult[] = [];
   /** The collection of the turn that ended last (a turn Claude starts right after it waits for it). */
   private collection: Promise<void> | null = null;
   /** An automatic `peer_accept` (mode auto) is queued on the main lane. */
@@ -944,6 +954,7 @@ export class ReviewEngine {
     this.pluginSyncMs = opts.pluginSyncMs ?? PLUGIN_SYNC_MS;
     this.runClaudeFn = opts.runClaude;
     this.interruptWaitMs = opts.interruptWaitMs ?? INTERRUPT_WAIT_MS;
+    this.shellTimeoutMs = opts.shellTimeoutMs ?? SHELL_TIMEOUT_MS;
     this.autoTurnWaitMs = opts.autoTurnWaitMs ?? AUTO_TURN_WAIT_MS; // MARK: r2-peers (§52.1)
     this.terminalPromptWaitMs = opts.terminalPromptWaitMs ?? TERMINAL_PROMPT_WAIT_MS; // MARK: terminal-chat (§57)
     this.maxBackgroundTerminals = opts.maxBackgroundTerminals ?? MAX_BACKGROUND_TERMINALS; // §57.10
@@ -1585,6 +1596,19 @@ export class ReviewEngine {
         return this.fileImageEvent(cmd.path);
       case "btw_ask": // §56.1
         return this.btwAsk(cmd.question);
+      case "add_dir": // §67.1
+        await this.addDir(cmd.path);
+        return;
+      case "remove_dir":
+        await this.removeDir(cmd.path);
+        return;
+      case "shell_run": // §67.2
+        await this.shellRunStart(cmd.command);
+        return;
+      case "shell_cancel":
+        if (!this.shellRun) throw new CommandRefused("no_shell_running");
+        this.cancelShell();
+        return;
       // ---- §21 side questions
       case "side_ask": {
         // MARK: r2-skills-side — §21 (M18): a skill / slash command the session knows runs in the main conversation only.
@@ -2269,6 +2293,7 @@ export class ReviewEngine {
   // ------------------------------------------------------------------ project lifecycle
 
   private async openProject(path: string, takeover: boolean): Promise<void> {
+    await this.stopShell(); // §67.2
     this.cancelAutoRestart();
     await this.side.stopAll();
     await this.side.load(null);
@@ -2699,6 +2724,8 @@ export class ReviewEngine {
    */
   private async switchSession(meta: SessionMeta, resume: boolean): Promise<void> {
     const project = this.project!;
+    await this.stopShell(); // §67.2: its row lands in the chat it ran in
+    this.shellPending = [];
     this.cancelAutoRestart();
     await this.side.stopAll();
     const back = this.takeParked(meta.id);
@@ -3501,6 +3528,7 @@ export class ReviewEngine {
   }
 
   private async closeProject(): Promise<void> {
+    await this.stopShell(); // §67.2
     this.cancelAutoRestart();
     await this.side.stopAll();
     await this.side.load(null);
@@ -3957,6 +3985,7 @@ export class ReviewEngine {
 
   private resetProjectState(): void {
     this.gate.reset();
+    this.shellPending = []; // §67.2
     this.autoAcceptRules = {}; // MARK: wave4c w4c-trust (§41.2)
     this.gate.checkpoint = null;
     this.projectGitDir = null;
@@ -4100,6 +4129,7 @@ export class ReviewEngine {
           systemPromptAppend: s.systemPromptAppend,
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
           backgroundWork: s.backgroundWork !== false, // §52
+          addedDirs: this.startAddedDirs(), // §67.1
           subagentsInTurn: s.subagentsInTurn === true, // §52.2
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
@@ -4359,6 +4389,9 @@ export class ReviewEngine {
     if (budgetNote) outgoing = `${budgetNote}\n\n${outgoing}`;
     // §23: the CLI expands `@path` itself (the file's content goes in as context, no Read call) — verified, CLI 2.1.305.
     if (mentions.length > 0) outgoing += `\n\nReferenced files: ${mentions.map((m) => mentionToken(m.path, m.kind)).join(" ")}`;
+    // §67.2: the user's `!` commands since the last message (a slash command must start with "/": they wait for the next one).
+    const shellNote = opts.command === true ? "" : shellContext(this.shellPending);
+    if (shellNote) outgoing = `${shellNote}\n\n${outgoing}`;
     const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
     if (opts.command !== true) {
       this.commitSlice.lastUserText = trimmed;
@@ -4397,6 +4430,7 @@ export class ReviewEngine {
       this.turnSent = { text: outgoing, checkpointTree: hookTree, images: sessionImages };
       session.sendUser(outgoing, hookTree, sessionImages, command ? { command } : {});
       if (budgetNote) this.toldBudget = budgetNumbers(this.settings.budget); // MARK: wave4 w4-longwork
+      if (shellNote) this.shellPending = []; // §67.2: Claude has them now
     } catch (e) {
       // The session went away while the turn was being prepared (snapshot A had succeeded).
       this.gate.abortTurn();
@@ -4461,6 +4495,181 @@ export class ReviewEngine {
       throw new CommandRefused("steer_already_read: Claude already read this message — it stays in the chat", { code: "steer_already_read" });
     }
     throw new CommandRefused("steer_take_back_failed: the CLI could not take the message back — Claude still reads it", { code: "steer_take_back_failed" });
+  }
+
+  // ------------------------------------------------------------------ §67.1 /add-dir
+
+  /** The current chat's `/add-dir` directories (§67.1). */
+  private currentAddedDirs(): string[] {
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    return [...(meta?.addedDirs ?? [])];
+  }
+
+  /** What a starting CLI is given: the chat's added directories that still exist (one gone is left out and logged). */
+  private startAddedDirs(): string[] {
+    return this.currentAddedDirs().filter((d) => {
+      const ok = existsSync(d);
+      if (!ok) this.log("warn", `added directory ${d} is gone: the session starts without it`);
+      return ok;
+    });
+  }
+
+  /** The chat `add_dir` / `remove_dir` change: refused without a project, for a terminal chat, and while work runs. */
+  private addedDirsChat(): SessionMeta {
+    this.requireProject();
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (!meta) throw new CommandRefused("no_session");
+    if (meta.kind === "terminal") throw new CommandRefused("terminal_chat"); // the TUI has its own /add-dir
+    const g = this.gate;
+    if (this.sessionState.starting || g.running || g.collecting || g.reverting || this.session?.isTurnActive || this.sessionState.externalTurn) {
+      throw new CommandRefused("dir_busy");
+    }
+    return meta;
+  }
+
+  /**
+   * §67.1 `add_dir {path}`: `path` joins the chat's directories (validated: an existing directory outside the project, not
+   * added yet) and is kept with the chat. The CLI takes them at its start: a running one restarts, resuming the
+   * conversation, so the next message has it.
+   */
+  private async addDir(path: unknown): Promise<void> {
+    const meta = this.addedDirsChat();
+    const dir = await validateAddDir(path, this.project!.path, meta.addedDirs ?? []);
+    meta.addedDirs = withAddedDir(meta.addedDirs ?? [], dir);
+    this.persistSessions();
+    this.log("info", `chat ${meta.id}: directory added (${meta.addedDirs.length} in all)`);
+    await this.applyAddedDirs();
+  }
+
+  /** §67.1 `remove_dir {path}`: refused `dir_not_added:<path>` when the chat has no such directory. */
+  private async removeDir(path: unknown): Promise<void> {
+    const meta = this.addedDirsChat();
+    const dir = findAddedDir(meta.addedDirs ?? [], path);
+    if (dir === null) throw new CommandRefused(`dir_not_added:${typeof path === "string" ? path : ""}`, { code: "dir_not_added" });
+    const rest = (meta.addedDirs ?? []).filter((d) => d !== dir);
+    if (rest.length > 0) meta.addedDirs = rest;
+    else delete meta.addedDirs;
+    this.persistSessions();
+    this.log("info", `chat ${meta.id}: directory removed (${rest.length} left)`);
+    await this.applyAddedDirs();
+  }
+
+  private async applyAddedDirs(): Promise<void> {
+    this.touch();
+    if (this.session && this.sessionState.open) await this.restartSession(true);
+  }
+
+  // ------------------------------------------------------------------ §67.2 `!` shell mode
+
+  /**
+   * §67.2 `shell_run {command}`: runs the user's command in the project folder between turns and replies once it started;
+   * `shell_output` follows while it runs, `shell_result` (and its row) when it ends. Refused: `empty_command`,
+   * `command_too_long`, `no_project`, `terminal_chat`, `shell_busy` (one runs), `turn_running` (a turn, its collection or a
+   * revert). Its changes reach the next review: a snapshot first (`noteShellBase`), and the next turn keeps the review's A.
+   */
+  private async shellRunStart(commandIn: unknown): Promise<void> {
+    const command = shellCommandOf(commandIn);
+    this.requireProject();
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (meta?.kind === "terminal") throw new CommandRefused("terminal_chat"); // the TUI has its own `!`
+    const busy = () => {
+      if (this.shellRun) throw new CommandRefused("shell_busy");
+      const g = this.gate;
+      if (g.running || g.collecting || g.reverting || this.session?.isTurnActive || this.sessionState.externalTurn) throw new CommandRefused("turn_running");
+    };
+    busy();
+    let before: string | null = null;
+    try {
+      before = await this.gate.noteShellBase();
+    } catch (e) {
+      this.log("warn", `! command: the snapshot before it failed: ${errorMessage(e)}`);
+    }
+    busy();
+    this.bgCarry = true; // §52.1: the next turn keeps the review's A (or the base just carried) — what it writes is reviewed
+    const cwd = this.project!.path;
+    const tc = await this.locate().catch(() => null);
+    const env = { ...this.childEnv(), ...(tc?.path ? { PATH: tc.path } : {}) };
+    const startedMs = Date.now();
+    let stopFn: (() => void) | null = null;
+    const run = {
+      info: { id: randomUUID(), command, cwd, startedAt: new Date(startedMs).toISOString() },
+      stop: () => stopFn?.(),
+      cancelled: false,
+      dropped: false,
+      done: Promise.resolve(),
+    };
+    this.shellRun = run;
+    this.log("info", `! command started in the project folder (${command.length} chars)`);
+    this.touch();
+    const ended = runSetupCommand(command, cwd, env, {
+      platform: this.platform,
+      timeoutMs: this.shellTimeoutMs,
+      throttleMs: SHELL_OUTPUT_MS,
+      keepChars: SHELL_OUTPUT_CHARS,
+      label: "command",
+      onOutput: (tail) => {
+        if (this.shellRun === run) this.emit({ type: "shell_output", id: run.info.id, output: cleanShellOutput(tail) });
+      },
+      onStart: (s) => {
+        stopFn = s;
+        this.setupStops.add(s); // the engine's dispose stops it
+      },
+    });
+    run.done = ended
+      .then((r) => this.shellEnded(run, r, before, startedMs))
+      .catch((e) => this.log("warn", `! command: ${errorMessage(e)}`))
+      .finally(() => {
+        if (stopFn) this.setupStops.delete(stopFn);
+        if (this.shellRun === run) {
+          this.shellRun = null;
+          this.touch();
+        }
+      });
+  }
+
+  /** §67.2: a `!` command ended — its row in its chat, the files it changed, and the result waiting for the next message. */
+  private async shellEnded(run: NonNullable<ReviewEngine["shellRun"]>, r: SetupRun, before: string | null, startedMs: number): Promise<void> {
+    let files: string[] = [];
+    if (before !== null && !run.dropped) files = await this.gate.changedSince(before).catch(() => []);
+    const result: ShellResult = {
+      id: run.info.id,
+      command: run.info.command,
+      cwd: run.info.cwd,
+      output: cleanShellOutput(r.logTail),
+      ...(r.truncated ? { truncated: true as const } : {}),
+      exitCode: run.cancelled ? null : r.exitCode,
+      ...(r.timedOut ? { timedOut: true as const } : {}),
+      ...(run.cancelled ? { cancelled: true as const } : {}),
+      durationMs: Math.max(0, Date.now() - startedMs),
+      ...(files.length > 0 ? { files: files.slice(0, SHELL_FILES_MAX) } : {}),
+      ...(files.length > SHELL_FILES_MAX ? { filesTruncated: true as const } : {}),
+    };
+    this.log("info", `! command ended: ${result.cancelled ? "stopped" : result.timedOut ? "timed out" : `exit ${result.exitCode}`}, ${files.length} file(s) changed`);
+    if (this.shellRun === run) this.shellRun = null;
+    if (run.dropped || this.project?.path !== run.info.cwd) return;
+    this.record({ kind: "shell", ...result });
+    this.shellPending = withPendingShell(this.shellPending, result);
+    this.emit({ type: "shell_result", turn: this.turn, at: new Date().toISOString(), ...result });
+    this.touch();
+  }
+
+  /** §67.2: stops the running `!` command (its process tree); its row says so. */
+  private cancelShell(): void {
+    const run = this.shellRun;
+    if (!run || run.cancelled) return;
+    run.cancelled = true;
+    run.stop();
+    this.log("info", "! command stopped by the user");
+  }
+
+  /** §67.2: before the chat or the project changes — the command stops, and its row lands in the chat it ran in. */
+  private async stopShell(): Promise<void> {
+    const run = this.shellRun;
+    if (!run) return;
+    this.cancelShell();
+    await withTimeout(run.done, 5000, "! command stop").catch(() => {
+      run.dropped = true;
+    });
   }
 
   /**
@@ -6117,7 +6326,10 @@ export class ReviewEngine {
     const reply = (taken: Set<string>): InterruptedEvent | undefined => takeBack
       ? { type: "interrupted", takenBack: waiting.filter((m) => taken.has(m.id)).map((m) => ({ id: m.id, text: m.text, ...(m.mentions ? { mentions: m.mentions } : {}) })), read: waiting.filter((m) => !taken.has(m.id)).map((m) => m.id) }
       : undefined;
-    if (!this.gate.running || !session) return reply(new Set());
+    if (!this.gate.running || !session) {
+      if (this.shellRun) this.cancelShell(); // §67.2: Esc / Stop between turns stops the `!` command
+      return reply(new Set());
+    }
     let taken = new Set<string>();
     if (waiting.length > 0) {
       taken = await this.interruptTakingBack(session, waiting.map((m) => m.id));
@@ -6378,6 +6590,7 @@ export class ReviewEngine {
     const meta = idx.create();
     meta.title = old.title.endsWith(REWOUND_TITLE_SUFFIX) ? old.title.slice(0, -REWOUND_TITLE_SUFFIX.length) : old.title;
     meta.forkedFrom = { sessionId: old.id, turn };
+    if (old.addedDirs?.length) meta.addedDirs = [...old.addedDirs]; // §67.1: the fork works where its chat did
     meta.turns = Math.max(0, turn - 1);
     meta.costUSD = kept.reduce((n, r) => n + (r.kind === "turn_end" ? r.usage.costUsd ?? 0 : 0), 0);
     const lastUser = [...kept].reverse().find((r) => r.kind === "user_message");
@@ -9673,6 +9886,9 @@ export class ReviewEngine {
         peerTurn: this.peerTurn ? { messageIds: [...this.peerTurn.messageIds], fromNames: [...this.peerTurn.fromNames] } : null,
         ...this.planSourceSlice(), // MARK: wave4d w4d-plan (§42.1)
         ...(this.terminal ? { terminal: this.terminal.state } : {}), // MARK: terminal-chat (§57)
+        addedDirs: this.currentAddedDirs(), // §67.1
+        shell: this.shellRun ? { ...this.shellRun.info } : null, // §67.2
+        shellPending: this.shellPending.length,
       },
       toolchain: this.toolchain,
       gate: this.gate,
@@ -10037,6 +10253,9 @@ function laneOf(cmd: EngineCommand): Lane {
     // §56.1: /btw is answered while the turn runs — never behind (or holding up) the turn's lane or the side forks.
     case "btw_ask":
       return "btw";
+    // §67.2: stopping a `!` command never waits behind the main lane.
+    case "shell_cancel":
+      return "steer";
     case "workbench_preview":
       return "query";
     // MARK: git-sync — §68.1: a fetch waits on the network and only moves remote-tracking refs: never behind (or holding up)
@@ -10119,6 +10338,10 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "terminal_request_cancel": // §57.14
     case "terminal_permission_response": // §57.15
     case "review_first_allow_turn": // §64
+    case "add_dir": // §67
+    case "remove_dir":
+    case "shell_run":
+    case "shell_cancel":
       return "session";
     case "side_ask":
     case "side_list":

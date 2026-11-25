@@ -236,6 +236,21 @@ export const REFUSAL_CODES = [
   // MARK: §49 Run as Task — `workbench_create {task}`
   "invalid_task",
   "task_handoff_failed",
+  // §67.1 /add-dir and §67.2 `!` (terminal_chat is listed above)
+  "dir_empty_path",
+  "dir_path_too_long",
+  "dir_not_found",
+  "dir_not_directory",
+  "dir_is_project",
+  "dir_already_added",
+  "dir_too_many",
+  "dir_busy",
+  "dir_not_added",
+  "empty_command",
+  "command_too_long",
+  "shell_busy",
+  "turn_running",
+  "no_shell_running",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -815,6 +830,36 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("No turn is running — its changes so far are in the review now");
     case "not_a_live_file":
       return t("{0} is not among this turn's changes so far", d);
+    // §67.1 /add-dir (the path in the detail is the resolved one)
+    case "dir_empty_path":
+      return t("Type the directory's path: /add-dir <path>");
+    case "dir_path_too_long":
+      return t("The path is too long (at most 4,096 characters).");
+    case "dir_not_found":
+      return t("No such directory: {0}", d);
+    case "dir_not_directory":
+      return t("Not a directory: {0}", d);
+    case "dir_is_project":
+      return t("That is the project folder or inside it — Claude works there already ({0})", d);
+    case "dir_already_added":
+      return t("Already added to this chat ({0})", d);
+    case "dir_too_many":
+      return t("A chat can have at most 20 added directories.");
+    case "dir_busy":
+      return t("Wait until Claude's work is done — the chat's directories do not change while it works");
+    case "dir_not_added":
+      return t("Not a directory added to this chat: {0}", d);
+    // §67.2 `!`
+    case "empty_command":
+      return t("Type a command after the !");
+    case "command_too_long":
+      return t("The command is too long (at most 10,000 characters).");
+    case "shell_busy":
+      return t("A shell command is already running — wait for it or stop it");
+    case "turn_running":
+      return t("Claude is working — run the command once the turn ends");
+    case "no_shell_running":
+      return t("No shell command is running");
     default:
       return null;
   }

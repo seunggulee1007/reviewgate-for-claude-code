@@ -44,6 +44,7 @@ import {
 import { AsyncQueue } from "./queue.js";
 import type { ReviewFirstHold } from "./reviewFirst.js"; // §64
 import { defaultScratchDirs, editScopeReason, GIT_INSTRUCTION, isolatedCall, SCOPE_MESSAGES, scopeInstruction, worktreeToolBlocked } from "./reviewScope.js";
+import { addedDirsInstruction } from "./addedDirs.js"; // §67.1
 import { settingsEditRisk } from "./settingsDiff.js";
 import { allowPatternSuggestions, cliSuggestionPatterns, mcpToolName, type McpToolHints, type UserRules } from "./permissionRules.js";
 import { commandOfWindowId, commandWindowId, SKILL_TOOL } from "./provenance.js"; // MARK: r2-skills-side (§31.1, M35)
@@ -121,6 +122,8 @@ export type SessionSettings = {
   maxTurns?: number;
   /** §52: background tasks on (default) and turns Claude starts itself taken as review turns; false: the §18 behavior. */
   backgroundWork?: boolean;
+  /** §67.1: the chat's `/add-dir` directories (absolute, real paths) — the SDK's `additionalDirectories`. */
+  addedDirs?: string[];
   /**
    * §52.2: subagents finish inside the turn that started them (every Agent / Task call gets `run_in_background: false`), as
    * before 0.6. Off (the default): they run as in the terminal — in the background unless Claude says not — and the main
@@ -568,6 +571,7 @@ export class ClaudeSession implements ClaudeSessionLike {
       plansDir: plansDir(),
       planFiles: new Set<string>(),
       scratchDirs: defaultScratchDirs(),
+      addedDirs: [...(opts.settings.addedDirs ?? [])], // §67.1
       turnActive: false,
       allowWorktreeIsolation: opts.settings.allowWorktreeIsolation !== false, // M05b: default on (§33.4)
       ...(opts.settings.userRules ? { userRules: opts.settings.userRules } : {}),
@@ -653,8 +657,10 @@ export class ClaudeSession implements ClaudeSessionLike {
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
-          append: [s.systemPromptAppend, scopeInstruction(this.opts.cwd, s.allowWorktreeIsolation !== false), GIT_INSTRUCTION].filter((t) => t.trim()).join("\n\n"),
+          append: [s.systemPromptAppend, scopeInstruction(this.opts.cwd, s.allowWorktreeIsolation !== false), addedDirsInstruction(s.addedDirs ?? []), GIT_INSTRUCTION].filter((t) => t.trim()).join("\n\n"),
         },
+        // §67.1: the chat's /add-dir directories, as the terminal's `--add-dir` (edits there still get the card).
+        ...((s.addedDirs ?? []).length > 0 ? { additionalDirectories: [...s.addedDirs!] } : {}),
         permissionMode: s.permissionMode ?? "default",
         // loadUserSettings (default): ~/.claude/settings.json too, so the user's skills, plugins,
         // slash commands and MCP servers exist in app sessions. Its `permissions.allow` rules would
@@ -2582,7 +2588,7 @@ export class ClaudeSession implements ClaudeSessionLike {
     const outsideRoot = AUTO_ALLOW_RE.test(toolName) && file !== undefined && isOutsideRoot(file, root);
     const scope: PermissionReason | null =
       (toolUseId ? this.hookCtx.scopeReasons?.get(toolUseId) : undefined) ??
-      (AUTO_ALLOW_RE.test(toolName) && file !== undefined ? editScopeReason(file, root, isOutsideRoot, outsideRoot ? await otherWorktrees(this.hookCtx) : [], this.hookCtx.scratchDirs) : null) ??
+      (AUTO_ALLOW_RE.test(toolName) && file !== undefined ? editScopeReason(file, root, isOutsideRoot, outsideRoot ? await otherWorktrees(this.hookCtx) : [], this.hookCtx.scratchDirs, this.hookCtx.addedDirs) : null) ??
       (isolatedCall(toolName, input, root) ? { code: "worktree_isolation", message: SCOPE_MESSAGES.worktree_isolation } : null) ??
       configScopeReason(toolName, input, this.hookCtx.cwd, root, this.hookCtx, ro) ??
       (await gitCommandReason(toolName, input, this.hookCtx)); // MARK: r1-git (§46): destructive git only

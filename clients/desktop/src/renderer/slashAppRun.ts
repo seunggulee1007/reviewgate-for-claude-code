@@ -4,6 +4,7 @@
  * the chat tab's close and rename. As on the Mac (App ComposerSlashCommands.swift).
  */
 import { create } from "zustand";
+import { addDir } from "./addedDirs"; // §67.1
 import { t } from "./i18n";
 import { pressKey } from "./menuActions.lifecycle";
 import { checkpointsOf } from "./rewind";
@@ -90,6 +91,10 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     }
     case "terminalOnly":
       return { card: { terminalOnly: cmd.name } };
+    case "addDir":
+      // §67.1: the composer runs it itself (the box keeps the draft on a refusal); from elsewhere the outcome is a notice.
+      void addDir(cmd.path).then((r) => r && notify(r.notice));
+      return null;
   }
 }
 

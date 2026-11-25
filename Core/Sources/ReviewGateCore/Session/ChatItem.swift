@@ -24,13 +24,16 @@ public enum ChatItem: Identifiable, Sendable, Equatable {
     case peerMessage(id: UUID, message: PeerMessage)
     /// §52.1: a turn Claude started itself (a background task ended, `/loop`, …) — the turn's first row.
     case autoTurn(id: UUID, turn: Int, info: AutoTurnInfo)
+    /// §67.2: a `!` command the user ran between turns (its output goes to Claude with the next message).
+    case shell(id: UUID, result: ShellResult)
 
     public var id: UUID {
         switch self {
         case .user(let id, _, _), .assistant(let id, _, _, _), .toolUse(let id, _, _, _, _, _),
              .toolResult(let id, _, _, _, _), .permission(let id, _, _),
              .budgetEvent(let id, _, _, _, _, _, _), .error(let id, _, _, _), .turnEnd(let id, _),
-             .plan(let id, _, _, _), .turnSummary(let id, _), .peerMessage(let id, _), .autoTurn(let id, _, _):
+             .plan(let id, _, _, _), .turnSummary(let id, _), .peerMessage(let id, _), .autoTurn(let id, _, _),
+             .shell(let id, _):
             return id
         }
     }

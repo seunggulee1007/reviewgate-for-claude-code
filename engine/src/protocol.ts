@@ -64,9 +64,12 @@ export type PermissionAgent = {
  * localize on `code` (and show `message` for a code they do not know).
  */
 export type PermissionReason = {
-  code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command";
+  code: "outside_project" | "nested_repository" | "other_worktree" | "worktree_command" | "worktree_isolation" | "claude_config" | "git_command" | "added_directory";
   message: string;
-  /** The nested repository / worktree root concerned (absolute, native); for `claude_config` the settings file itself. */
+  /**
+   * The nested repository / worktree root concerned (absolute, native); for `claude_config` the settings file itself; §67.1
+   * `added_directory`: the directory the chat added with `/add-dir` that holds the file.
+   */
   path?: string;
   /** §39.4 `worktree_command`: the worktree is another repository's (the command `cd`s / `-C`s there) — no chat can follow it. */
   otherRepository?: true;
@@ -743,6 +746,14 @@ export type EngineCommand =
   | Cmd<"steer_take_back", { messageId: string }>
   /** §56.1 `/btw`: a side question answered apart (no tools, never in the chat) → `btw_answer`. */
   | Cmd<"btw_ask", { question: string }>
+  /** §67.1 `/add-dir`: Claude may also work in `path` (absolute, `~/…`, or relative to the project) from the next message on. */
+  | Cmd<"add_dir", { path: string }>
+  /** §67.1: the chat's added directory `path` (as `state.session.addedDirs` lists it) is no longer Claude's to work in. */
+  | Cmd<"remove_dir", { path: string }>
+  /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
+  | Cmd<"shell_run", { command: string }>
+  /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
+  | Cmd<"shell_cancel">
   /** §57: how to start `claude` for the current terminal chat; replies `terminal_spec`. Each call issues a fresh hook token (the previous one is retired). */
   | Cmd<"terminal_spec", { sessionId: string }>
   /** §57: the app's PTY runs it (pid of the exec'd claude). */
@@ -1047,7 +1058,9 @@ export type BlockedReason =
   /** An older engine's: since M30 (§3) a failed collection no longer closes the input. */
   | "collect_failed"
   | "pending_review"
-  | "changes_requested";
+  | "changes_requested"
+  /** §67.2: a `!` command runs (`state.session.shell`); a message waits until it ends. */
+  | "shell_running";
 
 export type HudActivity = {
   kind: "idle" | "working" | "thinking" | "tool" | "subagent";
@@ -1148,6 +1161,36 @@ export type SessionState = {
   autoModel?: AutoModelChoice | null;
   /** §57: the terminal chat's live state; null / absent for a chat-kind session. */
   terminal?: TerminalSessionState | null;
+  /** §67.1: the current chat's directories added with `/add-dir` (absolute, real paths), in the order added. */
+  addedDirs?: string[];
+  /** §67.2: the `!` command running now (`canSend` is false meanwhile: `blockedReason: "shell_running"`); null when none. */
+  shell?: ShellRunInfo | null;
+  /** §67.2: `!` results of this chat that go to Claude with the next message (0 when none). */
+  shellPending?: number;
+};
+
+/** §67.2: a `!` command while it runs. */
+export type ShellRunInfo = { id: string; command: string; cwd: string; startedAt: string };
+
+/** §67.2: a finished `!` command — its transcript row (`kind: "shell"`) and the `shell_result` event. */
+export type ShellResult = {
+  id: string;
+  command: string;
+  /** Where it ran (the project folder). */
+  cwd: string;
+  /** stdout and stderr together, as a terminal shows them; ANSI escapes removed; the last `SHELL_OUTPUT_CHARS` when longer. */
+  output: string;
+  /** The output was longer: its start was cut. */
+  truncated?: true;
+  /** null: stopped (cancelled, timed out) or it could not start. */
+  exitCode: number | null;
+  timedOut?: true;
+  cancelled?: true;
+  durationMs: number;
+  /** Project files it changed (repo-relative, at most 50) — they reach the next review as `external` (§31.1). */
+  files?: string[];
+  /** More files changed than `files` lists. */
+  filesTruncated?: true;
 };
 
 /** §57: Claude Code waits for the user in the TUI (a permission dialog, a question). */
@@ -1682,6 +1725,8 @@ export type SessionMeta = {
   continuedIn?: string;
   /** §57.16: the CLI config dir the terminal really uses (learned from a hook's `transcript_path`). */
   cliConfigDir?: string;
+  /** §67.1: directories added with `/add-dir` (absolute, real paths); the CLI starts with them (`additionalDirectories`). */
+  addedDirs?: string[];
 };
 
 export type SessionsState = {
@@ -2024,6 +2069,8 @@ export type TranscriptItem = { at: string; turn: number } & (
   | ({ kind: "auto_turn" } & AutoTurnInfo)
   /** MARK: wave4 w4-history — §38.3: the turn's `turn_summary` (bounded; `truncated`: lists or texts were cut). */
   | ({ kind: "turn_summary" } & TurnSummaryRow)
+  /** §67.2: a `!` command the user ran between turns. */
+  | ({ kind: "shell" } & ShellResult)
 );
 /** §31: HEAD / the branch moved between the start and the end of turn `turn` (mirrored in `state.gate.headMoved`). */
 export type HeadMovedEvent = { type: "head_moved"; turn: number } & HeadMove;
@@ -2120,6 +2167,10 @@ export type SideTurnEndEvent = { type: "side_turn_end"; threadId: string; costUS
 export type InterruptedEvent = { type: "interrupted"; id?: string; takenBack: { id: string; text: string; mentions?: string[] }[]; read: string[] };
 /** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
+/** §67.2: the running `!` command's output so far (its last `SHELL_LIVE_CHARS`), at most every 300 ms. */
+export type ShellOutputEvent = { type: "shell_output"; id: string; output: string };
+/** §67.2: a `!` command ended — its row (also in the transcript). */
+export type ShellResultEvent = { type: "shell_result"; turn: number; at: string } & ShellResult;
 /** §57: reply to `terminal_spec` — how the app starts `claude` in its PTY (a reply only, never broadcast). */
 export type TerminalSpecEvent = {
   type: "terminal_spec";
@@ -2286,6 +2337,7 @@ export type EngineEvent =
   | SidePromoteDraftEvent
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
+  | ShellOutputEvent | ShellResultEvent // §67.2
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
