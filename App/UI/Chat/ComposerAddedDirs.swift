@@ -72,8 +72,9 @@ struct AddedDirsChip: View {
     }
 }
 
-/// The chip's list: each directory (home as ~, the full path in its tooltip) with ×, then "디렉터리 추가…".
-private struct AddedDirsPopover: View {
+/// The chip's list: each directory (home as ~, the full path in its tooltip) with ×, then "디렉터리 추가…". Not private: the
+/// screenshot tour shows it on its own (a popover is a window of its own, outside the window's capture).
+struct AddedDirsPopover: View {
     @Environment(AppState.self) private var store
     let composer: ComposerModel
     let close: () -> Void

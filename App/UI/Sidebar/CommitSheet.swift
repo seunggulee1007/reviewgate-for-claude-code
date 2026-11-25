@@ -68,10 +68,13 @@ struct CommitSheet: View {
     @State private var showUntracked = false
     @State private var extraSelected: Set<String> = []
 
-    /// `splitPreview`: open in "나눠서 커밋" with these files and cards (the screenshot tour).
-    init(splitPreview: CommitSplitSession? = nil) {
+    /// `splitPreview`: open in "나눠서 커밋" with these files and cards; `showUntracked` / `extraTicked`: the "Other changes"
+    /// group with untracked files listed and these ticked (the screenshot tour).
+    init(splitPreview: CommitSplitSession? = nil, showUntracked: Bool = false, extraTicked: Set<String> = []) {
         _split = State(initialValue: splitPreview != nil)
         _splitSession = State(initialValue: splitPreview)
+        _showUntracked = State(initialValue: showUntracked)
+        _extraSelected = State(initialValue: extraTicked)
     }
 
     /// §32: accepted gitignored mods files are not committable — left out of the list and named under it.

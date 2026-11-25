@@ -955,7 +955,10 @@ private final class Tour {
             let room = (try? views(NSScrollView.self, in: window, minSize: 0))?
                 .filter { $0.documentView?.accessibilityIdentifier() != "Composer" && $0.frame.width > 300 }
                 .map(\.frame.height).max() ?? 0
-            log("composerbar \(step): the tallest scroll view (the transcript) \(Int(room)) pt of \(Int(window.contentView?.bounds.height ?? 0))")
+            // A part taller than the window (a long line under the branch did it, §68.7) lays the whole window out taller.
+            let height = window.contentView?.bounds.height ?? 0
+            log("composerbar \(step): the tallest scroll view (the transcript) \(Int(room)) pt of \(Int(height))"
+                + (room > height ? " — TALLER (the window's content is laid out taller than the window)" : ""))
         }
         window.makeFirstResponder(nil)
         try await shoot("idle")
@@ -1022,6 +1025,185 @@ private final class Tour {
         if let firstCard { entry.model.chatTranscript.handledExpansion[firstCard.id] = true }
         log("composerbar handled-open: " + (firstCard == nil ? "no card row LOST" : "the run opened"))
         try await shoot("handled-open")
+        try await addDirShellShots(window, shoot: shoot)
+        try await gitSyncShots(window, shoot: shoot)
+        try await commitOthersShots(window)
+    }
+
+    // MARK: §67 / §68 at the laptop size (the composer bar check): what 0.5.29 added around the box and the branch.
+
+    /// A view alone in a panel of its own at its fitting size (a popover is a window AppKit captures apart from the main
+    /// one), dark, hidden while quiet. `composerbar-<name>.png`.
+    private func panelShot<V: View>(_ name: String, _ content: V) async throws {
+        let view = NSHostingView(rootView: content.environment(store).environment(store.pr).environment(entry.model))
+        let panel = NSWindow(contentRect: NSRect(origin: .zero, size: view.fittingSize), styleMask: [.titled], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.contentView = view
+        ScreenshotTour.hideIfQuiet(panel)
+        panel.orderFrontRegardless()
+        defer { panel.orderOut(nil) }
+        try await Task.sleep(for: .milliseconds(700))
+        panel.setContentSize(view.fittingSize)
+        try await Task.sleep(for: .milliseconds(300))
+        try write(try render(panel), "composerbar-\(name)")
+    }
+
+    private static func isoAgo(_ seconds: TimeInterval) -> String {
+        let format = ISO8601DateFormatter()
+        format.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return format.string(from: Date().addingTimeInterval(-seconds))
+    }
+
+    /// §67.1 the "디렉터리 N" chip and its list (idle, and while Claude works: × and 추가 off with the reason); §67.2 the box
+    /// in shell mode (a command, a bare "!"), the live row while it runs, and the finished rows with the caption over the box.
+    private func addDirShellShots(_ window: NSWindow, shoot: (String) async throws -> Void) async throws {
+        let root = store.projectURL?.path ?? "/Users/Shared/acme-shop"
+        let dirs = ["/Users/Shared/acme-design-tokens", "/Users/Shared/acme-platform/packages/api-client/src/generated/openapi"]
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+        store.debugShowAddDirShell(addedDirs: dirs)
+        try await shoot("adddir-chip")
+        let composer = entry.model.chatComposer
+        try await panelShot("adddir-popover", AddedDirsPopover(composer: composer) {})
+        store.debugShowComposerState(working: true, files: [])
+        log("composerbar adddir-popover-busy: × and Add Directory… off — \(store.addedDirsBlocker ?? "on LOST")")
+        try await panelShot("adddir-popover-busy", AddedDirsPopover(composer: composer) {})
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+
+        // The box in shell mode: a command typed after "!", then "!" alone (Run off: nothing to run).
+        if let box = composerView(window) { window.makeFirstResponder(box) }
+        setComposerText("!npm test -- --run", in: window)
+        try await shoot("shell-typed")
+        setComposerText("!", in: window)
+        try await shoot("shell-empty")
+        setComposerText("", in: window)
+        window.makeFirstResponder(nil)
+
+        // While it runs: the live row (spinner, elapsed, the output so far, Stop) and the composer's stop.
+        let vitest = (1...16).map { "  ✓ test/cart.test.ts > cart totals > case \($0) (\($0 * 3) ms)" }.joined(separator: "\n")
+        store.debugShowAddDirShell(addedDirs: dirs, shell: ShellRunInfo(id: "tour-sh-live", command: "npm test -- --run", cwd: root,
+                                                                         startedAt: Self.isoAgo(7)), output: vitest)
+        try await shoot("shell-running")
+
+        // Finished: a long passing run folded to its last lines, a failing lint that changed files, one stopped — two of
+        // them wait for the next message (the caption over the box).
+        store.debugShowAddDirShell(addedDirs: dirs, shellPending: 2)
+        let passed = ShellResult(id: "tour-sh-1", command: "npm test -- --run", cwd: root,
+                                 output: vitest + "\n\n Test Files  1 passed (1)\n      Tests  16 passed (16)\n   Duration  1.24s\n",
+                                 exitCode: 0, durationMs: 8_400)
+        let lint = ShellResult(id: "tour-sh-2", command: "npm run lint -- --fix && git status --short src test", cwd: root,
+                               output: "src/cart.ts\n  12:7  error  'total' is never reassigned. Use 'const' instead  prefer-const\n\n✖ 1 problem (1 error, 0 warnings)\n M src/cart.ts\n M src/pricing.ts\n",
+                               exitCode: 1, durationMs: 3_100, files: ["src/cart.ts", "src/pricing.ts"])
+        let stopped = ShellResult(id: "tour-sh-3", command: "npm run dev", cwd: root, output: "> acme-shop@1.0.0 dev\n> vite\n\n  VITE ready in 312 ms\n",
+                                  exitCode: nil, cancelled: true, durationMs: 21_000)
+        store.debugHandle([passed, lint, stopped].enumerated().map { i, result in
+            EngineEvent.shellResult(turn: 2, at: Self.isoAgo(Double(60 - i * 10)), result: result)
+        })
+        try await shoot("shell-done")
+        store.debugShowAddDirShell(addedDirs: [])
+    }
+
+    /// §68.7 the branch chip's ↑↓ and the line under it after a Fetch / Pull (fetched, pulled, refused), a fetch running, and
+    /// the branch menu's items as the menu would show them (a menu is not captured: `composerbar branch-menu` lines).
+    private func gitSyncShots(_ window: NSWindow, shoot: (String) async throws -> Void) async throws {
+        let remote = "https://example.com/acme/shop.git"
+        func branches(ahead: Int, behind: Int) -> [BranchInfo] {
+            [BranchInfo(name: "main", isCurrent: true, upstream: "origin/main", ahead: ahead, behind: behind, lastCommitDate: nil),
+             BranchInfo(name: "feature/discount-codes", isCurrent: false, upstream: "origin/feature/discount-codes", ahead: 1, behind: 0, lastCommitDate: nil)]
+        }
+        let sync = GitSyncState(lastFetchAt: Self.isoAgo(180), remotes: ["origin"], upstream: "origin/main")
+        func menuLog(_ step: String) {
+            let current = store.currentBranch
+            var items = ["Fetch" + (store.fetchDisabledReason.map { " off: \($0)" } ?? " on")]
+            let pullOff = store.pullDisabledReason ?? (store.isBranchDiverged
+                ? EngineMessages.refusal(error: "pull_diverged:\(current?.ahead ?? 0),\(current?.behind ?? 0)") : nil)
+            items.append("Pull \(current?.behind ?? 0)" + (pullOff.map { " off: \($0)" } ?? " on"))
+            if store.isBranchDiverged { items.append("Rebase" + (store.rebaseDisabledReason.map { " off: \($0)" } ?? " on")) }
+            let footer = store.gitSync?.lastFetchError.map { EngineMessages.refusal(error: $0) } ?? GitSyncText.lastFetched(store.gitSync?.lastFetchAt)
+            log("composerbar branch-menu \(step): badge \"\(GitSyncRules.badge(current))\" (\(GitSyncRules.badgeHelp(current) ?? "no tooltip")) · "
+                + items.joined(separator: " · ") + " · footer \(footer ?? "none")")
+        }
+        func headerCrop(_ step: String) throws {
+            // The project header (the branch line and the line under it), at the window's top left.
+            try write(try render(window), "composerbar-\(step)-header", crop: NSRect(x: 0, y: 637 - 230, width: 320, height: 230))
+        }
+        let fetched = GitSyncText.fetched(FetchedReply(remotes: ["origin"], ahead: 2, behind: 3))
+        store.debugShowGitSync(branches: branches(ahead: 2, behind: 3), sync: sync, remoteURL: remote,
+                               notice: GitSyncNotice(kind: .info, text: fetched))
+        menuLog("diverged")
+        try await shoot("branch-fetched")
+        try headerCrop("branch-fetched")
+        let pulled = GitSyncText.pulled(PulledReply(branch: "main", upstream: "origin/main", mode: .fastForward, commits: 3,
+                                                    files: ["src/cart.ts", "src/pricing.ts", "README.md", "test/cart.test.ts", "package.json"], fileCount: 5))
+        store.debugShowGitSync(branches: branches(ahead: 0, behind: 0), sync: sync, remoteURL: remote,
+                               notice: GitSyncNotice(kind: .success, text: pulled))
+        try await shoot("branch-pulled")
+        try headerCrop("branch-pulled")
+        let overwrite = ["src/cart.ts", "README.md", "src/format.ts", "test/cart.test.ts", "package.json", "tsconfig.json"]
+        let refused = EngineMessages.refusal(code: "pull_would_overwrite", error: "pull_would_overwrite:" + overwrite.prefix(5).joined(separator: ", "),
+                                             paths: overwrite)
+        store.debugShowGitSync(branches: branches(ahead: 0, behind: 3), sync: sync, remoteURL: remote,
+                               notice: GitSyncNotice(kind: .error, text: refused, paths: overwrite))
+        menuLog("behind")
+        try await shoot("branch-refused")
+        try headerCrop("branch-refused")
+        var busy = sync
+        busy.fetching = true
+        store.debugShowGitSync(branches: branches(ahead: 0, behind: 3), sync: busy, remoteURL: remote, notice: nil)
+        menuLog("fetching")
+        try await shoot("branch-fetching")
+        try headerCrop("branch-fetching")
+        var failed = sync
+        failed.lastFetchError = "fetch_failed:Could not resolve host: example.com"
+        store.debugShowGitSync(branches: branches(ahead: 1, behind: 0), sync: failed, remoteURL: remote, notice: nil)
+        menuLog("fetch-failed")
+        var noUpstream = sync
+        noUpstream.upstream = nil
+        noUpstream.pullBlocker = .noUpstream
+        store.debugShowGitSync(branches: [BranchInfo(name: "main", isCurrent: true, upstream: nil, ahead: 0, behind: 0, lastCommitDate: nil)],
+                               sync: noUpstream, remoteURL: remote, notice: nil)
+        menuLog("no-upstream")
+        store.debugShowComposerState(working: true, files: [])
+        var running = sync
+        running.pullBlocker = .running
+        store.debugShowGitSync(branches: branches(ahead: 2, behind: 3), sync: running, remoteURL: remote, notice: nil)
+        menuLog("running")
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+    }
+
+    /// §68.8 the commit sheet's "Other changes" on the demo project's own files (changed for it here: an edit, a rename,
+    /// two new files), with accepted review files and without a review — the default (none ticked, untracked hidden), and
+    /// with the untracked files listed and two ticked. `composerbar-commit-<step>.png` (+ `-sheet`).
+    private func commitOthersShots(_ window: NSWindow) async throws {
+        guard let root = store.projectURL else { throw TourError("no project") }
+        func runGit(_ args: String...) throws {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", root.path] + args
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { throw TourError("git \(args.joined(separator: " ")) failed") }
+        }
+        let readme = root.appendingPathComponent("README.md")
+        try (String(contentsOf: readme, encoding: .utf8) + "\n## Discount codes\n\nSAVE10 and FREESHIP — see docs/discounts.md.\n")
+            .write(to: readme, atomically: true, encoding: .utf8)
+        try runGit("mv", "src/format.ts", "src/money.ts")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("docs"), withIntermediateDirectories: true)
+        try "# Discount codes\n".write(to: root.appendingPathComponent("docs/discounts.md"), atomically: true, encoding: .utf8)
+        try "export const seed = [];\n".write(to: root.appendingPathComponent("src/seed.ts"), atomically: true, encoding: .utf8)
+        await store.refreshBranches()
+        log("composerbar commit-others: state.commit.otherChanges "
+            + (store.otherChangeCounts.map { "\($0.tracked) tracked, \($0.untracked) untracked" } ?? "none LOST"))
+        let accepted = [ChangedFile(path: "src/pricing.ts", oldPath: nil, status: .modified, added: 14, deleted: 2, isBinary: false, state: .accepted),
+                        ChangedFile(path: "src/cart.ts", oldPath: nil, status: .modified, added: 9, deleted: 3, isBinary: false, state: .accepted)]
+        store.debugShowGate(.reviewing, files: accepted)
+        try await sheetShot("composerbar-commit-others", on: window, CommitSheet())
+        store.debugShowGate(.idle)
+        try await sheetShot("composerbar-commit-others-only", on: window,
+                            CommitSheet(showUntracked: true, extraTicked: ["README.md", "docs/discounts.md"]))
     }
 
     /// A regular chat's review at the laptop's 1000 × 637 and the smallest window: the diff pane beside the chat is ~300 pt,

@@ -36,5 +36,27 @@ public extension AppState {
         snapshot.hud.lastTurnMs = lastTurnMs
         state = snapshot
     }
+
+    /// §67 (the composer bar check): the chat's added directories, a `!` command running with its output so far (nil:
+    /// none), and how many results wait for the next message — as a snapshot and `shell_output` report them.
+    func debugShowAddDirShell(addedDirs: [String], shell: ShellRunInfo? = nil, output: String = "", shellPending: Int = 0) {
+        var snapshot = state
+        snapshot.session.addedDirs = addedDirs
+        snapshot.session.shell = shell
+        snapshot.session.shellPending = shellPending
+        state = snapshot
+        shellLive = shell.map { ShellLiveOutput(id: $0.id, output: output) }
+    }
+
+    /// §68 (the composer bar check): the branches with their upstream counts, `branches.sync`, the remote the project
+    /// header shows and the last Fetch / Pull outcome — as a snapshot and a reply report them.
+    func debugShowGitSync(branches: [BranchInfo], sync: GitSyncState?, remoteURL: String?, notice: GitSyncNotice?) {
+        var snapshot = state
+        snapshot.branches.list = branches
+        snapshot.branches.sync = sync
+        snapshot.project?.remoteURL = remoteURL
+        state = snapshot
+        gitSyncNotice = notice
+    }
 }
 #endif
