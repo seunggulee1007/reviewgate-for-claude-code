@@ -33,3 +33,13 @@ export function otherStatusLetter(f: Pick<OtherChange, "status" | "untracked">):
 export function othersOnly(reviewListed: number, others: number, truncated: boolean): boolean {
   return reviewListed === 0 && (others > 0 || truncated);
 }
+
+/**
+ * The message once `commit_others` answered: with only other changes and the message still the review's suggestion
+ * (Claude's last instruction, or "Apply accepted changes"), the reply's neutral one ("Update README.md"); null keeps the
+ * message (a review file listed, something typed, an older engine) — as the Mac's `CommitOthersRules.message`.
+ */
+export function othersMessage(current: string, reviewSuggestion: string, othersSuggestion: string | undefined, onlyOthers: boolean): string | null {
+  if (!onlyOthers || !othersSuggestion) return null;
+  return current === reviewSuggestion || current === "" ? othersSuggestion : null;
+}

@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import type { OtherChange } from "@reviewgate/engine";
-import { extraPathsOf, otherStatusLetter, othersOnly, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
+import { extraPathsOf, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
 import { t } from "../../i18n";
 import { commitPaths } from "../../reviewGate";
 import { commitOf, refusalText, useStore } from "../../store";
@@ -58,6 +58,9 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
         if (!live) return;
         setOthers(r.files);
         setOthersTruncated(r.truncated);
+        // Only the user's own changes: not Claude's last instruction (or "Apply accepted changes") as the message.
+        const only = othersOnly(candidates.paths.length, r.files.length, r.truncated);
+        setMessage((current) => othersMessage(current, commit.suggestedMessage ?? "", r.suggestedMessage, only) ?? current);
       })
       .catch(() => undefined); // an older engine: no second group
     return () => {
