@@ -1273,11 +1273,15 @@ struct MainWindow: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: notice.kind == .error ? "exclamationmark.triangle.fill" : notice.kind == .success ? "checkmark.circle.fill" : "info.circle")
                     .foregroundStyle(notice.kind == .error ? Color.orange : notice.kind == .success ? Color.green : Color.secondary)
+                // At most four lines: a pull refused over many files grew the sidebar's header past the window's height
+                // (the whole window then laid out taller than itself at 1000 × 637). The whole text and every file are
+                // in the tooltip.
                 Text(verbatim: notice.text)
                     .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(4)
+                    .truncationMode(.tail)
                     .textSelection(.enabled)
-                    .help(notice.paths.isEmpty ? notice.text : notice.paths.joined(separator: "\n"))
+                    .help(notice.paths.isEmpty ? notice.text : notice.text + "\n\n" + notice.paths.joined(separator: "\n"))
                 Spacer(minLength: 4)
                 Button {
                     store.dismissGitSyncNotice()

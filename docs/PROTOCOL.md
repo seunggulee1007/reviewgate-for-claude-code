@@ -11419,7 +11419,8 @@ review again, extras-only with a pending review and with none.
 - **The outcome** of a Fetch / Pull the user asked for is one line under the branch line until dismissed (✕) or the
   next one: green "Pulled 2 commit(s) from origin/main · 5 file(s) changed", "Already up to date with origin/main",
   "Fetched origin — 3 incoming commit(s) to pull", or the refusal in words (orange) — `pull_would_overwrite` names the
-  files (all of them in the tooltip) and says nothing was changed. A project switch clears it.
+  files (all of them in the tooltip) and says nothing was changed. A project switch clears it. At most four lines (the
+  whole text in the tooltip): a long one must not make the sidebar's header taller than a 637 pt window.
 - **The automatic fetch** (§68.4): on project open and when the window comes back to the front, `git_fetch {auto:
   true}` — quiet whatever happens. Settings › Git › "Fetch and Pull" › "Fetch automatically" (default on; Mac
   `AppSettings.autoFetch`, Windows `settings.autoFetch`), also sent to the engine as `settings.autoFetch`.
