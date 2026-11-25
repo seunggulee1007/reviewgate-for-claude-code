@@ -6,9 +6,9 @@
  * §32 (wave1 desktop-review): gitignored files (`ignored`, mods files force-added to the review) are never in the
  * checklist — the engine cannot stage them — and a line says which accepted ones stay out.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OtherChange } from "@reviewgate/engine";
-import { extraPathsOf, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
+import { extraPathsOf, followingTicks, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
 import { t } from "../../i18n";
 import { commitPaths } from "../../reviewGate";
 import { commitOf, refusalText, useStore } from "../../store";
@@ -50,6 +50,10 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   const [others, setOthers] = useState<OtherChange[]>([]);
   const [othersTruncated, setOthersTruncated] = useState(false);
   const [showUntracked, setShowUntracked] = useState(false);
+  const othersSuggestion = useRef<string | null>(null); // the neutral message put in (null: none yet)
+  const messageNow = useRef(message);
+  messageNow.current = message;
+  const onlyOthersNow = useRef(false);
   const [extraSelected, setExtraSelected] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     let live = true;
@@ -60,17 +64,40 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
         setOthersTruncated(r.truncated);
         // Only the user's own changes: not Claude's last instruction (or "Apply accepted changes") as the message.
         const only = othersOnly(candidates.paths.length, r.files.length, r.truncated);
-        setMessage((current) => othersMessage(current, commit.suggestedMessage ?? "", r.suggestedMessage, only) ?? current);
+        const next = othersMessage(message, commit.suggestedMessage ?? "", r.suggestedMessage, only);
+        if (next !== null) {
+          othersSuggestion.current = next;
+          setMessage((current) => (current === message ? next : current));
+        }
       })
       .catch(() => undefined); // an older engine: no second group
     return () => {
       live = false;
     };
   }, []);
+  // The message names the ticked files while it is still the one last suggested (§68.5).
+  const ticksKey = [...extraSelected].sort().join("\0");
+  useEffect(() => {
+    if (othersSuggestion.current === null || !onlyOthersNow.current) return;
+    let live = true;
+    engineRequest({ type: "commit_others", paths: [...extraSelected] })
+      .then((r) => {
+        if (!live) return;
+        const next = followingTicks(messageNow.current, othersSuggestion.current, r.suggestedMessage);
+        if (next === null) return;
+        othersSuggestion.current = next;
+        setMessage(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [ticksKey]);
   const shownOthers = visibleOthers(others, showUntracked);
   const extras = extraPathsOf(extraSelected, others, showUntracked);
   const untrackedCount = others.filter((f) => f.untracked).length;
   const onlyOthers = othersOnly(candidates.paths.length, others.length, othersTruncated);
+  onlyOthersNow.current = onlyOthers;
   const toggleExtra = (path: string) =>
     setExtraSelected((prev) => {
       const next = new Set(prev);

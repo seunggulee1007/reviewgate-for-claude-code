@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { OtherChange, ReviewState } from "@reviewgate/engine";
 import { commitBeforeSwitchBlocker } from "./branchFlow";
-import { extraPathsOf, otherChangesTotal, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "./commitOthers";
+import { extraPathsOf, followingTicks, otherChangesTotal, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "./commitOthers";
 import { refusalCodeText } from "./errorCodes";
 import { initI18n } from "./i18n";
 
@@ -53,5 +53,12 @@ describe("§68.5 files outside the review in the commit dialog", () => {
     expect(othersMessage("fix: typo", review, "Update README.md", true)).toBeNull();
     expect(othersMessage(review, review, "Update README.md", false)).toBeNull(); // review files listed
     expect(othersMessage(review, review, undefined, true)).toBeNull(); // an older engine
+  });
+
+  it("the message follows the ticked files until the user typed their own", () => {
+    expect(followingTicks("Update 2 files", "Update 2 files", "Update a.txt")).toBe("Update a.txt");
+    expect(followingTicks("my words", "Update 2 files", "Update a.txt")).toBeNull();
+    expect(followingTicks("Update a.txt", "Update a.txt", "Update a.txt")).toBeNull();
+    expect(followingTicks("x", null, "Update a.txt")).toBeNull();
   });
 });

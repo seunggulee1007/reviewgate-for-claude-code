@@ -43,3 +43,11 @@ export function othersMessage(current: string, reviewSuggestion: string, othersS
   if (!onlyOthers || !othersSuggestion) return null;
   return current === reviewSuggestion || current === "" ? othersSuggestion : null;
 }
+
+/**
+ * The ticked files changed: the message the reply names them with, while the message is still the one last suggested
+ * (a draft typed over it stays); null keeps the message — as the Mac's `CommitOthersRules.followingTicks`.
+ */
+export function followingTicks(current: string, lastSuggestion: string | null, newSuggestion: string | undefined): string | null {
+  return lastSuggestion !== null && newSuggestion !== undefined && current === lastSuggestion && newSuggestion !== current ? newSuggestion : null;
+}
