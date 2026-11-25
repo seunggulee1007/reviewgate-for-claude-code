@@ -25,3 +25,21 @@ export function extraPathsOf(ticked: ReadonlySet<string>, files: readonly OtherC
 export function otherStatusLetter(f: Pick<OtherChange, "status" | "untracked">): string {
   return f.untracked ? "U" : f.status;
 }
+
+/**
+ * The dialog holds only changes outside the review (no review file to list): titled "Commit changes" — not "Commit
+ * accepted (0)…" — with no empty review list above them (as the Mac's `CommitOthersRules.othersOnly`).
+ */
+export function othersOnly(reviewListed: number, others: number, truncated: boolean): boolean {
+  return reviewListed === 0 && (others > 0 || truncated);
+}
+
+/**
+ * The message once `commit_others` answered: with only other changes and the message still the review's suggestion
+ * (Claude's last instruction, or "Apply accepted changes"), the reply's neutral one ("Update README.md"); null keeps the
+ * message (a review file listed, something typed, an older engine) — as the Mac's `CommitOthersRules.message`.
+ */
+export function othersMessage(current: string, reviewSuggestion: string, othersSuggestion: string | undefined, onlyOthers: boolean): string | null {
+  if (!onlyOthers || !othersSuggestion) return null;
+  return current === reviewSuggestion || current === "" ? othersSuggestion : null;
+}

@@ -67,11 +67,16 @@ struct CommitSheet: View {
     @State private var othersTruncated = false
     @State private var showUntracked = false
     @State private var extraSelected: Set<String> = []
+    /// The neutral message `commit_others` suggested and the sheet put in (not kept as a draft, as the review's is not).
+    @State private var othersSuggestion: String?
 
-    /// `splitPreview`: open in "나눠서 커밋" with these files and cards (the screenshot tour).
-    init(splitPreview: CommitSplitSession? = nil) {
+    /// `splitPreview`: open in "나눠서 커밋" with these files and cards; `showUntracked` / `extraTicked`: the "Other changes"
+    /// group with untracked files listed and these ticked (the screenshot tour).
+    init(splitPreview: CommitSplitSession? = nil, showUntracked: Bool = false, extraTicked: Set<String> = []) {
         _split = State(initialValue: splitPreview != nil)
         _splitSession = State(initialValue: splitPreview)
+        _showUntracked = State(initialValue: showUntracked)
+        _extraSelected = State(initialValue: extraTicked)
     }
 
     /// §32: accepted gitignored mods files are not committable — left out of the list and named under it.
@@ -86,6 +91,8 @@ struct CommitSheet: View {
     private var extras: [String] { CommitOthersRules.extraPaths(ticked: extraSelected, files: others, showUntracked: showUntracked) }
     private var visibleOthers: [OtherChange] { CommitOthersRules.visible(others, showUntracked: showUntracked) }
     private var untrackedCount: Int { others.filter(\.untracked).count }
+    /// §68.8: no review file to list, only changes outside the review (a commit from the branch menu with no review).
+    private var othersOnly: Bool { CommitOthersRules.othersOnly(reviewListed: listed.count, others: others.count, truncated: othersTruncated) }
     private var canSubmit: Bool {
         !trimmedMessage.isEmpty && CommitOthersRules.canCommit(reviewTicked: selected.count, extras: extras.count) && !committing
             && store.commitLockReason == nil && (store.canCommit || !toAccept.isEmpty || !extras.isEmpty)
@@ -102,7 +109,8 @@ struct CommitSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Commit accepted changes").font(.headline)
+                // §68.8: with no review file, only the user's own changes — nothing "accepted" to commit.
+                if othersOnly { Text("Commit changes").font(.headline) } else { Text("Commit accepted changes").font(.headline) }
                 Spacer()
                 Picker("Commit mode", selection: Binding(get: { split }, set: { setSplit($0) })) {
                     Text("Commit at once").tag(false)
@@ -142,6 +150,12 @@ struct CommitSheet: View {
             if let reply = await store.loadOtherChanges() {
                 others = reply.files
                 othersTruncated = reply.truncated
+                // Only the user's own changes: not Claude's last instruction (or "Apply accepted changes") as the message.
+                if let suggested = CommitOthersRules.message(current: message, reviewSuggestion: store.suggestedCommitMessage,
+                                                            othersSuggestion: reply.suggestedMessage, othersOnly: othersOnly) {
+                    othersSuggestion = suggested
+                    message = suggested
+                }
             }
         }
         .onChange(of: push) { _, on in if let projectKey { AppSettings.setCommitPush(on, root: projectKey) } }
@@ -154,7 +168,7 @@ struct CommitSheet: View {
             }
         }
         .onChange(of: message) { _, new in
-            store.flow.commitMessageDraft = new.isEmpty || new == store.suggestedCommitMessage ? nil : new
+            store.flow.commitMessageDraft = new.isEmpty || new == store.suggestedCommitMessage || new == othersSuggestion ? nil : new
         }
     }
 
@@ -177,7 +191,13 @@ struct CommitSheet: View {
 
     /// "Commit at once": the message, the files, push and Commit.
     @ViewBuilder private var single: some View {
-        Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD"). A ticked pending file is marked reviewed (accepted) first; rejected files are left alone.")
+        Group {
+            if othersOnly {
+                Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD") as they are — they are not reviewed and nothing is marked accepted.")
+            } else {
+                Text("Commits the ticked files on \(store.projectInfo?.branch ?? "HEAD"). A ticked pending file is marked reviewed (accepted) first; rejected files are left alone.")
+            }
+        }
             .font(.callout).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         TextEditor(text: $message)
@@ -189,6 +209,7 @@ struct CommitSheet: View {
             .accessibilityIdentifier("Commit message")
         // wave3 mac-flow (§36.11): Claude drafts the message (read-only); it only fills the field above.
         CommitDraftRow(message: $message, paths: listed.filter { selected.contains($0) })
+        if !othersOnly {   // §68.8: no empty "No accepted files" box over the user's own changes
         HStack {
             Text("Files (\(selected.count) of \(listed.count))").font(.subheadline.weight(.medium))
             Spacer()
@@ -244,6 +265,7 @@ struct CommitSheet: View {
         .frame(minHeight: 60, maxHeight: 160)
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
         .accessibilityIdentifier("Commit files")
+        }
         if !others.isEmpty || othersTruncated {
             otherChangesGroup   // MARK: git-sync (§68.5)
         }
@@ -291,7 +313,7 @@ struct CommitSheet: View {
                 .disabled(!canSubmit)
                 // polish P5-sheets-03: what it does and its key — and why it is off.
                 .help(store.commitLockReason.map { Text(verbatim: $0) }
-                      ?? (selected.isEmpty ? Text("Tick the files to commit") : trimmedMessage.isEmpty ? Text("Enter a commit message.")
+                      ?? (selected.isEmpty && extras.isEmpty ? Text("Tick the files to commit") : trimmedMessage.isEmpty ? Text("Enter a commit message.")
                           : push ? Text("Commit the ticked files and push (⌘↩)") : Text("Commit the ticked files (⌘↩)")))
                 .accessibilityLabel("Commit")
                 .accessibilityIdentifier("Commit")
@@ -352,7 +374,7 @@ struct CommitSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(6)
         }
-        .frame(minHeight: 40, maxHeight: 120)
+        .frame(minHeight: 40, maxHeight: othersOnly ? 220 : 120)   // alone in the sheet: the room the review's list leaves
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.separator))
         .accessibilityIdentifier("Commit other changes")
     }

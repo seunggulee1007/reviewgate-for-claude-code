@@ -81,13 +81,26 @@ import Testing
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 1, worktreeDirty: false)!.contains("Finish the review"))
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 0, worktreeDirty: true) == "Commit your changes before rebasing")
         #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(), reviewFiles: 0, worktreeDirty: false) == nil)
+        // Pull's blockers in a rebase's own words — not "pull when the turn ends" on the Rebase item.
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(pullBlocker: .running), reviewFiles: 0, worktreeDirty: false)
+                == "Claude is working — rebase when the turn ends")
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(pullBlocker: .operation(.merge)), reviewFiles: 0, worktreeDirty: false)
+                == "A merge is in progress — finish or abort it in a terminal, then rebase")
+        #expect(GitSyncRules.rebaseDisabledReason(sync: GitSyncState(fetching: true), reviewFiles: 1, worktreeDirty: false)
+                == "A fetch or pull is already running")
+        #expect(GitSyncRules.pullDisabledReason(sync: GitSyncState(pullBlocker: .running)) == "Claude is working — pull when the turn ends")
     }
 
     @Test func refusalsSayWhatToDo() {
         #expect(EngineMessages.refusal(error: "pull_diverged:2,3").contains("2 local, 3 incoming"))
         #expect(EngineMessages.refusal(error: "pull_no_upstream:topic").hasPrefix("topic has no upstream"))
         #expect(EngineMessages.refusal(error: "pull_in_progress:merge").hasPrefix("A merge is in progress"))
-        #expect(EngineMessages.refusal(error: "pull_would_overwrite:a.ts, b.ts").contains("a.ts, b.ts"))
+        let overwrite = EngineMessages.refusal(error: "pull_would_overwrite:src/cart.ts, b.ts")
+        #expect(overwrite.contains(GitSyncText.unbrokenPaths("src/cart.ts, b.ts")))
+        // A line never ends inside a path ("src/cart.\nts"): a word joiner after each "/" "." "-" "_" within it.
+        #expect(GitSyncText.unbrokenPaths("src/cart.ts, my-notes_1.md") == "src/\u{2060}cart.\u{2060}ts, my-\u{2060}notes_\u{2060}1.\u{2060}md")
+        #expect(overwrite.replacingOccurrences(of: "\u{2060}", with: "").contains("src/cart.ts, b.ts"))
+        #expect(GitSyncText.unbrokenPaths("a/") == "a/")   // nothing after the last character
         #expect(EngineMessages.refusal(error: "pull_blocked:running").hasPrefix("Claude is working"))
         #expect(EngineMessages.refusal(error: "pull_rebase_blocked:review").contains("Finish the review"))
         #expect(EngineMessages.refusal(error: "fetch_failed:fatal: could not read from remote") == "Fetch failed: fatal: could not read from remote")
@@ -116,6 +129,12 @@ import Testing
         #expect(store.gitSyncNotice?.kind == .error)
         #expect(store.gitSyncNotice?.paths == ["a.ts"])
         #expect(store.gitSyncNotice?.text.contains("Nothing was changed") == true)
+        // The files are counted in the sentence and listed on a line of their own — never a name wrapped mid-way.
+        #expect(store.gitSyncNotice?.text == "Pull would overwrite 1 uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.")
+        #expect(store.gitSyncNotice?.listsPaths == true)
+        #expect(store.gitSyncNotice?.pathsLine == "a.ts")
+        #expect(GitSyncNotice.refusal(code: "pull_failed", text: "Pull failed: x", paths: []) == GitSyncNotice(kind: .error, text: "Pull failed: x"))
+        #expect(GitSyncNotice(kind: .success, text: "Pulled", paths: ["x.ts"]).listsPaths == false)   // a pull's files: tooltip only
         store.dismissGitSyncNotice()
         #expect(store.gitSyncNotice == nil)
 

@@ -1598,8 +1598,12 @@ export type PulledEvent = {
 /** §68.5: a changed file outside the review. `status` as `git status` (`?` untracked); `hidden`: an ignore pattern of the app matches it. */
 export type OtherChange = { path: string; oldPath: string | null; status: "M" | "A" | "D" | "R" | "T" | "?"; untracked: boolean; hidden?: true };
 
-/** §68.5: reply to `commit_others` (≤ 500 files; `truncated` when there were more). */
-export type CommitOthersEvent = { type: "commit_others"; id?: string; files: OtherChange[]; truncated: boolean };
+/**
+ * §68.5: reply to `commit_others` (≤ 500 files; `truncated` when there were more). `suggestedMessage`: a neutral message for
+ * a commit of only these files ("Update README.md", "Update 3 files") — `commit.suggestedMessage` comes from Claude's last
+ * instruction, which does not describe the user's own edits (absent from an older engine).
+ */
+export type CommitOthersEvent = { type: "commit_others"; id?: string; files: OtherChange[]; truncated: boolean; suggestedMessage?: string };
 
 export type SubmitResultState = { reviewURL: string; inlineCount: number; event: ReviewEvent; submittedAt: string };
 

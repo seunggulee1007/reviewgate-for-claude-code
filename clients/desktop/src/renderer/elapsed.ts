@@ -5,6 +5,17 @@
  */
 import { currentLanguage } from "./i18n";
 
+/**
+ * A clock that ticks once a second (the running `!` command's row, §67.3): whole seconds from the start ("8s"), never a
+ * tenth that only changes with the tick ("8.3s", "9.3s" …); a minute and more as `formatElapsed` (the Mac's
+ * `ElapsedFormat.ticking`).
+ */
+export function formatTicking(seconds: number): string {
+  const s = Math.max(0, seconds);
+  if (s >= 60) return formatElapsed(s);
+  return `${Math.floor(s)}${currentLanguage() === "ko" ? "초" : "s"}`;
+}
+
 export function formatElapsed(seconds: number, opts: { tenths?: boolean } = {}): string {
   const s = Math.max(0, seconds);
   const ko = currentLanguage() === "ko";

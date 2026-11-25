@@ -18,6 +18,20 @@ public struct GitSyncNotice: Equatable, Sendable {
         self.text = text
         self.paths = paths
     }
+
+    /// A refused Fetch / Pull. `pull_would_overwrite` with its files counts them in the sentence and leaves the names to a
+    /// line of their own (`listsPaths`): inside a wrapped Korean sentence SwiftUI broke a name in two ("src/cart." / "ts")
+    /// whatever joiners it carried.
+    public static func refusal(code: String?, text: String, paths: [String]) -> GitSyncNotice {
+        guard code == "pull_would_overwrite", !paths.isEmpty else { return GitSyncNotice(kind: .error, text: text, paths: paths) }
+        return GitSyncNotice(kind: .error, text: GitSyncText.overwriteNotice(count: paths.count), paths: paths)
+    }
+
+    /// The files go on a line of their own under the text (a refusal naming them), not only in the tooltip.
+    public var listsPaths: Bool { kind == .error && !paths.isEmpty }
+
+    /// That line: the names, one after another (one line, cut at its end; every name in the tooltip).
+    public var pathsLine: String { paths.joined(separator: ", ") }
 }
 
 /// The words of §68: refusals, blockers and outcomes.
@@ -38,7 +52,8 @@ public enum GitSyncText {
             }
             return String(localized: "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.", bundle: .module)
         case "pull_would_overwrite":
-            return String(localized: "Pull would overwrite your uncommitted changes: \(detail) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
+            let files = unbrokenPaths(detail)
+            return String(localized: "Pull would overwrite your uncommitted changes: \(files) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
         case "pull_rebase_blocked":
             return detail == "review" ? String(localized: "Finish the review before rebasing — a rebase rewrites the files under review", bundle: .module)
                 : String(localized: "Commit your changes before rebasing", bundle: .module)
@@ -51,6 +66,24 @@ public enum GitSyncText {
             return String(localized: "\(detail) is no longer a change outside the review — reopen the commit sheet", bundle: .module)
         default: return nil
         }
+    }
+
+    /// `pull_would_overwrite` in the branch's notice: how many files, the names on the line under it.
+    public static func overwriteNotice(count: Int) -> String {
+        String(localized: "Pull would overwrite \(count) uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.", bundle: .module)
+    }
+
+    /// A list of paths ("src/cart.ts, README.md") whose names never break across lines: a word joiner (U+2060) after each
+    /// "/", ".", "-" and "_" inside a path, so a line ends only between two paths ("src/cart.\nts" read as two names).
+    public static func unbrokenPaths(_ list: String) -> String {
+        list.components(separatedBy: ", ").map { path in
+            var out = ""
+            for (i, ch) in path.enumerated() {
+                out.append(ch)
+                if "/.-_".contains(ch), i < path.count - 1 { out.append("\u{2060}") }
+            }
+            return out
+        }.joined(separator: ", ")
     }
 
     static func blockedText(_ kind: String) -> String {
@@ -80,6 +113,17 @@ public enum GitSyncText {
         case .detached: blockedText("detached")
         case .noUpstream: String(localized: "This branch has no upstream — push it first (git push -u) to pull into it", bundle: .module)
         case .operation(let op): String(localized: "A \(operationName(op.rawValue)) is in progress — finish or abort it in a terminal, then pull", bundle: .module)
+        }
+    }
+
+    /// Why "Rebase onto <upstream>" is off for the same blockers as Pull — in its own words: the rebase is what waits.
+    public static func rebaseBlocker(_ blocker: PullBlocker) -> String {
+        switch blocker {
+        case .running: String(localized: "Claude is working — rebase when the turn ends", bundle: .module)
+        case .busy: blockedText("busy")
+        case .detached: String(localized: "Check out a branch to rebase it (HEAD is detached)", bundle: .module)
+        case .noUpstream: String(localized: "This branch has no upstream to rebase onto", bundle: .module)
+        case .operation(let op): String(localized: "A \(operationName(op.rawValue)) is in progress — finish or abort it in a terminal, then rebase", bundle: .module)
         }
     }
 
@@ -143,9 +187,13 @@ public enum GitSyncRules {
         return branch.ahead > 0 && branch.behind > 0
     }
 
-    /// Why "Rebase onto <upstream>" is off (§68.3): Pull's own reasons, then files under review, then uncommitted changes.
+    /// Why "Rebase onto <upstream>" is off (§68.3): Pull's blockers in a rebase's words, then files under review, then
+    /// uncommitted changes.
     public static func rebaseDisabledReason(sync: GitSyncState?, reviewFiles: Int, worktreeDirty: Bool) -> String? {
-        if let reason = pullDisabledReason(sync: sync) { return reason }
+        if let sync {
+            if sync.isBusy { return GitSyncText.rebaseBlocker(.busy) }
+            if let blocker = sync.pullBlocker { return GitSyncText.rebaseBlocker(blocker) }
+        }
         if reviewFiles > 0 { return String(localized: "Finish the review before rebasing — a rebase rewrites the files under review", bundle: .module) }
         if worktreeDirty { return String(localized: "Commit your changes before rebasing", bundle: .module) }
         return nil
@@ -208,9 +256,11 @@ extension AppState {
             gitSyncNotice = GitSyncNotice(kind: r.mode == .upToDate ? .info : .success, text: GitSyncText.pulled(r), paths: r.files)
         } catch {
             await settle()
-            let paths: [String]
-            if case let .refused(_, _, refusedPaths, _)? = error as? EngineClientError { paths = refusedPaths } else { paths = [] }
-            gitSyncNotice = GitSyncNotice(kind: .error, text: syncErrorText(error), paths: paths)
+            if case let .refused(_, code, refusedPaths, _)? = error as? EngineClientError {
+                gitSyncNotice = .refusal(code: code, text: syncErrorText(error), paths: refusedPaths)
+            } else {
+                gitSyncNotice = GitSyncNotice(kind: .error, text: syncErrorText(error))
+            }
         }
     }
 

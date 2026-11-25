@@ -20,4 +20,12 @@ public enum ElapsedFormat {
         }
         return korean ? "\(whole / 3600)시간 \((whole % 3600) / 60)분" : String(format: "%dh %02dm", whole / 3600, (whole % 3600) / 60)
     }
+
+    /// A clock that ticks once a second (the running `!` command's row, §67.3): whole seconds from the start ("8초"), never
+    /// a tenth that only changes with the tick ("8.3초", "9.3초" …); a minute and more as `text`.
+    public static func ticking(seconds raw: Double, language: String = uiLanguage) -> String {
+        let s = max(0, raw)
+        guard s < 60 else { return text(seconds: s, language: language) }
+        return language.lowercased().hasPrefix("ko") ? "\(Int(s))초" : "\(Int(s))s"
+    }
 }

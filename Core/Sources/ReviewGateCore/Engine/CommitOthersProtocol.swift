@@ -63,21 +63,25 @@ public struct CommitOthersReply: Sendable, Equatable {
     public var id: String?
     public var files: [OtherChange]
     public var truncated: Bool
+    /// A neutral message for a commit of only these files ("Update README.md", "Update 3 files"); nil from an older engine.
+    public var suggestedMessage: String?
 
-    public init(id: String? = nil, files: [OtherChange] = [], truncated: Bool = false) {
+    public init(id: String? = nil, files: [OtherChange] = [], truncated: Bool = false, suggestedMessage: String? = nil) {
         self.id = id
         self.files = files
         self.truncated = truncated
+        self.suggestedMessage = suggestedMessage
     }
 }
 
 extension CommitOthersReply: Decodable {
-    private enum CodingKeys: String, CodingKey { case id, files, truncated }
+    private enum CodingKeys: String, CodingKey { case id, files, truncated, suggestedMessage }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(id: lenientValue(String.self, c, .id), files: lenientElements(OtherChange.self, c, .files),
-                  truncated: lenientValue(Bool.self, c, .truncated) ?? false)
+                  truncated: lenientValue(Bool.self, c, .truncated) ?? false,
+                  suggestedMessage: lenientValue(String.self, c, .suggestedMessage).flatMap { $0.isEmpty ? nil : $0 })
     }
 }
 
@@ -114,6 +118,20 @@ public enum CommitOthersRules {
 
     /// The sheet can commit: a review file or a change outside it is ticked.
     public static func canCommit(reviewTicked: Int, extras: Int) -> Bool { reviewTicked + extras > 0 }
+
+    /// The sheet holds only changes outside the review (no review file to list): it is titled "Commit changes" and shows
+    /// no empty "No accepted files" list above them.
+    public static func othersOnly(reviewListed: Int, others: Int, truncated: Bool) -> Bool {
+        reviewListed == 0 && (others > 0 || truncated)
+    }
+
+    /// The message the sheet shows once `commit_others` answered: with only other changes and the message still the
+    /// review's suggestion (Claude's last instruction, or "Apply accepted changes"), the reply's neutral one; nil keeps
+    /// the message (a review file listed, a draft typed or left from before, an older engine).
+    public static func message(current: String, reviewSuggestion: String, othersSuggestion: String?, othersOnly: Bool) -> String? {
+        guard othersOnly, let othersSuggestion, current == reviewSuggestion || current.isEmpty else { return nil }
+        return othersSuggestion
+    }
 }
 
 extension AppState {

@@ -80,7 +80,13 @@
 #                  composerbar: the rows around the classic chat's message box at 1000 × 637, dark, on the fake claude (its
 #                  chat session starts — initialize answered — and never runs a turn): a fresh chat, the box focused, text
 #                  typed, Claude at work after two turns, a review pending, the mode offer, decided permission cards and a
-#                  question in the transcript, folded and opened (`composerbar` lines: the transcript's height; composerbar-*.png).
+#                  question in the transcript, folded and opened (`composerbar` lines: the transcript's height, TALLER when the
+#                  window's content is laid out taller than the window; composerbar-*.png); then 0.5.29's §67 / §68: the
+#                  "Directories N" chip and its list (idle, and while Claude works), the box in `!` shell mode, the running and
+#                  finished `!` rows with the caption over the box, the branch's ↑↓ and the line under it after a fetch, a
+#                  pull and a refused pull (with a crop of the header), a fetch running, the branch menu's items as
+#                  `composerbar branch-menu` lines (a menu is not captured), and the commit sheet's "Other changes" on the
+#                  demo project's own edits — with a review and alone (composerbar-commit-*.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt).

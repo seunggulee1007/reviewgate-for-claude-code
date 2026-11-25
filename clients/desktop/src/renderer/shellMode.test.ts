@@ -65,9 +65,9 @@ describe("§67.2 ! shell mode on Windows", () => {
     expect(await mod.shell.cancelShellCommand()).toBeNull();
     expect(sent).toEqual([{ type: "shell_run", command: "npm test" }, { type: "shell_cancel" }]);
     answer = () => ({ ok: false, error: "shell_busy", code: "shell_busy" });
-    expect(await mod.shell.runShellCommand("ls")).toBe("셸 명령이 이미 실행 중이에요 — 끝날 때까지 기다리거나 중지하세요");
+    expect(await mod.shell.runShellCommand("ls")).toBe("셸 명령이 이미 실행 중이에요 — 끝나길 기다리거나 중지해요");
     answer = () => ({ ok: false, error: "turn_running", code: "turn_running" });
-    expect(await mod.shell.runShellCommand("ls")).toBe("Claude가 작업 중이에요 — 턴이 끝난 뒤에 실행하세요");
+    expect(await mod.shell.runShellCommand("ls")).toBe("Claude가 작업 중이에요 — 턴이 끝나면 실행할 수 있어요");
     answer = () => ({ ok: false, error: "no_shell_running", code: "no_shell_running" });
     expect(await mod.shell.cancelShellCommand()).toBe("실행 중인 셸 명령이 없어요");
   });

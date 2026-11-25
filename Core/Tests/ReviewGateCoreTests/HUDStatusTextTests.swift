@@ -33,4 +33,12 @@ import Testing
         #expect(ElapsedFormat.text(seconds: 200, language: "ko", tenths: false) == "3분 20초")
         #expect(ElapsedFormat.text(seconds: 12.4, language: "ko") == "12.4초")   // the turn time keeps its tenths
     }
+
+    @Test func aClockTickingEverySecondShowsWholeSeconds() {
+        #expect(ElapsedFormat.ticking(seconds: 8.3, language: "ko") == "8초")   // not "8.3초" then "9.3초"
+        #expect(ElapsedFormat.ticking(seconds: 0.4, language: "en") == "0s")
+        #expect(ElapsedFormat.ticking(seconds: 59.9, language: "en") == "59s")
+        #expect(ElapsedFormat.ticking(seconds: 200, language: "ko") == "3분 20초")
+        #expect(ElapsedFormat.ticking(seconds: -2, language: "ko") == "0초")
+    }
 }

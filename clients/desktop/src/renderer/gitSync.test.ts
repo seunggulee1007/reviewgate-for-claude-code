@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { BranchInfo, EngineCommand, RemoteSyncState, ReviewState } from "@reviewgate/engine";
 import { refusalCodeText } from "./errorCodes";
-import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, syncBadge, syncBadgeHelp, syncOf } from "./gitSync";
+import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, noticeListsPaths, refusalNotice, syncBadge, syncBadgeHelp, syncOf, unbrokenPaths } from "./gitSync";
 import { initI18n } from "./i18n";
 
 const branch = (o: Partial<BranchInfo> = {}): BranchInfo => ({ name: "main", isCurrent: true, upstream: "origin/main", ahead: 0, behind: 0, lastCommitDate: null, ...o });
@@ -26,7 +26,10 @@ describe("§68 fetch and pull — words and rules", () => {
     expect(refusalCodeText("pull_diverged", "2,3")).toBe("This branch and its upstream have diverged (2 local, 3 incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.");
     expect(refusalCodeText("pull_no_upstream", "topic")).toBe("topic has no upstream — push it first (git push -u) to pull into it");
     expect(refusalCodeText("pull_in_progress", "cherry-pick")).toBe("A cherry-pick is in progress — finish or abort it in a terminal, then pull");
-    expect(refusalCodeText("pull_would_overwrite", "a.ts, b.ts")).toBe("Pull would overwrite your uncommitted changes: a.ts, b.ts — commit them (or finish their review) first. Nothing was changed.");
+    expect(refusalCodeText("pull_would_overwrite", "a.ts, b.ts")).toBe(`Pull would overwrite your uncommitted changes: ${unbrokenPaths("a.ts, b.ts")} — commit them (or finish their review) first. Nothing was changed.`);
+    // A line never ends inside a path ("src/cart.\nts"): a word joiner after each "/" "." "-" "_" within it.
+    expect(unbrokenPaths("src/cart.ts, my-notes_1.md")).toBe("src/⁠cart.⁠ts, my-⁠notes_⁠1.⁠md");
+    expect(unbrokenPaths("a/")).toBe("a/");
     expect(refusalCodeText("pull_blocked", "running")).toBe("Claude is working — pull when the turn ends");
     expect(refusalCodeText("pull_rebase_blocked", "dirty")).toBe("Commit your changes before rebasing");
     expect(refusalCodeText("pull_rebase_failed", "CONFLICT (content)")).toBe("The rebase stopped and was undone — nothing changed: CONFLICT (content)");
@@ -55,6 +58,10 @@ describe("§68 fetch and pull — words and rules", () => {
     expect(rebaseDisabledReason(st({ files: 1 }))).toBe("Finish the review before rebasing — a rebase rewrites the files under review");
     expect(rebaseDisabledReason(st({ dirty: true }))).toBe("Commit your changes before rebasing");
     expect(rebaseDisabledReason(st())).toBeNull();
+    // Pull's blockers in a rebase's own words — not "pull when the turn ends" on the Rebase item.
+    expect(rebaseDisabledReason(st({ s: { pullBlocker: { kind: "running" } } }))).toBe("Claude is working — rebase when the turn ends");
+    expect(rebaseDisabledReason(st({ s: { pullBlocker: { kind: "operation", operation: "merge" } } }))).toBe("A merge is in progress — finish or abort it in a terminal, then rebase");
+    expect(rebaseDisabledReason(st({ s: { fetching: true }, files: 1 }))).toBe("A fetch or pull is already running");
   });
 
   it("the branch menu: Fetch, Pull with the count, Rebase only when diverged, the last fetch as a footer", async () => {
@@ -156,6 +163,11 @@ describe("§68 the store: Fetch, Pull and the automatic fetch", () => {
     await useStore.getState().gitPull();
     expect(useStore.getState().gitSyncNotice).toMatchObject({ kind: "error", paths: ["a.ts"] });
     expect(useStore.getState().gitSyncNotice?.text).toContain("Nothing was changed");
+    // The files are counted in the sentence and listed on a line of their own — never a name wrapped mid-way.
+    expect(useStore.getState().gitSyncNotice?.text).toBe("Pull would overwrite 1 uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.");
+    expect(noticeListsPaths(useStore.getState().gitSyncNotice!)).toBe(true);
+    expect(noticeListsPaths({ kind: "success", text: "Pulled", paths: ["x.ts"] })).toBe(false); // a pull's files: tooltip only
+    expect(refusalNotice("pull_failed", "Pull failed: x", [])).toEqual({ kind: "error", text: "Pull failed: x", paths: [] });
     useStore.getState().dismissGitSyncNotice();
     expect(useStore.getState().gitSyncNotice).toBeNull();
 

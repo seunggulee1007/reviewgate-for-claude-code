@@ -9,6 +9,24 @@ import { t } from "./i18n";
 /** What the last Fetch / Pull the user asked for came to. */
 export type GitSyncNotice = { kind: "success" | "info" | "error"; text: string; paths: string[] };
 
+/**
+ * A refused Fetch / Pull: `pull_would_overwrite` with its files counts them in the sentence and leaves the names to a line
+ * of their own (`noticeListsPaths`) — never a name wrapped mid-way (the Mac's `GitSyncNotice.refusal`).
+ */
+export function refusalNotice(code: string, text: string, paths: readonly string[]): GitSyncNotice {
+  if (code !== "pull_would_overwrite" || paths.length === 0) return { kind: "error", text, paths: [...paths] };
+  return {
+    kind: "error",
+    text: t("Pull would overwrite {0} uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.", paths.length),
+    paths: [...paths],
+  };
+}
+
+/** The files go on a line of their own under the text (a refusal naming them), not only in the tooltip. */
+export function noticeListsPaths(n: GitSyncNotice): boolean {
+  return n.kind === "error" && n.paths.length > 0;
+}
+
 type Syncy = Pick<ReviewState, "branches" | "project" | "changedFiles">;
 
 /** `state.branches.sync`; null from an older engine or in a folder without git (Fetch / Pull hidden). */
@@ -43,6 +61,17 @@ const NO_UPSTREAM = "This branch has no upstream — push it first (git push -u)
 const DIVERGED = "This branch and its upstream have diverged — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.";
 const REVIEW_BEFORE_REBASE = "Finish the review before rebasing — a rebase rewrites the files under review";
 
+/**
+ * A list of paths ("src/cart.ts, README.md") whose names never break across lines: a word joiner (U+2060) after each "/",
+ * ".", "-" and "_" inside a path, so a line ends only between two paths — the Mac's `GitSyncText.unbrokenPaths`.
+ */
+export function unbrokenPaths(list: string): string {
+  return list
+    .split(", ")
+    .map((path) => [...path].map((ch, i, all) => ("/.-_".includes(ch) && i < all.length - 1 ? ch + "⁠" : ch)).join(""))
+    .join(", ");
+}
+
 /** The §68 refusal codes (`refusalCodeText` asks here first); null for any other code. */
 export function gitSyncRefusalText(code: string, detail: string): string | null {
   const d = detail.trim();
@@ -61,7 +90,7 @@ export function gitSyncRefusalText(code: string, detail: string): string | null 
       return t(DIVERGED);
     }
     case "pull_would_overwrite":
-      return t("Pull would overwrite your uncommitted changes: {0} — commit them (or finish their review) first. Nothing was changed.", d);
+      return t("Pull would overwrite your uncommitted changes: {0} — commit them (or finish their review) first. Nothing was changed.", unbrokenPaths(d));
     case "pull_rebase_blocked":
       return d === "review" ? t(REVIEW_BEFORE_REBASE) : t("Commit your changes before rebasing");
     case "pull_rebase_failed":
@@ -108,10 +137,27 @@ export function isDiverged(b: BranchInfo | null): boolean {
   return b !== null && b.upstream !== null && b.ahead > 0 && b.behind > 0;
 }
 
-/** §68.3: Pull's own reasons, then files under review, then tracked changes. */
+/** Pull's blockers in a rebase's own words (the Rebase item waits, not a pull) — the Mac's `GitSyncText.rebaseBlocker`. */
+export function rebaseBlockerText(b: PullBlocker): string {
+  switch (b.kind) {
+    case "running":
+      return t("Claude is working — rebase when the turn ends");
+    case "detached":
+      return t("Check out a branch to rebase it (HEAD is detached)");
+    case "noUpstream":
+      return t("This branch has no upstream to rebase onto");
+    case "operation":
+      return t("A {0} is in progress — finish or abort it in a terminal, then rebase", operationName(b.operation));
+    default:
+      return blockedText(b.kind);
+  }
+}
+
+/** §68.3: Pull's blockers in a rebase's words, then files under review, then tracked changes. */
 export function rebaseDisabledReason(st: Syncy): string | null {
-  const reason = pullDisabledReason(syncOf(st));
-  if (reason) return reason;
+  const sync = syncOf(st);
+  if (sync && (sync.fetching || sync.pulling)) return blockedText("busy");
+  if (sync?.pullBlocker) return rebaseBlockerText(sync.pullBlocker);
   if (st.changedFiles.length > 0) return t(REVIEW_BEFORE_REBASE);
   if (st.branches.switchBlocker?.kind === "dirtyWorktree") return t("Commit your changes before rebasing");
   return null;

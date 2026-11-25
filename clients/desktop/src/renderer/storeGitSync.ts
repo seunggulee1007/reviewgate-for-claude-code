@@ -7,7 +7,7 @@
 import type { StateCreator } from "zustand";
 import { engineRequest, refusalOf } from "./engineRequest";
 import { refusalMessage } from "./errorCodes";
-import { fetchDisabledReason, fetchedText, pulledText, pullDisabledReason, syncOf, type GitSyncNotice } from "./gitSync";
+import { fetchDisabledReason, fetchedText, pulledText, pullDisabledReason, refusalNotice, syncOf, type GitSyncNotice } from "./gitSync";
 import type { Store } from "./store";
 
 export type GitSyncSlice = {
@@ -50,7 +50,7 @@ export const createGitSyncSlice: StateCreator<Store, [], [], GitSyncSlice> = (se
     } catch (e) {
       await get().settle();
       const r = refusalOf(e);
-      set({ gitSyncNotice: { kind: "error", text: refusalMessage(r), paths: r.paths ?? [] } });
+      set({ gitSyncNotice: refusalNotice(r.code, refusalMessage(r), r.paths ?? []) });
     }
   },
 

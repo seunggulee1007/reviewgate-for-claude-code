@@ -1114,7 +1114,29 @@ struct MainWindow: View {
     /// "New Branch…" and "Refresh". Switching is disabled — with the reason as a footer — while a
     /// review is pending, a tracked file has uncommitted changes, or Claude is working (§61: then Commit… is offered).
     /// A new branch takes uncommitted work along, so only Claude working disables it.
+    /// MARK: git-sync — §68.7: the ↑ahead ↓behind badge and the fetch / pull spinner sit beside the menu, not in its label:
+    /// a macOS menu button draws only its label's first title and icon, so anything else there never showed.
     private func branchSwitcher(_ info: ProjectInfo) -> some View {
+        HStack(spacing: 4) {
+            branchMenu(info)
+            let badge = GitSyncRules.badge(store.currentBranch)
+            if !badge.isEmpty {
+                Text(verbatim: badge).font(.caption2.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+                    .fixedSize()
+                    .help(branchChipHelp(store.branchSwitchBlocker()))
+                    .accessibilityLabel(GitSyncRules.badgeHelp(store.currentBranch) ?? badge)
+                    .accessibilityIdentifier("Branch ahead behind")
+            }
+            if store.gitSync?.isBusy == true {
+                ProgressView().controlSize(.mini)
+                    .help(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
+                    .accessibilityLabel(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
+                    .accessibilityIdentifier("Branch sync progress")
+            }
+        }
+    }
+
+    private func branchMenu(_ info: ProjectInfo) -> some View {
         let blocker = store.branchSwitchBlocker()
         let createBlocker = store.branchCreateBlocker()
         let prBlocker = store.prCreateBlocker
@@ -1179,18 +1201,6 @@ struct MainWindow: View {
                 }
                 .font(.caption.monospaced())
                 .lineLimit(1)
-                // MARK: git-sync — §68: ahead / behind of the upstream, and a fetch / pull in flight.
-                let badge = GitSyncRules.badge(store.currentBranch)
-                if !badge.isEmpty {
-                    Text(verbatim: badge).font(.caption2.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
-                        .accessibilityLabel(GitSyncRules.badgeHelp(store.currentBranch) ?? badge)
-                        .accessibilityIdentifier("Branch ahead behind")
-                }
-                if store.gitSync?.isBusy == true {
-                    ProgressView().controlSize(.mini)
-                        .accessibilityLabel(store.gitSync?.pulling == true ? String(localized: "Pulling…") : String(localized: "Fetching…"))
-                        .accessibilityIdentifier("Branch sync progress")
-                }
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
@@ -1263,11 +1273,27 @@ struct MainWindow: View {
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: notice.kind == .error ? "exclamationmark.triangle.fill" : notice.kind == .success ? "checkmark.circle.fill" : "info.circle")
                     .foregroundStyle(notice.kind == .error ? Color.orange : notice.kind == .success ? Color.green : Color.secondary)
-                Text(verbatim: notice.text)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .help(notice.paths.isEmpty ? notice.text : notice.paths.joined(separator: "\n"))
+                // At most four lines: a pull refused over many files grew the sidebar's header past the window's height
+                // (the whole window then laid out taller than itself at 1000 × 637). The whole text and every file are
+                // in the tooltip.
+                let help = notice.paths.isEmpty ? notice.text : notice.text + "\n\n" + notice.paths.joined(separator: "\n")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: notice.text)
+                        .font(.caption)
+                        .lineLimit(4)
+                        .truncationMode(.tail)
+                        .textSelection(.enabled)
+                    if notice.listsPaths {
+                        // The files a refused pull names, on one line of their own: never a name broken across lines.
+                        Text(verbatim: notice.pathsLine)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .accessibilityIdentifier("Sync notice files")
+                    }
+                }
+                .help(help)
                 Spacer(minLength: 4)
                 Button {
                     store.dismissGitSyncNotice()

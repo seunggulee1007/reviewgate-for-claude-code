@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { formatDuration } from "./agents";
 import { initI18n } from "./i18n";
-import { formatElapsed } from "./elapsed";
+import { formatElapsed, formatTicking } from "./elapsed";
 
 describe("formatElapsed", () => {
   afterAll(() => initI18n("en", "darwin"));
@@ -16,6 +16,17 @@ describe("formatElapsed", () => {
     expect(formatElapsed(245)).toBe("4m 05s");
     expect(formatElapsed(3725)).toBe("1h 02m");
     expect(formatElapsed(-3)).toBe("0.0s");
+  });
+
+  it("a clock ticking every second shows whole seconds (the running ! row)", () => {
+    initI18n("en", "darwin");
+    expect(formatTicking(8.3)).toBe("8s"); // not "8.3s" then "9.3s"
+    expect(formatTicking(0.4)).toBe("0s");
+    expect(formatTicking(59.9)).toBe("59s");
+    expect(formatTicking(200)).toBe("3m 20s");
+    initI18n("ko", "darwin");
+    expect(formatTicking(8.3)).toBe("8초");
+    expect(formatTicking(-2)).toBe("0초");
   });
 
   it("reads Korean units in Korean", () => {

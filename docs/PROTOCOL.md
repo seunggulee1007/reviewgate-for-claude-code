@@ -11262,16 +11262,17 @@ type ShellResult = {
 - **The chip.** With directories added, the composer's chip row shows "디렉터리 N" (folder icon); its popover lists each
   (home as `~`, full path in the tooltip) with × (`remove_dir`) and "디렉터리 추가…" (the picker). Its tooltip says edits
   there ask every time because the review does not show them. While work runs (`dir_busy` would refuse) × and 추가 are
-  disabled with that reason as the tooltip.
+  disabled with that reason as the tooltip, and the list says it too (a line over them, Mac).
 - **The card.** `reason.code: "added_directory"` reads "/add-dir로 추가한 디렉터리의 수정이에요 — 리뷰에 diff가 나오지 않아서
   여기서 승인받아요".
 - **`!` shell mode.** A draft whose first character is `!` switches the box to shell mode, as Claude Code's bash mode: a
   "!" / "셸" badge at its start, the box's accent in the shell colour, and the key hint "↩ 셸 명령 실행 · 출력은 다음
   메시지와 함께 Claude에게 가요". ↩ sends `shell_run {command}` (never to Claude, never queued); it joins the prompt
   history. A refusal keeps the draft with the reason in the notice line.
-- **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time, the streamed output
-  (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A message typed meanwhile waits in
-  the queue ("셸 명령이 끝나면 보내요").
+- **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time (whole seconds as it
+  ticks each second — Mac `ElapsedFormat.ticking`, Windows `formatTicking`; the finished row keeps one decimal under
+  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A
+  message typed meanwhile waits in the queue ("셸 명령이 끝나면 보내요").
 - **The row** (`kind: "shell"`, restored with the chat): `$ command` in monospace, how it ended (✓ 0 · ✗ 종료 코드 n ·
   중지됨 · 시간 초과), the time, the output (monospace, long output folded to its last lines with 전체 보기; "앞부분은
   잘렸어요" when `truncated`), "파일 N개를 바꿨어요 — 다음 리뷰에 나와요" with the names in a tooltip, and a context menu
@@ -11377,7 +11378,10 @@ Clients never show an automatic fetch's refusal as an error; `lastFetchError` is
 - `commit_others {}` → `commit_others { files: OtherChange[] (≤ 500), truncated }`: every `git status
   --untracked-files=all` entry whose path — or a rename's either path — is not a review file; unmerged entries left out.
   `OtherChange = { path, oldPath, status: "M"|"A"|"D"|"R"|"T"|"?", untracked, hidden? }` (`hidden`: an app ignore pattern
-  matches it — still the user's file to commit). A read (`query` lane).
+  matches it — still the user's file to commit). A read (`query` lane). `suggestedMessage` (absent from an older engine):
+  a neutral message for a commit of only these files — `commit.suggestedMessage` is Claude's last instruction, which does
+  not describe the user's own edits. From the tracked files (the untracked ones when none): one is named by what happened
+  to it ("Update README.md", "Add notes.md", "Delete old.ts", "Rename a.ts to b.ts"), more are counted ("Update 3 files").
 - `commit { message, paths?, extraPaths?, push? }`: `extraPaths` are committed in the same commit (`git add -A` of each,
   then `git commit --only` of the accepted paths and the extras — a `git mv` rename's old name included). Each must be in
   `commit_others` now, else `invalid_extra:<path>` (`paths`: it) — a review file is accepted, not slipped in as an extra.
@@ -11406,19 +11410,26 @@ review again, extras-only with a pending review and with none.
 
 - **The branch chip** (sidebar project header) carries `↑ahead ↓behind` of the current branch against its upstream
   (nothing when level or without an upstream) and a small spinner while a fetch or pull runs; its tooltip adds "2
-  commit(s) to push · 3 commit(s) to pull — origin/main" and "Fetched 3 min ago".
+  commit(s) to push · 3 commit(s) to pull — origin/main" and "Fetched 3 min ago". On the Mac the badge and the spinner sit
+  just after the chip, not in its label: a macOS menu button draws only its label's first title and icon.
 - **The branch menu**, after New Branch… / Refresh: **Fetch** (`git_fetch`; "Fetching…" while it runs), **Fetch All
   Remotes** (only with more than one remote), **Pull** — "Pull 3 commit(s)" when behind — (`git_pull`, fast-forward only),
   and, only when the branch has diverged, **Rebase onto origin/main** (`git_pull {rebase: true}`). Every item is disabled
   with its reason as its tooltip: `fetchBlocker` / `pullBlocker` (a turn running, a fetch or pull running, detached, no
   upstream — "push it first (git push -u)", a merge / rebase / cherry-pick / revert in progress), Pull on a diverged
-  branch with `pull_diverged`'s words, Rebase with "Finish the review before rebasing" (any review file) or "Commit your
-  changes before rebasing" (`switchBlocker` dirtyWorktree). The menu's footer is the last fetch ("Fetched 3 min ago") or
+  branch with `pull_diverged`'s words, Rebase with the same blockers in a rebase's words ("Claude is working — rebase when
+  the turn ends"; Mac `GitSyncText.rebaseBlocker`, Windows `rebaseBlockerText`), "Finish the review before rebasing" (any
+  review file) or "Commit your changes before rebasing" (`switchBlocker` dirtyWorktree). The menu's footer is the last fetch ("Fetched 3 min ago") or
   its failure ("Fetch failed: <git's line>").
 - **The outcome** of a Fetch / Pull the user asked for is one line under the branch line until dismissed (✕) or the
   next one: green "Pulled 2 commit(s) from origin/main · 5 file(s) changed", "Already up to date with origin/main",
   "Fetched origin — 3 incoming commit(s) to pull", or the refusal in words (orange) — `pull_would_overwrite` names the
-  files (all of them in the tooltip) and says nothing was changed. A project switch clears it.
+  files (all of them in the tooltip) and says nothing was changed. A project switch clears it. At most four lines (the
+  whole text in the tooltip): a long one must not make the sidebar's header taller than a 637 pt window. The files it
+  names never break inside a name: the words carry a word joiner after each `/ . - _` in a path (Mac
+  `GitSyncText.unbrokenPaths`, Windows `unbrokenPaths`), and on the Mac — where a wrapped Korean sentence broke a name
+  regardless — `pull_would_overwrite` counts the files ("pull하면 커밋하지 않은 파일 6개가 덮어써져요 — …") and lists them
+  on one line of their own under it, cut at its end (`GitSyncNotice.refusal`, `listsPaths`).
 - **The automatic fetch** (§68.4): on project open and when the window comes back to the front, `git_fetch {auto:
   true}` — quiet whatever happens. Settings › Git › "Fetch and Pull" › "Fetch automatically" (default on; Mac
   `AppSettings.autoFetch`, Windows `settings.autoFetch`), also sent to the engine as `settings.autoFetch`.
@@ -11436,7 +11447,11 @@ review again, extras-only with a pending review and with none.
   file ticked and then hidden again is not committed). Each row: git's status letter (`U` for untracked, its tooltip says
   what it is), the path (a rename `old → new`), "Hidden from the review" for a file an app ignore pattern hides, and on
   the Mac the file's context menu. The group's tooltip says the files go in as they are: not reviewed, nothing marked
-  accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group.
+  accepted. Over 500 files: "Only the first 500 files are listed". An older engine: no group. With no review file to list
+  (only the user's own changes, `othersOnly`) the sheet is titled **Commit changes**, says the files go in as they are, and
+  shows no empty review list above the group. Its message is then `commit_others`' `suggestedMessage` when the message
+  is still the review's suggestion (or empty) — never "Apply accepted changes"; a draft the user typed stays (Mac
+  `CommitOthersRules.message`, Windows `othersMessage`).
 - Commit sends `commit {message, paths, push, extraPaths}` — `paths: []` when only other changes are ticked (never
   "every accepted file"). Commit is enabled when a review file or an other change is ticked; `invalid_extra` reads
   "<path> is no longer a change outside the review — reopen the commit sheet". "Commit in parts" (§53) stays for the

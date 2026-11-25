@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import type { OtherChange } from "@reviewgate/engine";
-import { extraPathsOf, otherStatusLetter, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
+import { extraPathsOf, otherStatusLetter, othersMessage, othersOnly, visibleOthers } from "../../commitOthers"; // MARK: git-sync (§68.5)
 import { t } from "../../i18n";
 import { commitPaths } from "../../reviewGate";
 import { commitOf, refusalText, useStore } from "../../store";
@@ -58,6 +58,9 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
         if (!live) return;
         setOthers(r.files);
         setOthersTruncated(r.truncated);
+        // Only the user's own changes: not Claude's last instruction (or "Apply accepted changes") as the message.
+        const only = othersOnly(candidates.paths.length, r.files.length, r.truncated);
+        setMessage((current) => othersMessage(current, commit.suggestedMessage ?? "", r.suggestedMessage, only) ?? current);
       })
       .catch(() => undefined); // an older engine: no second group
     return () => {
@@ -67,6 +70,7 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   const shownOthers = visibleOthers(others, showUntracked);
   const extras = extraPathsOf(extraSelected, others, showUntracked);
   const untrackedCount = others.filter((f) => f.untracked).length;
+  const onlyOthers = othersOnly(candidates.paths.length, others.length, othersTruncated);
   const toggleExtra = (path: string) =>
     setExtraSelected((prev) => {
       const next = new Set(prev);
@@ -112,7 +116,7 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title={t("Commit accepted ({0})…", candidates.paths.length)} onClose={busy ? undefined : onClose} wide testId="Commit dialog">
+    <Modal title={onlyOthers ? t("Commit changes") : t("Commit accepted ({0})…", candidates.paths.length)} onClose={busy ? undefined : onClose} wide testId="Commit dialog">
       <div className="row" style={{ gap: 6 }} role="group" aria-label={t("Commit mode")}>
         <button type="button" className={`small ${split ? "" : "primary"}`} aria-pressed={!split} disabled={busy} onClick={() => setSplit(false)} data-testid="Commit mode single">
           {t("Commit at once")}
@@ -139,6 +143,8 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
       <CommitDraftRow message={message} onMessage={setMessage} paths={paths} disabled={busy} />
       </>)}
       <div className="field">
+        {/* §68.8: only the user's own changes — no empty review list above them */}
+        {!onlyOthers && (<>
         <span>{t("Files ({0} of {1})", paths.length, candidates.paths.length)}</span>
         <ul className="candidates" data-testid="Commit files">
           {candidates.paths.map((p) => {
@@ -157,6 +163,7 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
             );
           })}
         </ul>
+        </>)}
         {!split && (others.length > 0 || othersTruncated) && (
           // MARK: git-sync — §68.5 "Other changes": committed as they are, never reviewed or marked accepted
           <div className="col" style={{ gap: 4, marginTop: 6 }} data-testid="Commit other changes">
