@@ -9,6 +9,24 @@ import { t } from "./i18n";
 /** What the last Fetch / Pull the user asked for came to. */
 export type GitSyncNotice = { kind: "success" | "info" | "error"; text: string; paths: string[] };
 
+/**
+ * A refused Fetch / Pull: `pull_would_overwrite` with its files counts them in the sentence and leaves the names to a line
+ * of their own (`noticeListsPaths`) — never a name wrapped mid-way (the Mac's `GitSyncNotice.refusal`).
+ */
+export function refusalNotice(code: string, text: string, paths: readonly string[]): GitSyncNotice {
+  if (code !== "pull_would_overwrite" || paths.length === 0) return { kind: "error", text, paths: [...paths] };
+  return {
+    kind: "error",
+    text: t("Pull would overwrite {0} uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.", paths.length),
+    paths: [...paths],
+  };
+}
+
+/** The files go on a line of their own under the text (a refusal naming them), not only in the tooltip. */
+export function noticeListsPaths(n: GitSyncNotice): boolean {
+  return n.kind === "error" && n.paths.length > 0;
+}
+
 type Syncy = Pick<ReviewState, "branches" | "project" | "changedFiles">;
 
 /** `state.branches.sync`; null from an older engine or in a folder without git (Fetch / Pull hidden). */

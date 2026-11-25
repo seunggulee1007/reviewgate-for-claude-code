@@ -15,6 +15,7 @@ import { OtherSessionsSection } from "./OtherSessions"; // MARK: wave3 desktop-s
 import { removeRecent, useRecentEntries } from "../recentProjects"; // MARK: wave4 w4-install
 import { runAsTaskEnabled } from "../runAsTask"; // MARK: §49
 import { isShadowProject, shadowProjectLine, trackWithoutGitHelp } from "../noGit"; // §59
+import { noticeListsPaths } from "../gitSync"; // MARK: git-sync (§68.7)
 
 export function Sidebar() {
   const tab = useStore((s) => s.tab);
@@ -138,7 +139,11 @@ function GitSyncNoticeRow() {
   const tone = notice.kind === "error" ? "orange" : notice.kind === "success" ? "green" : "";
   return (
     <div className={`banner ${tone}`.trim()} style={{ borderRadius: 8, marginTop: 4, padding: "6px 8px" }} role={notice.kind === "error" ? "alert" : "status"} data-testid={notice.kind === "error" ? "Sync error" : "Sync notice"}>
-      <span className="caption grow" style={{ userSelect: "text" }} title={notice.paths.length > 0 ? notice.paths.join("\n") : notice.text}>{notice.text}</span>
+      <span className="col grow" style={{ gap: 2, minWidth: 0 }} title={notice.paths.length > 0 ? `${notice.text}\n\n${notice.paths.join("\n")}` : notice.text}>
+        <span className="caption" style={{ userSelect: "text" }}>{notice.text}</span>
+        {/* The files a refused pull names, on one line of their own: never a name broken across lines. */}
+        {noticeListsPaths(notice) && <span className="tiny mono muted truncate" data-testid="Sync notice files">{notice.paths.join(", ")}</span>}
+      </span>
       <button type="button" className="plain small" onClick={dismiss} title={t("Dismiss")} aria-label={t("Dismiss")} data-testid="Dismiss sync notice">✕</button>
     </div>
   );

@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { BranchInfo, EngineCommand, RemoteSyncState, ReviewState } from "@reviewgate/engine";
 import { refusalCodeText } from "./errorCodes";
-import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, syncBadge, syncBadgeHelp, syncOf, unbrokenPaths } from "./gitSync";
+import { fetchDisabledReason, fetchedText, isDiverged, lastFetchedText, pulledText, pullDisabledReason, rebaseDisabledReason, noticeListsPaths, refusalNotice, syncBadge, syncBadgeHelp, syncOf, unbrokenPaths } from "./gitSync";
 import { initI18n } from "./i18n";
 
 const branch = (o: Partial<BranchInfo> = {}): BranchInfo => ({ name: "main", isCurrent: true, upstream: "origin/main", ahead: 0, behind: 0, lastCommitDate: null, ...o });
@@ -163,6 +163,11 @@ describe("§68 the store: Fetch, Pull and the automatic fetch", () => {
     await useStore.getState().gitPull();
     expect(useStore.getState().gitSyncNotice).toMatchObject({ kind: "error", paths: ["a.ts"] });
     expect(useStore.getState().gitSyncNotice?.text).toContain("Nothing was changed");
+    // The files are counted in the sentence and listed on a line of their own — never a name wrapped mid-way.
+    expect(useStore.getState().gitSyncNotice?.text).toBe("Pull would overwrite 1 uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.");
+    expect(noticeListsPaths(useStore.getState().gitSyncNotice!)).toBe(true);
+    expect(noticeListsPaths({ kind: "success", text: "Pulled", paths: ["x.ts"] })).toBe(false); // a pull's files: tooltip only
+    expect(refusalNotice("pull_failed", "Pull failed: x", [])).toEqual({ kind: "error", text: "Pull failed: x", paths: [] });
     useStore.getState().dismissGitSyncNotice();
     expect(useStore.getState().gitSyncNotice).toBeNull();
 
