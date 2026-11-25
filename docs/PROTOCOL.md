@@ -7349,10 +7349,18 @@ download whose identifier differs from the running app's, so a build with an old
     at once more), `pendingUpdateInstall = {from, to, at}` (`at`: the quit, ms) and `restoreOnceAfterRelaunch` in `settings.json`, and the quit
     (no "Quit ReviewGate?" question: every window is idle, or the user said Restart Now). Only once every engine has
     stopped (`disposeAll`, at most 6 s) is the installer started, detached, from its folder:
-    `ReviewGate-Setup-X.Y.Z.exe /S /currentuser --updated --force-run` — silent; this user's install; an update (the
-    installer does not ask about a running app, and runs the old version's uninstaller with `--updated
-    --keep-shortcuts`, which keeps `%APPDATA%\ReviewGate`); and, with `/S`, ReviewGate is started when it is done
-    (electron-builder 26's assisted installer honours `--force-run` only when silent; it passes `--updated` to the app).
+    `ReviewGate-Setup-X.Y.Z.exe /currentuser --updated` — shown; this user's install (no install-mode page); an update
+    (no directory page, the installer does not ask about a running app, and runs the old version's uninstaller with
+    `--updated --keep-shortcuts`, which keeps `%APPDATA%\ReviewGate`); and ReviewGate is started when it is done:
+    `clients/desktop/build/installer.nsh` replaces electron-builder's finish page with one that, for an update, starts
+    ReviewGate (`--updated`, as this user) and closes instead of waiting for [Finish]; a double-clicked installer keeps
+    the page and its "Run ReviewGate" box. Up to 0.5.30 it ran `/S … --force-run`, silent: reproduced on
+    windows-latest, nothing of ReviewGate was on screen for the 10–20 s of the install (longer on a slower or scanned
+    disk), ReviewGate opened meanwhile was closed again by the installer, and a file of the install held open by
+    another process (here `resources\app.asar`, opened without delete sharing) ended the silent install in "Failed to
+    uninstall old application files. Please try running the installer again.: 2" — a box electron-builder shows even
+    under `/S`, alone on the screen some 25 s after ReviewGate had gone, its window never seen before. Shown, the window says "Installing", and a held file
+    gives "ReviewGate cannot be closed. Please close it manually and click Retry to continue." over it.
     The installer is never run by the app's own process tree while engines live, and nothing is killed by name by
     ReviewGate (the installer itself still closes a ReviewGate.exe of this user that is running after ~1.3 s, as every
     electron-builder update does). If the installer cannot start, the record gets `why` and the app reopens itself.
@@ -7364,7 +7372,7 @@ download whose identifier differs from the running app's, so a build with an old
     (`updateInstall.ts` `installerStillRunning`, main.ts).
     **For all users** the installer is started through Windows PowerShell by its full path
     (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
-    PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/S','/allusers','--updated','--force-run'
+    PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/allusers','--updated'
     -WorkingDirectory '<its folder>' -Verb RunAs` — Windows' UAC prompt. The script goes base64 (UTF-16LE), so no
     command-line quoting is involved; its paths are PowerShell single-quoted strings with every quote character
     PowerShell reads as one (`'` `‘` `’` `‚` `‛`) doubled. PowerShell exits 0 once the installer runs elevated; anything

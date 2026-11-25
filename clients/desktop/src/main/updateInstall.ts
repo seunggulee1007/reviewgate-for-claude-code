@@ -4,9 +4,10 @@
  * keeps the release page one click away. Electron-free: main passes the download, the checks, the windows Claude works in
  * and the quit (src/main/update.ts).
  *
- * The installer is electron-builder's assisted NSIS installer. Run with `INSTALLER_ARGS` it installs silently for the
- * current user over the installed version (its uninstaller is run with --updated: settings and shortcuts stay) and starts
- * the app when it is done (`--force-run`, honoured by the assisted installer only together with `/S`). An install for all
+ * The installer is electron-builder's assisted NSIS installer. Run with `INSTALLER_ARGS` it installs for the current user
+ * over the installed version (its uninstaller is run with --updated: settings and shortcuts stay), with its progress
+ * window and any "cannot be closed" / "failed to uninstall" box on screen, and starts the app when it is done
+ * (build/installer.nsh skips the finish page of an update). An install for all
  * users (under Program Files) gets `ELEVATED_INSTALLER_ARGS`, started through Windows PowerShell's `Start-Process -Verb
  * RunAs`: Windows asks once for administrator rights (UAC); declined, the update says so after the relaunch.
  */
@@ -15,11 +16,13 @@ import { compareVersions } from "@reviewgate/engine";
 import { t } from "../renderer/i18n";
 import type { InstallerAssets } from "./updateVerify.js";
 
-/** `/S` silent · `/currentuser` the per-user install, never elevated · `--updated` an update (no "app is running" box, the
- * old uninstaller keeps app data) · `--force-run` start ReviewGate when done (with `--updated` passed to it). */
-export const INSTALLER_ARGS: readonly string[] = ["/S", "/currentuser", "--updated", "--force-run"];
+/** `/currentuser` the per-user install, never elevated (no install-mode page) · `--updated` an update (no directory page,
+ * no "app is running" box, the old uninstaller keeps app data, and build/installer.nsh starts ReviewGate — with
+ * `--updated` — instead of showing the finish page). Not `/S`: silent, the install showed nothing for 10–60 s, a
+ * relaunch meanwhile was closed again by it, and a file in use ended in a lone "failed to uninstall" box (§48 Windows). */
+export const INSTALLER_ARGS: readonly string[] = ["/currentuser", "--updated"];
 /** The same for an install for all users (`/allusers`), run elevated. */
-export const ELEVATED_INSTALLER_ARGS: readonly string[] = ["/S", "/allusers", "--updated", "--force-run"];
+export const ELEVATED_INSTALLER_ARGS: readonly string[] = ["/allusers", "--updated"];
 /** How long "Ready — ReviewGate closes and reopens as X" shows before the quit. */
 export const READY_MS = 2000;
 /** While Claude works the windows are looked at again this often. */

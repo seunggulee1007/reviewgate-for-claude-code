@@ -158,8 +158,8 @@ describe("the install's steps", () => {
 });
 
 describe("the installer's command line", () => {
-  it("is silent, per user, an update, and starts ReviewGate when done", () => {
-    expect(INSTALLER_ARGS).toEqual(["/S", "/currentuser", "--updated", "--force-run"]);
+  it("is shown (not /S: its progress and boxes on screen), per user, an update", () => {
+    expect(INSTALLER_ARGS).toEqual(["/currentuser", "--updated"]);
   });
 
   it("starts detached from its own folder; a spawn error is said", async () => {
@@ -202,7 +202,7 @@ describe("the installer's command line", () => {
   it("per user: the installer itself; for all users: PowerShell by full path, Start-Process -Verb RunAs with /allusers, quoted", () => {
     const file = "C:\\Users\\dev\\AppData\\Roaming\\ReviewGate\\updates\\0.6.0-a\\ReviewGate-Setup-0.6.0.exe";
     expect(installerCommand(file, "user")).toEqual({ command: file, args: INSTALLER_ARGS });
-    expect(ELEVATED_INSTALLER_ARGS).toEqual(["/S", "/allusers", "--updated", "--force-run"]);
+    expect(ELEVATED_INSTALLER_ARGS).toEqual(["/allusers", "--updated"]);
     const script = (c: { args: readonly string[] }) => {
       expect(c.args.slice(0, 3)).toEqual(["-NoProfile", "-NonInteractive", "-EncodedCommand"]);
       return Buffer.from(c.args[3]!, "base64").toString("utf16le");
@@ -212,7 +212,7 @@ describe("the installer's command line", () => {
     expect(elevated.args).toHaveLength(4);
     expect(script(elevated)).toBe(
       "$ErrorActionPreference = 'Stop'\n" +
-        `try { Start-Process -FilePath '${file}' -ArgumentList '/S','/allusers','--updated','--force-run' -WorkingDirectory 'C:\\Users\\dev\\AppData\\Roaming\\ReviewGate\\updates\\0.6.0-a' -Verb RunAs } catch { exit 1 }\n` +
+        `try { Start-Process -FilePath '${file}' -ArgumentList '/allusers','--updated' -WorkingDirectory 'C:\\Users\\dev\\AppData\\Roaming\\ReviewGate\\updates\\0.6.0-a' -Verb RunAs } catch { exit 1 }\n` +
         "exit 0",
     );
     // Spaces stay inside the quotes; every quote PowerShell knows is doubled, so the path cannot end the string.

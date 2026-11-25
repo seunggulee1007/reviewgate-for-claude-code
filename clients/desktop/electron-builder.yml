@@ -46,8 +46,10 @@ win:
 #   ReviewGate.exe" — the in-app update looks for it);
 # - `deleteAppDataOnUninstall: false`: %APPDATA%\ReviewGate (settings.json, logs) is never removed, and `--updated` keeps
 #   it even if this ever changed;
-# - `perMachine: false`: per user, no elevation. The in-app update runs `/S /currentuser --updated --force-run`
-#   (src/main/updateInstall.ts INSTALLER_ARGS): silent, this user's install, and ReviewGate started when it is done.
+# - `perMachine: false`: per user, no elevation. The in-app update runs `/currentuser --updated`
+#   (src/main/updateInstall.ts INSTALLER_ARGS): shown, this user's install, and build/installer.nsh (picked up by
+#   electron-builder as `installer.nsh` in buildResources) starts ReviewGate when an update is done instead of showing
+#   the finish page.
 nsis:
   oneClick: false
   perMachine: false
