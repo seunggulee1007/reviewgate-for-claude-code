@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import type { ShellResult } from "@reviewgate/engine";
 import { useNow } from "../../agents";
-import { formatElapsed } from "../../elapsed";
+import { formatElapsed, formatTicking } from "../../elapsed";
 import { t } from "../../i18n";
 import { cancelShellCommand, foldShellOutput, shellEnd, shellFilesLine, shellRanInTitle, useShellLive } from "../../shellMode";
 import { useStore } from "../../store";
@@ -26,7 +26,7 @@ export function ShellRunningRow({ onGrow }: { onGrow?: () => void }) {
   useEffect(() => onGrow?.(), [onGrow, output, shell?.id]);
   if (!shell) return null;
   const started = Date.parse(shell.startedAt);
-  const elapsed = Number.isFinite(started) ? formatElapsed(Math.max(0, now - started) / 1000) : "";
+  const elapsed = Number.isFinite(started) ? formatTicking(Math.max(0, now - started) / 1000) : "";
   const stop = () => void cancelShellCommand().then((why) => why && showToast(why));
   return (
     <div className="shell-row running" data-testid="Shell running row">

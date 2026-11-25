@@ -78,7 +78,7 @@ describe("§67.3 the ! command's rows", () => {
     sync();
     const html = renderToStaticMarkup(createElement(m.rows.ShellRunningRow, {}));
     expect(html).toContain("$ npm run build");
-    expect(html).toMatch(/[45]\.\d초/);
+    expect(html).toMatch(/>[45]초</); // whole seconds while it ticks
     expect(html).toContain("compiling…");
     expect(html).toContain('title="셸 명령 중지 (esc)"');
     expect(html).toContain("</span> 중지</button>");
