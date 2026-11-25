@@ -2680,6 +2680,7 @@
   "Pull request created": "풀 리퀘스트를 만들었어요",
   "Pull requests": "풀 리퀘스트",
   "Pull would overwrite your uncommitted changes: {0} — commit them (or finish their review) first. Nothing was changed.": "pull하면 커밋하지 않은 변경이 덮어써져요: {0} — 먼저 커밋하거나 리뷰를 마쳐야 해요. 아무것도 바뀌지 않았어요.",
+  "Pull would overwrite {0} uncommitted file(s) — commit them (or finish their review) first. Nothing was changed.": "pull하면 커밋하지 않은 파일 {0}개가 덮어써져요 — 먼저 커밋하거나 리뷰를 마쳐야 해요. 아무것도 바뀌지 않았어요.",
   "Pull {0} commit(s)": "커밋 {0}개 pull",
   "Pulled {0} commit(s) from {1} · {2} file(s) changed": "{1}에서 커밋 {0}개를 pull했어요 · 파일 {2}개 바뀜",
   "Pulling…": "pull하는 중…",
