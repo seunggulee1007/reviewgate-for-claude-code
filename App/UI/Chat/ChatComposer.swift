@@ -1315,9 +1315,12 @@ struct ChatComposer: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Color.shellAccent, in: Capsule())
-                        .padding(.bottom, 3)
                         .help(ShellMode.placeholder + " — " + ShellMode.hint(key: KeyHint.sendKey))
                         .accessibilityIdentifier("Shell mode badge")
+                        // Beside the command's first line, as the box's height goes (bottom-aligned it sat below the
+                        // line, and below the whole command once the box was taller).
+                        .padding(.top, 5)
+                        .frame(height: min(max(composer.height, inputHeightLimits.min), inputHeightLimits.max), alignment: .top)
                 }
                 ComposerTextView(text: $composer.draft, isFocused: $composer.inputFocused, caret: $composer.caret,
                                  caretRequest: $composer.caretRequest, contentHeight: $composer.height,
