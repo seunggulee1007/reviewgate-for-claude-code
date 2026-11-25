@@ -11269,9 +11269,10 @@ type ShellResult = {
   "!" / "셸" badge at its start, the box's accent in the shell colour, and the key hint "↩ 셸 명령 실행 · 출력은 다음
   메시지와 함께 Claude에게 가요". ↩ sends `shell_run {command}` (never to Claude, never queued); it joins the prompt
   history. A refusal keeps the draft with the reason in the notice line.
-- **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time, the streamed output
-  (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A message typed meanwhile waits in
-  the queue ("셸 명령이 끝나면 보내요").
+- **While it runs** a live row at the end of the chat shows `$ command`, a spinner, the elapsed time (whole seconds as it
+  ticks each second — Mac `ElapsedFormat.ticking`, Windows `formatTicking`; the finished row keeps one decimal under
+  10 s), the streamed output (`shell_output`) and 중지 (`shell_cancel`); Esc and the composer's stop do the same. A
+  message typed meanwhile waits in the queue ("셸 명령이 끝나면 보내요").
 - **The row** (`kind: "shell"`, restored with the chat): `$ command` in monospace, how it ended (✓ 0 · ✗ 종료 코드 n ·
   중지됨 · 시간 초과), the time, the output (monospace, long output folded to its last lines with 전체 보기; "앞부분은
   잘렸어요" when `truncated`), "파일 N개를 바꿨어요 — 다음 리뷰에 나와요" with the names in a tooltip, and a context menu

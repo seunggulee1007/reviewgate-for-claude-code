@@ -135,7 +135,7 @@ private struct LiveShellRow: View {
                     .help(run.command)
                 Spacer(minLength: 8)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(verbatim: ElapsedFormat.text(seconds: ShellMode.elapsed(since: run.startedAt, now: context.date), tenths: false))
+                    Text(verbatim: ElapsedFormat.ticking(seconds: ShellMode.elapsed(since: run.startedAt, now: context.date)))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .fixedSize()
