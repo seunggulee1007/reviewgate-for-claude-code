@@ -131,21 +131,24 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
             {file.partial && <span className="orange"> · {t("{0} part(s) already reverted", file.rejectedHunks ?? 0)}</span>}
           </span>
           {busy && <span className="spinner" />}
+          {/* As the Mac's diff header: "Revert selected" only once a part is ticked (nothing to say why it is off before). */}
           {n > 0 && (
-            <button type="button" className="plain small" disabled={disabled} onClick={() => setSelected(new Set())}>
-              {t("Clear selection")}
-            </button>
+            <>
+              <button type="button" className="plain small" disabled={disabled} onClick={() => setSelected(new Set())}>
+                {t("Clear selection")}
+              </button>
+              <button
+                type="button"
+                className="small"
+                disabled={disabled}
+                onClick={() => (n > 1 ? setConfirm(ids) : void run(ids))}
+                title={blocked ?? t("Revert the selected parts only")}
+                data-testid="Revert selected hunks"
+              >
+                ↶ {t("Revert selected ({0})", n)}
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            className="small"
-            disabled={disabled || n === 0}
-            onClick={() => (n > 1 ? setConfirm(ids) : void run(ids))}
-            title={blocked ?? t("Revert the selected parts only")}
-            data-testid="Revert selected hunks"
-          >
-            ↶ {t("Revert selected ({0})", n)}
-          </button>
         </div>
       );
     }
