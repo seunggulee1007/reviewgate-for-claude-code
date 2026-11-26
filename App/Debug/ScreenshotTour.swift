@@ -3083,10 +3083,12 @@ private final class Tour {
                 if label == "smallest" { window.setContentSize(NSSize(width: 900, height: 460)) }
                 try await Task.sleep(for: .milliseconds(1500))
                 let content = window.contentView?.bounds.size ?? .zero
-                // Content that needs more height than the window lays the whole window out taller (the toolbar pushed off).
-                let needs = window.contentView?.fittingSize.height ?? 0
-                log("noproject window-\(label)-\(appearance.rawValue): window \(Int(window.frame.width))×\(Int(window.frame.height)) pt, content \(Int(content.width))×\(Int(content.height)), needs \(Int(needs))"
-                    + (needs > content.height + 1 ? " — TALLER (the window's content is laid out taller than the window)" : ""))
+                // Content that needs more height than the window lays the whole window out taller: the sidebar's tabs (a
+                // segmented control) go past the window's top.
+                let tabs = ((try? views(NSSegmentedControl.self, in: window, minSize: 0)) ?? []).map { $0.convert($0.bounds, to: nil) }
+                let outside = tabs.filter { $0.maxY > window.frame.height + 1 || $0.minY < -1 }
+                log("noproject window-\(label)-\(appearance.rawValue): window \(Int(window.frame.width))×\(Int(window.frame.height)) pt, content \(Int(content.width))×\(Int(content.height)), sidebar tabs \(tabs.map { "\(Int($0.minY))–\(Int($0.maxY))" }.joined(separator: ", "))"
+                    + (outside.isEmpty ? "" : " — TALLER (the window's content is laid out taller than the window)"))
                 try write(try render(window), "noproject-window-\(label)-\(appearance.rawValue)")
             }
             try await sheet("new-empty", NewProjectSheet(), appearance: appearance)
