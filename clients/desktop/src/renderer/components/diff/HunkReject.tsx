@@ -104,8 +104,9 @@ export function useHunkReject(file: ChangedFileState | null, diff: ReviewDiff | 
           onClick={() => void run([h.id])}
           title={blocked ?? (sinceAccepted ? t("Put this part back as you accepted it; the rest of the file stays under review") : t("Put this part back as it was before the turn; the rest of the file stays under review"))}
           data-testid={`Revert hunk ${h.id}`}
+          aria-label={t("Revert this part")}
         >
-          ↶ {t("Revert this part")}
+          ↶<span className="hunk-revert-label"> {t("Revert this part")}</span>
         </button>
       </span>
     );

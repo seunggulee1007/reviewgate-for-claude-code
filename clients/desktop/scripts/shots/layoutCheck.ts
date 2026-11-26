@@ -12,13 +12,15 @@
  * - WRAPPED   a short word with no space in it (a count, a key, a label) broken over two lines;
  * - SIDEWAYS  a control or a line of text past the right edge of the scrolling box it is in (a list or a chat scrolling
  *             sideways because a row does not fit); code (pre, .mono, a diff's lines) may scroll sideways;
+ * - DIFF SCROLL a diff's scroller (`.unified`) scrolling sideways although no code line is wider than the pane (something
+ *             that is not code, e.g. a hunk header's buttons, widens the rows); a real long code line may scroll;
  * - OUTSIDE   a control or a line of text past the window's edge with no scrolling box around it;
  * - OVERLAP   two controls on top of each other (both reachable: neither covered by a dialog, neither inside the other);
  * - NO REASON a control that is off with no tooltip saying why (its own title, or its radio group's / label's);
  * - BLANK     no text on the page (the PNG's own one-colour check is in main.ts);
  * - HOME      the real home folder's path in any text, title, label, placeholder or value.
  */
-export type LayoutFinding = { kind: "CLIPPED" | "CUT" | "WRAPPED" | "SIDEWAYS" | "OUTSIDE" | "OVERLAP" | "NO REASON" | "BLANK" | "HOME"; what: string; rect: { x: number; y: number; w: number; h: number } | null };
+export type LayoutFinding = { kind: "CLIPPED" | "CUT" | "WRAPPED" | "SIDEWAYS" | "DIFF SCROLL" | "OUTSIDE" | "OVERLAP" | "NO REASON" | "BLANK" | "HOME"; what: string; rect: { x: number; y: number; w: number; h: number } | null };
 
 export function layoutCheck(opts: { home: string }): LayoutFinding[] {
   const out: LayoutFinding[] = [];
@@ -125,6 +127,21 @@ export function layoutCheck(opts: { home: string }): LayoutFinding[] {
     const edge = box.getBoundingClientRect().left + b.clientLeft + b.clientWidth;
     const past = [...box.querySelectorAll("*")].find((c) => (isControl(c) || hasOwnText(c)) && !c.closest(`${SKIP}, pre, code, .mono, [data-testid="Unified diff"]`) && shown(c) && c.getBoundingClientRect().right > edge + 1);
     if (past) out.push({ kind: "SIDEWAYS", what: `${describe(past)} pushes ${describe(box).slice(0, 60)} sideways (${b.scrollWidth} > ${b.clientWidth})`, rect: rectOf(past.getBoundingClientRect()) });
+  }
+
+  // DIFF SCROLL: the diff scrolls sideways with no code line that needs it. A code line's own width is its text's last
+  // character (a wrapped line ends inside the pane; a long no-wrap line ends past it); hunk header rows are not code.
+  for (const box of all.filter((el) => el.matches(".unified"))) {
+    const b = box as HTMLElement;
+    if (b.scrollWidth <= b.clientWidth + 1) continue;
+    const left = box.getBoundingClientRect().left + b.clientLeft - b.scrollLeft;
+    let need = 0;
+    for (const t of box.querySelectorAll(".line:not(.hunk) .text")) {
+      const range = document.createRange();
+      range.selectNodeContents(t);
+      for (const q of range.getClientRects()) need = Math.max(need, q.right - left);
+    }
+    if (need <= b.clientWidth + 1) out.push({ kind: "DIFF SCROLL", what: `${describe(box).slice(0, 60)} scrolls sideways (${b.scrollWidth} > ${b.clientWidth}) with no code line wider than ${b.clientWidth} (widest ${Math.round(need)})`, rect: rectOf(box.getBoundingClientRect()) });
   }
 
   // OVERLAP: controls that are reachable (the topmost thing at their centre is them) whose shown parts intersect.

@@ -51,6 +51,11 @@
 .unified .hunk-check { display: inline-flex; align-items: center; cursor: pointer; }
 .unified .hunk-check input { margin: 0; cursor: pointer; }
 .unified .hunk-revert { font-size: 11px; padding: 0 7px; line-height: 1.55; }
+/* A narrow pane (the 900 px window's diff column): the header's buttons shrink to their icons — the label stays as aria-label and tooltip — so they never push the rows wider than the code (a useless sideways scrollbar). */
+@container (max-width: 480px) {
+  .unified .hunk-actions .side-ask-label, .unified .hunk-actions .hunk-revert-label { display: none; }
+  .unified .hunk-actions .side-ask { padding: 0 3px; }
+}
 .unified .line.hunk-sel { box-shadow: inset 3px 0 0 var(--accent); }
 .unified .line.hunk.hunk-sel { background: var(--accent-bg); color: var(--fg); }
 /* MARK: r2-skills-side — §31.1 (M35): a slash command's own work is a row to read, not a call to open */
