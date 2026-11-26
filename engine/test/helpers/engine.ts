@@ -135,6 +135,12 @@ export class FakeClaudeSession implements ClaudeSessionLike {
     this.efforts.push(effort);
   }
 
+  /** §70.4: `set_thinking` calls that reached the live session. */
+  readonly thinkings: boolean[] = [];
+  async setThinking(enabled: boolean): Promise<void> {
+    this.thinkings.push(enabled);
+  }
+
   /** §29: releasePeers / dismissPeers / setPeerInbound calls, in order. */
   readonly peerCalls: { op: "release" | "dismiss" | "inbound"; ids?: string[]; tree?: string; value?: string }[] = [];
   /** §29: what `releasePeers` resolves with (default: every id) — or rejects with. */

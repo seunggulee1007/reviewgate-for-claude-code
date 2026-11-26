@@ -750,6 +750,8 @@ export type EngineCommand =
   | Cmd<"add_dir", { path: string }>
   /** §67.1: the chat's added directory `path` (as `state.session.addedDirs` lists it) is no longer Claude's to work in. */
   | Cmd<"remove_dir", { path: string }>
+  /** §70.4 Alt+T: extended thinking on or off for the current chat, from the CLI's next request on. */
+  | Cmd<"set_thinking", { enabled: boolean }>
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -1174,7 +1176,15 @@ export type SessionState = {
   shell?: ShellRunInfo | null;
   /** §67.2: `!` results of this chat that go to Claude with the next message (0 when none). */
   shellPending?: number;
+  /** §70.4: extended thinking for the current chat (absent from an older engine). */
+  thinking?: ThinkingState;
 };
+
+/**
+ * §70.4: `enabled` — the chat's Alt+T choice (on unless turned off); `alwaysOn` — the model the next answer comes from thinks
+ * anyway (Opus 5.5, Sonnet 5.5, Haiku 5.5, the Fable models), so the toggle has no effect there, as in the terminal.
+ */
+export type ThinkingState = { enabled: boolean; alwaysOn: boolean };
 
 /** §67.2: a `!` command while it runs. */
 export type ShellRunInfo = { id: string; command: string; cwd: string; startedAt: string };
@@ -1738,6 +1748,8 @@ export type SessionMeta = {
   cliConfigDir?: string;
   /** §67.1: directories added with `/add-dir` (absolute, real paths); the CLI starts with them (`additionalDirectories`). */
   addedDirs?: string[];
+  /** §70.4: extended thinking turned off for this chat (Alt+T); absent: on. The CLI starts with it (`thinking: disabled`). */
+  thinkingOff?: true;
 };
 
 export type SessionsState = {

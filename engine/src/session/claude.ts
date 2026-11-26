@@ -124,6 +124,8 @@ export type SessionSettings = {
   backgroundWork?: boolean;
   /** §67.1: the chat's `/add-dir` directories (absolute, real paths) — the SDK's `additionalDirectories`. */
   addedDirs?: string[];
+  /** §70.4: false — extended thinking off for the chat (the SDK's `thinking: { type: "disabled" }`); absent / true: the CLI's default. */
+  thinking?: boolean;
   /**
    * §52.2: subagents finish inside the turn that started them (every Agent / Task call gets `run_in_background: false`), as
    * before 0.6. Off (the default): they run as in the terminal — in the background unless Claude says not — and the main
@@ -251,6 +253,8 @@ export interface ClaudeSessionLike {
   setModel?(model: string | null): Promise<void>;
   /** §25: the flag-settings `effortLevel` (null = the model's default). */
   setEffort?(effort: EffortLevel | null): Promise<void>;
+  /** §70.4: extended thinking on (the CLI's default budget) or off, from the next model request on. */
+  setThinking?(enabled: boolean): Promise<void>;
   /**
    * §29: lets every held peer message through as this session's own turn (the review gate collects it like a send):
    * `crossSessionInbound` accept, straight back to hold; resolves with the ids the CLI released (rejects when none was).
@@ -689,6 +693,7 @@ export class ClaudeSession implements ClaudeSessionLike {
         ...(!s.resumeSessionId && s.sessionId ? { sessionId: s.sessionId } : {}),
         model: s.model,
         ...(s.effort ? { effort: s.effort } : {}),
+        ...(s.thinking === false ? { thinking: { type: "disabled" as const } } : {}), // §70.4
         ...(Object.keys(extraArgs).length > 0 ? { extraArgs } : {}),
         env: exe.env ? { ...env, ...exe.env } : env,
         spawnClaudeCodeProcess: (o) => this.spawnClaude(o),
@@ -1102,6 +1107,11 @@ export class ClaudeSession implements ClaudeSessionLike {
   /** §25: `effortLevel` in the flag settings layer, applied live (null = the model's default). */
   async setEffort(effort: EffortLevel | null): Promise<void> {
     await this.requireQuery().applyFlagSettings({ effortLevel: effort });
+  }
+
+  /** §70.4: `Query.setMaxThinkingTokens` — 0 turns thinking off, null gives the CLI's default back (what Alt+T does). */
+  async setThinking(enabled: boolean): Promise<void> {
+    await this.requireQuery().setMaxThinkingTokens(enabled ? null : 0);
   }
 
   /**

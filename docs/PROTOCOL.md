@@ -11579,3 +11579,40 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
   dialog with `ref` (`TaskStartDialog initialRef`). The three commands are on the renderer's allow list (`ipcGuard.ts`);
   `newProjectParent` is checked as a folder by main's `settingsGuard` and is a row of Settings › General (`GeneralTab.tsx`,
   `settingsIndex.ts`). Tests: `newProject.test.ts`, `ipcGuard.test.ts`, `settingsGuard.test.ts`.
+
+## 70. Terminal parity, batch D
+
+Four more things a terminal user reaches for without thinking, checked against Claude Code's docs (interactive mode and
+the commands reference, as of 2026-11): Ctrl+R history search, `#` memory, `/export` and `/copy`, and Alt+T thinking.
+Terminal chats (§57) are the real TUI and keep theirs; everything here is for classic chats.
+
+### 70.2 `#` quick memory — not built
+
+Claude Code no longer has it. The interactive-mode reference's quick commands are `/` (commands and skills), `!` (shell
+mode), `@` (file mentions), `:` (emoji) and `?` (shortcut help) — no `#`; the memory page says to ask Claude to remember
+something or to edit CLAUDE.md through `/memory`. A message starting with `#` therefore goes to Claude as typed, as in
+the terminal. (`/memory` stays the app's own, §56.5.)
+
+### 70.4 Alt+T — extended thinking on or off
+
+```ts
+// command
+set_thinking { enabled: boolean }   // the current chat's; lane main, allowed while a turn runs (from the next model request on)
+// refused: invalid_thinking | no_project | no_session | terminal_chat | set_thinking_failed:<why>
+// state.session.thinking?: { enabled: boolean; alwaysOn: boolean }
+//   enabled  — the chat's choice: on unless Alt+T turned it off
+//   alwaysOn — the next answer's model always thinks (Opus 5.5, Sonnet 5.5, Haiku 5.5, the Fable models): the toggle has no effect
+// SessionMeta.thinkingOff?: true      // kept with the chat (sessions/index.json); a rewind fork (§26) inherits it
+```
+
+- **As the terminal's Option+T / Alt+T.** The docs: "Enable or disable extended thinking mode. Has no effect on Opus 5.5,
+  Sonnet 5.5, Haiku 5.5, or the Fable models, which always use extended thinking." It is a switch for the conversation,
+  not one message: the engine keeps it with the chat, so a restart, a chat switch and back, or a resumed chat keep it, and
+  a new chat starts with thinking on (the CLI's default).
+- **The CLI takes it live.** A running CLI gets `Query.setMaxThinkingTokens(0)` (off) or `null` (the CLI's default back),
+  applied from its next model request — the same while a turn runs. A starting CLI gets the SDK option
+  `thinking: { type: "disabled" }` when the chat has it off (nothing when on).
+- **The status line** (§44.2) says `thinkingEnabled: enabled || alwaysOn` instead of a fixed true.
+- Engine: `statusline/input.ts` (`thinkingAlwaysOn`), `session/claude.ts` (`thinking`, `setThinking`), `review/sessions.ts`
+  (`thinkingOff`), `engine.ts` (`setThinking`, `thinkingSlice`, the start's `thinking: false`). Tests:
+  `engine/test/w70.thinking.test.ts`.

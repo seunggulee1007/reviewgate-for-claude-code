@@ -122,6 +122,7 @@ import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
 import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-sync (§68.5)
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
+import type { ThinkingState } from "./protocol.js"; // §70.4
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
 import { withFileMeta } from "./diff/fileMeta.js"; // MARK: wave4b w4b-files
@@ -276,7 +277,7 @@ import { StatusLine } from "./statusline/runner.js";
 import { resolveStatusLine, type StatusLineResolution } from "./statusline/settings.js";
 import { readManagedPolicy, type ManagedPolicy } from "./statusline/managed.js";
 import { ContextWindows } from "./statusline/contextWindows.js";
-import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffort, repoOfRemote, type StatusLineSnapshot } from "./statusline/input.js";
+import { gitWorktreeName, lastTranscriptUsage, modelDisplayName, modelTakesEffort, repoOfRemote, thinkingAlwaysOn, type StatusLineSnapshot } from "./statusline/input.js";
 // MARK: terminal-chat (§57)
 import { HookServer, RETIRED_REASON } from "./session/hookServer.js";
 import { TerminalSession, type PromptAnswer } from "./session/terminalSession.js";
@@ -1606,6 +1607,9 @@ export class ReviewEngine {
         return;
       case "remove_dir":
         await this.removeDir(cmd.path);
+        return;
+      case "set_thinking": // §70.4
+        await this.setThinking(cmd.enabled);
         return;
       case "shell_run": // §67.2
         await this.shellRunStart(cmd.command);
@@ -4144,6 +4148,7 @@ export class ReviewEngine {
           maxTurns: s.maxTurns, // MARK: wave4 w4-longwork (§38.2)
           backgroundWork: s.backgroundWork !== false, // §52
           addedDirs: this.startAddedDirs(), // §67.1
+          ...(this.currentThinking() ? {} : { thinking: false }), // §70.4
           subagentsInTurn: s.subagentsInTurn === true, // §52.2
           ...this.startModel(),
           autoAllowReadOnlyBash: s.autoAllowReadOnlyBash !== false,
@@ -4571,6 +4576,46 @@ export class ReviewEngine {
   private async applyAddedDirs(): Promise<void> {
     this.touch();
     if (this.session && this.sessionState.open) await this.restartSession(true);
+  }
+
+  // ------------------------------------------------------------------ §70.4 extended thinking (Alt+T)
+
+  /** The current chat's Alt+T choice: on unless the chat turned it off. */
+  private currentThinking(): boolean {
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    return meta?.thinkingOff !== true;
+  }
+
+  /** `state.session.thinking`: the choice, and whether the next answer's model thinks anyway. */
+  private thinkingSlice(): ThinkingState {
+    const id = this.statusModelId(this.models ?? STATIC_MODELS, null);
+    return { enabled: this.currentThinking(), alwaysOn: id !== "" && thinkingAlwaysOn(id) };
+  }
+
+  /**
+   * §70.4 `set_thinking {enabled}`: the chat's extended thinking, kept with the chat (`SessionMeta.thinkingOff`). A running
+   * CLI takes it live (`Query.setMaxThinkingTokens`) from its next model request — allowed while a turn runs, as Alt+T is
+   * in the terminal; a starting one gets it with the next start.
+   */
+  private async setThinking(enabled: unknown): Promise<void> {
+    if (typeof enabled !== "boolean") throw new CommandRefused("invalid_thinking: enabled must be a boolean", { code: "invalid_thinking" });
+    this.requireProject();
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (!meta) throw new CommandRefused("no_session");
+    if (meta.kind === "terminal") throw new CommandRefused("terminal_chat"); // the TUI has its own Alt+T
+    const session = this.session;
+    if (session && !this.sessionState.starting && typeof session.setThinking === "function") {
+      try {
+        await withTimeout(session.setThinking(enabled), 15_000, "setThinking");
+      } catch (e) {
+        throw new CommandRefused(`set_thinking_failed:${firstLineOf(errorMessage(e))}`, { code: "set_thinking_failed" });
+      }
+    }
+    if (enabled) delete meta.thinkingOff;
+    else meta.thinkingOff = true;
+    this.persistSessions();
+    this.log("info", `chat ${meta.id}: extended thinking ${enabled ? "on" : "off"}`);
+    this.touch();
   }
 
   // ------------------------------------------------------------------ §67.2 `!` shell mode
@@ -6651,6 +6696,7 @@ export class ReviewEngine {
     meta.title = old.title.endsWith(REWOUND_TITLE_SUFFIX) ? old.title.slice(0, -REWOUND_TITLE_SUFFIX.length) : old.title;
     meta.forkedFrom = { sessionId: old.id, turn };
     if (old.addedDirs?.length) meta.addedDirs = [...old.addedDirs]; // §67.1: the fork works where its chat did
+    if (old.thinkingOff) meta.thinkingOff = true; // §70.4: and thinks as it did
     meta.turns = Math.max(0, turn - 1);
     meta.costUSD = kept.reduce((n, r) => n + (r.kind === "turn_end" ? r.usage.costUsd ?? 0 : 0), 0);
     const lastUser = [...kept].reverse().find((r) => r.kind === "user_message");
@@ -8904,7 +8950,7 @@ export class ReviewEngine {
       usage,
       contextWindowSize: this.hud.contextWindow ?? this.contextWindows.get(id) ?? (/\[1m\]$/i.test(id) ? 1_000_000 : 200_000),
       effort: id && modelTakesEffort(id, models) ? this.effectiveEffort() ?? "high" : null,
-      thinkingEnabled: true,
+      thinkingEnabled: this.currentThinking() || (id !== "" && thinkingAlwaysOn(id)), // §70.4
       fastMode: false,
       rateLimits: this.rateLimits,
       nowMs: this.now(),
@@ -9949,6 +9995,7 @@ export class ReviewEngine {
         addedDirs: this.currentAddedDirs(), // §67.1
         shell: this.shellRun ? { ...this.shellRun.info } : null, // §67.2
         shellPending: this.shellPending.length,
+        thinking: this.thinkingSlice(), // §70.4
       },
       toolchain: this.toolchain,
       gate: this.gate,
@@ -10406,6 +10453,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "remove_dir":
     case "shell_run":
     case "shell_cancel":
+    case "set_thinking": // §70.4
       return "session";
     case "side_ask":
     case "side_list":
