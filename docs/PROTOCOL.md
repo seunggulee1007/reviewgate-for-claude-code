@@ -7424,8 +7424,10 @@ download whose identifier differs from the running app's, so a build with an old
     `update-installer.log` in userData (`%APPDATA%\ReviewGate`), and, first, for one version, 0.5.35's
     `ReviewGate-update.log` in Node's `os.tmpdir()` and Electron's temp folder (`installerLogFiles`, the older place
     first so the newest run's lines are the last). `$TEMP` alone did not work: on windows-latest the app the installer
-    started again had another TEMP than the installer and never found the file, though it was there. A file that
-    cannot be read is logged as a warning. Each line goes to
+    started again through Explorer (`ExecShellAsUser`) had the session's own temp folder
+    (`C:\Users\<user>\AppData\Local\Temp\2`) while the installer, started by the app, had `…\Temp`, so the launch never
+    found the file, though it was there. A temp folder named by a number is such a session's: the one above it is looked
+    in too. A file that cannot be read is logged as a warning. Each line goes to
     the app's log as `update: installer: <line>`, and the last run's lines (from its `start`) give the why: a held file
     → "A file of ReviewGate was in use by another program — resources\app.asar (in use by X.exe 1234). Close that
     program or restart Windows, then try again." (no file found any more: "The old version could not be removed — a

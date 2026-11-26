@@ -8,7 +8,7 @@
  * the app's log, and an update that did not install says why from the last run's lines. Electron-free.
  */
 import { readFileSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { t } from "../renderer/i18n";
 
 /**
@@ -90,9 +90,11 @@ export function takeInstallerLog(files: readonly string[]): { lines: string[]; p
 /**
  * The files a launch takes, the older place first so the newest run's lines come last: 0.5.35's in each temp folder
  * (its installer wrote to `$TEMP`, the environment's TMP / TEMP; Node's `os.tmpdir()` and Electron's temp folder), then
- * userData's. `$TEMP` was not enough: on windows-latest the app the installer started again through Explorer had another
- * TEMP than the installer, and never found the file.
+ * userData's. `$TEMP` was not enough: on windows-latest the app the installer started again through Explorer had the
+ * session's own temp folder (`…\AppData\Local\Temp\2`) while the installer, started by the app, had `…\Temp`, so the
+ * launch never found the file. A temp folder named by a number is a session's: the one above it is looked in too.
  */
 export function installerLogFiles(userData: string, tempDirs: readonly string[]): string[] {
-  return [...tempDirs.filter((d) => d !== "").map((d) => join(d, OLD_INSTALLER_LOG_NAME)), join(userData, INSTALLER_LOG_NAME)];
+  const dirs = tempDirs.filter((d) => d !== "").flatMap((d) => (/^\d+$/.test(basename(d)) ? [d, dirname(d)] : [d]));
+  return [...dirs.map((d) => join(d, OLD_INSTALLER_LOG_NAME)), join(userData, INSTALLER_LOG_NAME)];
 }

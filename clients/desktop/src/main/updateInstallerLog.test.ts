@@ -74,4 +74,18 @@ describe("the installer's log", () => {
     expect(installerLogWhy(lines)).toMatch(/^Another ReviewGate installer was still open/);
     expect(existsSync(join(temp, OLD_INSTALLER_LOG_NAME)) || existsSync(join(userData, INSTALLER_LOG_NAME))).toBe(false);
   });
+
+  it("a session's own temp folder (…\\Temp\\2, the app started again through Explorer): 0.5.35's file in the one above it is found", () => {
+    const userData = join(dir, "ud2");
+    const temp = join(dir, "Temp");
+    const session = join(temp, "2");
+    mkdirSync(session, { recursive: true });
+    expect(installerLogFiles(userData, [session])).toEqual([join(session, OLD_INSTALLER_LOG_NAME), join(temp, OLD_INSTALLER_LOG_NAME), join(userData, INSTALLER_LOG_NAME)]);
+    // What 0.5.35's installer wrote on windows-latest, read by the app it started again.
+    writeFileSync(join(temp, OLD_INSTALLER_LOG_NAME), utf16("0.5.35 start x /currentuser --updated\r\n0.5.35 failed another-installer\r\n0.5.35 reopened C:\\RG\\ReviewGate.exe (ok)\r\n"));
+    const { lines } = takeInstallerLog(installerLogFiles(userData, [session, session]));
+    expect(lines).toHaveLength(3);
+    expect(installerLogWhy(lines)).toMatch(/^Another ReviewGate installer was still open/);
+    expect(existsSync(join(temp, OLD_INSTALLER_LOG_NAME))).toBe(false);
+  });
 });
