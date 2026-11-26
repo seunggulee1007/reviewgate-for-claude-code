@@ -16,6 +16,7 @@ import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, net, shell } from "electron";
 import { compareVersions, createPlatform, locateToolchain } from "@reviewgate/engine";
@@ -28,6 +29,7 @@ import { downloadTo, MAX_CHECKSUM_BYTES, MAX_INSTALLER_BYTES, type HttpGet } fro
 import { installerAssets, verifyInstaller, type InstallerAssets } from "./updateVerify.js";
 import { InstallerRecheck } from "./updateRecheck.js";
 import { blockerLine, installMode, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type InstallMode, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
+import { installerLogWhy, takeInstallerLog } from "./updateInstallerLog.js";
 
 export type ReleaseInfo = { version: string; tag: string; page: string; notes: string; assets: InstallerAssets | null };
 export type UpdateOutcome = { kind: "available"; release: ReleaseInfo } | { kind: "upToDate"; latest: string } | { kind: "unavailable"; why: string };
@@ -316,10 +318,14 @@ export async function checkForUpdatesNow(): Promise<void> {
 /** The launch: what the last update did (said once), earlier downloads removed; checks at launch and every 6 hours; the banner's answers. */
 export function installUpdates(h: UpdateHooks): void {
   hooks = h;
+  // What the installer wrote (build/installer.nsh), taken once whether or not this launch follows an update.
+  const { lines: installerLines, problems } = takeInstallerLog([tmpdir(), app.getPath("temp")]);
+  for (const line of installerLines) logLine("main", "main", `update: installer: ${line}`);
+  for (const p of problems) logLine("main", "warn", `update: the installer's log could not be read: ${p}`);
   const record = loadSettings().pendingUpdateInstall;
   if (record !== undefined) {
     saveSettings({ pendingUpdateInstall: undefined });
-    notice = noticeOf(record, app.getVersion());
+    notice = noticeOf(record, app.getVersion(), installerLogWhy(installerLines));
     logLine("main", "main", `update: after the restart — ${notice ? (notice.kind === "updated" ? `updated to ${notice.version}` : `${notice.version} did not install: ${notice.why}`) : "an unreadable record"}`);
     if (notice?.kind === "updated") {
       const version = notice.version;

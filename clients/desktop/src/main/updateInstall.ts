@@ -77,12 +77,13 @@ export function processAlive(pid: number, kill: (pid: number, signal: 0) => unkn
   }
 }
 
-/** The running version is `to` or newer → updated; still older → did not install. Said once: the caller removes the record. */
-export function noticeOf(raw: unknown, running: string): UpdateNotice | null {
+/** The running version is `to` or newer → updated; still older → did not install, why: what the installer said
+ * (src/main/updateInstallerLog.ts), else the record's, else "still installed". Said once: the caller removes the record. */
+export function noticeOf(raw: unknown, running: string, installerWhy: string | null = null): UpdateNotice | null {
   const r = validRecord(raw);
   if (!r) return null;
   if (compareVersions(running, r.to) >= 0) return { kind: "updated", version: running, from: r.from };
-  return { kind: "failed", version: r.to, why: r.why ?? t("ReviewGate {0} is still installed.", running) };
+  return { kind: "failed", version: r.to, why: installerWhy ?? r.why ?? t("ReviewGate {0} is still installed.", running) };
 }
 
 /** How this copy updates itself: this user's install, an install for all users (Windows asks for administrator rights

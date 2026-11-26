@@ -243,6 +243,9 @@ describe("after the restart", () => {
     expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.6.1")).toEqual({ kind: "updated", version: "0.6.1", from: "0.5.17" });
     expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.5.17")).toEqual({ kind: "failed", version: "0.6.0", why: "ReviewGate 0.5.17 is still installed." });
     expect(noticeOf({ from: "0.5.17", to: "0.6.0", why: "The installer could not start: spawn EACCES" }, "0.5.17")).toEqual({ kind: "failed", version: "0.6.0", why: "The installer could not start: spawn EACCES" });
+    // What the installer wrote (updateInstallerLog.ts) says more than the record; never over an update that installed.
+    expect(noticeOf({ from: "0.5.17", to: "0.6.0", why: "The installer closed at once (exit code 2)." }, "0.5.17", "Another ReviewGate installer was still open")).toEqual({ kind: "failed", version: "0.6.0", why: "Another ReviewGate installer was still open" });
+    expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.6.0", "anything")).toEqual({ kind: "updated", version: "0.6.0", from: "0.5.17" });
     expect(noticeOf(undefined, "0.6.0")).toBeNull();
     expect(noticeOf({ from: "0.5.17" }, "0.6.0")).toBeNull();
     expect(noticeOf({ from: "x", to: "0.6.0" }, "0.6.0")).toBeNull();

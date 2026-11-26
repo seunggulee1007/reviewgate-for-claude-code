@@ -7404,9 +7404,20 @@ download whose identifier differs from the running app's, so a build with an old
   - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
     Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
     no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:
-    the installer could not start, else "ReviewGate Y is still installed.") with [Try Again] (looks the release up when
-    no check has, and installs it), [Download Page] and ×. Nothing installs by itself, so a failed install cannot loop.
-    The windows that were open reopen once, whatever "Reopen last projects" says.
+    what the installer said, else why the installer could not start, else "ReviewGate Y is still installed.") with
+    [Try Again] (looks the release up when no check has, and installs it), [Download Page] and ×. Nothing installs by
+    itself, so a failed install cannot loop. The windows that were open reopen once, whatever "Reopen last projects"
+    says. **What the installer said**: every launch takes `%TEMP%\ReviewGate-update.log` once
+    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines, then removed), looked for in
+    Node's `os.tmpdir()` (TEMP / TMP, what the installer's `$TEMP` is) and Electron's temp folder — on windows-latest
+    Electron's alone did not find it; a file there that cannot be read is logged as a warning. Each line goes to
+    the app's log as `update: installer: <line>`, and the last run's lines (from its `start`) give the why: a held file
+    → "A file of ReviewGate was in use by another program — resources\app.asar (in use by X.exe 1234). Close that
+    program or restart Windows, then try again." (no file found any more: "The old version could not be removed — a
+    file of ReviewGate was in use. Restart Windows, then try again."); another installer → "Another ReviewGate
+    installer was still open — close it (its window may be behind other windows, or end ReviewGate-Setup in Task
+    Manager), then try again."; a run with no end (`installed` or a failure) → "The installer stopped before it
+    finished (its last step: mode)."; one that installed → nothing.
   - **Words.** The banner's title is "Installing ReviewGate X" from the click to the quit, its line the step:
     "Downloading 12.4 / 115.3 MB" beside a bar (`role=progressbar`, named "Download progress", its value the line),
     "Checking the download's checksum…" beside a spinner. Every button has a tooltip; [Download Page] ("Opens the release
