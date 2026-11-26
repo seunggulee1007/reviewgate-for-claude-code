@@ -40,8 +40,10 @@
 ; - when it still fails, no box under /S (it would hold the mutex), the box in front otherwise, then the installed (old)
 ;   ReviewGate is started again, `--updated` (past the launch guard of 0.5.31 and later) and the installer quits;
 ; - an installer that finds another one still open says so and starts ReviewGate again before it quits;
-; - each step goes to %TEMP%\ReviewGate-update.log (UTF-16LE, one line each: `<version> <event> <detail>`), which the
-;   next launch reads into its log and the "did not install" notice (src/main/updateInstallerLog.ts), then removes.
+; - each step goes to %APPDATA%\ReviewGate\update-installer.log, the app's own folder (UTF-16LE, one line each:
+;   `<version> <event> <detail>`), which the next launch reads into its log and the "did not install" notice
+;   (src/main/updateInstallerLog.ts), then removes. Not $TEMP (0.5.35): the app started again through Explorer can
+;   have another TEMP than this installer, and did not find it.
 ; (In customHeader: electron-builder inserts it once LogicLib and its own functions are there.)
 !macro customHeader
 !ifndef BUILD_UNINSTALLER
@@ -50,14 +52,26 @@
 
   Function rgLog
     Push $0
+    Push $1
+    ; The user's own AppData (electron's userData, src/main/main.ts `app.setPath("userData", …)`), for an install for
+    ; all users too - as electron-builder itself does for the app's data ("electron always uses per user app data").
+    ${if} $installMode == "all"
+      SetShellVarContext current
+    ${endif}
+    StrCpy $1 "$APPDATA\ReviewGate"
+    ${if} $installMode == "all"
+      SetShellVarContext all
+    ${endif}
+    CreateDirectory "$1"
     ClearErrors
-    FileOpen $0 "$TEMP\ReviewGate-update.log" a
+    FileOpen $0 "$1\update-installer.log" a
     ${ifNot} ${Errors}
       FileSeek $0 0 END
       FileWriteUTF16LE $0 "${VERSION} $rgLogLine$\r$\n"
       FileClose $0
     ${endif}
     ClearErrors
+    Pop $1
     Pop $0
   FunctionEnd
 

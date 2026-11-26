@@ -7400,7 +7400,8 @@ download whose identifier differs from the running app's, so a build with an old
     Manager), shows its box only when it is not silent (in front), starts the installed (old) ReviewGate again with
     `--updated` (past the launch guard below) and quits; an installer that finds another one still open (its mutex,
     looked at before electron-builder's check quits silently) starts ReviewGate again after 4 s. Each step goes to
-    `%TEMP%\ReviewGate-update.log` (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
+    `update-installer.log` in the user's own `%APPDATA%\ReviewGate` (the app's userData, also for an install for all
+    users; 0.5.35's installer: `%TEMP%\ReviewGate-update.log`) (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
     `mode <CurrentUser|all> <folder>`, `uninstall-old failed N`, `uninstall-old retry: N`, `failed uninstall-old N
     <file> (in use by <program> <pid>)`, `failed another-installer`, `reopened <exe> (<result>)`, `installed <folder>`).
     The apps up to 0.5.30 download and run the new installer silent too, so they get it as well: they come back
