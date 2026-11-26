@@ -1,9 +1,9 @@
-// §48 Windows — the installer's own account (build/installer.nsh → %TEMP%\ReviewGate-update.log) read by the next launch.
+// §48 Windows — the installer's own account (build/installer.nsh → %APPDATA%\ReviewGate\update-installer.log) read by the next launch.
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { INSTALLER_LOG_NAME, installerLogLines, installerLogWhy, MAX_INSTALLER_LOG_BYTES, takeInstallerLog } from "./updateInstallerLog";
+import { INSTALLER_LOG_NAME, installerLogFiles, installerLogLines, installerLogWhy, MAX_INSTALLER_LOG_BYTES, OLD_INSTALLER_LOG_NAME, takeInstallerLog } from "./updateInstallerLog";
 
 const utf16 = (s: string) => Buffer.from(s, "utf16le");
 const dir = mkdtempSync(join(tmpdir(), "rg-installer-log-"));
@@ -44,18 +44,48 @@ describe("the installer's log", () => {
     expect(installerLogWhy([])).toBeNull();
   });
 
-  it("is taken once from each temp folder: read and removed; none is no lines, an unreadable one is said", () => {
+  it("is taken once: read and removed; none is no lines, an unreadable one is said", () => {
     const file = join(dir, INSTALLER_LOG_NAME);
     writeFileSync(file, utf16(heldRun.join("\r\n") + "\r\n"));
-    // Node's and Electron's temp folders, the same one spelled twice: read once.
-    expect(takeInstallerLog([join(dir, "missing"), dir, dir.toUpperCase()])).toEqual({ lines: heldRun, problems: [] });
+    // The same file spelled twice: read once.
+    expect(takeInstallerLog([join(dir, "missing", INSTALLER_LOG_NAME), file, file.toUpperCase()])).toEqual({ lines: heldRun, problems: [] });
     expect(existsSync(file)).toBe(false);
-    expect(takeInstallerLog([dir])).toEqual({ lines: [], problems: [] });
+    expect(takeInstallerLog([file])).toEqual({ lines: [], problems: [] });
     // A huge one is read from its end.
     writeFileSync(file, Buffer.concat([utf16("x".repeat(MAX_INSTALLER_LOG_BYTES)), Buffer.from([0x41]), utf16("\r\n0.5.35 start z\r\n0.5.35 installed C:\\RG\r\n")]));
-    expect(takeInstallerLog([dir]).lines.slice(-2)).toEqual(["0.5.35 start z", "0.5.35 installed C:\\RG"]);
+    expect(takeInstallerLog([file]).lines.slice(-2)).toEqual(["0.5.35 start z", "0.5.35 installed C:\\RG"]);
     // A folder where a file is expected: said, not thrown.
     mkdirSync(join(dir, "odd", INSTALLER_LOG_NAME), { recursive: true });
-    expect(takeInstallerLog([join(dir, "odd")]).problems).toEqual([expect.stringMatching(/ReviewGate-update\.log: E[A-Z]+$/)]);
+    expect(takeInstallerLog([join(dir, "odd", INSTALLER_LOG_NAME)]).problems).toEqual([expect.stringMatching(/update-installer\.log: E[A-Z]+$/)]);
+  });
+
+  it("is looked for in userData, and where 0.5.35's installer wrote it (each temp folder) before that", () => {
+    const userData = join(dir, "userData");
+    const temp = join(dir, "temp");
+    mkdirSync(userData, { recursive: true });
+    mkdirSync(temp, { recursive: true });
+    expect(installerLogFiles(userData, [temp, "", temp])).toEqual([join(temp, OLD_INSTALLER_LOG_NAME), join(temp, OLD_INSTALLER_LOG_NAME), join(userData, INSTALLER_LOG_NAME)]);
+    // An older run left in $TEMP by 0.5.35's installer, this run in userData: both taken, this run's lines last (its why).
+    writeFileSync(join(temp, OLD_INSTALLER_LOG_NAME), utf16(heldRun.join("\r\n") + "\r\n"));
+    writeFileSync(join(userData, INSTALLER_LOG_NAME), utf16("0.5.36 start y\r\n0.5.36 failed another-installer\r\n0.5.36 reopening C:\\RG\\ReviewGate.exe\r\n"));
+    const { lines, problems } = takeInstallerLog(installerLogFiles(userData, [temp, temp]));
+    expect(problems).toEqual([]);
+    expect(lines).toEqual([...heldRun, "0.5.36 start y", "0.5.36 failed another-installer", "0.5.36 reopening C:\\RG\\ReviewGate.exe"]);
+    expect(installerLogWhy(lines)).toMatch(/^Another ReviewGate installer was still open/);
+    expect(existsSync(join(temp, OLD_INSTALLER_LOG_NAME)) || existsSync(join(userData, INSTALLER_LOG_NAME))).toBe(false);
+  });
+
+  it("a session's own temp folder (…\\Temp\\2, the app started again through Explorer): 0.5.35's file in the one above it is found", () => {
+    const userData = join(dir, "ud2");
+    const temp = join(dir, "Temp");
+    const session = join(temp, "2");
+    mkdirSync(session, { recursive: true });
+    expect(installerLogFiles(userData, [session])).toEqual([join(session, OLD_INSTALLER_LOG_NAME), join(temp, OLD_INSTALLER_LOG_NAME), join(userData, INSTALLER_LOG_NAME)]);
+    // What 0.5.35's installer wrote on windows-latest, read by the app it started again.
+    writeFileSync(join(temp, OLD_INSTALLER_LOG_NAME), utf16("0.5.35 start x /currentuser --updated\r\n0.5.35 failed another-installer\r\n0.5.35 reopened C:\\RG\\ReviewGate.exe (ok)\r\n"));
+    const { lines } = takeInstallerLog(installerLogFiles(userData, [session, session]));
+    expect(lines).toHaveLength(3);
+    expect(installerLogWhy(lines)).toMatch(/^Another ReviewGate installer was still open/);
+    expect(existsSync(join(temp, OLD_INSTALLER_LOG_NAME))).toBe(false);
   });
 });

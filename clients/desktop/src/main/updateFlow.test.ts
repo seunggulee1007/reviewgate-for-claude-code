@@ -123,11 +123,11 @@ describe("the Windows update through main (§48)", () => {
     await m.afterEnginesStopped(endsAtOnce);
     expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number), pid: 4343, why: "The installer closed at once (exit code 2) — another ReviewGate installer may still be open." });
     expect(h.relaunched.length).toBe(relaunched + 1);
-    // build/installer.nsh's account, in the temp folder (here userData): read once, its reason in the notice.
-    writeFileSync(join(h.userData, "ReviewGate-update.log"), Buffer.from("0.6.0 start x /S --updated\r\n0.6.0 failed another-installer\r\n", "utf16le"));
+    // build/installer.nsh's account, in userData: read once, its reason in the notice.
+    writeFileSync(join(h.userData, "update-installer.log"), Buffer.from("0.6.0 start x /S --updated\r\n0.6.0 failed another-installer\r\n", "utf16le"));
     const next = await launch("0.5.17");
     expect(next.updateStatus().notice).toEqual({ kind: "failed", version: "0.6.0", why: expect.stringMatching(/^Another ReviewGate installer was still open/) });
-    expect(existsSync(join(h.userData, "ReviewGate-update.log"))).toBe(false);
+    expect(existsSync(join(h.userData, "update-installer.log"))).toBe(false);
   });
 
   it("a release without its installer yet: Install off and why, Check Again possible; once it is attached, Install is on", async () => {

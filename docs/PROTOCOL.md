@@ -7400,9 +7400,12 @@ download whose identifier differs from the running app's, so a build with an old
     Manager), shows its box only when it is not silent (in front), starts the installed (old) ReviewGate again with
     `--updated` (past the launch guard below) and quits; an installer that finds another one still open (its mutex,
     looked at before electron-builder's check quits silently) starts ReviewGate again after 4 s. Each step goes to
-    `%TEMP%\ReviewGate-update.log` (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
+    `update-installer.log` in the user's own `%APPDATA%\ReviewGate` (the app's userData, also for an install for all
+    users; 0.5.35's installer: `%TEMP%\ReviewGate-update.log`) (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
     `mode <CurrentUser|all> <folder>`, `uninstall-old failed N`, `uninstall-old retry: N`, `failed uninstall-old N
-    <file> (in use by <program> <pid>)`, `failed another-installer`, `reopened <exe> (<result>)`, `installed <folder>`).
+    <file> (in use by <program> <pid>)`, `failed another-installer`, `reopening <exe>` — written before ReviewGate starts, as the launch takes the file at
+    once (0.5.35 wrote `reopened <exe> (<result>)` after it) — then `reopen failed (<result>)` only when it could not
+    start, `installed <folder>`).
     The apps up to 0.5.30 download and run the new installer silent too, so they get it as well: they come back
     (saying only "still installed"). The app (from 0.5.35) watches the installer it started for 1.5 s
     (`updateInstall.ts` `EARLY_EXIT_MS`, before the installer's own close of a running ReviewGate ~2 s on): one that
@@ -7416,10 +7419,15 @@ download whose identifier differs from the running app's, so a build with an old
     what the installer said, else why the installer could not start, else "ReviewGate Y is still installed.") with
     [Try Again] (looks the release up when no check has, and installs it), [Download Page] and ×. Nothing installs by
     itself, so a failed install cannot loop. The windows that were open reopen once, whatever "Reopen last projects"
-    says. **What the installer said**: every launch takes `%TEMP%\ReviewGate-update.log` once
-    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines, then removed), looked for in
-    Node's `os.tmpdir()` (TEMP / TMP, what the installer's `$TEMP` is) and Electron's temp folder — on windows-latest
-    Electron's alone did not find it; a file there that cannot be read is logged as a warning. Each line goes to
+    says. **What the installer said**: every launch, with or without a record, takes the installer's log once
+    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines of each, then removed):
+    `update-installer.log` in userData (`%APPDATA%\ReviewGate`), and, first, for one version, 0.5.35's
+    `ReviewGate-update.log` in Node's `os.tmpdir()` and Electron's temp folder (`installerLogFiles`, the older place
+    first so the newest run's lines are the last). `$TEMP` alone did not work: on windows-latest the app the installer
+    started again through Explorer (`ExecShellAsUser`) had the session's own temp folder
+    (`C:\Users\<user>\AppData\Local\Temp\2`) while the installer, started by the app, had `…\Temp`, so the launch never
+    found the file, though it was there. A temp folder named by a number is such a session's: the one above it is looked
+    in too. A file that cannot be read is logged as a warning. Each line goes to
     the app's log as `update: installer: <line>`, and the last run's lines (from its `start`) give the why: a held file
     → "A file of ReviewGate was in use by another program — resources\app.asar (in use by X.exe 1234). Close that
     program or restart Windows, then try again." (no file found any more: "The old version could not be removed — a
