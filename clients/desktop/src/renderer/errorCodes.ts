@@ -260,6 +260,9 @@ export const REFUSAL_CODES = [
   "export_failed",
   "invalid_copy_n",
   "no_response",
+  // §70.4 Alt+T
+  "invalid_thinking",
+  "set_thinking_failed",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -886,6 +889,11 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("Type a number after /copy — /copy 2 copies the answer before the last");
     case "no_response":
       return d === "" || d === "1" ? t("Claude has not answered in this chat yet") : t("This chat has fewer than {0} answers", d);
+    // §70.4 Alt+T
+    case "invalid_thinking":
+      return t("Could not change thinking — the app sent something the engine does not take");
+    case "set_thinking_failed":
+      return d ? t("Claude Code could not change thinking: {0}", d) : t("Claude Code could not change thinking");
     default:
       return null;
   }

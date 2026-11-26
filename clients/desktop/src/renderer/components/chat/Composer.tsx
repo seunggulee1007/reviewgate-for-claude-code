@@ -62,6 +62,8 @@ import { addDir } from "../../addedDirs"; // §67.1
 import { copyResponse, exportToFile } from "../../chatExport"; // §70.3
 import { isHistorySearchKey, noteHistorySearchKey, searchAccepted, startHistorySearch, type HistorySearch } from "../../historySearch"; // §70.1
 import { HistorySearchBar } from "./HistorySearchBar";
+import { isThinkingKey, thinkingBlocker, thinkingOf, toggleThinking } from "../../thinking"; // §70.4
+import { ThinkingChip } from "./ThinkingChip";
 import { AddedDirsChip } from "./AddedDirsChip";
 // §67.2 `!` shell mode
 import { cancelShellCommand, isShellDraft, runShellCommand, shellBadgeTitle, shellCommandOfDraft, shellKeyHint, shellPendingCaption } from "../../shellMode";
@@ -773,6 +775,13 @@ export function Composer() {
     inputRef.current?.focus();
   };
 
+  // §70.4: the chat's extended thinking (the bar's chip and Alt+T).
+  const thinking = thinkingOf(state.session);
+  const thinkingWhy = thinkingBlocker({ projectOpen: state.project !== null, thinking, terminalChat: !!state.session.terminal, viewing: viewing !== null });
+  const runThinkingToggle = () => {
+    void toggleThinking(thinking, thinkingWhy).then((r) => (r.warning ? setAttachErrors([r.notice]) : showToast(r.notice)));
+  };
+
   /** §70.1 Enter / Tab: the match goes into the box (the draft stays when nothing matched); Esc: the bar closes. */
   const acceptSearch = () => {
     if (!search) return;
@@ -974,6 +983,12 @@ export function Composer() {
       noteHistorySearchKey(); // the View menu's Refresh is dropped for this press
       closePalette();
       setSearch(startHistorySearch(history, draft));
+      return;
+    }
+    // §70.4: Alt+T, as in the terminal — extended thinking on or off for this chat (an older engine: the key as before).
+    if (isThinkingKey({ key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }) && thinking !== null) {
+      e.preventDefault();
+      runThinkingToggle();
       return;
     }
     // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
@@ -1329,6 +1344,7 @@ export function Composer() {
           plain key hint only while the empty box has the focus), the capabilities as an icon, the tools and Send. */}
       <div className="footer">
         <ModeMenu />
+        {thinking !== null && <ThinkingChip thinking={thinking} blocker={thinkingWhy} onToggle={runThinkingToggle} /* §70.4 */ />}
         {(hint ?? (inputFocused && draft.length === 0 ? "plain" : null)) !== null && (
           <span className={`hint caption truncate ${hint ? "muted" : "faint"}${shellDraft ? " shell" : ""}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
         )}
