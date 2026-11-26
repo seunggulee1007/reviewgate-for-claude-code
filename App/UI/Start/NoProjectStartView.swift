@@ -272,7 +272,6 @@ struct TaskProjectSheet: View {
                     .tag(url)
                     .contentShape(Rectangle())
                     .help(url.path)
-                    .onTapGesture(count: 2) { selected = url; start() }
                 }
                 .listStyle(.bordered)
                 .frame(height: min(CGFloat(recent.count) * 40 + 8, 220))
