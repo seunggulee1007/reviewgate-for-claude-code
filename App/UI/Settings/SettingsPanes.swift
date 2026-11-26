@@ -39,7 +39,7 @@ struct GeneralSettingsPane: View {
             Section("Starting without a folder") {
                 LabeledContent {
                     HStack(spacing: 6) {
-                        Text(verbatim: newProjectParent.isEmpty ? AppSettings.defaultNewProjectParent : newProjectParent)
+                        Text(verbatim: ((newProjectParent.isEmpty ? AppSettings.defaultNewProjectParent : newProjectParent) as NSString).abbreviatingWithTildeInPath)
                             .foregroundStyle(newProjectParent.isEmpty ? .secondary : .primary)
                             .lineLimit(1).truncationMode(.middle)
                             .textSelection(.enabled)

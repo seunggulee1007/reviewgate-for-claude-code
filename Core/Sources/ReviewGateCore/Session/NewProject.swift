@@ -77,6 +77,13 @@ public extension AppSettings {
 
     /// The default shown when nothing is set (the engine resolves the same).
     static var defaultNewProjectParent: String { (NSHomeDirectory() as NSString).appendingPathComponent("ReviewGate") }
+
+    /// The parent as the screens show it: the home folder as `~` (`~/ReviewGate` by default), as Windows shows it.
+    static var newProjectParentForDisplay: String { newProjectParentForDisplay() }
+
+    static func newProjectParentForDisplay(defaults: UserDefaults = .standard) -> String {
+        ((newProjectParent(defaults: defaults) ?? defaultNewProjectParent) as NSString).abbreviatingWithTildeInPath
+    }
 }
 
 /// §69 refusals in the user's words (`git_init_failed` keeps its existing wording).
