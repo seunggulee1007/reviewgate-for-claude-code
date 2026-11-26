@@ -3021,7 +3021,9 @@ extension TranscriptItem: Decodable {
 
 public enum EngineEvent: Sendable, Equatable {
     case ready(id: String?, engineVersion: String, platform: String, protocolVersion: Int)
-    case state(ReviewState)
+    /// Boxed: the snapshot is by far the widest payload — inline it made every event as wide as a whole state, and a test
+    /// holding many events overflowed its thread's stack once the session slice grew (§70.4).
+    indirect case state(ReviewState)
     /// §19.6: `code` is the refusal's stable id (older engines omit it); `paths` the files it is about
     /// (`file_changed_since_review`, §19.1); `partial` the commits a `commit_series` made before it failed (§53).
     case result(id: String, ok: Bool, error: String?, code: String? = nil, paths: [String]? = nil, partial: CommittedSeries? = nil)
