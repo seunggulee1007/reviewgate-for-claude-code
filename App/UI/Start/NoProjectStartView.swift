@@ -134,6 +134,9 @@ struct NewProjectSheet: View {
             Text("What do you want to make?").font(.subheadline.weight(.semibold))
             TextEditor(text: $prompt)
                 .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 4).padding(.vertical, 4)   // the words off the border, as in the other text boxes
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
                 .frame(minHeight: 90, maxHeight: 180)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.secondary.opacity(0.3)))
                 .focused($promptFocused)
