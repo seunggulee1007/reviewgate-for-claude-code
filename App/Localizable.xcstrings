@@ -5537,22 +5537,6 @@
         }
       }
     },
-    "Choose a project folder (3)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose a project folder (3)"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "프로젝트 폴더 고르기 (3)"
-          }
-        }
-      }
-    },
     "Choose another directory Claude may work in (/add-dir)": {
       "localizations": {
         "en": {
@@ -6193,22 +6177,6 @@
         }
       }
     },
-    "Matches %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Matches %@"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ 일치"
-          }
-        }
-      }
-    },
     "More: Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
       "localizations": {
         "en": {
@@ -6333,22 +6301,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "다음 참조 (F4)"
-          }
-        }
-      }
-    },
-    "No folder yet — say what you want to make": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No folder yet — say what you want to make"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "폴더 없이 — 만들고 싶은 걸 적어요"
           }
         }
       }
@@ -10179,6 +10131,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트 폴더를 선택하세요"
+          }
+        }
+      }
+    },
+    "Choose a project folder (3)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a project folder (3)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더를 골라요 (3)"
           }
         }
       }
@@ -23168,6 +23136,22 @@
         }
       }
     },
+    "Matches %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matches %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 원격과 일치"
+          }
+        }
+      }
+    },
     "Maven and Gradle count when the goal or task runs tests (test, verify, check, …Test).": {
       "localizations": {
         "en": {
@@ -24642,6 +24626,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "복사할 파일 없음"
+          }
+        }
+      }
+    },
+    "No folder yet — say what you want to make": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder yet — say what you want to make"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더가 없어도 돼요 — 만들고 싶은 걸 적어요"
           }
         }
       }
