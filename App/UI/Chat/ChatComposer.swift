@@ -361,6 +361,7 @@ struct ChatComposer: View {
             // (the plain key hint only while the empty box has the focus), the capabilities as an icon, then the controls.
             HStack {
                 ComposerModeMenu(compact: barCompact)   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드"
+                ThinkingChip(composer: composer)   // §70.4: ⌥T
                 if store.isSessionEnded {
                     Label("Session ended", systemImage: "bolt.slash")
                         .font(.caption).foregroundStyle(.orange)
@@ -448,6 +449,7 @@ struct ChatComposer: View {
                 // stack: a modifier on the bare views would measure each of them apart. §56.6: the mode menu folds with them.
                 HStack(spacing: ComposerBarFit.spacing) {
                     ComposerModeMenu()
+                    ThinkingChip(composer: composer)
                     secondaryControls(compact: false, measuring: true)
                 }
                     .fixedSize()
@@ -1440,7 +1442,7 @@ struct ChatComposer: View {
                 composer.mentionDismissed = true
                 return true
             case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG, .controlR:
+                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG, .controlR, .optionT:
                 break
             }
         }
@@ -1470,6 +1472,11 @@ struct ChatComposer: View {
             if paletteVisible { composer.closePalette() }
             composer.mentionDismissed = true
             composer.startHistorySearch(entries: store.promptHistory)
+            return true
+        case .optionT:
+            // §70.4: as Option+T in the terminal — extended thinking on or off for this chat (an older engine: "†" as before).
+            guard store.thinking != nil else { return false }
+            composer.toggleThinking(store: store)
             return true
         case .pageUp, .pageDown:
             // polish P3-transcript-17: a page of the conversation from the message box (the transcript scrolls by the tick).

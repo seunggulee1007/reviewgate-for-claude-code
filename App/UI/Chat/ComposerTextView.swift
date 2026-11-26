@@ -41,6 +41,8 @@ enum ComposerKey: Equatable {
     case space
     /// §70.1: ⌃R — the prompt history search, as Ctrl+R in the terminal (AppKit binds nothing to it in a text view).
     case controlR
+    /// §70.4: ⌥T — extended thinking on or off, as Option+T in the terminal (instead of typing "†").
+    case optionT
     /// §56.3: ⌃G — the draft in an external editor, as Ctrl+G in the terminal (AppKit binds nothing to it in a text view).
     case controlG
 }
@@ -318,7 +320,20 @@ final class ComposerNSTextView: NSTextView {
            event.charactersIgnoringModifiers?.lowercased() == "r", coordinator.parent.onKey(.controlR) {   // §70.1
             return
         }
+        if !hasMarkedText(), let coordinator, event.modifierFlags.intersection([.command, .control, .option, .shift]) == .option,
+           Self.isKey(event, "t", keyCode: 17), coordinator.parent.onKey(.optionT) {   // §70.4
+            return
+        }
         super.keyDown(with: event)
+    }
+
+    /// The letter `letter` on any layout: its character, or — when the input source types no Latin letter there (Korean)
+    /// — the key at its ANSI position.
+    static func isKey(_ event: NSEvent, _ letter: String, keyCode: UInt16) -> Bool {
+        guard let typed = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        if typed == letter { return true }
+        let latin = typed.unicodeScalars.allSatisfy { ("a"..."z").contains($0) }
+        return !latin && event.keyCode == keyCode
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
