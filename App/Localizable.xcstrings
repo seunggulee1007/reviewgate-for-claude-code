@@ -5761,6 +5761,22 @@
         }
       }
     },
+    "Each key opens it at once": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each key opens it at once"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "누르면 바로 열려요"
+          }
+        }
+      }
+    },
     "Earlier searches": {
       "localizations": {
         "en": {
@@ -6237,6 +6253,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더의 ReviewGate."
+          }
+        }
+      }
+    },
+    "New Project · Start from a task · Open a folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Project · Start from a task · Open a folder…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 시작 · 업무로 시작 · 폴더 열기…"
           }
         }
       }
@@ -16215,6 +16247,22 @@
         }
       }
     },
+    "Move between the cards, then take the marked one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move between the cards, then take the marked one"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카드 사이 이동, 표시된 것 열기"
+          }
+        }
+      }
+    },
     "Move through the choices and the recent chats, then open the marked one": {
       "localizations": {
         "en": {
@@ -19075,6 +19123,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프로젝트 창이 열릴 때"
+          }
+        }
+      }
+    },
+    "When a window has no project open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a window has no project open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열지 않은 창에서"
           }
         }
       }
@@ -38690,6 +38754,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "왜?"
+          }
+        }
+      }
+    },
+    "Window with no project": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window with no project"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 없는 창"
           }
         }
       }
