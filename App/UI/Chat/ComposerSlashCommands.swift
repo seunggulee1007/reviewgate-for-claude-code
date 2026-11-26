@@ -184,7 +184,10 @@ struct ComposerSlashHooks: ViewModifier {
         case let .terminalOnly(name): composer.slashCard = .terminalOnly(name)
         case let .addDir(path):   // §67.1
             if path.isEmpty { composer.pickAddDir(store: store) } else { composer.addDir(path, typed: request.draft, store: store) }
-        case let .export(file):   // §70.3
+        case .export where store.viewingChat != nil, .copy where store.viewingChat != nil:   // §70.3: not the chat shown read-only
+            composer.notice = ChatExportText.viewingBlocker
+            if composer.draft.isEmpty { composer.draft = request.draft }
+        case let .export(file):
             if file.isEmpty { composer.openExport(store: store) { exportItem = ChatExportItem(export: $0) } }
             else { composer.export(to: file, typed: request.draft, store: store) }
         case let .copy(argument):

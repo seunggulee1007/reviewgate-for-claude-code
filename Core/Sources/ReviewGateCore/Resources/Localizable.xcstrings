@@ -7895,6 +7895,22 @@
         }
       }
     },
+    "Go back to the running chat to export or copy from it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to export or copy from it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내보내거나 복사하려면 실행 중인 채팅으로 돌아가세요"
+          }
+        }
+      }
+    },
     "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
       "localizations": {
         "en": {

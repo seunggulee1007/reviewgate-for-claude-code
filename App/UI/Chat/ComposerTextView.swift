@@ -317,7 +317,7 @@ final class ComposerNSTextView: NSTextView {
             return
         }
         if !hasMarkedText(), let coordinator, event.modifierFlags.intersection([.command, .control, .option, .shift]) == .control,
-           event.charactersIgnoringModifiers?.lowercased() == "r", coordinator.parent.onKey(.controlR) {   // §70.1
+           Self.isKey(event, "r", keyCode: 15), coordinator.parent.onKey(.controlR) {   // §70.1
             return
         }
         if !hasMarkedText(), let coordinator, event.modifierFlags.intersection([.command, .control, .option, .shift]) == .option,

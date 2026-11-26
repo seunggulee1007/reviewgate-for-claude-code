@@ -91,6 +91,8 @@ public enum ChatExportText {
         n <= 1 ? String(localized: "Copied Claude's last answer", bundle: .module)
                : String(localized: "Copied Claude's answer \(n) back", bundle: .module)
     }
+    /// A chat shown read-only (§39.2): /export and /copy work on the running chat.
+    public static var viewingBlocker: String { String(localized: "Go back to the running chat to export or copy from it", bundle: .module) }
     public static var copyUsage: String { String(localized: "Type a number after /copy — /copy 2 copies the answer before the last", bundle: .module) }
     /// "N lines · M characters" under the sheet's title.
     public static func size(_ text: String) -> String {
