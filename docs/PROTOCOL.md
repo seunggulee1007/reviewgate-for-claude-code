@@ -7400,7 +7400,12 @@ download whose identifier differs from the running app's, so a build with an old
     `mode <CurrentUser|all> <folder>`, `uninstall-old failed N`, `uninstall-old retry: N`, `failed uninstall-old N
     <file> (in use by <program> <pid>)`, `failed another-installer`, `reopened <exe> (<result>)`, `installed <folder>`).
     The apps up to 0.5.30 download and run the new installer silent too, so they get it as well: they come back
-    (saying only "still installed").
+    (saying only "still installed"). The app (from 0.5.35) watches the installer it started for 1.5 s
+    (`updateInstall.ts` `EARLY_EXIT_MS`, before the installer's own close of a running ReviewGate ~2 s on): one that
+    ends meanwhile did not install (an older installer meeting another one's mutex quits within a second) — "The
+    installer closed at once (exit code N) — another ReviewGate installer may still be open." goes into the record and
+    the app reopens. Its log says `update: installer started (<file>, pid N, shown: /currentuser --updated)` and
+    `update: the installer still runs after 1500 ms — quitting`.
   - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
     Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
     no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:

@@ -301,5 +301,21 @@ export function launchInstaller(file: string, spawn: SpawnInstaller, mode: "user
   });
 }
 
+/** How long the quitting app watches the installer it started: one that ends this soon did not install (another
+ * installer of ReviewGate still open: electron-builder's single-instance check quits at once). Short of the installer's
+ * own close of a running ReviewGate (~2 s on). */
+export const EARLY_EXIT_MS = 1500;
+
+/** The installer's exit code when it ends within `ms` (null: it ended without one), else "running". */
+export function endedWithin(child: Pick<ReturnType<SpawnInstaller>, "once">, ms: number): Promise<number | null | "running"> {
+  return new Promise((done) => {
+    const timer = setTimeout(() => done("running"), ms);
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      done(code);
+    });
+  });
+}
+
 /** `<userData>/updates` — every download folder lives there; the next launch removes what is left. */
 export const updatesFolder = (userData: string): string => join(userData, "updates");

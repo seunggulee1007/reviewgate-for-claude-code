@@ -2,7 +2,7 @@
 // → the record and the quit hook → the installer started once the engines stopped; an installer that cannot start → the
 // record says why and the app reopens; the next launch says it once and installs nothing by itself. Each "launch" is a
 // fresh import of the module (a new process).
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -111,6 +111,25 @@ describe("the Windows update through main (§48)", () => {
     expect(laterQuits).toBe(0);
     expect(h.settings["pendingUpdateInstall"]).toBeUndefined();
   });
+  it("an installer that ends at once (another one still open): the record says so and the app reopens; the installer's log says more", async () => {
+    let quits = 0;
+    const m = await launch("0.5.17", () => void quits++);
+    await m.checkOnce(async () => ({ ok: true, json: release }));
+    await m.installNow();
+    await until(() => quits > 0);
+    const endsAtOnce: SpawnInstaller = () =>
+      ({ pid: 4343, once: (e: string, cb: (c?: number | null) => void) => (e === "spawn" ? queueMicrotask(() => cb()) : e === "exit" ? setTimeout(() => cb(2), 50) : undefined), unref: () => undefined }) as ReturnType<SpawnInstaller>;
+    const relaunched = h.relaunched.length;
+    await m.afterEnginesStopped(endsAtOnce);
+    expect(h.settings["pendingUpdateInstall"]).toEqual({ from: "0.5.17", to: "0.6.0", at: expect.any(Number), pid: 4343, why: "The installer closed at once (exit code 2) — another ReviewGate installer may still be open." });
+    expect(h.relaunched.length).toBe(relaunched + 1);
+    // build/installer.nsh's account, in the temp folder (here userData): read once, its reason in the notice.
+    writeFileSync(join(h.userData, "ReviewGate-update.log"), Buffer.from("0.6.0 start x /S --updated\r\n0.6.0 failed another-installer\r\n", "utf16le"));
+    const next = await launch("0.5.17");
+    expect(next.updateStatus().notice).toEqual({ kind: "failed", version: "0.6.0", why: expect.stringMatching(/^Another ReviewGate installer was still open/) });
+    expect(existsSync(join(h.userData, "ReviewGate-update.log"))).toBe(false);
+  });
+
   it("a release without its installer yet: Install off and why, Check Again possible; once it is attached, Install is on", async () => {
     h.mode = { kind: "user" };
     const m = await launch("0.5.17");

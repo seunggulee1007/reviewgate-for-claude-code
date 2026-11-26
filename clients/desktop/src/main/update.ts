@@ -28,7 +28,7 @@ import type { UpdateStatus } from "../shared/ipc.js";
 import { downloadTo, MAX_CHECKSUM_BYTES, MAX_INSTALLER_BYTES, type HttpGet } from "./updateDownload.js";
 import { installerAssets, verifyInstaller, type InstallerAssets } from "./updateVerify.js";
 import { InstallerRecheck } from "./updateRecheck.js";
-import { blockerLine, installMode, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type InstallMode, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
+import { blockerLine, EARLY_EXIT_MS, endedWithin, INSTALLER_ARGS, installMode, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type InstallMode, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
 import { installerLogWhy, takeInstallerLog } from "./updateInstallerLog.js";
 
 export type ReleaseInfo = { version: string; tag: string; page: string; notes: string; assets: InstallerAssets | null };
@@ -267,18 +267,25 @@ export async function afterEnginesStopped(spawnInstaller: SpawnInstaller = spawn
   pendingInstaller = null;
   const mode = modeHere().kind === "elevated" ? "elevated" : "user";
   let pid: number | undefined;
+  let child: ReturnType<SpawnInstaller> | undefined;
   const keepPid: SpawnInstaller = (file, args, options) => {
-    const child = spawnInstaller(file, args, options);
+    child = spawnInstaller(file, args, options);
     pid = child.pid;
     return child;
   };
-  const why = await launchInstaller(ready.file, keepPid, mode, process.env["SystemRoot"]);
+  let why = await launchInstaller(ready.file, keepPid, mode, process.env["SystemRoot"]);
   if (why === null) {
-    logLine("main", "main", `update: installer started (${ready.file}${pid ? `, pid ${pid}` : ""})`);
+    logLine("main", "main", `update: installer started (${ready.file}${pid ? `, pid ${pid}` : ""}, ${mode === "user" ? `shown: ${INSTALLER_ARGS.join(" ")}` : "elevated through PowerShell"})`);
     // A launch while it runs knows it (`installerStillRunning`). Elevated, `pid` is PowerShell's, gone at once.
     const record = mode === "user" && pid ? validRecord(loadSettings().pendingUpdateInstall) : null;
     if (record) saveSettings({ pendingUpdateInstall: { ...record, pid } });
-    return;
+    // One that ends at once did not install (another installer of ReviewGate still open): say so and come back.
+    const ended = mode === "user" && child ? await endedWithin(child, EARLY_EXIT_MS) : "running";
+    if (ended === "running") {
+      logLine("main", "main", `update: the installer still runs after ${EARLY_EXIT_MS} ms — quitting`);
+      return;
+    }
+    why = t("The installer closed at once (exit code {0}) — another ReviewGate installer may still be open.", String(ended));
   }
   logLine("main", "error", `update: ${why}`);
   const record = validRecord(loadSettings().pendingUpdateInstall);
