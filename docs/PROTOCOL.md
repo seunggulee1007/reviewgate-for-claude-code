@@ -11558,7 +11558,7 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
   (69.2) and the sheet stays.
 - **Start from a task.** One sheet: the task field (as §63.3's), then the base project: the recent projects (existing
   folders only), the one `project_match` names preselected — `guess`, else the most recent — with "Matches <owner/repo>" on
-  the rows in `matches`, plus "Other folder…" (the folder picker). One click on a row, or Continue, opens that project; its
+  the rows in `matches`, plus "Other folder…" (the folder picker). One click on a row picks it; a double-click on it, or Open and Continue (↩ / Enter), opens that project; its
   start screen then shows (whatever "Start straight away next time" says — the user asked for the task) with the task sheet
   of §63.3 already open and the task filled in. From there it is §63.3 unchanged (branch or workbench, first prompt, never
   sent). Nothing is created in this path. A folder that is no repository gets the git-init prompt first (§59); the task

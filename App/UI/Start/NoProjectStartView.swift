@@ -304,6 +304,12 @@ struct TaskProjectSheet: View {
                     .help(url.path)
                 }
                 .listStyle(.bordered)
+                .contextMenu(forSelectionType: URL.self, menu: { _ in EmptyView() }) { urls in
+                    // A double-click on a row opens it, as on Windows; a single click only selects.
+                    guard let url = urls.first else { return }
+                    selected = url
+                    start()
+                }
                 .frame(height: min(CGFloat(recent.count) * 40 + 8, 220))
                 .accessibilityIdentifier("Task project list")
             }
