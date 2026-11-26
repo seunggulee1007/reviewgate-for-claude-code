@@ -7783,6 +7783,38 @@
         }
       }
     },
+    "No prompt matches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No prompt matches"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "맞는 프롬프트가 없어요"
+          }
+        }
+      }
+    },
+    "No prompts in this project yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No prompts in this project yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에서 보낸 프롬프트가 아직 없어요"
+          }
+        }
+      }
+    },
     "No references": {
       "localizations": {
         "en": {
@@ -7923,6 +7955,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "채팅 기록을 열어 이전 채팅을 이어가요"
+          }
+        }
+      }
+    },
+    "Prompt history search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt history search"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트 기록 검색"
           }
         }
       }
@@ -8147,6 +8195,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "10초가 지나 검색을 멈췄어요"
+          }
+        }
+      }
+    },
+    "Search your prompts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search your prompts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보낸 프롬프트 검색"
+          }
+        }
+      }
+    },
+    "Searches the prompts sent in this project, newest first: ⌃R or ↑ for an older match, ↓ for a newer one, ↩ or ⇥ puts it into the message box, esc gives your draft back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches the prompts sent in this project, newest first: ⌃R or ↑ for an older match, ↓ for a newer one, ↩ or ⇥ puts it into the message box, esc gives your draft back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에서 보낸 프롬프트를 최근 것부터 찾아요: ⌃R 이나 ↑ 는 더 이전 것, ↓ 는 더 최근 것, ↩ 나 ⇥ 는 메시지 입력창에 넣고, esc 는 쓰던 초안을 돌려놔요"
           }
         }
       }
@@ -8803,6 +8883,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "/add-dir 뒤에 디렉터리 경로를 입력하세요"
+          }
+        }
+      }
+    },
+    "Type to search the prompts sent in this project": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type to search the prompts sent in this project"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력하면 이 프로젝트에서 보낸 프롬프트를 찾아요"
           }
         }
       }
@@ -21039,6 +21135,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 폴더는 너무 커서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "⌃R older · ↩ or ⇥ use · esc cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃R older · ↩ or ⇥ use · esc cancel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃R 이전 · ↩ 또는 ⇥ 넣기 · esc 취소"
           }
         }
       }

@@ -11586,6 +11586,32 @@ Four more things a terminal user reaches for without thinking, checked against C
 the commands reference, as of 2026-11): Ctrl+R history search, `#` memory, `/export` and `/copy`, and Alt+T thinking.
 Terminal chats (§57) are the real TUI and keep theirs; everything here is for classic chats.
 
+### 70.1 Ctrl+R — search the prompt history (clients only)
+
+No engine command: the prompt history is the clients' own (↑ / ↓, per project, ≤ 100 — §44.1; Mac `AppSettings`
+`promptHistory`, Windows `promptHistory.ts` in localStorage).
+
+- **As the terminal's Ctrl+R.** The interactive-mode reference: "Press `Ctrl+R` to interactively search through your
+  command history … Type to filter … press `Ctrl+R` again to cycle through older matches … Press `Enter` or `Tab` to place
+  a match in the prompt input, or `Esc` to cancel" (the search dialog of fullscreen rendering; the classic renderer's inline
+  search sends on Enter and accepts on Esc). The app follows the dialog: a search never sends anything, and Esc gives the
+  draft back.
+- **Mac ⌃R, Windows Ctrl+R** in the message box of a classic chat open a search bar over the box: a field (focused), the
+  match with the typed text highlighted (newest first, case-insensitive, at most three lines shown), "2 / 5", and the key
+  hint. Typing filters; ⌃R / Ctrl+R again or ↑ steps to the next older match, ↓ to a newer one; ↩ / Enter or ⇥ / Tab puts
+  the match into the box (caret at the end) and closes the bar; esc, ⌫ / Backspace in an empty field, and ⌃C (Mac) close
+  it and give the draft back. Nothing typed yet shows "Type to search the prompts sent in this project"; no match shows
+  "No prompt matches" (↩ then keeps the draft); an empty history says "No prompts in this project yet". An input method's
+  composition (Korean) keeps its own ↩ / esc. The bar's tooltip lists the keys.
+- **Windows: Ctrl+R was Refresh.** The View menu's Refresh keeps Ctrl+R as its shown key, but the renderer owns the key
+  (`registerAccelerator: false`, as the other renderer keys): in the message box it opens the search, elsewhere it
+  refreshes as before. On the Mac ⌘R stays Refresh and ⌃R is free.
+- **Mac:** Core `Session/PromptHistorySearch.swift` (`PromptHistorySearch`, `PromptHistorySearchText`); App
+  `ComposerHistorySearch.swift` (the bar), `ComposerTextView` (⌃R → `.controlR`), `ChatComposer`. Tests:
+  `PromptHistorySearchTests`.
+- **Windows:** `historySearch.ts` (pure), `components/chat/HistorySearchBar.tsx`, `Composer.tsx`, `shortcuts.ts` (Ctrl+R
+  outside the box), main `menu.ts`. Tests: `historySearch.test.ts`.
+
 ### 70.2 `#` quick memory — not built
 
 Claude Code no longer has it. The interactive-mode reference's quick commands are `/` (commands and skills), `!` (shell
