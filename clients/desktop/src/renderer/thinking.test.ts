@@ -71,13 +71,14 @@ describe("§70.4 Alt+T on Windows", () => {
     expect(m.mod.thinkingBlocker({ ...base, projectOpen: false })).not.toBeNull();
   });
 
-  it("the chip: the brain, the words when off, the tooltip, disabled with the reason", () => {
+  it("the chip: the mark, struck through when off, the tooltip, disabled with the reason", () => {
     const on = renderToStaticMarkup(createElement(m.chip.ThinkingChip, { thinking: { enabled: true, alwaysOn: false }, blocker: null, onToggle: () => undefined }));
     expect(on).toContain('aria-pressed="true"');
     expect(on).toContain("click or press Alt+T to turn it off");
-    expect(on).not.toContain("<span>");
+    expect(on).toContain("✻");
     const off = renderToStaticMarkup(createElement(m.chip.ThinkingChip, { thinking: { enabled: false, alwaysOn: false }, blocker: null, onToggle: () => undefined }));
-    expect(off).toContain("<span>Thinking off</span>");
+    expect(off).toContain('aria-pressed="false"');
+    expect(off).toContain('aria-label="Thinking off — ');
     const blocked = renderToStaticMarkup(createElement(m.chip.ThinkingChip, { thinking: { enabled: true, alwaysOn: false }, blocker: "Go back", onToggle: () => undefined }));
     expect(blocked).toContain("disabled");
     expect(blocked).toContain('title="Go back"');

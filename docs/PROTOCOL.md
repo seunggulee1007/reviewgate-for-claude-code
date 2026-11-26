@@ -11691,8 +11691,9 @@ set_thinking { enabled: boolean }   // the current chat's; lane main, allowed wh
 - **Clients.** ⌥T (Mac) / Alt+T (Windows; the physical T — macOS types "†", a Korean layout "ㅅ") in the message box sends
   `set_thinking {enabled: !enabled}`; the line after it says "Thinking off — from Claude's next request" (Mac the info line,
   Windows a toast). With `alwaysOn` nothing is sent and the line says the model always thinks. The composer bar shows a
-  brain right after the mode menu: the accent while Claude thinks (`enabled || alwaysOn`), dim with "Thinking off" when it
-  does not; a click toggles it. Its tooltip: "Extended thinking is on for this chat — click or press ⌥T to turn it off" (or
+  chip right after the mode menu, in the accent while Claude thinks (`enabled || alwaysOn`): on the Mac a brain, dim with
+  "Thinking off" when it does not; on Windows Claude Code's ✻, struck through when off (no words: the narrow chat column
+  keeps its footer on one row — the words are the tooltip and the accessible name). A click toggles it. Its tooltip: "Extended thinking is on for this chat — click or press ⌥T to turn it off" (or
   on), "This model always uses extended thinking — ⌥T has no effect on it", or why it is disabled (no project, an engine
   without §70.4 — then the chip is hidden and the key types as before —, a terminal chat, a chat shown read-only). Mac: Core
   `Session/ExtendedThinking.swift` (`ThinkingState`, `ThinkingText`, `ThinkingToggle`, `thinkingBlocker`,
