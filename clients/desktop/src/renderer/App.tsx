@@ -253,7 +253,7 @@ function NoProjectCards({ opening, onOpen }: { opening: boolean; onOpen: () => v
   };
   const where = parent?.trim() || (window.rg.platform === "win32" ? "%USERPROFILE%\\ReviewGate" : "~/ReviewGate");
   const cards: { c: NoProjectChoice; icon: IconName; title: string; detail: string; help: string; testId: string }[] = [
-    { c: 1, icon: "plus", title: t("New"), detail: t("No folder yet — say what you want to make"), help: t("Makes a folder for it under {0} as a git repository (1)", where), testId: "No project choice 1" },
+    { c: 1, icon: "plus", title: t("New Project"), detail: t("No folder yet — say what you want to make"), help: t("Makes a folder for it under {0} as a git repository (1)", where), testId: "No project choice 1" },
     { c: 2, icon: "branch", title: t("Start from a task"), detail: t("Pick the project the task belongs to"), help: t("A task link, key or number — then its project, its branch and first prompt (2)"), testId: "No project choice 2" },
     { c: 3, icon: "folder", title: t("Open a folder…"), detail: t("A project you already have"), help: t("Choose a project folder (3)"), testId: "Open project" },
   ];
@@ -263,7 +263,7 @@ function NoProjectCards({ opening, onOpen }: { opening: boolean; onOpen: () => v
       className="start-cards"
       tabIndex={-1}
       role="group"
-      aria-label={t("New · Start from a task · Open a folder…")}
+      aria-label={t("New Project · Start from a task · Open a folder…")}
       style={{ width: 640, maxWidth: "100%", outline: "none" }}
       onKeyDown={(e) => {
         if (e.target instanceof HTMLInputElement || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
@@ -318,7 +318,7 @@ function NoProject() {
       ) : (
         <h2>{t("How do you want to start?")}</h2>
       )}
-      <div>{t("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New.")}</div>
+      <div>{t("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")}</div>
       {/* §69: 1 New · 2 Start from a task · 3 Open a folder… (Open Project), with the keys of the start screen */}
       <NoProjectCards opening={opening !== null} onOpen={() => void chooseAndOpen("open")} />
       {entries.length > 0 && (

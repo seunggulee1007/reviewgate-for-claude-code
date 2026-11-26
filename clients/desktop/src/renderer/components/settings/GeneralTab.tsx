@@ -75,7 +75,7 @@ export function GeneralPane({ settings }: PaneProps) {
           <span>{t("Folder for new projects")}</span>
           <TextField value={settings.newProjectParent ?? ""} placeholder={DEFAULT_NEW_PROJECT_PARENT[window.rg.platform === "win32" ? "win32" : "other"]} onCommit={(v) => patch({ newProjectParent: v })} testId="Folder for new projects" />
         </div>
-        <div className="note">{t("New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.")}</div>
+        <div className="note">{t("New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.")}</div>
       </section>
       <section>
         <h4>{t("Typing and the chat")}</h4>
