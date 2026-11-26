@@ -16,6 +16,7 @@ import { parseUnifiedDiff } from "../../../../engine/src/diff/parse.js";
 import { addSegments } from "../../../../engine/src/diff/segments.js";
 import { DEFAULTS } from "../../src/main/settings.js";
 import type { AppSettings } from "../../src/shared/ipc.js";
+import { projectRootHash } from "../../src/shared/hash.js";
 import pkg from "../../package.json";
 import { baseState } from "./baseState.js";
 import { layoutCheck, type LayoutFinding } from "./layoutCheck.js";
@@ -77,6 +78,8 @@ type Scene = {
   bridge?: Record<string, unknown>;
   /** File diffs by path as unified patches: `select_file` replies (`file_diff`). */
   diffs?: Record<string, string>;
+  /** §70.1: the open project's sent prompts (oldest first), in the page's localStorage before the app starts. */
+  promptHistory?: string[];
   steps?: Step[];
 };
 
@@ -357,6 +360,13 @@ async function shoot(scene: Scene, variant: Variant, index: number): Promise<Sho
   live.set(wc.id, l);
   try {
     await win.loadFile(join(rendererDir, "index.html"));
+    const root = (scene.state?.project as { root?: string } | null | undefined)?.root;
+    if (scene.promptHistory && root) {
+      // The composer reads the history when it mounts: write it, then load the page again (the partition keeps it).
+      const key = `rg.promptHistory.${projectRootHash(root)}`;
+      await wc.executeJavaScript(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(scene.promptHistory))})`);
+      await win.loadFile(join(rendererDir, "index.html"));
+    }
     const ready = await wc.executeJavaScript(`new Promise((r) => { const t0 = Date.now(); const tick = () => document.querySelector('[data-testid="App"]') ? r(true) : Date.now() - t0 > 8000 ? r(false) : setTimeout(tick, 50); tick(); })`);
     if (!ready) errors.push("the app never rendered");
     await sleep(400);

@@ -1,0 +1,12 @@
+{
+  "extends": "04-review.json",
+  "name": "thinking-off",
+  "description": "Alt+T turned extended thinking off for the chat (§70.4): the composer bar's brain with \"Thinking off\".",
+  "state": {
+    "session": { "thinking": { "enabled": false, "alwaysOn": false } }
+  },
+  "steps": [
+    { "waitFor": "Thinking toggle" },
+    { "wait": 300 }
+  ]
+}

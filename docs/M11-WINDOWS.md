@@ -290,7 +290,8 @@ Windows 11 frame at 100 % (31 px title bar, 20 px menu bar, 8 px resize borders)
 **Scenes** are JSON: `settings` (over the app's `DEFAULTS`), `recent` (the recent-projects rows), `state` (merged over
 `baseState.ts`; arrays replace), `events` (engine events after the state: `transcript_restore`, …), `replies` (an
 engine request's reply by command type; `{"$by": "<field>", "map": {…}}` picks one by a field of the command),
-`diffs` (unified patches by path: `select_file` replies), `bridge` (a `window.rg` call's value by name), `extends`
+`diffs` (unified patches by path: `select_file` replies), `bridge` (a `window.rg` call's value by name), `promptHistory`
+(the open project's sent prompts, oldest first — the page's localStorage before the app starts, §70.1), `extends`
 (another scene file this one is merged over) and `steps`:
 
 | Step | |
@@ -305,7 +306,9 @@ engine request's reply by command type; `{"$by": "<field>", "map": {…}}` picks
 The first scenes: `no-project` (§69 cards, recent projects, one gone), `new-project` (New Project with a long Korean
 first prompt), `task-project` (Start from a task, an issue link, the matching project preselected), `review` (three
 changed files, a diff, the turn in the chat), `commit-others` (the commit dialog with other changes, an untracked one
-shown), `settings-general` (Settings › General). A request with no reply in the scene (or the harness's common empty
+shown), `settings-general` (Settings › General); §70: `history-search` (Ctrl+R over the prompts, a match highlighted),
+`history-nomatch` (nothing matches), `thinking-off` (the composer bar's chip with thinking off), `chat-export` (`/export`'s
+dialog). A request with no reply in the scene (or the harness's common empty
 replies) is refused and listed as `note: no fixture for …`.
 
 **Checks** — any finding marks the shot (`MARK` in the output, details in `report.json`) and the run exits 1:

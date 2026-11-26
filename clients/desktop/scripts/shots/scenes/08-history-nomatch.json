@@ -1,0 +1,13 @@
+{
+  "extends": "07-history-search.json",
+  "name": "history-nomatch",
+  "description": "Ctrl+R with a search no prompt has (§70.1): \"No prompt matches\" — Enter keeps the draft.",
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": { "en": "half-typed draft", "ko": "쓰다 만 초안" } } },
+    { "key": "r", "ctrl": true },
+    { "waitFor": "Prompt history search field" },
+    { "type": { "testid": "Prompt history search field", "value": "deploy to staging" } },
+    { "wait": 300 }
+  ]
+}
