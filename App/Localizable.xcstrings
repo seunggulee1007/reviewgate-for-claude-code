@@ -5665,6 +5665,38 @@
         }
       }
     },
+    "Close the search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the search"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색 닫기"
+          }
+        }
+      }
+    },
+    "Close the search — your draft stays (esc)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close the search — your draft stays (esc)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색 닫기 — 쓰던 초안은 그대로예요 (esc)"
+          }
+        }
+      }
+    },
     "Commit changed files — the review's and your own": {
       "localizations": {
         "en": {

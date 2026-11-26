@@ -42,6 +42,8 @@ final class ComposerModel {
     var dropHover = false
     /// ↑ / ↓ in an empty composer: this project's previous prompts.
     @ObservationIgnored var history = PromptHistoryNavigator(entries: [])
+    /// §70.1: the ⌃R search over those prompts while its bar is open (ComposerHistorySearch.swift).
+    var historySearch: PromptHistorySearch?
     /// §56.3: ⌃G — the draft out in an external editor.
     let externalEditor = ComposerExternalEditor()
     // MARK: r1-composer M12 — the window keeps this composer (§38.1)
@@ -353,6 +355,7 @@ struct ChatComposer: View {
             ComposerSlashSlot(composer: composer)   // §56.5: /status, or a built-in only the terminal has
             ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
             ShellPendingCaption()   // §67.2: "셸 결과 N개가 다음 메시지와 함께 Claude에게 가요"
+            ComposerHistorySearchBar(composer: composer)   // §70.1: ⌃R over the prompt history
             inputBox
             // §56.6: one row under the box — the mode (the terminal's mode line, now its menu), what a send does right now
             // (the plain key hint only while the empty box has the focus), the capabilities as an icon, then the controls.
@@ -1437,7 +1440,7 @@ struct ChatComposer: View {
                 composer.mentionDismissed = true
                 return true
             case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG:
+                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG, .controlR:
                 break
             }
         }
@@ -1461,6 +1464,12 @@ struct ChatComposer: View {
         case .controlG:
             guard store.viewingChat == nil else { return false }   // §56.3
             startExternalEdit()
+            return true
+        case .controlR:
+            // §70.1: as Ctrl+R in the terminal — the bar over the box searches this project's prompts (the palettes close).
+            if paletteVisible { composer.closePalette() }
+            composer.mentionDismissed = true
+            composer.startHistorySearch(entries: store.promptHistory)
             return true
         case .pageUp, .pageDown:
             // polish P3-transcript-17: a page of the conversation from the message box (the transcript scrolls by the tick).

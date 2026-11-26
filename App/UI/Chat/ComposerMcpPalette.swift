@@ -134,7 +134,7 @@ extension ComposerModel {
             draft = ""   // as the terminal's dialog: the command goes with it
             return true
         case .pageUp, .pageDown, .commandSlash, .commandShiftEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-             .digit, .space, .controlG:
+             .digit, .space, .controlG, .controlR:
             return nil
         }
     }
