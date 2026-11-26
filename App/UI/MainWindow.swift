@@ -1494,7 +1494,20 @@ private struct EmptyProjectView: View {
     @Environment(AppState.self) private var store
 
     var body: some View {
-        VStack(spacing: 20) {
+        // §69: the cards and the recent projects are taller than a short window; they scroll there instead of laying the
+        // whole window out taller than the screen (the sidebar's tabs pushed off the top), and stay centred when they fit.
+        GeometryReader { geometry in
+            ScrollView {
+                content
+                    .padding(.horizontal, 32).padding(.vertical, 24)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: 16) {
             Image(systemName: "folder").font(.system(size: 44)).foregroundStyle(.secondary)
             if let opening = store.openingProject {
                 // An open on its way (it may wait on git — capped by the engine, which then says why): never a silent window.
@@ -1517,7 +1530,5 @@ private struct EmptyProjectView: View {
 
             RecentProjectsList()   // MARK: wave4 w4-install (daily-17): a missing folder dimmed with "Not found", every row removable
         }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
