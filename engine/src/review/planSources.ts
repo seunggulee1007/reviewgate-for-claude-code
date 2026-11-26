@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
-import { MAX_PLAN_BYTES, type PlanSourceKind, type PlanStepBrief, type PlanVsActual } from "../protocol.js";
+import { MAX_PLAN_BYTES, type PlanSourceKind, type PlanStepBrief, type PlanVsActual, type TodoItem, type TodoStatus } from "../protocol.js";
 import { matchPlan, mentionsPath, parsePlanSteps, plainText, type PlanStep } from "./summary.js";
 
 /**
@@ -130,8 +130,40 @@ export function todoWriteSteps(input: unknown): PlanStep[] | null {
   return steps;
 }
 
-/** One task of the Task tools' list (`TaskCreate` / `TaskUpdate`). */
-export type TaskItem = { id: string; text: string; body: string; done: boolean };
+/** One task of the Task tools' list (`TaskCreate` / `TaskUpdate`). §71.2: `status` / `activeForm` for the live checklist. */
+export type TaskItem = { id: string; text: string; body: string; done: boolean; status?: TodoStatus; activeForm?: string };
+
+/** §71.2: the statuses the to-do tools take (anything else reads as pending). */
+function todoStatus(v: unknown): TodoStatus {
+  return v === "completed" || v === "in_progress" ? v : "pending";
+}
+
+/**
+ * §71.2: a TodoWrite call's list as the terminal's Ctrl+T checklist shows it — each item's text, status and the words it
+ * shows while the item runs (`activeForm`); null when the input carries no list.
+ */
+export function todoWriteItems(input: unknown): TodoItem[] | null {
+  const todos = (input as { todos?: unknown } | null)?.todos;
+  if (!Array.isArray(todos)) return null;
+  const items: TodoItem[] = [];
+  for (const t of todos) {
+    const o = t as { content?: unknown; activeForm?: unknown; status?: unknown } | null;
+    const text = plainText(typeof o?.content === "string" ? o.content : "").slice(0, PLAN_STEP_TEXT_MAX);
+    if (!text) continue;
+    const active = plainText(typeof o?.activeForm === "string" ? o.activeForm : "").slice(0, PLAN_STEP_TEXT_MAX);
+    items.push({ text, status: todoStatus(o?.status), ...(active ? { activeForm: active } : {}) });
+  }
+  return items;
+}
+
+/** §71.2: the Task tools' list as checklist items. */
+export function taskItemsAsTodos(list: readonly TaskItem[]): TodoItem[] {
+  return list.map((t) => ({
+    text: t.text,
+    status: t.status ?? (t.done ? "completed" : "pending"),
+    ...(t.activeForm ? { activeForm: t.activeForm } : {}),
+  }));
+}
 
 /**
  * The task list after a `TaskCreate` / `TaskUpdate` call (null: not a task tool). A created task gets the next number
@@ -139,14 +171,15 @@ export type TaskItem = { id: string; text: string; body: string; done: boolean }
  * drops it, a new subject / description replaces the old one).
  */
 export function applyTaskTool(list: readonly TaskItem[], name: string, input: unknown): TaskItem[] | null {
-  const o = (input ?? {}) as { subject?: unknown; description?: unknown; taskId?: unknown; status?: unknown };
+  const o = (input ?? {}) as { subject?: unknown; description?: unknown; taskId?: unknown; status?: unknown; activeForm?: unknown };
   const str = (v: unknown) => (typeof v === "string" ? v : "");
   if (name === "TaskCreate") {
     const subject = str(o.subject);
     const text = plainText(subject);
     if (!text) return [...list];
     const next = list.reduce((n, t) => Math.max(n, Number.parseInt(t.id, 10) || 0), 0) + 1;
-    return [...list, { id: String(next), text: text.slice(0, PLAN_STEP_TEXT_MAX), body: `${subject}\n${str(o.description)}`, done: false }];
+    const active = plainText(str(o.activeForm)).slice(0, PLAN_STEP_TEXT_MAX);
+    return [...list, { id: String(next), text: text.slice(0, PLAN_STEP_TEXT_MAX), body: `${subject}\n${str(o.description)}`, done: false, status: "pending", ...(active ? { activeForm: active } : {}) }];
   }
   if (name === "TaskUpdate") {
     const id = typeof o.taskId === "number" ? String(o.taskId) : str(o.taskId);
@@ -161,6 +194,8 @@ export function applyTaskTool(list: readonly TaskItem[], name: string, input: un
         ...(subject ? { text: plainText(subject).slice(0, PLAN_STEP_TEXT_MAX) } : {}),
         ...(subject || description ? { body: `${subject || t.text}\n${description}` } : {}),
         ...(o.status === "completed" ? { done: true } : o.status === "pending" || o.status === "in_progress" ? { done: false } : {}),
+        ...(o.status === "completed" || o.status === "pending" || o.status === "in_progress" ? { status: o.status } : {}),
+        ...(str(o.activeForm) ? { activeForm: plainText(str(o.activeForm)).slice(0, PLAN_STEP_TEXT_MAX) } : {}),
       };
     });
   }

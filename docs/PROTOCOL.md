@@ -11780,3 +11780,30 @@ background work (`/tasks`, Ctrl+B). Terminal chats (§57) are the real TUI and k
   the plan windows (`hud.rateLimits`, §38.2) were already in the state. A new chat starts the lines again; `startedAt`
   follows the CLI process (a restart starts it again, as the terminal's clock does).
 - Engine: `engine.ts` (`slices()`), `protocol.ts` (`SessionTotals`). Tests: `engine/test/w71.usage.test.ts`.
+
+### 71.2 Ctrl+T — Claude's to-do checklist, live
+
+```ts
+// state.session.todos?: TodoItem[]      // [] when the chat has none; absent from an older engine
+type TodoItem = { text: string; status: "pending" | "in_progress" | "completed"; activeForm?: string };
+```
+
+- **As the terminal's task list.** The interactive-mode reference: "`Ctrl+T` — Toggle Claude's task checklist. Show or hide
+  Claude's to-do checklist in the status area. This is not the background-task view; use `/tasks` to see running shells
+  and subagents", and under "Task list": "items Claude created to plan multi-step work, with indicators showing what's
+  pending, in progress, or complete … The display shows up to five tasks at a time. When Claude hasn't created any
+  checklist items yet, the toggle has no visible effect". The tools reference: `TodoWrite` "Manages the session task
+  checklist. Disabled by default in favor of `TaskCreate`, `TaskGet`, `TaskList`, and `TaskUpdate`", and the task tools
+  are "available by default only on Opus 4.7, Sonnet 4.6, Haiku 4.5, and earlier models" (newer models plan without a
+  written checklist, so the list stays empty there, as in the terminal).
+- **`/todos` is gone from the CLI** (the commands reference has no such row; it lists `/tasks` for background work). The
+  app keeps `/todos` as its own name for the checklist, as it was a terminal-only name before (§56.5), so the habit
+  still finds it; it goes to Claude only when the user has a command of that name.
+- **The engine** keeps the chat's list as it did for "plan vs actual" (§42.1: the main thread's `TodoWrite` /
+  `TaskCreate` / `TaskUpdate` calls, read back from the chat's rows when it opens), now with each item's status and its
+  running words (`activeForm`, which the terminal shows for the item in progress). `todos` is the list of the tool Claude
+  used last. A main-thread call to one of them sends a state at once, so the checklist follows the turn live; a
+  subagent's own list is not the chat's.
+- Engine: `review/planSources.ts` (`todoWriteItems`, `taskItemsAsTodos`, `TaskItem.status` / `activeForm`),
+  `engine.ts` (`ChatPlanMemory.todoItems` / `lastTool`, `checklistOf`, `slices()`), `protocol.ts` (`TodoItem`). Tests:
+  `engine/test/w71.todos.test.ts`.

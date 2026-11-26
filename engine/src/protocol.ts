@@ -1185,6 +1185,20 @@ export type SessionState = {
   shellPending?: number;
   /** §70.4: extended thinking for the current chat (absent from an older engine). */
   thinking?: ThinkingState;
+  /**
+   * §71.2: Claude's to-do checklist in the current chat — the latest TodoWrite list, or the Task tools' list
+   * (TaskCreate / TaskUpdate), whichever Claude used last; [] when it has none (absent from an older engine).
+   */
+  todos?: TodoItem[];
+};
+
+/** §71.2: one item of Claude's to-do checklist (the terminal's Ctrl+T list). */
+export type TodoStatus = "pending" | "in_progress" | "completed";
+export type TodoItem = {
+  text: string;
+  status: TodoStatus;
+  /** The words the terminal shows while the item runs ("Running the tests"); absent when Claude gave none. */
+  activeForm?: string;
 };
 
 /**

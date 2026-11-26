@@ -1,6 +1,6 @@
 import type { BranchInfo, BranchSwitchBlocker } from "./git/branches.js";
 import type { PRStore } from "./pr/store.js";
-import type { ShellRunInfo, ThinkingState } from "./protocol.js"; // §67.2, §70.4
+import type { ShellRunInfo, ThinkingState, TodoItem } from "./protocol.js"; // §67.2, §70.4, §71.2
 import type {
   BlockedReason,
   Budget,
@@ -102,6 +102,8 @@ export type EngineSlices = {
     shellPending?: number;
     /** §70.4 (see protocol.ts SessionState). */
     thinking?: ThinkingState;
+    /** §71.2 (see protocol.ts SessionState). */
+    todos?: TodoItem[];
   };
   toolchain: ToolchainState;
   gate: ReviewGate;
