@@ -139,6 +139,7 @@ public enum SettingsCatalog {
         public static let cliPin = "Claude Code updates itself in the background. Pin a version to keep starting new sessions with it; ReviewGate marks the versions it was checked with."
         public static let toolchainOverrides = "Leave empty to detect via the login shell."
         // MARK: task-start (§63)
+        public static let newProjectParent = "New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
         public static let startScreen = "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."
         public static let taskPlatform = "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."
         public static let taskBranchPrefix = "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels."
@@ -152,6 +153,7 @@ public enum SettingsCatalog {
         // General
         SettingEntry("appearance", .general, section: "Appearance", title: "Appearance", info: Info.appearance),
         SettingEntry("reopenLastProjects", .general, section: "Appearance", title: "Reopen last projects on launch"),
+        SettingEntry("newProjectParent", .general, section: "New projects", title: "Folder for new projects", info: Info.newProjectParent),   // §69
         SettingEntry("returnSends", .general, section: "Typing and the chat", title: "Return sends the message", info: Info.returnSends),
         SettingEntry("showExploreDetail", .general, section: "Typing and the chat", title: "Show exploration rows in detail", info: Info.exploreDetail),
         SettingEntry("confirmQuit", .general, section: "Closing and quitting", title: "Ask before quitting", info: Info.confirmQuit),

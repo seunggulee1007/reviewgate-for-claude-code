@@ -747,6 +747,12 @@ public enum EngineCommand: Sendable, Equatable {
     // MARK: task-start
     /// §63: one GitHub issue (`gh issue view`) for "Start from a task" → `.taskFetched`.
     case taskFetch(ref: String)
+    /// §69: the folder name a new project gets from `text` under `parent` (nil: `~/ReviewGate`) → `.projectName`.
+    case projectName(text: String, parent: String? = nil)
+    /// §69: makes `<parent>/<name>[-n]`, `git init`s and opens it → `.projectCreated`.
+    case projectCreate(name: String, parent: String? = nil)
+    /// §69: which of `paths` have the task's repository as a remote → `.projectMatches`.
+    case projectMatch(ref: String, paths: [String])
     case shutdown
 
     /// The wire `type` discriminator.
@@ -920,6 +926,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .definitionPreview: "definition_preview"
         case .navIndexBuild: "nav_index_build"
         case .taskFetch: "task_fetch"   // MARK: task-start
+        case .projectName: "project_name"   // §69
+        case .projectCreate: "project_create"
+        case .projectMatch: "project_match"
         case .shutdown: "shutdown"
         }
     }
@@ -967,6 +976,7 @@ extension EngineCommand: Encodable {
         case filesOnly, column, receiver, after, full   // ide-nav
         case ref   // task-start
         case confirm   // §59
+        case parent   // §69
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1260,6 +1270,15 @@ extension EngineCommand: Encodable {
             if full { try c.encode(true, forKey: .full) }
         case let .taskFetch(ref):   // MARK: task-start (§63)
             try c.encode(ref, forKey: .ref)
+        case let .projectName(text, parent):   // §69
+            try c.encode(text, forKey: .text)
+            try c.encodeIfPresent(parent, forKey: .parent)
+        case let .projectCreate(name, parent):
+            try c.encode(name, forKey: .name)
+            try c.encodeIfPresent(parent, forKey: .parent)
+        case let .projectMatch(ref, paths):
+            try c.encode(ref, forKey: .ref)
+            try c.encode(paths, forKey: .paths)
         case let .requestChanges(extra, noteIds):
             try c.encodeIfPresent(extra, forKey: .extra)
             try c.encodeIfPresent(noteIds, forKey: .noteIds)
@@ -3175,6 +3194,10 @@ public enum EngineEvent: Sendable, Equatable {
     // MARK: task-start
     /// §63: reply to `task_fetch`.
     case taskFetched(TaskFetchedReply)
+    /// §69: replies to `project_name`, `project_create`, `project_match`.
+    case projectName(ProjectNameReply)
+    case projectCreated(ProjectCreatedReply)
+    case projectMatches(ProjectMatchesReply)
     // MARK: wave4d w4d-plan
     /// §42.1: `plan_approved` with `into` — the fresh chat, the plan handed to a workbench, or received from one.
     case planApprovedInto(PlanApprovedInfo)
@@ -3232,6 +3255,9 @@ public enum EngineEvent: Sendable, Equatable {
         case let .definitionPreview(reply): reply.id
         case let .navIndex(reply): reply.id
         case let .taskFetched(reply): reply.id   // MARK: task-start
+        case let .projectName(reply): reply.id   // §69
+        case let .projectCreated(reply): reply.id
+        case let .projectMatches(reply): reply.id
         default: nil
         }
     }
@@ -3493,6 +3519,12 @@ extension EngineEvent: Decodable {
             self = .navIndex(try NavIndexReply(from: decoder))
         case "task_fetched":   // MARK: task-start (§63)
             self = .taskFetched(try TaskFetchedReply(from: decoder))
+        case "project_name":   // §69
+            self = .projectName(try ProjectNameReply(from: decoder))
+        case "project_created":
+            self = .projectCreated(try ProjectCreatedReply(from: decoder))
+        case "project_matches":
+            self = .projectMatches(try ProjectMatchesReply(from: decoder))
         case "fetched":   // MARK: git-sync (§68)
             self = .fetched(try FetchedReply(from: decoder))
         case "pulled":
