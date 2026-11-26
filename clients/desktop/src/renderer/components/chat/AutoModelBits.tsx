@@ -76,7 +76,8 @@ export function NextMessageModelMenu({ value, onChange, models, disabled }: { va
       value={value ?? ""}
       disabled={disabled || options.length === 0}
       onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
-      title={t("Only the next message goes out on the model you pick here")}
+      // Off: why (no project, no models listed yet); on: what it does.
+      title={disabled ? t("Open a project first") : options.length === 0 ? t("The session has not reported its models yet.") : t("Only the next message goes out on the model you pick here")}
       aria-label={t("Model for this message")}
       data-testid="Next message model"
     >
