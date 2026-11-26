@@ -18,6 +18,15 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Settings…", mac: "⌘,", win: "Ctrl+," },
     ],
   },
+  // §69.4: the window with no project open — its three cards (NoProjectCards in App.tsx).
+  {
+    title: "Window with no project",
+    note: "When a window has no project open",
+    rows: [
+      { action: "New Project · Start from a task · Open a folder…", mac: "1 / 2 / 3", win: "1 / 2 / 3", note: "Each key opens it at once" },
+      { action: "Move between the cards, then take the marked one", mac: "← → ↑ ↓ ↩", win: "← → ↑ ↓ Enter" },
+    ],
+  },
   // MARK: task-start (§63.4): the start screen of a project window (components/start/StartScreen.tsx).
   {
     title: "Start screen",
