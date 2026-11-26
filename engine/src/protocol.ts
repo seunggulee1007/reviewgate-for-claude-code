@@ -1523,7 +1523,16 @@ export type HudState = {
   // MARK: wave5 w5-model
   /** §43.4: messages auto sent to each family in this chat since the engine opened it, most first (reset with the HUD). */
   autoModelCounts?: AutoModelCount[];
+  /** §71.1: the session block of the terminal's `/usage` (absent from an older engine). */
+  sessionTotals?: SessionTotals;
 };
+
+/**
+ * §71.1: what the terminal's `/usage` Session block adds to the cost — the live CLI's start (epoch ms; null while no CLI
+ * runs: its "Total duration (wall)"), the API time of its results (`duration_api_ms`, summed), and the lines the collected
+ * turns of this chat added / removed since the engine opened it (the status line's `cost.total_lines_*`, §44.2).
+ */
+export type SessionTotals = { startedAt: number | null; apiDurationMs: number; linesAdded: number; linesRemoved: number };
 
 // MARK: wave4 w4-longwork
 /**

@@ -11754,3 +11754,29 @@ set_thinking { enabled: boolean }   // the current chat's; lane main, allowed wh
 - **Shortcut tables.** ⌃R / Ctrl+R "Search the prompt history" and ⌥T / Alt+T "Turn extended thinking on or off" are rows
   of the message box section in docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. Neither
   clashes: ⌘R / Ctrl+R outside the box is Refresh (70.1), Ctrl+Alt+T is New Terminal Chat, ⌥⌘T New Chat in a Workbench.
+
+## 71. Terminal parity, batch E
+
+Three more terminal screens for classic chats, checked against Claude Code's docs (interactive mode, the commands
+reference, the costs page and the tools reference, as of 2026-11): `/usage`, Claude's to-do checklist (Ctrl+T), and the
+background work (`/tasks`, Ctrl+B). Terminal chats (§57) are the real TUI and keep theirs.
+
+### 71.1 `/usage` — session cost, plan usage and the cost by model
+
+```ts
+// state.hud.sessionTotals?: { startedAt: number | null; apiDurationMs: number; linesAdded: number; linesRemoved: number }
+//   startedAt     — epoch ms the live CLI started (null while none runs): "Total duration (wall)"
+//   apiDurationMs — its results' duration_api_ms, summed: "Total duration (API)"
+//   linesAdded / linesRemoved — the collected turns of this chat since the engine opened it: "Total code changes"
+```
+
+- **As the terminal's command.** The commands reference: "`/usage` — Show session cost, plan usage limits, and activity
+  stats … `/cost` and `/stats` are aliases" (`/stats` "Opens on the Stats tab"). The costs page shows its Session block:
+  `Estimated cost`, `Total duration (API)`, `Total duration (wall)`, `Total code changes: N lines added, M lines removed`
+  and `Usage by model: <model>: 1.2k input, 5.3k output, 940.0k cache read, 50.0k cache write ($0.55)`; subscribers also
+  see the plan usage bars with their reset times.
+- **The engine** adds only what the clients did not have: `hud.sessionTotals` (the same numbers the status line's
+  `cost.*` takes, §44.2). The cost, the per-model tokens (`hud.sessionModels`, §42.4), the side questions' cost (§21) and
+  the plan windows (`hud.rateLimits`, §38.2) were already in the state. A new chat starts the lines again; `startedAt`
+  follows the CLI process (a restart starts it again, as the terminal's clock does).
+- Engine: `engine.ts` (`slices()`), `protocol.ts` (`SessionTotals`). Tests: `engine/test/w71.usage.test.ts`.

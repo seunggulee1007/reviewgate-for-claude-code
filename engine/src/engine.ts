@@ -10036,7 +10036,16 @@ export class ReviewEngine {
       budget: this.settings.budget,
       budgetUsage: this.budgetUsage,
       reviewFirst: this.reviewFirstSlice(), // §64
-      hud: this.rateLimits.length > 0 ? { ...this.hud, rateLimits: this.rateLimits.map((w) => ({ ...w })) } : this.hud, // MARK: wave4 w4-longwork (§38.2)
+      hud: {
+        ...this.hud,
+        ...(this.rateLimits.length > 0 ? { rateLimits: this.rateLimits.map((w) => ({ ...w })) } : {}), // MARK: wave4 w4-longwork (§38.2)
+        sessionTotals: { // §71.1: the terminal's /usage Session block
+          startedAt: this.sessionStartedAt,
+          apiDurationMs: this.session?.statusUsage?.apiDurationMs ?? 0,
+          linesAdded: this.chatLines.added,
+          linesRemoved: this.chatLines.removed,
+        },
+      },
       branches: this.branches,
       sync: { ...this.syncFlags, autoFetch: this.settings.autoFetch !== false }, // MARK: git-sync (§68)
       pr: this.pr,
