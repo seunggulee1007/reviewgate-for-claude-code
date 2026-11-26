@@ -7403,7 +7403,9 @@ download whose identifier differs from the running app's, so a build with an old
     `update-installer.log` in the user's own `%APPDATA%\ReviewGate` (the app's userData, also for an install for all
     users; 0.5.35's installer: `%TEMP%\ReviewGate-update.log`) (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
     `mode <CurrentUser|all> <folder>`, `uninstall-old failed N`, `uninstall-old retry: N`, `failed uninstall-old N
-    <file> (in use by <program> <pid>)`, `failed another-installer`, `reopened <exe> (<result>)`, `installed <folder>`).
+    <file> (in use by <program> <pid>)`, `failed another-installer`, `reopening <exe>` — written before ReviewGate starts, as the launch takes the file at
+    once (0.5.35 wrote `reopened <exe> (<result>)` after it) — then `reopen failed (<result>)` only when it could not
+    start, `installed <folder>`).
     The apps up to 0.5.30 download and run the new installer silent too, so they get it as well: they come back
     (saying only "still installed"). The app (from 0.5.35) watches the installer it started for 1.5 s
     (`updateInstall.ts` `EARLY_EXIT_MS`, before the installer's own close of a running ReviewGate ~2 s on): one that

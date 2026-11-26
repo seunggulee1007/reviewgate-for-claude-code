@@ -3,7 +3,8 @@
  * app's own folder (userData, `%APPDATA%\ReviewGate`; 0.5.35's installer: `%TEMP%\ReviewGate-update.log`)
  * (UTF-16LE, `<installer version> <event> <detail>`):`start <command line>`, `mode …`, `uninstall-old failed <code>`,
  * `uninstall-old retry <n>: <code>`, `failed uninstall-old <code> <file> (in use by <program> <pid>)`,
- * `failed another-installer`, `reopened …`, `installed <folder>`. The next launch takes the file once: every line goes to
+ * `failed another-installer`, `reopening <exe>` (before it starts; 0.5.35: `reopened …` after), `reopen failed (…)`,
+ * `installed <folder>`. The next launch takes the file once: every line goes to
  * the app's log, and an update that did not install says why from the last run's lines. Electron-free.
  */
 import { readFileSync, rmSync, statSync } from "node:fs";

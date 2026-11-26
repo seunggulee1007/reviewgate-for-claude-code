@@ -75,16 +75,23 @@
     Pop $0
   FunctionEnd
 
-  ; The installed ReviewGate, started again as this user (the version that is still there).
+  ; The installed ReviewGate, started again as this user (the version that is still there). Said before it starts: the
+  ; launch takes the log at once, so a line written after it would be left for the launch after that one.
   Function rgStartInstalled
     Exch $0
     ${if} ${FileExists} "$0\${APP_EXECUTABLE_FILENAME}"
+      StrCpy $rgLogLine "reopening $0\${APP_EXECUTABLE_FILENAME}"
+      Call rgLog
       ${StdUtils.ExecShellAsUser} $1 "$0\${APP_EXECUTABLE_FILENAME}" "open" "--updated"
-      StrCpy $rgLogLine "reopened $0\${APP_EXECUTABLE_FILENAME} ($1)"
+      ${if} $1 != "ok"
+      ${andIf} $1 != "fallback"
+        StrCpy $rgLogLine "reopen failed ($1)"
+        Call rgLog
+      ${endif}
     ${else}
       StrCpy $rgLogLine "reopened none ($0)"
+      Call rgLog
     ${endif}
-    Call rgLog
     Pop $0
   FunctionEnd
 
