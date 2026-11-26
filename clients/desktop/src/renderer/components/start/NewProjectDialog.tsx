@@ -23,6 +23,8 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [nameTyped, setNameTyped] = useState(false);
   const [preview, setPreview] = useState<ProjectNameEvent | null>(null);
+  /** Why the engine gives no name (too old, the parent setting refused): on the path line and as Create's reason. */
+  const [unavailable, setUnavailable] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
@@ -33,8 +35,14 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
     const mine = ++seq.current;
     const timer = setTimeout(() => {
       void previewProjectName(source, parent).then((reply) => {
-        if (mine !== seq.current || !reply) return;
+        if (mine !== seq.current) return;
+        if ("unavailable" in reply) {
+          setPreview(null);
+          setUnavailable(reply.unavailable);
+          return;
+        }
         setPreview(reply);
+        setUnavailable(null);
         if (!nameTyped) setName(reply.name);
       });
     }, 300);
@@ -42,7 +50,7 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, parent, nameTyped]);
 
-  const blocker = !prompt.trim() ? t("Say what you want to make first") : preview === null ? t("Working out the folder name…") : null;
+  const blocker = !prompt.trim() ? t("Say what you want to make first") : unavailable ?? (preview === null ? t("Working out the folder name…") : null);
 
   const create = async () => {
     if (blocker !== null || creating || !preview) return;
@@ -88,8 +96,8 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
           />
         </label>
         <div className="row" style={{ gap: 8 }}>
-          <span className="caption muted truncate grow" title={preview?.path ?? ""} data-testid="New project path">
-            {preview ? t("Creates {0}", preview.path) : t("Working out the folder name…")}
+          <span className={unavailable ? "caption orange grow" : "caption muted truncate grow"} title={unavailable ?? preview?.path ?? ""} role={unavailable ? "alert" : undefined} data-testid="New project path">
+            {unavailable ?? (preview ? t("Creates {0}", preview.path) : t("Working out the folder name…"))}
           </span>
           <button
             type="button"

@@ -18,15 +18,21 @@ export function parentArg(parent: string | undefined): { parent?: string } {
   return p ? { parent: p } : {};
 }
 
-/** `project_name`: the folder New would make for `text`; null when the engine cannot say (the dialog keeps its last one). */
-export async function previewProjectName(text: string, parent: string | undefined, bridge?: Bridge): Promise<ProjectNameEvent | null> {
+/**
+ * `project_name`: the folder New Project would make for `text`, or why the engine cannot say — an engine before §69
+ * (`unknown_command`), a parent it refuses (`bad_parent`), … in the user's words; the dialog shows it and Create stays off.
+ */
+export async function previewProjectName(text: string, parent: string | undefined, bridge?: Bridge): Promise<ProjectNameEvent | { unavailable: string }> {
   try {
     const reply = (await engineRequest({ type: "project_name", text, ...parentArg(parent) }, bridge)) as ProjectNameEvent;
-    return typeof reply?.path === "string" && typeof reply.name === "string" ? reply : null;
-  } catch {
-    return null;
+    return typeof reply?.path === "string" && typeof reply.name === "string" ? reply : { unavailable: tooOldForNewProjects() };
+  } catch (e) {
+    const r = refusalOf(e);
+    return { unavailable: r.code === "unknown_command" || /^unknown command\b/.test(r.error) ? tooOldForNewProjects() : newProjectRefusal(e) };
   }
 }
+
+const tooOldForNewProjects = (): string => t("This engine cannot make new projects yet — update ReviewGate");
 
 /** `project_match`: which recent projects have the task's repository as a remote (none when the engine cannot say). */
 export async function matchProjects(ref: string, paths: string[], bridge?: Bridge): Promise<Pick<ProjectMatchesEvent, "repo" | "matches" | "guess">> {

@@ -79,7 +79,14 @@ describe("starting without a folder (§69)", () => {
     await m.previewProjectName("x", "D:\\work", bridge);
     expect(asked).toEqual([{ type: "project_name", text: "Build a todo app" }, { type: "project_name", text: "x", parent: "D:\\work" }]);
     respond = () => ({ ok: false, error: "bad_parent:code", code: "bad_parent" });
-    expect(await m.previewProjectName("x", "code", bridge)).toBeNull();
+    expect(await m.previewProjectName("x", "code", bridge)).toEqual({ unavailable: "The folder for new projects must be a full path — change it in Settings › General" });
+  });
+
+  it("project_name on an engine before §69: a reason, never a preview that waits forever", async () => {
+    respond = () => ({ ok: false, error: "unknown command: project_name", code: "unknown_command" });
+    expect(await m.previewProjectName("Build a todo app", undefined, bridge)).toEqual({ unavailable: "This engine cannot make new projects yet — update ReviewGate" });
+    respond = () => ({ ok: false, error: "unknown command: project_name" });
+    expect(await m.previewProjectName("x", undefined, bridge)).toEqual({ unavailable: "This engine cannot make new projects yet — update ReviewGate" });
   });
 
   it("project_create through the store: the path once open; a refusal in the user's words", async () => {
