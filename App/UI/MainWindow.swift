@@ -1508,7 +1508,7 @@ private struct EmptyProjectView: View {
             } else {
                 Text("How do you want to start?").font(.title2.weight(.semibold))
             }
-            Text("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New.")
+            Text("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             // §69: New · Start from a task · Open a folder… (Open Project), 1 / 2 / 3, the arrows and ↩.

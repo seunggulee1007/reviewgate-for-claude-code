@@ -11492,7 +11492,7 @@ review again, extras-only with a pending review and with none.
 
 A window with no project used to offer only Open Project and the recent projects, and the start screen (§63.4) came only
 after a folder was open, so "make a branch and start" in a fresh window had no base project to start from. The window with
-no project now offers three choices, with the recent projects and Open Project kept below them: **New** (새로 시작: no
+no project now offers three choices, with the recent projects and Open Project kept below them: **New Project** (새로 시작: no
 folder yet, the app makes one from what the user wants to do), **Start from a task** (업무로 시작: the app picks the base
 project first) and **Open a folder** (폴더 열기, as before). Additive on the wire: three commands, each with its own reply.
 All three work with no project open.
@@ -11543,10 +11543,10 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
 
 ### 69.4 Clients
 
-- **The no-project window.** Three cards with 1 / 2 / 3 badges — 1 **New** (새로 시작), 2 **Start from a task** (업무로
+- **The no-project window.** Three cards with 1 / 2 / 3 badges — 1 **New Project** (새로 시작), 2 **Start from a task** (업무로
   시작), 3 **Open a folder…** (폴더 열기…) — then the recent projects as before. 1 / 2 / 3 act at once; ← → ↑ ↓ move the mark
   over the cards and ↩ takes it. While an open is on its way the cards are off with "Opening <name>…" as the reason.
-- **New.** One sheet: "What do you want to make?" (the first prompt, required), the folder name (follows the prompt through
+- **New Project.** One sheet: "What do you want to make?" (the first prompt, required), the folder name (follows the prompt through
   `project_name`, 0.3 s after typing stops, until edited; editable), the line "Creates <path>" and the parent with "Change…"
   (Settings). Create sends `project_create`; on success the window opens the new project **without the start screen**
   (the window's own suppression, §63.5), and the prompt goes where the new chat takes text — the message box, or a terminal

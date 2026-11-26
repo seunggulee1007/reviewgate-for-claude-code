@@ -20,7 +20,7 @@ struct NoProjectStartCards: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            card(.new, symbol: "sparkles", title: "New", detail: "No folder yet — say what you want to make",
+            card(.new, symbol: "sparkles", title: "New Project", detail: "No folder yet — say what you want to make",
                  help: String(localized: "Makes a folder for it under \(AppSettings.newProjectParent() ?? AppSettings.defaultNewProjectParent) as a git repository (1)"))
             card(.task, symbol: "checklist", title: "Start from a task", detail: "Pick the project the task belongs to",
                  help: String(localized: "A task link, key or number — then its project, its branch and first prompt (2)"))

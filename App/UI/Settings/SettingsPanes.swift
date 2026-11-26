@@ -44,7 +44,7 @@ struct GeneralSettingsPane: View {
                             .lineLimit(1).truncationMode(.middle)
                             .textSelection(.enabled)
                         Button("Choose…") { chooseNewProjectParent() }
-                            .help("The folder New makes each project's folder in")
+                            .help("Choose where New Project makes each project's folder")
                             .accessibilityIdentifier("Choose folder for new projects")
                         Button("Reset") { newProjectParent = "" }
                             .disabled(newProjectParent.isEmpty)

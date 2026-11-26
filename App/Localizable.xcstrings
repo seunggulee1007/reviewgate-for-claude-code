@@ -6209,12 +6209,12 @@
         }
       }
     },
-    "New": {
+    "New Project": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New"
+            "value": "New Project"
           }
         },
         "ko": {
@@ -6225,12 +6225,12 @@
         }
       }
     },
-    "New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
+    "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+            "value": "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
           }
         },
         "ko": {
@@ -7041,22 +7041,6 @@
         }
       }
     },
-    "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New."
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영돼요 — 폴더가 아직 없다면 새로 시작을 눌러요."
-          }
-        }
-      }
-    },
     "Run the command in the project folder — its output goes to Claude with your next message": {
       "localizations": {
         "en": {
@@ -7501,22 +7485,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "정의, %lld번째 줄 — 두 번 클릭하거나 ↩ 로 열어요"
-          }
-        }
-      }
-    },
-    "The folder New makes each project's folder in": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The folder New makes each project's folder in"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "새로 시작이 프로젝트 폴더를 만드는 곳"
           }
         }
       }
@@ -10275,6 +10243,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 프로젝트에서 앞으로 묻지 않을 범위를 골라요 — 저장하기 전에 보여 드려요"
+          }
+        }
+      }
+    },
+    "Choose where New Project makes each project's folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose where New Project makes each project's folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 시작으로 만드는 프로젝트 폴더가 생길 곳을 골라요"
           }
         }
       }
@@ -30626,6 +30610,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "ReviewGate가 다시 시작됐어요 — 이 터미널은 더 이상 리뷰되지 않아요. 다시 시작하세요"
+          }
+        }
+      }
+    },
+    "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영돼요 — 폴더가 아직 없다면 새로 시작을 눌러요."
           }
         }
       }
