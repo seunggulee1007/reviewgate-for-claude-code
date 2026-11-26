@@ -82,6 +82,8 @@ export type AppSettings = {
   // MARK: task-start — §63 (src/shared/taskStartSettings.ts)
   /** "다음부터 바로 시작": a project window opens straight into its chat, no start screen (absent = the start screen shows). */
   skipStartScreen?: boolean;
+  /** §69: where New (no folder open) makes each project's folder — "" / absent = `<home>/ReviewGate`; `~/…` or absolute. */
+  newProjectParent?: string;
   /** Settings › Tasks: the default every repository without its own uses (absent = the built-in default). */
   taskStartSettings?: TaskStartSettings;
   /** Settings › Tasks of a repository, keyed by `projectRootHash` of its main worktree. */

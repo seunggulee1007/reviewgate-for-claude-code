@@ -23,13 +23,13 @@ import { WorkbenchProgressView } from "../flow/WorkbenchSetup";
 import "../dialogs/dialogs.css";
 import "./start.css";
 
-export function TaskStartDialog({ onClose }: { onClose: () => void }) {
+export function TaskStartDialog({ onClose, initialRef }: { onClose: () => void; initialRef?: string }) {
   const state = useStore((s) => s.state);
   const createWith = useStore((s) => s.createWorkbenchWith);
   const create = useStore((s) => s.flow.create);
   const openDialog = useStore((s) => s.openDialog);
   const [settings] = useState(() => taskStartSettingsFor(useStore.getState().settings, flowRepoRoot(useStore.getState().state)));
-  const [refText, setRefText] = useState("");
+  const [refText, setRefText] = useState(initialRef ?? ""); // §69.4: the task named before the project was picked
   const [fetched, setFetched] = useState<FetchedTask | null>(null);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);

@@ -16,6 +16,7 @@ import { hideStartScreen, stepStartScreen, useStartScreen, type StartScreenWatch
 import { lastComponent, useStore } from "../../store";
 import { recentStartChats, startScreenKey, type StartAction, type StartChoice, type StartMark } from "../../taskStart";
 import { startStraight } from "../../taskStartFlow";
+import { samePathLoose } from "../../newProject";
 import { chatPtyOf, liveTerminalChatId } from "../../terminal/terminalChat";
 import { chatTerminalOf, focusTerminal } from "../../terminal/termHost";
 import "./start.css";
@@ -25,7 +26,13 @@ export function useStartScreenWatch(): void {
   useEffect(() => {
     const watch: { current: StartScreenWatch } = { current: { checkedPath: null, suppressNext: window.rgNoStartScreen === true } };
     const step = (s: ReturnType<typeof useStore.getState>) => {
-      const next = stepStartScreen(watch.current, { state: s.state, settings: s.settings, composerWaiting: composerTextWaiting() }, useStartScreen.getState().shown);
+      const ui = useStartScreen.getState();
+      // §69.4: a project New just made opens into its chat; a task named before its project opened shows the screen.
+      const current = ui.suppressNext ? { ...watch.current, suppressNext: true } : watch.current;
+      const pendingTask = !!ui.pendingTask && !!s.state.project && samePathLoose(ui.pendingTask.path, s.state.project.path);
+      const next = stepStartScreen(current, { state: s.state, settings: s.settings, composerWaiting: composerTextWaiting(), pendingTask }, ui.shown);
+      if (ui.suppressNext && !next.watch.suppressNext) useStartScreen.setState({ suppressNext: false });
+      if (ui.pendingTask && next.watch.checkedPath !== watch.current.checkedPath && next.watch.checkedPath !== null && !pendingTask) useStartScreen.setState({ pendingTask: null });
       watch.current = next.watch;
       if (next.show === true) useStartScreen.setState({ shown: true, mark: { choice: 1 } });
       else if (next.show === false) hideStartScreen();
@@ -57,6 +64,14 @@ export function StartScreen() {
   const sessions = sessionsOf(state);
   const chats = recentStartChats(sessions.list);
   const chatIds = chats.map((c) => c.id);
+
+  // §69.4: the task named before this project opened — its dialog opens at once with the task filled in.
+  useEffect(() => {
+    const pending = useStartScreen.getState().pendingTask;
+    if (!shown || !pending || !state.project || !samePathLoose(pending.path, state.project.path)) return;
+    useStartScreen.setState({ pendingTask: null });
+    openDialog({ kind: "taskStart", ref: pending.ref });
+  }, [shown, state.project, openDialog]);
 
   // It takes the keyboard as it appears (the chat behind takes it first), and again when the task dialog closes.
   useEffect(() => {

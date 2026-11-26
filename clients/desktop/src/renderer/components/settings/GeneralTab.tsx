@@ -30,6 +30,8 @@ import { REVIEW_FIRST_MODES, reviewFirstModeLabel, reviewFirstModeOf, type Revie
 /** Mirrors src/main/settings.ts (which cannot be imported here: it pulls in `electron`). */
 const DEFAULT_IGNORE_PATTERNS = ".omc/\n.claude/settings.local.json";
 const DEFAULT_WORKTREE_ROOT = "~/.reviewgate/worktrees";
+/** §69: what the engine uses when `newProjectParent` is empty. */
+const DEFAULT_NEW_PROJECT_PARENT = { win32: "%USERPROFILE%\\ReviewGate", other: "~/ReviewGate" } as const;
 const HARD_MULTIPLIER = 2.0;
 
 type PaneProps = { settings: AppSettings };
@@ -65,6 +67,15 @@ export function GeneralPane({ settings }: PaneProps) {
           {t("Reopen last projects on launch")}
         </label>
         <div className="note">{t("Reopens the windows that were open when you last quit (up to 5, in order). Off: start with the empty state.")}</div>
+      </section>
+      {/* §69: where New (no folder open) makes each project's folder */}
+      <section>
+        <h4>{t("Starting without a folder")}</h4>
+        <div className="field-row" data-setting="newProjectParent">
+          <span>{t("Folder for new projects")}</span>
+          <TextField value={settings.newProjectParent ?? ""} placeholder={DEFAULT_NEW_PROJECT_PARENT[window.rg.platform === "win32" ? "win32" : "other"]} onCommit={(v) => patch({ newProjectParent: v })} testId="Folder for new projects" />
+        </div>
+        <div className="note">{t("New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.")}</div>
       </section>
       <section>
         <h4>{t("Typing and the chat")}</h4>

@@ -40,6 +40,7 @@ import type { ShellResult } from "@reviewgate/engine"; // §67.2
 import { clearShellOutput, noteShellOutput } from "./shellMode"; // §67.2: the running `!` command's output
 import type { AppSettings } from "../shared/ipc";
 import { engineRequest, refusalOf } from "./engineRequest";
+import { newProjectRefusal, parentArg } from "./newProject"; // §69
 import { isShadowProject, type TrackOutcome } from "./noGit"; // §59
 import { errorEventText, presentationOf, refusalMessage } from "./errorCodes";
 import { canAcceptAndSend, isDiffCollapsed } from "./friction";
@@ -320,7 +321,10 @@ export type Dialog =
   /** §9 "New Chat in a Workbench": one field (the branch) and [만들기] — components/dialogs/WorkbenchChatDialog.tsx. */
   | { kind: "workbenchChat" }
   /** MARK: task-start — §63.3 "Start from a task" (업무로 시작), from the start screen: components/start/TaskStartDialog.tsx. */
-  | { kind: "taskStart" }
+  | { kind: "taskStart"; /** §69.4: the task named before the project was picked */ ref?: string }
+  /** §69 the window with no project: 1 New (components/start/NewProjectDialog.tsx), 2 Start from a task (TaskProjectDialog.tsx). */
+  | { kind: "newProject" }
+  | { kind: "taskProject" }
   | { kind: "createPR" }
   /** §55.11: `highlight` — a setting's id (settingsIndex.ts): its tab opens at its row, tinted for a moment. */
   | { kind: "settings"; tab?: import("./settingsIndex").SettingsTab; highlight?: string }
@@ -518,6 +522,11 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
   switchProject(path: string): Promise<void>;
   requestSwitch(path: string): void;
   chooseAndOpen(mode?: "open" | "switch"): Promise<void>;
+  /**
+   * §69.2 `project_create` with no project open: makes, `git init`s and opens `<parent>/<name>[-n]` (`expected`: the path
+   * `project_name` previewed, shown while it opens). `{path}` once open, `{error}` in the user's words (nothing opened).
+   */
+  createProject(name: string, parent: string | undefined, expected: string): Promise<{ path: string } | { error: string }>;
   /** `project_open_failed`'s Reopen: the folder opened last, again. */
   reopenLastProject(): Promise<void>;
   takeOver(): Promise<void>;
@@ -1551,6 +1560,21 @@ export const useStore = create<Store>((set, get, api) => {
       if (!path) return;
       if (mode === "switch" || get().state.project) get().requestSwitch(path);
       else await get().openProject(path);
+    },
+
+    async createProject(name, parent, expected) {
+      resetProjectView();
+      set({ lockedProjectPath: null, refusedLockPid: null, tab: "changes" });
+      const opening = beginOpening(expected);
+      try {
+        const reply = await engineRequest({ type: "project_create", name, ...parentArg(parent) });
+        await get().settle();
+        return { path: reply.path };
+      } catch (e) {
+        return { error: newProjectRefusal(e) };
+      } finally {
+        endOpening(opening);
+      }
     },
 
     async reopenLastProject() {

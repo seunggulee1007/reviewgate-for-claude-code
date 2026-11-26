@@ -89,7 +89,10 @@
 #                  demo project's own edits — with a review and alone (composerbar-commit-*.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
-#                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt).
+#                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with
+#                  no project at 1000 × 637 and 900 × 460, the New Project sheet (empty, typed, a long Korean prompt, an engine before §69) and
+#                  the task's project picker over three fixture repositories in DEMO_DIR-recent (`noproject` lines;
+#                  noproject-*.png).
 #                  demo: the README's demo GIF frames (demo-<nn>-<step>.png; scripts/make-gif.swift puts them together) on the
 #                  fake claude in its demo script (a `fake-demo` file next to it): a prompt typed into the terminal chat at
 #                  1360 × 850, dark, Claude editing four files, the review beside the terminal, one file accepted, one
@@ -624,6 +627,25 @@ CLI_VERSION="$("$CLAUDE_BIN" --version | awk '{print $1}')"
 ENGINE_VERSION="$(sed -n 's/.*ENGINE_VERSION = "\(.*\)".*/\1/p' "$ROOT/engine/src/version.ts")"
 node "$ROOT/scripts/verified-cli.mjs" record "$DATA" "$CLI_VERSION" "$ENGINE_VERSION" tour   # no "unverified CLI" banner
 
+# §69 (SHOTS_LAYOUT=settings): the window with no project lists recent projects and "Start from a task" picks one by its git
+# remote — three repositories in a folder of their own next to the demo project (only ever deleted when it carries the
+# marker), one with the task's repository (acme/widgets) as its remote, not the most recent; New Project previews its
+# folders in the same place (never a folder under the home folder).
+RECENT_DIR="$DEMO_DIR-recent"
+if [ "${SHOTS_LAYOUT:-}" = settings ]; then
+  if [ -e "$RECENT_DIR" ]; then
+    [ -f "$RECENT_DIR/$MARKER" ] || die "$RECENT_DIR exists and is not this script's (no $MARKER) — refusing to delete it"
+    rm -rf "$RECENT_DIR"
+  fi
+  mkdir -p "$RECENT_DIR"
+  touch "$RECENT_DIR/$MARKER"
+  for name in billing widgets docs-site; do
+    mkdir -p "$RECENT_DIR/$name"
+    git -C "$RECENT_DIR/$name" -c init.defaultBranch=main init -q
+    git -C "$RECENT_DIR/$name" remote add origin "https://github.com/acme/$name.git"
+  done
+fi
+
 defaults delete "$BUNDLE_ID" >/dev/null 2>&1 || true
 w() { defaults write "$BUNDLE_ID" "$@"; }
 w loadUserSettings -bool false               # settingSources ["project"]: nothing from ~/.claude
@@ -635,6 +657,10 @@ w confirmCloseWhileWorking -bool false       # the tour's quit never waits on an
 w reopenLastProjects -bool false
 w worktreeRoot -string /Users/Shared/acme-workbenches   # shown in the sheets: never a path under $HOME (SHOTS_DIR may be)
 [ "$CLAUDE_BIN" = claude ] || w claudePath -string "$CLAUDE_BIN"   # §57 terminal tour: the fake, never the real one
+if [ "${SHOTS_LAYOUT:-}" = settings ]; then   # §69: most recent first; the demo project goes in front when it opens
+  w recentProjects -array "$RECENT_DIR/billing" "$RECENT_DIR/widgets" "$RECENT_DIR/docs-site"
+  w newProjectParent -string "$RECENT_DIR"
+fi
 w defaultModeOffered -data "$(printf '["%s"]' "$DEMO_DIR" | xxd -p | tr -d '\n')"
 
 # --- the build --------------------------------------------------------------------------------------------------------

@@ -5,7 +5,7 @@
  * `window.rg.onEvent` → store, menu actions, the initial project (`REVIEWGATE_PROJECT` / a
  * workbench window), and starts the `--e2e` script (src/renderer/e2e.ts).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AgentPanel } from "./components/agents/AgentPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BannerStack } from "./components/BannerStack";
@@ -41,6 +41,9 @@ import { TerminalSplit, useTerminalReviewReopen } from "./components/terminal/Te
 import { PanelStatusBar, ShellPanel, useShellPanelHost } from "./components/terminal/ShellPanel"; // §57.17, §57.18
 import { useViewing } from "./viewedChat"; // §57.5
 import { StartScreen, useStartScreenWatch } from "./components/start/StartScreen"; // MARK: task-start (§63.4)
+import { noProjectKey, type NoProjectChoice } from "./newProject"; // §69
+import { Icon, type IconName } from "./icons";
+import "./components/start/start.css";
 
 declare global {
   interface Window {
@@ -232,7 +235,71 @@ function PaneDivider(props: { pref: "sidebarWidth" | "chatWidth"; fallback: numb
   );
 }
 
-/** Empty state when no project is open: Open Project… plus the recent projects from settings. */
+/** §69.4: the three cards of the window with no project — 1 / 2 / 3 act at once, the arrows move the mark, Enter takes it. */
+function NoProjectCards({ opening, onOpen }: { opening: string | null; onOpen: () => void }) {
+  const openDialog = useStore((s) => s.openDialog);
+  const dialogOpen = useStore((s) => s.dialog !== null);
+  const parent = useStore((s) => s.settings?.newProjectParent);
+  const [mark, setMark] = useState<NoProjectChoice>(1);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dialogOpen) root.current?.focus({ preventScroll: true });
+  }, [dialogOpen]);
+  const act = (c: NoProjectChoice) => {
+    if (opening !== null) return;
+    if (c === 1) openDialog({ kind: "newProject" });
+    else if (c === 2) openDialog({ kind: "taskProject" });
+    else onOpen();
+  };
+  const where = parent?.trim() || (window.rg.platform === "win32" ? "%USERPROFILE%\\ReviewGate" : "~/ReviewGate");
+  const cards: { c: NoProjectChoice; icon: IconName; title: string; detail: string; help: string; testId: string }[] = [
+    { c: 1, icon: "plus", title: t("New Project"), detail: t("No folder yet — say what you want to make"), help: t("Makes a folder for it under {0} as a git repository (1)", where), testId: "No project choice 1" },
+    { c: 2, icon: "branch", title: t("Start from a task"), detail: t("Pick the project the task belongs to"), help: t("A task link, key or number — then its project, its branch and first prompt (2)"), testId: "No project choice 2" },
+    { c: 3, icon: "folder", title: t("Open a folder…"), detail: t("A project you already have"), help: t("Choose a project folder (3)"), testId: "Open project" },
+  ];
+  return (
+    <div
+      ref={root}
+      className="start-cards"
+      tabIndex={-1}
+      role="group"
+      aria-label={t("New Project · Start from a task · Open a folder…")}
+      style={{ width: 640, maxWidth: "100%", outline: "none" }}
+      onKeyDown={(e) => {
+        if (e.target instanceof HTMLInputElement || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
+        const r = noProjectKey(e.key, mark);
+        if (!r.handled) return;
+        e.preventDefault();
+        setMark(r.mark);
+        if (r.act !== null) act(r.act);
+      }}
+      data-testid="No project start"
+    >
+      {cards.map(({ c, icon, title, detail, help, testId }) => (
+        <button
+          key={c}
+          type="button"
+          className={mark === c ? "start-card marked" : "start-card"}
+          disabled={opening !== null}
+          title={opening !== null ? t("Opening {0}…", lastComponent(opening)) : help}
+          aria-label={`${title} — ${detail}`}
+          onClick={() => { setMark(c); act(c); }}
+          onFocus={() => setMark(c)}
+          data-testid={testId}
+        >
+          <span className="row" style={{ justifyContent: "space-between" }}>
+            <span className="start-card-icon" aria-hidden="true"><Icon name={icon} size={20} /></span>
+            <span className="start-badge" aria-hidden="true">{c}</span>
+          </span>
+          <span className="start-card-title">{title}</span>
+          <span className="caption muted">{detail}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Empty state when no project is open: the §69 cards plus the recent projects from settings. */
 function NoProject() {
   const entries = useRecentEntries(); // MARK: wave4 w4-install (daily-17): no temp folders, gone ones dimmed, each removable
   const [notice, setNotice] = useState<string | null>(null);
@@ -240,7 +307,7 @@ function NoProject() {
   const openProject = useStore((s) => s.openProject);
   const opening = useStore((s) => s.openingPath);
   return (
-    <div className="empty grow" data-testid="No project">
+    <div className="empty grow no-project" data-testid="No project">
       <div className="glyph">▭</div>
       {/* An open on its way (it may wait on git — the engine caps it at 20 s and then says why): never a silent window. */}
       {opening ? (
@@ -249,12 +316,11 @@ function NoProject() {
           {t("Opening {0}…", lastComponent(opening))}
         </h2>
       ) : (
-        <h2>{t("No project open")}</h2>
+        <h2>{t("How do you want to start?")}</h2>
       )}
-      <div>{t("Open a folder (⌘O) to start a Claude session.")}</div>
-      <button type="button" className="primary" onClick={() => void chooseAndOpen("open")} data-testid="Open project">
-        {t("Open Project…")}
-      </button>
+      <div>{t("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")}</div>
+      {/* §69: 1 New · 2 Start from a task · 3 Open a folder… (Open Project), with the keys of the start screen */}
+      <NoProjectCards opening={opening} onOpen={() => void chooseAndOpen("open")} />
       {entries.length > 0 && (
         <div className="col" style={{ gap: 4, marginTop: 12, alignItems: "stretch", width: 360, maxWidth: "100%" }}>
           <div className="caption muted bold">{t("Recent projects")}</div>

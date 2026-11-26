@@ -12,7 +12,8 @@ struct RecentProjectsList: View {
     @State private var notice: String?
 
     var body: some View {
-        Group {
+        // A stack, not a Group: a Group with nothing in it got no onAppear, so a list empty at first never loaded.
+        VStack(spacing: 0) {
             if !entries.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Recent").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)

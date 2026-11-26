@@ -957,6 +957,13 @@ export type EngineCommand =
   // MARK: task-start — §63
   /** One GitHub issue for "Start from a task" (`gh issue view`): `123`, `#123`, `owner/repo#123` or an issue URL. Replies `task_fetched`. */
   | Cmd<"task_fetch", { ref: string }>
+  // §69 start without a folder
+  /** The folder name a new project would get from `text` (the first prompt, or a typed name) under `parent` (default `~/ReviewGate`); replies `project_name`. */
+  | Cmd<"project_name", { text: string; parent?: string }>
+  /** Makes `<parent>/<name>` (`-2`, `-3`, … when taken), `git init`s it and opens it; replies `project_created`. */
+  | Cmd<"project_create", { name: string; parent?: string }>
+  /** Which of `paths` (recent projects, most recent first) have the task's repository as a git remote; replies `project_matches`. */
+  | Cmd<"project_match", { ref: string; paths: string[] }>
   | Cmd<"shutdown">;
 
 // ---------------------------------------------------------------- §21 side questions
@@ -2388,6 +2395,7 @@ export type EngineEvent =
   | ReferencesEvent
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
+  | ProjectNameEvent | ProjectCreatedEvent | ProjectMatchesEvent // §69
   | FetchedEvent | PulledEvent | CommitOthersEvent; // MARK: git-sync (§68)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
@@ -2443,6 +2451,9 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "definition_preview" } ? SymbolPreviewEvent
   : C extends { type: "nav_index_build" } ? NavIndexEvent
   : C extends { type: "task_fetch" } ? TaskFetchedEvent // MARK: task-start (§63)
+  : C extends { type: "project_name" } ? ProjectNameEvent // §69
+  : C extends { type: "project_create" } ? ProjectCreatedEvent
+  : C extends { type: "project_match" } ? ProjectMatchesEvent
   : C extends { type: "git_fetch" } ? FetchedEvent // MARK: git-sync (§68)
   : C extends { type: "git_pull" } ? PulledEvent
   : C extends { type: "commit_others" } ? CommitOthersEvent
@@ -2469,6 +2480,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | DefinitionsEvent | ReferencesEvent // MARK: code-nav (§62)
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
+  | ProjectNameEvent | ProjectCreatedEvent | ProjectMatchesEvent // §69
   | FetchedEvent | PulledEvent | CommitOthersEvent // MARK: git-sync (§68)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
@@ -3452,4 +3464,10 @@ export type NavIndexEvent = { type: "nav_index"; id?: string; index: NavIndexSta
  * Refused `bad_task_ref`, `gh_missing`, `no_remote` (a number without an `origin` to name the repository), `not_found`,
  * `task_fetch_failed:<gh's first line>`.
  */
+/** §69: `name` (the folder name rule's result), `parent` (resolved), `path` (the first free `<parent>/<name>[-n]`). */
+export type ProjectNameEvent = { type: "project_name"; id?: string; name: string; parent: string; path: string };
+/** §69: the folder made and opened. */
+export type ProjectCreatedEvent = { type: "project_created"; id?: string; path: string };
+/** §69: `repo` the task's `owner/repo` (null: the text names none), `matches` the paths whose remote is it, `guess` the one to preselect. */
+export type ProjectMatchesEvent = { type: "project_matches"; id?: string; repo: string | null; matches: string[]; guess: string | null };
 export type TaskFetchedEvent = { type: "task_fetched"; id?: string; task: { id: string; number: number; title: string; body: string; url: string; labels: string[] } };

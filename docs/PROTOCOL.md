@@ -11487,3 +11487,95 @@ review again, extras-only with a pending review and with none.
   extraPaths:)`, App `CommitSheet.swift` (`otherChangesGroup`), `MainWindow.swift`. Windows: `commitOthers.ts`,
   `CommitDialog.tsx`, `store.commitAccepted({extraPaths})`, `BranchSwitcher.tsx`, `ChangedFiles.tsx`, `branchFlow.ts`.
   Tests: Core `CommitOthersTests`, Windows `commitOthers.test.ts`.
+
+## 69. Start without a folder
+
+A window with no project used to offer only Open Project and the recent projects, and the start screen (§63.4) came only
+after a folder was open, so "make a branch and start" in a fresh window had no base project to start from. The window with
+no project now offers three choices, with the recent projects and Open Project kept below them: **New Project** (새로 시작: no
+folder yet, the app makes one from what the user wants to do), **Start from a task** (업무로 시작: the app picks the base
+project first) and **Open a folder** (폴더 열기, as before). Additive on the wire: three commands, each with its own reply.
+All three work with no project open.
+
+```ts
+project_name   { text: string; parent?: string }    → project_name   { name, parent, path }   // lane "query"
+project_create { name: string; parent?: string }    → project_created { path }                // lane "main"
+project_match  { ref: string; paths: string[] }     → project_matches { repo: string | null; matches: string[]; guess: string | null } // lane "query"
+```
+
+### 69.1 The folder name — `project_name`
+
+- **The rule** (`projectSlug`, engine `git/newProject.ts`): the text's first five words — letters and digits of any script,
+  so Korean stays (`로그인 페이지 만들어줘` → `로그인-페이지-만들어줘`) — lower-cased, joined by `-`, at most 40 characters
+  cut at a word (a single longer word is cut); nothing left → `new-project`; a Windows device name (`con`, `nul`, `com1`, …)
+  gets `-project`. Separators, dots and slashes never survive, so the name is always one safe folder name. The rule is
+  idempotent: the client sends the prompt while the name follows it, and the typed name once the user edits it.
+- **`parent`**: absent or empty → `<home>/ReviewGate` (`%USERPROFILE%\ReviewGate` on Windows); `~` and `~/…` are the home
+  folder; anything not absolute is refused `bad_parent`. The reply's `parent` is the resolved one.
+- **`path`**: the first of `<parent>/<name>`, `<name>-2`, `<name>-3`, … that does not exist — a preview ("Creates …"); the
+  create picks again.
+
+### 69.2 `project_create`
+
+The same name rule on `name`, then `mkdir -p <parent>` and `mkdir` of the first free `<name>[-n]` (each `mkdir` is the
+check, so two creates never share a folder), `git init` in it (`initRepository`, as `init_repo`, §59) and an open, exactly as
+`open_project` of a repository (lock, session, chats). No commit is made, so no git identity is needed: the first commit
+asks for it as any commit does. The reply `project_created {path}` comes once the project is open. Refusals
+(`result{ok:false, code}`), nothing opened:
+
+| code (`error`) | when |
+| --- | --- |
+| `bad_parent` (`bad_parent:<parent>`) | the parent is not an absolute path |
+| `parent_not_writable` (`parent_not_writable:<why>`) | the parent cannot be made or written (a file is in the way, no permission, `-2` … `-99` all taken) |
+| `git_init_failed` (`git_init_failed:<git's first line>`) | `git init` failed (git missing, …); the empty folder it made is removed |
+
+### 69.3 The base project of a task — `project_match`
+
+- **`ref`**: what the user pasted. Its repository is that of an issue link (`https://<host>/<owner>/<repo>/issues/<n>`, also
+  the first link in a sentence) or `owner/repo#n` (`taskRepo`, read as `task_fetch` reads it, §63.1). A key (`ACME-123`), a
+  number or text names no repository: `{repo: null, matches: [], guess: null}`.
+- **`paths`**: the client's recent projects, most recent first; at most 30 are read, relative paths are skipped. Each is
+  read with `git remote -v` only (read-only, the shadow registry of §59 ignored, 3 s cap each, all at once); a missing
+  folder, a folder that is no repository or a git that does not answer has no remotes.
+- **`matches`**: the paths with any remote whose `owner/repo` is the task's (case-insensitive), those on the link's host
+  first, otherwise in the client's order. **`guess`**: the first match; else the first path with a remote of the same
+  repository name (a fork) or whose folder has that name; else null (the client preselects its most recent project).
+
+### 69.4 Clients
+
+- **The no-project window.** Three cards with 1 / 2 / 3 badges — 1 **New Project** (새로 시작), 2 **Start from a task** (업무로
+  시작), 3 **Open a folder…** (폴더 열기…) — then the recent projects as before. 1 / 2 / 3 act at once; ← → ↑ ↓ move the mark
+  over the cards and ↩ takes it. While an open is on its way the cards are off with "Opening <name>…" as the reason.
+- **New Project.** One sheet: "What do you want to make?" (the first prompt, required), the folder name (follows the prompt through
+  `project_name`, 0.3 s after typing stops, until edited; editable), the line "Creates <path>" and the parent with "Change…"
+  (Settings). When the engine gives no name — one before §69 answers `unknown_command`, a parent it refuses `bad_parent` —
+  that line says why in the user's words ("This engine cannot make new projects yet — update ReviewGate") and Create stays
+  off with the same reason, never a name that waits forever. Create sends `project_create`; on success the window opens the new project **without the start screen**
+  (the window's own suppression, §63.5), and the prompt goes where the new chat takes text — the message box, or a terminal
+  chat's prompt as one bracketed paste — exactly as §63.3 hands a task's first prompt: **a draft, never sent by the app**;
+  one Return sends it. (The same rule as §63 on purpose: the user sees what Claude gets in the chat's own box, picks the
+  permission mode, and a terminal chat is never sent Enter for them.) A refusal shows in the sheet in the user's words
+  (69.2) and the sheet stays.
+- **Start from a task.** One sheet: the task field (as §63.3's), then the base project: the recent projects (existing
+  folders only), the one `project_match` names preselected — `guess`, else the most recent — with "Matches <owner/repo>" on
+  the rows in `matches`, plus "Other folder…" (the folder picker). One click on a row picks it; a double-click on it, or Open and Continue (↩ / Enter), opens that project; its
+  start screen then shows (whatever "Start straight away next time" says — the user asked for the task) with the task sheet
+  of §63.3 already open and the task filled in. From there it is §63.3 unchanged (branch or workbench, first prompt, never
+  sent). Nothing is created in this path. A folder that is no repository gets the git-init prompt first (§59); the task
+  sheet follows it.
+- **Settings.** The parent folder for new projects, `newProjectParent` (empty = `<home>/ReviewGate`): Settings › General ›
+  Starting without a folder › Folder for new projects, in the settings search.
+- **Mac.** `NoProjectStartCards`, `NewProjectSheet` and `TaskProjectSheet` (App `UI/Start/NoProjectStartView.swift`) in
+  `EmptyProjectView` (`MainWindow.swift`); the task waits in `WindowModel.pendingTaskStart` (keyed by the project) until
+  `StartScreenOverlay` decides for that project and `StartScreenView` opens `TaskStartSheet(initialRef:)`; New sets
+  `suppressNextStartScreen`. Core `NewProject.swift`: the replies, `AppState.newProjectName` / `createProject` (through the
+  same open path as Open Project — a refusal goes back to the sheet, not the banner) / `matchProjects`, the setting,
+  `NewProjectText`, `NoProjectChoice`; tests `NewProjectTests`. The setting's row: `GeneralSettingsPane` (Choose… / Reset).
+- **Windows.** The cards are `NoProjectCards` in `NoProject` (`src/renderer/App.tsx`); the dialogs `components/start/
+  NewProjectDialog.tsx` and `TaskProjectDialog.tsx` (store dialogs `newProject` / `taskProject`); `newProject.ts` holds the
+  requests, `newProjectRefusal`, `noProjectKey`, `preselectProject` and `samePathLoose`; `store.createProject` opens the way
+  `openProject` does ("Opening <name>…", a refusal back to the dialog). `useStartScreen` carries `suppressNext` (New) and
+  `pendingTask {path, ref}` (Start from a task): `stepStartScreen` shows the screen for it and `StartScreen` opens the task
+  dialog with `ref` (`TaskStartDialog initialRef`). The three commands are on the renderer's allow list (`ipcGuard.ts`);
+  `newProjectParent` is checked as a folder by main's `settingsGuard` and is a row of Settings › General (`GeneralTab.tsx`,
+  `settingsIndex.ts`). Tests: `newProject.test.ts`, `ipcGuard.test.ts`, `settingsGuard.test.ts`.

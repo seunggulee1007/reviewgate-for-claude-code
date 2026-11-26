@@ -803,7 +803,9 @@ public final class AppState {
 
     /// `open_project` refused with `locked_by_other_session:<pid>` is not an error row: `lockConflict` is set
     /// and the window asks whether to take the worktree over (`takeOver()`) or stays empty (`cancelTakeover()`).
-    private func open(_ url: URL, command: EngineCommand) async {
+    /// §69 `refused`: a refusal of the command (not a lock) goes there instead of the banner (`project_create`'s sheet).
+    @discardableResult
+    func open(_ url: URL, command: EngineCommand, refused: ((EngineClientError) -> Void)? = nil) async -> EngineEvent? {
         resetProjectView()
         let opening = beginOpening(url)
         defer { endOpening(opening) }
@@ -816,7 +818,7 @@ public final class AppState {
             try await client.send(.setSettings(EngineSettings(
                 permissionMode: AppSettings.permissionMode(root: AppSettings.projectKey(url), defaults: defaults))))
             try await client.send(.setSettings(projectSessionSettings(for: url)))   // wave3 mac-session (§36.6): local settings
-            _ = try await client.request(command)
+            let reply = try await client.request(command)
             engineStarted = true
             nodeToolchain = await client.toolchain
             enginePID = await client.enginePID
@@ -824,6 +826,12 @@ public final class AppState {
             // §9 New Chat in a Workbench: a held message handed to this workbench goes into its composer; the first chat was
             // made a chat for it (`projectSessionSettings`), later ones are of the user's kind again.
             if takeWorkbenchHandoff(for: url) { pushNewChatKind() }
+            return reply
+        } catch let error as EngineClientError where refused != nil && Self.isPlainRefusal(error) {
+            engineStarted = true
+            nodeToolchain = await client.toolchain
+            enginePID = await client.enginePID
+            refused?(error)
         } catch EngineClientError.refused(let message, _, _, _) where message.hasPrefix("locked_by_other_session") {
             engineStarted = true
             nodeToolchain = await client.toolchain
@@ -838,6 +846,13 @@ public final class AppState {
             fail(error.localizedDescription, fatal: true, scope: .engine)
             errorBanner?.reopenProject = url
         }
+        return nil
+    }
+
+    /// §69: a refusal other than another session's lock (that one is the takeover prompt's).
+    private static func isPlainRefusal(_ error: EngineClientError) -> Bool {
+        guard let code = error.refusalCode else { return false }
+        return !code.hasPrefix("locked_by_other_session")
     }
 
     /// `openingProject` is `url` from now on; the returned tick ends it (`endOpening`) unless a newer open began meanwhile.
@@ -854,6 +869,12 @@ public final class AppState {
     /// The screenshot tour's "Opening <name>…" shot (App/Debug/ScreenshotTour.swift); nil ends it.
     public func debugShowOpening(_ url: URL?) {
         if let url { _ = beginOpening(url) } else { endOpening(openingTick) }
+    }
+
+    /// The screenshot tour's engine that does not know a command: every request and reply refused with `code` (as an engine
+    /// before the feature answers) until nil — §69's New Project sheet with an engine before §69.
+    public func debugRefuseRequests(_ code: String?) {
+        replySink = code.map { code in { command in throw EngineClientError.refused("unknown command: \(command)", code: code) } }
     }
     #endif
 
@@ -2401,7 +2422,7 @@ public final class AppState {
             break
         case .documentSymbols, .workspaceSymbols, .definitionPreview, .navIndex:   // MARK: ide-nav — §65 replies, consumed by the request that asked
             break
-        case .taskFetched:   // MARK: task-start — §63 reply, consumed by the request that asked
+        case .taskFetched, .projectName, .projectCreated, .projectMatches:   // §63 / §69 replies, consumed by the request that asked
             break
         case .fetched, .pulled, .commitOthers:   // MARK: git-sync — §68 replies, consumed by the request that asked
             break

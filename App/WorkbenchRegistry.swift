@@ -24,6 +24,9 @@ final class WindowModel {
     var startScreenCheckedRoot: String?
     /// The next project this window opens shows no start screen (a launch restore, a headless run).
     var suppressNextStartScreen = false
+    /// §69.4: the task "Start from a task" named with no project open — the project it opens shows the start screen with
+    /// the task sheet open and this task filled in.
+    var pendingTaskStart: PendingTaskStart?
     // M13: sheets / dialogs the Review and Workbenches menus open (the views bind to these).
     /// Accept-all summary sheet (audit 1.9).
     var showAcceptAll = false

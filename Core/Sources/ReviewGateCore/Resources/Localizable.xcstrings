@@ -6167,6 +6167,38 @@
         }
       }
     },
+    "Could not make the project folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not make the project folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더를 만들지 못했어요"
+          }
+        }
+      }
+    },
+    "Could not make the project folder: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not make the project folder: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더를 만들지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Could not open a new chat": {
       "localizations": {
         "en": {
@@ -8499,6 +8531,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락한 내용도 함께 사라져요. 디스크의 파일이 이번 라운드 전 상태로 돌아가고 리뷰 목록에서 빠져요."
+          }
+        }
+      }
+    },
+    "The folder for new projects must be a full path — change it in Settings › General": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The folder for new projects must be a full path — change it in Settings › General"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 프로젝트 폴더는 전체 경로여야 해요 — 설정 › 일반에서 바꿔 주세요"
           }
         }
       }
@@ -16751,6 +16799,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 Claude 세션은 MCP 서버를 관리할 수 없어요 — Claude Code를 업데이트하세요"
+          }
+        }
+      }
+    },
+    "This engine cannot make new projects yet — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot make new projects yet — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 아직 새 프로젝트를 만들 수 없어요 — ReviewGate를 업데이트하세요"
           }
         }
       }

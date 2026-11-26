@@ -1494,7 +1494,20 @@ private struct EmptyProjectView: View {
     @Environment(AppState.self) private var store
 
     var body: some View {
-        VStack(spacing: 20) {
+        // §69: the cards and the recent projects are taller than a short window; they scroll there instead of laying the
+        // whole window out taller than the screen (the sidebar's tabs pushed off the top), and stay centred when they fit.
+        GeometryReader { geometry in
+            ScrollView {
+                content
+                    .padding(.horizontal, 32).padding(.vertical, 24)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    private var content: some View {
+        VStack(spacing: 16) {
             Image(systemName: "folder").font(.system(size: 44)).foregroundStyle(.secondary)
             if let opening = store.openingProject {
                 // An open on its way (it may wait on git — capped by the engine, which then says why): never a silent window.
@@ -1506,20 +1519,16 @@ private struct EmptyProjectView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("Opening project")
             } else {
-                Text("Open a project to start").font(.title2.weight(.semibold))
+                Text("How do you want to start?").font(.title2.weight(.semibold))
             }
-            Text("ReviewGate runs Claude in a folder and gates every change behind your review.")
+            Text("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Open Project…", systemImage: "folder.badge.plus") { ProjectOpener.choose(store: store) }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .accessibilityIdentifier("Open Project…")
+                .frame(maxWidth: 520)   // two even lines over the cards, not one long line and a last word
+            // §69: New · Start from a task · Open a folder… (Open Project), 1 / 2 / 3, the arrows and ↩.
+            NoProjectStartCards()
 
             RecentProjectsList()   // MARK: wave4 w4-install (daily-17): a missing folder dimmed with "Not found", every row removable
         }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
