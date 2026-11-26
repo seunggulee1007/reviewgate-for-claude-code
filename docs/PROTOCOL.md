@@ -11603,14 +11603,15 @@ No engine command: the prompt history is the clients' own (↑ / ↓, per projec
   it and give the draft back. Nothing typed yet shows "Type to search the prompts sent in this project"; no match shows
   "No prompt matches" (↩ then keeps the draft); an empty history says "No prompts in this project yet". An input method's
   composition (Korean) keeps its own ↩ / esc. The bar's tooltip lists the keys.
-- **Windows: Ctrl+R was Refresh.** The View menu's Refresh keeps Ctrl+R as its shown key, but the renderer owns the key
-  (`registerAccelerator: false`, as the other renderer keys): in the message box it opens the search, elsewhere it
-  refreshes as before. On the Mac ⌘R stays Refresh and ⌃R is free.
+- **Windows: Ctrl+R is also Refresh.** The View menu keeps Ctrl+R for Refresh everywhere else. In the message box (and in
+  the search field) the box takes the key first and notes it; should the menu still fire for the same press, its refresh
+  is dropped (`historySearchKeyJustHandled`, as Ctrl+B and Toggle Sidebar, §52). On the Mac ⌘R stays Refresh and ⌃R is
+  free.
 - **Mac:** Core `Session/PromptHistorySearch.swift` (`PromptHistorySearch`, `PromptHistorySearchText`); App
   `ComposerHistorySearch.swift` (the bar), `ComposerTextView` (⌃R → `.controlR`), `ChatComposer`. Tests:
   `PromptHistorySearchTests`.
-- **Windows:** `historySearch.ts` (pure), `components/chat/HistorySearchBar.tsx`, `Composer.tsx`, `shortcuts.ts` (Ctrl+R
-  outside the box), main `menu.ts`. Tests: `historySearch.test.ts`.
+- **Windows:** `historySearch.ts` (pure), `components/chat/HistorySearchBar.tsx`, `Composer.tsx`, `App.tsx` (Refresh dropped for
+  the press the box took). Tests: `historySearch.test.ts`.
 
 ### 70.2 `#` quick memory — not built
 

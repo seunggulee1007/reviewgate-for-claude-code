@@ -159,3 +159,14 @@
 .slash-status { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; }
 .slash-status-row { display: contents; }
 .slash-terminal-only { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+
+/* §70.1: the Ctrl+R search over the message box (HistorySearchBar.tsx) */
+.history-search { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 5px 8px; border-radius: 6px; background: var(--elevated); border: 1px solid var(--accent); font-size: 12px; }
+.history-search-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.history-search-icon { color: var(--fg-3); }
+.history-search-input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 1px 0; }
+.history-search-position { flex: none; font-variant-numeric: tabular-nums; }
+.history-search-match { color: var(--fg); white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.history-search-match mark { background: var(--accent-bg); color: inherit; font-weight: 600; border-radius: 2px; }
+.history-search-status.warn { color: var(--orange); }
+.history-search-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

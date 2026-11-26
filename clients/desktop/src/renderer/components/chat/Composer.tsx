@@ -59,6 +59,8 @@ import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
 import { parseSlashAppCommand } from "../../slashAppCommands";
 import { runSlashAppCommand } from "../../slashAppRun";
 import { addDir } from "../../addedDirs"; // §67.1
+import { isHistorySearchKey, noteHistorySearchKey, searchAccepted, startHistorySearch, type HistorySearch } from "../../historySearch"; // §70.1
+import { HistorySearchBar } from "./HistorySearchBar";
 import { AddedDirsChip } from "./AddedDirsChip";
 // §67.2 `!` shell mode
 import { cancelShellCommand, isShellDraft, runShellCommand, shellBadgeTitle, shellCommandOfDraft, shellKeyHint, shellPendingCaption } from "../../shellMode";
@@ -175,6 +177,8 @@ export function Composer() {
   const projectHash = root ? projectRootHash(root) : null;
   const [history, setHistory] = useState<string[]>(() => loadHistory(projectHash));
   const [nav, setNav] = useState<HistoryNav>(IDLE_NAV);
+  // §70.1: the Ctrl+R search over those prompts while its bar is open.
+  const [search, setSearch] = useState<HistorySearch | null>(null);
   const navRef = useRef(nav); // MARK: wave6 w6-terminal (§44.1): the parked draft, read when the chat changes
   navRef.current = nav;
   useEffect(() => {
@@ -745,6 +749,20 @@ export function Composer() {
     inputRef.current?.focus();
   };
 
+  /** §70.1 Enter / Tab: the match goes into the box (the draft stays when nothing matched); Esc: the bar closes. */
+  const acceptSearch = () => {
+    if (!search) return;
+    const text = searchAccepted(search);
+    setSearch(null);
+    if (text !== draft) setNav(IDLE_NAV); // a recalled prompt starts a fresh ↑ walk
+    showDraft(text);
+    inputRef.current?.focus();
+  };
+  const cancelSearch = () => {
+    setSearch(null);
+    inputRef.current?.focus();
+  };
+
   /** Plain Send: the message goes out and every file keeps the state it had. */
   const doSend = () => {
     if (takeBtw() || takeMcp() || takeAppCommand() || takeShell()) return; // §56.1 / §56.4 / §56.5 / §67.2
@@ -926,6 +944,14 @@ export function Composer() {
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposing(e)) return; // wave4 w4-input (polish-11): the IME's own Enter / Tab / arrows
+    // §70.1: Ctrl+R, as in the terminal — the bar over the box searches this project's prompts (the palettes close).
+    if (isHistorySearchKey(e)) {
+      e.preventDefault();
+      noteHistorySearchKey(); // the View menu's Refresh is dropped for this press
+      closePalette();
+      setSearch(startHistorySearch(history, draft));
+      return;
+    }
     // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
     if (btwOverlay?.kind === "answered" && draft === "" && (isEnter(e) || e.key === " ") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
       e.preventDefault();
@@ -1222,6 +1248,7 @@ export function Composer() {
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
       {slashCard !== null && <SlashCard card={slashCard} onClose={() => setSlashCard(null)} /* §56.5 */ />}
       <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
+      {search !== null && <HistorySearchBar search={search} onChange={setSearch} onAccept={acceptSearch} onCancel={cancelSearch} /* §70.1 */ />}
       {pendingCaption && (
         <div className="shell-pending caption" role="status" title={t("Claude reads them in front of your next message, as the terminal's ! does")} data-testid="Shell results pending">
           <span aria-hidden="true">$</span> {pendingCaption}
