@@ -870,6 +870,12 @@ public final class AppState {
     public func debugShowOpening(_ url: URL?) {
         if let url { _ = beginOpening(url) } else { endOpening(openingTick) }
     }
+
+    /// The screenshot tour's engine that does not know a command: every request and reply refused with `code` (as an engine
+    /// before the feature answers) until nil — §69's New Project sheet with an engine before §69.
+    public func debugRefuseRequests(_ code: String?) {
+        replySink = code.map { code in { command in throw EngineClientError.refused("unknown command: \(command)", code: code) } }
+    }
     #endif
 
     /// The banner's "Reopen": opens the project again after the engine stopped or failed to start (a new engine is

@@ -3083,13 +3083,20 @@ private final class Tour {
                 if label == "smallest" { window.setContentSize(NSSize(width: 900, height: 460)) }
                 try await Task.sleep(for: .milliseconds(1500))
                 let content = window.contentView?.bounds.size ?? .zero
-                log("noproject window-\(label)-\(appearance.rawValue): window \(Int(window.frame.width))×\(Int(window.frame.height)) pt, content \(Int(content.width))×\(Int(content.height))")
+                // Content that needs more height than the window lays the whole window out taller (the toolbar pushed off).
+                let needs = window.contentView?.fittingSize.height ?? 0
+                log("noproject window-\(label)-\(appearance.rawValue): window \(Int(window.frame.width))×\(Int(window.frame.height)) pt, content \(Int(content.width))×\(Int(content.height)), needs \(Int(needs))"
+                    + (needs > content.height + 1 ? " — TALLER (the window's content is laid out taller than the window)" : ""))
                 try write(try render(window), "noproject-window-\(label)-\(appearance.rawValue)")
             }
             try await sheet("new-empty", NewProjectSheet(), appearance: appearance)
             try await sheet("new-typed", NewProjectSheet(initialPrompt: "Build a small todo app with a REST API and tests"), appearance: appearance)
             try await sheet("new-korean", NewProjectSheet(initialPrompt: "할 일 목록 앱을 만들어 줘. 마감일과 태그로 거를 수 있고, 끝낸 일은 접어 두고, "
                 + "데이터는 로컬 SQLite에 저장해 줘. 화면은 키보드만으로 다룰 수 있어야 하고, 테스트도 같이 써 줘."), appearance: appearance)
+            // An engine before §69 answers project_name unknown_command: the reason on the path line, Create off with it.
+            store.debugRefuseRequests("unknown_command")
+            try await sheet("new-old-engine", NewProjectSheet(initialPrompt: "Build a small todo app with a REST API and tests"), appearance: appearance)
+            store.debugRefuseRequests(nil)
             try await sheet("task", TaskProjectSheet(initialRef: "https://github.com/acme/widgets/issues/42"), appearance: appearance)
             try await sheet("task-empty", TaskProjectSheet(), appearance: appearance)
         }
