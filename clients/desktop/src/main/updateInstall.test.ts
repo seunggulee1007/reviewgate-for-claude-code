@@ -1,7 +1,7 @@
 // The Windows in-app update's steps (docs/PROTOCOL.md §48, Windows): download → verify → (waiting for Claude) → ready →
 // the record and the quit; cancel and failures; the installer's argv; what the next launch says from the record, once.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blockerLine, EARLY_EXIT_MS, endedWithin, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installerStillRunning, INSTALLING_MS, installMode, launchInstaller, noticeOf, processAlive, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
+import { blockerLine, bringForwardCommand, EARLY_EXIT_MS, endedWithin, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installerStillRunning, INSTALLING_MS, installMode, launchInstaller, noticeOf, processAlive, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
 
 const target: InstallTarget = {
   version: "0.6.0",
@@ -314,6 +314,10 @@ describe("after the restart", () => {
     await vi.advanceTimersByTimeAsync(EARLY_EXIT_MS);
     expect(await late).toBe("running");
     expect(EARLY_EXIT_MS).toBeLessThan(2000); // before the installer's own close of a running ReviewGate
+  });
+
+  it("a launch during the install brings the installer's window forward by its pid, Windows PowerShell by its full path", () => {
+    expect(bringForwardCommand(4242, "D:\\Win")).toEqual({ command: "D:\\Win\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", "(New-Object -ComObject WScript.Shell).AppActivate(4242) | Out-Null"] });
   });
 
   it("names the windows the restart waits for", () => {

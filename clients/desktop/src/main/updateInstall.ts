@@ -67,6 +67,16 @@ export function installerStillRunning(o: { raw: unknown; running: string; argv: 
   return o.alive(r.pid);
 }
 
+/**
+ * What such a launch runs before it leaves: the installer's window brought to the front (WScript.Shell's AppActivate by
+ * its pid, Windows PowerShell by its full path) — its progress, or a box waiting for an answer behind other windows
+ * (reproduced on windows-latest: "ReviewGate cannot be closed … Retry" for a file another program held, and each launch
+ * meanwhile left without a word). Best effort.
+ */
+export function bringForwardCommand(pid: number, systemRoot = "C:\\Windows"): { command: string; args: readonly string[] } {
+  return { command: win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), args: ["-NoProfile", "-NonInteractive", "-Command", `(New-Object -ComObject WScript.Shell).AppActivate(${Math.trunc(pid)}) | Out-Null`] };
+}
+
 /** `process.kill(pid, 0)`: the process is there (EPERM: there, another user's). */
 export function processAlive(pid: number, kill: (pid: number, signal: 0) => unknown = (p, s) => process.kill(p, s)): boolean {
   try {

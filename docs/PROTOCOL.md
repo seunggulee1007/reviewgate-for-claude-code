@@ -7369,7 +7369,11 @@ download whose identifier differs from the running app's, so a build with an old
     then closed, and the first took the record, so the launch the installer made had nothing to say): a
     launch that finds the record with `pid` still running, within 5 minutes of `at`, not started with `--updated` and
     still older than `to` leaves at once, before the single-instance lock and any window, and keeps the record
-    (`updateInstall.ts` `installerStillRunning`, main.ts).
+    (`updateInstall.ts` `installerStillRunning`, main.ts). Before it leaves it brings the installer's window to the
+    front (`bringForwardCommand`: `(New-Object -ComObject WScript.Shell).AppActivate(<pid>)` through Windows
+    PowerShell by its full path, at most 4 s, best effort): reproduced on windows-latest with a held file, the 0.5.33
+    installer waited on "ReviewGate cannot be closed … Retry" and every launch meanwhile left without a word, which on a
+    desktop with other windows over that box looks like ReviewGate never opening.
     **For all users** the installer is started through Windows PowerShell by its full path
     (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
     PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/allusers','--updated'
