@@ -165,7 +165,8 @@ struct NewProjectSheet: View {
                 Spacer()
                 SettingsJumpButton("Change…", to: "newProjectParent")
                     .controlSize(.small)
-                    .help("Settings › General › Folder for new projects")
+                    .disabled(creating)
+                    .help(creating ? String(localized: "The project is being made") : String(localized: "Settings › General › Folder for new projects"))
                     .accessibilityIdentifier("New project parent")
             }
             if let error {
