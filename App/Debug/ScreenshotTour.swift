@@ -1028,6 +1028,74 @@ private final class Tour {
         try await addDirShellShots(window, shoot: shoot)
         try await gitSyncShots(window, shoot: shoot)
         try await commitOthersShots(window)
+        try await parityDShots(window, shoot: shoot)
+    }
+
+    // MARK: §70 at the laptop size (the composer bar check): ⌃R over the prompts, the thinking chip, /export's sheet.
+
+    /// §70.1 the ⌃R search bar (a match with the typed part highlighted, an older one, no match, an empty history), §70.4 the
+    /// composer bar's thinking chip off and for a model that always thinks, §70.3 the `/export` sheet and the line after a
+    /// save. `composerbar-history-*.png`, `composerbar-thinking-*.png`, `composerbar-export-*.png`.
+    private func parityDShots(_ window: NSWindow, shoot: (String) async throws -> Void) async throws {
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+        let composer = entry.model.chatComposer
+        let prompts = [
+            "Add a SAVE10 discount code to the cart totals",
+            "Run the cart tests and fix what fails",
+            "Explain how pricing.ts rounds the totals — keep it short",
+            "Write a test for the free-shipping threshold in test/cart.test.ts\nand make it fail first",
+            "Run the tests again",
+        ]
+        setComposerText("half-typed draft", in: window)
+        composer.startHistorySearch(entries: prompts)
+        try await Task.sleep(for: .milliseconds(400))
+        composer.historySearch?.setQuery("test")
+        try await shoot("history-search")
+        composer.historySearch?.older()
+        log("composerbar history-older: " + (composer.historySearch?.position.map { "\($0.index) / \($0.count)" } ?? "no match LOST"))
+        try await shoot("history-older")
+        composer.historySearch?.setQuery("deploy to staging")
+        try await shoot("history-nomatch")
+        composer.historySearch = PromptHistorySearch(entries: [], original: "")
+        try await shoot("history-empty")
+        composer.historySearch?.setQuery("")
+        composer.historySearch = PromptHistorySearch(entries: prompts, original: "half-typed draft")
+        composer.historySearch?.setQuery("free-shipping")
+        composer.acceptHistorySearch()
+        log("composerbar history-accepted: the box has \"\(composer.draft.prefix(40))\"" + (composer.historySearch == nil ? "" : " — the bar stayed LOST"))
+        try await shoot("history-accepted")
+        setComposerText("", in: window)
+        window.makeFirstResponder(nil)
+
+        store.debugShowThinking(ThinkingState(enabled: false))
+        log("composerbar thinking-off: \(ThinkingText.chip(ThinkingState(enabled: false))) — \(ThinkingText.help(ThinkingState(enabled: false)))")
+        try await shoot("thinking-off")
+        store.debugShowThinking(ThinkingState(enabled: true, alwaysOn: true))
+        log("composerbar thinking-always: \(ThinkingText.help(ThinkingState(enabled: true, alwaysOn: true)))")
+        composer.infoNotice = ThinkingToggle.alwaysOn.notice.text
+        try await shoot("thinking-always")
+        composer.infoNotice = ThinkingText.toggled(false)
+        store.debugShowThinking(ThinkingState(enabled: false))
+        try await shoot("thinking-toggled")
+        composer.infoNotice = nil
+        store.debugShowThinking(ThinkingState(enabled: true))
+
+        let text = [
+            "> Add a SAVE10 discount code to the cart totals",
+            "⏺ I'll add the code to the pricing table and cover it with a test.",
+            "⏺ Edit(src/pricing.ts)\n  ⎿  Updated src/pricing.ts with 4 additions",
+            "⏺ Bash(npm test -- --run)\n  ⎿  Tests  16 passed (16)",
+            "⏺ SAVE10 takes 10% off the subtotal before shipping; the new test covers it.",
+        ].joined(separator: "\n\n") + "\n"
+        let item = ChatExportItem(export: ChatExport(text: text, name: "2026-11-26-143005-add-a-save10-discount-code.txt"))
+        try await panelShot("export-sheet", ChatExportSheet(item: item, done: { _ in }, failed: { _ in }))
+        composer.infoNotice = ChatExportText.saved("/Users/Shared/acme-shop/chat.txt")
+        try await shoot("export-saved")
+        composer.infoNotice = nil
+        composer.notice = ChatExportText.refusal(code: "export_exists", detail: "/Users/Shared/acme-shop/chat.txt")
+        try await shoot("export-exists")
+        composer.notice = nil
     }
 
     // MARK: §67 / §68 at the laptop size (the composer bar check): what 0.5.29 added around the box and the branch.

@@ -48,6 +48,13 @@ public extension AppState {
         shellLive = shell.map { ShellLiveOutput(id: $0.id, output: output) }
     }
 
+    /// §70.4 (the composer bar check): the chat's extended thinking as a snapshot reports it.
+    func debugShowThinking(_ thinking: ThinkingState?) {
+        var snapshot = state
+        snapshot.session.thinking = thinking
+        state = snapshot
+    }
+
     /// §68 (the composer bar check): the branches with their upstream counts, `branches.sync`, the remote the project
     /// header shows and the last Fetch / Pull outcome — as a snapshot and a reply report them.
     func debugShowGitSync(branches: [BranchInfo], sync: GitSyncState?, remoteURL: String?, notice: GitSyncNotice?) {
