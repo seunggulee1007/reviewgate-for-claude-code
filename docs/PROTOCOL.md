@@ -11653,6 +11653,17 @@ type ResponseTextEvent = { type: "response_text"; n: number; text: string };
   built: the whole answer is copied.
 - Engine: `session/exportChat.ts` (`chatExportText`, `responses`, `nthResponse`, `exportFileName`, `writeExport`),
   `engine.ts` (`exportChat`, `copyResponse`). Tests: `engine/test/w70.export.test.ts`.
+- **Clients.** `/export file` and `/copy [N]` empty the box; a refusal gives the command back with the reason in the notice
+  line. `/export file` then says "Saved the conversation to …"; `/copy` confirms with a toast. `/export` alone opens a sheet
+  (Mac) / dialog (Windows): the text's start (monospace, ≤ 6 000 characters shown), "N lines · M characters", Cancel,
+  **Save to File…** (Mac `NSSavePanel`, Windows main's `rg:saveExportFile` save dialog — both ask before replacing, then
+  `export_chat {path, replace: true}`) and **Copy to Clipboard** (the default). A chat shown read-only is not exported
+  (Windows says to go back to the running chat). Mac: Core `Session/ChatExport.swift` (`ChatExport`, `ResponseText`,
+  `CopyArgument`, `ChatExportText`, the store's `exportChat` / `copyResponse`), `SlashAppCommand.export` / `.copy`; App
+  `ComposerExport.swift`, `ComposerSlashCommands.swift`. Tests: `ChatExportTests`, `SlashAppCommandsTests`. Windows:
+  `chatExport.ts`, `components/dialogs/ChatExportDialog.tsx`, `slashAppCommands.ts`, `slashAppRun.ts`, `Composer.tsx`,
+  `errorCodes.ts`, main `ipc.ts` (`rg:saveExportFile`) and `ipcGuard.ts`. Tests: `chatExport.test.ts` (the clipboard and
+  the save dialog stubbed), `slashAppCommands.test.ts`, `ipcGuard.test.ts`.
 
 ### 70.4 Alt+T — extended thinking on or off
 
@@ -11677,3 +11688,17 @@ set_thinking { enabled: boolean }   // the current chat's; lane main, allowed wh
 - Engine: `statusline/input.ts` (`thinkingAlwaysOn`), `session/claude.ts` (`thinking`, `setThinking`), `review/sessions.ts`
   (`thinkingOff`), `engine.ts` (`setThinking`, `thinkingSlice`, the start's `thinking: false`). Tests:
   `engine/test/w70.thinking.test.ts`.
+- **Clients.** ⌥T (Mac) / Alt+T (Windows; the physical T — macOS types "†", a Korean layout "ㅅ") in the message box sends
+  `set_thinking {enabled: !enabled}`; the line after it says "Thinking off — from Claude's next request" (Mac the info line,
+  Windows a toast). With `alwaysOn` nothing is sent and the line says the model always thinks. The composer bar shows a
+  brain right after the mode menu: the accent while Claude thinks (`enabled || alwaysOn`), dim with "Thinking off" when it
+  does not; a click toggles it. Its tooltip: "Extended thinking is on for this chat — click or press ⌥T to turn it off" (or
+  on), "This model always uses extended thinking — ⌥T has no effect on it", or why it is disabled (no project, an engine
+  without §70.4 — then the chip is hidden and the key types as before —, a terminal chat, a chat shown read-only). Mac: Core
+  `Session/ExtendedThinking.swift` (`ThinkingState`, `ThinkingText`, `ThinkingToggle`, `thinkingBlocker`,
+  `toggleThinking`); App `ComposerThinking.swift` (`ThinkingChip`), `ComposerTextView` (`.optionT`). Tests:
+  `ExtendedThinkingTests`. Windows: `thinking.ts`, `components/chat/ThinkingChip.tsx`, `Composer.tsx`, `errorCodes.ts`.
+  Tests: `thinking.test.ts`.
+- **Shortcut tables.** ⌃R / Ctrl+R "Search the prompt history" and ⌥T / Alt+T "Turn extended thinking on or off" are rows
+  of the message box section in docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. Neither
+  clashes: ⌘R / Ctrl+R outside the box is Refresh (70.1), Ctrl+Alt+T is New Terminal Chat, ⌥⌘T New Chat in a Workbench.

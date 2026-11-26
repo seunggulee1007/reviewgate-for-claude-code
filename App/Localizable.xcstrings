@@ -6097,6 +6097,38 @@
         }
       }
     },
+    "In the message box — press it again for an older match": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box — press it again for an older match"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서 — 다시 누르면 더 이전 것을 찾아요"
+          }
+        }
+      }
+    },
+    "In the message box, for this chat — no effect on a model that always thinks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box, for this chat — no effect on a model that always thinks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서, 이 채팅에 — 항상 생각하는 모델에는 효과가 없어요"
+          }
+        }
+      }
+    },
     "Puts the whole conversation on the clipboard as plain text": {
       "localizations": {
         "en": {
@@ -6109,6 +6141,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "대화 전체를 일반 텍스트로 클립보드에 넣어요"
+          }
+        }
+      }
+    },
+    "Search the prompt history": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search the prompt history"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트 기록 검색"
+          }
+        }
+      }
+    },
+    "Turn extended thinking on or off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn extended thinking on or off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "extended thinking 켜기·끄기"
           }
         }
       }

@@ -132,6 +132,8 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Switch the permission mode", mac: "⇧⇥", win: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto" },
       { action: "Run the command in the background", mac: "⌃B", win: "Ctrl+B", note: "In an empty message box, while a command runs" }, // §52
       { action: "Edit the message in an external editor", mac: "⌃G", win: "Ctrl+G", note: "In the message box — each save comes back into it" }, // §56.3
+      { action: "Search the prompt history", mac: "⌃R", win: "Ctrl+R", note: "In the message box — press it again for an older match" }, // §70.1
+      { action: "Turn extended thinking on or off", mac: "⌥T", win: "Alt+T", note: "In the message box, for this chat — no effect on a model that always thinks" }, // §70.4
     ],
   },
   {
