@@ -106,12 +106,15 @@ struct NewProjectSheet: View {
     @State private var name = ""
     @State private var nameTyped = false
     @State private var preview: ProjectNameReply?
+    /// Why the engine gives no name (too old, the parent setting refused): shown on the path line and as Create's reason.
+    @State private var unavailable: String?
     @State private var creating = false
     @State private var error: String?
     @FocusState private var promptFocused: Bool
 
     private var blocker: String? {
         if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return String(localized: "Say what you want to make first") }
+        if let unavailable { return unavailable }
         if preview == nil { return String(localized: "Working out the folder name…") }
         return nil
     }
@@ -140,12 +143,16 @@ struct NewProjectSheet: View {
                 .help("Follows what you type above until you edit it; a name already taken gets -2, -3")
                 .accessibilityIdentifier("New project name")
             HStack(spacing: 6) {
-                Image(systemName: "folder").foregroundStyle(.secondary)
-                Text(preview.map { String(localized: "Creates \($0.path)") } ?? String(localized: "Working out the folder name…"))
+                if unavailable != nil {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                } else {
+                    Image(systemName: "folder").foregroundStyle(.secondary)
+                }
+                Text(unavailable ?? preview.map { String(localized: "Creates \($0.path)") } ?? String(localized: "Working out the folder name…"))
                     .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
+                    .lineLimit(unavailable == nil ? 1 : 2).truncationMode(.middle)
                     .textSelection(.enabled)
-                    .help(preview?.path ?? "")
+                    .help(unavailable ?? preview?.path ?? "")
                     .accessibilityIdentifier("New project path")
                 Spacer()
                 SettingsJumpButton("Change…", to: "newProjectParent")
@@ -183,10 +190,17 @@ struct NewProjectSheet: View {
     private func refreshPreview() async {
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { return }
-        let reply = await store.newProjectName(text: nameTyped ? name : prompt)
-        guard !Task.isCancelled, let reply else { return }
-        preview = reply
-        if !nameTyped { name = reply.name }
+        let outcome = await store.newProjectName(text: nameTyped ? name : prompt)
+        guard !Task.isCancelled else { return }
+        switch outcome {
+        case .ready(let reply):
+            preview = reply
+            unavailable = nil
+            if !nameTyped { name = reply.name }
+        case .unavailable(let why):
+            preview = nil
+            unavailable = why
+        }
     }
 
     private func create() {

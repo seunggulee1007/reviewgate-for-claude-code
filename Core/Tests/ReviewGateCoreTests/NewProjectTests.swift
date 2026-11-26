@@ -54,6 +54,19 @@ import Testing
         #expect(EngineMessages.refusal(code: "parent_not_writable", error: "parent_not_writable:EACCES: permission denied").contains("EACCES"))
     }
 
+    @Test func theNamePreviewSaysWhyWhenTheEngineCannotGiveOne() async {
+        let store = AppState(engineScript: "/nonexistent/sidecar.mjs", defaults: defaults())
+        store.replySink = { _ in .projectName(ProjectNameReply(name: "todo", parent: "/work/acme", path: "/work/acme/todo")) }
+        #expect(await store.newProjectName(text: "todo") == .ready(ProjectNameReply(name: "todo", parent: "/work/acme", path: "/work/acme/todo")))
+        // An engine before §69: a reason, never a preview that waits forever.
+        store.replySink = { _ in throw EngineClientError.refused("unknown command: project_name", code: "unknown_command") }
+        guard case let .unavailable(old) = await store.newProjectName(text: "todo") else { Issue.record("no reason for an old engine"); return }
+        #expect(old.contains("update ReviewGate"))
+        store.replySink = { _ in throw EngineClientError.refused("bad_parent:code", code: "bad_parent") }
+        guard case let .unavailable(parent) = await store.newProjectName(text: "todo") else { Issue.record("no reason for a bad parent"); return }
+        #expect(parent.contains("Settings"))
+    }
+
     @Test func thePreselectedProjectAndTheKeys() {
         let recent = ["/work/acme/a", "/work/acme/b"]
         #expect(ProjectMatchesReply(guess: "/work/acme/b").preselect(in: recent) == "/work/acme/b")

@@ -16803,6 +16803,22 @@
         }
       }
     },
+    "This engine cannot make new projects yet — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot make new projects yet — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 아직 새 프로젝트를 만들 수 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
     "This engine cannot manage MCP servers — reopen the project after updating ReviewGate": {
       "localizations": {
         "en": {

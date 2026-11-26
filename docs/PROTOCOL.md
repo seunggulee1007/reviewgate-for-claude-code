@@ -11548,7 +11548,9 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
   over the cards and ↩ takes it. While an open is on its way the cards are off with "Opening <name>…" as the reason.
 - **New Project.** One sheet: "What do you want to make?" (the first prompt, required), the folder name (follows the prompt through
   `project_name`, 0.3 s after typing stops, until edited; editable), the line "Creates <path>" and the parent with "Change…"
-  (Settings). Create sends `project_create`; on success the window opens the new project **without the start screen**
+  (Settings). When the engine gives no name — one before §69 answers `unknown_command`, a parent it refuses `bad_parent` —
+  that line says why in the user's words ("This engine cannot make new projects yet — update ReviewGate") and Create stays
+  off with the same reason, never a name that waits forever. Create sends `project_create`; on success the window opens the new project **without the start screen**
   (the window's own suppression, §63.5), and the prompt goes where the new chat takes text — the message box, or a terminal
   chat's prompt as one bracketed paste — exactly as §63.3 hands a task's first prompt: **a draft, never sent by the app**;
   one Return sends it. (The same rule as §63 on purpose: the user sees what Claude gets in the chat's own box, picks the

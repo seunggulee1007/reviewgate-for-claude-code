@@ -19,6 +19,13 @@ public struct ProjectNameReply: Sendable, Equatable, Decodable {
     }
 }
 
+/// §69 what the New sheet's name line shows: the folder `project_name` gives, or why the engine cannot say.
+public enum ProjectNamePreview: Sendable, Equatable {
+    case ready(ProjectNameReply)
+    /// In the user's words: an engine too old for §69 (`unknown_command`), a parent setting it refuses (`bad_parent`), …
+    case unavailable(String)
+}
+
 /// §69 reply to `project_create`: the folder made and opened.
 public struct ProjectCreatedReply: Sendable, Equatable, Decodable {
     public var id: String?
@@ -84,6 +91,15 @@ public enum NewProjectText {
         default: return nil
         }
     }
+
+    /// Why `project_name` gave no name: an engine before §69 says so plainly (else the sheet would wait for it forever).
+    static func unavailable(_ error: Error) -> String {
+        guard let error = error as? EngineClientError else { return error.localizedDescription }
+        if error.refusalCode == "unknown_command" {
+            return String(localized: "This engine cannot make new projects yet — update ReviewGate", bundle: .module)
+        }
+        return error.userMessage
+    }
 }
 
 /// §69 the three choices of the window with no project: 1 New, 2 Start from a task, 3 Open a folder.
@@ -97,10 +113,16 @@ public enum NoProjectChoice: Int, CaseIterable, Sendable {
 }
 
 extension AppState {
-    /// `project_name`: the folder New would make for `text` (nil when the engine cannot say — the sheet keeps its last one).
-    public func newProjectName(text: String) async -> ProjectNameReply? {
-        guard case let .projectName(reply)? = try? await typedReply(.projectName(text: text, parent: AppSettings.newProjectParent(defaults: settingsDefaults))) else { return nil }
-        return reply
+    /// `project_name`: the folder New Project would make for `text`, or why there is none (the sheet shows it and Create
+    /// stays off with it).
+    public func newProjectName(text: String) async -> ProjectNamePreview {
+        do {
+            let reply = try await typedReply(.projectName(text: text, parent: AppSettings.newProjectParent(defaults: settingsDefaults)))
+            guard case let .projectName(name) = reply else { return .unavailable(NewProjectText.unavailable(EngineClientError.unexpectedReply("project_name"))) }
+            return .ready(name)
+        } catch {
+            return .unavailable(NewProjectText.unavailable(error))
+        }
     }
 
     /// `project_create` and the open, then `prompt` where the new chat takes text — never sent (§69.4, as §63.3). `expected`:
