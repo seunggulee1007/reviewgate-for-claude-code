@@ -263,6 +263,7 @@ struct TaskProjectSheet: View {
                 Text("First the project the task belongs to — then its branch and first prompt, as in a project window.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Text("Task id or link").font(.subheadline.weight(.semibold))
             TextField("Task id or link", text: $refText, prompt: Text(verbatim: "ACME-123 · #42 · https://github.com/acme/widgets/issues/42"))
                 .textFieldStyle(.roundedBorder)
                 .focused($refFocused)
