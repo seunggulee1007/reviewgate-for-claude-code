@@ -314,6 +314,7 @@ replies) is refused and listed as `note: no fixture for …`.
 - `CUT` a control or a line of text partly hidden by such a box, and a closed drop-down cutting its label short;
 - `WRAPPED` a short word without a space (a count, a key) broken over two lines;
 - `SIDEWAYS` a control or text past the right edge of a scrolling box (code may scroll sideways);
+- `DIFF SCROLL` the diff scrolls sideways with no code line wider than its pane (a hunk header's buttons widen the rows);
 - `OUTSIDE` past the window's edge with nothing to scroll; `OVERLAP` two reachable controls over each other;
 - `NO REASON` a control that is off with no tooltip saying why;
 - `BLANK` a one-colour PNG or a page without text; `HOME` the real home folder's path in any text, title, label,
