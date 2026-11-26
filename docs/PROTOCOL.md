@@ -11593,6 +11593,40 @@ mode), `@` (file mentions), `:` (emoji) and `?` (shortcut help) — no `#`; the 
 something or to edit CLAUDE.md through `/memory`. A message starting with `#` therefore goes to Claude as typed, as in
 the terminal. (`/memory` stays the app's own, §56.5.)
 
+### 70.3 `/export` and `/copy`
+
+```ts
+// commands (lane query: never behind a turn)
+export_chat   { path?: string; replace?: boolean }  // → chat_export
+copy_response { n?: number }                        // → response_text (n: 1 = the latest answer, ≤ 1000)
+// refused: no_project | no_session | terminal_chat
+//          | export_empty (no row to export) | export_empty_path | export_path_too_long (> 4096)
+//          | export_exists:<abs> (a file is there and replace is not set) | export_failed:<errno> <why>
+//          | invalid_copy_n:<n> | no_response:<n> (fewer answers than that)
+type ChatExportEvent   = { type: "chat_export"; text: string; name: string; path: string | null };
+type ResponseTextEvent = { type: "response_text"; n: number; text: string };
+```
+
+- **As the terminal's commands.** The commands reference: "`/export [filename]` — Export the current conversation as plain
+  text. With a filename, writes directly to that file, and on v2.1.327 or later refuses one that already exists. Without,
+  opens a dialog to copy to clipboard or save to a file." and "`/copy [N]` — Copy the last assistant response to clipboard.
+  Pass a number `N` to copy the Nth-latest response." Both are app commands in a classic chat now, no longer
+  terminal-only names (§56.5); terminal chats are refused `terminal_chat` (their TUI has its own).
+- **The text** is made from the chat's transcript rows, oldest first, in the terminal's shapes: `> ` before each of the
+  user's messages (continuation lines indented), `⏺ ` before Claude's text, one `⏺ Tool(argument)` line per top-level
+  tool call (the file, command, pattern, URL or description) with `  ⎿  ` and the first line of its result (`Error: ` when
+  it failed), `! command` with its output for a `!` run (§67.2), and `⏺ Error: …` for an error the user saw. A subagent's
+  own calls are left out, as the terminal folds them into the Agent line. Blocks are separated by a blank line.
+- **`/export file`** writes it there — absolute, `~/…`, or relative to the project folder (the terminal's cwd); an existing
+  file is refused `export_exists` (never replaced). **`/export`** alone replies with the text and a proposed name
+  (`YYYY-MM-DD-HHMMSS-<first message's words>.txt`, local time); the client's dialog copies it (a user-initiated clipboard
+  write) or saves it: the save panel asks before replacing, so the client then sends `export_chat {path, replace: true}`.
+- **`/copy [N]`**: an answer is the text of one turn's own `assistant_text` rows, joined by a blank line. The client puts
+  `text` on the clipboard and says so. The terminal's picker for single code blocks (and its `w` to write a file) is not
+  built: the whole answer is copied.
+- Engine: `session/exportChat.ts` (`chatExportText`, `responses`, `nthResponse`, `exportFileName`, `writeExport`),
+  `engine.ts` (`exportChat`, `copyResponse`). Tests: `engine/test/w70.export.test.ts`.
+
 ### 70.4 Alt+T — extended thinking on or off
 
 ```ts

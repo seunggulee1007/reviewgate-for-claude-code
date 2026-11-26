@@ -752,6 +752,13 @@ export type EngineCommand =
   | Cmd<"remove_dir", { path: string }>
   /** §70.4 Alt+T: extended thinking on or off for the current chat, from the CLI's next request on. */
   | Cmd<"set_thinking", { enabled: boolean }>
+  /**
+   * §70.3 `/export [file]`: the conversation as plain text → `chat_export`. With `path` (absolute, `~/…`, or relative to the
+   * project folder) it is written there — an existing file is refused unless `replace` (a save dialog asked already).
+   */
+  | Cmd<"export_chat", { path?: string; replace?: boolean }>
+  /** §70.3 `/copy [N]`: Claude's Nth-latest answer (1 = the latest) → `response_text`; the client puts it on the clipboard. */
+  | Cmd<"copy_response", { n?: number }>
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -2189,6 +2196,10 @@ export type SideTurnEndEvent = { type: "side_turn_end"; threadId: string; costUS
  */
 export type InterruptedEvent = { type: "interrupted"; id?: string; takenBack: { id: string; text: string; mentions?: string[] }[]; read: string[] };
 /** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
+/** §70.3: `export_chat`'s reply — the text, the name a save dialog proposes, and where it was written (null: not written). */
+export type ChatExportEvent = { type: "chat_export"; id?: string; text: string; name: string; path: string | null };
+/** §70.3: `copy_response`'s reply. */
+export type ResponseTextEvent = { type: "response_text"; id?: string; n: number; text: string };
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
 /** §67.2: the running `!` command's output so far (its last `SHELL_LIVE_CHARS`), at most every 300 ms. */
 export type ShellOutputEvent = { type: "shell_output"; id: string; output: string };
@@ -2361,6 +2372,7 @@ export type EngineEvent =
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | ShellOutputEvent | ShellResultEvent // §67.2
+  | ChatExportEvent | ResponseTextEvent // §70.3
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
@@ -2470,6 +2482,8 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "git_pull" } ? PulledEvent
   : C extends { type: "commit_others" } ? CommitOthersEvent
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
+  : C extends { type: "export_chat" } ? ChatExportEvent // §70.3
+  : C extends { type: "copy_response" } ? ResponseTextEvent
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
@@ -2496,6 +2510,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | FetchedEvent | PulledEvent | CommitOthersEvent // MARK: git-sync (§68)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
+  | ChatExportEvent | ResponseTextEvent // §70.3
   | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow

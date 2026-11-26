@@ -122,7 +122,8 @@ import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
 import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-sync (§68.5)
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
-import type { ThinkingState } from "./protocol.js"; // §70.4
+import type { ChatExportEvent, ResponseTextEvent, ThinkingState } from "./protocol.js"; // §70.3, §70.4
+import { chatExportText, exportFileName, nthResponse, writeExport } from "./session/exportChat.js"; // §70.3
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
 import { withFileMeta } from "./diff/fileMeta.js"; // MARK: wave4b w4b-files
@@ -1611,6 +1612,10 @@ export class ReviewEngine {
       case "set_thinking": // §70.4
         await this.setThinking(cmd.enabled);
         return;
+      case "export_chat": // §70.3
+        return this.exportChat(cmd.path, cmd.replace === true);
+      case "copy_response":
+        return this.copyResponse(cmd.n);
       case "shell_run": // §67.2
         await this.shellRunStart(cmd.command);
         return;
@@ -4576,6 +4581,35 @@ export class ReviewEngine {
   private async applyAddedDirs(): Promise<void> {
     this.touch();
     if (this.session && this.sessionState.open) await this.restartSession(true);
+  }
+
+  // ------------------------------------------------------------------ §70.3 /export, /copy
+
+  /** The current classic chat's transcript rows (refused without a project / chat, and for a terminal chat). */
+  private exportRows(): TranscriptItem[] {
+    this.requireProject();
+    const meta = this.currentSessionId ? this.sessions?.get(this.currentSessionId) : undefined;
+    if (!meta || !this.transcript) throw new CommandRefused("no_session");
+    if (meta.kind === "terminal") throw new CommandRefused("terminal_chat"); // the TUI has its own /export and /copy
+    return this.transcript.tail(Number.MAX_SAFE_INTEGER);
+  }
+
+  /** §70.3 `export_chat {path?, replace?}`: the conversation as plain text; written to `path` when one is given. */
+  private async exportChat(path: unknown, replace: boolean): Promise<ChatExportEvent> {
+    const rows = this.exportRows();
+    const text = chatExportText(rows);
+    if (!text) throw new CommandRefused("export_empty", { code: "export_empty" });
+    const name = exportFileName(rows, new Date(this.now()));
+    if (path === undefined || path === null) return { type: "chat_export", text, name, path: null };
+    const written = await writeExport(path, this.project!.path, text, replace);
+    this.log("info", `chat exported (${text.length} chars)`);
+    return { type: "chat_export", text, name, path: written };
+  }
+
+  /** §70.3 `copy_response {n?}`: Claude's Nth-latest answer. */
+  private copyResponse(n: unknown): ResponseTextEvent {
+    const text = nthResponse(this.exportRows(), n);
+    return { type: "response_text", n: typeof n === "number" ? n : 1, text };
   }
 
   // ------------------------------------------------------------------ §70.4 extended thinking (Alt+T)
@@ -10375,6 +10409,10 @@ function laneOf(cmd: EngineCommand): Lane {
     case "project_name":
     case "project_match":
       return "query";
+    // §70.3: a read of the chat's rows (and one file written), never behind a turn.
+    case "export_chat":
+    case "copy_response":
+      return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
   }
@@ -10454,6 +10492,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "shell_run":
     case "shell_cancel":
     case "set_thinking": // §70.4
+    case "export_chat": // §70.3
+    case "copy_response":
       return "session";
     case "side_ask":
     case "side_list":
