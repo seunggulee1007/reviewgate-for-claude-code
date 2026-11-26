@@ -252,6 +252,91 @@ Artifacts built on macOS:
 - `clients/desktop/release/win-unpacked/` — the unpacked x64 app (488 MB)
 - `clients/desktop/release/mac-arm64/ReviewGate.app` — unsigned arm64 .app for local runs (441 MB)
 
+## Screenshot harness (`npm run shots`)
+
+The Windows client's screens as PNGs, on a Mac or on Windows, without showing anything — the counterpart of the Mac's
+quiet tour (`scripts/screenshots.sh`). No engine, no `claude`, no download: the renderer as shipped, fixture state, and
+the Electron of `devDependencies`.
+
+```sh
+cd clients/desktop
+npm run shots                                   # every scene; PNGs in $TMPDIR/reviewgate-win-shots/shots
+SHOTS_DIR=/tmp/acme-shots SHOTS_SCENES=review,commit-others npm run shots
+```
+
+| Env | |
+|---|---|
+| `SHOTS_DIR` | scratch folder (default `$TMPDIR/reviewgate-win-shots`; refused inside the repository): the built renderer and harness, `shots/<scene>--<size>-<theme>-<lang>.png`, `report.json`, the user-data folder |
+| `SHOTS_SCENES` | comma-separated scene names (default: all) |
+| `SHOTS_PROBE` | a JavaScript expression evaluated in each page after its steps, printed as `probe …` (for chasing a finding) |
+
+Each scene is shot at **1000 × 637** (the laptop the app is used on) and **900 × 560** (the window's minimum,
+`main/windows.ts`), **dark** and **light**, in **en** and **ko** — 8 PNGs. The page gets the window less the
+Windows 11 frame at 100 % (31 px title bar, 20 px menu bar, 8 px resize borders), and `window.rg.platform` is `win32`
+(Ctrl key names, `\` paths). Fonts are the Mac's (no Segoe UI / Malgun Gothic), so widths are close, not exact.
+
+**Pieces** (`clients/desktop/scripts/shots/`):
+
+| File | |
+|---|---|
+| `run.mjs` | builds the renderer (vite, into `SHOTS_DIR`) and the harness (esbuild), prepares the quiet Electron, runs it, watches it from outside |
+| `main.ts` | the harness's Electron main: one hidden offscreen window per shot, the fake main process (answers from the scene), the steps, the capture, the checks, `report.json` |
+| `preload.ts` | the fake `window.rg`: typed `Required<RGBridge>` (a member added to `src/shared/ipc.ts` and missing here fails `tsc`); every call goes to the harness's main |
+| `guard.ts` | imported first by `main.ts`: every `child_process` entry point throws |
+| `baseState.ts` | the engine snapshot every scene starts from (no project) |
+| `layoutCheck.ts` | the in-page check (below) |
+| `scenes/*.json` | the scenes |
+
+**Scenes** are JSON: `settings` (over the app's `DEFAULTS`), `recent` (the recent-projects rows), `state` (merged over
+`baseState.ts`; arrays replace), `events` (engine events after the state: `transcript_restore`, …), `replies` (an
+engine request's reply by command type; `{"$by": "<field>", "map": {…}}` picks one by a field of the command),
+`diffs` (unified patches by path: `select_file` replies), `bridge` (a `window.rg` call's value by name), `extends`
+(another scene file this one is merged over) and `steps`:
+
+| Step | |
+|---|---|
+| `{"click": "<data-testid>"}` / `{"click": {"selector": "…"}}` / `{"click": {"text": "…"}}` | scrolls it into view and clicks it |
+| `{"type": {"testid": "…", "value": "…"}}` | sets a field's value as React sees typing; `value` may be `{"en": "…", "ko": "…"}` |
+| `{"key": "Enter", "ctrl": true}` | a key on the focused element |
+| `{"menu": {"type": "settings"}}` | a menu action (as main sends `rg:menu`) |
+| `{"event": {…}}` | an engine event |
+| `{"waitFor": "<data-testid>"}`, `{"wait": 300}` | |
+
+The first scenes: `no-project` (§69 cards, recent projects, one gone), `new-project` (New Project with a long Korean
+first prompt), `task-project` (Start from a task, an issue link, the matching project preselected), `review` (three
+changed files, a diff, the turn in the chat), `commit-others` (the commit dialog with other changes, an untracked one
+shown), `settings-general` (Settings › General). A request with no reply in the scene (or the harness's common empty
+replies) is refused and listed as `note: no fixture for …`.
+
+**Checks** — any finding marks the shot (`MARK` in the output, details in `report.json`) and the run exits 1:
+
+- `CLIPPED` a non-scrolling box or a button whose content is larger than it (an ellipsis excuses the width, a line clamp the height);
+- `CUT` a control or a line of text partly hidden by such a box, and a closed drop-down cutting its label short;
+- `WRAPPED` a short word without a space (a count, a key) broken over two lines;
+- `SIDEWAYS` a control or text past the right edge of a scrolling box (code may scroll sideways);
+- `OUTSIDE` past the window's edge with nothing to scroll; `OVERLAP` two reachable controls over each other;
+- `NO REASON` a control that is off with no tooltip saying why;
+- `BLANK` a one-colour PNG or a page without text; `HOME` the real home folder's path in any text, title, label,
+  placeholder or value.
+
+**Safety model** — nothing shows and nothing takes focus while someone works on the Mac:
+
+- On macOS the harness runs from an APFS clone of `node_modules/electron/dist/Electron.app` in `SHOTS_DIR/quiet`
+  whose `Info.plist` says `LSUIElement` (no Dock icon, no menu bar) under its own bundle id
+  (`io.github.seunggulee1007.reviewgate.shots-win`), signed ad hoc; `run.mjs` refuses to start it unless the plist says
+  so, and unregisters it from LaunchServices afterwards (`lsregister -u`). Before `ready` the harness sets the
+  activation policy to `prohibited` (it can never become the active app) and hides the Dock icon again.
+- Every window is `show: false` with `webPreferences.offscreen: true` (no native window is ever on screen),
+  `focusable: false`, captured with `webContents.capturePage()`. A window's `show` / `focus`, `browser-window-focus`,
+  the app's `did-become-active`, or a window found visible after a shot is a `VISIBLE` violation and fails the run.
+- `run.mjs` checks from outside every half second with `lsappinfo` (read only): the harness's application type must be
+  `UIElement` / `BackgroundOnly` and it must never be the front app — its last line says how many samples it took.
+- An error in the main process goes to stderr and exits (the entry catches it) — never Electron's error dialog box.
+- No engine, no `claude`, no git, no shell: `guard.ts` makes every `child_process` call throw; engine commands go
+  nowhere; requests are answered from the scene. User data, logs, crash dumps and the session's storage are under
+  `SHOTS_DIR` (each shot an in-memory partition); the keychain is Chromium's mock one (no prompt). Fixture paths use
+  `C:\Users\dev`, `acme`, `example.com`; the `HOME` check fails a shot that shows the real home folder.
+
 ## Updating (PROTOCOL §48 "Windows")
 
 - **By hand: run the new installer over the old one — no uninstall needed.** It finds the installed ReviewGate, installs

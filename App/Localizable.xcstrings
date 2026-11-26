@@ -6220,7 +6220,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더의 ReviewGate."
+            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
           }
         }
       }
@@ -11410,7 +11410,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "턴이 도는 중이거나 Claude가 답을 기다릴 때 창을 닫거나 앱을 종료하면 먼저 물어봐요."
+            "value": "턴이 진행 중이거나 Claude가 답을 기다릴 때 창을 닫거나 앱을 종료하면 먼저 물어봐요."
           }
         }
       }
@@ -30689,7 +30689,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영돼요 — 폴더가 아직 없다면 새로 시작을 눌러요."
+            "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영돼요 — 아직 폴더가 없다면 ‘새로 시작’을 눌러 주세요."
           }
         }
       }
@@ -37729,7 +37729,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "메시지를 먼저 입력하세요"
+            "value": "메시지를 먼저 입력해 주세요"
           }
         }
       }

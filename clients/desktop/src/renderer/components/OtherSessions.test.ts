@@ -58,7 +58,7 @@ describe("이 저장소의 다른 Claude 세션 (§36.9)", () => {
     const collapsed = section({ open: false });
     expect(collapsed).not.toContain("os-row");
     expect(collapsed).toContain("입력 대기 1");
-    expect(section({ running: [] })).toContain("지금 이 저장소에서 도는 다른 Claude 세션이 없어요.");
+    expect(section({ running: [] })).toContain("지금 이 저장소에서 실행 중인 다른 Claude 세션이 없어요.");
   });
 });
 

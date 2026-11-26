@@ -6,7 +6,9 @@
 .start-title { margin: 0; font-size: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 720px) { .start-cards { grid-template-columns: 1fr; } }
-.start-card { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 110px; padding: 14px; text-align: left; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); }
+.start-card { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 110px; padding: 14px; text-align: left; border-radius: 10px; border: 1px solid var(--border); background: var(--panel);
+  /* A button keeps one line (styles.css) and clips the rest: a card's caption wraps instead — whole Korean words, a long token anywhere. */
+  white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 .start-card:hover:not(:disabled) { border-color: var(--border-strong); background: var(--bg-2); }
 .start-card.marked { border: 2px solid var(--accent); padding: 13px; }
 .start-card:disabled { opacity: 0.55; }

@@ -39,8 +39,9 @@
 .diff-fold button:disabled, .diff-expander button:disabled { color: var(--fg-3); }
 .diff-expander .spinner { width: 10px; height: 10px; flex: none; }
 
-/* The row above the lines: the pane's own bar on the left, find / wrap on the right. */
-.diff-tools { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 28px; padding: 0 8px 0 0; border-bottom: 1px solid var(--border); background: var(--panel); flex: none; }
+/* The row above the lines: the pane's own bar on the left, find / wrap on the right — on a second line (right-aligned) when
+   the pane is too narrow for both, never one over the other. */
+.diff-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 2px 4px; min-width: 0; min-height: 28px; padding: 0 8px 0 0; border-bottom: 1px solid var(--border); background: var(--panel); flex: none; }
 .diff-tools-start { flex: 1 1 auto; min-width: 0; display: flex; }
 .diff-tools-start > .hunk-bar { flex: 1 1 auto; border-bottom: 0; background: transparent; }
 .diff-tools-start > .diff-tools-note { flex: none; align-self: center; margin-left: 10px; }

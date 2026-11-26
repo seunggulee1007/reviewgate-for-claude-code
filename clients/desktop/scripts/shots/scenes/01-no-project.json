@@ -1,0 +1,13 @@
+{
+  "name": "no-project",
+  "description": "The window with no project (§69): New Project · Start from a task · Open a folder…, and the recent projects (one gone).",
+  "settings": {
+    "recentProjects": ["C:\\Users\\dev\\src\\acme-shop", "C:\\Users\\dev\\src\\acme-api", "D:\\work\\acme\\widgets-with-a-rather-long-folder-name", "C:\\Users\\dev\\src\\old-prototype"]
+  },
+  "recent": [
+    { "path": "C:\\Users\\dev\\src\\acme-shop", "exists": true },
+    { "path": "C:\\Users\\dev\\src\\acme-api", "exists": true },
+    { "path": "D:\\work\\acme\\widgets-with-a-rather-long-folder-name", "exists": true },
+    { "path": "C:\\Users\\dev\\src\\old-prototype", "exists": false }
+  ]
+}

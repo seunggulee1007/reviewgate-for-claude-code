@@ -14,5 +14,5 @@
     "types": ["node"],
     "paths": { "@reviewgate/engine": ["../../engine/src/index.ts"] }
   },
-  "include": ["src/main/**/*.ts", "src/preload.ts", "src/shared/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/preload.ts", "src/shared/**/*.ts", "scripts/shots/**/*.ts"]
 }

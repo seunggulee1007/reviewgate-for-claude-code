@@ -119,6 +119,15 @@ describe("diff cause section (§34.8 changedFiles[].why)", () => {
     expect(html).toContain("Why it changed");
   });
 
+  it("an Edit's line counts do not count a trailing newline as a line", async () => {
+    const { lineCount } = await import("../diff/ChangeCause");
+    expect(lineCount('    "test": "vitest run"\n')).toBe(1);
+    expect(lineCount("a\r\nb\r\n")).toBe(2);
+    expect(lineCount("a\nb")).toBe(2);
+    expect(lineCount("\n")).toBe(1);
+    expect(lineCount("")).toBe(0);
+  });
+
   it("no recorded call: the 'no recorded cause' row stays; a reported why is shown under it", () => {
     const html = renderToStaticMarkup(createElement(ChangeCause, { file: changed({ tools: [], toolUseIds: [], why: { text: "README 오타 수정", source: "reported" } }) }));
     expect(html).toContain('data-testid="Cause none"');

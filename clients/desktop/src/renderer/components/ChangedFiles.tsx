@@ -457,7 +457,7 @@ function FileRow(props: {
         </div>
         <AskButton anchor={{ path: f.path }} label="" className="hover icon-only" title={t("Why did {0} change? Ask a side question", f.path)} testId={`Ask file ${f.path}`} />
         {f.state === "pending" && (
-          <span className="row" style={{ gap: 2 }}>
+          <span className="row" style={{ gap: 2, flex: "none" /* the path gives way, not ✓ / ↶ (they pushed the list sideways) */ }}>
             <button
               type="button"
               className="plain small"

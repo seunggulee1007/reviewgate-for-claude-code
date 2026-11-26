@@ -84,7 +84,7 @@ function ProjectHeader() {
   }, [refreshWorkbenches]);
   const pr = state.pr.lastCreatedPR;
   return (
-    <div className="col" style={{ padding: "10px 12px", gap: 3 }}>
+    <div className="col" style={{ padding: "10px 12px", gap: 3, flex: "none" /* never squeezed by a long file list in a short window */ }}>
       <div className="row" style={{ gap: 6 }}>
         <ProjectSwitcher />
         {!isMainWorkbench(state) && (

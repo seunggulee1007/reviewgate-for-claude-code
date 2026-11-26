@@ -961,7 +961,7 @@
   "Claude Code was updated": "Claude Code가 업데이트됐어요",
   "This folder": "이 폴더",
   "Works in this folder — its changes can mix into this review": "이 폴더에서 작업 중이에요 — 그 변경이 이번 리뷰에 섞일 수 있어요",
-  "No other Claude sessions here right now.": "지금 이 저장소에서 도는 다른 Claude 세션이 없어요.",
+  "No other Claude sessions here right now.": "지금 이 저장소에서 실행 중인 다른 Claude 세션이 없어요.",
   "The conversation continues in a new chat of this window. What the terminal session already changed is the starting point, not part of a review.": "대화는 이 창의 새 채팅에서 이어져요. 터미널 세션이 이미 바꾼 내용은 리뷰 대상이 아니라 출발점이 돼요.",
   "No terminal conversations of this repository to import.": "가져올 이 저장소의 터미널 대화가 없어요.",
   "Copies: {0}": "복사: {0}",
