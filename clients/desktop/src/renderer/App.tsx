@@ -236,7 +236,7 @@ function PaneDivider(props: { pref: "sidebarWidth" | "chatWidth"; fallback: numb
 }
 
 /** §69.4: the three cards of the window with no project — 1 / 2 / 3 act at once, the arrows move the mark, Enter takes it. */
-function NoProjectCards({ opening, onOpen }: { opening: boolean; onOpen: () => void }) {
+function NoProjectCards({ opening, onOpen }: { opening: string | null; onOpen: () => void }) {
   const openDialog = useStore((s) => s.openDialog);
   const dialogOpen = useStore((s) => s.dialog !== null);
   const parent = useStore((s) => s.settings?.newProjectParent);
@@ -246,7 +246,7 @@ function NoProjectCards({ opening, onOpen }: { opening: boolean; onOpen: () => v
     if (!dialogOpen) root.current?.focus({ preventScroll: true });
   }, [dialogOpen]);
   const act = (c: NoProjectChoice) => {
-    if (opening) return;
+    if (opening !== null) return;
     if (c === 1) openDialog({ kind: "newProject" });
     else if (c === 2) openDialog({ kind: "taskProject" });
     else onOpen();
@@ -280,8 +280,8 @@ function NoProjectCards({ opening, onOpen }: { opening: boolean; onOpen: () => v
           key={c}
           type="button"
           className={mark === c ? "start-card marked" : "start-card"}
-          disabled={opening}
-          title={opening ? t("Opening a project…") : help}
+          disabled={opening !== null}
+          title={opening !== null ? t("Opening {0}…", lastComponent(opening)) : help}
           aria-label={`${title} — ${detail}`}
           onClick={() => { setMark(c); act(c); }}
           onFocus={() => setMark(c)}
@@ -320,7 +320,7 @@ function NoProject() {
       )}
       <div>{t("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")}</div>
       {/* §69: 1 New · 2 Start from a task · 3 Open a folder… (Open Project), with the keys of the start screen */}
-      <NoProjectCards opening={opening !== null} onOpen={() => void chooseAndOpen("open")} />
+      <NoProjectCards opening={opening} onOpen={() => void chooseAndOpen("open")} />
       {entries.length > 0 && (
         <div className="col" style={{ gap: 4, marginTop: 12, alignItems: "stretch", width: 360, maxWidth: "100%" }}>
           <div className="caption muted bold">{t("Recent projects")}</div>

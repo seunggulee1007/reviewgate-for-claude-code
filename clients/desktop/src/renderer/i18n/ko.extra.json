@@ -70,7 +70,6 @@
   "Open in IDE": "IDE에서 열기",
   "Open in {0} at this line — Ctrl+Alt+O opens there from now on": "이 줄을 {0}에서 열어요 — 이제부터 Ctrl+Alt+O도 여기서 열어요",
   "Open it in the diff or the file view (Enter)": "diff나 파일 보기에서 열어요 (Enter)",
-  "Opening a project…": "프로젝트를 여는 중…",
   "Opens it in the diff or the file view": "diff나 파일 보기에서 열어요",
   "Opens the project, then its task dialog with this task filled in": "프로젝트를 열고, 이 업무를 채운 업무 시작 창을 띄워요",
   "Or ⌘-click the name (Ctrl+click on Windows)": "이름을 ⌘-클릭해도 돼요 (Windows 는 Ctrl+클릭)",
