@@ -99,6 +99,9 @@ struct NoProjectStartCards: View {
 
 /// 1 New: the first prompt, the folder name it gives (editable) and where it goes; Create makes, opens and fills the chat.
 struct NewProjectSheet: View {
+    /// The words already typed when it opens (the screenshot tour's; empty: none).
+    var initialPrompt: String = ""
+
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -182,7 +185,10 @@ struct NewProjectSheet: View {
         }
         .padding(20)
         .frame(width: 520)
-        .onAppear { promptFocused = true }
+        .onAppear {
+            if prompt.isEmpty, !initialPrompt.isEmpty { prompt = initialPrompt }
+            promptFocused = true
+        }
         .task(id: nameTyped ? "name:\(name)" : "prompt:\(prompt)") { await refreshPreview() }
     }
 
@@ -223,6 +229,9 @@ struct NewProjectSheet: View {
 
 /// 2 Start from a task: the task first, then the project it belongs to (one click), then §63's task sheet in that project.
 struct TaskProjectSheet: View {
+    /// The task already typed when it opens (the screenshot tour's; empty: none).
+    var initialRef: String = ""
+
     @Environment(AppState.self) private var store
     @Environment(WindowModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -311,6 +320,7 @@ struct TaskProjectSheet: View {
         .onAppear {
             recent = RecentProjects.entries().filter(\.exists).map(\.url)
             selected = recent.first
+            if refText.isEmpty, !initialRef.isEmpty { refText = initialRef }
             refFocused = true
         }
         .task(id: refText) { await match() }

@@ -3038,8 +3038,62 @@ private final class Tour {
             log("settings restart-banner-\(appearance.rawValue): waiting \(store.settingsWaitingForRestart.joined(separator: ", "))")
             store.debugSetSettingsAtSessionStart(nil)
             try await startScreenShots(appearance: appearance)   // MARK: task-start (§63)
+            // §69: the folder for new projects, scrolled to and tinted (the fixture's, never one under the home folder).
+            SettingsNavigation.shared.show("newProjectParent")
+            try await shot("jump-newProjectParent", appearance: appearance, settle: .milliseconds(700))
         }
+        try await noProjectShots()   // §69 — it closes the project, so it comes last
         AppSettings.setAppearance(.dark)
+    }
+
+    /// §69 start without a folder: the window with no project — its three cards over the recent projects — at the laptop's
+    /// 1000 × 637 and at the smallest window (900 × 460 inside), the New Project sheet empty, with a prompt typed and with a
+    /// long Korean one, and the task's project picker over the recent projects (scripts/screenshots.sh's fixtures under
+    /// /Users/Shared), the one whose remote is the task's repository preselected — dark and light, `noproject-*` PNGs. Each
+    /// sheet is in a panel of its own (hidden while quiet); its height against the smallest window and the laptop's screen is
+    /// in tour.log (TALLER when it does not fit 637).
+    private func noProjectShots() async throws {
+        guard let window = entry.window else { throw TourError("no window") }
+        try await wait("project open", timeout: 180) { $0.projectURL != nil && !$0.isStarting }
+        await store.closeProject()
+        try await until("no project") { self.store.projectURL == nil }
+        let origin = window.frame.origin
+        log("noproject: recent \(RecentProjects.entries().map(\.url.lastPathComponent).joined(separator: ", ")), parent \(AppSettings.newProjectParent() ?? "default")")
+        func sheet<V: View>(_ name: String, _ view: V, appearance: Appearance) async throws {
+            let host = NSHostingView(rootView: view.environment(store).environment(store.pr).environment(entry.model))
+            let panel = NSWindow(contentRect: NSRect(origin: .zero, size: host.fittingSize), styleMask: [.titled], backing: .buffered, defer: false)
+            panel.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
+            panel.contentView = host
+            ScreenshotTour.hideIfQuiet(panel)
+            panel.orderFrontRegardless()
+            try await Task.sleep(for: .milliseconds(1800))   // the engine's name / match comes 0.3 s after the text
+            panel.setContentSize(host.fittingSize)
+            try await Task.sleep(for: .milliseconds(300))
+            let rep = try render(panel)
+            let tall = panel.frame.height
+            log("noproject \(name)-\(appearance.rawValue): sheet \(Int(panel.frame.width))×\(Int(tall)) pt"
+                + (tall <= 460 ? " — fits the smallest window (460)" : tall <= 637 ? " — fits 637, taller than the smallest window" : " — TALLER than 637"))
+            try write(rep, "noproject-\(name)-\(appearance.rawValue)")
+            panel.orderOut(nil)
+        }
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            window.setFrame(NSRect(origin: origin, size: NSSize(width: 1000, height: 637)), display: true)
+            for label in ["laptop", "smallest"] {
+                if label == "smallest" { window.setContentSize(NSSize(width: 900, height: 460)) }
+                try await Task.sleep(for: .milliseconds(1500))
+                let content = window.contentView?.bounds.size ?? .zero
+                log("noproject window-\(label)-\(appearance.rawValue): window \(Int(window.frame.width))×\(Int(window.frame.height)) pt, content \(Int(content.width))×\(Int(content.height))")
+                try write(try render(window), "noproject-window-\(label)-\(appearance.rawValue)")
+            }
+            try await sheet("new-empty", NewProjectSheet(), appearance: appearance)
+            try await sheet("new-typed", NewProjectSheet(initialPrompt: "Build a small todo app with a REST API and tests"), appearance: appearance)
+            try await sheet("new-korean", NewProjectSheet(initialPrompt: "할 일 목록 앱을 만들어 줘. 마감일과 태그로 거를 수 있고, 끝낸 일은 접어 두고, "
+                + "데이터는 로컬 SQLite에 저장해 줘. 화면은 키보드만으로 다룰 수 있어야 하고, 테스트도 같이 써 줘."), appearance: appearance)
+            try await sheet("task", TaskProjectSheet(initialRef: "https://github.com/acme/widgets/issues/42"), appearance: appearance)
+            try await sheet("task-empty", TaskProjectSheet(), appearance: appearance)
+        }
+        window.setFrame(NSRect(origin: origin, size: NSSize(width: 1000, height: 637)), display: true)
     }
 
     /// MARK: task-start — §63.4: the start screen (at the laptop window's chat area) and the "Start from a task" sheet, each
