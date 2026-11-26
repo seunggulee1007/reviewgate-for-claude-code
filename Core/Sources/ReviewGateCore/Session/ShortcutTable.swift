@@ -135,6 +135,8 @@ public enum ShortcutTable {
             ShortcutRow("Switch the permission mode", mac: "⇧⇥", windows: "Shift+Tab", note: "In the message box: default → accept edits → plan → auto"),
             ShortcutRow("Run the command in the background", mac: "⌃B", windows: "Ctrl+B", note: "In an empty message box, while a command runs"),   // §52
             ShortcutRow("Edit the message in an external editor", mac: "⌃G", windows: "Ctrl+G", note: "In the message box — each save comes back into it"),   // §56.3
+            ShortcutRow("Search the prompt history", mac: "⌃R", windows: "Ctrl+R", note: "In the message box — press it again for an older match"),   // §70.1
+            ShortcutRow("Turn extended thinking on or off", mac: "⌥T", windows: "Alt+T", note: "In the message box, for this chat — no effect on a model that always thinks"),   // §70.4
         ]),
         ShortcutSection("Permission and plan cards", note: "From an empty message box, or with the card focused — never while you type", rows: [
             ShortcutRow("Allow once", mac: "⌘↩", windows: "Ctrl+Enter"),

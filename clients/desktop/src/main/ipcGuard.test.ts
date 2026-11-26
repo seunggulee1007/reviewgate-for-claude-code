@@ -128,6 +128,13 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "btw_ask", question: "why?" }).ok).toBe(true); // §56.1
   });
 
+  it("§70: allows /export, /copy and Alt+T", () => {
+    expect(validateCommand({ type: "export_chat" }).ok).toBe(true);
+    expect(validateCommand({ type: "export_chat", path: "chat.txt", replace: true }).ok).toBe(true);
+    expect(validateCommand({ type: "copy_response", n: 2 }).ok).toBe(true);
+    expect(validateCommand({ type: "set_thinking", enabled: false }).ok).toBe(true);
+  });
+
   it("§67: allows /add-dir, its chip's × and the ! command (run and stop)", () => {
     expect(validateCommand({ type: "add_dir", path: "../shared" }).ok).toBe(true);
     expect(validateCommand({ type: "remove_dir", path: "C:\\work\\shared" }).ok).toBe(true);

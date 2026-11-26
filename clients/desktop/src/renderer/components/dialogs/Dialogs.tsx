@@ -33,6 +33,7 @@ import { FinishReviewDialog, RejectExternalDialog, StaleReviewDialog } from "./R
 import { AgentDetailSheet } from "../agents/AgentDetailSheet";
 import { RejectOneDialog } from "./SafetyDialogs"; // MARK: wave4 w4-safety
 import { ShortcutsDialog } from "./ShortcutsDialog"; // MARK: wave4d w4d-windows
+import { ChatExportDialog } from "./ChatExportDialog"; // §70.3
 import "./dialogs.css";
 
 export function Dialogs() {
@@ -109,6 +110,8 @@ export function Dialogs() {
     // MARK: wave4d w4d-windows — polish-08
     case "shortcuts":
       return <ShortcutsDialog onClose={close} />;
+    case "chatExport": // §70.3
+      return <ChatExportDialog export={dialog.export} onClose={close} />;
   }
 }
 

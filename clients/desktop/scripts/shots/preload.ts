@@ -44,6 +44,7 @@ const bridge: Required<RGBridge> = {
   onMenu: (cb: (a: MenuAction) => void) => listen<[MenuAction]>("shots:menu", cb),
   chooseDirectory: call("chooseDirectory"),
   pickAddDirectory: call("pickAddDirectory"),
+  saveExportFile: call("saveExportFile"),
   openInEditor: call("openInEditor"),
   openInIde: call("openInIde"),
   openExternal: call("openExternal"),

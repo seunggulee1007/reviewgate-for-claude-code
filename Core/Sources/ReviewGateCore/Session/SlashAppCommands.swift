@@ -12,12 +12,16 @@ public enum SlashAppCommand: Equatable, Sendable {
     case resume, rewind, context, cost, permissions, agents, memory, config, help, status, exit, rename
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
+    /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
+    case export(String)
+    /// §70.3 `/copy [N]`: Claude's Nth-latest answer to the clipboard (the argument as typed: "" is the latest).
+    case copy(String)
     /// A built-in of the terminal's screen the app has none for (`/hooks`, `/vim` …): never sent.
     case terminalOnly(String)
 
     /// The app's commands, as the palette lists them (each the terminal's name).
-    public static let names = ["add-dir", "agents", "config", "context", "cost", "exit", "help", "memory", "model", "permissions",
-                               "rename", "resume", "rewind", "status"]
+    public static let names = ["add-dir", "agents", "config", "context", "copy", "cost", "exit", "export", "help", "memory", "model",
+                               "permissions", "rename", "resume", "rewind", "status"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
@@ -26,7 +30,7 @@ public enum SlashAppCommand: Equatable, Sendable {
 
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
-        "bashes", "bug", "doctor", "export", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+        "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
         "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
         "release-notes", "sandbox", "stats", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "usage", "vim",
     ]
@@ -62,6 +66,8 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "exit": return .exit
         case "rename": return .rename
         case "add-dir": return .addDir(argument)   // §67.1
+        case "export": return .export(argument)   // §70.3
+        case "copy": return .copy(argument)
         default: return terminalOnly.contains(name) ? .terminalOnly(name) : nil
         }
     }
@@ -70,6 +76,8 @@ public enum SlashAppCommand: Equatable, Sendable {
     public static func description(_ name: String) -> String? {
         switch name {
         case "add-dir": AddDirText.description   // §67.1
+        case "copy": ChatExportText.copyDescription   // §70.3
+        case "export": ChatExportText.exportDescription
         case "agents": String(localized: "Show the agent panel", bundle: .module)
         case "config": String(localized: "Open Settings", bundle: .module)
         case "context": String(localized: "Show how full the context is — and compact it", bundle: .module)
@@ -92,6 +100,8 @@ public enum SlashAppCommand: Equatable, Sendable {
         switch name {
         case "model": "[model]"
         case "add-dir": AddDirText.argumentHint
+        case "copy": "[N]"   // §70.3
+        case "export": "[file]"
         default: ""
         }
     }

@@ -5,6 +5,7 @@
  */
 import { create } from "zustand";
 import { addDir } from "./addedDirs"; // §67.1
+import { copyResponse, exportToFile, loadExport } from "./chatExport"; // §70.3
 import { t } from "./i18n";
 import { pressKey } from "./menuActions.lifecycle";
 import { checkpointsOf } from "./rewind";
@@ -94,6 +95,13 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     case "addDir":
       // §67.1: the composer runs it itself (the box keeps the draft on a refusal); from elsewhere the outcome is a notice.
       void addDir(cmd.path).then((r) => r && notify(r.notice));
+      return null;
+    case "export": // §70.3: the file, or the dialog (copy / save)
+      if (cmd.file === "") void loadExport().then((r) => ("export" in r ? st.openDialog({ kind: "chatExport", export: r.export }) : notify(r.notice)));
+      else void exportToFile(cmd.file).then((r) => notify(r.notice));
+      return null;
+    case "copy":
+      void copyResponse(cmd.arg).then((r) => notify(r.notice));
       return null;
   }
 }

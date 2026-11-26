@@ -151,6 +151,15 @@ export function modelTakesEffort(id: string, models: readonly ModelOption[] = []
   return !/^claude-(opus-4-0|opus-4-1|sonnet-4-0|sonnet-4-5|haiku-4-5)(?:-\d{8})?$/.test(base);
 }
 
+/**
+ * §70.4: the models that always use extended thinking — Alt+T has no effect on them (docs: Opus 5.5, Sonnet 5.5, Haiku 5.5
+ * and the Fable models). `id` is the resolved model (`claude-opus-5-5`, `claude-opus-5-5[1m]`, a dated id) or an alias.
+ */
+export function thinkingAlwaysOn(id: string): boolean {
+  const base = id.replace(/\[1m\]$/i, "").toLowerCase();
+  return /^claude-(opus|sonnet|haiku)-5-5(?!\d)/.test(base) || /(^|-)fable(?![a-z])/.test(base);
+}
+
 /** `owner/name` and the host of a `git@host:owner/name(.git)` / `https://host/owner/name(.git)` remote (`workspace.repo`). */
 export function repoOfRemote(url: string | null | undefined): { host: string; owner: string; name: string } | null {
   const u = (url ?? "").trim();

@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SessionCapabilities } from "@reviewgate/engine";
 import { initI18n } from "./i18n";
-import { APP_COMMAND_NAMES, appCommandDescription, parseSlashAppCommand, terminalOnlyDescription, type SlashAppCommand } from "./slashAppCommands";
+import { APP_COMMAND_NAMES, appCommandDescription, parseSlashAppCommand, TERMINAL_ONLY, terminalOnlyDescription, type SlashAppCommand } from "./slashAppCommands";
 import { flattenSections, slashEntries, slashSections, type SlashEntry } from "./slashCommands";
 
 beforeAll(() => initI18n("en", "darwin"));
@@ -18,7 +18,7 @@ describe("parseSlashAppCommand", () => {
       "/model": { kind: "model", name: "" }, "/resume": { kind: "resume" }, "/rewind": { kind: "rewind" }, "/context": { kind: "context" },
       "/cost": { kind: "cost" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
-      "/add-dir": { kind: "addDir", path: "" },
+      "/add-dir": { kind: "addDir", path: "" }, "/export": { kind: "export", file: "" }, "/copy": { kind: "copy", arg: "" },
     };
     for (const [text, cmd] of Object.entries(expected)) expect(parseSlashAppCommand(text, []), text).toEqual(cmd);
     expect(new Set(APP_COMMAND_NAMES)).toEqual(new Set(Object.keys(expected).map((k) => k.slice(1))));
@@ -48,6 +48,12 @@ describe("parseSlashAppCommand", () => {
     expect(parseSlashAppCommand("/ADD-DIR", [])).toEqual({ kind: "addDir", path: "" });
     expect(parseSlashAppCommand("/add-dir a\nb", [])).toBeNull();
     expect(parseSlashAppCommand("/add-dirs", [])).toBeNull();
+  });
+
+  it("§70.3: /export and /copy are the app's own — with their argument", () => {
+    expect(parseSlashAppCommand("/export chat.txt", [])).toEqual({ kind: "export", file: "chat.txt" });
+    expect(parseSlashAppCommand("/copy 2", [])).toEqual({ kind: "copy", arg: "2" });
+    expect(TERMINAL_ONLY.has("export")).toBe(false);
   });
 
   it("sends everything else to Claude as before", () => {

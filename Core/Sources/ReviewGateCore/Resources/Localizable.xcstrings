@@ -113,6 +113,22 @@
         }
       }
     },
+    "%@ exists already — /export never replaces a file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ exists already — /export never replaces a file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 파일이 이미 있어요 — /export는 파일을 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
     "%@ goes back to %@ as it was before this turn.": {
       "localizations": {
         "en": {
@@ -781,6 +797,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld줄 추가, %lld줄 삭제"
+          }
+        }
+      }
+    },
+    "%lld lines · %lld characters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lines · %lld characters"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld줄 · %lld자"
           }
         }
       }
@@ -1805,6 +1837,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "심볼릭 링크는 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "A terminal chat has its own ⌥T": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A terminal chat has its own ⌥T"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서는 터미널의 ⌥T를 쓰세요"
           }
         }
       }
@@ -3665,6 +3713,38 @@
         }
       }
     },
+    "Claude Code could not change thinking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not change thinking"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 thinking을 바꾸지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude Code could not change thinking: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not change thinking: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 thinking을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Claude can answer questions, read and plan, but it may not change files until you accept or reject the files waiting for review. Settings › Review changes this.": {
       "localizations": {
         "en": {
@@ -3901,6 +3981,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 변경을 나누지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude has not answered in this chat yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude has not answered in this chat yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude가 아직 답하지 않았어요"
           }
         }
       }
@@ -5975,6 +6071,86 @@
         }
       }
     },
+    "Copied Claude's answer %lld back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied Claude's answer %lld back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 %lld번째 전 답을 복사했어요"
+          }
+        }
+      }
+    },
+    "Copied Claude's last answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied Claude's last answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 마지막 답을 복사했어요"
+          }
+        }
+      }
+    },
+    "Copied the conversation to the clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied the conversation to the clipboard"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 클립보드에 복사했어요"
+          }
+        }
+      }
+    },
+    "Copy Claude's last answer — /copy 2 copies the one before": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Claude's last answer — /copy 2 copies the one before"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 마지막 답을 복사해요 — /copy 2는 그 전 답이에요"
+          }
+        }
+      }
+    },
+    "Copy to Clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy to Clipboard"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클립보드에 복사"
+          }
+        }
+      }
+    },
     "Cost first": {
       "localizations": {
         "en": {
@@ -5987,6 +6163,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "비용 우선"
+          }
+        }
+      }
+    },
+    "Could not change thinking — the app sent something the engine does not take": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not change thinking — the app sent something the engine does not take"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "thinking을 바꾸지 못했어요 — 앱이 엔진이 받지 않는 값을 보냈어요"
           }
         }
       }
@@ -6483,6 +6675,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모델을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Could not write the file: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not write the file: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 쓰지 못했어요: %@"
           }
         }
       }
@@ -7191,6 +7399,70 @@
         }
       }
     },
+    "Export Conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export Conversation"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화 내보내기"
+          }
+        }
+      }
+    },
+    "Export the conversation as text — to the clipboard or a file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the conversation as text — to the clipboard or a file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 텍스트로 내보내요 — 클립보드나 파일로"
+          }
+        }
+      }
+    },
+    "Extended thinking is off for this chat — click or press ⌥T to turn it on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extended thinking is off for this chat — click or press ⌥T to turn it on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 extended thinking이 꺼져 있어요 — 클릭하거나 ⌥T를 누르면 켜요"
+          }
+        }
+      }
+    },
+    "Extended thinking is on for this chat — click or press ⌥T to turn it off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extended thinking is on for this chat — click or press ⌥T to turn it off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 extended thinking이 켜져 있어요 — 클릭하거나 ⌥T를 누르면 꺼요"
+          }
+        }
+      }
+    },
     "External": {
       "localizations": {
         "en": {
@@ -7607,6 +7879,38 @@
         }
       }
     },
+    "Go back to the running chat to change thinking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to change thinking"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "thinking을 바꾸려면 실행 중인 채팅으로 돌아가세요"
+          }
+        }
+      }
+    },
+    "Go back to the running chat to export or copy from it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to export or copy from it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내보내거나 복사하려면 실행 중인 채팅으로 돌아가세요"
+          }
+        }
+      }
+    },
     "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
       "localizations": {
         "en": {
@@ -7783,6 +8087,38 @@
         }
       }
     },
+    "No prompt matches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No prompt matches"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "맞는 프롬프트가 없어요"
+          }
+        }
+      }
+    },
+    "No prompts in this project yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No prompts in this project yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에서 보낸 프롬프트가 아직 없어요"
+          }
+        }
+      }
+    },
     "No references": {
       "localizations": {
         "en": {
@@ -7923,6 +8259,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "채팅 기록을 열어 이전 채팅을 이어가요"
+          }
+        }
+      }
+    },
+    "Prompt history search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt history search"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프롬프트 기록 검색"
           }
         }
       }
@@ -8135,6 +8487,38 @@
         }
       }
     },
+    "Save to File…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to File…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일로 저장…"
+          }
+        }
+      }
+    },
+    "Saved the conversation to %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved the conversation to %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 %@에 저장했어요"
+          }
+        }
+      }
+    },
     "Search stopped after 10 s": {
       "localizations": {
         "en": {
@@ -8147,6 +8531,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "10초가 지나 검색을 멈췄어요"
+          }
+        }
+      }
+    },
+    "Search your prompts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search your prompts"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보낸 프롬프트 검색"
+          }
+        }
+      }
+    },
+    "Searches the prompts sent in this project, newest first: ⌃R or ↑ for an older match, ↓ for a newer one, ↩ or ⇥ puts it into the message box, esc gives your draft back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searches the prompts sent in this project, newest first: ⌃R or ↑ for an older match, ↓ for a newer one, ↩ or ⇥ puts it into the message box, esc gives your draft back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트에서 보낸 프롬프트를 최근 것부터 찾아요: ⌃R 이나 ↑ 는 더 이전 것, ↓ 는 더 최근 것, ↩ 나 ⇥ 는 메시지 입력창에 넣고, esc 는 쓰던 초안을 돌려놔요"
           }
         }
       }
@@ -8439,6 +8855,22 @@
         }
       }
     },
+    "That file exists already — /export never replaces one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That file exists already — /export never replaces one"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 있는 파일이에요 — /export는 파일을 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
     "That is a file, not a directory": {
       "localizations": {
         "en": {
@@ -8535,6 +8967,22 @@
         }
       }
     },
+    "The conversation as plain text, as the terminal's /export writes it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The conversation as plain text, as the terminal's /export writes it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 /export처럼 대화를 일반 텍스트로 만들어요"
+          }
+        }
+      }
+    },
     "The folder for new projects must be a full path — change it in Settings › General": {
       "localizations": {
         "en": {
@@ -8615,6 +9063,86 @@
         }
       }
     },
+    "There is nothing in this chat to export yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is nothing in this chat to export yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에는 아직 내보낼 내용이 없어요"
+          }
+        }
+      }
+    },
+    "Thinking off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 꺼짐"
+          }
+        }
+      }
+    },
+    "Thinking off — from Claude's next request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking off — from Claude's next request"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 꺼짐 — Claude의 다음 요청부터 적용돼요"
+          }
+        }
+      }
+    },
+    "Thinking on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 켜짐"
+          }
+        }
+      }
+    },
+    "Thinking on — from Claude's next request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking on — from Claude's next request"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 켜짐 — Claude의 다음 요청부터 적용돼요"
+          }
+        }
+      }
+    },
     "This branch and its upstream have diverged (%lld local, %lld incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.": {
       "localizations": {
         "en": {
@@ -8675,6 +9203,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 브랜치에는 upstream이 없어요 — 먼저 push해서(git push -u) upstream을 만들어야 pull할 수 있어요"
+          }
+        }
+      }
+    },
+    "This chat has fewer than %@ answers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat has fewer than %@ answers"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 답이 %@개보다 적어요"
+          }
+        }
+      }
+    },
+    "This engine cannot change thinking — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot change thinking — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 thinking을 바꿀 수 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
+    "This model always uses extended thinking — ⌥T has no effect on it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model always uses extended thinking — ⌥T has no effect on it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 모델은 항상 extended thinking을 써요 — ⌥T는 효과가 없어요"
           }
         }
       }
@@ -8803,6 +9379,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "/add-dir 뒤에 디렉터리 경로를 입력하세요"
+          }
+        }
+      }
+    },
+    "Type a file name after /export": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a file name after /export"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/export 뒤에 파일 이름을 입력하세요"
+          }
+        }
+      }
+    },
+    "Type a number after /copy — /copy 2 copies the answer before the last": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a number after /copy — /copy 2 copies the answer before the last"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/copy 뒤에는 숫자를 입력하세요 — /copy 2는 마지막 바로 전 답을 복사해요"
+          }
+        }
+      }
+    },
+    "Type to search the prompts sent in this project": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type to search the prompts sent in this project"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력하면 이 프로젝트에서 보낸 프롬프트를 찾아요"
           }
         }
       }
@@ -21039,6 +21663,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 폴더는 너무 커서 git 없이 추적할 수 없어요. 대신 git 저장소로 초기화하거나 더 작은 폴더를 여세요."
+          }
+        }
+      }
+    },
+    "⌃R older · ↩ or ⇥ use · esc cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃R older · ↩ or ⇥ use · esc cancel"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⌃R 이전 · ↩ 또는 ⇥ 넣기 · esc 취소"
           }
         }
       }

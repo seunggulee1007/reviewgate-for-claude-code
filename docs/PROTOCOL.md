@@ -11579,3 +11579,127 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
   dialog with `ref` (`TaskStartDialog initialRef`). The three commands are on the renderer's allow list (`ipcGuard.ts`);
   `newProjectParent` is checked as a folder by main's `settingsGuard` and is a row of Settings › General (`GeneralTab.tsx`,
   `settingsIndex.ts`). Tests: `newProject.test.ts`, `ipcGuard.test.ts`, `settingsGuard.test.ts`.
+
+## 70. Terminal parity, batch D
+
+Four more things a terminal user reaches for without thinking, checked against Claude Code's docs (interactive mode and
+the commands reference, as of 2026-11): Ctrl+R history search, `#` memory, `/export` and `/copy`, and Alt+T thinking.
+Terminal chats (§57) are the real TUI and keep theirs; everything here is for classic chats.
+
+### 70.1 Ctrl+R — search the prompt history (clients only)
+
+No engine command: the prompt history is the clients' own (↑ / ↓, per project, ≤ 100 — §44.1; Mac `AppSettings`
+`promptHistory`, Windows `promptHistory.ts` in localStorage).
+
+- **As the terminal's Ctrl+R.** The interactive-mode reference: "Press `Ctrl+R` to interactively search through your
+  command history … Type to filter … press `Ctrl+R` again to cycle through older matches … Press `Enter` or `Tab` to place
+  a match in the prompt input, or `Esc` to cancel" (the search dialog of fullscreen rendering; the classic renderer's inline
+  search sends on Enter and accepts on Esc). The app follows the dialog: a search never sends anything, and Esc gives the
+  draft back.
+- **Mac ⌃R, Windows Ctrl+R** in the message box of a classic chat open a search bar over the box: a field (focused), the
+  match with the typed text highlighted (newest first, case-insensitive, at most three lines shown), "2 / 5", and the key
+  hint. Typing filters; ⌃R / Ctrl+R again or ↑ steps to the next older match, ↓ to a newer one; ↩ / Enter or ⇥ / Tab puts
+  the match into the box (caret at the end) and closes the bar; esc, ⌫ / Backspace in an empty field, and ⌃C (Mac) close
+  it and give the draft back. Nothing typed yet shows "Type to search the prompts sent in this project"; no match shows
+  "No prompt matches" (↩ then keeps the draft); an empty history says "No prompts in this project yet". An input method's
+  composition (Korean) keeps its own ↩ / esc. The bar's tooltip lists the keys.
+- **Windows: Ctrl+R is also Refresh.** The View menu keeps Ctrl+R for Refresh everywhere else. In the message box (and in
+  the search field) the box takes the key first and notes it; should the menu still fire for the same press, its refresh
+  is dropped (`historySearchKeyJustHandled`, as Ctrl+B and Toggle Sidebar, §52). On the Mac ⌘R stays Refresh and ⌃R is
+  free.
+- **Mac:** Core `Session/PromptHistorySearch.swift` (`PromptHistorySearch`, `PromptHistorySearchText`); App
+  `ComposerHistorySearch.swift` (the bar), `ComposerTextView` (⌃R → `.controlR`), `ChatComposer`. Tests:
+  `PromptHistorySearchTests`.
+- **Windows:** `historySearch.ts` (pure), `components/chat/HistorySearchBar.tsx`, `Composer.tsx`, `App.tsx` (Refresh dropped for
+  the press the box took). Tests: `historySearch.test.ts`.
+
+### 70.2 `#` quick memory — not built
+
+Claude Code no longer has it. The interactive-mode reference's quick commands are `/` (commands and skills), `!` (shell
+mode), `@` (file mentions), `:` (emoji) and `?` (shortcut help) — no `#`; the memory page says to ask Claude to remember
+something or to edit CLAUDE.md through `/memory`. A message starting with `#` therefore goes to Claude as typed, as in
+the terminal. (`/memory` stays the app's own, §56.5.)
+
+### 70.3 `/export` and `/copy`
+
+```ts
+// commands (lane query: never behind a turn)
+export_chat   { path?: string; replace?: boolean }  // → chat_export
+copy_response { n?: number }                        // → response_text (n: 1 = the latest answer, ≤ 1000)
+// refused: no_project | no_session | terminal_chat
+//          | export_empty (no row to export) | export_empty_path | export_path_too_long (> 4096)
+//          | export_exists:<abs> (a file is there and replace is not set) | export_failed:<errno> <why>
+//          | invalid_copy_n:<n> | no_response:<n> (fewer answers than that)
+type ChatExportEvent   = { type: "chat_export"; text: string; name: string; path: string | null };
+type ResponseTextEvent = { type: "response_text"; n: number; text: string };
+```
+
+- **As the terminal's commands.** The commands reference: "`/export [filename]` — Export the current conversation as plain
+  text. With a filename, writes directly to that file, and on v2.1.327 or later refuses one that already exists. Without,
+  opens a dialog to copy to clipboard or save to a file." and "`/copy [N]` — Copy the last assistant response to clipboard.
+  Pass a number `N` to copy the Nth-latest response." Both are app commands in a classic chat now, no longer
+  terminal-only names (§56.5); terminal chats are refused `terminal_chat` (their TUI has its own).
+- **The text** is made from the chat's transcript rows, oldest first, in the terminal's shapes: `> ` before each of the
+  user's messages (continuation lines indented), `⏺ ` before Claude's text, one `⏺ Tool(argument)` line per top-level
+  tool call (the file, command, pattern, URL or description) with `  ⎿  ` and the first line of its result (`Error: ` when
+  it failed), `! command` with its output for a `!` run (§67.2), and `⏺ Error: …` for an error the user saw. A subagent's
+  own calls are left out, as the terminal folds them into the Agent line. Blocks are separated by a blank line.
+- **`/export file`** writes it there — absolute, `~/…`, or relative to the project folder (the terminal's cwd); an existing
+  file is refused `export_exists` (never replaced). **`/export`** alone replies with the text and a proposed name
+  (`YYYY-MM-DD-HHMMSS-<first message's words>.txt`, local time); the client's dialog copies it (a user-initiated clipboard
+  write) or saves it: the save panel asks before replacing, so the client then sends `export_chat {path, replace: true}`.
+- **`/copy [N]`**: an answer is the text of one turn's own `assistant_text` rows, joined by a blank line. The client puts
+  `text` on the clipboard and says so. The terminal's picker for single code blocks (and its `w` to write a file) is not
+  built: the whole answer is copied.
+- Engine: `session/exportChat.ts` (`chatExportText`, `responses`, `nthResponse`, `exportFileName`, `writeExport`),
+  `engine.ts` (`exportChat`, `copyResponse`). Tests: `engine/test/w70.export.test.ts`.
+- **Clients.** `/export file` and `/copy [N]` empty the box; a refusal gives the command back with the reason in the notice
+  line. `/export file` then says "Saved the conversation to …"; `/copy` confirms with a toast. `/export` alone opens a sheet
+  (Mac) / dialog (Windows): the text's start (monospace, ≤ 6 000 characters shown), "N lines · M characters", Cancel,
+  **Save to File…** (Mac `NSSavePanel`, Windows main's `rg:saveExportFile` save dialog — both ask before replacing, then
+  `export_chat {path, replace: true}`) and **Copy to Clipboard** (the default). A chat shown read-only is not exported
+  (Windows says to go back to the running chat). Mac: Core `Session/ChatExport.swift` (`ChatExport`, `ResponseText`,
+  `CopyArgument`, `ChatExportText`, the store's `exportChat` / `copyResponse`), `SlashAppCommand.export` / `.copy`; App
+  `ComposerExport.swift`, `ComposerSlashCommands.swift`. Tests: `ChatExportTests`, `SlashAppCommandsTests`. Windows:
+  `chatExport.ts`, `components/dialogs/ChatExportDialog.tsx`, `slashAppCommands.ts`, `slashAppRun.ts`, `Composer.tsx`,
+  `errorCodes.ts`, main `ipc.ts` (`rg:saveExportFile`) and `ipcGuard.ts`. Tests: `chatExport.test.ts` (the clipboard and
+  the save dialog stubbed), `slashAppCommands.test.ts`, `ipcGuard.test.ts`.
+
+### 70.4 Alt+T — extended thinking on or off
+
+```ts
+// command
+set_thinking { enabled: boolean }   // the current chat's; lane main, allowed while a turn runs (from the next model request on)
+// refused: invalid_thinking | no_project | no_session | terminal_chat | set_thinking_failed:<why>
+// state.session.thinking?: { enabled: boolean; alwaysOn: boolean }
+//   enabled  — the chat's choice: on unless Alt+T turned it off
+//   alwaysOn — the next answer's model always thinks (Opus 5.5, Sonnet 5.5, Haiku 5.5, the Fable models): the toggle has no effect
+// SessionMeta.thinkingOff?: true      // kept with the chat (sessions/index.json); a rewind fork (§26) inherits it
+```
+
+- **As the terminal's Option+T / Alt+T.** The docs: "Enable or disable extended thinking mode. Has no effect on Opus 5.5,
+  Sonnet 5.5, Haiku 5.5, or the Fable models, which always use extended thinking." It is a switch for the conversation,
+  not one message: the engine keeps it with the chat, so a restart, a chat switch and back, or a resumed chat keep it, and
+  a new chat starts with thinking on (the CLI's default).
+- **The CLI takes it live.** A running CLI gets `Query.setMaxThinkingTokens(0)` (off) or `null` (the CLI's default back),
+  applied from its next model request — the same while a turn runs. A starting CLI gets the SDK option
+  `thinking: { type: "disabled" }` when the chat has it off (nothing when on).
+- **The status line** (§44.2) says `thinkingEnabled: enabled || alwaysOn` instead of a fixed true.
+- Engine: `statusline/input.ts` (`thinkingAlwaysOn`), `session/claude.ts` (`thinking`, `setThinking`), `review/sessions.ts`
+  (`thinkingOff`), `engine.ts` (`setThinking`, `thinkingSlice`, the start's `thinking: false`). Tests:
+  `engine/test/w70.thinking.test.ts`.
+- **Clients.** ⌥T (Mac) / Alt+T (Windows; the physical T — macOS types "†", a Korean layout "ㅅ") in the message box sends
+  `set_thinking {enabled: !enabled}`; the line after it says "Thinking off — from Claude's next request" (Mac the info line,
+  Windows a toast). With `alwaysOn` nothing is sent and the line says the model always thinks. The composer bar shows a
+  chip right after the mode menu, in the accent while Claude thinks (`enabled || alwaysOn`): on the Mac a brain, dim with
+  "Thinking off" when it does not; on Windows Claude Code's ✻, struck through when off (no words: the narrow chat column
+  keeps its footer on one row — the words are the tooltip and the accessible name). A click toggles it. Its tooltip: "Extended thinking is on for this chat — click or press ⌥T to turn it off" (or
+  on), "This model always uses extended thinking — ⌥T has no effect on it", or why it is disabled (no project, an engine
+  without §70.4 — then the chip is hidden and the key types as before —, a terminal chat, a chat shown read-only). Mac: Core
+  `Session/ExtendedThinking.swift` (`ThinkingState`, `ThinkingText`, `ThinkingToggle`, `thinkingBlocker`,
+  `toggleThinking`); App `ComposerThinking.swift` (`ThinkingChip`), `ComposerTextView` (`.optionT`). Tests:
+  `ExtendedThinkingTests`. Windows: `thinking.ts`, `components/chat/ThinkingChip.tsx`, `Composer.tsx`, `errorCodes.ts`.
+  Tests: `thinking.test.ts`.
+- **Shortcut tables.** ⌃R / Ctrl+R "Search the prompt history" and ⌥T / Alt+T "Turn extended thinking on or off" are rows
+  of the message box section in docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. Neither
+  clashes: ⌘R / Ctrl+R outside the box is Refresh (70.1), Ctrl+Alt+T is New Terminal Chat, ⌥⌘T New Chat in a Workbench.

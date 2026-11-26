@@ -456,6 +456,13 @@ public enum EngineCommand: Sendable, Equatable {
     case shellRun(command: String)
     /// §67.2: stops the running `!` command; refused `no_shell_running` when none runs.
     case shellCancel
+    // MARK: §70 terminal parity, batch D
+    /// §70.4 ⌥T: extended thinking on or off for the current chat (Session/ExtendedThinking.swift).
+    case setThinking(enabled: Bool)
+    /// §70.3 `/export [file]`: the conversation as text → `.chatExport`; written to `path` when given (Session/ChatExport.swift).
+    case exportChat(path: String?, replace: Bool)
+    /// §70.3 `/copy [N]`: Claude's Nth-latest answer → `.responseText`.
+    case copyResponse(n: Int?)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -779,6 +786,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .removeDir: "remove_dir"
         case .shellRun: "shell_run"   // §67.2
         case .shellCancel: "shell_cancel"
+        case .setThinking: "set_thinking"   // §70.4
+        case .exportChat: "export_chat"   // §70.3
+        case .copyResponse: "copy_response"
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -1017,6 +1027,10 @@ extension EngineCommand: Encodable {
             try encodeBtwFields(to: encoder)
         case .addDir, .removeDir, .shellRun, .shellCancel:   // §67
             try encodeAddDirShellFields(to: encoder)
+        case .setThinking:   // §70.4
+            try encodeThinkingFields(to: encoder)
+        case .exportChat, .copyResponse:   // §70.3
+            try encodeExportFields(to: encoder)
         case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal,
              .terminalRequestCancel, .terminalPermissionResponse:   // §57
             try encodeTerminalChatFields(to: encoder)
@@ -1524,6 +1538,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var shell: ShellRunInfo?
     /// §67.2: `!` results of this chat that go to Claude with the next message.
     public var shellPending = 0
+    /// §70.4: the chat's extended thinking; nil from an engine without it.
+    public var thinking: ThinkingState?
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1587,6 +1603,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         steering = SteeringWire.messages(from: decoder)   // MARK: composer (§50.2)
         terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
         (addedDirs, shell, shellPending) = AddDirShellWire.session(from: decoder)   // §67
+        thinking = ThinkingWire.session(from: decoder)   // §70.4
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
@@ -3004,7 +3021,9 @@ extension TranscriptItem: Decodable {
 
 public enum EngineEvent: Sendable, Equatable {
     case ready(id: String?, engineVersion: String, platform: String, protocolVersion: Int)
-    case state(ReviewState)
+    /// Boxed: the snapshot is by far the widest payload — inline it made every event as wide as a whole state, and a test
+    /// holding many events overflowed its thread's stack once the session slice grew (§70.4).
+    indirect case state(ReviewState)
     /// §19.6: `code` is the refusal's stable id (older engines omit it); `paths` the files it is about
     /// (`file_changed_since_review`, §19.1); `partial` the commits a `commit_series` made before it failed (§53).
     case result(id: String, ok: Bool, error: String?, code: String? = nil, paths: [String]? = nil, partial: CommittedSeries? = nil)
@@ -3124,6 +3143,10 @@ public enum EngineEvent: Sendable, Equatable {
     case prAiDraft(PRAiDraftReply)
     /// §56.1: reply to `btw_ask`.
     case btwAnswer(BtwAnswer)
+    /// §70.3: reply to `export_chat`.
+    case chatExport(ChatExport)
+    /// §70.3: reply to `copy_response`.
+    case responseText(ResponseText)
     /// §67.2: the running `!` command's output so far (its last few thousand characters).
     case shellOutput(id: String, output: String)
     /// §67.2: a `!` command ended — its row (also in the transcript).
@@ -3466,6 +3489,10 @@ extension EngineEvent: Decodable {
             self = .interrupted(try InterruptedReply(from: decoder))
         case "btw_answer":   // §56.1
             self = .btwAnswer(try BtwAnswer(from: decoder))
+        case "chat_export":   // §70.3
+            self = .chatExport(try ChatExport(from: decoder))
+        case "response_text":
+            self = .responseText(try ResponseText(from: decoder))
         case "shell_output":   // §67.2
             self = .shellOutput(id: Self.lenient(String.self, c, .id) ?? "", output: Self.lenient(String.self, c, .output) ?? "")
         case "shell_result":

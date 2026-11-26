@@ -34,6 +34,7 @@ import { useNotificationNotices } from "./components/NotificationNotices"; // MA
 import { receiveMovedChat } from "./chatMove"; // MARK: wave4b w4b-follow
 import { BoardDialog } from "./components/board/BoardDialog"; // MARK: wave5 w5-board
 import { backgroundKeyJustHandled } from "./background"; // §52
+import { historySearchKeyJustHandled } from "./historySearch"; // §70.1
 import { runMenuAction } from "./menuActions"; // MARK: polish p-foundation (P1-chrome-09)
 import { useTermHost } from "./terminal/useTermHost"; // §57.17
 import { diffCollapsedNow, draftToLiveChat, shownChatIsTerminal, useTerminalChatPty } from "./terminal/terminalChat"; // §57.17
@@ -115,7 +116,8 @@ export function App() {
           if (!backgroundKeyJustHandled()) s.toggleSidebar();
           break;
         case "refresh":
-          void s.refresh();
+          // §70.1: the same Ctrl+R already opened the prompt search from the message box.
+          if (!historySearchKeyJustHandled()) void s.refresh();
           break;
         // MARK: wave3 desktop-flow — §36.14: PR comments another window sent here ("Send to Claude"); never sent by itself.
         case "composer_draft":

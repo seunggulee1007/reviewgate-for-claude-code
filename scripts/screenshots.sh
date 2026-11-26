@@ -86,7 +86,11 @@
 #                  finished `!` rows with the caption over the box, the branch's ↑↓ and the line under it after a fetch, a
 #                  pull and a refused pull (with a crop of the header), a fetch running, the branch menu's items as
 #                  `composerbar branch-menu` lines (a menu is not captured), and the commit sheet's "Other changes" on the
-#                  demo project's own edits — with a review and alone (composerbar-commit-*.png).
+#                  demo project's own edits — with a review and alone (composerbar-commit-*.png); then §70: the ⌃R search
+#                  bar over the box (a match, an older one, no match, no history, a match taken into the box;
+#                  composerbar-history-*.png), the thinking chip off, for a model that always thinks and after ⌥T
+#                  (composerbar-thinking-*.png), and /export's sheet with the lines after a save and a refusal
+#                  (composerbar-export-*.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with

@@ -389,6 +389,8 @@ export type RGBridge = {
   chooseDirectory(): Promise<string | null>;
   /** §67.1 `/add-dir` alone and the chip's "디렉터리 추가…": main's folder dialog; the picked folder, null when cancelled. */
   pickAddDirectory?(): Promise<string | null>;
+  /** §70.3 `/export`'s Save: main's save dialog (it asks before replacing) with `name` proposed; the path, null when cancelled. */
+  saveExportFile?(name: string): Promise<string | null>;
   openInEditor(path: string, line: number | null, editor?: EditorKind): Promise<string | null>;
   /**
    * §62 Open in IDE: a repo-relative file of this window's project at a line / column, in VS Code or IntelliJ IDEA (main builds

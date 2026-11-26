@@ -179,6 +179,10 @@
     "addedDirs": [],
     "shell": null,
     "shellPending": 0,
+    "thinking": {
+      "enabled": true,
+      "alwaysOn": false
+    },
     "canRestart": true
   },
   "toolchain": {

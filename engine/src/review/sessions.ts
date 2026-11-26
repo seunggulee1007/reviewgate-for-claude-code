@@ -80,6 +80,7 @@ function normalizeMeta(o: Partial<SessionMeta>): SessionMeta | null {
     ...(typeof o.continuedIn === "string" && o.continuedIn ? { continuedIn: o.continuedIn } : {}),
     ...(typeof o.cliConfigDir === "string" && isAbsolute(o.cliConfigDir) ? { cliConfigDir: o.cliConfigDir } : {}), // §57.16
     ...normalizeAddedDirs(o.addedDirs), // §67.1
+    ...(o.thinkingOff === true ? { thinkingOff: true as const } : {}), // §70.4
   };
 }
 

@@ -25,6 +25,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "remove_dir",
   "shell_run",
   "shell_cancel",
+  // §70.3 /export and /copy, §70.4 Alt+T
+  "export_chat",
+  "copy_response",
+  "set_thinking",
   "request_changes",
   "interrupt",
   "permission_response",

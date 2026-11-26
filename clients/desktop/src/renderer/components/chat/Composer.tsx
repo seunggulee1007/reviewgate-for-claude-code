@@ -59,6 +59,11 @@ import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
 import { parseSlashAppCommand } from "../../slashAppCommands";
 import { runSlashAppCommand } from "../../slashAppRun";
 import { addDir } from "../../addedDirs"; // §67.1
+import { copyResponse, exportToFile } from "../../chatExport"; // §70.3
+import { isHistorySearchKey, noteHistorySearchKey, searchAccepted, startHistorySearch, type HistorySearch } from "../../historySearch"; // §70.1
+import { HistorySearchBar } from "./HistorySearchBar";
+import { isThinkingKey, thinkingBlocker, thinkingOf, toggleThinking } from "../../thinking"; // §70.4
+import { ThinkingChip } from "./ThinkingChip";
 import { AddedDirsChip } from "./AddedDirsChip";
 // §67.2 `!` shell mode
 import { cancelShellCommand, isShellDraft, runShellCommand, shellBadgeTitle, shellCommandOfDraft, shellKeyHint, shellPendingCaption } from "../../shellMode";
@@ -175,6 +180,8 @@ export function Composer() {
   const projectHash = root ? projectRootHash(root) : null;
   const [history, setHistory] = useState<string[]>(() => loadHistory(projectHash));
   const [nav, setNav] = useState<HistoryNav>(IDLE_NAV);
+  // §70.1: the Ctrl+R search over those prompts while its bar is open.
+  const [search, setSearch] = useState<HistorySearch | null>(null);
   const navRef = useRef(nav); // MARK: wave6 w6-terminal (§44.1): the parked draft, read when the chat changes
   navRef.current = nav;
   useEffect(() => {
@@ -684,6 +691,29 @@ export function Composer() {
       else runAddDir(cmd.path, draft);
       return true;
     }
+    if ((cmd.kind === "export" && cmd.file !== "") || cmd.kind === "copy") {
+      // §70.3: the box empties; a refusal (a file that exists, no answer yet) gives the command back with why.
+      palette.record(cmd.kind);
+      if (viewing) {
+        setAttachErrors([t("Go back to the running chat to export or copy from it")]);
+        return true;
+      }
+      const typed = draft;
+      setDraft("");
+      setNav(IDLE_NAV);
+      const run = cmd.kind === "copy" ? copyResponse(cmd.arg) : exportToFile(cmd.file);
+      void run.then((r) => {
+        if (r.ok && cmd.kind === "copy") showToast(r.notice);
+        else setAttachErrors([r.notice]);
+        if (!r.ok) setDraft((d) => (d.length === 0 ? typed : d));
+      });
+      inputRef.current?.focus();
+      return true;
+    }
+    if (cmd.kind === "export" && viewing) {
+      setAttachErrors([t("Go back to the running chat to export or copy from it")]);
+      return true;
+    }
     if (cmd.kind !== "terminalOnly") {
       palette.record(cmd.kind);
       setDraft("");
@@ -742,6 +772,27 @@ export function Composer() {
         setNav(IDLE_NAV);
       }
     });
+    inputRef.current?.focus();
+  };
+
+  // §70.4: the chat's extended thinking (the bar's chip and Alt+T).
+  const thinking = thinkingOf(state.session);
+  const thinkingWhy = thinkingBlocker({ projectOpen: state.project !== null, thinking, terminalChat: !!state.session.terminal, viewing: viewing !== null });
+  const runThinkingToggle = () => {
+    void toggleThinking(thinking, thinkingWhy).then((r) => (r.warning ? setAttachErrors([r.notice]) : showToast(r.notice)));
+  };
+
+  /** §70.1 Enter / Tab: the match goes into the box (the draft stays when nothing matched); Esc: the bar closes. */
+  const acceptSearch = () => {
+    if (!search) return;
+    const text = searchAccepted(search);
+    setSearch(null);
+    if (text !== draft) setNav(IDLE_NAV); // a recalled prompt starts a fresh ↑ walk
+    showDraft(text);
+    inputRef.current?.focus();
+  };
+  const cancelSearch = () => {
+    setSearch(null);
     inputRef.current?.focus();
   };
 
@@ -926,6 +977,20 @@ export function Composer() {
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposing(e)) return; // wave4 w4-input (polish-11): the IME's own Enter / Tab / arrows
+    // §70.1: Ctrl+R, as in the terminal — the bar over the box searches this project's prompts (the palettes close).
+    if (isHistorySearchKey(e)) {
+      e.preventDefault();
+      noteHistorySearchKey(); // the View menu's Refresh is dropped for this press
+      closePalette();
+      setSearch(startHistorySearch(history, draft));
+      return;
+    }
+    // §70.4: Alt+T, as in the terminal — extended thinking on or off for this chat (an older engine: the key as before).
+    if (isThinkingKey({ key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }) && thinking !== null) {
+      e.preventDefault();
+      runThinkingToggle();
+      return;
+    }
     // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
     if (btwOverlay?.kind === "answered" && draft === "" && (isEnter(e) || e.key === " ") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
       e.preventDefault();
@@ -1222,6 +1287,7 @@ export function Composer() {
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
       {slashCard !== null && <SlashCard card={slashCard} onClose={() => setSlashCard(null)} /* §56.5 */ />}
       <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
+      {search !== null && <HistorySearchBar search={search} onChange={setSearch} onAccept={acceptSearch} onCancel={cancelSearch} /* §70.1 */ />}
       {pendingCaption && (
         <div className="shell-pending caption" role="status" title={t("Claude reads them in front of your next message, as the terminal's ! does")} data-testid="Shell results pending">
           <span aria-hidden="true">$</span> {pendingCaption}
@@ -1278,6 +1344,7 @@ export function Composer() {
           plain key hint only while the empty box has the focus), the capabilities as an icon, the tools and Send. */}
       <div className="footer">
         <ModeMenu />
+        {thinking !== null && <ThinkingChip thinking={thinking} blocker={thinkingWhy} onToggle={runThinkingToggle} /* §70.4 */ />}
         {(hint ?? (inputFocused && draft.length === 0 ? "plain" : null)) !== null && (
           <span className={`hint caption truncate ${hint ? "muted" : "faint"}${shellDraft ? " shell" : ""}`} title={hint ?? undefined} data-testid="Composer hint">{hint ?? (settings?.returnSends !== false ? t("↩ to send · ⇧↩ new line · ⌘/ commands") : t("⌘↩ to send · ⌘/ commands · ⌘⇧C focus"))}</span>
         )}

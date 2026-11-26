@@ -252,6 +252,17 @@ export const REFUSAL_CODES = [
   "shell_running",
   "turn_running",
   "no_shell_running",
+  // §70.3 /export and /copy
+  "export_empty",
+  "export_empty_path",
+  "export_path_too_long",
+  "export_exists",
+  "export_failed",
+  "invalid_copy_n",
+  "no_response",
+  // §70.4 Alt+T
+  "invalid_thinking",
+  "set_thinking_failed",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -863,6 +874,26 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("Claude is working — run the command once the turn ends");
     case "no_shell_running":
       return t("No shell command is running");
+    // §70.3 /export and /copy
+    case "export_empty":
+      return t("There is nothing in this chat to export yet");
+    case "export_empty_path":
+      return t("Type a file name after /export");
+    case "export_path_too_long":
+      return t("The path is too long (at most 4,096 characters).");
+    case "export_exists":
+      return d ? t("{0} exists already — /export never replaces a file", d) : t("That file exists already — /export never replaces one");
+    case "export_failed":
+      return t("Could not write the file: {0}", d);
+    case "invalid_copy_n":
+      return t("Type a number after /copy — /copy 2 copies the answer before the last");
+    case "no_response":
+      return d === "" || d === "1" ? t("Claude has not answered in this chat yet") : t("This chat has fewer than {0} answers", d);
+    // §70.4 Alt+T
+    case "invalid_thinking":
+      return t("Could not change thinking — the app sent something the engine does not take");
+    case "set_thinking_failed":
+      return d ? t("Claude Code could not change thinking: {0}", d) : t("Claude Code could not change thinking");
     default:
       return null;
   }

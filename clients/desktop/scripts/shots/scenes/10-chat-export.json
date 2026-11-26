@@ -1,0 +1,20 @@
+{
+  "extends": "04-review.json",
+  "name": "chat-export",
+  "description": "/export alone (§70.3): the conversation as plain text — its start, its size, Copy to Clipboard and Save to File….",
+  "replies": {
+    "export_chat": {
+      "type": "chat_export",
+      "text": "> Add discount codes to the checkout\n\n⏺ I'll add the codes to the checkout and cover them with a test.\n\n⏺ Edit(src/checkout/discount.ts)\n  ⎿  Updated src/checkout/discount.ts with 31 additions\n\n⏺ Write(src/checkout/discount.test.ts)\n  ⎿  Wrote 24 lines\n\n⏺ Bash(npm test -- --run)\n  ⎿  Tests  12 passed (12)\n\n⏺ SAVE10 takes 10% off the subtotal before shipping; the new test covers it.\n",
+      "name": "2026-11-26-143005-add-discount-codes-to-the-checkout.txt",
+      "path": null
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/export" } },
+    { "key": "Enter" },
+    { "waitFor": "Chat export dialog" },
+    { "wait": 300 }
+  ]
+}
