@@ -87,9 +87,10 @@ export function AskButton(props: {
       onMouseDown={(e) => e.stopPropagation()}
       title={props.title ?? t("Ask a side question about this — the main conversation is not affected (⌥⌘/)")}
       data-testid={props.testId ?? "Ask why"}
+      aria-label={props.label ?? t("Why?")}
     >
       <span className="q" aria-hidden="true">?</span>
-      {props.label ?? t("Why?")}
+      <span className="side-ask-label">{props.label ?? t("Why?")}</span>
     </button>
   );
 }
