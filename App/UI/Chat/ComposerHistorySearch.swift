@@ -127,7 +127,10 @@ private struct HistorySearchField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         let query = composer.historySearch?.query ?? ""
-        if field.stringValue != query, field.currentEditor()?.hasMarkedTextSafely != true { field.stringValue = query }
+        guard field.stringValue != query, field.currentEditor()?.hasMarkedTextSafely != true else { return }
+        field.stringValue = query
+        // A text set from outside (a search started over) leaves the caret at its end, not the whole text selected.
+        field.currentEditor()?.selectedRange = NSRange(location: (query as NSString).length, length: 0)
     }
 
     static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
