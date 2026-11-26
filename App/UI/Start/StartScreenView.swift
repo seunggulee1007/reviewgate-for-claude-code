@@ -42,6 +42,12 @@ struct StartScreenOverlay: View {
             if Task.isCancelled { return }
         }
         guard store.projectURL == url, store.sessionsInfo != nil, !store.needsGitInit else { return }   // a git-init prompt comes first
+        // §69.4: a task named before the project was picked — the user asked for it, whatever "start straight away" says.
+        if model.pendingTaskStart?.root == root {
+            model.showStartScreen = true
+            return
+        }
+        model.pendingTaskStart = nil
         model.showStartScreen = StartScreen.shouldShow(skip: AppSettings.skipStartScreen(), suppressed: suppressed, phase: store.gatePhase,
                                                        reviewPending: store.hasPendingReview, composerTask: store.taskForComposer != nil)
     }
@@ -55,6 +61,8 @@ struct StartScreenView: View {
     @AppStorage(AppSettings.Key.skipStartScreen) private var skipNextTime = false
     @State private var cursor = StartScreenCursor()
     @State private var showTaskSheet = false
+    /// §69.4: the task the no-project window named, filled into the task sheet.
+    @State private var taskRef = ""
     @FocusState private var focused: Bool
 
     private var chats: [SessionMeta] { store.startScreenChats }
@@ -100,6 +108,12 @@ struct StartScreenView: View {
         .focused($focused)
         .task {
             // The chat behind takes the keyboard as it appears; the screen takes it back a moment later.
+            if let pending = model.pendingTaskStart, let url = store.projectURL, pending.root == AppSettings.projectKey(url) {
+                model.pendingTaskStart = nil
+                taskRef = pending.ref
+                showTaskSheet = true
+                return
+            }
             focused = true
             try? await Task.sleep(for: .milliseconds(150))
             focused = true
@@ -116,8 +130,8 @@ struct StartScreenView: View {
             return .handled
         }
         .onKeyPress(.escape) { perform(.start); return .handled }
-        .sheet(isPresented: $showTaskSheet, onDismiss: { focused = true }) {
-            TaskStartSheet { outcome in
+        .sheet(isPresented: $showTaskSheet, onDismiss: { focused = true; taskRef = "" }) {
+            TaskStartSheet(initialRef: taskRef) { outcome in
                 switch outcome {
                 case .startedHere:
                     finish()

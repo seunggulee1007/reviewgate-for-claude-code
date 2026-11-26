@@ -2193,6 +2193,22 @@
         }
       }
     },
+    "A project you already have": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A project you already have"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 있는 프로젝트"
+          }
+        }
+      }
+    },
     "A quick client-side check of the command; ReviewGate's review gate still applies to every file change.": {
       "localizations": {
         "en": {
@@ -2333,6 +2349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "업무 링크, ABC-123 같은 키, 또는 할 일 — 그곳의 첫 메시지로 보내요."
+          }
+        }
+      }
+    },
+    "A task link, key or number — then its project, its branch and first prompt (2)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A task link, key or number — then its project, its branch and first prompt (2)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 링크·키·번호 — 그다음 프로젝트, 브랜치, 첫 프롬프트 (2)"
           }
         }
       }
@@ -4129,6 +4161,22 @@
         }
       }
     },
+    "Already the default (ReviewGate in your home folder)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already the default (ReviewGate in your home folder)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 기본값이에요 (홈 폴더의 ReviewGate)"
+          }
+        }
+      }
+    },
     "Also apply the terminal's Bash allow rules": {
       "localizations": {
         "en": {
@@ -5393,6 +5441,22 @@
         }
       }
     },
+    "Back to ReviewGate in your home folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to ReviewGate in your home folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "홈 폴더의 ReviewGate로 되돌려요"
+          }
+        }
+      }
+    },
     "Back to the built-in template": {
       "localizations": {
         "en": {
@@ -5441,6 +5505,54 @@
         }
       }
     },
+    "Change…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바꾸기…"
+          }
+        }
+      }
+    },
+    "Choose": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택"
+          }
+        }
+      }
+    },
+    "Choose a project folder (3)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a project folder (3)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더 고르기 (3)"
+          }
+        }
+      }
+    },
     "Choose another directory Claude may work in (/add-dir)": {
       "localizations": {
         "en": {
@@ -5453,6 +5565,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 일할 디렉터리를 하나 더 골라요 (/add-dir)"
+          }
+        }
+      }
+    },
+    "Choose the folder for new projects": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the folder for new projects"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 프로젝트 폴더를 골라 주세요"
+          }
+        }
+      }
+    },
+    "Choose the project the task belongs to": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the project the task belongs to"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무가 속한 프로젝트를 골라 주세요"
+          }
+        }
+      }
+    },
+    "Choose the project's folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the project's folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 폴더를 골라요"
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택…"
           }
         }
       }
@@ -5549,6 +5725,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "출력 복사"
+          }
+        }
+      }
+    },
+    "Creates %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creates %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "만들 위치: %@"
           }
         }
       }
@@ -5777,6 +5969,22 @@
         }
       }
     },
+    "First the project the task belongs to — then its branch and first prompt, as in a project window.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First the project the task belongs to — then its branch and first prompt, as in a project window."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 업무가 속한 프로젝트를 고르고, 그다음 프로젝트 창에서처럼 브랜치와 첫 프롬프트를 정해요."
+          }
+        }
+      }
+    },
     "Fold the accepted files": {
       "localizations": {
         "en": {
@@ -5789,6 +5997,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락한 파일 접기"
+          }
+        }
+      }
+    },
+    "Folder for new projects": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder for new projects"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 프로젝트 폴더"
+          }
+        }
+      }
+    },
+    "Folder name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folder name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 이름"
+          }
+        }
+      }
+    },
+    "Follows what you type above until you edit it; a name already taken gets -2, -3": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follows what you type above until you edit it; a name already taken gets -2, -3"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "직접 고치기 전까지는 위에 적은 내용을 따라가요. 이미 있는 이름이면 -2, -3이 붙어요"
           }
         }
       }
@@ -5873,6 +6129,70 @@
         }
       }
     },
+    "Looking for its project…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for its project…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 찾는 중…"
+          }
+        }
+      }
+    },
+    "Makes a folder for it under %@ as a git repository (1)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes a folder for it under %@ as a git repository (1)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 아래에 폴더를 만들고 git 저장소로 시작해요 (1)"
+          }
+        }
+      }
+    },
+    "Makes the folder, opens it and puts your words into the message box; nothing is sent until you press Return": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes the folder, opens it and puts your words into the message box; nothing is sent until you press Return"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더를 만들어 열고 적은 내용을 메시지 입력창에 넣어요. Return을 누르기 전에는 아무것도 보내지 않아요"
+          }
+        }
+      }
+    },
+    "Matches %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matches %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 일치"
+          }
+        }
+      }
+    },
     "More: Continue leaving the rest pending, Accept all, Reject all, AI pre-review, Finish review, order and grouping of the list": {
       "localizations": {
         "en": {
@@ -5885,6 +6205,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "더 보기: 남은 파일은 그대로 두고 계속, 모두 수락, 모두 거절, AI 사전 리뷰, 리뷰 끝내기, 목록 정렬·묶기"
+          }
+        }
+      }
+    },
+    "New": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 시작"
+          }
+        }
+      }
+    },
+    "New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더의 ReviewGate."
+          }
+        }
+      }
+    },
+    "New project": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New project"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 프로젝트"
           }
         }
       }
@@ -5937,6 +6305,22 @@
         }
       }
     },
+    "No folder yet — say what you want to make": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No folder yet — say what you want to make"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 없이 — 만들고 싶은 걸 적어요"
+          }
+        }
+      }
+    },
     "No matching symbols": {
       "localizations": {
         "en": {
@@ -5949,6 +6333,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "맞는 심볼이 없어요"
+          }
+        }
+      }
+    },
+    "No recent projects — choose its folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No recent projects — choose its folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 프로젝트가 없어요 — 폴더를 골라 주세요."
           }
         }
       }
@@ -6097,6 +6497,22 @@
         }
       }
     },
+    "Open a folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a folder…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 열기…"
+          }
+        }
+      }
+    },
     "Open a project first": {
       "localizations": {
         "en": {
@@ -6109,6 +6525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "먼저 프로젝트를 여세요"
+          }
+        }
+      }
+    },
+    "Open and Continue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open and Continue"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "열고 계속"
           }
         }
       }
@@ -6177,6 +6609,22 @@
         }
       }
     },
+    "Opens the project, then its task sheet with this task filled in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the project, then its task sheet with this task filled in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 열고, 이 업무를 채운 업무 시작 창을 띄워요"
+          }
+        }
+      }
+    },
     "Or ⌘-click a name (Ctrl+click on Windows) — on the Mac when Settings › Review › Diff › ⌘-click on a name is Go to Definition": {
       "localizations": {
         "en": {
@@ -6205,6 +6653,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다른 변경 (%lld / %lld)"
+          }
+        }
+      }
+    },
+    "Other Folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other Folder…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 폴더…"
           }
         }
       }
@@ -6285,6 +6749,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "참조를 고르면 앞뒤 줄과 함께 보여요"
+          }
+        }
+      }
+    },
+    "Pick the project the task belongs to": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick the project the task belongs to"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무가 속한 프로젝트를 골라요"
           }
         }
       }
@@ -6545,6 +7025,38 @@
         }
       }
     },
+    "ReviewGate makes the folder and a git repository; your words go into the message box.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate makes the folder and a git repository; your words go into the message box."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate가 폴더와 git 저장소를 만들고, 적은 내용은 메시지 입력창에 넣어 둬요."
+          }
+        }
+      }
+    },
+    "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate는 폴더 안에서 Claude를 실행하고, 모든 변경은 사용자의 리뷰를 거쳐야 반영돼요 — 폴더가 아직 없다면 새로 시작을 눌러요."
+          }
+        }
+      }
+    },
     "Run the command in the project folder — its output goes to Claude with your next message": {
       "localizations": {
         "en": {
@@ -6593,6 +7105,22 @@
         }
       }
     },
+    "Say what you want to make first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Say what you want to make first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 만들고 싶은 걸 적어 주세요"
+          }
+        }
+      }
+    },
     "Search again": {
       "localizations": {
         "en": {
@@ -6621,6 +7149,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "다시 찾기 (그사이 파일이 바뀌었을 수 있어요)"
+          }
+        }
+      }
+    },
+    "Settings › General › Folder for new projects": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings › General › Folder for new projects"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 › 일반 › 새 프로젝트 폴더"
           }
         }
       }
@@ -6701,6 +7245,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "출력 전체를 보여요"
+          }
+        }
+      }
+    },
+    "Starting without a folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting without a folder"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 없이 시작"
           }
         }
       }
@@ -6817,6 +7377,38 @@
         }
       }
     },
+    "Task %@ — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task %@ — %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 %1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "Task %@ — no recent project has %@ as a remote": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Task %@ — no recent project has %@ as a remote"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업무 %1$@ — 최근 프로젝트 중 원격 저장소가 %2$@인 곳이 없어요"
+          }
+        }
+      }
+    },
     "Tells Claude to continue without deciding the %lld pending file(s) — they stay in the review; what you decided goes with it": {
       "localizations": {
         "en": {
@@ -6913,6 +7505,22 @@
         }
       }
     },
+    "The folder New makes each project's folder in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The folder New makes each project's folder in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 시작이 프로젝트 폴더를 만드는 곳"
+          }
+        }
+      }
+    },
     "The output of the shell commands you ran goes in front of your next message, as in Claude Code — Claude is not asked anything until then": {
       "localizations": {
         "en": {
@@ -6925,6 +7533,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "실행한 셸 명령의 출력은 Claude Code처럼 다음 메시지 앞에 붙어서 가요 — 그때까지 Claude에게는 아무것도 묻지 않아요"
+          }
+        }
+      }
+    },
+    "The project is being made": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The project is being made"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트를 만드는 중이에요"
           }
         }
       }
@@ -7057,6 +7681,22 @@
         }
       }
     },
+    "What do you want to make?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What do you want to make?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "무엇을 만들고 싶나요?"
+          }
+        }
+      }
+    },
     "Where %@ is declared (F12)": {
       "localizations": {
         "en": {
@@ -7069,6 +7709,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@이(가) 선언된 곳으로 가요 (F12)"
+          }
+        }
+      }
+    },
+    "Working out the folder name…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working out the folder name…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 이름을 정하는 중…"
           }
         }
       }

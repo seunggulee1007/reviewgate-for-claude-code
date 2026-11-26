@@ -153,7 +153,7 @@ public enum SettingsCatalog {
         // General
         SettingEntry("appearance", .general, section: "Appearance", title: "Appearance", info: Info.appearance),
         SettingEntry("reopenLastProjects", .general, section: "Appearance", title: "Reopen last projects on launch"),
-        SettingEntry("newProjectParent", .general, section: "New projects", title: "Folder for new projects", info: Info.newProjectParent),   // §69
+        SettingEntry("newProjectParent", .general, section: "Starting without a folder", title: "Folder for new projects", info: Info.newProjectParent),   // §69
         SettingEntry("returnSends", .general, section: "Typing and the chat", title: "Return sends the message", info: Info.returnSends),
         SettingEntry("showExploreDetail", .general, section: "Typing and the chat", title: "Show exploration rows in detail", info: Info.exploreDetail),
         SettingEntry("confirmQuit", .general, section: "Closing and quitting", title: "Ask before quitting", info: Info.confirmQuit),

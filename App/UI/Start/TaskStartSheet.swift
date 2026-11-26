@@ -14,6 +14,8 @@ struct TaskStartSheet: View {
         case workbench(URL)
     }
 
+    /// §69.4: the task named before the project was picked (empty: none).
+    var initialRef: String = ""
     let onStarted: (Outcome) -> Void
 
     @Environment(AppState.self) private var store
@@ -121,6 +123,7 @@ struct TaskStartSheet: View {
         .onAppear {
             settings = store.taskStartSettings
             location = settings.location
+            if refText.isEmpty, !initialRef.isEmpty { refText = initialRef }
             refFocused = true
         }
         .onChange(of: refText) { _, _ in

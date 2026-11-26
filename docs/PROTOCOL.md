@@ -11540,3 +11540,32 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
 - **`matches`**: the paths with any remote whose `owner/repo` is the task's (case-insensitive), those on the link's host
   first, otherwise in the client's order. **`guess`**: the first match; else the first path with a remote of the same
   repository name (a fork) or whose folder has that name; else null (the client preselects its most recent project).
+
+### 69.4 Clients
+
+- **The no-project window.** Three cards with 1 / 2 / 3 badges — 1 **New** (새로 시작), 2 **Start from a task** (업무로
+  시작), 3 **Open a folder…** (폴더 열기…) — then the recent projects as before. 1 / 2 / 3 act at once; ← → ↑ ↓ move the mark
+  over the cards and ↩ takes it. While an open is on its way the cards are off with "Opening <name>…" as the reason.
+- **New.** One sheet: "What do you want to make?" (the first prompt, required), the folder name (follows the prompt through
+  `project_name`, 0.3 s after typing stops, until edited; editable), the line "Creates <path>" and the parent with "Change…"
+  (Settings). Create sends `project_create`; on success the window opens the new project **without the start screen**
+  (the window's own suppression, §63.5), and the prompt goes where the new chat takes text — the message box, or a terminal
+  chat's prompt as one bracketed paste — exactly as §63.3 hands a task's first prompt: **a draft, never sent by the app**;
+  one Return sends it. (The same rule as §63 on purpose: the user sees what Claude gets in the chat's own box, picks the
+  permission mode, and a terminal chat is never sent Enter for them.) A refusal shows in the sheet in the user's words
+  (69.2) and the sheet stays.
+- **Start from a task.** One sheet: the task field (as §63.3's), then the base project: the recent projects (existing
+  folders only), the one `project_match` names preselected — `guess`, else the most recent — with "Matches <owner/repo>" on
+  the rows in `matches`, plus "Other folder…" (the folder picker). One click on a row, or Continue, opens that project; its
+  start screen then shows (whatever "Start straight away next time" says — the user asked for the task) with the task sheet
+  of §63.3 already open and the task filled in. From there it is §63.3 unchanged (branch or workbench, first prompt, never
+  sent). Nothing is created in this path. A folder that is no repository gets the git-init prompt first (§59); the task
+  sheet follows it.
+- **Settings.** The parent folder for new projects, `newProjectParent` (empty = `<home>/ReviewGate`): Settings › General ›
+  Starting without a folder › Folder for new projects, in the settings search.
+- **Mac.** `NoProjectStartCards`, `NewProjectSheet` and `TaskProjectSheet` (App `UI/Start/NoProjectStartView.swift`) in
+  `EmptyProjectView` (`MainWindow.swift`); the task waits in `WindowModel.pendingTaskStart` (keyed by the project) until
+  `StartScreenOverlay` decides for that project and `StartScreenView` opens `TaskStartSheet(initialRef:)`; New sets
+  `suppressNextStartScreen`. Core `NewProject.swift`: the replies, `AppState.newProjectName` / `createProject` (through the
+  same open path as Open Project — a refusal goes back to the sheet, not the banner) / `matchProjects`, the setting,
+  `NewProjectText`, `NoProjectChoice`; tests `NewProjectTests`. The setting's row: `GeneralSettingsPane` (Choose… / Reset).

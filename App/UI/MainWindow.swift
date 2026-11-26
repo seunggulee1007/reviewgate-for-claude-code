@@ -1506,16 +1506,13 @@ private struct EmptyProjectView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("Opening project")
             } else {
-                Text("Open a project to start").font(.title2.weight(.semibold))
+                Text("How do you want to start?").font(.title2.weight(.semibold))
             }
-            Text("ReviewGate runs Claude in a folder and gates every change behind your review.")
+            Text("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Open Project…", systemImage: "folder.badge.plus") { ProjectOpener.choose(store: store) }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-                .accessibilityIdentifier("Open Project…")
+            // §69: New · Start from a task · Open a folder… (Open Project), 1 / 2 / 3, the arrows and ↩.
+            NoProjectStartCards()
 
             RecentProjectsList()   // MARK: wave4 w4-install (daily-17): a missing folder dimmed with "Not found", every row removable
         }

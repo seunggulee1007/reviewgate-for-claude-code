@@ -19,6 +19,7 @@ struct GeneralSettingsPane: View {
     @AppStorage(AppSettings.Key.returnSends) private var returnSends = true
     @AppStorage(AppSettings.Key.notificationsEnabled) private var notificationsEnabled = true
     @AppStorage(AppSettings.Key.notificationSound) private var notificationSound = true
+    @AppStorage(AppSettings.Key.newProjectParent) private var newProjectParent = ""   // §69
 
     var body: some View {
         Form {
@@ -33,6 +34,25 @@ struct GeneralSettingsPane: View {
                     .help("On launch, reopens the project windows that were open at last quit (up to \(AppSettings.maxRestoredWindows)). Off: the app starts with the empty state.")
                     .accessibilityIdentifier("Reopen last projects on launch")
                     .settingAnchor("reopenLastProjects")
+            }
+            // §69: where New (no folder open) makes each project's folder.
+            Section("Starting without a folder") {
+                LabeledContent {
+                    HStack(spacing: 6) {
+                        Text(verbatim: newProjectParent.isEmpty ? AppSettings.defaultNewProjectParent : newProjectParent)
+                            .foregroundStyle(newProjectParent.isEmpty ? .secondary : .primary)
+                            .lineLimit(1).truncationMode(.middle)
+                            .textSelection(.enabled)
+                        Button("Choose…") { chooseNewProjectParent() }
+                            .help("The folder New makes each project's folder in")
+                            .accessibilityIdentifier("Choose folder for new projects")
+                        Button("Reset") { newProjectParent = "" }
+                            .disabled(newProjectParent.isEmpty)
+                            .help(newProjectParent.isEmpty ? String(localized: "Already the default (ReviewGate in your home folder)") : String(localized: "Back to ReviewGate in your home folder"))
+                            .accessibilityIdentifier("Reset folder for new projects")
+                    }
+                } label: { SettingLabel("newProjectParent") }
+                .settingAnchor("newProjectParent")
             }
             Section("Typing and the chat") {
                 Toggle(isOn: $returnSends) { SettingLabel("returnSends") }
@@ -68,6 +88,21 @@ struct GeneralSettingsPane: View {
             AppVersionFooter()   // MARK: wave4 w4-install — "0.2.3 (610)", as in About and Copy Diagnostics
         }
         .formStyle(.grouped)
+    }
+}
+
+extension GeneralSettingsPane {
+    /// §69: picks the parent folder for new projects (a folder made here if the user wants one).
+    private func chooseNewProjectParent() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose")
+        panel.message = String(localized: "Choose the folder for new projects")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        newProjectParent = url.path
     }
 }
 
