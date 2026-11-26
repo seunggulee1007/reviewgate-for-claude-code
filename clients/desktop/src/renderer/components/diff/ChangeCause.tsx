@@ -25,7 +25,8 @@ import { transcriptShape } from "../../transcriptShape"; // MARK: wave4d w4d-spe
 const EMPTY_AGENTS: AgentNode[] = [];
 const OPEN_KEY = "rg.diff.causeOpen";
 
-const lineCount = (v: unknown): number => (typeof v === "string" && v.length > 0 ? v.split("\n").length : 0);
+/** Lines in an Edit's `old_string` / `new_string`: a trailing newline ends the last line, it does not start another. */
+export const lineCount = (v: unknown): number => (typeof v === "string" && v.length > 0 ? v.replace(/\r?\n$/, "").split("\n").length : 0);
 
 /** A short description of what the call did to the file. */
 function shortInput(use: ToolUseItem): string {
