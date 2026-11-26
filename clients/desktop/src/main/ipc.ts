@@ -5,7 +5,7 @@
  */
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type WebContents } from "electron";
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
 import type { AppSettings, EditorKind, McpConfigFileResult, OpenInIdeResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
@@ -119,6 +119,20 @@ export function installIPC(deps: Deps): void {
     };
     const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0]!;
+  });
+  // §70.3 `/export`'s Save: the user picks where the conversation goes (the engine writes it there, replace: the dialog asked).
+  ipcMain.handle("rg:saveExportFile", async (evt, name: unknown) => {
+    const win = BrowserWindow.fromWebContents(evt.sender);
+    const root = deps.engineFor(evt.sender)?.state.project?.root ?? null;
+    const file = typeof name === "string" && name.trim() !== "" ? basename(name) : "conversation.txt";
+    const options: Electron.SaveDialogOptions = {
+      title: t("Export Conversation"),
+      defaultPath: root ? join(root, file) : file,
+      filters: [{ name: t("Text"), extensions: ["txt"] }],
+      properties: ["createDirectory", "showOverwriteConfirmation"],
+    };
+    const r = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    return r.canceled || !r.filePath ? null : r.filePath;
   });
   ipcMain.handle("rg:openInEditor", (_e, path: string, line: number | null, editor?: EditorKind) => openInEditor(path, line, editor ?? loadSettings().preferredEditor));
   // §62 Open in IDE: the renderer names the IDE and a repo-relative path; main builds the URL from this window's project root

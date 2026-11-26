@@ -60,6 +60,7 @@ const bridge: RGBridge = {
   },
   chooseDirectory: () => ipcRenderer.invoke("rg:chooseDirectory"),
   pickAddDirectory: () => ipcRenderer.invoke("rg:pickAddDirectory"), // §67.1
+  saveExportFile: (name: string) => ipcRenderer.invoke("rg:saveExportFile", name), // §70.3
   openInEditor: (path: string, line: number | null, editor?: EditorKind) => ipcRenderer.invoke("rg:openInEditor", path, line, editor),
   openInIde: (ide: IdeKind, path: string, line: number, column: number) => ipcRenderer.invoke("rg:openInIde", ide, path, line, column),
   openExternal: (url: string) => ipcRenderer.invoke("rg:openExternal", url),

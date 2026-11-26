@@ -353,7 +353,9 @@ export type Dialog =
   // MARK: wave4 w4-safety — daily-11: the reject shortcut asks first (components/dialogs/SafetyDialogs.tsx)
   | { kind: "rejectOne"; path: string }
   // MARK: wave4d w4d-windows — polish-08: Help › Keyboard Shortcuts (components/dialogs/ShortcutsDialog.tsx)
-  | { kind: "shortcuts" };
+  | { kind: "shortcuts" }
+  /** §70.3 `/export` alone: the conversation as text — copy or save (components/dialogs/ChatExportDialog.tsx). */
+  | { kind: "chatExport"; export: import("./chatExport").ChatExport };
 
 /** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
 const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);

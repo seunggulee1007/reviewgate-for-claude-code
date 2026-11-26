@@ -59,6 +59,7 @@ import { SlashCard, type SlashCardKind } from "./SlashCard"; // §56.5
 import { parseSlashAppCommand } from "../../slashAppCommands";
 import { runSlashAppCommand } from "../../slashAppRun";
 import { addDir } from "../../addedDirs"; // §67.1
+import { copyResponse, exportToFile } from "../../chatExport"; // §70.3
 import { isHistorySearchKey, noteHistorySearchKey, searchAccepted, startHistorySearch, type HistorySearch } from "../../historySearch"; // §70.1
 import { HistorySearchBar } from "./HistorySearchBar";
 import { AddedDirsChip } from "./AddedDirsChip";
@@ -686,6 +687,29 @@ export function Composer() {
       palette.record("add-dir");
       if (viewing) setAttachErrors([t("Go back to the running chat to add a directory to it")]);
       else runAddDir(cmd.path, draft);
+      return true;
+    }
+    if ((cmd.kind === "export" && cmd.file !== "") || cmd.kind === "copy") {
+      // §70.3: the box empties; a refusal (a file that exists, no answer yet) gives the command back with why.
+      palette.record(cmd.kind);
+      if (viewing) {
+        setAttachErrors([t("Go back to the running chat to export or copy from it")]);
+        return true;
+      }
+      const typed = draft;
+      setDraft("");
+      setNav(IDLE_NAV);
+      const run = cmd.kind === "copy" ? copyResponse(cmd.arg) : exportToFile(cmd.file);
+      void run.then((r) => {
+        if (r.ok && cmd.kind === "copy") showToast(r.notice);
+        else setAttachErrors([r.notice]);
+        if (!r.ok) setDraft((d) => (d.length === 0 ? typed : d));
+      });
+      inputRef.current?.focus();
+      return true;
+    }
+    if (cmd.kind === "export" && viewing) {
+      setAttachErrors([t("Go back to the running chat to export or copy from it")]);
       return true;
     }
     if (cmd.kind !== "terminalOnly") {

@@ -2,9 +2,10 @@
  * MARK: b-slash — docs/PROTOCOL.md §56.5: the terminal's built-in slash commands typed in a classic chat. Its CLI runs in
  * stream-json, where the interactive built-ins (/model, /resume, /config …) do nothing visible — so the app answers them
  * with its own screens (src/renderer/slashAppRun.ts), and a built-in it has none for is never sent: the card over the box
- * offers a terminal chat. §67.1: /add-dir is the app's own (src/renderer/addedDirs.ts). /clear, /compact, /btw and /mcp keep their own paths; prompt built-ins (/init, /review …) and the
+ * offers a terminal chat. §67.1: /add-dir is the app's own (src/renderer/addedDirs.ts); §70.3 /export and /copy too (src/renderer/chatExport.ts). /clear, /compact, /btw and /mcp keep their own paths; prompt built-ins (/init, /review …) and the
  * user's own commands go to Claude. As on the Mac (Core SlashAppCommands.swift).
  */
+import { copyDescription, exportDescription } from "./chatExport"; // §70.3
 import { t } from "./i18n";
 import type { SlashEntry } from "./slashCommands";
 
@@ -12,11 +13,15 @@ export type SlashAppCommand =
   | { kind: "model"; name: string }
   /** §67.1 `/add-dir [path]`: "" opens the folder picker. */
   | { kind: "addDir"; path: string }
+  /** §70.3 `/export [file]`: "" opens the export dialog. */
+  | { kind: "export"; file: string }
+  /** §70.3 `/copy [N]`: the argument as typed ("" is the latest answer). */
+  | { kind: "copy"; arg: string }
   | { kind: "resume" | "rewind" | "context" | "cost" | "permissions" | "agents" | "memory" | "config" | "help" | "status" | "exit" | "rename" }
   | { kind: "terminalOnly"; name: string };
 
 /** The app's commands, as the palette lists them (each the terminal's name). */
-export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "cost", "exit", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status"] as const;
+export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "cost", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status"] as const;
 type AppName = (typeof APP_COMMAND_NAMES)[number];
 
 /** The terminal's other names for them. */
@@ -30,7 +35,7 @@ export const APP_COMMAND_ALIASES: Readonly<Record<string, AppName>> = {
 
 /** The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them. */
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
-  "bashes", "bug", "doctor", "export", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+  "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
   "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
   "release-notes", "sandbox", "stats", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "usage", "vim",
 ]);
@@ -53,6 +58,8 @@ export function parseSlashAppCommand(text: string, entries: readonly SlashEntry[
   if (isAppName(name)) {
     if (name === "model") return { kind: "model", name: (m[2] ?? "").trim() };
     if (name === "add-dir") return { kind: "addDir", path: (m[2] ?? "").trim() }; // §67.1
+    if (name === "export") return { kind: "export", file: (m[2] ?? "").trim() }; // §70.3
+    if (name === "copy") return { kind: "copy", arg: (m[2] ?? "").trim() };
     return { kind: name };
   }
   return TERMINAL_ONLY.has(name) ? { kind: "terminalOnly", name } : null;
@@ -65,6 +72,8 @@ export function appCommandDescription(name: string): string | null {
     case "agents": return t("Show the agent panel");
     case "config": return t("Open Settings");
     case "context": return t("Show how full the context is — and compact it");
+    case "copy": return copyDescription(); // §70.3
+    case "export": return exportDescription();
     case "cost": return t("Show the session cost by model");
     case "exit": return t("Close this chat tab — it stays in the chat history");
     case "help": return t("Show the keyboard shortcuts");
@@ -79,7 +88,8 @@ export function appCommandDescription(name: string): string | null {
   }
 }
 
-export const appCommandHint = (name: string): string => (name === "model" ? "[model]" : name === "add-dir" ? "[path]" : "");
+export const appCommandHint = (name: string): string =>
+  name === "model" ? "[model]" : name === "add-dir" ? "[path]" : name === "export" ? "[file]" : name === "copy" ? "[N]" : "";
 
 /** The palette's line for a built-in only the terminal has. */
 export function terminalOnlyDescription(original: string): string {
