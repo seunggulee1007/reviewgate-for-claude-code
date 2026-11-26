@@ -1809,6 +1809,22 @@
         }
       }
     },
+    "A terminal chat has its own ⌥T": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A terminal chat has its own ⌥T"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서는 터미널의 ⌥T를 쓰세요"
+          }
+        }
+      }
+    },
     "A workbench is still being created": {
       "localizations": {
         "en": {
@@ -3661,6 +3677,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "모델을 골라요 — 바로 정하려면 /model sonnet"
+          }
+        }
+      }
+    },
+    "Claude Code could not change thinking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not change thinking"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 thinking을 바꾸지 못했어요"
+          }
+        }
+      }
+    },
+    "Claude Code could not change thinking: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not change thinking: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 thinking을 바꾸지 못했어요: %@"
           }
         }
       }
@@ -5991,6 +6039,22 @@
         }
       }
     },
+    "Could not change thinking — the app sent something the engine does not take": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not change thinking — the app sent something the engine does not take"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "thinking을 바꾸지 못했어요 — 앱이 엔진이 받지 않는 값을 보냈어요"
+          }
+        }
+      }
+    },
     "Could not collect changes: %@ — Retry": {
       "localizations": {
         "en": {
@@ -7191,6 +7255,38 @@
         }
       }
     },
+    "Extended thinking is off for this chat — click or press ⌥T to turn it on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extended thinking is off for this chat — click or press ⌥T to turn it on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 extended thinking이 꺼져 있어요 — 클릭하거나 ⌥T를 누르면 켜요"
+          }
+        }
+      }
+    },
+    "Extended thinking is on for this chat — click or press ⌥T to turn it off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extended thinking is on for this chat — click or press ⌥T to turn it off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅은 extended thinking이 켜져 있어요 — 클릭하거나 ⌥T를 누르면 꺼요"
+          }
+        }
+      }
+    },
     "External": {
       "localizations": {
         "en": {
@@ -7603,6 +7699,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "일반"
+          }
+        }
+      }
+    },
+    "Go back to the running chat to change thinking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to change thinking"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "thinking을 바꾸려면 실행 중인 채팅으로 돌아가세요"
           }
         }
       }
@@ -8695,6 +8807,70 @@
         }
       }
     },
+    "Thinking off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking off"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 꺼짐"
+          }
+        }
+      }
+    },
+    "Thinking off — from Claude's next request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking off — from Claude's next request"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 꺼짐 — Claude의 다음 요청부터 적용돼요"
+          }
+        }
+      }
+    },
+    "Thinking on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 켜짐"
+          }
+        }
+      }
+    },
+    "Thinking on — from Claude's next request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking on — from Claude's next request"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking 켜짐 — Claude의 다음 요청부터 적용돼요"
+          }
+        }
+      }
+    },
     "This branch and its upstream have diverged (%lld local, %lld incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.": {
       "localizations": {
         "en": {
@@ -8755,6 +8931,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 브랜치에는 upstream이 없어요 — 먼저 push해서(git push -u) upstream을 만들어야 pull할 수 있어요"
+          }
+        }
+      }
+    },
+    "This engine cannot change thinking — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot change thinking — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 thinking을 바꿀 수 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
+    "This model always uses extended thinking — ⌥T has no effect on it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This model always uses extended thinking — ⌥T has no effect on it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 모델은 항상 extended thinking을 써요 — ⌥T는 효과가 없어요"
           }
         }
       }

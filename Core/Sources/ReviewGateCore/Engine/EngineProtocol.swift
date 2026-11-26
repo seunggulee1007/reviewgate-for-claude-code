@@ -456,6 +456,9 @@ public enum EngineCommand: Sendable, Equatable {
     case shellRun(command: String)
     /// §67.2: stops the running `!` command; refused `no_shell_running` when none runs.
     case shellCancel
+    // MARK: §70 terminal parity, batch D
+    /// §70.4 ⌥T: extended thinking on or off for the current chat (Session/ExtendedThinking.swift).
+    case setThinking(enabled: Bool)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -779,6 +782,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .removeDir: "remove_dir"
         case .shellRun: "shell_run"   // §67.2
         case .shellCancel: "shell_cancel"
+        case .setThinking: "set_thinking"   // §70.4
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -1017,6 +1021,8 @@ extension EngineCommand: Encodable {
             try encodeBtwFields(to: encoder)
         case .addDir, .removeDir, .shellRun, .shellCancel:   // §67
             try encodeAddDirShellFields(to: encoder)
+        case .setThinking:   // §70.4
+            try encodeThinkingFields(to: encoder)
         case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal,
              .terminalRequestCancel, .terminalPermissionResponse:   // §57
             try encodeTerminalChatFields(to: encoder)
@@ -1524,6 +1530,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var shell: ShellRunInfo?
     /// §67.2: `!` results of this chat that go to Claude with the next message.
     public var shellPending = 0
+    /// §70.4: the chat's extended thinking; nil from an engine without it.
+    public var thinking: ThinkingState?
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1587,6 +1595,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         steering = SteeringWire.messages(from: decoder)   // MARK: composer (§50.2)
         terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
         (addedDirs, shell, shellPending) = AddDirShellWire.session(from: decoder)   // §67
+        thinking = ThinkingWire.session(from: decoder)   // §70.4
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
