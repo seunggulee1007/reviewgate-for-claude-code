@@ -143,7 +143,7 @@ export function CommitDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal title={onlyOthers ? t("Commit changes") : t("Commit accepted ({0})…", candidates.paths.length)} onClose={busy ? undefined : onClose} wide testId="Commit dialog">
+    <Modal title={onlyOthers ? t("Commit changes") : t("Commit accepted changes") /* the Mac sheet's title: the count is on the files list, an ellipsis belongs to the button */} onClose={busy ? undefined : onClose} wide testId="Commit dialog">
       <div className="row" style={{ gap: 6 }} role="group" aria-label={t("Commit mode")}>
         <button type="button" className={`small ${split ? "" : "primary"}`} aria-pressed={!split} disabled={busy} onClick={() => setSplit(false)} data-testid="Commit mode single">
           {t("Commit at once")}
