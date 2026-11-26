@@ -5601,6 +5601,22 @@
         }
       }
     },
+    "Choose where to save the conversation as a text file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose where to save the conversation as a text file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 텍스트 파일로 저장할 곳을 골라요"
+          }
+        }
+      }
+    },
     "Choose…": {
       "localizations": {
         "en": {
@@ -6045,6 +6061,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "직접 고치기 전까지는 위에 적은 내용을 따라가요. 이미 있는 이름이면 -2, -3이 붙어요"
+          }
+        }
+      }
+    },
+    "Puts the whole conversation on the clipboard as plain text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puts the whole conversation on the clipboard as plain text"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화 전체를 일반 텍스트로 클립보드에 넣어요"
           }
         }
       }

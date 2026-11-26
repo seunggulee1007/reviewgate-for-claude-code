@@ -7,7 +7,7 @@ import ReviewGateCore
 // /memory the applied extensions (CLAUDE.md and memory), /help the keyboard shortcuts, /status a card over the box, /rename
 // the tab's rename, /exit closes the chat tab (it stays in the history — ⌘⇧T brings it back). A built-in only the terminal
 // has is never sent: the card offers "Continue as Terminal Chat". §67.1: /add-dir <path> adds a directory to the chat
-// (`add_dir`), /add-dir alone opens the folder picker first.
+// (`add_dir`), /add-dir alone opens the folder picker first. §70.3: /export [file] and /copy [N] (ComposerExport.swift).
 
 /// A HUD popover a typed built-in opens (the HUD's chip shows it).
 enum HUDPopoverRequest: Equatable { case model, context, cost }
@@ -142,6 +142,7 @@ struct ComposerSlashHooks: ViewModifier {
     let composer: ComposerModel
     @State private var rewind: TurnCheckpoint?
     @State private var showExtensions = false
+    @State private var exportItem: ChatExportItem?   // §70.3
 
     func body(content: Content) -> some View {
         content
@@ -153,6 +154,9 @@ struct ComposerSlashHooks: ViewModifier {
             .onChange(of: store.draftChatId) { _, _ in composer.slashCard = nil }   // the card was the other chat's
             .sheet(item: $rewind) { RewindSheet(checkpoint: $0) }
             .sheet(isPresented: $showExtensions) { ExtensionsSheet() }
+            .sheet(item: $exportItem) { item in
+                ChatExportSheet(item: item, done: { composer.infoNotice = $0 }, failed: { composer.notice = $0 })
+            }
     }
 
     private func run(_ request: SlashRequest) {
@@ -180,6 +184,11 @@ struct ComposerSlashHooks: ViewModifier {
         case let .terminalOnly(name): composer.slashCard = .terminalOnly(name)
         case let .addDir(path):   // §67.1
             if path.isEmpty { composer.pickAddDir(store: store) } else { composer.addDir(path, typed: request.draft, store: store) }
+        case let .export(file):   // §70.3
+            if file.isEmpty { composer.openExport(store: store) { exportItem = ChatExportItem(export: $0) } }
+            else { composer.export(to: file, typed: request.draft, store: store) }
+        case let .copy(argument):
+            composer.copyResponse(argument, typed: request.draft, store: store)
         }
     }
 
