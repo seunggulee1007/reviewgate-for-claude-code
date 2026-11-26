@@ -29,7 +29,7 @@ import { downloadTo, MAX_CHECKSUM_BYTES, MAX_INSTALLER_BYTES, type HttpGet } fro
 import { installerAssets, verifyInstaller, type InstallerAssets } from "./updateVerify.js";
 import { InstallerRecheck } from "./updateRecheck.js";
 import { blockerLine, EARLY_EXIT_MS, endedWithin, INSTALLER_ARGS, installMode, launchInstaller, noticeOf, updatesFolder, UpdateInstaller, validRecord, type Blocker, type InstallMode, type Prepared, type SpawnInstaller, type UpdateNotice } from "./updateInstall.js";
-import { installerLogWhy, takeInstallerLog } from "./updateInstallerLog.js";
+import { installerLogFiles, installerLogWhy, takeInstallerLog } from "./updateInstallerLog.js";
 
 export type ReleaseInfo = { version: string; tag: string; page: string; notes: string; assets: InstallerAssets | null };
 export type UpdateOutcome = { kind: "available"; release: ReleaseInfo } | { kind: "upToDate"; latest: string } | { kind: "unavailable"; why: string };
@@ -326,7 +326,7 @@ export async function checkForUpdatesNow(): Promise<void> {
 export function installUpdates(h: UpdateHooks): void {
   hooks = h;
   // What the installer wrote (build/installer.nsh), taken once whether or not this launch follows an update.
-  const { lines: installerLines, problems } = takeInstallerLog([tmpdir(), app.getPath("temp")]);
+  const { lines: installerLines, problems } = takeInstallerLog(installerLogFiles(app.getPath("userData"), [tmpdir(), app.getPath("temp")]));
   for (const line of installerLines) logLine("main", "main", `update: installer: ${line}`);
   for (const p of problems) logLine("main", "warn", `update: the installer's log could not be read: ${p}`);
   const record = loadSettings().pendingUpdateInstall;

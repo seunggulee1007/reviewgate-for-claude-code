@@ -7416,10 +7416,13 @@ download whose identifier differs from the running app's, so a build with an old
     what the installer said, else why the installer could not start, else "ReviewGate Y is still installed.") with
     [Try Again] (looks the release up when no check has, and installs it), [Download Page] and ×. Nothing installs by
     itself, so a failed install cannot loop. The windows that were open reopen once, whatever "Reopen last projects"
-    says. **What the installer said**: every launch takes `%TEMP%\ReviewGate-update.log` once
-    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines, then removed), looked for in
-    Node's `os.tmpdir()` (TEMP / TMP, what the installer's `$TEMP` is) and Electron's temp folder — on windows-latest
-    Electron's alone did not find it; a file there that cannot be read is logged as a warning. Each line goes to
+    says. **What the installer said**: every launch, with or without a record, takes the installer's log once
+    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines of each, then removed):
+    `update-installer.log` in userData (`%APPDATA%\ReviewGate`), and, first, for one version, 0.5.35's
+    `ReviewGate-update.log` in Node's `os.tmpdir()` and Electron's temp folder (`installerLogFiles`, the older place
+    first so the newest run's lines are the last). `$TEMP` alone did not work: on windows-latest the app the installer
+    started again had another TEMP than the installer and never found the file, though it was there. A file that
+    cannot be read is logged as a warning. Each line goes to
     the app's log as `update: installer: <line>`, and the last run's lines (from its `start`) give the why: a held file
     → "A file of ReviewGate was in use by another program — resources\app.asar (in use by X.exe 1234). Close that
     program or restart Windows, then try again." (no file found any more: "The old version could not be removed — a

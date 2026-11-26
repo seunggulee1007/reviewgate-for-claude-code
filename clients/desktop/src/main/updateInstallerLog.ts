@@ -1,6 +1,7 @@
 /**
- * §48 Windows — what the installer said. build/installer.nsh appends one line per step to `%TEMP%\ReviewGate-update.log`
- * (UTF-16LE, `<installer version> <event> <detail>`): `start <command line>`, `mode …`, `uninstall-old failed <code>`,
+ * §48 Windows — what the installer said. build/installer.nsh appends one line per step to `update-installer.log` in the
+ * app's own folder (userData, `%APPDATA%\ReviewGate`; 0.5.35's installer: `%TEMP%\ReviewGate-update.log`)
+ * (UTF-16LE, `<installer version> <event> <detail>`):`start <command line>`, `mode …`, `uninstall-old failed <code>`,
  * `uninstall-old retry <n>: <code>`, `failed uninstall-old <code> <file> (in use by <program> <pid>)`,
  * `failed another-installer`, `reopened …`, `installed <folder>`. The next launch takes the file once: every line goes to
  * the app's log, and an update that did not install says why from the last run's lines. Electron-free.
@@ -9,7 +10,13 @@ import { readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { t } from "../renderer/i18n";
 
-export const INSTALLER_LOG_NAME = "ReviewGate-update.log";
+/**
+ * In userData: a known folder of the user (not an environment variable), so the installer and every later launch name
+ * the same file whoever started them.
+ */
+export const INSTALLER_LOG_NAME = "update-installer.log";
+/** Where 0.5.35's installer wrote it, in `$TEMP`: still read for one version. */
+export const OLD_INSTALLER_LOG_NAME = "ReviewGate-update.log";
 /** More than any run writes; a larger file is read from its end. */
 export const MAX_INSTALLER_LOG_BYTES = 64 * 1024;
 
@@ -56,19 +63,16 @@ export function installerLogWhy(lines: readonly string[]): string | null {
 }
 
 /**
- * Reads and removes `ReviewGate-update.log` in each of `dirs` (the same folder named twice counts once): the lines, and
- * what went wrong other than there being none. Never throws. The installer writes to its `$TEMP` (the environment's
- * TMP / TEMP); main passes Node's `os.tmpdir()` (TEMP / TMP) and Electron's temp folder — seen on windows-latest,
- * Electron's alone did not find the file the installer had written.
+ * Reads and removes each of `files` (one named twice, in any case, counts once), in their order: the lines, and what
+ * went wrong other than a file not being there. Never throws.
  */
-export function takeInstallerLog(dirs: readonly string[]): { lines: string[]; problems: string[] } {
+export function takeInstallerLog(files: readonly string[]): { lines: string[]; problems: string[] } {
   const lines: string[] = [];
   const problems: string[] = [];
   const seen = new Set<string>();
-  for (const dir of dirs) {
-    if (!dir || seen.has(dir.toLowerCase())) continue;
-    seen.add(dir.toLowerCase());
-    const file = join(dir, INSTALLER_LOG_NAME);
+  for (const file of files) {
+    if (!file || seen.has(file.toLowerCase())) continue;
+    seen.add(file.toLowerCase());
     try {
       const size = statSync(file).size;
       const all = readFileSync(file);
@@ -80,4 +84,14 @@ export function takeInstallerLog(dirs: readonly string[]): { lines: string[]; pr
     }
   }
   return { lines: lines.slice(-60), problems };
+}
+
+/**
+ * The files a launch takes, the older place first so the newest run's lines come last: 0.5.35's in each temp folder
+ * (its installer wrote to `$TEMP`, the environment's TMP / TEMP; Node's `os.tmpdir()` and Electron's temp folder), then
+ * userData's. `$TEMP` was not enough: on windows-latest the app the installer started again through Explorer had another
+ * TEMP than the installer, and never found the file.
+ */
+export function installerLogFiles(userData: string, tempDirs: readonly string[]): string[] {
+  return [...tempDirs.filter((d) => d !== "").map((d) => join(d, OLD_INSTALLER_LOG_NAME)), join(userData, INSTALLER_LOG_NAME)];
 }
