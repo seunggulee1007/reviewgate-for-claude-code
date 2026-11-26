@@ -102,6 +102,7 @@ public enum EngineMessages {
         if let text = NewProjectText.refusal(code: code, detail: detail) { return text }   // §69
         if let text = AddDirShellText.refusal(code: code, detail: detail) { return text }   // §67
         if let text = ThinkingText.refusal(code: code, detail: detail) { return text }   // §70.4
+        if let text = ChatExportText.refusal(code: code, detail: detail) { return text }   // §70.3
         // Failures whose `error` is the underlying (English) text rather than `code:<detail>`.
         let underlying = plainGitFailure(detail.isEmpty && raw != code && codeWord(raw) != code ? raw : detail)
         switch code {

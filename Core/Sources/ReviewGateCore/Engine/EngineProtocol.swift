@@ -459,6 +459,10 @@ public enum EngineCommand: Sendable, Equatable {
     // MARK: §70 terminal parity, batch D
     /// §70.4 ⌥T: extended thinking on or off for the current chat (Session/ExtendedThinking.swift).
     case setThinking(enabled: Bool)
+    /// §70.3 `/export [file]`: the conversation as text → `.chatExport`; written to `path` when given (Session/ChatExport.swift).
+    case exportChat(path: String?, replace: Bool)
+    /// §70.3 `/copy [N]`: Claude's Nth-latest answer → `.responseText`.
+    case copyResponse(n: Int?)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -783,6 +787,8 @@ public enum EngineCommand: Sendable, Equatable {
         case .shellRun: "shell_run"   // §67.2
         case .shellCancel: "shell_cancel"
         case .setThinking: "set_thinking"   // §70.4
+        case .exportChat: "export_chat"   // §70.3
+        case .copyResponse: "copy_response"
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -1023,6 +1029,8 @@ extension EngineCommand: Encodable {
             try encodeAddDirShellFields(to: encoder)
         case .setThinking:   // §70.4
             try encodeThinkingFields(to: encoder)
+        case .exportChat, .copyResponse:   // §70.3
+            try encodeExportFields(to: encoder)
         case .sessionNewTerminal, .terminalSpec, .terminalStarted, .terminalExited, .terminalEndTurn, .sessionContinueTerminal,
              .terminalRequestCancel, .terminalPermissionResponse:   // §57
             try encodeTerminalChatFields(to: encoder)
@@ -3133,6 +3141,10 @@ public enum EngineEvent: Sendable, Equatable {
     case prAiDraft(PRAiDraftReply)
     /// §56.1: reply to `btw_ask`.
     case btwAnswer(BtwAnswer)
+    /// §70.3: reply to `export_chat`.
+    case chatExport(ChatExport)
+    /// §70.3: reply to `copy_response`.
+    case responseText(ResponseText)
     /// §67.2: the running `!` command's output so far (its last few thousand characters).
     case shellOutput(id: String, output: String)
     /// §67.2: a `!` command ended — its row (also in the transcript).
@@ -3475,6 +3487,10 @@ extension EngineEvent: Decodable {
             self = .interrupted(try InterruptedReply(from: decoder))
         case "btw_answer":   // §56.1
             self = .btwAnswer(try BtwAnswer(from: decoder))
+        case "chat_export":   // §70.3
+            self = .chatExport(try ChatExport(from: decoder))
+        case "response_text":
+            self = .responseText(try ResponseText(from: decoder))
         case "shell_output":   // §67.2
             self = .shellOutput(id: Self.lenient(String.self, c, .id) ?? "", output: Self.lenient(String.self, c, .output) ?? "")
         case "shell_result":

@@ -113,6 +113,22 @@
         }
       }
     },
+    "%@ exists already — /export never replaces a file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ exists already — /export never replaces a file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 파일이 이미 있어요 — /export는 파일을 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
     "%@ goes back to %@ as it was before this turn.": {
       "localizations": {
         "en": {
@@ -781,6 +797,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld줄 추가, %lld줄 삭제"
+          }
+        }
+      }
+    },
+    "%lld lines · %lld characters": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lines · %lld characters"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld줄 · %lld자"
           }
         }
       }
@@ -3953,6 +3985,22 @@
         }
       }
     },
+    "Claude has not answered in this chat yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude has not answered in this chat yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude가 아직 답하지 않았어요"
+          }
+        }
+      }
+    },
     "Claude is waiting for your answer": {
       "localizations": {
         "en": {
@@ -6023,6 +6071,86 @@
         }
       }
     },
+    "Copied Claude's answer %lld back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied Claude's answer %lld back"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 %lld번째 전 답을 복사했어요"
+          }
+        }
+      }
+    },
+    "Copied Claude's last answer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied Claude's last answer"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 마지막 답을 복사했어요"
+          }
+        }
+      }
+    },
+    "Copied the conversation to the clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied the conversation to the clipboard"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 클립보드에 복사했어요"
+          }
+        }
+      }
+    },
+    "Copy Claude's last answer — /copy 2 copies the one before": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Claude's last answer — /copy 2 copies the one before"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 마지막 답을 복사해요 — /copy 2는 그 전 답이에요"
+          }
+        }
+      }
+    },
+    "Copy to Clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy to Clipboard"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클립보드에 복사"
+          }
+        }
+      }
+    },
     "Cost first": {
       "localizations": {
         "en": {
@@ -6547,6 +6675,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모델을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Could not write the file: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not write the file: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 쓰지 못했어요: %@"
           }
         }
       }
@@ -7251,6 +7395,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "종료 코드 %lld"
+          }
+        }
+      }
+    },
+    "Export Conversation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export Conversation"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화 내보내기"
+          }
+        }
+      }
+    },
+    "Export the conversation as text — to the clipboard or a file": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the conversation as text — to the clipboard or a file"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 텍스트로 내보내요 — 클립보드나 파일로"
           }
         }
       }
@@ -8295,6 +8471,38 @@
         }
       }
     },
+    "Save to File…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to File…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일로 저장…"
+          }
+        }
+      }
+    },
+    "Saved the conversation to %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved the conversation to %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "대화를 %@에 저장했어요"
+          }
+        }
+      }
+    },
     "Search stopped after 10 s": {
       "localizations": {
         "en": {
@@ -8631,6 +8839,22 @@
         }
       }
     },
+    "That file exists already — /export never replaces one": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That file exists already — /export never replaces one"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 있는 파일이에요 — /export는 파일을 덮어쓰지 않아요"
+          }
+        }
+      }
+    },
     "That is a file, not a directory": {
       "localizations": {
         "en": {
@@ -8727,6 +8951,22 @@
         }
       }
     },
+    "The conversation as plain text, as the terminal's /export writes it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The conversation as plain text, as the terminal's /export writes it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 /export처럼 대화를 일반 텍스트로 만들어요"
+          }
+        }
+      }
+    },
     "The folder for new projects must be a full path — change it in Settings › General": {
       "localizations": {
         "en": {
@@ -8803,6 +9043,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@에 디렉터리가 없어요"
+          }
+        }
+      }
+    },
+    "There is nothing in this chat to export yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is nothing in this chat to export yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에는 아직 내보낼 내용이 없어요"
           }
         }
       }
@@ -8931,6 +9187,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 브랜치에는 upstream이 없어요 — 먼저 push해서(git push -u) upstream을 만들어야 pull할 수 있어요"
+          }
+        }
+      }
+    },
+    "This chat has fewer than %@ answers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This chat has fewer than %@ answers"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅의 답이 %@개보다 적어요"
           }
         }
       }
@@ -9091,6 +9363,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "/add-dir 뒤에 디렉터리 경로를 입력하세요"
+          }
+        }
+      }
+    },
+    "Type a file name after /export": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a file name after /export"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/export 뒤에 파일 이름을 입력하세요"
+          }
+        }
+      }
+    },
+    "Type a number after /copy — /copy 2 copies the answer before the last": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a number after /copy — /copy 2 copies the answer before the last"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/copy 뒤에는 숫자를 입력하세요 — /copy 2는 마지막 바로 전 답을 복사해요"
           }
         }
       }

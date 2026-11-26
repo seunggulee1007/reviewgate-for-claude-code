@@ -2376,6 +2376,8 @@ public final class AppState {
             break
         case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
+        case .chatExport, .responseText:   // §70.3: consumed by `exportChat` / `copyResponse`
+            break
         case let .shellOutput(id, output):   // §67.2
             handleShellOutput(id: id, output: output)
         case let .shellResult(_, at, result):
