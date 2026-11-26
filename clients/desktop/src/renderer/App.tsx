@@ -307,7 +307,7 @@ function NoProject() {
   const openProject = useStore((s) => s.openProject);
   const opening = useStore((s) => s.openingPath);
   return (
-    <div className="empty grow" data-testid="No project">
+    <div className="empty grow no-project" data-testid="No project">
       <div className="glyph">▭</div>
       {/* An open on its way (it may wait on git — the engine caps it at 20 s and then says why): never a silent window. */}
       {opening ? (

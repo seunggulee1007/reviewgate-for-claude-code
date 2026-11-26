@@ -26,3 +26,8 @@
 .task-start .task-status.ok { color: var(--green); }
 .task-start .task-status.warn { color: var(--orange); }
 .task-start fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* §69.4: the cards and the recent projects can be taller than a short window — scroll then, centred while they fit
+   ("safe": never cut off above the top, as plain centring does when the content overflows). */
+.empty.no-project { overflow: auto; min-height: 0; justify-content: safe center; }
+.empty.no-project > * { flex-shrink: 0; }
