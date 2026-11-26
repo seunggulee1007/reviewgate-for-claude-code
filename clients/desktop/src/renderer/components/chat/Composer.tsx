@@ -1140,7 +1140,7 @@ export function Composer() {
   };
 
   const separateItem = (
-    <div role="menuitem" tabIndex={-1} aria-disabled={!hasText} className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? doSeparately() : undefined)} data-testid="Send apart from the question">
+    <div role="menuitem" tabIndex={-1} aria-disabled={!hasText} className={`item ${!hasText ? "disabled" : ""}`} title={!hasText ? t("Type a message first") : undefined} onClick={() => (hasText ? doSeparately() : undefined)} data-testid="Send apart from the question">
       <span className="col" style={{ gap: 1 }}>
         <span>{t("Send apart from the question")}</span>
         <span className="tiny faint">{t("Claude reads it once the question is answered (⌥↩)")}</span>
@@ -1149,7 +1149,7 @@ export function Composer() {
   );
 
   const queueItem = (
-    <div role="menuitem" tabIndex={-1} aria-disabled={!hasText} className={`item ${!hasText ? "disabled" : ""}`} onClick={() => (hasText ? (setSplitOpen(false), doQueue()) : undefined)} data-testid="Queue item">
+    <div role="menuitem" tabIndex={-1} aria-disabled={!hasText} className={`item ${!hasText ? "disabled" : ""}`} title={!hasText ? t("Type a message first") : undefined} onClick={() => (hasText ? (setSplitOpen(false), doQueue()) : undefined)} data-testid="Queue item">
       <span className="col" style={{ gap: 1 }}>
         <span>{t("Add to queue")}</span>
         <span className="tiny faint">{t("Sent in order when sending is possible")}</span>
@@ -1419,7 +1419,7 @@ export function Composer() {
                 className="primary split-main"
                 disabled={!hasText}
                 onClick={doDenyWithText}
-                title={t("{0} ({1})", t("Deny the waiting card with your message as the instruction — Claude follows it in this turn"), sendKey)}
+                title={!hasText ? t("Type a message first") : t("{0} ({1})", t("Deny the waiting card with your message as the instruction — Claude follows it in this turn"), sendKey)}
                 data-testid="Deny with this"
               >
                 {t("Deny with this")}
@@ -1444,7 +1444,7 @@ export function Composer() {
                 className="primary split-main"
                 disabled={!hasText}
                 onClick={doSteer}
-                title={t("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review ({0}). The menu queues it for after the turn or stops the turn first.", sendKey)}
+                title={!hasText ? t("Type a message first") : t("Sends your message to Claude now: it reads it as soon as the current step is done, and its changes join this turn's review ({0}). The menu queues it for after the turn or stops the turn first.", sendKey)}
                 data-testid="Send now"
               >
                 {t("Send now")}
@@ -1455,7 +1455,7 @@ export function Composer() {
                 className="primary split-main"
                 disabled={!hasText}
                 onClick={doQueue}
-                title={t("Queues your message; it is sent when Claude is free. The menu has “Stop and send” (⌥⌘↩). ({0})", sendKey)}
+                title={!hasText ? t("Type a message first") : t("Queues your message; it is sent when Claude is free. The menu has “Stop and send” (⌥⌘↩). ({0})", sendKey)}
                 data-testid="Add to queue"
               >
                 {t("Add to queue")}
@@ -1484,7 +1484,7 @@ export function Composer() {
                   tabIndex={-1}
                   aria-disabled={!running || !hasText}
                   className={`item ${!running || !hasText ? "disabled" : ""}`}
-                  title={t("Stops Claude's current turn, waits for it to end, then sends this message first (⌥⌘↩)")}
+                  title={running && !hasText ? t("Type a message first") : t("Stops Claude's current turn, waits for it to end, then sends this message first (⌥⌘↩)")}
                   onClick={() => (running && hasText ? doStopAndSend() : undefined)}
                   data-testid="Stop and send"
                 >
@@ -1504,7 +1504,7 @@ export function Composer() {
             disabled={!canSend || draft.trim().length === 0}
             onClick={doSend}
             aria-label={shellDraft ? t("Run") : t("Send")}
-            title={viewBlock ?? (viewWait !== null ? viewWaitKeyHint : !canSend && reason !== null ? reason
+            title={viewBlock ?? (viewWait !== null ? viewWaitKeyHint : !canSend && reason !== null ? reason : draft.trim().length === 0 ? t("Type a message first")
               : shellDraft ? t("Runs the command in the project folder — not sent to Claude; its output goes with your next message ({0})", sendKey) // §67.2
               : t("Sends your message. The review list is left exactly as it is ({0})", sendKey))}
             data-testid="Send"
