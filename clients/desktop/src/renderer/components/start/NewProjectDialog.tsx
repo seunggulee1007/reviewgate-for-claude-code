@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProjectNameEvent } from "@reviewgate/engine";
 import { t, usesMacKeys } from "../../i18n";
+import { isEnter } from "../../ime";
 import { previewProjectName } from "../../newProject";
 import { useStartScreen } from "../../startScreen";
 import { useStore } from "../../store";
@@ -91,6 +92,13 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => {
               setName(e.target.value);
               setNameTyped(true);
+            }}
+            onKeyDown={(e) => {
+              // Enter in the name creates, as Return does on the Mac (the prompt above keeps Enter for its new lines).
+              if (isEnter(e)) {
+                e.preventDefault();
+                void create();
+              }
             }}
             data-testid="New project name"
           />
