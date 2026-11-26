@@ -51,6 +51,7 @@ import { listUserMods, settingsPluginDirs } from "./board/mods.js"; // MARK: wav
 import { locateToolchain, type Toolchain } from "./platform/toolchain.js";
 import { createPR, parseRemoteURL } from "./pr/create.js";
 import { fetchTask, parseTaskRef, type FetchedTask } from "./pr/task.js"; // MARK: task-start (§63)
+import { createProjectFolder, freeProjectPath, matchProjects, projectSlug, removeEmptyFolder, resolveProjectParent } from "./git/newProject.js"; // §69
 import { DEFAULT_GH_HOST, PRStore, type ResolvedGH } from "./pr/store.js";
 import type {
   ActivityKind,
@@ -1827,6 +1828,15 @@ export class ReviewEngine {
       }
       case "task_fetch": // MARK: task-start — §63
         return { type: "task_fetched", task: await this.taskFetch(cmd.ref) };
+      case "project_name": { // §69
+        const parent = this.projectParent(cmd.parent);
+        const name = projectSlug(typeof cmd.text === "string" ? cmd.text : "");
+        return { type: "project_name", name, parent, path: freeProjectPath(parent, name) };
+      }
+      case "project_create": // §69
+        return { type: "project_created", path: await this.projectCreate(cmd.name, cmd.parent) };
+      case "project_match": // §69
+        return { type: "project_matches", ...(await matchProjects(typeof cmd.ref === "string" ? cmd.ref : "", Array.isArray(cmd.paths) ? cmd.paths : [])) };
       case "shutdown":
         return;
       default:
@@ -5646,6 +5656,40 @@ export class ReviewEngine {
       if (msg === "not_found") throw new CommandRefused("not_found", { code: "not_found" });
       throw new CommandRefused(msg.startsWith("task_fetch_failed:") ? msg : `task_fetch_failed:${firstLineOf(msg)}`, { code: "task_fetch_failed" });
     }
+  }
+
+  // ------------------------------------------------------------------ §69 start without a folder
+
+  /** The parent folder of a new project (`~/ReviewGate` by default); refused `bad_parent` when it is not absolute. */
+  private projectParent(raw: unknown): string {
+    const parent = resolveProjectParent(typeof raw === "string" ? raw : null, homedir());
+    if (!parent) throw new CommandRefused(`bad_parent:${String(raw)}`, { code: "bad_parent" });
+    return parent;
+  }
+
+  /**
+   * `project_create`: the folder (its name through the same rule as `project_name`, the first free `-n`), `git init` in it
+   * — no commit, so no git identity is needed yet — and an open, as `open_project` of a repository. A failed `git init`
+   * removes the folder it made (still empty).
+   */
+  private async projectCreate(rawName: unknown, rawParent: unknown): Promise<string> {
+    const parent = this.projectParent(rawParent);
+    const name = projectSlug(typeof rawName === "string" ? rawName : "");
+    let path: string;
+    try {
+      path = await createProjectFolder(parent, name);
+    } catch (e) {
+      throw new CommandRefused(errorMessage(e), { code: "parent_not_writable" });
+    }
+    try {
+      await initRepository(path);
+    } catch (e) {
+      await removeEmptyFolder(path);
+      throw new CommandRefused(`git_init_failed:${firstLineOf(errorMessage(e))}`, { code: "git_init_failed" });
+    }
+    this.log("info", `new project ${path}`);
+    await this.openProject(path, false);
+    return path;
   }
 
   // ------------------------------------------------------------------ pr_create
@@ -10280,6 +10324,10 @@ function laneOf(cmd: EngineCommand): Lane {
       return "remote";
     case "commit_others":
       return "query";
+    // §69: a name preview and `git remote -v` reads for the no-project window, never behind an open.
+    case "project_name":
+    case "project_match":
+      return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
   }
@@ -10383,6 +10431,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "switch_project":
     case "init_repo":
     case "track_without_git": // §59
+    case "project_create": // §69
     case "reject":
     case "reject_all":
     case "reject_hunks":
