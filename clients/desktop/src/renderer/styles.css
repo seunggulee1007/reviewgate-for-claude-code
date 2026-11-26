@@ -210,7 +210,9 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 0; }
 .orange { color: var(--orange); }
 .blue { color: var(--blue); }
 .bold { font-weight: 600; }
-.num { font-variant-numeric: tabular-nums; white-space: nowrap; } /* "+31" / "−6" never break in a narrow row */
+.num { font-variant-numeric: tabular-nums; }
+/* The added / removed counts ("+31", "−6") never break after their sign in a narrow row; a sentence in .num still wraps. */
+.num.green, .num.red { white-space: nowrap; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .col { display: flex; flex-direction: column; min-height: 0; }
