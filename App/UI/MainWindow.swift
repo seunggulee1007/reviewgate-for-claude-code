@@ -1511,6 +1511,7 @@ private struct EmptyProjectView: View {
             Text("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")
                 .font(.callout).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)   // two even lines over the cards, not one long line and a last word
             // §69: New · Start from a task · Open a folder… (Open Project), 1 / 2 / 3, the arrows and ↩.
             NoProjectStartCards()
 

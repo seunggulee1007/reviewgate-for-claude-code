@@ -28,6 +28,7 @@ struct NoProjectStartCards: View {
                  help: String(localized: "Choose a project folder (3)"))
                 .accessibilityIdentifier("Open Project…")
         }
+        .fixedSize(horizontal: false, vertical: true)   // every card as tall as the tallest
         .frame(maxWidth: 640)
         .disabled(store.openingProject != nil)
         .focusable()
@@ -80,11 +81,12 @@ struct NoProjectStartCards: View {
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
                         .accessibilityHidden(true)
                 }
+                .frame(height: 24)   // the symbols differ in height: the titles stay on one line across the cards
                 Text(title).font(.headline)
                 Text(detail).font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.leading)
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 104, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(marked ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: marked ? 2 : 1))
             .contentShape(RoundedRectangle(cornerRadius: 10))
