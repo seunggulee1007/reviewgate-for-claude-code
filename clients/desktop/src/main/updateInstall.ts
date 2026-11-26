@@ -67,6 +67,16 @@ export function installerStillRunning(o: { raw: unknown; running: string; argv: 
   return o.alive(r.pid);
 }
 
+/**
+ * What such a launch runs before it leaves: the installer's window brought to the front (WScript.Shell's AppActivate by
+ * its pid, Windows PowerShell by its full path) — its progress, or a box waiting for an answer behind other windows
+ * (reproduced on windows-latest: "ReviewGate cannot be closed … Retry" for a file another program held, and each launch
+ * meanwhile left without a word). Best effort.
+ */
+export function bringForwardCommand(pid: number, systemRoot = "C:\\Windows"): { command: string; args: readonly string[] } {
+  return { command: win32.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), args: ["-NoProfile", "-NonInteractive", "-Command", `(New-Object -ComObject WScript.Shell).AppActivate(${Math.trunc(pid)}) | Out-Null`] };
+}
+
 /** `process.kill(pid, 0)`: the process is there (EPERM: there, another user's). */
 export function processAlive(pid: number, kill: (pid: number, signal: 0) => unknown = (p, s) => process.kill(p, s)): boolean {
   try {
@@ -77,12 +87,13 @@ export function processAlive(pid: number, kill: (pid: number, signal: 0) => unkn
   }
 }
 
-/** The running version is `to` or newer → updated; still older → did not install. Said once: the caller removes the record. */
-export function noticeOf(raw: unknown, running: string): UpdateNotice | null {
+/** The running version is `to` or newer → updated; still older → did not install, why: what the installer said
+ * (src/main/updateInstallerLog.ts), else the record's, else "still installed". Said once: the caller removes the record. */
+export function noticeOf(raw: unknown, running: string, installerWhy: string | null = null): UpdateNotice | null {
   const r = validRecord(raw);
   if (!r) return null;
   if (compareVersions(running, r.to) >= 0) return { kind: "updated", version: running, from: r.from };
-  return { kind: "failed", version: r.to, why: r.why ?? t("ReviewGate {0} is still installed.", running) };
+  return { kind: "failed", version: r.to, why: installerWhy ?? r.why ?? t("ReviewGate {0} is still installed.", running) };
 }
 
 /** How this copy updates itself: this user's install, an install for all users (Windows asks for administrator rights
@@ -297,6 +308,22 @@ export function launchInstaller(file: string, spawn: SpawnInstaller, mode: "user
     } catch (e) {
       done(t("The installer could not start: {0}", e instanceof Error ? e.message : String(e)));
     }
+  });
+}
+
+/** How long the quitting app watches the installer it started: one that ends this soon did not install (another
+ * installer of ReviewGate still open: electron-builder's single-instance check quits at once). Short of the installer's
+ * own close of a running ReviewGate (~2 s on). */
+export const EARLY_EXIT_MS = 1500;
+
+/** The installer's exit code when it ends within `ms` (null: it ended without one), else "running". */
+export function endedWithin(child: Pick<ReturnType<SpawnInstaller>, "once">, ms: number): Promise<number | null | "running"> {
+  return new Promise((done) => {
+    const timer = setTimeout(() => done("running"), ms);
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      done(code);
+    });
   });
 }
 

@@ -1,7 +1,7 @@
 // The Windows in-app update's steps (docs/PROTOCOL.md §48, Windows): download → verify → (waiting for Claude) → ready →
 // the record and the quit; cancel and failures; the installer's argv; what the next launch says from the record, once.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { blockerLine, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installerStillRunning, INSTALLING_MS, installMode, launchInstaller, noticeOf, processAlive, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
+import { blockerLine, bringForwardCommand, EARLY_EXIT_MS, endedWithin, ELEVATED_INSTALLER_ARGS, INSTALLER_ARGS, installerCommand, installerStillRunning, INSTALLING_MS, installMode, launchInstaller, noticeOf, processAlive, READY_MS, UpdateInstaller, validRecord, WAIT_POLL_MS, type Blocker, type InstallDeps, type InstallTarget, type SpawnInstaller, type UpdateRecord } from "./updateInstall";
 
 const target: InstallTarget = {
   version: "0.6.0",
@@ -243,6 +243,9 @@ describe("after the restart", () => {
     expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.6.1")).toEqual({ kind: "updated", version: "0.6.1", from: "0.5.17" });
     expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.5.17")).toEqual({ kind: "failed", version: "0.6.0", why: "ReviewGate 0.5.17 is still installed." });
     expect(noticeOf({ from: "0.5.17", to: "0.6.0", why: "The installer could not start: spawn EACCES" }, "0.5.17")).toEqual({ kind: "failed", version: "0.6.0", why: "The installer could not start: spawn EACCES" });
+    // What the installer wrote (updateInstallerLog.ts) says more than the record; never over an update that installed.
+    expect(noticeOf({ from: "0.5.17", to: "0.6.0", why: "The installer closed at once (exit code 2)." }, "0.5.17", "Another ReviewGate installer was still open")).toEqual({ kind: "failed", version: "0.6.0", why: "Another ReviewGate installer was still open" });
+    expect(noticeOf({ from: "0.5.17", to: "0.6.0" }, "0.6.0", "anything")).toEqual({ kind: "updated", version: "0.6.0", from: "0.5.17" });
     expect(noticeOf(undefined, "0.6.0")).toBeNull();
     expect(noticeOf({ from: "0.5.17" }, "0.6.0")).toBeNull();
     expect(noticeOf({ from: "x", to: "0.6.0" }, "0.6.0")).toBeNull();
@@ -298,6 +301,23 @@ describe("after the restart", () => {
     await vi.advanceTimersByTimeAsync(READY_MS * 10);
     expect(h.records).toEqual([]);
     expect(h.log).toEqual([]);
+  });
+
+  it("an installer that ends within the watch says its exit code; one still there after it is running", async () => {
+    let exit: ((code: number | null) => void) | null = null;
+    const child = { once: (_e: string, cb: (code: number | null) => void) => void (exit = cb) } as unknown as Parameters<typeof endedWithin>[0];
+    const early = endedWithin(child, EARLY_EXIT_MS);
+    await vi.advanceTimersByTimeAsync(200);
+    exit!(2);
+    expect(await early).toBe(2);
+    const late = endedWithin(child, EARLY_EXIT_MS);
+    await vi.advanceTimersByTimeAsync(EARLY_EXIT_MS);
+    expect(await late).toBe("running");
+    expect(EARLY_EXIT_MS).toBeLessThan(2000); // before the installer's own close of a running ReviewGate
+  });
+
+  it("a launch during the install brings the installer's window forward by its pid, Windows PowerShell by its full path", () => {
+    expect(bringForwardCommand(4242, "D:\\Win")).toEqual({ command: "D:\\Win\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", "(New-Object -ComObject WScript.Shell).AppActivate(4242) | Out-Null"] });
   });
 
   it("names the windows the restart waits for", () => {

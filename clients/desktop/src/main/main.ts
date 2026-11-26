@@ -4,6 +4,7 @@
  * Windows and their engines live in src/main/windows.ts, the `rg:*` handlers in src/main/ipc.ts.
  */
 import { app, BrowserWindow, clipboard, shell } from "electron";
+import { spawnSync } from "node:child_process";
 import { statSync, writeFileSync } from "node:fs";
 import { release, tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
@@ -18,7 +19,7 @@ import { installIPC } from "./ipc.js";
 import { installNotifications } from "./notifications.js";
 import { installReadiness } from "./readiness.js"; // MARK: polish p-lifecycle (P5-sheets-44)
 import { afterEnginesStopped, checkForUpdatesNow, installUpdates } from "./update.js"; // MARK: polish p-lifecycle (P5-sheets-49), §48 Windows
-import { installerStillRunning, processAlive } from "./updateInstall.js";
+import { bringForwardCommand, installerStillRunning, processAlive, validRecord } from "./updateInstall.js";
 import { closeGuardReason } from "../shared/closeGuard.js";
 import { appUserModelId } from "./notify.js"; // MARK: wave4b w4-notify
 import { logDir, logLine } from "./log.js";
@@ -78,12 +79,21 @@ if (PTY_SELFTEST) {
 // Audit daily-19: one ReviewGate process per user — a second launch hands its project to this one and quits instead of
 // opening the same worktrees with a second set of engines (src/main/singleInstance.ts). The --e2e harness skips the lock.
 // §48 Windows: ReviewGate opened again while its update's installer still runs (updateInstall.ts `installerStillRunning`)
-// leaves at once — before the lock and any window, keeping the record; the installer shows its own progress and starts
-// ReviewGate when it is done.
+// leaves at once — before the lock and any window, keeping the record — and brings the installer's window to the front
+// first (its progress, or a box waiting behind other windows); the installer starts ReviewGate when it is done.
 const UPDATE_INSTALLING =
   process.platform === "win32" && app.isPackaged && E2E === null && !E2E_TERMINAL && PTY_SELFTEST === null && installerStillRunning({ raw: storedUpdateRecord(), running: app.getVersion(), argv: process.argv, now: Date.now(), alive: processAlive });
 if (UPDATE_INSTALLING) {
-  logLine("main", "main", "update: the installer is still running — this launch leaves");
+  const pid = validRecord(storedUpdateRecord())?.pid;
+  logLine("main", "main", `update: the installer is still running (pid ${pid ?? "?"}) — this launch brings it to the front and leaves`);
+  if (pid) {
+    const c = bringForwardCommand(pid, process.env["SystemRoot"]);
+    try {
+      spawnSync(c.command, c.args, { stdio: "ignore", windowsHide: true, timeout: 4000 });
+    } catch {
+      /* best effort */
+    }
+  }
   app.exit(0);
 }
 const secondLaunchData: SecondInstanceData = { project: process.env.REVIEWGATE_PROJECT ?? "" };

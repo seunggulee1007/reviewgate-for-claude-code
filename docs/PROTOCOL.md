@@ -7369,7 +7369,11 @@ download whose identifier differs from the running app's, so a build with an old
     then closed, and the first took the record, so the launch the installer made had nothing to say): a
     launch that finds the record with `pid` still running, within 5 minutes of `at`, not started with `--updated` and
     still older than `to` leaves at once, before the single-instance lock and any window, and keeps the record
-    (`updateInstall.ts` `installerStillRunning`, main.ts).
+    (`updateInstall.ts` `installerStillRunning`, main.ts). Before it leaves it brings the installer's window to the
+    front (`bringForwardCommand`: `(New-Object -ComObject WScript.Shell).AppActivate(<pid>)` through Windows
+    PowerShell by its full path, at most 4 s, best effort): reproduced on windows-latest with a held file, the 0.5.33
+    installer waited on "ReviewGate cannot be closed … Retry" and every launch meanwhile left without a word, which on a
+    desktop with other windows over that box looks like ReviewGate never opening.
     **For all users** the installer is started through Windows PowerShell by its full path
     (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -EncodedCommand …`, never
     PATH) running `Start-Process -FilePath '<installer>' -ArgumentList '/allusers','--updated'
@@ -7378,12 +7382,51 @@ download whose identifier differs from the running app's, so a build with an old
     PowerShell reads as one (`'` `‘` `’` `‚` `‛`) doubled. PowerShell exits 0 once the installer runs elevated; anything
     else (the prompt declined, the start failed) records "Administrator rights were not given — the installer did not
     run." and the app reopens and says it, as any installer that could not start. The checks before are the same.
+  - **When it does not install.** Reproduced on windows-latest (2026-11, the real [Install and Restart] of the released
+    0.5.28 and 0.5.33, a project and a terminal shell open) with `resources\app.asar` held open by another program
+    without delete sharing — what an antivirus, backup or indexing agent can do: the old version's uninstaller renames
+    every file of the install into the installer's temp folder, puts them back when one cannot be moved and fails
+    (exit code 2), and electron-builder's installer gives up without starting ReviewGate. With the 0.5.34 installer
+    run silent by 0.5.28, "Failed to uninstall old application files. Please try running the installer again.: 2"
+    (shown even under `/S`, with no window of its own) waited for an OK; ReviewGate opened by hand said "ReviewGate
+    0.5.28 is still installed."; and while that box waited, every later [Install and Restart] started an installer
+    that met electron-builder's single-instance mutex and quit at once — ReviewGate closed and never came back. Run
+    shown by 0.5.33, "ReviewGate cannot be closed. Please close it manually and click Retry to continue." waited the
+    same way. Without a held file both updated and reopened (also with claude-like children under the app's exe, a
+    ConPTY shell, and an install folder the user picked). From the 0.5.35 installer (`build/installer.nsh`), for an
+    update (`--updated`): run silent, the old uninstaller runs once more after ReviewGate's own processes are closed
+    again (one opened meanwhile holds its files too); when it still fails the installer looks for the file and who
+    holds it (`build/rg-busy.ps1`: the first file that cannot be opened for delete, its holders from Windows' Restart
+    Manager), shows its box only when it is not silent (in front), starts the installed (old) ReviewGate again with
+    `--updated` (past the launch guard below) and quits; an installer that finds another one still open (its mutex,
+    looked at before electron-builder's check quits silently) starts ReviewGate again after 4 s. Each step goes to
+    `%TEMP%\ReviewGate-update.log` (UTF-16LE, `<installer version> <event> <detail>`: `start <command line>`,
+    `mode <CurrentUser|all> <folder>`, `uninstall-old failed N`, `uninstall-old retry: N`, `failed uninstall-old N
+    <file> (in use by <program> <pid>)`, `failed another-installer`, `reopened <exe> (<result>)`, `installed <folder>`).
+    The apps up to 0.5.30 download and run the new installer silent too, so they get it as well: they come back
+    (saying only "still installed"). The app (from 0.5.35) watches the installer it started for 1.5 s
+    (`updateInstall.ts` `EARLY_EXIT_MS`, before the installer's own close of a running ReviewGate ~2 s on): one that
+    ends meanwhile did not install (an older installer meeting another one's mutex quits within a second) — "The
+    installer closed at once (exit code N) — another ReviewGate installer may still be open." goes into the record and
+    the app reopens. Its log says `update: installer started (<file>, pid N, shown: /currentuser --updated)` and
+    `update: the installer still runs after 1500 ms — quitting`.
   - **After the restart.** The record is taken once: the running version is `to` or newer → "Updated to ReviewGate X ·
     Previously Y." with [What's New] (the notes of `vX` read with `gh api … releases/tags/vX` or the public API; offline:
     no button) and ×; still older → "Could not install ReviewGate X · The update to X did not install — <why>" (why:
-    the installer could not start, else "ReviewGate Y is still installed.") with [Try Again] (looks the release up when
-    no check has, and installs it), [Download Page] and ×. Nothing installs by itself, so a failed install cannot loop.
-    The windows that were open reopen once, whatever "Reopen last projects" says.
+    what the installer said, else why the installer could not start, else "ReviewGate Y is still installed.") with
+    [Try Again] (looks the release up when no check has, and installs it), [Download Page] and ×. Nothing installs by
+    itself, so a failed install cannot loop. The windows that were open reopen once, whatever "Reopen last projects"
+    says. **What the installer said**: every launch takes `%TEMP%\ReviewGate-update.log` once
+    (`updateInstallerLog.ts` `takeInstallerLog`, at most its last 64 KB and 60 lines, then removed), looked for in
+    Node's `os.tmpdir()` (TEMP / TMP, what the installer's `$TEMP` is) and Electron's temp folder — on windows-latest
+    Electron's alone did not find it; a file there that cannot be read is logged as a warning. Each line goes to
+    the app's log as `update: installer: <line>`, and the last run's lines (from its `start`) give the why: a held file
+    → "A file of ReviewGate was in use by another program — resources\app.asar (in use by X.exe 1234). Close that
+    program or restart Windows, then try again." (no file found any more: "The old version could not be removed — a
+    file of ReviewGate was in use. Restart Windows, then try again."); another installer → "Another ReviewGate
+    installer was still open — close it (its window may be behind other windows, or end ReviewGate-Setup in Task
+    Manager), then try again."; a run with no end (`installed` or a failure) → "The installer stopped before it
+    finished (its last step: mode)."; one that installed → nothing.
   - **Words.** The banner's title is "Installing ReviewGate X" from the click to the quit, its line the step:
     "Downloading 12.4 / 115.3 MB" beside a bar (`role=progressbar`, named "Download progress", its value the line),
     "Checking the download's checksum…" beside a spinner. Every button has a tooltip; [Download Page] ("Opens the release
