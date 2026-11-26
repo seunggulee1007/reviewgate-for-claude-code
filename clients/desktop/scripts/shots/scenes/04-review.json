@@ -1,0 +1,313 @@
+{
+  "name": "review",
+  "description": "The main window after a turn: three changed files to review, the first one's diff, the chat with the turn.",
+  "settings": {
+    "recentProjects": [
+      "C:\\Users\\dev\\src\\acme-shop"
+    ]
+  },
+  "state": {
+    "project": {
+      "path": "C:\\Users\\dev\\src\\acme-shop",
+      "root": "C:\\Users\\dev\\src\\acme-shop",
+      "name": "acme-shop",
+      "branch": "feature/discount-codes",
+      "remoteURL": "https://github.com/acme/shop.git",
+      "vcs": "git"
+    },
+    "session": {
+      "open": true,
+      "ready": true,
+      "sessionId": "s1",
+      "model": "claude-sonnet-4-5",
+      "canRestart": true,
+      "selectedModel": null,
+      "effort": null
+    },
+    "gate": {
+      "phase": "reviewing",
+      "canSend": false,
+      "canRequestChanges": true,
+      "blockedReason": "pending_review",
+      "pendingCount": 3,
+      "turnStartTree": "a1",
+      "turnEndTree": "b1",
+      "reviewEndTree": "b1",
+      "reviewTurns": [
+        1
+      ],
+      "reviewSummary": {
+        "files": 3,
+        "added": 58,
+        "deleted": 7,
+        "pending": 3,
+        "changesRequested": 0,
+        "acceptedUncommitted": 0
+      },
+      "lastTurnChanges": {
+        "turn": 1,
+        "files": 3,
+        "added": 58,
+        "deleted": 7
+      }
+    },
+    "changedFiles": [
+      {
+        "path": "src/checkout/discount.ts",
+        "oldPath": null,
+        "status": "M",
+        "added": 31,
+        "deleted": 6,
+        "isBinary": false,
+        "tools": [
+          "Edit"
+        ],
+        "toolUseIds": [
+          "t2"
+        ],
+        "state": "pending",
+        "noteCount": 0,
+        "changedThisTurn": true,
+        "turnAdded": 31,
+        "turnDeleted": 6,
+        "blob": "c1"
+      },
+      {
+        "path": "src/checkout/discount.test.ts",
+        "oldPath": null,
+        "status": "A",
+        "added": 24,
+        "deleted": 0,
+        "isBinary": false,
+        "tools": [
+          "Write"
+        ],
+        "toolUseIds": [
+          "t3"
+        ],
+        "state": "pending",
+        "noteCount": 0,
+        "changedThisTurn": true,
+        "turnAdded": 24,
+        "turnDeleted": 0,
+        "blob": "c2",
+        "risks": [],
+        "riskScore": -1
+      },
+      {
+        "path": "package.json",
+        "oldPath": null,
+        "status": "M",
+        "added": 3,
+        "deleted": 1,
+        "isBinary": false,
+        "tools": [
+          "Edit"
+        ],
+        "toolUseIds": [
+          "t4"
+        ],
+        "state": "pending",
+        "noteCount": 0,
+        "changedThisTurn": true,
+        "turnAdded": 3,
+        "turnDeleted": 1,
+        "blob": "c3"
+      }
+    ],
+    "hud": {
+      "contextTokens": 48200,
+      "contextWindow": 200000,
+      "sessionCostUSD": 0.14,
+      "turnCount": 1,
+      "lastTurnMs": 41000
+    },
+    "branches": {
+      "list": [
+        {
+          "name": "feature/discount-codes",
+          "isCurrent": true,
+          "upstream": "origin/feature/discount-codes",
+          "ahead": 1,
+          "behind": 0,
+          "lastCommitDate": 1764100000
+        },
+        {
+          "name": "main",
+          "isCurrent": false,
+          "upstream": "origin/main",
+          "ahead": 0,
+          "behind": 0,
+          "lastCommitDate": 1764000000
+        }
+      ],
+      "defaultBranch": "main"
+    },
+    "sessions": {
+      "list": [
+        {
+          "id": "s1",
+          "title": "Discount codes at checkout",
+          "createdAt": "2026-11-26T09:00:00Z",
+          "updatedAt": "2026-11-26T09:02:00Z",
+          "turns": 1,
+          "costUSD": 0.14,
+          "lastUserText": "Add discount codes to the checkout",
+          "cliKnown": true
+        }
+      ],
+      "currentId": "s1",
+      "openTabIds": [
+        "s1"
+      ]
+    }
+  },
+  "events": [
+    {
+      "type": "transcript_restore",
+      "sessionId": "s1",
+      "start": 0,
+      "items": [
+        {
+          "at": "2026-11-26T09:00:00Z",
+          "turn": 1,
+          "kind": "user_message",
+          "text": "Add discount codes to the checkout: a percentage or a fixed amount, never below zero, with tests."
+        },
+        {
+          "at": "2026-11-26T09:00:05Z",
+          "turn": 1,
+          "kind": "assistant_text",
+          "text": "I'll add a `applyDiscount` helper next to the checkout total and cover it with tests."
+        },
+        {
+          "at": "2026-11-26T09:00:06Z",
+          "turn": 1,
+          "kind": "tool_use",
+          "id": "t1",
+          "name": "Read",
+          "input": {
+            "file_path": "C:\\Users\\dev\\src\\acme-shop\\src\\checkout\\discount.ts"
+          },
+          "file": "src/checkout/discount.ts"
+        },
+        {
+          "at": "2026-11-26T09:00:07Z",
+          "turn": 1,
+          "kind": "tool_result",
+          "toolUseId": "t1",
+          "isError": false,
+          "preview": "export function total(items: Item[]) {"
+        },
+        {
+          "at": "2026-11-26T09:00:20Z",
+          "turn": 1,
+          "kind": "tool_use",
+          "id": "t2",
+          "name": "Edit",
+          "input": {
+            "file_path": "C:\\Users\\dev\\src\\acme-shop\\src\\checkout\\discount.ts",
+            "old_string": "export function total(items: Item[]) {\n  return items.reduce((sum, i) => sum + i.price * i.qty, 0);\n}\n",
+            "new_string": "export function subtotal(items: Item[]): number {\n  return items.reduce((sum, i) => sum + i.price * i.qty, 0);\n}\n"
+          },
+          "file": "src/checkout/discount.ts"
+        },
+        {
+          "at": "2026-11-26T09:00:21Z",
+          "turn": 1,
+          "kind": "tool_result",
+          "toolUseId": "t2",
+          "isError": false,
+          "preview": "The file was updated."
+        },
+        {
+          "at": "2026-11-26T09:00:30Z",
+          "turn": 1,
+          "kind": "tool_use",
+          "id": "t3",
+          "name": "Write",
+          "input": {
+            "file_path": "C:\\Users\\dev\\src\\acme-shop\\src\\checkout\\discount.test.ts",
+            "content": "import { describe, expect, it } from \"vitest\";\n"
+          },
+          "file": "src/checkout/discount.test.ts"
+        },
+        {
+          "at": "2026-11-26T09:00:31Z",
+          "turn": 1,
+          "kind": "tool_result",
+          "toolUseId": "t3",
+          "isError": false,
+          "preview": "File created."
+        },
+        {
+          "at": "2026-11-26T09:00:35Z",
+          "turn": 1,
+          "kind": "tool_use",
+          "id": "t4",
+          "name": "Edit",
+          "input": {
+            "file_path": "C:\\Users\\dev\\src\\acme-shop\\package.json",
+            "old_string": "    \"test\": \"vitest run\"\n",
+            "new_string": "    \"test\": \"vitest run\",\n    \"test:checkout\": \"vitest run src/checkout\",\n    \"lint\": \"eslint src\"\n"
+          },
+          "file": "package.json",
+          "rationale": "Adds a script that runs only the checkout tests."
+        },
+        {
+          "at": "2026-11-26T09:00:36Z",
+          "turn": 1,
+          "kind": "tool_result",
+          "toolUseId": "t4",
+          "isError": false,
+          "preview": "The file was updated."
+        },
+        {
+          "at": "2026-11-26T09:00:40Z",
+          "turn": 1,
+          "kind": "assistant_text",
+          "text": "Done: `applyDiscount` takes a code, clamps the total at zero, and the tests cover both kinds of code. I also added a `test:checkout` script."
+        },
+        {
+          "at": "2026-11-26T09:00:41Z",
+          "turn": 1,
+          "kind": "turn_end",
+          "stopReason": "end_turn",
+          "usage": {
+            "inputTokens": 1200,
+            "outputTokens": 900,
+            "costUsd": 0.14,
+            "durationMs": 41000,
+            "cacheReadTokens": 40000,
+            "cacheCreationTokens": 6100,
+            "contextTokens": 48200
+          },
+          "files": 3,
+          "added": 58,
+          "deleted": 7,
+          "changedOutside": []
+        }
+      ]
+    }
+  ],
+  "diffs": {
+    "src/checkout/discount.ts": "--- a/src/checkout/discount.ts\n+++ b/src/checkout/discount.ts\n@@ -1,12 +1,37 @@\n import type { Item } from \"./types\";\n \n-export function total(items: Item[]) {\n-  return items.reduce((sum, i) => sum + i.price * i.qty, 0);\n+export type DiscountCode = { code: string; kind: \"percent\" | \"fixed\"; amount: number };\n+\n+/** The order total before any discount. */\n+export function subtotal(items: Item[]): number {\n+  return items.reduce((sum, i) => sum + i.price * i.qty, 0);\n }\n \n-export function format(n: number) {\n-  return n.toFixed(2);\n+/** The total after `discount`, never below zero. */\n+export function applyDiscount(items: Item[], discount: DiscountCode | null): number {\n+  const before = subtotal(items);\n+  if (!discount) return before;\n+  const off = discount.kind === \"percent\" ? (before * discount.amount) / 100 : discount.amount;\n+  return Math.max(0, round2(before - off));\n+}\n+\n+function round2(n: number): number {\n+  return Math.round(n * 100) / 100;\n+}\n+\n+export function format(n: number, currency = \"USD\"): string {\n+  return new Intl.NumberFormat(\"en-US\", { style: \"currency\", currency }).format(n);\n }\n",
+    "package.json": "--- a/package.json\n+++ b/package.json\n@@ -5,6 +5,8 @@\n   \"scripts\": {\n     \"build\": \"tsc -p .\",\n-    \"test\": \"vitest run\"\n+    \"test\": \"vitest run\",\n+    \"test:checkout\": \"vitest run src/checkout\",\n+    \"lint\": \"eslint src\"\n   },\n   \"dependencies\": {\n     \"express\": \"^4.21.0\"\n",
+    "src/checkout/discount.test.ts": "--- /dev/null\n+++ b/src/checkout/discount.test.ts\n@@ -0,0 +1,8 @@\n+import { describe, expect, it } from \"vitest\";\n+import { applyDiscount } from \"./discount\";\n+\n+const items = [{ price: 20, qty: 2 }];\n+describe(\"applyDiscount\", () => {\n+  it(\"takes a percentage off\", () => expect(applyDiscount(items, { code: \"SPRING10\", kind: \"percent\", amount: 10 })).toBe(36));\n+  it(\"never goes below zero\", () => expect(applyDiscount(items, { code: \"BIG\", kind: \"fixed\", amount: 100 })).toBe(0));\n+});\n"
+  },
+  "steps": [
+    {
+      "waitFor": {
+        "selector": ".file-row"
+      }
+    },
+    {
+      "click": {
+        "selector": ".file-row"
+      }
+    },
+    {
+      "wait": 600
+    }
+  ]
+}

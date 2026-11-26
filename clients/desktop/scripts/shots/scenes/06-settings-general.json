@@ -1,0 +1,10 @@
+{
+  "name": "settings-general",
+  "description": "Settings › General, opened from the menu (Ctrl+,).",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop"], "newProjectParent": "" },
+  "steps": [
+    { "menu": { "type": "settings" } },
+    { "waitFor": "Settings dialog" },
+    { "wait": 300 }
+  ]
+}

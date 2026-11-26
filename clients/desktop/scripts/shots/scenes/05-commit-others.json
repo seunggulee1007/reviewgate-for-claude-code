@@ -1,0 +1,42 @@
+{
+  "extends": "04-review.json",
+  "name": "commit-others",
+  "description": "The commit dialog (§68.5): two accepted files, one pending, and other changes outside the review (one untracked).",
+  "state": {
+    "gate": {
+      "pendingCount": 1,
+      "reviewSummary": { "files": 3, "added": 58, "deleted": 7, "pending": 1, "changesRequested": 0, "acceptedUncommitted": 2 }
+    },
+    "changedFiles": [
+      { "path": "src/checkout/discount.ts", "oldPath": null, "status": "M", "added": 31, "deleted": 6, "isBinary": false, "tools": ["Edit"], "toolUseIds": ["t2"], "state": "accepted", "noteCount": 0, "changedThisTurn": true, "turnAdded": 31, "turnDeleted": 6, "blob": "c1" },
+      { "path": "src/checkout/discount.test.ts", "oldPath": null, "status": "A", "added": 24, "deleted": 0, "isBinary": false, "tools": ["Write"], "toolUseIds": ["t3"], "state": "accepted", "noteCount": 0, "changedThisTurn": true, "turnAdded": 24, "turnDeleted": 0, "blob": "c2", "risks": [], "riskScore": -1 },
+      { "path": "package.json", "oldPath": null, "status": "M", "added": 3, "deleted": 1, "isBinary": false, "tools": ["Edit"], "toolUseIds": ["t4"], "state": "pending", "noteCount": 0, "changedThisTurn": true, "turnAdded": 3, "turnDeleted": 1, "blob": "c3" }
+    ],
+    "commit": {
+      "canCommit": true,
+      "acceptedPaths": ["src/checkout/discount.ts", "src/checkout/discount.test.ts"],
+      "suggestedMessage": "Add discount codes to the checkout",
+      "otherChanges": { "tracked": 2, "untracked": 1 }
+    }
+  },
+  "replies": {
+    "commit_others": {
+      "type": "commit_others",
+      "files": [
+        { "path": "README.md", "oldPath": null, "status": "M", "untracked": false },
+        { "path": "docs/checkout/discount-codes-for-the-spring-campaign.md", "oldPath": null, "status": "A", "untracked": false },
+        { "path": "notes/todo.txt", "oldPath": null, "status": "?", "untracked": true }
+      ],
+      "truncated": false,
+      "suggestedMessage": "Update 2 files"
+    }
+  },
+  "steps": [
+    { "waitFor": "Commit accepted" },
+    { "click": "Commit accepted" },
+    { "waitFor": "Commit other changes" },
+    { "click": "Commit show untracked" },
+    { "click": "Commit other README.md" },
+    { "wait": 400 }
+  ]
+}

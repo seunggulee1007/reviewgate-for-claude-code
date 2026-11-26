@@ -1,0 +1,19 @@
+{
+  "name": "task-project",
+  "description": "Start from a task (§69.4): a GitHub issue link, the recent project whose remote is its repository preselected.",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop", "C:\\Users\\dev\\src\\acme-api", "D:\\work\\acme\\widgets"] },
+  "recent": [
+    { "path": "C:\\Users\\dev\\src\\acme-shop", "exists": true },
+    { "path": "C:\\Users\\dev\\src\\acme-api", "exists": true },
+    { "path": "D:\\work\\acme\\widgets", "exists": true }
+  ],
+  "replies": {
+    "project_match": { "type": "project_matches", "repo": "acme/widgets", "matches": ["D:\\work\\acme\\widgets"], "guess": "D:\\work\\acme\\widgets" }
+  },
+  "steps": [
+    { "click": "No project choice 2" },
+    { "waitFor": "Task project reference" },
+    { "type": { "testid": "Task project reference", "value": "https://github.com/acme/widgets/issues/42" } },
+    { "wait": 700 }
+  ]
+}

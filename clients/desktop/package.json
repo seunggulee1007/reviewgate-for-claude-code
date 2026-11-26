@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
     "e2e": "node scripts/build.mjs && electron . --e2e",
     "e2e:terminal": "node scripts/build.mjs && node scripts/e2e-terminal.mjs",
+    "shots": "node scripts/shots/run.mjs",
     "dist:win": "node scripts/build.mjs && electron-builder --win nsis --x64",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac dir",
     "test": "vitest run"

@@ -1,0 +1,19 @@
+{
+  "name": "new-project",
+  "description": "New Project (§69.4) with a long Korean first prompt: the folder name the engine gives and where it goes.",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop", "C:\\Users\\dev\\src\\acme-api"] },
+  "replies": {
+    "project_name": { "type": "project_name", "name": "acme-bookstore-admin", "parent": "C:\\Users\\dev\\ReviewGate", "path": "C:\\Users\\dev\\ReviewGate\\acme-bookstore-admin" }
+  },
+  "steps": [
+    { "click": "No project choice 1" },
+    { "waitFor": "New project prompt" },
+    {
+      "type": {
+        "testid": "New project prompt",
+        "value": "동네 서점용 재고 관리 웹앱을 만들고 싶어요. 책을 바코드로 등록하고, 입고·출고 내역을 날짜별로 보고, 재고가 다섯 권 아래로 내려가면 알림을 보내 주세요. 관리자 로그인은 이메일과 비밀번호로 하고, 화면은 모바일에서도 보기 좋게 만들어 주세요. 처음에는 SQLite 로 시작하고 나중에 PostgreSQL 로 옮길 수 있게 해 주세요."
+      }
+    },
+    { "wait": 700 }
+  ]
+}
