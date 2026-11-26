@@ -55,6 +55,11 @@ describe("sanitizeSettingsPatch", () => {
     expect(bad.rejected).toHaveLength(3);
   });
 
+  it("§69: the folder for new projects — empty, ~/… or absolute", () => {
+    for (const v of ["", "~/ReviewGate", "C:\\Users\\dev\\ReviewGate", "/Users/dev/ReviewGate"]) expect(sanitizeSettingsPatch({ newProjectParent: v }).rejected).toEqual([]);
+    for (const v of ["relative\\dir", 3, "a\0b"]) expect(sanitizeSettingsPatch({ newProjectParent: v }).rejected).toEqual(["newProjectParent"]);
+  });
+
   it("keeps the §33 permission switches only as booleans", () => {
     const ok = sanitizeSettingsPatch({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });
     expect(ok.patch).toEqual({ allowWorktreeIsolation: true, applyUserAllowRules: false, persistSessionAllows: true, applyUserBashRules: false });

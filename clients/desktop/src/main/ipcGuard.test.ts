@@ -105,6 +105,12 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "pr_comment", body: "Thanks!" }).ok).toBe(true);
   });
 
+  it("allows project_name, project_create and project_match (§69: starting without a folder)", () => {
+    expect(validateCommand({ type: "project_name", text: "Build a todo app" }).ok).toBe(true);
+    expect(validateCommand({ type: "project_create", name: "todo", parent: "C:\\Users\\dev\\ReviewGate" }).ok).toBe(true);
+    expect(validateCommand({ type: "project_match", ref: "acme/widgets#1", paths: ["C:\\work\\widgets"] }).ok).toBe(true);
+  });
+
   it("allows task_fetch (§63.1: the task dialog reads a GitHub issue; the engine refuses anything but an issue ref)", () => {
     expect(validateCommand({ type: "task_fetch", ref: "#42" }).ok).toBe(true);
     expect(validateCommand({ type: "task_fetch", ref: "https://github.com/acme/widgets/issues/42" }).ok).toBe(true);

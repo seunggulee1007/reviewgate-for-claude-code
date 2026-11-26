@@ -17,7 +17,12 @@ declare global {
   }
 }
 
-export const useStartScreen = create<{ shown: boolean; mark: StartMark }>(() => ({ shown: false, mark: START_MARK }));
+/**
+ * §69.4: `suppressNext` — the next project this window opens shows no start screen (a project New just made: its prompt waits
+ * in the chat); `pendingTask` — "Start from a task" with no project open named this task for the project at `path`: its
+ * start screen shows (whatever "start straight away" says) with the task dialog open and the task filled in.
+ */
+export const useStartScreen = create<{ shown: boolean; mark: StartMark; suppressNext?: boolean; pendingTask?: { path: string; ref: string } | null }>(() => ({ shown: false, mark: START_MARK }));
 
 export function hideStartScreen(): void {
   if (useStartScreen.getState().shown) useStartScreen.setState({ shown: false, mark: START_MARK });
@@ -32,6 +37,8 @@ export type StartScreenScene = {
   settings: Pick<AppSettings, "skipStartScreen"> | null;
   /** Text waits for the composer (a draft handed over before it mounted). */
   composerWaiting: boolean;
+  /** §69.4: a task was named for this project before it opened — the screen shows for it. */
+  pendingTask?: boolean;
 };
 
 /**
@@ -44,6 +51,7 @@ export function stepStartScreen(watch: StartScreenWatch, scene: StartScreenScene
     if (!path) return { watch: { ...watch, checkedPath: null }, show: false };
     // The git-init prompt comes first (§59); the decision waits for the project behind it.
     if (scene.state.gitInit) return { watch, show: false };
+    if (scene.pendingTask) return { watch: { checkedPath: path, suppressNext: false }, show: true };
     const show = shouldShowStartScreen({
       skip: scene.settings?.skipStartScreen === true,
       suppressed: watch.suppressNext,

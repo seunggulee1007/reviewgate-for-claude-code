@@ -11569,3 +11569,11 @@ asks for it as any commit does. The reply `project_created {path}` comes once th
   `suppressNextStartScreen`. Core `NewProject.swift`: the replies, `AppState.newProjectName` / `createProject` (through the
   same open path as Open Project — a refusal goes back to the sheet, not the banner) / `matchProjects`, the setting,
   `NewProjectText`, `NoProjectChoice`; tests `NewProjectTests`. The setting's row: `GeneralSettingsPane` (Choose… / Reset).
+- **Windows.** The cards are `NoProjectCards` in `NoProject` (`src/renderer/App.tsx`); the dialogs `components/start/
+  NewProjectDialog.tsx` and `TaskProjectDialog.tsx` (store dialogs `newProject` / `taskProject`); `newProject.ts` holds the
+  requests, `newProjectRefusal`, `noProjectKey`, `preselectProject` and `samePathLoose`; `store.createProject` opens the way
+  `openProject` does ("Opening <name>…", a refusal back to the dialog). `useStartScreen` carries `suppressNext` (New) and
+  `pendingTask {path, ref}` (Start from a task): `stepStartScreen` shows the screen for it and `StartScreen` opens the task
+  dialog with `ref` (`TaskStartDialog initialRef`). The three commands are on the renderer's allow list (`ipcGuard.ts`);
+  `newProjectParent` is checked as a folder by main's `settingsGuard` and is a row of Settings › General (`GeneralTab.tsx`,
+  `settingsIndex.ts`). Tests: `newProject.test.ts`, `ipcGuard.test.ts`, `settingsGuard.test.ts`.

@@ -92,6 +92,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   taskBranchPrefix: (v) => text(200, { singleLine: true })(v) && /^(?:[A-Za-z0-9._-]+\/)*$/.test(v as string),
   // MARK: task-start — §63: the start screen's switch and Settings › Tasks (the default, and per repository hash)
   skipStartScreen: bool,
+  newProjectParent: folder, // §69
   taskStartSettings: isTaskStartSettings,
   projectTaskStartSettings: (v) => isProjectMap(v, isTaskStartSettings),
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),

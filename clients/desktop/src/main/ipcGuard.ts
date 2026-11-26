@@ -70,6 +70,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "pr_reload_comments",
   "pr_comment", // §60: a general comment on the PR's conversation
   "task_fetch", // MARK: task-start — §63.1: one GitHub issue for "Start from a task" (gh, the PR lane)
+  // §69 start without a folder: the folder name preview, the create (mkdir, git init, open) and the remote match
+  "project_name",
+  "project_create",
+  "project_match",
   "accounts",
   "login_in_terminal",
   "workbench_list",
