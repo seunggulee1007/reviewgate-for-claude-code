@@ -263,6 +263,12 @@ export const REFUSAL_CODES = [
   // §70.4 Alt+T
   "invalid_thinking",
   "set_thinking_failed",
+  // §72.2 /output-style
+  "unknown_output_style",
+  "invalid_output_style",
+  "local_settings_off",
+  "output_style_unsupported",
+  "output_style_failed",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -894,6 +900,17 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("Could not change thinking — the app sent something the engine does not take");
     case "set_thinking_failed":
       return d ? t("Claude Code could not change thinking: {0}", d) : t("Claude Code could not change thinking");
+    // §72.2 /output-style (the Mac's words, Core OutputStyleText)
+    case "unknown_output_style":
+      return t("No output style is called “{0}” — type /output-style to see the list", d);
+    case "invalid_output_style":
+      return t("Type a style after /output-style — /output-style concise");
+    case "local_settings_off":
+      return t("This project's chats do not load .claude/settings.local.json (Settings › Extensions), where the style is saved");
+    case "output_style_unsupported":
+      return t("This Claude Code cannot switch the style from the app — update it, or use a terminal chat");
+    case "output_style_failed":
+      return t("Claude Code could not switch the style: {0}", d);
     default:
       return null;
   }

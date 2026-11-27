@@ -19,7 +19,7 @@ describe("parseSlashAppCommand", () => {
       "/usage": { kind: "usage" }, "/todos": { kind: "todos" }, "/tasks": { kind: "tasks" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
       "/add-dir": { kind: "addDir", path: "" }, "/export": { kind: "export", file: "" }, "/copy": { kind: "copy", arg: "" },
-      "/hooks": { kind: "hooks" }, // §72.1
+      "/hooks": { kind: "hooks" }, "/output-style": { kind: "outputStyle", name: "" }, // §72.1, §72.2
     };
     for (const [text, cmd] of Object.entries(expected)) expect(parseSlashAppCommand(text, []), text).toEqual(cmd);
     expect(new Set(APP_COMMAND_NAMES)).toEqual(new Set(Object.keys(expected).map((k) => k.slice(1))));

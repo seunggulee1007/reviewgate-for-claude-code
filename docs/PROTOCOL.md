@@ -12018,6 +12018,12 @@ type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path
   `OutputStyleText`, `AppState.outputStyle` / `outputStyles()` / `setOutputStyle(_:)`), `SessionInfo.outputStyle`,
   `SlashAppCommand.outputStyle`; App `OutputStyleSheet.swift`, `ComposerModeMenu.swift` (the item and the tooltip line),
   `ComposerSlashCommands.swift`. Tests: `OutputStylesTests`, `SlashAppCommandsTests`.
+- Windows: `outputStyles.ts` (the words, `styleBlocker`, `loadOutputStyles`, `setOutputStyle`),
+  `components/dialogs/OutputStyleDialog.tsx` (`Dialog {kind: "outputStyle"}`; ↑ / Tab to a row, Space picks, Enter or a double
+  click switches; after a switch the toast says it), `components/chat/ModeMenu.tsx` (the menu's Output Style item and the
+  tooltip line), `components/chat/SlashCard.tsx` (`/status`'s row), `errorCodes.ts` (the refusals),
+  `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "outputStyle", name}`). Tests: `outputStyles.test.ts`,
+  `slashAppCommands.test.ts`, `errorCodes.test.ts`.
 
 ### 72.3 `/plugin` and `/reload-plugins` — plugins and marketplaces
 

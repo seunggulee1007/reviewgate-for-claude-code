@@ -10,6 +10,7 @@ import { usageDescription } from "./usageReport"; // §71.1
 import { todosDescription } from "./todoChecklist"; // §71.2
 import { tasksDescription } from "./background"; // §71.3
 import { hooksDescription } from "./hooksList"; // §72.1
+import { outputStyleDescription } from "./outputStyles"; // §72.2
 import { t } from "./i18n";
 import type { SlashEntry } from "./slashCommands";
 
@@ -30,10 +31,12 @@ export type SlashAppCommand =
   | { kind: "tasks" }
   /** §72.1 `/hooks`: the hooks in effect, read-only (components/dialogs/HooksDialog.tsx). */
   | { kind: "hooks" }
+  /** §72.2 `/output-style [style]`: "" opens the style dialog; a name switches at once (any case, as the terminal's). */
+  | { kind: "outputStyle"; name: string }
   | { kind: "terminalOnly"; name: string };
 
 /** The app's commands, as the palette lists them (each the terminal's name). */
-export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "hooks", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"] as const;
+export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "hooks", "memory", "model", "output-style", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"] as const;
 type AppName = (typeof APP_COMMAND_NAMES)[number];
 
 /** The terminal's other names for them. */
@@ -51,7 +54,7 @@ export const APP_COMMAND_ALIASES: Readonly<Record<string, AppName>> = {
 /** The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them. */
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "bug", "doctor", "extra-usage", "feedback", "ide", "install-github-app",
-  "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
+  "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "plugin", "privacy-settings",
   "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
 ]);
 
@@ -75,6 +78,7 @@ export function parseSlashAppCommand(text: string, entries: readonly SlashEntry[
     if (name === "add-dir") return { kind: "addDir", path: (m[2] ?? "").trim() }; // §67.1
     if (name === "export") return { kind: "export", file: (m[2] ?? "").trim() }; // §70.3
     if (name === "copy") return { kind: "copy", arg: (m[2] ?? "").trim() };
+    if (name === "output-style") return { kind: "outputStyle", name: (m[2] ?? "").trim() }; // §72.2
     return { kind: name };
   }
   return TERMINAL_ONLY.has(name) ? { kind: "terminalOnly", name } : null;
@@ -92,6 +96,7 @@ export function appCommandDescription(name: string): string | null {
     case "exit": return t("Close this chat tab — it stays in the chat history");
     case "help": return t("Show the keyboard shortcuts");
     case "hooks": return hooksDescription(); // §72.1
+    case "output-style": return outputStyleDescription(); // §72.2
     case "memory": return t("Show CLAUDE.md and the memory files Claude reads");
     case "model": return t("Choose the model — or type one: /model sonnet");
     case "permissions": return t("Open Settings › permissions");
@@ -107,7 +112,7 @@ export function appCommandDescription(name: string): string | null {
 }
 
 export const appCommandHint = (name: string): string =>
-  name === "model" ? "[model]" : name === "add-dir" ? "[path]" : name === "export" ? "[file]" : name === "copy" ? "[N]" : "";
+  name === "model" ? "[model]" : name === "add-dir" ? "[path]" : name === "export" ? "[file]" : name === "copy" ? "[N]" : name === "output-style" ? "[style]" : "";
 
 /** The palette's line for a built-in only the terminal has. */
 export function terminalOnlyDescription(original: string): string {

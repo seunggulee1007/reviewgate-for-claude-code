@@ -11,6 +11,7 @@ import type { PermissionMode } from "@reviewgate/engine";
 import { autoModeHelp, busyModeHelp, scheduledModeText } from "../../autoMode";
 import { modeBusy, modeSwitchesNow } from "../../storeAutoMode";
 import { modeLine, planApproveMode } from "../../terminalMode"; // MARK: wave6 w6-terminal (§44.1)
+import { styleHelpLine, styleMenuItem } from "../../outputStyles"; // §72.2
 
 export const MODES: PermissionMode[] = ["default", "acceptEdits", "plan", "auto"];
 
@@ -45,8 +46,10 @@ function useModeMenu() {
   const state = useStore((s) => s.state);
   const scheduled = useStore((s) => s.scheduledPermissionMode);
   const pick = useStore((s) => s.pickPermissionMode);
+  const openDialog = useStore((s) => s.openDialog);
   const mode = permissionMode(state);
   const busy = modeBusy(state);
+  const style = state.session.outputStyle ?? null; // §72.2
   const label = scheduled ? `${modeLabel(mode)} → ${modeLabel(scheduled)}` : modeLabel(mode);
   const title = scheduled ? scheduledModeText(modeLabel(scheduled)) : `${t("Permission mode")}: ${modeLabel(mode)} — ${modeHelp(mode)}`;
   const items: MenuItem[] = [
@@ -65,8 +68,10 @@ function useModeMenu() {
       onClick: () => pick(m),
     })),
     ...(busy ? [{ kind: "footer" as const, label: busyModeHelp(modeSwitchesNow(state, "auto", mode)) }] : []),
+    // §72.2: the session's output style, and its dialog (as /output-style).
+    ...(style ? [{ kind: "sep" as const }, { kind: "item" as const, label: styleMenuItem(style), title: t("Choose how Claude answers — the output style, as the terminal's /output-style"), testId: "Output style menu item", onClick: () => openDialog({ kind: "outputStyle" }) }] : []),
   ];
-  return { mode, scheduled, label, title, items, open: state.session.open };
+  return { mode, scheduled, label, title: style ? `${title}\n${styleHelpLine(style)}` : title, items, open: state.session.open };
 }
 
 /**
