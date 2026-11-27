@@ -237,7 +237,7 @@ function PaneDivider(props: { pref: "sidebarWidth" | "chatWidth"; fallback: numb
   );
 }
 
-/** §69.4: the three cards of the window with no project — 1 / 2 / 3 act at once, the arrows move the mark, Enter takes it. */
+/** §69.4 / §74.4: the four cards of the window with no project — 1 – 4 act at once, the arrows move the mark, Enter takes it. */
 function NoProjectCards({ opening, onOpen }: { opening: string | null; onOpen: () => void }) {
   const openDialog = useStore((s) => s.openDialog);
   const dialogOpen = useStore((s) => s.dialog !== null);
@@ -251,6 +251,7 @@ function NoProjectCards({ opening, onOpen }: { opening: string | null; onOpen: (
     if (opening !== null) return;
     if (c === 1) openDialog({ kind: "newProject" });
     else if (c === 2) openDialog({ kind: "taskProject" });
+    else if (c === 4) openDialog({ kind: "cloneProject" });
     else onOpen();
   };
   const where = parent?.trim() || (window.rg.platform === "win32" ? "%USERPROFILE%\\ReviewGate" : "~/ReviewGate");
@@ -258,15 +259,16 @@ function NoProjectCards({ opening, onOpen }: { opening: string | null; onOpen: (
     { c: 1, icon: "plus", title: t("New Project"), detail: t("No folder yet — say what you want to make"), help: t("Makes a folder for it under {0} as a git repository (1)", where), testId: "No project choice 1" },
     { c: 2, icon: "branch", title: t("Start from a task"), detail: t("Pick the project the task belongs to"), help: t("A task link, key or number — then its project, its branch and first prompt (2)"), testId: "No project choice 2" },
     { c: 3, icon: "folder", title: t("Open a folder…"), detail: t("A project you already have"), help: t("Choose a project folder (3)"), testId: "Open project" },
+    { c: 4, icon: "download", title: t("Clone from Git"), detail: t("Paste a repository link"), help: t("git clone with your own sign-in into {0}, then it opens (4)", where), testId: "No project choice 4" },
   ];
   return (
     <div
       ref={root}
-      className="start-cards"
+      className="start-cards four"
       tabIndex={-1}
       role="group"
-      aria-label={t("New Project · Start from a task · Open a folder…")}
-      style={{ width: 640, maxWidth: "100%", outline: "none" }}
+      aria-label={t("New Project · Start from a task · Open a folder… · Clone from Git")}
+      style={{ width: 720, maxWidth: "100%", outline: "none" }}
       onKeyDown={(e) => {
         if (e.target instanceof HTMLInputElement || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
         const r = noProjectKey(e.key, mark);
@@ -321,7 +323,7 @@ function NoProject() {
         <h2>{t("How do you want to start?")}</h2>
       )}
       <div>{t("ReviewGate runs Claude in a folder and gates every change behind your review — no folder yet? Start with New Project.")}</div>
-      {/* §69: 1 New · 2 Start from a task · 3 Open a folder… (Open Project), with the keys of the start screen */}
+      {/* §69: 1 New · 2 Start from a task · 3 Open a folder… (Open Project) · §74: 4 Clone from Git, with the keys of the start screen */}
       <NoProjectCards opening={opening} onOpen={() => void chooseAndOpen("open")} />
       {entries.length > 0 && (
         <div className="col" style={{ gap: 4, marginTop: 12, alignItems: "stretch", width: 360, maxWidth: "100%" }}>

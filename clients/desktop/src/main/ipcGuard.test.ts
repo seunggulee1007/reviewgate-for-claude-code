@@ -111,6 +111,12 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "project_match", ref: "acme/widgets#1", paths: ["C:\\work\\widgets"] }).ok).toBe(true);
   });
 
+  it("allows project_clone_preview, project_clone and project_clone_cancel (§74: clone from git)", () => {
+    expect(validateCommand({ type: "project_clone_preview", url: "acme/widgets", paths: ["C:\\work\\widgets"] }).ok).toBe(true);
+    expect(validateCommand({ type: "project_clone", url: "git@github.com:acme/widgets.git", name: "widgets", branch: "dev" }).ok).toBe(true);
+    expect(validateCommand({ type: "project_clone_cancel" }).ok).toBe(true);
+  });
+
   it("allows task_fetch (§63.1: the task dialog reads a GitHub issue; the engine refuses anything but an issue ref)", () => {
     expect(validateCommand({ type: "task_fetch", ref: "#42" }).ok).toBe(true);
     expect(validateCommand({ type: "task_fetch", ref: "https://github.com/acme/widgets/issues/42" }).ok).toBe(true);

@@ -11996,3 +11996,9 @@ create); the reply `project_cloned {path}` comes once the project is open.
   `AppState.cloneProgress`), `CloneProjectText` (each refusal, each step, `cloneURL(forTask:repo:)`), `AppState.clonePreview`
   / `cloneProject` (through the same open path as Open Project, `CloneOutcome`) / `cancelClone`; `NoProjectChoice.clone`.
   Tests: `CloneProjectTests`, `NewProjectTests`.
+- **Windows.** The fourth card in `NoProjectCards` (`src/renderer/App.tsx`, two by two below a 980 px wide window); the
+  dialog `components/start/CloneProjectDialog.tsx` (store dialog `cloneProject {url?, taskRef?}`; `TaskProjectDialog` offers
+  it); `cloneProject.ts` holds the requests, `cloneRefusal` (git missing names Git for Windows), `clonePhaseLabel`,
+  `cloneURLForTask` and the progress store `useCloneProgress` (`applyCloneEvent`); `store.cloneProject` opens the way
+  `createProject` does ("Opening <name>…", a refusal back to the dialog, `cancelled`), `store.cancelClone`. The three commands
+  are on the renderer's allow list (`ipcGuard.ts`). Tests: `cloneProject.test.ts`, `newProject.test.ts`, `ipcGuard.test.ts`.

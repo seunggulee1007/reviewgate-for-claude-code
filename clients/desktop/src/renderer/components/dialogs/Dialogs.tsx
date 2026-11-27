@@ -26,6 +26,7 @@ import { WorkbenchChatDialog } from "./WorkbenchChatDialog"; // §9
 import { TaskStartDialog } from "../start/TaskStartDialog"; // MARK: task-start (§63.3)
 import { NewProjectDialog } from "../start/NewProjectDialog"; // §69
 import { TaskProjectDialog } from "../start/TaskProjectDialog";
+import { CloneProjectDialog } from "../start/CloneProjectDialog"; // §74
 // MARK: wave1 desktop-review
 import { planRejectAll } from "../../reviewGate";
 import { FinishReviewDialog, RejectExternalDialog, StaleReviewDialog } from "./ReviewGateDialogs";
@@ -63,6 +64,8 @@ export function Dialogs() {
       return <NewProjectDialog onClose={close} />;
     case "taskProject":
       return <TaskProjectDialog onClose={close} />;
+    case "cloneProject": // §74
+      return <CloneProjectDialog onClose={close} initialURL={dialog.url} taskRef={dialog.taskRef} />;
     case "createPR":
       return <CreatePRDialog onClose={close} />;
     case "submitReview":

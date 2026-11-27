@@ -9,7 +9,7 @@
 import type { ReactElement } from "react";
 import "./components/common/common.css";
 
-export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check" | "terminal" | "search" | "play" | "stop" | "lines" | "trash";
+export type IconName = "refresh" | "close" | "cloud" | "branch" | "chevronDown" | "folder" | "plus" | "minus" | "warning" | "copy" | "check" | "terminal" | "search" | "play" | "stop" | "lines" | "trash" | "download";
 
 const PATHS: Record<IconName, ReactElement> = {
   refresh: (
@@ -19,6 +19,12 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   close: <path d="M4 4l8 8M12 4l-8 8" />,
+  download: (
+    <>
+      <path d="M8 2.5v7.5M5 7l3 3 3-3" />
+      <path d="M3 12.5h10" />
+    </>
+  ),
   cloud: <path d="M4.75 12.5h6.5a2.75 2.75 0 0 0 .3-5.48 4 4 0 0 0-7.7.98A2.25 2.25 0 0 0 4.75 12.5z" />,
   branch: (
     <>

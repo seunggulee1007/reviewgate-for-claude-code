@@ -78,6 +78,10 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "project_name",
   "project_create",
   "project_match",
+  // §74 clone from git: what a link clones (a read), the clone (git clone with the user's own sign-in, then the open), its stop
+  "project_clone_preview",
+  "project_clone",
+  "project_clone_cancel",
   "accounts",
   "login_in_terminal",
   "workbench_list",
