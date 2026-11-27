@@ -117,6 +117,7 @@ struct ComposerSlashSlot: View {
             row("Model", store.autoModelChipText ?? store.modelChipText)
             row("Effort", store.effort?.displayName ?? String(localized: "Default"))
             row("Mode", store.permissionMode.displayName)
+            if let style = store.outputStyle { row("Output style", OutputStyleText.displayName(style)) }   // §72.2
             row("Chat", chat.map(\.displayTitle) ?? String(localized: "New chat"))
             if let id = store.currentSessionId { row("Session", String(id.prefix(8))) }
             row("MCP", attention > 0 ? String(localized: "\(servers) servers · \(attention) need attention")
@@ -146,6 +147,7 @@ struct ComposerSlashHooks: ViewModifier {
     @State private var showUsage = false   // §71.1
     @State private var showTasks = false   // §71.3
     @State private var showHooks = false   // §72.1
+    @State private var showOutputStyle = false   // §72.2
 
     func body(content: Content) -> some View {
         content
@@ -163,6 +165,9 @@ struct ComposerSlashHooks: ViewModifier {
             .sheet(isPresented: $showUsage) { UsageSheet() }
             .sheet(isPresented: $showTasks) { BackgroundTasksSheet() }
             .sheet(isPresented: $showHooks) { HooksSheet() }
+            .sheet(isPresented: $showOutputStyle) {
+                OutputStyleSheet { text, warning in if warning { composer.notice = text } else { composer.infoNotice = text } }
+            }
     }
 
     private func run(_ request: SlashRequest) {
@@ -182,6 +187,8 @@ struct ComposerSlashHooks: ViewModifier {
         case .todos: composer.showTodos(store: store)   // §71.2
         case .tasks: showTasks = true   // §71.3 (/bashes too)
         case .hooks: showHooks = true   // §72.1
+        case let .outputStyle(name):   // §72.2: a name switches at once, as the terminal's
+            if name.isEmpty { showOutputStyle = true } else { setOutputStyle(name, typed: request.draft) }
         case .permissions: settings(.general)   // the permissions are in General
         case .config: settings(.general)
         case .agents: model.showAgentPanelTick += 1
@@ -222,6 +229,19 @@ struct ComposerSlashHooks: ViewModifier {
         if store.modelMode == .auto { AutoModelSettings.apply(.manual, from: store) }   // a model is a manual pick, as in the picker
         Task {
             if let refusal = await store.setModel(option?.value ?? name) { composer.notice = refusal }
+        }
+    }
+
+    /// §72.2 `/output-style <name>`: the CLI switches it from the next message; a refusal gives the draft back.
+    private func setOutputStyle(_ name: String, typed: String) {
+        Task {
+            do {
+                let reply = try await store.setOutputStyle(name)
+                composer.infoNotice = OutputStyleText.switched(reply.current ?? name)
+            } catch {
+                composer.notice = (error as? EngineClientError)?.userMessage ?? error.localizedDescription
+                if composer.draft.isEmpty { composer.draft = typed }
+            }
         }
     }
 

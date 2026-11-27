@@ -18,6 +18,8 @@ public enum SlashAppCommand: Equatable, Sendable {
     case tasks
     /// §72.1 `/hooks`: the hooks in effect, read-only, with Open in Editor.
     case hooks
+    /// §72.2 `/output-style [style]`: "" opens the style sheet; a name switches to it at once (any case, as the terminal's).
+    case outputStyle(String)
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
     /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
@@ -29,7 +31,7 @@ public enum SlashAppCommand: Equatable, Sendable {
 
     /// The app's commands, as the palette lists them (each the terminal's name).
     public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "hooks", "memory", "model",
-                               "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"]
+                               "output-style", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
@@ -41,7 +43,7 @@ public enum SlashAppCommand: Equatable, Sendable {
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
         "bug", "doctor", "extra-usage", "feedback", "ide", "install-github-app",
-        "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
+        "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "plugin", "privacy-settings",
         "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
     ]
 
@@ -70,6 +72,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "todos": return .todos   // §71.2
         case "tasks": return .tasks   // §71.3
         case "hooks": return .hooks   // §72.1
+        case "output-style": return .outputStyle(argument)   // §72.2
         case "permissions": return .permissions
         case "agents": return .agents
         case "memory": return .memory
@@ -97,6 +100,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "exit": String(localized: "Close this chat tab — it stays in the chat history", bundle: .module)
         case "help": String(localized: "Show the keyboard shortcuts", bundle: .module)
         case "hooks": HooksText.description   // §72.1
+        case "output-style": OutputStyleText.description   // §72.2
         case "memory": String(localized: "Show CLAUDE.md and the memory files Claude reads", bundle: .module)
         case "model": String(localized: "Choose the model — or type one: /model sonnet", bundle: .module)
         case "permissions": String(localized: "Open Settings › permissions", bundle: .module)
@@ -118,6 +122,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "add-dir": AddDirText.argumentHint
         case "copy": "[N]"   // §70.3
         case "export": "[file]"
+        case "output-style": OutputStyleText.argumentHint   // §72.2
         default: ""
         }
     }

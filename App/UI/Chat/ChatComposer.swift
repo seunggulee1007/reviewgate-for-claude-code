@@ -361,7 +361,7 @@ struct ChatComposer: View {
             // §56.6: one row under the box — the mode (the terminal's mode line, now its menu), what a send does right now
             // (the plain key hint only while the empty box has the focus), the capabilities as an icon, then the controls.
             HStack {
-                ComposerModeMenu(compact: barCompact)   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드"
+                ComposerModeMenu(compact: barCompact, composer: composer)   // MARK: wave6 w6-terminal — §44.1: "⏵⏵ 자동 모드" (§72.2: its output style)
                 ThinkingChip(composer: composer)   // §70.4: ⌥T
                 if store.isSessionEnded {
                     Label("Session ended", systemImage: "bolt.slash")

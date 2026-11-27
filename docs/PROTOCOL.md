@@ -11996,6 +11996,24 @@ type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path
 - Engine: `session/outputStyles.ts` (`listOutputStyles`, `outputStyleSetIn`, `canonicalStyle`, `styleFrontmatter`,
   `projectStyleDirs`), `session/claude.ts` (`output_style_info`, `setOutputStyle`, `reloadOutputStyles`), `engine.ts`
   (`noteOutputStyle`, `outputStyles`, `setOutputStyle`, `slices()`), `protocol.ts`. Tests: `engine/test/w72.outputStyle.test.ts`.
+- **`/output-style` is an app command now** (no longer terminal-only, §56.5), with the hint `[style]`:
+  - `/output-style` opens the **output style sheet** (Mac) / dialog (Windows): "다음 메시지부터 새 스타일로 답해요. 터미널의
+    /output-style처럼 .claude/settings.local.json에 저장돼요.", one row per style — the current one checked and marked
+    "현재", its name ("default" reads 기본), where it comes from (기본 제공 · 사용자 · 프로젝트 · 플러그인 <name> · 관리 정책 ·
+    Claude Code) and its line: the built-ins' in the app's words (from the output-styles page's table), a custom style's
+    `description`. A click picks a row, a double click or **이 스타일 쓰기** switches (disabled with the reason: the current
+    one, nothing picked, or `why` in words — "세션이 시작되면 …", "… settings.local.json을 불러오지 않아요", "… 업데이트하거나
+    터미널 채팅을 써요"). Under the list, where the style that applies is set (`setIn`). After a switch the sheet closes
+    and the line under the box says "Output style: Concise — 다음 메시지부터 이 스타일로 답해요"; a refusal says why there.
+  - `/output-style <name>` switches at once, any case, as the terminal's (the same line; a name the CLI does not list:
+    "“x”라는 output style이 없어요 — /output-style로 목록을 봐요", the draft given back).
+  - **The composer bar shows the style**: the mode menu's tooltip ends with "Output style: Concise (/output-style)" and the
+    menu has **Output Style: Concise…**, which opens the sheet; `/status`'s card has an "Output style" row. Nothing shows
+    until the session reported its style (an older engine: never).
+- Mac: Core `Session/OutputStyles.swift` (`OutputStyleInfo`, `OutputStylesReply.blocker`, `OutputStyleWire`,
+  `OutputStyleText`, `AppState.outputStyle` / `outputStyles()` / `setOutputStyle(_:)`), `SessionInfo.outputStyle`,
+  `SlashAppCommand.outputStyle`; App `OutputStyleSheet.swift`, `ComposerModeMenu.swift` (the item and the tooltip line),
+  `ComposerSlashCommands.swift`. Tests: `OutputStylesTests`, `SlashAppCommandsTests`.
 
 ### 72.3 `/plugin` and `/reload-plugins` — plugins and marketplaces
 

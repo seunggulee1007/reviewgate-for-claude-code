@@ -273,6 +273,22 @@
         }
       }
     },
+    "%@ is set in %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is set in %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@에 %1$@(으)로 설정돼 있어요"
+          }
+        }
+      }
+    },
     "%@ runs the shell command · its output goes to Claude with your next message": {
       "localizations": {
         "en": {
@@ -2209,6 +2225,22 @@
         }
       }
     },
+    "Adds short Insight blocks that explain the choices behind the code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds short Insight blocks that explain the choices behind the code"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "코드를 그렇게 짠 이유를 짧은 Insight 블록으로 설명해요"
+          }
+        }
+      }
+    },
     "Agent": {
       "localizations": {
         "en": {
@@ -3713,6 +3745,22 @@
         }
       }
     },
+    "Built-in style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Built-in style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 제공"
+          }
+        }
+      }
+    },
     "Bulk change: %lld files": {
       "localizations": {
         "en": {
@@ -3969,6 +4017,22 @@
         }
       }
     },
+    "Choose how Claude answers — the output style, as the terminal's /output-style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how Claude answers — the output style, as the terminal's /output-style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 답하는 방식 고르기 — 터미널의 /output-style처럼 output style을 바꿔요"
+          }
+        }
+      }
+    },
     "Choose the model — or type one: /model sonnet": {
       "localizations": {
         "en": {
@@ -3981,6 +4045,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모델을 골라요 — 바로 정하려면 /model sonnet"
+          }
+        }
+      }
+    },
+    "Claude Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code"
           }
         }
       }
@@ -4013,6 +4093,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code가 thinking을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude Code could not switch the style: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not switch the style: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 스타일을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude Code's standard instructions for software engineering": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's standard instructions for software engineering"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "소프트웨어 개발에 맞춘 Claude Code의 기본 지침이에요"
           }
         }
       }
@@ -4413,6 +4525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "지금은 Claude가 작업 중인 턴이 없어요"
+          }
+        }
+      }
+    },
+    "Claude uses the new style from your next message. It is saved to .claude/settings.local.json, as the terminal's /output-style saves it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude uses the new style from your next message. It is saved to .claude/settings.local.json, as the terminal's /output-style saves it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음 메시지부터 새 스타일로 답해요. 터미널의 /output-style처럼 .claude/settings.local.json에 저장돼요."
           }
         }
       }
@@ -7111,6 +7239,22 @@
         }
       }
     },
+    "Current": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재"
+          }
+        }
+      }
+    },
     "Current session (5 hours)": {
       "localizations": {
         "en": {
@@ -7815,6 +7959,22 @@
         }
       }
     },
+    "Explains its choices and leaves small pieces of code for you to write": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explains its choices and leaves small pieces of code for you to write"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "선택한 이유를 설명하고, 작은 코드 조각은 직접 써 보도록 남겨요"
+          }
+        }
+      }
+    },
     "Export Conversation": {
       "localizations": {
         "en": {
@@ -8455,6 +8615,22 @@
         }
       }
     },
+    "Leads with the result and leaves out the preamble, the narration and the recap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leads with the result and leaves out the preamble, the narration and the recap"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "결과부터 말하고 서론·진행 설명·요약은 빼요"
+          }
+        }
+      }
+    },
     "Let Claude work in a directory outside the project too": {
       "localizations": {
         "en": {
@@ -8695,6 +8871,22 @@
         }
       }
     },
+    "No output style is called “%@” — type /output-style to see the list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No output style is called “%@” — type /output-style to see the list"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”라는 output style이 없어요 — /output-style로 목록을 봐요"
+          }
+        }
+      }
+    },
     "No output yet": {
       "localizations": {
         "en": {
@@ -8919,6 +9111,70 @@
         }
       }
     },
+    "Output Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output Style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output Style"
+          }
+        }
+      }
+    },
+    "Output Style: %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output Style: %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output Style: %@…"
+          }
+        }
+      }
+    },
+    "Output style: %@ (/output-style)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style: %@ (/output-style)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style: %@ (/output-style)"
+          }
+        }
+      }
+    },
+    "Output style: %@ — Claude uses it from your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style: %@ — Claude uses it from your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style: %@ — 다음 메시지부터 이 스타일로 답해요"
+          }
+        }
+      }
+    },
     "Plan usage": {
       "localizations": {
         "en": {
@@ -9075,6 +9331,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "터미널의 /hooks처럼 보기만 해요. 훅을 바꾸려면 그 훅이 정의된 파일을 고쳐요."
+          }
+        }
+      }
+    },
+    "Reading the output styles…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the output styles…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "output style을 읽는 중…"
           }
         }
       }
@@ -9655,6 +9927,22 @@
         }
       }
     },
+    "Starts work right away and makes reasonable assumptions instead of asking about routine decisions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts work right away and makes reasonable assumptions instead of asking about routine decisions"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바로 작업을 시작하고, 사소한 결정은 묻지 않고 합리적으로 가정해요"
+          }
+        }
+      }
+    },
     "Stop the shell command (esc)": {
       "localizations": {
         "en": {
@@ -9895,6 +10183,22 @@
         }
       }
     },
+    "The output style can be changed once the session has started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The output style can be changed once the session has started"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션이 시작되면 output style을 바꿀 수 있어요"
+          }
+        }
+      }
+    },
     "The project is larger than the index — some symbols are missing": {
       "localizations": {
         "en": {
@@ -10071,6 +10375,22 @@
         }
       }
     },
+    "This Claude Code cannot switch the style from the app — update it, or use a terminal chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Claude Code cannot switch the style from the app — update it, or use a terminal chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Claude Code는 앱에서 스타일을 바꿀 수 없어요 — 업데이트하거나 터미널 채팅을 써요"
+          }
+        }
+      }
+    },
     "This branch and its upstream have diverged (%lld local, %lld incoming commits) — a fast-forward is not possible. Rebase onto the upstream, or merge in a terminal.": {
       "localizations": {
         "en": {
@@ -10183,6 +10503,22 @@
         }
       }
     },
+    "This is the current style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the current style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "지금 쓰는 스타일이에요"
+          }
+        }
+      }
+    },
     "This model always uses extended thinking — ⌥T has no effect on it": {
       "localizations": {
         "en": {
@@ -10195,6 +10531,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 모델은 항상 extended thinking을 써요 — ⌥T는 효과가 없어요"
+          }
+        }
+      }
+    },
+    "This project's chats do not load .claude/settings.local.json (Settings › Extensions), where the style is saved": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project's chats do not load .claude/settings.local.json (Settings › Extensions), where the style is saved"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트의 채팅은 스타일이 저장되는 .claude/settings.local.json을 불러오지 않아요(설정 › 확장)"
           }
         }
       }
@@ -10455,6 +10807,22 @@
         }
       }
     },
+    "Type a style after /output-style — /output-style concise": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a style after /output-style — /output-style concise"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/output-style 뒤에 스타일을 적어요 — /output-style concise"
+          }
+        }
+      }
+    },
     "Type to search the prompts sent in this project": {
       "localizations": {
         "en": {
@@ -10515,6 +10883,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모델별 사용량"
+          }
+        }
+      }
+    },
+    "Use Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 스타일 쓰기"
           }
         }
       }
@@ -10675,6 +11059,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "조직 정책이 관리 훅만 허용해요 — 나머지는 실행되지 않아요."
+          }
+        }
+      }
+    },
+    "Your organization's policy sets the style (%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your organization's policy sets the style (%@)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조직 정책이 스타일을 정해요(%@)"
           }
         }
       }

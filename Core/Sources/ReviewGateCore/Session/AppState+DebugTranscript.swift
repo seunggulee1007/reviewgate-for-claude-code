@@ -10,6 +10,14 @@ public extension AppState {
     /// §72.1: what `/hooks` shows (nil: the engine's answer again).
     func debugShowHooks(_ list: HooksList?) { debugHooksList = list }
 
+    /// §72.2: what `/output-style` lists and the session's style as a snapshot reports it (nil: the engine's again).
+    func debugShowOutputStyles(_ reply: OutputStylesReply?) {
+        debugOutputStyles = reply
+        var snapshot = state
+        snapshot.session.outputStyle = reply?.current
+        state = snapshot
+    }
+
     /// The gate as a snapshot reports it: `.running` while the turn works, `.reviewing` with `files` pending after it. The
     /// engine's next snapshot puts its own back.
     func debugShowGate(_ phase: GatePhase, files: [ChangedFile] = []) {

@@ -6177,6 +6177,38 @@
         }
       }
     },
+    "Output style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style"
+          }
+        }
+      }
+    },
+    "Pick a style first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a style first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 스타일을 골라요"
+          }
+        }
+      }
+    },
     "Puts the whole conversation on the clipboard as plain text": {
       "localizations": {
         "en": {
@@ -6237,6 +6269,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude의 할 일 목록 보이기·숨기기"
+          }
+        }
+      }
+    },
+    "Switch to this style — Claude uses it from your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to this style — Claude uses it from your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 스타일로 바꿔요 — 다음 메시지부터 적용돼요"
           }
         }
       }
