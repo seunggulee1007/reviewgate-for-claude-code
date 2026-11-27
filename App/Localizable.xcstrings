@@ -6801,18 +6801,18 @@
         }
       }
     },
-    "New Project · Start from a task · Open a folder…": {
+    "New Project · Start from a task · Open a folder… · Clone from Git": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Project · Start from a task · Open a folder…"
+            "value": "New Project · Start from a task · Open a folder… · Clone from Git"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새로 시작 · 업무로 시작 · 폴더 열기…"
+            "value": "새로 시작 · 업무로 시작 · 폴더 열기… · Git 저장소로 시작"
           }
         }
       }
