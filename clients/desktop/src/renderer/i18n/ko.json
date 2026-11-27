@@ -20,6 +20,7 @@
   "+{0} more": "+{0}개 더",
   "/plugin has no “{0}” here — the sheet lists what it can do": "/plugin에는 여기서 “{0}”이(가) 없어요 — 할 수 있는 일은 이 창에 있어요",
   "/{0} — no description · ↩ inserts it": "/{0} — 설명이 없는 커맨드예요 · ↩로 입력란에 넣기",
+  "1 hook": "훅 1개",
   "1 item needs attention": "확인할 항목 1개",
   "1 · 2 · 3, ↑ ↓ ↩ — Esc starts now": "1 · 2 · 3, ↑ ↓ ↩ — Esc는 바로 시작",
   "5h {0}": "5시간 {0}",
