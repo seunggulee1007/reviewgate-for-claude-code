@@ -10393,7 +10393,7 @@ review" whatever the reason.
 
 Reviewing a diff or a file of the code browser (§47), the user wants an IDE's "go to definition" (⌘-click / F12) and
 "find references" (⇧F12) on a name — in Java / Spring, Kotlin, JavaScript / TypeScript, JSP and Vue projects above all.
-There is no language server: the engine searches the project with `git grep` and recognises definition lines by per-language
+No language server here (§73 adds one for JS / TS / Vue, with this section as its fallback): the engine searches the project with `git grep` and recognises definition lines by per-language
 patterns, ranked by what the clicked file imports and where it lives. Fast (one `git grep`: 0.1–0.3 s for a definition and
 its references in ReviewGate's own repository), dependency-free, approximate — "best guess first, the rest in a list". Additive on the wire: two
 commands with one reply each; nothing is written.
@@ -11892,3 +11892,189 @@ No engine change: §52 already has the list (`state.session.backgroundTasks`), `
   `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
   `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
   Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.
+
+## 73. A language server for JavaScript, TypeScript and Vue (lsp)
+
+§62 and §65 answer Go to Definition and Find References by search: `git grep` plus per-language patterns, ranked by
+imports and folders — fast and dependency-free, but approximate ("best guess first"). For JavaScript, TypeScript and Vue
+projects the engine now asks TypeScript's own language service instead, as VS Code does, and answers exactly: the
+definition through re-exports, aliases and `.vue` components, and only the real references. Every other language — and
+a JS / TS / Vue click while the server starts, times out or fails — keeps §62 / §65's answer, and the reply says which it
+is. Additive on the wire: one `Settings` field, two optional `find_references` fields, three optional reply fields, one
+optional `ready` field, one optional state field.
+
+```ts
+// extended commands
+find_definition { symbol; fromPath?; line?; column?; receiver? }               → definitions (+ source, fallback?, quickInfo?)
+find_references { symbol; fromPath?; limit?; line?: number; column?: number } → references  (+ source, fallback?)
+// replies (both)
+source: "lsp" | "grep";                 // who answered: the language server, or §62 / §65's search (absent: an older engine — grep)
+fallback?: LspFallback;                  // source "grep" for a JS / TS / Vue file: why the language server did not answer
+type LspFallback = "off" | "starting" | "timeout" | "failed" | "unavailable" | "no_result";
+quickInfo?: { display: string; documentation?: string; kind?: string };       // definitions only, source "lsp": the type / signature
+// settings
+Settings.languageServer?: boolean;      // default true; live. false: never started (a running one is stopped), fallback "off"
+// ready
+ready.languageServer?: { available: boolean; typescript?: string };          // the bundled server is there (its TypeScript version)
+// state (while a project is open, once the server was asked for; absent = idle)
+state.nav.lsp?: LspState;
+type LspState = {
+  status: "starting" | "ready" | "failed" | "unavailable";
+  typescript?: { version: string; source: "project" | "bundled" };
+  /** failed / unavailable: why, in English (the server's last stderr line, "stopped 4 times in 10 minutes", …). */
+  error?: string;
+  /** Crashes since the project opened (restarted with backoff). */
+  restarts?: number;
+};
+```
+
+### 73.1 Which server — the choice and the measurements
+
+Two ways to give the engine a real TypeScript / Vue language service were measured (npm 11, Node 24, a 12-core Mac,
+2026-11):
+
+| | (a) `tsserver` + `@vue/typescript-plugin` (chosen) | (b) `typescript-language-server` + `@vue/language-server` |
+| --- | --- | --- |
+| What runs | one process: TypeScript's `tsserver` (its JSON protocol over stdio) with the Vue plugin loaded as a tsserver plugin — Volar's "hybrid mode", what VS Code's Vue extension does | an LSP server wrapping tsserver, and Vue's LSP server — which since 3.0 answers only template / style features itself and sends every TypeScript question back to its client, to ask a tsserver running `@vue/typescript-plugin`: (a) plus two more processes |
+| Packages (`npm pack --dry-run`, `du` of an install) | `typescript@6.0.3` 4.5 MB packed / 24.3 MB unpacked; `@vue/typescript-plugin@3.3.14` with its 16 dependencies 11 MB installed | 55 MB installed (88 packages) |
+| Shipped | **15 MB** (2.5 MB gzip -9, 1.7 MB xz): tsserver's runtime files only (13.9 MB: `tsserver.js`, `_tsserver.js`, `typescript.js` 9.1 MB, the `lib.*.d.ts` 3.9 MB, `typesMap.json`, `watchGuard.js`) and the plugin bundled into one 0.9 MB file | the same plus ~40 MB |
+| Runtime | any Node ≥ 14.17 | `typescript-language-server` 6 wants Node ≥ 22.22 |
+
+**(a) it is**: the smallest, one process, and the same plugin Vue's own tooling loads. Measured with the bundle: a
+small Vue project (two SFCs with `<script setup lang="ts">`, a TS module) answers its first `definition` 0.44 s after
+the spawn (0.08 s of it to start), later ones in 1–10 ms, at 190–233 MB resident; this repository's `engine/` package
+(384 TypeScript files plus `@types/node` and vitest's types) answers its first `definition` in 2.1 s (the project's
+program is built on first use), then `references` of `ReviewGate.refresh` in 0.16 s, at 638 MB resident.
+
+**TypeScript 6.0.3 is bundled — the last JavaScript TypeScript.** `typescript@7` (npm `latest` since 7.0) is the native
+Go port: per-platform binaries (not "pure JS"), no tsserver protocol and no plugin API, so no Vue. 6.0 keeps both;
+`@vue/typescript-plugin@3` requires `typescript < 7`.
+
+**The project's own TypeScript first.** When `<root>/node_modules/typescript` is a TypeScript from 5.0 up to (not
+including) 7 with a `lib/tsserver.js`, and git does not list it (it is installed — ignored —, not committed into the
+repository), the engine runs that tsserver; otherwise the bundled 6.0.3. Why: the project's version is the compiler the
+project builds with — its tsconfig options, `lib` names and module resolution modes are the ones that version knows, and
+6.0 changed defaults that matter here (`types` defaults to `[]`, so a 5.x project relying on automatic `@types/*` would
+lose `process`, `describe` … under 6.0; `strict` on; `moduleResolution: node10` and `baseUrl` deprecated). 4.x and
+older use the bundled 6.0 (it reads their configs). The Vue plugin always comes from the bundle
+(`--pluginProbeLocations`). Running a project's `node_modules` code is what `npm install` and every IDE already do with
+that folder; one committed into git is the case that is not trusted. `state.nav.lsp.typescript` says which one runs.
+
+### 73.2 The server
+
+- **One per project root** (the open worktree; §59's folder too), started **lazily**: on the first `find_definition` /
+  `find_references` from a JS / TS / Vue file (`.ts .tsx .mts .cts .js .jsx .mjs .cjs .vue`), or when such a file is
+  read by `project_file` or `document_symbols` (the code browser opened it — the server starts and opens that file, so its
+  project is loaded by the time the user clicks). Nothing starts at `open_project`.
+- **Process**: `process.execPath` (the Node the engine runs on: the Node the Mac app found, Electron's binary with
+  `ELECTRON_RUN_AS_NODE=1` on Windows — no new runtime) with `--max-old-space-size=3072` (VS Code's default cap) and
+  tsserver's `--disableAutomaticTypingAcquisition` (never `npm`, never the network), `--suppressDiagnosticEvents`,
+  `--noGetErrOnBackgroundUpdate`, `--useInferredProjectPerProjectRoot`, `--locale en`, `--globalPlugins
+  @vue/typescript-plugin --pluginProbeLocations <bundle>`; cwd = the root; `TSS_LOG` removed from its environment. Its
+  stdout is read as tsserver's `Content-Length` frames, parsed incrementally; every request is a promise with a timer —
+  nothing ever blocks the engine's event loop.
+- **Startup**: `configure` (`.vue` as an extra file extension, `hostInfo: "reviewgate"`), then
+  `compilerOptionsForInferredProjects` (`allowJs`, `checkJs: false`, ESNext, `moduleResolution: bundler`, `jsx:
+  preserve`, `allowNonTsExtensions`, `resolveJsonModule`), then the implicit project (below). `status` is `starting` until
+  `configure` answers, then `ready`.
+- **Projects**: tsserver finds each opened file's nearest `tsconfig.json` / `jsconfig.json` itself — monorepos with many
+  tsconfigs and project references work as in VS Code (one configured project per tsconfig, loaded on first use).
+  **JS without a tsconfig** (the implicit project): the files git lists (tracked, and untracked not ignored) in those
+  extensions that no folder with a `tsconfig.json` / `jsconfig.json` holds — §65's excluded folders (`node_modules`,
+  `dist` …) and `*.min.js` left out, at most **5 000** in path order — are one external project (`openExternalProject`,
+  the same options), so Find References sees every file, not only what the clicked file imports. The list is taken again
+  (on the next request) after a turn's collection or a refresh. Files past the cap fall into inferred projects.
+- **What it reads is the working tree** — the files as they are on disk, which is what the review's diff shows on its new
+  side (the diff compares the round's baseline with the working tree; accepting a file changes nothing on disk). A file
+  the engine asks about is sent to tsserver with its current contents (`updateOpen`, the file read now, re-sent only when
+  it changed since; at most 50 open, the least recently used closed); every other file tsserver reads from disk and
+  re-reads when its own file watcher sees it change. Lines of the diff's old side (deleted lines) are not in the working
+  tree: a click there whose word is not on that line of the working tree is answered by §62 (no `fallback`).
+- **Idle shutdown** after **10 minutes** without a request; the next one starts it again (`state.nav.lsp` absent while idle).
+- **Crash** (an exit nobody asked for — the memory cap included): pending requests fall back (`failed`), the server is
+  started again after 1 s, 2 s, 4 s … (at most 30 s; `restarts` counts); the 4th crash within 10 minutes leaves it
+  `failed` (§62 answers) until the project is opened again or the setting is turned off and on.
+- **Not found / unusable** (a build without the bundle, a damaged one): `unavailable`, §62 answers (`fallback:
+  "unavailable"`); `ready.languageServer.available` is false then.
+- `close_project`, a project switch, `languageServer: false` and `dispose` stop it (stdin closed, `SIGTERM`, `SIGKILL`
+  after 2 s). Nothing is written in the project (tsserver's shim turns on Node's compile cache, which keeps V8 code
+  caches in the OS temporary folder).
+
+### 73.3 Go to Definition, Find References, hover
+
+- **When.** `fromPath` is a JS / TS / Vue file, `line` is given, the setting is on, and the symbol is found on that line
+  of the working tree: the occurrence at `column` (1-based UTF-16, as §65), else the one nearest to it (for `a.b.C` the
+  last part; for a path the string's text). tsserver's lines and offsets are 1-based and in UTF-16 code units — the same
+  as §62's.
+- **Definitions.** `definitionAndBoundSpan` at that position (and `quickinfo` there, in parallel). Every definition inside
+  the root (paths through `toRepoRelative`, also against the root's real path — `/tmp` ↔ `/private/tmp`; never under
+  `.git`) is a candidate: `path`, `line`, `column` of the name, `kind` from the symbol index's reading of that line when
+  it has one (§65, with its `container`), else from tsserver's `quickinfo` kind there (`class interface enum type module
+  function method constructor property` as they are, `var let const parameter` → `variable`, `enum member` →
+  `constant`, a file's first character → `component` for a `.vue`, `module` otherwise), `preview` as §62, `score` in
+  tsserver's order (1000, 990 …). Definitions outside the root (`lib.dom.d.ts`, a parent folder) are left out;
+  `node_modules` inside the root stays (a `.d.ts` there opens read-only as any project file).
+- **quickInfo** (`source: "lsp"` only): tsserver's `displayString` (`function formatPrice(n: number): string`, `(alias)
+  …`), its `documentation` (≤ 2 000 characters) and `kind`.
+- **References** (`references` at that position): every reference inside the root, one hit per path:line (the first
+  column), `kind` on the definition's own line, ordered as §62 (the clicked file, its folder, the rest by path; line
+  order) and limited as §62 (`limit`, `truncated`). Comments and strings that only spell the name are not references.
+- **Fallback to §62 / §65** — the same search, the same reply, `source: "grep"` and `fallback`:
+  - `off` the setting is off; `unavailable` no usable server; `failed` it crashed and gave up, or crashed during the request;
+  - `starting` it was not ready, or its project still loading, when the time ran out; `timeout` it was ready and did not
+    answer in time — **3 s** for a definition, **10 s** for references, counted from the command (a start included); the
+    late answer is dropped;
+  - `no_result` it answered with no definition (or reference) inside the project — a library type outside the root, an
+    options-API template without Vue's types — so the search's best guess is better than nothing.
+  A click outside JS / TS / Vue, without `line`, or whose word is not on the line: `source: "grep"`, no `fallback`.
+- **Lanes.** Unchanged: lane `nav`. A request waits for the server on that lane at most its time budget.
+
+### 73.4 Packaging
+
+- **One build script**, `scripts/build-lsp.mjs <outDir>/lsp`, from the versions in `packaging/lsp/package.json` (a
+  workspace, so `npm ci` installs them; the root's own `typescript` for type-checking stays 5.x): tsserver's runtime files
+  and the plugin bundled by esbuild (§73.1), plus `LICENSES.md` (every shipped package's licence) and a stamp that skips
+  an unchanged rebuild.
+- **Mac.** `scripts/build-sidecar.sh` builds it into `sidecar/dist/lsp` after the sidecar; the "Embed sidecar" phase copies
+  it into `ReviewGate.app/Contents/Resources/dist/lsp`, next to `sidecar.mjs`, where the engine looks first. JavaScript,
+  JSON, Markdown and `.d.ts` files only — no Mach-O, so the app's signature seals them as resources and notarization is
+  unchanged.
+- **Windows.** `clients/desktop/scripts/build.mjs` builds it into `clients/desktop/lsp-dist/lsp`; electron-builder's
+  `extraResources` copies it to `resources/lsp` — outside `app.asar`, so tsserver reads its `lib.*.d.ts` and the plugin
+  from real files. main passes that folder to the engine (`EngineOptions.lspDir`).
+- **Where the engine looks**: `EngineOptions.lspDir`, else `REVIEWGATE_LSP_DIR`, else `lsp/` next to the running engine
+  file (`sidecar.mjs`), else the development workspace (`packaging/lsp` resolved from `node_modules`).
+- **Licences**: `docs/THIRD_PARTY_NOTICES.md` (the Mac app; also inside it at `Resources/dist/lsp/LICENSES.md`) and
+  `clients/desktop/THIRD_PARTY_NOTICES.md` (Windows; `resources/lsp/LICENSES.md`) list the components: TypeScript
+  (Apache-2.0, with its ThirdPartyNoticeText), the Vue language tools, Volar, Vue's compiler, @babel/parser,
+  source-map-js (BSD-3-Clause), entities (BSD-2-Clause) and the rest (MIT).
+
+### 73.5 How clients present it
+
+- **Exact or estimated.** Next to the peek list's / band's header and the References tab's count, a small label: **정확**
+  (`source: "lsp"`, tooltip "언어 서버(TypeScript)가 찾은 결과예요") or **추정** (`source: "grep"`, tooltip by `fallback`:
+  `starting` "언어 서버가 아직 시작하는 중이라 검색으로 찾았어요", `timeout` "언어 서버가 제때 답하지 않아 검색으로 찾았어요",
+  `failed` / `unavailable` "언어 서버를 쓸 수 없어 검색으로 찾았어요", `no_result` "언어 서버가 프로젝트 안에서 찾지 못해
+  검색으로 찾았어요", `off` "설정에서 언어 서버를 껐어요 — 검색으로 찾았어요", none "검색으로 찾은 결과예요 — 이름이 같은 다른 것이
+  섞일 수 있어요"). An older engine (no `source`): 추정.
+- **Starting.** While `state.nav.lsp.status` is `starting`, the lookup line says "언어 서버 시작 중…" next to "Looking for X…".
+- **Hover.** The ⌘ / Ctrl hover card shows `quickInfo.display` (monospaced, bold) in place of the signature line when the
+  reply has it, and `documentation` under it.
+- **Settings** › Review › Diff (Mac) / Settings › Review › Code navigation (Windows): **"JS/TS/Vue에 언어 서버 사용"**
+  (on by default; tooltip "정의로 이동과 참조 찾기를 TypeScript 언어 서버로 정확하게 찾아요. 끄면 검색으로 찾아요"),
+  sent as `set_settings {languageServer}`. Off with its reason when `ready.languageServer.available` is false ("이
+  빌드에는 언어 서버가 들어 있지 않아요").
+- Find References sends `line` and `column` of the name too (the word under the pointer / caret).
+
+- **Security.** Reads only: tsserver gets the files of the root, no network (typings acquisition off), no plugin from the
+  project unless it runs the project's own TypeScript (which loads the plugins its tsconfig names from that
+  `node_modules`, as VS Code does with a workspace version; `--allowLocalPluginLoads` is never passed). Nothing leaves
+  the machine.
+- **Not in this pass.** Rename, completions, diagnostics, code actions (tsserver can; the review is read-only here), a
+  project's TypeScript in a nested package of a monorepo (the root's only), `vueCompilerOptions` beyond what the plugin
+  reads from the tsconfig, Vue 2 without `vue`'s types installed.
+- Owner: lsp (engine `lsp/locate.ts`, `lsp/tsserver.ts`, `lsp/service.ts`, `engine.ts`, `protocol.ts`;
+  `scripts/build-lsp.mjs`, `packaging/lsp`). Tests: `engine/test/lsp.test.ts` (TS across files and re-exports, into a
+  `.vue` component, `<script setup>`, plain JS without a tsconfig, references, the working tree's contents, the timeout
+  fallback, crash and restart, the project's TypeScript chosen or not), `engine/test/engine.lsp.test.ts` (the commands,
+  `source` / `fallback`, the setting, `state.nav.lsp`).
