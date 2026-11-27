@@ -11892,3 +11892,49 @@ No engine change: §52 already has the list (`state.session.backgroundTasks`), `
   `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
   `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
   Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.
+
+## 72. Terminal parity, batch F
+
+Three more terminal screens for classic chats, checked against Claude Code's docs (the hooks reference, the commands
+reference, the output-styles page and the plugin pages, as of 2026-11-27): `/hooks`, `/output-style` and `/plugin` with
+`/reload-plugins`. Terminal chats (§57) are the real TUI and keep theirs.
+
+### 72.1 `/hooks` — the hooks in effect, read-only
+
+```ts
+// command (lane query: never behind a turn)
+hooks_list {}   // → hooks_list
+type HooksListEvent = { type: "hooks_list"; hooks: HookEntry[]; files: HookFile[]; off: "app" | "settings" | "managed_only" | "managed" | null };
+type HookEntry = {
+  event: string; matcher: string /* "" = every one */; type: string /* command | http | mcp_tool | prompt | agent */;
+  text: string /* what it runs, ≤ 4000 chars */; if?: string; timeout?: number; async?: true; statusMessage?: string;
+  source: "user" | "project" | "local" | "plugin" | "managed"; plugin?: string; path: string; active?: boolean;
+};
+type HookFile = { source: HookSource; plugin?: string; path: string; exists: boolean; count: number };
+```
+
+- **As the terminal's.** The hooks reference: "Type `/hooks` in Claude Code to open a read-only browser for your
+  configured hooks. The list labels each hook with where it comes from, such as user settings, project settings, local
+  settings, a plugin, or the current session … Select a hook to see the full text of what it runs and where it's defined,
+  such as the path of its settings file or the name of its plugin … To browse all hook events, including ones with no
+  hooks configured, select `All events`". It does not edit: "To remove a hook defined in a settings file, delete its
+  entry from that file." So the app does not edit hooks either; it offers the file.
+- **What the engine reads** — the files the session loads, the way §16 / §36.6 load them: `<config>/settings.json` (only
+  with user settings), `<project>/.claude/settings.json`, `.claude/settings.local.json` (only while local settings load),
+  each enabled plugin's `hooks/hooks.json`, and the managed tier's `hooks` (§44.2's reader). One entry per handler, with
+  the matcher group's `matcher` (`"*"` / none → ""), the handler's `type`, what it runs (`command` with its exec-form
+  `args`, the `url`, `server › tool`, the `prompt`), `if`, `timeout`, `async`, `statusMessage`. Sorted in the reference's
+  lifecycle order of the 34 events (an unknown event after them, by name), then user, project, local, plugin, managed.
+  Every file through `safeReadOrNull` (a regular file ≤ 1 MB). `files` lists each settings file the session would load,
+  `exists: false` when it is not there yet, so Open in Editor has a target before the first hook.
+- **`active` and `off`**, as the CLI: a settings file's `disableAllHooks` (the highest file that sets it wins — "a
+  `disableAllHooks: false` in a project's `.claude/settings.json` overrides a `true` in your user settings") or
+  ReviewGate's "turn off my hooks" (`disableUserHooks`, the flag layer's `disableAllHooks`, §16) stops the settings and
+  plugin hooks; only the managed tier's `disableAllHooks` stops the managed ones; the managed `allowManagedHooksOnly`
+  leaves only those.
+- **Not listed, with why:** the terminal's "current session" hooks — a skill's or subagent's frontmatter `hooks`, which
+  the CLI registers while that skill or subagent runs — are in no settings file; ReviewGate's own SDK callback hooks
+  (budget, git guard, containment) are not the user's and are not in the terminal's list either. A plugin's hooks
+  declared inline in its `plugin.json` are not read (only `hooks/hooks.json`).
+- Engine: `session/hooksList.ts` (`listHooks`, `hookEntriesOf`, `sortHooks`, `HOOK_EVENTS`), `engine.ts`
+  (`hooksList`), `protocol.ts` (`HookEntry`, `HookFile`, `HooksListEvent`). Tests: `engine/test/w72.hooks.test.ts`.

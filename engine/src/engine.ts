@@ -123,6 +123,8 @@ import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-s
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
 import type { ChatExportEvent, ResponseTextEvent, ThinkingState, TodoItem } from "./protocol.js"; // §70.3, §70.4, §71.2
+import type { HooksListEvent } from "./protocol.js"; // §72.1
+import { listHooks } from "./session/hooksList.js"; // §72.1
 import { chatExportText, exportFileName, nthResponse, writeExport } from "./session/exportChat.js"; // §70.3
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
@@ -1616,6 +1618,8 @@ export class ReviewEngine {
         return this.exportChat(cmd.path, cmd.replace === true);
       case "copy_response":
         return this.copyResponse(cmd.n);
+      case "hooks_list": // §72.1
+        return this.hooksList();
       case "shell_run": // §67.2
         await this.shellRunStart(cmd.command);
         return;
@@ -8094,6 +8098,30 @@ export class ReviewEngine {
     return loadPermissionRules({ configDir: claudeConfigDir(this.childEnv()), root: this.project?.root ?? cwd ?? "", loadUser, loadLocal });
   }
 
+  /**
+   * §72.1 `hooks_list`: the hooks of the files this session loads (user settings only when they load, local settings only
+   * when they do, the plugins the CLI loaded), each with whether it runs — as the terminal's read-only `/hooks`.
+   */
+  private hooksList(): HooksListEvent {
+    const configDir = claudeConfigDir(this.childEnv());
+    const loadUser = this.ext?.loadUser ?? (this.settings.loadUserSettings !== false && this.extensionsFallback === null);
+    const loadLocal = this.ext?.loadLocal ?? (this.settings.loadLocalSettings !== false && this.extensionsFallback === null);
+    const policy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const plugins = loadUser ? this.knownPlugins().filter((p) => p.enabled).map((p) => ({ name: p.name, path: p.path })) : [];
+    return {
+      type: "hooks_list",
+      ...listHooks({
+        configDir,
+        cwd: this.project?.path ?? this.project?.root ?? null,
+        loadUser,
+        loadLocal,
+        plugins,
+        appHooksOff: this.settings.disableUserHooks === true,
+        managed: { settings: policy.settings, path: policy.sources[0]?.path ?? null },
+      }),
+    };
+  }
+
   /** §33.8: `permission_rules` — every allow rule of the user's settings, what ReviewGate does with it, the terminal's default mode. */
   private permissionRules(): PermissionRulesEvent {
     if (!this.project) throw new CommandRefused("no_project");
@@ -10425,6 +10453,7 @@ function laneOf(cmd: EngineCommand): Lane {
     // §70.3: a read of the chat's rows (and one file written), never behind a turn.
     case "export_chat":
     case "copy_response":
+    case "hooks_list": // §72.1: reads of the settings files
       return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
@@ -10507,6 +10536,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "set_thinking": // §70.4
     case "export_chat": // §70.3
     case "copy_response":
+    case "hooks_list": // §72.1
       return "session";
     case "side_ask":
     case "side_list":

@@ -759,6 +759,8 @@ export type EngineCommand =
   | Cmd<"export_chat", { path?: string; replace?: boolean }>
   /** §70.3 `/copy [N]`: Claude's Nth-latest answer (1 = the latest) → `response_text`; the client puts it on the clipboard. */
   | Cmd<"copy_response", { n?: number }>
+  /** §72.1 `/hooks`: the hooks in effect for the session, read from the settings files it loads → `hooks_list`. */
+  | Cmd<"hooks_list">
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -2221,6 +2223,38 @@ export type InterruptedEvent = { type: "interrupted"; id?: string; takenBack: { 
 /** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
 /** §70.3: `export_chat`'s reply — the text, the name a save dialog proposes, and where it was written (null: not written). */
 export type ChatExportEvent = { type: "chat_export"; id?: string; text: string; name: string; path: string | null };
+/** §72.1: where a hook is defined — the CLI's settings files, a plugin's `hooks/hooks.json`, the managed policy. */
+export type HookSource = "user" | "project" | "local" | "plugin" | "managed";
+/** §72.1: one hook handler, as the terminal's `/hooks` shows it. */
+export type HookEntry = {
+  event: string;
+  /** The matcher group's `matcher`; "" for every one (the CLI's `"*"`, `""` or none). */
+  matcher: string;
+  /** `command` | `http` | `mcp_tool` | `prompt` | `agent` (as written; `command` when none is). */
+  type: string;
+  /** What it runs: the command (with its exec-form `args`), the URL, `server › tool`, the prompt (≤ 4000 chars). */
+  text: string;
+  if?: string;
+  /** Seconds, as written. */
+  timeout?: number;
+  async?: true;
+  statusMessage?: string;
+  source: HookSource;
+  /** The plugin's name (`source: "plugin"`). */
+  plugin?: string;
+  /** The file that defines it. */
+  path: string;
+  /** Whether it runs in this session (`disableAllHooks`, ReviewGate's "turn off my hooks", the managed switches). */
+  active?: boolean;
+};
+/** §72.1: a file `hooks_list` read (`exists: false` — a settings file the session would load, not there yet). */
+export type HookFile = { source: HookSource; plugin?: string; path: string; exists: boolean; count: number };
+/**
+ * §72.1: reply to `hooks_list`. `off`: why the settings and plugin hooks do not run — ReviewGate's switch (`app`), a
+ * settings file's `disableAllHooks` (`settings`), the managed `allowManagedHooksOnly` (`managed_only`) or its
+ * `disableAllHooks` (`managed`, the managed hooks too); null when they run.
+ */
+export type HooksListEvent = { type: "hooks_list"; id?: string; hooks: HookEntry[]; files: HookFile[]; off: "app" | "settings" | "managed_only" | "managed" | null };
 /** §70.3: `copy_response`'s reply. */
 export type ResponseTextEvent = { type: "response_text"; id?: string; n: number; text: string };
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
@@ -2396,6 +2430,7 @@ export type EngineEvent =
   | InterruptedEvent // §56.2
   | ShellOutputEvent | ShellResultEvent // §67.2
   | ChatExportEvent | ResponseTextEvent // §70.3
+  | HooksListEvent // §72.1
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
@@ -2507,6 +2542,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "export_chat" } ? ChatExportEvent // §70.3
   : C extends { type: "copy_response" } ? ResponseTextEvent
+  : C extends { type: "hooks_list" } ? HooksListEvent // §72.1
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
@@ -2534,6 +2570,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | ChatExportEvent | ResponseTextEvent // §70.3
+  | HooksListEvent // §72.1
   | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow
