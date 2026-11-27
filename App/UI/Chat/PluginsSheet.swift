@@ -355,7 +355,7 @@ struct PendingPluginAction: Identifiable, Equatable {
 }
 
 /// The confirmation: what runs, why to be careful, and (to install) the scope, as the terminal's three install options.
-private struct PluginConfirmSheet: View {
+struct PluginConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
     let pending: PendingPluginAction
     let hasProject: Bool

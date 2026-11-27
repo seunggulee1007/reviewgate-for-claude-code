@@ -1030,6 +1030,101 @@ private final class Tour {
         try await commitOthersShots(window)
         try await parityDShots(window, shoot: shoot)
         try await parityEShots(window)
+        try await parityFShots(window)
+    }
+
+    // MARK: §72 at the laptop size (the composer bar check): /hooks' sheet, /output-style's sheet, /plugin's sheet.
+
+    /// §72.1 the hooks sheet (every source, and with the hooks off and All events), §72.2 the output style sheet and `/status`'s
+    /// card with the style, §72.3 the plugin sheet (Installed with a command's output, Discover, Marketplaces) and the install
+    /// confirmation — dark and light. `composerbar-hooks-*-<appearance>.png`, `composerbar-style-*-<appearance>.png`,
+    /// `composerbar-plugins-*-<appearance>.png`.
+    private func parityFShots(_ window: NSWindow) async throws {
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+        let composer = entry.model.chatComposer
+        let home = "/Users/dev"
+        let root = "/Users/Shared/acme-shop"
+        let hooks = HooksList(hooks: [
+            HookEntry(event: "SessionStart", matcher: "startup", text: "node \(home)/.claude/hooks/load-context.js", source: .user, path: "\(home)/.claude/settings.json"),
+            HookEntry(event: "PreToolUse", matcher: "Bash", text: "\(root)/.claude/hooks/block-rm.sh", condition: "Bash(rm *)", timeout: 30, source: .project, path: "\(root)/.claude/settings.json"),
+            HookEntry(event: "PreToolUse", type: "http", text: "https://hooks.example.com/audit", source: .local, path: "\(root)/.claude/settings.local.json"),
+            HookEntry(event: "PostToolUse", matcher: "Edit|Write", text: "${CLAUDE_PLUGIN_ROOT}/scripts/format.sh", statusMessage: "Formatting", source: .plugin, plugin: "formatter",
+                      path: "\(home)/.claude/plugins/cache/acme-market/formatter/1.2.0/hooks/hooks.json"),
+            HookEntry(event: "Stop", type: "prompt", text: "Check that every task in the request is done. $ARGUMENTS", source: .user, path: "\(home)/.claude/settings.json"),
+            HookEntry(event: "Notification", text: "afplay /System/Library/Sounds/Glass.aiff", async: true, source: .user, path: "\(home)/.claude/settings.json"),
+        ], files: [HookFile(source: .user, path: "\(home)/.claude/settings.json", count: 3), HookFile(source: .project, path: "\(root)/.claude/settings.json", count: 1),
+                   HookFile(source: .local, path: "\(root)/.claude/settings.local.json", count: 1)])
+        var hooksOff = hooks
+        hooksOff.off = .app
+        hooksOff.hooks = hooks.hooks.prefix(2).map { var h = $0; h.active = false; return h }
+        let styles = OutputStylesReply(styles: [
+            OutputStyleInfo(name: "default", source: .builtin), OutputStyleInfo(name: "Proactive", source: .builtin), OutputStyleInfo(name: "Concise", source: .builtin),
+            OutputStyleInfo(name: "Explanatory", source: .builtin), OutputStyleInfo(name: "Learning", source: .builtin),
+            OutputStyleInfo(name: "Diagrams first", description: "Lead every explanation with a diagram", source: .user, path: "\(home)/.claude/output-styles/diagrams.md"),
+            OutputStyleInfo(name: "tutor", description: "Step by step, with a question at the end", source: .plugin, plugin: "teach"),
+        ], current: "Concise", setIn: OutputStyleSetIn(source: "local", path: "\(root)/.claude/settings.local.json", value: "Concise"), canSet: true)
+        let plugins = PluginsList(installed: [
+            PluginInstalled(id: "formatter@acme-market", name: "formatter", marketplace: "acme-market", version: "1.2.0"),
+            PluginInstalled(id: "release-notes@acme-market", name: "release-notes", marketplace: "acme-market", version: "3f2a9c1d0b7e", scope: "project", enabled: false,
+                            errors: ["Plugin \"release-notes\" not cached at ~/.claude/plugins/cache/acme-market/release-notes"]),
+            PluginInstalled(id: "review-kit@acme-market", name: "review-kit", marketplace: "acme-market", version: "0.9.0", notes: ["Not used recently"], appOff: true),
+            PluginInstalled(id: "policy-guard@acme-org", name: "policy-guard", marketplace: "acme-org", version: "2.0.0", scope: "managed"),
+        ], available: [
+            PluginAvailable(id: "deploy@acme-market", name: "deploy", marketplace: "acme-market", description: "Deploy helpers: preview environments, rollbacks and release checklists", version: "0.4.1"),
+            PluginAvailable(id: "db-tools@acme-market", name: "db-tools", marketplace: "acme-market", description: "Migrations and query plans for Postgres"),
+        ], marketplaces: [MarketplaceInfo(name: "acme-market", source: "github", repo: "acme/claude-plugins"),
+                          MarketplaceInfo(name: "acme-org", source: "git", url: "https://git.example.com/acme/plugins.git", ref: "v2")])
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            let a = appearance.rawValue
+            try await Task.sleep(for: .milliseconds(600))
+            store.debugShowHooks(hooks)
+            try await panelShot("hooks-sheet-\(a)", HooksSheet(), appearance: appearance, settle: 1.2)
+            store.debugShowHooks(hooksOff)
+            try await panelShot("hooks-off-\(a)", HooksSheet(), appearance: appearance, settle: 1.2)
+            store.debugShowHooks(HooksList(hooks: [], files: hooks.files))
+            try await panelShot("hooks-empty-\(a)", HooksSheet(), appearance: appearance, settle: 1.2)
+            store.debugShowHooks(nil)
+            log("composerbar hooks: " + hooks.byEvent().map { "\($0.event) \($0.hooks.count)" }.joined(separator: ", ") + " · off: " + (HooksText.off(.app) ?? ""))
+
+            store.debugShowOutputStyles(styles)
+            try await panelShot("style-sheet-\(a)", OutputStyleSheet { _, _ in }, appearance: appearance, settle: 1.2)
+            var noSession = styles
+            noSession.canSet = false
+            noSession.why = "local_settings_off"
+            store.debugShowOutputStyles(noSession)
+            try await panelShot("style-off-\(a)", OutputStyleSheet { _, _ in }, appearance: appearance, settle: 1.2)
+            store.debugShowOutputStyles(styles)
+            composer.slashCard = .status
+            try await Task.sleep(for: .milliseconds(1500))
+            try write(try render(window), "composerbar-style-status-\(a)")
+            composer.slashCard = nil
+            composer.infoNotice = OutputStyleText.switched("Explanatory")
+            try await Task.sleep(for: .milliseconds(1200))
+            try write(try render(window), "composerbar-style-switched-\(a)")
+            composer.infoNotice = nil
+            store.debugShowOutputStyles(nil)
+            log("composerbar style: " + OutputStyleText.helpLine("Concise") + " · " + OutputStyleText.menuItem("Concise"))
+
+            store.debugShowPlugins(plugins)
+            try await panelShot("plugins-installed-\(a)", PluginsSheet(request: PluginRequest(tab: .installed)) { _, _ in }, appearance: appearance, settle: 1.5)
+            try await panelShot("plugins-discover-\(a)", PluginsSheet(request: PluginRequest(tab: .discover)) { _, _ in }, appearance: appearance, settle: 1.5)
+            try await panelShot("plugins-marketplaces-\(a)", PluginsSheet(request: PluginRequest(tab: .marketplaces)) { _, _ in }, appearance: appearance, settle: 1.5)
+            try await panelShot("plugins-confirm-\(a)", PluginConfirmSheet(pending: PendingPluginAction(action: .install, target: "deploy@acme-market"), hasProject: true) { _ in },
+                                appearance: appearance)
+            store.debugShowPlugins(nil)
+            composer.infoNotice = PluginText.reloaded(PluginsReloaded(applied: true, plugins: 3, skills: 7, agents: 4, hooks: 2, mcpServers: 1))
+            try await Task.sleep(for: .milliseconds(1200))
+            try write(try render(window), "composerbar-plugins-reloaded-\(a)")
+            composer.infoNotice = nil
+            composer.notice = PluginText.reloaded(PluginsReloaded(applied: false, held: true, mcpServersAdded: ["plugin:deploy:previews"]))
+            try await Task.sleep(for: .milliseconds(1200))
+            try write(try render(window), "composerbar-plugins-held-\(a)")
+            composer.notice = nil
+            log("composerbar plugins: " + plugins.installed.map { "\($0.id) \($0.enabled ? "on" : "off")" }.joined(separator: ", "))
+        }
+        AppSettings.setAppearance(.dark)
     }
 
     // MARK: §71 at the laptop size (the composer bar check): /usage's sheet, the to-do checklist, /tasks' sheet.
