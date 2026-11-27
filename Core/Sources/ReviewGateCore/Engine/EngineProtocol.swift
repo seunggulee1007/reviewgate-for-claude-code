@@ -1540,6 +1540,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var shellPending = 0
     /// §70.4: the chat's extended thinking; nil from an engine without it.
     public var thinking: ThinkingState?
+    /// §71.2: Claude's to-do checklist in the chat ([] when none); nil from an engine without it.
+    public var todos: [TodoItem]?
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1604,6 +1606,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
         (addedDirs, shell, shellPending) = AddDirShellWire.session(from: decoder)   // §67
         thinking = ThinkingWire.session(from: decoder)   // §70.4
+        todos = TodoWire.session(from: decoder)   // §71.2
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.

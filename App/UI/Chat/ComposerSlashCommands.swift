@@ -175,6 +175,7 @@ struct ComposerSlashHooks: ViewModifier {
             }
         case .context: popover(.context)
         case .usage: showUsage = true   // §71.1 (/cost and /stats too)
+        case .todos: composer.showTodos(store: store)   // §71.2
         case .permissions: settings(.general)   // the permissions are in General
         case .config: settings(.general)
         case .agents: model.showAgentPanelTick += 1

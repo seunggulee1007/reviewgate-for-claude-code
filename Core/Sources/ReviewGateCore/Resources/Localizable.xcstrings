@@ -673,6 +673,22 @@
         }
       }
     },
+    "%lld done above": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld done above"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "위에 완료한 일 %lld개"
+          }
+        }
+      }
+    },
     "%lld file(s) changed outside the app stay as they are": {
       "localizations": {
         "en": {
@@ -941,6 +957,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메모 %lld개도 함께 지워져요."
+          }
+        }
+      }
+    },
+    "%lld of %lld done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld개 중 %1$lld개 완료"
           }
         }
       }
@@ -1357,6 +1389,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "(shift+tab 전환)"
+          }
+        }
+      }
+    },
+    "+%lld more": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld more"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld개 더"
           }
         }
       }
@@ -1933,6 +1981,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "심볼릭 링크는 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "A terminal chat has its own Ctrl+T": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A terminal chat has its own Ctrl+T"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서는 터미널의 Ctrl+T를 쓰세요"
           }
         }
       }
@@ -4097,6 +4161,22 @@
         }
       }
     },
+    "Claude has no to-do list in this chat yet — it makes one for work in several steps (on models with the to-do tools)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude has no to-do list in this chat yet — it makes one for work in several steps (on models with the to-do tools)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude가 아직 할 일 목록을 만들지 않았어요 — 여러 단계로 하는 작업에서 만들어요 (할 일 도구가 있는 모델에서)"
+          }
+        }
+      }
+    },
     "Claude has not answered in this chat yet": {
       "localizations": {
         "en": {
@@ -4317,6 +4397,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude의 git 명령으로 HEAD가 바뀜 (%@) — 리뷰에는 Claude의 변경만 보여요"
+          }
+        }
+      }
+    },
+    "Claude's to-do checklist for this chat — it follows the work live, as Ctrl+T in Claude Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude's to-do checklist for this chat — it follows the work live, as Ctrl+T in Claude Code"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude의 할 일 목록이에요 — Claude Code의 Ctrl+T처럼 작업을 따라 바로 바뀌어요"
           }
         }
       }
@@ -7303,6 +7399,22 @@
         }
       }
     },
+    "Done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료"
+          }
+        }
+      }
+    },
     "Earlier note: %@": {
       "localizations": {
         "en": {
@@ -8103,6 +8215,38 @@
         }
       }
     },
+    "Go back to the running chat to see Claude's checklist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to see Claude's checklist"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 할 일 목록을 보려면 실행 중인 채팅으로 돌아가세요"
+          }
+        }
+      }
+    },
+    "Hide the checklist (⌃T or /todos shows it again)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the checklist (⌃T or /todos shows it again)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "목록 숨기기 (⌃T나 /todos로 다시 볼 수 있어요)"
+          }
+        }
+      }
+    },
     "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
       "localizations": {
         "en": {
@@ -8115,6 +8259,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code 설정에서 hook이 꺼져 있어서(disableAllHooks 또는 allowManagedHooksOnly) ReviewGate가 터미널 채팅을 리뷰할 수 없어요"
+          }
+        }
+      }
+    },
+    "In progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In progress"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "진행 중"
           }
         }
       }
@@ -8919,6 +9079,22 @@
         }
       }
     },
+    "Show Claude's to-do checklist for this chat (⌃T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Claude's to-do checklist for this chat (⌃T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude의 할 일 목록을 보여줘요 (⌃T)"
+          }
+        }
+      }
+    },
     "Show CLAUDE.md and the memory files Claude reads": {
       "localizations": {
         "en": {
@@ -9575,6 +9751,22 @@
         }
       }
     },
+    "This engine has no to-do checklist — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine has no to-do checklist — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진에는 할 일 목록이 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
     "This model always uses extended thinking — ⌥T has no effect on it": {
       "localizations": {
         "en": {
@@ -9651,6 +9843,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "시간 초과"
+          }
+        }
+      }
+    },
+    "To-do checklist hidden — ⌃T shows it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do checklist hidden — ⌃T shows it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일 목록을 숨겼어요 — ⌃T로 다시 볼 수 있어요"
+          }
+        }
+      }
+    },
+    "To-do checklist shown — ⌃T hides it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do checklist shown — ⌃T hides it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일 목록을 보여요 — ⌃T로 숨길 수 있어요"
+          }
+        }
+      }
+    },
+    "To-dos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일"
           }
         }
       }

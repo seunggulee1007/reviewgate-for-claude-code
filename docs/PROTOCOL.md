@@ -11830,3 +11830,23 @@ type TodoItem = { text: string; status: "pending" | "in_progress" | "completed";
 - Engine: `review/planSources.ts` (`todoWriteItems`, `taskItemsAsTodos`, `TaskItem.status` / `activeForm`),
   `engine.ts` (`ChatPlanMemory.todoItems` / `lastTool`, `checklistOf`, `slices()`), `protocol.ts` (`TodoItem`). Tests:
   `engine/test/w71.todos.test.ts`.
+- **Clients.** Over the message box of a classic chat, a small panel: "할 일 · 5개 중 2개 완료", then at most five items as
+  the terminal shows them — □ 대기, ◼ 진행 중 (accent, semibold, its `activeForm` words), ✓ 완료 (struck through) — starting
+  one item before the first one not done, with "위에 완료한 일 N개" / "+N개 더" for the rest. Each row's tooltip is the
+  item's text; the panel's says it follows the work live as Ctrl+T in Claude Code. It shows only while the chat has items
+  and the choice is "shown" (kept with the app, on until hidden — as the terminal restores the view it was left in); a
+  chat shown read-only does not show the live chat's list.
+  - **Mac ⌃T** in the message box (instead of AppKit's transpose) shows or hides it, and the line under the box says
+    "할 일 목록을 보여요 — ⌃T로 숨길 수 있어요" / "…숨겼어요 — ⌃T로 다시 볼 수 있어요", or that Claude has no list yet. The
+    panel's chevron hides it too (tooltip: "목록 숨기기 (⌃T나 /todos로 다시 볼 수 있어요)"). An engine without §71.2: ⌃T
+    transposes as before; `/todos` says the engine has no checklist.
+  - **`/todos`** shows it (and says when there is nothing yet).
+  - **Windows Ctrl+Shift+L** does the same — Ctrl+T stays New Chat there (the app's own key since M15, every Windows
+    app's "new tab"); the shortcut tables say so.
+- Mac: Core `Session/TodoChecklist.swift` (`TodoItem`, `TodoWindow`, `TodoText`, `AppSettings.todoListShown`,
+  `todoBlocker`), `SessionInfo.todos`, `SlashAppCommand.todos`; App `ComposerTodos.swift` (`ComposerTodoPanel`,
+  `toggleTodos`, `showTodos`), `ComposerTextView` (`.controlT`), `ChatComposer`. Tests: `TodoChecklistTests`,
+  `SlashAppCommandsTests`, `ShortcutTableTests`.
+- **Shortcut tables.** "Show or hide Claude's to-do checklist" ⌃T / Ctrl+Shift+L is a row of the message box section in
+  docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. No clash: ⌃T was unbound on the Mac
+  (⌘T is New Chat, ⌃⌘T New Terminal Chat); on Windows Ctrl+Shift+L was free (Ctrl+Alt+L is the diff layout).

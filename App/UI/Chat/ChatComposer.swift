@@ -351,6 +351,7 @@ struct ChatComposer: View {
                 .transition(.opacity)
                 .accessibilityIdentifier("Composer info notice")
             }
+            ComposerTodoPanel()   // §71.2: Claude's to-do checklist (⌃T, /todos)
             ComposerBtwSlot()   // §56.1: the /btw answer, over the box
             ComposerSlashSlot(composer: composer)   // §56.5: /status, or a built-in only the terminal has
             ComposerExternalEditorBar(editor: composer.externalEditor)   // §56.3: "Editing in …" while the draft is out
@@ -1442,7 +1443,7 @@ struct ChatComposer: View {
                 composer.mentionDismissed = true
                 return true
             case .commandSlash, .commandShiftEnter, .commandEnter, .optionCommandEnter, .commandDelete, .backtab, .controlB,
-                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG, .controlR, .optionT:
+                 .optionEnter, .digit, .pageUp, .pageDown, .space, .controlG, .controlR, .optionT, .controlT:
                 break
             }
         }
@@ -1477,6 +1478,12 @@ struct ChatComposer: View {
             // §70.4: as Option+T in the terminal — extended thinking on or off for this chat (an older engine: "†" as before).
             guard store.thinking != nil else { return false }
             composer.toggleThinking(store: store)
+            return true
+        case .controlT:
+            // §71.2: as Ctrl+T in the terminal — Claude's to-do checklist over the box, shown or hidden (an older engine:
+            // AppKit's transpose as before).
+            guard store.todos != nil else { return false }
+            composer.toggleTodos(store: store)
             return true
         case .pageUp, .pageDown:
             // polish P3-transcript-17: a page of the conversation from the message box (the transcript scrolls by the tick).

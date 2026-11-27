@@ -134,6 +134,7 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Edit the message in an external editor", mac: "⌃G", win: "Ctrl+G", note: "In the message box — each save comes back into it" }, // §56.3
       { action: "Search the prompt history", mac: "⌃R", win: "Ctrl+R", note: "In the message box — press it again for an older match" }, // §70.1
       { action: "Turn extended thinking on or off", mac: "⌥T", win: "Alt+T", note: "In the message box, for this chat — no effect on a model that always thinks" }, // §70.4
+      { action: "Show or hide Claude's to-do checklist", mac: "⌃T", win: "Ctrl+Shift+L", note: "In the message box — /todos shows it too. On Windows Ctrl+T is New Chat" }, // §71.2
     ],
   },
   {

@@ -12,6 +12,8 @@ public enum SlashAppCommand: Equatable, Sendable {
     case resume, rewind, context, permissions, agents, memory, config, help, status, exit, rename
     /// §71.1 `/usage` (the terminal's `/cost` and `/stats` are its aliases): the usage sheet.
     case usage
+    /// §71.2 `/todos`: Claude's to-do checklist over the box (as ⌃T). The CLI has no such command any more; the app keeps it.
+    case todos
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
     /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
@@ -23,7 +25,7 @@ public enum SlashAppCommand: Equatable, Sendable {
 
     /// The app's commands, as the palette lists them (each the terminal's name).
     public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model",
-                               "permissions", "rename", "resume", "rewind", "status", "usage"]
+                               "permissions", "rename", "resume", "rewind", "status", "todos", "usage"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
@@ -35,7 +37,7 @@ public enum SlashAppCommand: Equatable, Sendable {
     public static let terminalOnly: Set<String> = [
         "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
         "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
-        "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "vim",
+        "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "upgrade", "vim",
     ]
 
     /// `text` (one line, `/name [args]`) as the app's command; nil when it goes to Claude as before — another command, a
@@ -60,6 +62,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "rewind": return .rewind
         case "context": return .context
         case "usage": return .usage   // §71.1
+        case "todos": return .todos   // §71.2
         case "permissions": return .permissions
         case "agents": return .agents
         case "memory": return .memory
@@ -93,6 +96,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "resume": String(localized: "Open the chat history to resume an earlier chat", bundle: .module)
         case "rewind": String(localized: "Rewind to before your last message", bundle: .module)
         case "status": String(localized: "Show the model, effort, session and MCP servers", bundle: .module)
+        case "todos": TodoText.description   // §71.2
         case "usage", "cost", "stats": UsageText.description   // §71.1 (the terminal lists its aliases too)
         default: nil
         }

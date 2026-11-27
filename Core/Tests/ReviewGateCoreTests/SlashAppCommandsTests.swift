@@ -14,7 +14,7 @@ import Testing
 
     @Test func eachAppCommandParses() {
         let expected: [String: SlashAppCommand] = [
-            "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage,
+            "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage, "/todos": .todos,
             "/permissions": .permissions, "/agents": .agents, "/memory": .memory, "/config": .config, "/help": .help,
             "/status": .status, "/exit": .exit, "/rename": .rename, "/add-dir": .addDir(""), "/export": .export(""), "/copy": .copy(""),
         ]
@@ -44,7 +44,7 @@ import Testing
         #expect(SlashAppCommand.parse("/vim", entries: []) == .terminalOnly("vim"))
         #expect(!SlashAppCommand.terminalOnly.contains("add-dir"))   // §67.1: the app's own now
         #expect(!SlashAppCommand.terminalOnly.contains("export"))   // §70.3
-        for name in ["usage", "stats"] { #expect(!SlashAppCommand.terminalOnly.contains(name), "\(name)") }   // §71.1
+        for name in ["usage", "stats", "todos"] { #expect(!SlashAppCommand.terminalOnly.contains(name), "\(name)") }   // §71.1
     }
 
     /// §67.1: `/add-dir <path>` keeps the path as typed (case, spaces, quotes — the engine resolves them).
