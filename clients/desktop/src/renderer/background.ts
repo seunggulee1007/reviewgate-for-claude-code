@@ -199,6 +199,19 @@ export const movedOf = (reply: { moved?: unknown } | null | undefined): boolean 
 
 export const CANNOT_MOVE_TEXT = (): string => t("Could not move it to the background");
 
+// §71.3: `/tasks` (`/bashes`) — the list with each task's output tail.
+
+/** The last `lines` non-empty lines of a task's output (ANSI colors and `\r` redraws taken out, each ≤ 240 characters). */
+export function outputTail(text: string, lines = 3): string[] {
+  // eslint-disable-next-line no-control-regex
+  const plain = text.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+  const shown = plain.split("\n").map((line) => line.split("\r").filter((s) => s !== "").pop() ?? "");
+  return shown.filter((l) => l.trim() !== "").slice(-lines).map((l) => l.slice(0, 240));
+}
+
+/** The palette's line for `/tasks`. */
+export const tasksDescription = (): string => t("List the shells and agents running in the background — their output, and stop them");
+
 // ---------------------------------------------------------------- refusals in the user's words
 
 /** `task_unknown` / `no_output` / `background_off` / `no_session` / `*_failed:<why>`; null = a code these controls do not word themselves. */

@@ -8,6 +8,7 @@
 import { copyDescription, exportDescription } from "./chatExport"; // §70.3
 import { usageDescription } from "./usageReport"; // §71.1
 import { todosDescription } from "./todoChecklist"; // §71.2
+import { tasksDescription } from "./background"; // §71.3
 import { t } from "./i18n";
 import type { SlashEntry } from "./slashCommands";
 
@@ -24,10 +25,12 @@ export type SlashAppCommand =
   | { kind: "usage" }
   /** §71.2 `/todos`: Claude's to-do checklist over the box. The CLI has no such command any more; the app keeps it. */
   | { kind: "todos" }
+  /** §71.3 `/tasks` (the terminal's `/bashes` is its alias): the background work, with stop. */
+  | { kind: "tasks" }
   | { kind: "terminalOnly"; name: string };
 
 /** The app's commands, as the palette lists them (each the terminal's name). */
-export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "todos", "usage"] as const;
+export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"] as const;
 type AppName = (typeof APP_COMMAND_NAMES)[number];
 
 /** The terminal's other names for them. */
@@ -39,13 +42,14 @@ export const APP_COMMAND_ALIASES: Readonly<Record<string, AppName>> = {
   "allowed-tools": "permissions",
   cost: "usage", // §71.1: the commands reference — "`/cost` and `/stats` are aliases"
   stats: "usage",
+  bashes: "tasks", // §71.3: "`/tasks` … Also available as `/bashes`"
 };
 
 /** The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them. */
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
-  "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+  "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
   "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
-  "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "upgrade", "vim",
+  "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
 ]);
 
 const isAppName = (name: string): name is AppName => (APP_COMMAND_NAMES as readonly string[]).includes(name);
@@ -92,6 +96,7 @@ export function appCommandDescription(name: string): string | null {
     case "rewind": return t("Rewind to before your last message");
     case "status": return t("Show the model, effort, session and MCP servers");
     case "todos": return todosDescription(); // §71.2
+    case "tasks": case "bashes": return tasksDescription(); // §71.3
     case "usage": case "cost": case "stats": return usageDescription(); // §71.1 (the terminal lists its aliases too)
     default: return null;
   }

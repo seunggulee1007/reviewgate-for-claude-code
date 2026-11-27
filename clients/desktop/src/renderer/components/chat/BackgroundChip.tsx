@@ -4,7 +4,7 @@
  * with [출력 보기] (the last 64 KB of the task's output) and [중지]. A refusal is one orange line in the user's words.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { backgroundChipText, backgroundTasksOf, taskMetaLine, taskTitle, type BackgroundTask, type TaskOutput } from "../../background";
+import { backgroundChipText, backgroundTasksOf, outputTail, taskMetaLine, taskTitle, type BackgroundTask, type TaskOutput } from "../../background";
 import { t } from "../../i18n";
 import { useStore } from "../../store";
 import { Modal } from "../Menu";
@@ -65,17 +65,26 @@ export function BackgroundList({ tasks, onOutput }: { tasks: BackgroundTask[]; o
     <div className="bg-list">
       <div className="bold">{t("Running in the background")}</div>
       <div className="tiny muted">{t("When one finishes, Claude goes on. Files changed in the meantime join the next review.")}</div>
+      {tasks.length === 0 && <div className="small muted" data-testid="Background empty">{t("Nothing is running in the background.")}</div>}
       {tasks.map((task) => (
         <div key={task.taskId} className="bg-task" data-testid={`Background task ${task.taskId}`}>
           <div className="bg-title truncate" title={taskTitle(task)}>{taskTitle(task)}</div>
           <div className="tiny muted">{taskMetaLine(task)}</div>
+          {task.hasOutput && <OutputTail taskId={task.taskId} /* §71.3 */ />}
           <div className="bg-actions">
             {task.hasOutput && (
-              <button type="button" className="small" onClick={() => onOutput(task)} data-testid="Show task output">
+              <button type="button" className="small" onClick={() => onOutput(task)} title={t("Show the end of its output (the last 64 KB)")} data-testid="Show task output">
                 {t("Show output")}
               </button>
             )}
-            <button type="button" className="small" disabled={stopping === task.taskId} onClick={() => void doStop(task.taskId)} data-testid="Stop task">
+            <button
+              type="button"
+              className="small"
+              disabled={stopping === task.taskId}
+              onClick={() => void doStop(task.taskId)}
+              title={stopping === task.taskId ? t("Stopping…") : t("Stop this task — Claude goes on without waiting for it")}
+              data-testid="Stop task"
+            >
               {t("Stop")}
             </button>
           </div>
@@ -83,6 +92,50 @@ export function BackgroundList({ tasks, onOutput }: { tasks: BackgroundTask[]; o
         </div>
       ))}
     </div>
+  );
+}
+
+/** §71.3: the last lines of a task's output under its row, read again every 3 s while the list is open. */
+function OutputTail({ taskId }: { taskId: string }) {
+  const read = useStore((s) => s.readTaskOutput);
+  const [lines, setLines] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      void read(taskId).then((r) => {
+        if (live && r.ok) setLines(outputTail(r.output.text));
+      });
+    load();
+    const id = setInterval(load, 3000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [read, taskId]);
+  if (lines === null) return null;
+  return (
+    <pre className={`bg-tail mono${lines.length === 0 ? " faint" : ""}`} data-testid="Background task tail">
+      {lines.length === 0 ? t("No output yet") : lines.join("\n")}
+    </pre>
+  );
+}
+
+/** §71.3 `/tasks` (`/bashes`): the list in a dialog — it opens with nothing running too, as the terminal's /tasks. */
+export function BackgroundTasksDialog({ onClose }: { onClose: () => void }) {
+  const session = useStore((s) => s.state.session);
+  const tasks = backgroundTasksOf(session);
+  const [viewing, setViewing] = useState<BackgroundTask | null>(null);
+  return (
+    <Modal title={t("Background tasks")} onClose={onClose} testId="Background tasks dialog">
+      <div className="bg-popover bg-dialog">
+        <BackgroundList tasks={tasks} onOutput={setViewing} />
+      </div>
+      <div className="tiny muted">{t("While Claude runs a command, ⌃B in the empty message box moves it here.")}</div>
+      <div className="actions">
+        <button type="button" className="primary" onClick={onClose} autoFocus data-testid="Background tasks done">{t("Done")}</button>
+      </div>
+      {viewing && <TaskOutputDialog task={viewing} onClose={() => setViewing(null)} />}
+    </Modal>
   );
 }
 

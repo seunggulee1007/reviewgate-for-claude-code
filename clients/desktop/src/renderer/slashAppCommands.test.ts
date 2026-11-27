@@ -16,7 +16,7 @@ describe("parseSlashAppCommand", () => {
   it("parses each app command", () => {
     const expected: Record<string, SlashAppCommand> = {
       "/model": { kind: "model", name: "" }, "/resume": { kind: "resume" }, "/rewind": { kind: "rewind" }, "/context": { kind: "context" },
-      "/usage": { kind: "usage" }, "/todos": { kind: "todos" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
+      "/usage": { kind: "usage" }, "/todos": { kind: "todos" }, "/tasks": { kind: "tasks" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
       "/add-dir": { kind: "addDir", path: "" }, "/export": { kind: "export", file: "" }, "/copy": { kind: "copy", arg: "" },
     };
@@ -39,7 +39,8 @@ describe("parseSlashAppCommand", () => {
     expect(parseSlashAppCommand("/cost", [])).toEqual({ kind: "usage" }); // §71.1
     expect(parseSlashAppCommand("/stats", [])).toEqual({ kind: "usage" });
     expect(appCommandDescription("cost")).toBe(appCommandDescription("usage"));
-    for (const name of ["usage", "stats"]) expect(TERMINAL_ONLY.has(name), name).toBe(false);
+    expect(parseSlashAppCommand("/bashes", [])).toEqual({ kind: "tasks" }); // §71.3
+    for (const name of ["usage", "stats", "tasks", "bashes"]) expect(TERMINAL_ONLY.has(name), name).toBe(false);
   });
 
   it("keeps a built-in only the terminal has out of the chat", () => {

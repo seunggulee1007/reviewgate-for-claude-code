@@ -11886,3 +11886,7 @@ No engine change: §52 already has the list (`state.session.backgroundTasks`), `
 - Mac: Core `Session/BackgroundTasksList.swift` (`BackgroundText.tail`, the words), `SlashAppCommand.tasks`; App
   `BackgroundViews.swift` (`BackgroundTasksSheet`, `BackgroundOutputTail`), `ComposerSlashCommands.swift`. Tests:
   `BackgroundTasksListTests`, `SlashAppCommandsTests`.
+- Windows: `background.ts` (`outputTail`, `tasksDescription`), `components/chat/BackgroundChip.tsx` (`OutputTail`,
+  `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
+  `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
+  Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.

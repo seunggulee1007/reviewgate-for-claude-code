@@ -357,7 +357,9 @@ export type Dialog =
   /** §70.3 `/export` alone: the conversation as text — copy or save (components/dialogs/ChatExportDialog.tsx). */
   | { kind: "chatExport"; export: import("./chatExport").ChatExport }
   /** §71.1 `/usage` (`/cost`, `/stats`): the session block and the plan windows (components/dialogs/UsageDialog.tsx). */
-  | { kind: "usage" };
+  | { kind: "usage" }
+  /** §71.3 `/tasks` (`/bashes`): the background work with each task's output tail (components/chat/BackgroundChip.tsx). */
+  | { kind: "backgroundTasks" };
 
 /** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
 const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);
