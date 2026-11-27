@@ -973,6 +973,12 @@ export type EngineCommand =
   | Cmd<"project_create", { name: string; parent?: string }>
   /** Which of `paths` (recent projects, most recent first) have the task's repository as a git remote; replies `project_matches`. */
   | Cmd<"project_match", { ref: string; paths: string[] }>
+  /** §74: what a pasted repository URL clones — the folder under `parent`, the recent `paths` that already have it; replies `project_clone_preview`. */
+  | Cmd<"project_clone_preview", { url: string; name?: string; parent?: string; paths?: string[] }>
+  /** §74: `git clone` into `<parent>/<name>` (`-2`, … when taken) and an open, `project_clone_progress` meanwhile; replies `project_cloned`. */
+  | Cmd<"project_clone", { url: string; name?: string; parent?: string; branch?: string }>
+  /** §74: stops the running clone and removes its folder (that `project_clone` is refused `clone_cancelled`). */
+  | Cmd<"project_clone_cancel">
   | Cmd<"shutdown">;
 
 // ---------------------------------------------------------------- §21 side questions
@@ -2443,6 +2449,7 @@ export type EngineEvent =
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
   | ProjectNameEvent | ProjectCreatedEvent | ProjectMatchesEvent // §69
+  | ProjectClonePreviewEvent | ProjectCloneProgressEvent | ProjectClonedEvent // §74
   | FetchedEvent | PulledEvent | CommitOthersEvent; // MARK: git-sync (§68)
 
 /** The typed reply a command with an `id` receives (`result` for everything without a dedicated reply). */
@@ -2501,6 +2508,8 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "project_name" } ? ProjectNameEvent // §69
   : C extends { type: "project_create" } ? ProjectCreatedEvent
   : C extends { type: "project_match" } ? ProjectMatchesEvent
+  : C extends { type: "project_clone_preview" } ? ProjectClonePreviewEvent // §74
+  : C extends { type: "project_clone" } ? ProjectClonedEvent
   : C extends { type: "git_fetch" } ? FetchedEvent // MARK: git-sync (§68)
   : C extends { type: "git_pull" } ? PulledEvent
   : C extends { type: "commit_others" } ? CommitOthersEvent
@@ -2530,6 +2539,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | DocumentSymbolsEvent | WorkspaceSymbolsEvent | SymbolPreviewEvent | NavIndexEvent // MARK: ide-nav (§65)
   | TaskFetchedEvent // MARK: task-start (§63)
   | ProjectNameEvent | ProjectCreatedEvent | ProjectMatchesEvent // §69
+  | ProjectClonePreviewEvent | ProjectClonedEvent // §74
   | FetchedEvent | PulledEvent | CommitOthersEvent // MARK: git-sync (§68)
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
@@ -3520,4 +3530,15 @@ export type ProjectNameEvent = { type: "project_name"; id?: string; name: string
 export type ProjectCreatedEvent = { type: "project_created"; id?: string; path: string };
 /** §69: `repo` the task's `owner/repo` (null: the text names none), `matches` the paths whose remote is it, `guess` the one to preselect. */
 export type ProjectMatchesEvent = { type: "project_matches"; id?: string; repo: string | null; matches: string[]; guess: string | null };
+/**
+ * §74: what `url` clones — `url` credential-free as git gets it (a shorthand expanded, a browser link cut to the repository),
+ * `repo` its `owner/repo` (or its name), `host` (null: a local path), `branch` one the link named (null: the default), `name`
+ * the folder name (the repository's, or the one sent), `path` the first free `<parent>/<name>[-n]`, `matches` the recent
+ * paths whose remote is this repository on this host (the client offers to open the first instead).
+ */
+export type ProjectClonePreviewEvent = { type: "project_clone_preview"; id?: string; url: string; repo: string; host: string | null; branch: string | null; name: string; parent: string; path: string; matches: string[] };
+/** §74: a step of the running clone (never a reply): `percent` the whole clone's 0–100, `detail` the size and speed while receiving. */
+export type ProjectCloneProgressEvent = { type: "project_clone_progress"; path: string; phase: "connecting" | "counting" | "compressing" | "receiving" | "resolving" | "checkout"; percent: number; phasePercent: number | null; detail: string | null };
+/** §74: the folder cloned and opened. */
+export type ProjectClonedEvent = { type: "project_cloned"; id?: string; path: string };
 export type TaskFetchedEvent = { type: "task_fetched"; id?: string; task: { id: string; number: number; title: string; body: string; url: string; labels: string[] } };

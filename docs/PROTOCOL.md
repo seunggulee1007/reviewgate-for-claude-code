@@ -11892,3 +11892,78 @@ No engine change: §52 already has the list (`state.session.backgroundTasks`), `
   `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
   `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
   Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.
+
+## 74. Clone from Git
+
+The window with no project (§69) could make a new folder, open one or start from a task, but a repository that is not on
+this computer yet meant a terminal and `git clone` first. It now has a fourth card, **Clone from Git** (Git 저장소로 시작):
+paste a repository link, and ReviewGate clones it with the user's own git sign-in and opens it. Additive on the wire: three
+commands, two replies, one event. All three work with no project open.
+
+```ts
+project_clone_preview { url: string; name?: string; parent?: string; paths?: string[] } → project_clone_preview { url, repo, host, branch, name, parent, path, matches } // lane "query"
+project_clone         { url: string; name?: string; parent?: string; branch?: string }  → project_cloned { path }           // lane "main"; project_clone_progress meanwhile
+project_clone_cancel  {}                                                                → result                           // lane "steer"
+project_clone_progress { path; phase: "connecting" | "counting" | "compressing" | "receiving" | "resolving" | "checkout"; percent; phasePercent; detail } // an event, never a reply
+```
+
+### 74.1 The link — `parseCloneSource` (engine `git/cloneProject.ts`)
+
+- **Accepted:** `https://` / `http://` / `ssh://` / `git://` URLs, the scp form `[user@]host:path` (`git@github.com:acme/widgets.git`),
+  GitHub's shorthand `owner/repo` (→ `https://github.com/owner/repo.git`), a link without its scheme
+  (`github.com/acme/widgets`), a local absolute path or `file://` URL, and a whole pasted `git clone [-b <branch>] <url> [<dir>]`
+  (the URL and the branch are taken, the rest dropped). Spaces around, `<…>` and quotes are trimmed.
+- **GitHub's own links** (`github.com/<owner>/<repo>/…`: a file, an issue, `www.`) are cut to the repository;
+  `…/tree/<branch>` names the branch. Other hosts keep their path (GitLab's subgroups), without query and fragment.
+- **`repo`**: `owner/repo` when the URL names one (`parseRemoteURL`, as §69.3 reads remotes), else the repository's name.
+  **`name`**: the folder name — the repository's (`.git` dropped) or the one sent, through `cloneFolderName`: case kept (unlike
+  §69's rule), every character a folder cannot hold (`/ \ : * ? " < > |`, spaces, control characters) a `-`, no leading dot or
+  dash, ≤ 100 characters, a Windows device name gets `-repo`, nothing left → `repo`.
+- **Refused** (`result{ok:false, code}`): `url_has_credentials` — a password, or a user part that is a token (`ghp_…`,
+  `github_pat_…`, `glpat-…`, `x-access-token`, an opaque string of 30+ characters): git would keep it in `.git/config`, and the
+  user's credential helper or SSH key signs in instead; a user name alone (Azure DevOps puts the organisation there) is kept.
+  `bad_url:<why>` — empty, spaces inside, an option (`-…`), a transport helper (`ext::…`, `fd::…`), a scheme other than the
+  ones above, no repository in the path, a bare word.
+- **`parent`** as §69.1 (`bad_parent`); **`path`** the first free `<parent>/<name>[-n]` (a preview; the clone picks again).
+
+### 74.2 Already cloned — `matches`
+
+`paths` are the client's recent projects (most recent first, ≤ 30, relative ones skipped), each read with `git remote -v`
+as §69.3 does (read-only, 3 s cap each, all at once). `matches`: those with a remote of the same `owner/repo` (any case) on
+the same host (`www.` ignored) — a fork or another host's copy is another repository; a local source matches a remote that is
+the same path. The client offers to open the first instead (74.4).
+
+### 74.3 The clone — `project_clone`
+
+- The same link rule (the engine reads `url` again; it never trusts the client's preview) and folder rule; `branch` given
+  wins over one the link named (`bad_branch` for one starting with `-` or holding spaces). The folder is made empty first
+  (`createProjectFolder`, §69.2: each `mkdir` is the check), then `git -c core.fsmonitor= clone --progress [--branch <b>] --
+  <url> <path>` runs into it — plain git, the user's own: their credential helper (osxkeychain, Git Credential Manager, `gh`)
+  and their SSH agent sign in. No prompt can wait for an answer (`GIT_TERMINAL_PROMPT=0`, stdin closed), so a missing
+  sign-in fails at once. `LC_ALL=C`, so git's messages are English for the reasons below. One clone at a time (`clone_busy`).
+- **Progress:** git's stderr is read as it comes (`\r`-separated lines, `remote: ` stripped), at most one event per 150 ms
+  for a step (a step's change and its 100 % always go out). `percent` is the whole clone's: counting 0–3, compressing 3–6,
+  receiving 6–88, resolving deltas 88–96, checking out files 96–100. `detail`: the size and speed while receiving
+  (`1.20 MiB | 512.00 KiB/s`). The first event is `connecting` (0).
+- **Timeout:** no output for 120 s (a network that stopped answering) kills it: `clone_timeout`. While progress keeps coming
+  there is no limit.
+- **`project_clone_cancel`** kills git and the helpers it started (the platform's tree kill), then the folder is removed;
+  that `project_clone` is refused `clone_cancelled`. With no clone running it does nothing. The engine stopping cancels too.
+- **Refusals**, nothing opened, the folder removed (any failure removes it — retried, for a helper holding a file on Windows):
+
+| code (`error`) | when |
+| --- | --- |
+| `clone_auth_failed:<git's line>` | `Authentication failed`, `could not read Username` (no sign-in saved), `Permission denied (publickey)`, HTTP 401 / 403, `Host key verification failed` |
+| `clone_not_found:<git's line>` | `Repository not found`, `does not appear to be a git repository`, HTTP 404, a local path that `does not exist` |
+| `clone_branch_not_found:<git's line>` | `Remote branch <b> not found` |
+| `clone_network:<git's line>` | `Could not resolve host`, `Failed to connect`, `Connection timed out` / `refused`, `Network is unreachable`, TLS errors, `early EOF` |
+| `clone_folder_exists` | the folder is not empty (git's `already exists`), or `<name>-2` … `-99` all exist |
+| `clone_timeout` | no output for 120 s |
+| `clone_cancelled` | `project_clone_cancel` |
+| `git_missing` | git could not be started |
+| `clone_failed:<git's line>` | anything else |
+
+`<git's line>` is git's first `fatal:` / `error:` line (progress, `Cloning into` and hints left out), credentials in it
+redacted (`https://***@host/…`), ≤ 300 characters; log lines carry the URL redacted the same way. `parent_not_writable`,
+`bad_parent`, `bad_url`, `url_has_credentials` as above. Then an open, exactly as `open_project` of a repository (as §69.2's
+create); the reply `project_cloned {path}` comes once the project is open.
