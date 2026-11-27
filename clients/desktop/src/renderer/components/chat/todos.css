@@ -10,3 +10,8 @@
 .todo-item.completed .todo-mark { color: var(--green); }
 .todo-item.completed .todo-text { color: var(--fg-3); text-decoration: line-through; }
 .todo-more { padding-left: 20px; font-size: 11px; color: var(--fg-3); }
+/* The window's smallest heights: two rows show (the rest scroll) so the HUD and the box keep their room. */
+@media (max-height: 540px) {
+  .todo-list { max-height: 3em; overflow-y: auto; }
+  .todo-more { display: none; }
+}

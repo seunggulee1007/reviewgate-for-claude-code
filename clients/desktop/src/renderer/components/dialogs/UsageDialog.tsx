@@ -49,7 +49,6 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
               <div key={m.model} className="usage-model usage-indent" data-testid="Usage model">
                 <span className="small bold truncate">{m.model}</span>
                 <span className="tiny muted num">{modelTokensLine(m)}</span>
-                <span className="spacer" />
                 <span className="tiny num">{usageCost(m.costUsd)}</span>
               </div>
             ))

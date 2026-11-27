@@ -83,6 +83,6 @@
 .bg-popover .bg-task { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--border); }
 .bg-popover .bg-title { font-size: 12px; }
 .bg-popover .bg-actions { display: flex; gap: 6px; }
-.bg-popover .bg-tail { margin: 0; padding: 3px 6px; font-size: 10.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; max-height: 4.4em; overflow: hidden; color: var(--fg-2); background: var(--bg-2); border-radius: 4px; user-select: text; }
+.bg-popover .bg-tail { margin: 0; padding: 3px 6px; font-size: 10.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; color: var(--fg-2); background: var(--bg-2); border-radius: 4px; user-select: text; }
 .bg-popover.bg-dialog .bg-list { max-height: 48vh; }
 .bg-output { margin: 8px 0 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-all; font-size: 11.5px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; user-select: text; }
