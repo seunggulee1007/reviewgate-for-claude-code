@@ -11967,3 +11967,32 @@ the same path. The client offers to open the first instead (74.4).
 redacted (`https://***@host/…`), ≤ 300 characters; log lines carry the URL redacted the same way. `parent_not_writable`,
 `bad_parent`, `bad_url`, `url_has_credentials` as above. Then an open, exactly as `open_project` of a repository (as §69.2's
 create); the reply `project_cloned {path}` comes once the project is open.
+
+### 74.4 Clients
+
+- **The card.** The window with no project has four cards with 1 – 4 badges: 1 New Project, 2 Start from a task, 3 Open a
+  folder…, **4 Clone from Git** (Git 저장소로 시작, "Paste a repository link"; its tooltip names the folder for new projects).
+  1 – 4 act at once; ← → ↑ ↓ move the mark and ↩ takes it, as §69.4.
+- **The sheet / dialog.** Repository (the link; Return takes it), a status line under it — `owner/repo · host · branch <b>` from
+  `project_clone_preview` 0.3 s after typing stops, "Reading the link…" meanwhile, or the refusal in the user's words in
+  orange (Clone stays off with the same reason; an engine before §74 says "update ReviewGate") — then Folder name (the
+  repository's until edited; collisions -2, -3), Branch (optional; empty: the default, or the one the link names) and
+  "Clones into <path>" with Change… (Settings › Folder for new projects). Clone and Open sends `project_clone`.
+- **Already have it.** When `matches` is not empty: "You already have <owner/repo>" with two choices — **Open <folder>**
+  (preselected; the primary button reads Open and opens it as Open Project does) and **Clone a fresh copy anyway** (the
+  folder fields come back, the button reads Clone and Open). A new preview with another match preselects Open again.
+- **While it clones.** The fields are off; a bar with the whole clone's percent, the step ("Receiving objects… ·
+  1.20 MiB | 512.00 KiB/s", 43 %), and Cancel — "Stops git clone and removes the folder it was cloning into" — sends
+  `project_clone_cancel` (Esc too); the sheet cannot be dismissed otherwise. The window behind shows "Opening <name>…" as
+  for any open. A refusal shows under the fields (in red) and the preview is read again; a cancel just goes back to the form.
+- **Then** the project opens and **its start screen shows** as after any open (§63.4; nothing is suppressed — the user may
+  want Start from a task next).
+- **From "Start from a task"** (§69.4): when the task names a repository (`project_match`'s `repo`) that no recent project
+  has, the sheet offers **Clone <owner/repo>…** under the task line. It opens the same sheet with the link filled in (on the
+  issue link's host: `https://<host>/<owner>/<repo>.git`; for `owner/repo#n`, the shorthand), and the task waits for the
+  project it clones (or the one it opens instead): its start screen opens the task sheet of §63.3 with the task filled in.
+- **Mac.** `NoProjectStartCards` (the fourth card, key 4) and `CloneProjectSheet` (App `UI/Start/NoProjectStartView.swift`);
+  `TaskProjectSheet` offers the clone. Core `Session/CloneProject.swift`: the replies, `ProjectCloneProgress` (into
+  `AppState.cloneProgress`), `CloneProjectText` (each refusal, each step, `cloneURL(forTask:repo:)`), `AppState.clonePreview`
+  / `cloneProject` (through the same open path as Open Project, `CloneOutcome`) / `cancelClone`; `NoProjectChoice.clone`.
+  Tests: `CloneProjectTests`, `NewProjectTests`.
