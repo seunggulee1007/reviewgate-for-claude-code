@@ -35,6 +35,7 @@ import { RejectOneDialog } from "./SafetyDialogs"; // MARK: wave4 w4-safety
 import { ShortcutsDialog } from "./ShortcutsDialog"; // MARK: wave4d w4d-windows
 import { ChatExportDialog } from "./ChatExportDialog"; // §70.3
 import { UsageDialog } from "./UsageDialog"; // §71.1
+import { HooksDialog } from "./HooksDialog"; // §72.1
 import { BackgroundTasksDialog } from "../chat/BackgroundChip"; // §71.3
 import "./dialogs.css";
 
@@ -118,6 +119,8 @@ export function Dialogs() {
       return <UsageDialog onClose={close} />;
     case "backgroundTasks": // §71.3
       return <BackgroundTasksDialog onClose={close} />;
+    case "hooks": // §72.1
+      return <HooksDialog onClose={close} />;
   }
 }
 

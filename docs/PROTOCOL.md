@@ -11950,6 +11950,10 @@ type HookFile = { source: HookSource; plugin?: string; path: string; exists: boo
 - Mac: Core `Session/HooksList.swift` (`HookEntry`, `HookFile`, `HooksList.byEvent`, `HooksText`, `AppState.hooksList`),
   `SlashAppCommand.hooks`; App `HooksSheet.swift`, `ComposerSlashCommands.swift`. Tests: `HooksListTests`,
   `SlashAppCommandsTests`.
+- Windows: `hooksList.ts` (`hooksByEvent`, `HOOK_EVENTS`, the words — their Korean from the Mac's catalogs through
+  `gen-i18n.mjs`, `loadHooks`), `components/dialogs/HooksDialog.tsx` (`Dialog {kind: "hooks"}`; Open in Editor through
+  `window.rg.openInEditor`, the editor of the diff's Open in Editor), `slashAppCommands.ts` / `slashAppRun.ts`
+  (`{kind: "hooks"}`). Tests: `hooksList.test.ts`, `slashAppCommands.test.ts`.
 
 ### 72.2 `/output-style` — pick the session's output style
 

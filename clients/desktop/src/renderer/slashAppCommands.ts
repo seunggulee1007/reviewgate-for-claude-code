@@ -9,6 +9,7 @@ import { copyDescription, exportDescription } from "./chatExport"; // §70.3
 import { usageDescription } from "./usageReport"; // §71.1
 import { todosDescription } from "./todoChecklist"; // §71.2
 import { tasksDescription } from "./background"; // §71.3
+import { hooksDescription } from "./hooksList"; // §72.1
 import { t } from "./i18n";
 import type { SlashEntry } from "./slashCommands";
 
@@ -27,10 +28,12 @@ export type SlashAppCommand =
   | { kind: "todos" }
   /** §71.3 `/tasks` (the terminal's `/bashes` is its alias): the background work, with stop. */
   | { kind: "tasks" }
+  /** §72.1 `/hooks`: the hooks in effect, read-only (components/dialogs/HooksDialog.tsx). */
+  | { kind: "hooks" }
   | { kind: "terminalOnly"; name: string };
 
 /** The app's commands, as the palette lists them (each the terminal's name). */
-export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"] as const;
+export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "hooks", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"] as const;
 type AppName = (typeof APP_COMMAND_NAMES)[number];
 
 /** The terminal's other names for them. */
@@ -47,7 +50,7 @@ export const APP_COMMAND_ALIASES: Readonly<Record<string, AppName>> = {
 
 /** The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them. */
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
-  "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+  "bug", "doctor", "extra-usage", "feedback", "ide", "install-github-app",
   "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
   "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
 ]);
@@ -88,6 +91,7 @@ export function appCommandDescription(name: string): string | null {
     case "export": return exportDescription();
     case "exit": return t("Close this chat tab — it stays in the chat history");
     case "help": return t("Show the keyboard shortcuts");
+    case "hooks": return hooksDescription(); // §72.1
     case "memory": return t("Show CLAUDE.md and the memory files Claude reads");
     case "model": return t("Choose the model — or type one: /model sonnet");
     case "permissions": return t("Open Settings › permissions");

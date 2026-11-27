@@ -69,6 +69,9 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     case "tasks": // §71.3 (/bashes too)
       st.openDialog({ kind: "backgroundTasks" });
       return null;
+    case "hooks": // §72.1
+      st.openDialog({ kind: "hooks" });
+      return null;
     case "todos": { // §71.2: the checklist shown (it says so when Claude has none yet)
       const todos = todosOf(st.state.session);
       const viewing = viewingOf(useViewedChat.getState().chat, st.state) !== null;

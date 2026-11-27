@@ -359,7 +359,9 @@ export type Dialog =
   /** §71.1 `/usage` (`/cost`, `/stats`): the session block and the plan windows (components/dialogs/UsageDialog.tsx). */
   | { kind: "usage" }
   /** §71.3 `/tasks` (`/bashes`): the background work with each task's output tail (components/chat/BackgroundChip.tsx). */
-  | { kind: "backgroundTasks" };
+  | { kind: "backgroundTasks" }
+  /** §72.1 `/hooks`: the hooks in effect, read-only (components/dialogs/HooksDialog.tsx). */
+  | { kind: "hooks" };
 
 /** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
 const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);

@@ -48,3 +48,15 @@
 .usage-bar { height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
 .usage-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .usage-bar.high > span { background: var(--orange); }
+/* §72.1 /hooks: the hooks by event, each with its matcher, source, what it runs (HooksDialog.tsx). */
+.hooks-head { gap: 8px; }
+.hooks-head > .tiny.muted { flex: 1 1 auto; min-width: 0; }
+.hooks-body { max-height: calc(100vh - 260px); min-height: 120px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.hooks-empty { padding: 24px 0; text-align: center; }
+.hooks-event { display: flex; flex-direction: column; gap: 4px; }
+.hooks-event > .row { gap: 6px; align-items: baseline; }
+.hooks-row { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border-radius: 6px; background: var(--bg-2); }
+.hooks-row > .row { gap: 6px; align-items: baseline; min-width: 0; }
+.hooks-row.off .hooks-text { color: var(--fg-2); }
+.hooks-matcher { padding: 0 5px; border-radius: 4px; background: var(--bg-3); white-space: nowrap; }
+.hooks-text { white-space: pre-wrap; word-break: break-all; user-select: text; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
