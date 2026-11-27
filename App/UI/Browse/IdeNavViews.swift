@@ -160,6 +160,7 @@ struct CodeNavPeekBand: View {
                 Text("Definition of \(band.symbol)").font(.callout.weight(.semibold)).lineLimit(1)
             }
             Spacer(minLength: 4)
+            if let reply = band.reply { NavSourceBadge(source: reply.source, fallback: reply.fallback) }   // MARK: lsp (§73.5)
             if band.status == .looking || band.preview == .loading { ProgressView().controlSize(.mini) }
             Button("Open") { store.openPeekSelection() }
                 .disabled(band.current == nil)
@@ -194,7 +195,11 @@ struct CodeNavPeekBand: View {
     private var content: some View {
         switch band.status {
         case .looking:
-            Text("Looking for \(band.symbol)…").font(.callout).foregroundStyle(.secondary).padding(10)
+            HStack(spacing: 8) {
+                Text("Looking for \(band.symbol)…").font(.callout).foregroundStyle(.secondary)
+                NavLspStartingNote()   // MARK: lsp (§73.5)
+            }
+            .padding(10)
         case .notFound:
             CodeNavPeekNote(symbol: band.symbol, from: band.from, message: String(localized: "No definition found for \(band.symbol)"))
         case let .failed(message):
@@ -316,10 +321,14 @@ struct CodeNavHoverCard: View {
     var body: some View {
         let c = card.candidate
         VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: card.preview.symbol?.signature ?? c.preview)
+            // MARK: lsp (§73.5): the language server's type / signature when it answered, else the declaration line.
+            Text(verbatim: card.quickInfo?.display ?? card.preview.symbol?.signature ?? c.preview)
                 .font(.system(.body, design: .monospaced).weight(.bold))
-                .lineLimit(2)
+                .lineLimit(card.quickInfo == nil ? 2 : 4)
                 .fixedSize(horizontal: false, vertical: true)
+            if let doc = card.quickInfo?.documentation {
+                Text(verbatim: doc).font(.callout).foregroundStyle(.secondary).lineLimit(4).fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 6) {
                 Text(verbatim: "\((c.path as NSString).lastPathComponent):\(c.line)").font(.caption.weight(.medium))
                 if let container = card.preview.symbol?.container ?? c.container {
