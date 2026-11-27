@@ -416,7 +416,7 @@ export function buildState(s: EngineSlices): ReviewState {
     },
     ...(s.storage ? { storage: structuredClone(s.storage) } : {}), // MARK: wave4b w4b-bigturn (§39.1)
     ...(s.project && s.autoAcceptRules && anyAutoAcceptRule(s.autoAcceptRules) ? { autoAcceptRules: normalizeAutoAcceptRules(s.autoAcceptRules) } : {}), // MARK: wave4c w4c-trust (§41.2)
-    ...(s.project && s.nav ? { nav: { index: { ...s.nav.index } } } : {}), // MARK: ide-nav (§65)
+    ...(s.project && s.nav ? { nav: { index: { ...s.nav.index }, ...(s.nav.lsp ? { lsp: structuredClone(s.nav.lsp) } : {}) } } : {}), // MARK: ide-nav (§65); lsp (§73.2)
   };
 }
 

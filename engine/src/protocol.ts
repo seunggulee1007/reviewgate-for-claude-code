@@ -436,6 +436,11 @@ export type Settings = {
    * that changes files is denied and a new prompt is refused; `off`: neither (a send is a question that may edit, §3). Live.
    */
   reviewFirst?: ReviewFirstMode;
+  /**
+   * MARK: lsp — §73: Go to Definition / Find References from a JS / TS / Vue file ask the bundled TypeScript language
+   * server (default true; live). false: never started — a running one is stopped — and §62 answers (`fallback: "off"`).
+   */
+  languageServer?: boolean;
 };
 
 /** §64: the review-first rule while it holds Claude back (`gate.reviewFirst`; null / absent: it does not). */
@@ -953,7 +958,7 @@ export type EngineCommand =
    */
   | Cmd<"find_definition", { symbol: string; fromPath?: string; line?: number; /** §65 */ column?: number; /** §65: `this`, `user`, `CartService` in `user.symbol` */ receiver?: string }>
   /** Every line holding `symbol` as a whole word (`git grep -w -F`), the clicked file first. Replies `references`. */
-  | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number }>
+  | Cmd<"find_references", { symbol: string; fromPath?: string; limit?: number; /** §73: where the name is (the language server's position) */ line?: number; column?: number }>
   // MARK: ide-nav — §65
   /** The outline of one file (file order, `depth` = its containers); replies `document_symbols`. */
   | Cmd<"document_symbols", { path: string }>
@@ -1880,7 +1885,7 @@ export type ReviewHistoryEntry = {
 
 export type ErrorScope = "engine" | "session" | "git" | "pr";
 
-export type ReadyEvent = { type: "ready"; id?: string; engineVersion: string; platform: "darwin" | "win32" | "linux"; protocolVersion: 2 };
+export type ReadyEvent = { type: "ready"; id?: string; engineVersion: string; platform: "darwin" | "win32" | "linux"; protocolVersion: 2; /** MARK: lsp — §73 */ languageServer?: LanguageServerInfo };
 export type StateEvent = { type: "state"; state: ReviewState };
 /**
  * `code`: the stable refusal / failure id (docs/PROTOCOL.md "Error and refusal codes"), always set on `ok:false` from this
@@ -3455,7 +3460,15 @@ export type DefinitionCandidate = { path: string; line: number; column: number; 
  * §62: reply to `find_definition` — candidates best first (≤ 50). `truncated`: more candidates than sent, or the word was on
  * more than 100 000 lines and only those were read; `timedOut`: the search was stopped after 10 s (what it found until then).
  */
-export type DefinitionsEvent = { type: "definitions"; id?: string; symbol: string; candidates: DefinitionCandidate[]; truncated: boolean; timedOut?: true };
+export type DefinitionsEvent = {
+  type: "definitions"; id?: string; symbol: string; candidates: DefinitionCandidate[]; truncated: boolean; timedOut?: true;
+  /** MARK: lsp — §73: who answered (absent: an older engine — the search). */
+  source?: NavSource;
+  /** §73: source "grep" for a JS / TS / Vue file — why the language server did not answer. */
+  fallback?: LspFallback;
+  /** §73: the clicked name's type / signature (source "lsp"). */
+  quickInfo?: LspQuickInfo;
+};
 
 /** §62: one line holding the symbol as a whole word; `kind` when that line is a definition by §62's patterns. */
 export type ReferenceHit = { path: string; line: number; column: number; preview: string; kind?: DefinitionKind };
@@ -3464,7 +3477,33 @@ export type ReferenceHit = { path: string; line: number; column: number; preview
  * §62: reply to `find_references` — the clicked file's lines first, then its folder's, then the rest by path, line order in a
  * file. `files`: how many files they are in. `truncated`: more than `limit`; `timedOut`: stopped after 15 s.
  */
-export type ReferencesEvent = { type: "references"; id?: string; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true };
+export type ReferencesEvent = {
+  type: "references"; id?: string; symbol: string; hits: ReferenceHit[]; files: number; truncated: boolean; timedOut?: true;
+  /** MARK: lsp — §73 (as `DefinitionsEvent`). */
+  source?: NavSource;
+  fallback?: LspFallback;
+};
+
+// ---------------------------------------------------------------- MARK: lsp — §73 the language server for JS / TS / Vue
+// Types only (docs/PROTOCOL.md §73).
+
+/** §73: the language server (exact) or §62 / §65's search (approximate). */
+export type NavSource = "lsp" | "grep";
+/** §73.3: why a JS / TS / Vue lookup was answered by the search. */
+export type LspFallback = "off" | "starting" | "timeout" | "failed" | "unavailable" | "no_result";
+/** §73.3: tsserver's quickinfo of the clicked name — `display` (`function f(n: number): string`), its doc comment, its kind. */
+export type LspQuickInfo = { display: string; documentation?: string; kind?: string };
+/** §73.2: `state.nav.lsp` — absent while idle (not started, stopped after 10 idle minutes) or off. */
+export type LspState = {
+  status: "starting" | "ready" | "failed" | "unavailable";
+  typescript?: { version: string; source: "project" | "bundled" };
+  /** failed / unavailable: why (English). */
+  error?: string;
+  /** Crashes since the project opened (each restarted with backoff). */
+  restarts?: number;
+};
+/** §73: `ready.languageServer` — the bundled server is there (its TypeScript version). */
+export type LanguageServerInfo = { available: boolean; typescript?: string };
 
 // ---------------------------------------------------------------- MARK: ide-nav — §65 the symbol index
 // Types only (docs/PROTOCOL.md §65).
@@ -3495,7 +3534,7 @@ export type NavIndexState = {
   /** `failed`: git's first line. */
   error?: string;
 };
-export type NavState = { index: NavIndexState };
+export type NavState = { index: NavIndexState; /** MARK: lsp — §73.2 */ lsp?: LspState };
 export type DocumentSymbolsEvent = { type: "document_symbols"; id?: string; path: string; language: string; symbols: DocumentSymbol[]; truncated: boolean };
 export type WorkspaceSymbolsEvent = { type: "workspace_symbols"; id?: string; query: string; symbols: WorkspaceSymbol[]; truncated: boolean; index: NavIndexState };
 export type SymbolPreviewEvent = {

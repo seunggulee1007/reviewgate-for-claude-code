@@ -311,7 +311,7 @@ export class SymbolIndex {
   }
 }
 
-async function gitFiles(root: string): Promise<string[]> {
+export async function gitFiles(root: string): Promise<string[]> {
   const out = await runGit(root, ["-c", "submodule.recurse=false", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], { timeoutMs: 30_000 });
   return [...new Set(out.text.split("\0").filter(Boolean))];
 }
