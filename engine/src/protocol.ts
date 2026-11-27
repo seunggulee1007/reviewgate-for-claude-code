@@ -759,6 +759,24 @@ export type EngineCommand =
   | Cmd<"export_chat", { path?: string; replace?: boolean }>
   /** §70.3 `/copy [N]`: Claude's Nth-latest answer (1 = the latest) → `response_text`; the client puts it on the clipboard. */
   | Cmd<"copy_response", { n?: number }>
+  /** §72.1 `/hooks`: the hooks in effect for the session, read from the settings files it loads → `hooks_list`. */
+  | Cmd<"hooks_list">
+  /** §72.2 `/output-style`: the styles the session offers, the current one and where it is set → `output_styles`. */
+  | Cmd<"output_styles">
+  /**
+   * §72.2 `/output-style <name>`: switches the session's style through the CLI's own settings writer — `outputStyle` in
+   * `.claude/settings.local.json`, live from the next message, as the terminal's command → `output_styles`.
+   */
+  | Cmd<"output_style_set", { name: string }>
+  /** §72.3 `/plugin`: installed plugins, the ones the marketplaces offer, and the marketplaces → `plugins_list`. */
+  | Cmd<"plugins_list">
+  /**
+   * §72.3: one of the CLI's own plugin commands (`claude plugin <action> <target> [--scope] --json`, never a shell) →
+   * `plugin_result`. The clients confirm install, uninstall and the marketplace changes before they send it.
+   */
+  | Cmd<"plugin_run", { action: PluginAction; target: string; scope?: "user" | "project" | "local" }>
+  /** §72.3 `/reload-plugins [--force]`: the session's plugins from disk again → `plugins_reloaded`. */
+  | Cmd<"plugins_reload", { force?: boolean }>
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -1196,6 +1214,11 @@ export type SessionState = {
    * (TaskCreate / TaskUpdate), whichever Claude used last; [] when it has none (absent from an older engine).
    */
   todos?: TodoItem[];
+  /**
+   * §72.2: the running session's output style ("default" without one) — the CLI's at initialize, then each
+   * `output_style_set`; null while no session reported it (absent from an older engine).
+   */
+  outputStyle?: string | null;
 };
 
 /** §71.2: one item of Claude's to-do checklist (the terminal's Ctrl+T list). */
@@ -2227,6 +2250,111 @@ export type InterruptedEvent = { type: "interrupted"; id?: string; takenBack: { 
 /** §56.1: reply to `btw_ask` — `via` "session": the live CLI's `side_question`; "fork": a fork of the chat without tools. */
 /** §70.3: `export_chat`'s reply — the text, the name a save dialog proposes, and where it was written (null: not written). */
 export type ChatExportEvent = { type: "chat_export"; id?: string; text: string; name: string; path: string | null };
+/** §72.1: where a hook is defined — the CLI's settings files, a plugin's `hooks/hooks.json`, the managed policy. */
+export type HookSource = "user" | "project" | "local" | "plugin" | "managed";
+/** §72.1: one hook handler, as the terminal's `/hooks` shows it. */
+export type HookEntry = {
+  event: string;
+  /** The matcher group's `matcher`; "" for every one (the CLI's `"*"`, `""` or none). */
+  matcher: string;
+  /** `command` | `http` | `mcp_tool` | `prompt` | `agent` (as written; `command` when none is). */
+  type: string;
+  /** What it runs: the command (with its exec-form `args`), the URL, `server › tool`, the prompt (≤ 4000 chars). */
+  text: string;
+  if?: string;
+  /** Seconds, as written. */
+  timeout?: number;
+  async?: true;
+  statusMessage?: string;
+  source: HookSource;
+  /** The plugin's name (`source: "plugin"`). */
+  plugin?: string;
+  /** The file that defines it. */
+  path: string;
+  /** Whether it runs in this session (`disableAllHooks`, ReviewGate's "turn off my hooks", the managed switches). */
+  active?: boolean;
+};
+/** §72.1: a file `hooks_list` read (`exists: false` — a settings file the session would load, not there yet). */
+export type HookFile = { source: HookSource; plugin?: string; path: string; exists: boolean; count: number };
+/**
+ * §72.1: reply to `hooks_list`. `off`: why the settings and plugin hooks do not run — ReviewGate's switch (`app`), a
+ * settings file's `disableAllHooks` (`settings`), the managed `allowManagedHooksOnly` (`managed_only`) or its
+ * `disableAllHooks` (`managed`, the managed hooks too); null when they run.
+ */
+export type HooksListEvent = { type: "hooks_list"; id?: string; hooks: HookEntry[]; files: HookFile[]; off: "app" | "settings" | "managed_only" | "managed" | null };
+/** §72.2: one output style — a built-in (`description` null: the clients have its words), a style file's, or `other`. */
+export type OutputStyleInfo = {
+  name: string;
+  description: string | null;
+  source: "builtin" | "user" | "project" | "plugin" | "managed" | "other";
+  /** The style file. */
+  path?: string;
+  plugin?: string;
+};
+/** §72.2: the settings file whose `outputStyle` applies, and the value written there. */
+export type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path: string; value: string };
+/**
+ * §72.2: reply to `output_styles` / `output_style_set`. `current`: the session's style ("default" without one; null while
+ * no session reported it). `canSet: false` with `why` — `no_session`, `local_settings_off` (the CLI writes the local
+ * settings file, which this session does not load), `unsupported` (a CLI without the settings writer).
+ */
+export type OutputStylesEvent = {
+  type: "output_styles";
+  id?: string;
+  styles: OutputStyleInfo[];
+  current: string | null;
+  setIn: OutputStyleSetIn | null;
+  canSet: boolean;
+  why?: "no_session" | "local_settings_off" | "unsupported";
+};
+/** §72.3: what `plugin_run` asks the CLI to do (`marketplace_*`: `claude plugin marketplace <verb>`). */
+export type PluginAction = "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace_add" | "marketplace_remove" | "marketplace_update";
+/** §72.3: an installed plugin, as `claude plugin list --json` reports it. */
+export type PluginInstalled = {
+  /** `name@marketplace` (`@inline`, `@skills-dir`, `@synced` for the other origins). */
+  id: string;
+  name: string;
+  marketplace: string | null;
+  version: string;
+  /** `user` | `project` | `local` | `managed` | `session` | `synced`. */
+  scope: string;
+  /** Enabled in the merged settings. */
+  enabled: boolean;
+  installPath?: string;
+  projectPath?: string;
+  errors?: string[];
+  notes?: string[];
+  /** Off in ReviewGate (`settings.disabledPlugins`, §16) whatever the settings say. */
+  appOff?: true;
+};
+/** §72.3: a plugin a marketplace offers that is not installed (`--available`). */
+export type PluginAvailable = { id: string; name: string; marketplace: string; description?: string; version?: string; installCount?: number };
+/** §72.3: a configured marketplace (`claude plugin marketplace list --json`). */
+export type MarketplaceInfo = { name: string; source: string; repo?: string; url?: string; path?: string; ref?: string; installLocation?: string };
+/** §72.3: reply to `plugins_list`; `error` — the CLI could not list (not found, an older CLI without `--json`). */
+export type PluginsListEvent = { type: "plugins_list"; id?: string; installed: PluginInstalled[]; available: PluginAvailable[]; marketplaces: MarketplaceInfo[]; error?: string };
+/**
+ * §72.3: reply to `plugin_run` — the CLI's own words (`message`, its `--json` result) and what it printed (`output`,
+ * ≤ 8 KB). A refused or failed command is `ok: false` here, not a refusal: the clients show its output.
+ */
+export type PluginResultEvent = { type: "plugin_result"; id?: string; action: PluginAction; target: string; ok: boolean; message: string; output: string };
+/**
+ * §72.3: reply to `plugins_reload` — the terminal's summary counts. `held`: not applied, it would change the tools this
+ * conversation's prompt cache depends on (`cacheImpact`: the plugin MCP servers it would add or drop); `force` applies it.
+ */
+export type PluginsReloadedEvent = {
+  type: "plugins_reloaded";
+  id?: string;
+  applied: boolean;
+  held: boolean;
+  cacheImpact?: { mcpServersAdded: string[]; mcpServersRemoved: string[]; lspToolChange: string | null };
+  plugins: number;
+  skills: number;
+  agents: number;
+  hooks: number;
+  mcpServers: number;
+  errors: number;
+};
 /** §70.3: `copy_response`'s reply. */
 export type ResponseTextEvent = { type: "response_text"; id?: string; n: number; text: string };
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
@@ -2402,6 +2530,9 @@ export type EngineEvent =
   | InterruptedEvent // §56.2
   | ShellOutputEvent | ShellResultEvent // §67.2
   | ChatExportEvent | ResponseTextEvent // §70.3
+  | HooksListEvent // §72.1
+  | OutputStylesEvent // §72.2
+  | PluginsListEvent | PluginResultEvent | PluginsReloadedEvent // §72.3
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
@@ -2516,6 +2647,11 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "btw_ask" } ? BtwAnswerEvent // §56.1
   : C extends { type: "export_chat" } ? ChatExportEvent // §70.3
   : C extends { type: "copy_response" } ? ResponseTextEvent
+  : C extends { type: "hooks_list" } ? HooksListEvent // §72.1
+  : C extends { type: "output_styles" | "output_style_set" } ? OutputStylesEvent // §72.2
+  : C extends { type: "plugins_list" } ? PluginsListEvent // §72.3
+  : C extends { type: "plugin_run" } ? PluginResultEvent
+  : C extends { type: "plugins_reload" } ? PluginsReloadedEvent
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
@@ -2544,6 +2680,9 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | BtwAnswerEvent // §56.1
   | InterruptedEvent // §56.2
   | ChatExportEvent | ResponseTextEvent // §70.3
+  | HooksListEvent // §72.1
+  | OutputStylesEvent // §72.2
+  | PluginsListEvent | PluginResultEvent | PluginsReloadedEvent // §72.3
   | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow

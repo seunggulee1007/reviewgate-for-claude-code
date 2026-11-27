@@ -141,6 +141,8 @@ export type SessionEvent =
   | { type: "steer_withdrawn"; uuid: string }
   /** MARK: wave4d w4d-config — §42.3: the subagents (raw `AgentInfo[]`) of `initializationResult().agents`. */
   | { type: "agents_info"; agents: unknown[] }
+  /** §72.2: the session's output style and the styles it offers (`initializationResult()`, raw). */
+  | { type: "output_style_info"; current: unknown; available: unknown }
   /** MARK: wave3 engine-session — §36.7: the starting CLI made progress (the init watchdog restarted). */
   | ({ type: "start_progress" } & StartProgress)
   /** A tool call was denied because no engine-started turn was running (Claude Code continued on its own; §18). */

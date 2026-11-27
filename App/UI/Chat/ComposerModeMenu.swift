@@ -12,12 +12,21 @@ struct ComposerModeMenu: View {
     @Environment(AppState.self) private var store
     /// The row under the box folded (r1-composer M11): the mode's symbol only, the line in its tooltip.
     var compact = false
+    /// §72.2: the composer whose `/output-style` sheet the menu's Output Style item opens (nil: no such item, the measuring copy).
+    var composer: ComposerModel?
 
     var body: some View {
         let line = store.composerModeLine
         let mode = store.scheduledPermissionMode ?? store.permissionMode
         Menu {
             PermissionModeMenuItems()
+            // §72.2: the session's output style, and its sheet (as /output-style).
+            if let style = store.outputStyle, let composer {
+                Divider()
+                Button(OutputStyleText.menuItem(style)) { composer.slashRequest = SlashRequest(command: .outputStyle("")) }
+                    .help(OutputStyleText.description)
+                    .accessibilityIdentifier("Output style menu item")
+            }
         } label: {
             if compact {
                 Image(systemName: mode.symbolName)
@@ -36,6 +45,7 @@ struct ComposerModeMenu: View {
         .help(store.canPickPermissionMode
               ? PermissionModeLabels.help(store) + "\n" + (compact ? line.label + "\n" : "")
                 + String(localized: "Shift+Tab in the message box switches the permission mode")
+                + (store.outputStyle.map { "\n" + OutputStyleText.helpLine($0) } ?? "")   // §72.2
               : String(localized: "The permission mode can be picked once the session has started"))
         .accessibilityLabel(String(localized: "Permission mode: \(line.label)"))
         .accessibilityIdentifier("Permission mode")

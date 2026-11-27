@@ -19,6 +19,7 @@ describe("parseSlashAppCommand", () => {
       "/usage": { kind: "usage" }, "/todos": { kind: "todos" }, "/tasks": { kind: "tasks" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
       "/add-dir": { kind: "addDir", path: "" }, "/export": { kind: "export", file: "" }, "/copy": { kind: "copy", arg: "" },
+      "/hooks": { kind: "hooks" }, "/output-style": { kind: "outputStyle", name: "" }, "/plugin": { kind: "plugin", arg: "" }, "/reload-plugins": { kind: "reloadPlugins", force: false }, // §72
     };
     for (const [text, cmd] of Object.entries(expected)) expect(parseSlashAppCommand(text, []), text).toEqual(cmd);
     expect(new Set(APP_COMMAND_NAMES)).toEqual(new Set(Object.keys(expected).map((k) => k.slice(1))));
@@ -44,7 +45,7 @@ describe("parseSlashAppCommand", () => {
   });
 
   it("keeps a built-in only the terminal has out of the chat", () => {
-    expect(parseSlashAppCommand("/hooks", [])).toEqual({ kind: "terminalOnly", name: "hooks" });
+    expect(parseSlashAppCommand("/doctor", [])).toEqual({ kind: "terminalOnly", name: "doctor" });
   });
 
   it("§67.1: /add-dir is the app's own — with its path, or alone for the folder picker", () => {
@@ -85,7 +86,7 @@ describe("the palette", () => {
   it("lists the app commands with what they do here", () => {
     const entries = slashEntries(caps([
       { name: "model", description: "Set the AI model", argumentHint: "", source: "builtin" },
-      { name: "hooks", description: "Manage hook configurations", argumentHint: "", source: "builtin" },
+      { name: "doctor", description: "Diagnose the installation", argumentHint: "", source: "builtin" },
       { name: "status", description: "Project status", argumentHint: "", source: "project" },
     ] as SessionCapabilities["commands"]), true);
     const by = new Map(entries.map((e) => [e.name, e]));
@@ -99,7 +100,7 @@ describe("the palette", () => {
     expect(by.get("exit")?.aliases).toEqual(["quit"]);
     expect(by.get("status")?.group).toEqual({ kind: "project" });
     expect(by.get("status")?.description).toBe("Project status");
-    expect(by.get("hooks")?.description).toBe(terminalOnlyDescription("Manage hook configurations"));
+    expect(by.get("doctor")?.description).toBe(terminalOnlyDescription("Diagnose the installation"));
     const names = entries.map((e) => e.name);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
   });

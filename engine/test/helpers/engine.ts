@@ -1,7 +1,7 @@
 import { ReviewEngine, type EngineOptions } from "../../src/engine.js";
 import type { Platform } from "../../src/platform/index.js";
 import type { Budget, EffortLevel, EngineEvent, HelloCommand, PermissionMode, ReviewState, Settings, TurnUsage } from "../../src/protocol.js";
-import type { BtwAnswer, BtwExchange, ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, SendUserOptions, SessionImage, SteerTakeBack } from "../../src/session/claude.js";
+import type { BtwAnswer, BtwExchange, ClaudeSessionLike, ClaudeSessionOptions, DenyOptions, PermissionSettings, PluginReload, PluginReloadReport, SendUserOptions, SessionImage, SteerTakeBack } from "../../src/session/claude.js";
 import type { SessionEvent, ToolFileEntry } from "../../src/session/events.js";
 import { WAIT_MS } from "./wait.js";
 
@@ -109,6 +109,24 @@ export class FakeClaudeSession implements ClaudeSessionLike {
   async reloadPlugins(): Promise<PluginReload | null> {
     this.reloads += 1;
     return this.reloadResult;
+  }
+
+  /** §72.3: `reloadPluginsNow` calls (their `force`), and what they answer. */
+  readonly reloadsNow: boolean[] = [];
+  reloadNowResult: PluginReloadReport = { commands: [], plugins: [], held: false, agents: 0, mcpServers: [], errorCount: 0 };
+
+  async reloadPluginsNow(force: boolean): Promise<PluginReloadReport> {
+    this.reloadsNow.push(force);
+    return this.reloadNowResult;
+  }
+
+  /** §72.2: the styles `setOutputStyle` wrote, and what the next one throws (a CLI that refuses). */
+  readonly outputStyleSets: string[] = [];
+  outputStyleFailure: Error | null = null;
+
+  async setOutputStyle(name: string): Promise<void> {
+    if (this.outputStyleFailure) throw this.outputStyleFailure;
+    this.outputStyleSets.push(name);
   }
 
   respondPermission(requestId: string, allow: boolean, message?: string, _updatedInput?: Record<string, unknown>, opts?: DenyOptions): void {

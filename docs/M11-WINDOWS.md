@@ -311,7 +311,11 @@ shown), `settings-general` (Settings › General); §70: `history-search` (Ctrl+
 `history-nomatch` (nothing matches), `thinking-off` (the composer bar's chip with thinking off), `chat-export` (`/export`'s
 dialog); §71: `usage` (`/usage`'s dialog: the session block, three plan windows, one near its limit), `usage-empty` (no
 CLI running, no windows yet), `todos` (the to-do checklist over the box while Claude works), `tasks` (`/tasks`' dialog:
-a dev server and a test run with their output tails, an agent) and `tasks-empty` (nothing running). A request with no reply in the scene (or the harness's common empty
+a dev server and a test run with their output tails, an agent) and `tasks-empty` (nothing running); §72: `hooks` (`/hooks`'
+dialog: user, project, local and plugin hooks by event), `hooks-off` (turned off in ReviewGate, All events),
+`output-style` (`/output-style`'s dialog, another style picked), `plugins` (`/plugin manage`: an error, one off in ReviewGate,
+a managed one, a disable's words and output), `plugins-install` (the install confirmation with its scopes) and
+`plugins-marketplaces` (the marketplaces and a source typed). A request with no reply in the scene (or the harness's common empty
 replies) is refused and listed as `note: no fixture for …`.
 
 **Checks** — any finding marks the shot (`MARK` in the output, details in `report.json`) and the run exits 1:

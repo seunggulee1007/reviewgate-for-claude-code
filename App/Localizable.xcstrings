@@ -5041,6 +5041,22 @@
         }
       }
     },
+    "Ask Claude Code for the plugins again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Claude Code for the plugins again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code에 플러그인 목록을 다시 물어요"
+          }
+        }
+      }
+    },
     "Ask Claude to make a change.": {
       "localizations": {
         "en": {
@@ -6353,6 +6369,70 @@
         }
       }
     },
+    "Install %@ — you pick the scope first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install %@ — you pick the scope first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 설치 — 먼저 범위를 골라요"
+          }
+        }
+      }
+    },
+    "Matcher": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matcher"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matcher"
+          }
+        }
+      }
+    },
+    "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
+          }
+        }
+      }
+    },
+    "New Project · Start from a task · Open a folder…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Project · Start from a task · Open a folder…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새로 시작 · 업무로 시작 · 폴더 열기…"
+          }
+        }
+      }
+    },
     "Open %@": {
       "localizations": {
         "en": {
@@ -6369,6 +6449,38 @@
         }
       }
     },
+    "Open a project to install for it — without one it installs for you": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a project to install for it — without one it installs for you"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트에 설치하려면 프로젝트를 열어요 — 열지 않으면 나에게 설치돼요"
+          }
+        }
+      }
+    },
+    "Open a settings file this chat reads in your editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a settings file this chat reads in your editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅이 읽는 설정 파일을 에디터에서 열어요"
+          }
+        }
+      }
+    },
     "Opens the project you already have": {
       "localizations": {
         "en": {
@@ -6381,6 +6493,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이미 있는 프로젝트를 열어요"
+          }
+        }
+      }
+    },
+    "Output style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output style"
           }
         }
       }
@@ -6417,6 +6545,22 @@
         }
       }
     },
+    "Pick a style first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a style first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 스타일을 골라요"
+          }
+        }
+      }
+    },
     "Puts the whole conversation on the clipboard as plain text": {
       "localizations": {
         "en": {
@@ -6429,6 +6573,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대화 전체를 일반 텍스트로 클립보드에 넣어요"
+          }
+        }
+      }
+    },
+    "Read the settings files again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read the settings files again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 파일을 다시 읽어요"
           }
         }
       }
@@ -6513,6 +6673,22 @@
         }
       }
     },
+    "Switch to this style — Claude uses it from your next message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to this style — Claude uses it from your next message"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 스타일로 바꿔요 — 다음 메시지부터 적용돼요"
+          }
+        }
+      }
+    },
     "The repository's name until you edit it; a name already taken gets -2, -3": {
       "localizations": {
         "en": {
@@ -6557,6 +6733,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "내 git 로그인 정보를 써요 — push는 하지 않아요"
+          }
+        }
+      }
+    },
+    "Where Claude Code turns it on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where Claude Code turns it on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 플러그인을 켤 곳이에요"
           }
         }
       }

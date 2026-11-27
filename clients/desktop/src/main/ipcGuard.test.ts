@@ -141,6 +141,15 @@ describe("isSafeExternalURL / validateCommand", () => {
     expect(validateCommand({ type: "set_thinking", enabled: false }).ok).toBe(true);
   });
 
+  it("§72: allows /hooks, /output-style, /plugin and /reload-plugins", () => {
+    expect(validateCommand({ type: "hooks_list" }).ok).toBe(true);
+    expect(validateCommand({ type: "output_styles" }).ok).toBe(true);
+    expect(validateCommand({ type: "output_style_set", name: "Concise" }).ok).toBe(true);
+    expect(validateCommand({ type: "plugins_list" }).ok).toBe(true);
+    expect(validateCommand({ type: "plugin_run", action: "install", target: "deploy@acme-market", scope: "user" }).ok).toBe(true);
+    expect(validateCommand({ type: "plugins_reload", force: true }).ok).toBe(true);
+  });
+
   it("§67: allows /add-dir, its chip's × and the ! command (run and stop)", () => {
     expect(validateCommand({ type: "add_dir", path: "../shared" }).ok).toBe(true);
     expect(validateCommand({ type: "remove_dir", path: "C:\\work\\shared" }).ok).toBe(true);

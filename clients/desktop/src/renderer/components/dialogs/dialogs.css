@@ -48,3 +48,43 @@
 .usage-bar { height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
 .usage-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .usage-bar.high > span { background: var(--orange); }
+/* §72.1 /hooks: the hooks by event, each with its matcher, source, what it runs (HooksDialog.tsx). */
+.hooks-head { gap: 8px; }
+.hooks-head > .tiny.muted { flex: 1 1 auto; min-width: 0; }
+.hooks-body { max-height: calc(100vh - 260px); min-height: 120px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.hooks-empty { padding: 24px 0; text-align: center; }
+.hooks-event { display: flex; flex-direction: column; gap: 4px; }
+.hooks-event > .row { gap: 6px; align-items: baseline; }
+.hooks-row { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border-radius: 6px; background: var(--bg-2); }
+.hooks-row > .row { gap: 6px; align-items: baseline; min-width: 0; }
+.hooks-row.off .hooks-text { color: var(--fg-2); }
+.hooks-matcher { padding: 0 5px; border-radius: 4px; background: var(--bg-3); white-space: nowrap; }
+.hooks-text { white-space: pre-wrap; word-break: break-all; user-select: text; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+/* §72.2 /output-style: the styles, the current one marked, the picked one highlighted (OutputStyleDialog.tsx). */
+.style-list { max-height: calc(100vh - 230px); min-height: 100px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.style-row { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; cursor: default; }
+.style-row:hover { background: var(--bg-2); }
+.style-row.picked { background: var(--accent-bg, var(--bg-3)); }
+.style-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.style-mark { color: var(--fg-2); flex: none; }
+.style-mark.current { color: var(--accent); }
+.style-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.style-text > .row { gap: 6px; align-items: baseline; }
+.style-text .accent { color: var(--accent); }
+/* §72.3 /plugin: installed, discover, marketplaces through `claude plugin` (PluginsDialog.tsx). */
+.plugins-head { gap: 8px; }
+.plugins-head > .tiny.muted { flex: 1 1 auto; min-width: 0; }
+.segmented.plugins-tabs { margin: 0; }
+.plugins-body { max-height: calc(100vh - 330px); min-height: 110px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.plugins-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; border-radius: 6px; background: var(--bg-2); }
+.plugins-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.plugins-text > .row { gap: 6px; align-items: baseline; min-width: 0; }
+.plugins-scope { padding: 0 5px; border-radius: 4px; background: var(--bg-3); white-space: nowrap; }
+.plugins-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.plugins-switch { display: flex; align-items: center; padding-top: 2px; }
+.plugins-empty { padding: 24px 0; text-align: center; }
+.plugins-add { gap: 6px; margin-top: 4px; }
+.plugins-result { display: flex; flex-direction: column; gap: 3px; }
+.plugins-output { max-height: 90px; overflow: auto; margin: 4px 0 0; padding: 6px; border-radius: 5px; background: var(--bg-2); white-space: pre-wrap; user-select: text; }
+.plugins-scopes { display: flex; flex-direction: column; gap: 4px; }
+.plugins-scopes .row { gap: 6px; }

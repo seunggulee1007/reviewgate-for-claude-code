@@ -93,7 +93,11 @@
 #                  (composerbar-export-*.png); then §71, dark and light: /usage's sheet (a subscription's windows, none
 #                  yet, one reached; composerbar-usage-*-<appearance>.png), the to-do checklist over the box (idle, while
 #                  Claude works, hidden, none yet; composerbar-todos-*-<appearance>.png) and /tasks' sheet with each task's
-#                  output tail and with nothing running (composerbar-tasks-*-<appearance>.png).
+#                  output tail and with nothing running (composerbar-tasks-*-<appearance>.png); then §72, dark and light:
+#                  /hooks' sheet (every source, the hooks off with All events, none; composerbar-hooks-*-<appearance>.png),
+#                  /output-style's sheet (and when it cannot switch), /status's card with the style and the line after a
+#                  switch (composerbar-style-*-<appearance>.png), /plugin's sheet on each tab, the install confirmation and
+#                  /reload-plugins' lines, applied and held (composerbar-plugins-*-<appearance>.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with

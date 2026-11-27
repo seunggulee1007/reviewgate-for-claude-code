@@ -17,6 +17,7 @@ import Testing
             "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage, "/todos": .todos, "/tasks": .tasks,
             "/permissions": .permissions, "/agents": .agents, "/memory": .memory, "/config": .config, "/help": .help,
             "/status": .status, "/exit": .exit, "/rename": .rename, "/add-dir": .addDir(""), "/export": .export(""), "/copy": .copy(""),
+            "/hooks": .hooks, "/output-style": .outputStyle(""), "/plugin": .plugin(""), "/reload-plugins": .reloadPlugins(force: false),   // §72
         ]
         for (text, command) in expected { #expect(SlashAppCommand.parse(text, entries: []) == command, "\(text)") }
         #expect(Set(SlashAppCommand.names) == Set(expected.keys.map { String($0.dropFirst()) }))
@@ -41,8 +42,9 @@ import Testing
     }
 
     @Test func terminalOnlyBuiltinsAreNotSent() {
-        #expect(SlashAppCommand.parse("/hooks", entries: []) == .terminalOnly("hooks"))
+        #expect(SlashAppCommand.parse("/doctor", entries: []) == .terminalOnly("doctor"))
         #expect(SlashAppCommand.parse("/vim", entries: []) == .terminalOnly("vim"))
+        #expect(!SlashAppCommand.terminalOnly.contains("hooks"))   // §72.1: the app's own now
         #expect(!SlashAppCommand.terminalOnly.contains("add-dir"))   // §67.1: the app's own now
         #expect(!SlashAppCommand.terminalOnly.contains("export"))   // §70.3
         for name in ["usage", "stats", "todos", "tasks", "bashes"] { #expect(!SlashAppCommand.terminalOnly.contains(name), "\(name)") }   // §71.1
@@ -83,7 +85,7 @@ import Testing
 
     @Test func paletteListsTheAppCommandsInAClassicChat() {
         let session = caps([SlashCommandInfo(name: "model", description: "Set the AI model", source: .builtin),
-                            SlashCommandInfo(name: "hooks", description: "Manage hook configurations", source: .builtin),
+                            SlashCommandInfo(name: "doctor", description: "Diagnose the installation", source: .builtin),
                             SlashCommandInfo(name: "status", description: "Project status", source: .project)])
         let entries = SlashCommandCatalog.entries(session, offersAppCommands: true)
         let byName = Dictionary(entries.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
@@ -95,7 +97,8 @@ import Testing
         #expect(byName["exit"]?.aliases == ["quit"])
         #expect(byName["status"]?.group == .project)   // the project's own, untouched
         #expect(byName["status"]?.description == "Project status")
-        #expect(byName["hooks"]?.description == SlashAppCommand.terminalOnlyDescription("Manage hook configurations"))
+        #expect(byName["doctor"]?.description == SlashAppCommand.terminalOnlyDescription("Diagnose the installation"))
+        #expect(byName["hooks"]?.description == HooksText.description)   // §72.1
         #expect(entries.map(\.name) == entries.map(\.name).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending })
     }
 

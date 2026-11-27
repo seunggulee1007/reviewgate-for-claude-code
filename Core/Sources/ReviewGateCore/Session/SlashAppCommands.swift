@@ -16,6 +16,14 @@ public enum SlashAppCommand: Equatable, Sendable {
     case todos
     /// §71.3 `/tasks` (the terminal's `/bashes` is its alias): the background work — shells, monitors, agents — with stop.
     case tasks
+    /// §72.1 `/hooks`: the hooks in effect, read-only, with Open in Editor.
+    case hooks
+    /// §72.2 `/output-style [style]`: "" opens the style sheet; a name switches to it at once (any case, as the terminal's).
+    case outputStyle(String)
+    /// §72.3 `/plugin [subcommand]` (the terminal's `/plugins` and `/marketplace` too): the plugin sheet, as `PluginRequest.parse` reads it.
+    case plugin(String)
+    /// §72.3 `/reload-plugins [--force]`: the session's plugins again, with the terminal's summary.
+    case reloadPlugins(force: Bool)
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
     /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
@@ -26,20 +34,22 @@ public enum SlashAppCommand: Equatable, Sendable {
     case terminalOnly(String)
 
     /// The app's commands, as the palette lists them (each the terminal's name).
-    public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model",
-                               "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"]
+    public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "hooks", "memory", "model",
+                               "output-style", "permissions", "plugin", "reload-plugins", "rename", "resume", "rewind", "status", "tasks",
+                               "todos", "usage"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
         "continue": "resume", "quit": "exit", "settings": "config", "checkpoint": "rewind", "allowed-tools": "permissions",
         "cost": "usage", "stats": "usage",   // §71.1: the commands reference — "`/cost` and `/stats` are aliases"
         "bashes": "tasks",   // §71.3: "`/tasks` … Also available as `/bashes`"
+        "plugins": "plugin", "marketplace": "plugin",   // §72.3: "`/plugins` and `/marketplace` are aliases for `/plugin`"
     ]
 
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
-        "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
-        "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
+        "bug", "doctor", "extra-usage", "feedback", "ide", "install-github-app",
+        "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "privacy-settings",
         "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
     ]
 
@@ -67,6 +77,10 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "usage": return .usage   // §71.1
         case "todos": return .todos   // §71.2
         case "tasks": return .tasks   // §71.3
+        case "hooks": return .hooks   // §72.1
+        case "output-style": return .outputStyle(argument)   // §72.2
+        case "plugin": return .plugin(typed == "marketplace" ? ("marketplace " + argument).trimmingCharacters(in: .whitespaces) : argument)   // §72.3
+        case "reload-plugins": return .reloadPlugins(force: ["--force", "force"].contains(argument.lowercased()))
         case "permissions": return .permissions
         case "agents": return .agents
         case "memory": return .memory
@@ -93,6 +107,10 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "context": String(localized: "Show how full the context is — and compact it", bundle: .module)
         case "exit": String(localized: "Close this chat tab — it stays in the chat history", bundle: .module)
         case "help": String(localized: "Show the keyboard shortcuts", bundle: .module)
+        case "hooks": HooksText.description   // §72.1
+        case "output-style": OutputStyleText.description   // §72.2
+        case "plugin", "plugins", "marketplace": PluginText.description   // §72.3
+        case "reload-plugins": PluginText.reloadDescription
         case "memory": String(localized: "Show CLAUDE.md and the memory files Claude reads", bundle: .module)
         case "model": String(localized: "Choose the model — or type one: /model sonnet", bundle: .module)
         case "permissions": String(localized: "Open Settings › permissions", bundle: .module)
@@ -114,6 +132,9 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "add-dir": AddDirText.argumentHint
         case "copy": "[N]"   // §70.3
         case "export": "[file]"
+        case "output-style": OutputStyleText.argumentHint   // §72.2
+        case "plugin": PluginText.argumentHint   // §72.3
+        case "reload-plugins": "[--force]"
         default: ""
         }
     }

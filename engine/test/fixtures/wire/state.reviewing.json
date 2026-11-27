@@ -184,6 +184,7 @@
       "alwaysOn": false
     },
     "todos": [],
+    "outputStyle": null,
     "canRestart": true
   },
   "toolchain": {

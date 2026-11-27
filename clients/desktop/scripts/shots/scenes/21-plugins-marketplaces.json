@@ -1,0 +1,13 @@
+{
+  "extends": "19-plugins.json",
+  "name": "plugins-marketplaces",
+  "description": "/plugin marketplace (§72.3): the two marketplaces with their sources, Update and Remove, and a source typed into the add field.",
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/plugin marketplace" } },
+    { "key": "Enter" },
+    { "waitFor": "Plugins marketplace" },
+    { "type": { "testid": "Plugins marketplace source", "value": "acme/more-plugins" } },
+    { "wait": 300 }
+  ]
+}

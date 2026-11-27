@@ -14,6 +14,7 @@ import { capabilitiesOf, permissionMode, useStore } from "../../store";
 import { usePtyInfo } from "../../terminal/ptyInfo";
 import { effortLabel } from "./HudPopovers";
 import { modeLabel } from "./ModeMenu";
+import { styleDisplayName } from "../../outputStyles"; // §72.2
 
 export type SlashCardKind = "status" | { terminalOnly: string };
 
@@ -40,6 +41,7 @@ function StatusLines() {
     [t("Model"), option?.displayName ?? session.model ?? t("Model default")],
     [t("Effort"), effortLabel(session.effort ?? null)],
     [t("Mode"), modeLabel(permissionMode(state))],
+    ...(session.outputStyle ? [[t("Output style"), styleDisplayName(session.outputStyle)] as [string, string]] : []), // §72.2
     [t("Chat"), chat ? displayChatTitle(chat.title) : t("New chat")],
     ...(list.currentId ? [[t("Session"), list.currentId.slice(0, 8)] as [string, string]] : []),
     ["MCP", attention > 0 ? t("{0} servers · {1} need attention", servers, attention) : t("{0} servers", servers)],

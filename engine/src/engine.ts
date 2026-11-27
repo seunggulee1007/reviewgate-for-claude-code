@@ -125,6 +125,13 @@ import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-s
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
 import type { ChatExportEvent, ResponseTextEvent, ThinkingState, TodoItem } from "./protocol.js"; // §70.3, §70.4, §71.2
+import type { HooksListEvent, OutputStylesEvent, PluginAction, PluginResultEvent, PluginsListEvent, PluginsReloadedEvent } from "./protocol.js"; // §72.1–§72.3
+import { parseMarketplaces, parsePluginList, pluginActionTimeoutMs, pluginRunArgs, pluginRunOutcome, reloadCounts } from "./session/pluginCli.js"; // §72.3
+import { hookEntriesOf } from "./session/hooksList.js"; // §72.3
+import { safeReadOrNull } from "./util/safeRead.js"; // §72.3
+import { listHooks } from "./session/hooksList.js"; // §72.1
+import { canonicalStyle, listOutputStyles, outputStyleSetIn } from "./session/outputStyles.js"; // §72.2
+import { managedSettingsDir } from "./statusline/managed.js"; // §72.2
 import { chatExportText, exportFileName, nthResponse, writeExport } from "./session/exportChat.js"; // §70.3
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
@@ -413,7 +420,7 @@ export const INTERRUPT_WAIT_MS = 15_000;
 /** Default of `EngineOptions.parkIdleMs` (§9.1): one idle CLI besides the live one, for five minutes at most. */
 export const PARK_IDLE_MS = 5 * 60_000;
 /** §9.1: what a parked CLI may say and still be taken back (none of it is work); anything else ends it. */
-const PARKED_QUIET_EVENTS: ReadonlySet<string> = new Set(["rate_limit_info", "extensions_info", "models_info", "commands_info", "agents_info"]);
+const PARKED_QUIET_EVENTS: ReadonlySet<string> = new Set(["rate_limit_info", "extensions_info", "models_info", "commands_info", "agents_info", "output_style_info"]);
 /** §31: a restored review saved longer ago than this is stale (`state.gate.stale.reasons` "old"). */
 export const STALE_REVIEW_MS = 12 * 60 * 60 * 1000;
 /** `context_warning` threshold (§27). */
@@ -732,7 +739,7 @@ export class ReviewEngine {
   private agentsKey = "";
   private listeners = new Set<(ev: EngineEvent) => void>();
   private readonly pending = new Map<string, Pending>();
-  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), nav: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve(), remote: Promise.resolve() };
+  private readonly lanes: Record<Lane, Promise<void>> = { main: Promise.resolve(), pr: Promise.resolve(), side: Promise.resolve(), sidectl: Promise.resolve(), mcp: Promise.resolve(), query: Promise.resolve(), live: Promise.resolve(), workbench: Promise.resolve(), search: Promise.resolve(), nav: Promise.resolve(), steer: Promise.resolve(), btw: Promise.resolve(), remote: Promise.resolve(), plugin: Promise.resolve() };
   /** Side threads of the current chat (§21). */
   private readonly side: SideThreads;
   /** §56.1: the current chat's /btw exchanges (in memory: the CLI keeps none for an SDK session). */
@@ -773,6 +780,8 @@ export class ReviewEngine {
   private readonly mcpFiles = new McpFileIndex();
   /** `initializationResult().agents` of the running session, with their files. */
   private cliAgents: SubagentInfo[] | null = null;
+  /** §72.2: each CLI's output style and the styles it offers (`initializationResult()`, then `output_style_set`). */
+  private readonly outputStyleOf = new WeakMap<ClaudeSessionLike, { current: string; available: string[] }>();
   private disposing: Promise<void> | null = null;
   private closed = false;
   // ---- §23–28
@@ -1621,6 +1630,18 @@ export class ReviewEngine {
         return this.exportChat(cmd.path, cmd.replace === true);
       case "copy_response":
         return this.copyResponse(cmd.n);
+      case "hooks_list": // §72.1
+        return this.hooksList();
+      case "output_styles": // §72.2
+        return this.outputStyles();
+      case "output_style_set":
+        return this.setOutputStyle(cmd.name);
+      case "plugins_list": // §72.3
+        return this.pluginsList();
+      case "plugin_run":
+        return this.pluginRun(cmd.action, cmd.target, cmd.scope);
+      case "plugins_reload":
+        return this.pluginsReload(cmd.force === true);
       case "shell_run": // §67.2
         await this.shellRunStart(cmd.command);
         return;
@@ -7274,6 +7295,93 @@ export class ReviewEngine {
     }).join("|");
   }
 
+  /**
+   * §72.3 `plugins_list`: `claude plugin list --json --available` and `claude plugin marketplace list --json` in the project
+   * folder (its project and local installs). A CLI that cannot list answers `error` with empty lists, never a refusal.
+   */
+  private async pluginsList(): Promise<PluginsListEvent> {
+    const cwd = this.project?.path ?? homedir();
+    const empty = (error: string): PluginsListEvent => ({ type: "plugins_list", installed: [], available: [], marketplaces: [], error });
+    let list: { status: number | null; stdout: string; stderr: string };
+    try {
+      list = await this.execClaude(["plugin", "list", "--json", "--available"], cwd);
+    } catch (e) {
+      return empty(e instanceof CommandRefused ? e.message : firstLineOf(errorMessage(e)));
+    }
+    const parsed = list.status === 0 ? parsePluginList(list.stdout, this.settings.disabledPlugins ?? []) : null;
+    if (!parsed) return empty(firstLineOf(list.stderr) || firstLineOf(list.stdout) || `exit ${list.status}`);
+    let marketplaces: PluginsListEvent["marketplaces"] = [];
+    try {
+      const m = await this.execClaude(["plugin", "marketplace", "list", "--json"], cwd);
+      if (m.status === 0) marketplaces = parseMarketplaces(m.stdout);
+    } catch (e) {
+      this.log("debug", `claude plugin marketplace list: ${errorMessage(e)}`);
+    }
+    return { type: "plugins_list", ...parsed, marketplaces };
+  }
+
+  /**
+   * §72.3 `plugin_run`: one of the CLI's own plugin commands with `--json`, its words and output as the reply. It changes
+   * the user's Claude Code settings and plugin folder as the terminal's `/plugin` does; the plugin sync (§36.5) then has the
+   * running session reload once no turn runs. Project and local scope need a project.
+   */
+  private async pluginRun(action: PluginAction, target: string, scope?: "user" | "project" | "local"): Promise<PluginResultEvent> {
+    const args = pluginRunArgs(action, target, scope);
+    if (scope === "project" || scope === "local") this.requireProject();
+    const out = await this.execClaude(args, this.project?.path ?? homedir(), pluginActionTimeoutMs(action));
+    const r = pluginRunOutcome(out);
+    this.log("info", `claude plugin ${action.replace("_", " ")}: ${r.ok ? "ok" : "failed"} (exit ${out.status})`);
+    return { type: "plugin_result", action, target: target.trim(), ...r };
+  }
+
+  /**
+   * §72.3 `plugins_reload {force}`: the terminal's `/reload-plugins [--force]` — the CLI reloads its plugins now (held when
+   * it would change the conversation's tools, unless `force`), and the palette, plugins and hooks follow.
+   */
+  private async pluginsReload(force: boolean): Promise<PluginsReloadedEvent> {
+    const session = this.session;
+    if (!session || this.terminal) throw new CommandRefused("no_session");
+    if (typeof session.reloadPluginsNow !== "function") throw new CommandRefused("plugins_reload_unsupported");
+    if (this.gate.running || this.gate.collecting || session.isTurnActive) throw new CommandRefused("plugins_turn_running");
+    if (this.pluginReloading) throw new CommandRefused("plugins_reloading");
+    this.pluginReloading = true;
+    try {
+      const r = await withTimeout(session.reloadPluginsNow(force), MCP_CALL_TIMEOUT_MS, "reloadPlugins");
+      if (!r.held && this.session === session) this.applyPluginReload(r);
+      this.pluginStamp = this.pluginFilesStamp(); // the files as reloaded: the sync does not reload them again
+      const hooks = r.plugins.reduce((n, p) => {
+        const text = safeReadOrNull(join(p.path, "hooks", "hooks.json"));
+        if (text === null) return n;
+        try {
+          return n + hookEntriesOf((JSON.parse(text) as { hooks?: unknown } | null)?.hooks, { source: "plugin", path: "", plugin: p.name }).length;
+        } catch {
+          return n;
+        }
+      }, 0);
+      this.log("info", `reload-plugins${force ? " --force" : ""}: ${r.held ? "held (it would change this conversation's tools)" : `${r.plugins.length} plugins`}`);
+      return { type: "plugins_reloaded", applied: !r.held, held: r.held, ...(r.cacheImpact ? { cacheImpact: r.cacheImpact } : {}), ...reloadCounts(r, hooks) };
+    } catch (e) {
+      if (e instanceof CommandRefused) throw e;
+      const why = firstLineOf(errorMessage(e));
+      throw new CommandRefused(why === "plugins_reload_unsupported" ? why : `plugins_reload_failed:${why}`, { code: why === "plugins_reload_unsupported" ? why : "plugins_reload_failed" });
+    } finally {
+      this.pluginReloading = false;
+    }
+  }
+
+  /** A reload the CLI applied: its plugins and commands replace the session's (§36.5). */
+  private applyPluginReload(r: { commands: unknown; plugins: { name: string; path: string; version?: string }[] }): void {
+    const caps = this.sessionState.capabilities ?? emptyCapabilities();
+    this.sessionState.capabilities = {
+      ...caps,
+      plugins: r.plugins.map((p) => p.name),
+      pluginDetails: r.plugins.map((p) => ({ name: p.name, path: p.path, id: pluginIdFromPath(p.name, p.path), ...(p.version ? { version: p.version } : {}) })),
+    };
+    if (this.ext) this.ext.plugins = r.plugins.map((p) => ({ ...p }));
+    this.refreshExtensions();
+    this.applyCommands(r.commands);
+  }
+
   private async syncPlugins(session: ClaudeSessionLike): Promise<void> {
     if (this.session !== session || this.closed || this.pluginReloading || !session.reloadPlugins) return;
     if (!(this.ext?.loadUser ?? false)) return;
@@ -7291,15 +7399,7 @@ export class ReviewEngine {
         return;
       }
       this.log("info", `plugins reloaded: ${r.plugins.map((p) => p.name).join(", ") || "none"}`);
-      const caps = this.sessionState.capabilities ?? emptyCapabilities();
-      this.sessionState.capabilities = {
-        ...caps,
-        plugins: r.plugins.map((p) => p.name),
-        pluginDetails: r.plugins.map((p) => ({ name: p.name, path: p.path, id: pluginIdFromPath(p.name, p.path), ...(p.version ? { version: p.version } : {}) })),
-      };
-      if (this.ext) this.ext.plugins = r.plugins.map((p) => ({ ...p }));
-      this.refreshExtensions();
-      this.applyCommands(r.commands);
+      this.applyPluginReload(r);
     } catch (e) {
       this.log("debug", `reloadPlugins: ${errorMessage(e)}`);
     } finally {
@@ -7552,20 +7652,22 @@ export class ReviewEngine {
     return this.session && typeof this.session.mcpServerStatus === "function" ? this.mcpStatusReply() : this.mcpEvent();
   }
 
+  /** `claude <args>` without a shell in `cwd` (test seam `runClaude`); refused `cli_not_found` without a CLI. */
+  private async execClaude(args: string[], cwd: string, timeoutMs = 30_000): Promise<{ status: number | null; stdout: string; stderr: string }> {
+    if (this.runClaudeFn) return this.runClaudeFn(args, cwd);
+    const tc = await this.locate();
+    if (!tc.claude) throw new CommandRefused("cli_not_found");
+    const exe = resolveClaudeExecutable(tc.claude, this.platform.isWindows);
+    const file = exe.executable ?? exe.path;
+    const argv = exe.executable ? [exe.path, ...args] : args;
+    const r = await exec(file, argv, { cwd, env: { ...this.childEnv(), PATH: tc.path, ...(exe.env ?? {}) }, timeoutMs });
+    return { status: r.status, stdout: r.stdout.toString("utf8"), stderr: r.timedOut ? `timed out after ${Math.round(timeoutMs / 1000)} s\n${r.stderr}` : r.stderr };
+  }
+
   /** `claude <args>` without a shell, in the project (project scope writes its `.mcp.json`); argv is never logged (env / header values). */
   private async runClaudeMcp(args: string[], name: string, cwdOverride?: string): Promise<void> {
     const cwd = cwdOverride ?? this.project?.path ?? homedir(); // MARK: wave4d w4d-config (§42.3: the folder of the server's .mcp.json)
-    let out: { status: number | null; stdout: string; stderr: string };
-    if (this.runClaudeFn) out = await this.runClaudeFn(args, cwd);
-    else {
-      const tc = await this.locate();
-      if (!tc.claude) throw new CommandRefused("cli_not_found");
-      const exe = resolveClaudeExecutable(tc.claude, this.platform.isWindows);
-      const file = exe.executable ?? exe.path;
-      const argv = exe.executable ? [exe.path, ...args] : args;
-      const r = await exec(file, argv, { cwd, env: { ...this.childEnv(), PATH: tc.path, ...(exe.env ?? {}) }, timeoutMs: 30_000 });
-      out = { status: r.status, stdout: r.stdout.toString("utf8"), stderr: r.stderr };
-    }
+    const out = await this.execClaude(args, cwd);
     this.log("info", `claude mcp ${args[1]} ${name}: exit ${out.status}`);
     if (out.status !== 0) {
       const why = firstLineOf(out.stderr) || firstLineOf(out.stdout) || `exit ${out.status}`;
@@ -8166,6 +8268,85 @@ export class ReviewEngine {
     return loadPermissionRules({ configDir: claudeConfigDir(this.childEnv()), root: this.project?.root ?? cwd ?? "", loadUser, loadLocal });
   }
 
+  /**
+   * §72.1 `hooks_list`: the hooks of the files this session loads (user settings only when they load, local settings only
+   * when they do, the plugins the CLI loaded), each with whether it runs — as the terminal's read-only `/hooks`.
+   */
+  private hooksList(): HooksListEvent {
+    const configDir = claudeConfigDir(this.childEnv());
+    const loadUser = this.ext?.loadUser ?? (this.settings.loadUserSettings !== false && this.extensionsFallback === null);
+    const loadLocal = this.ext?.loadLocal ?? (this.settings.loadLocalSettings !== false && this.extensionsFallback === null);
+    const policy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const plugins = loadUser ? this.knownPlugins().filter((p) => p.enabled).map((p) => ({ name: p.name, path: p.path })) : [];
+    return {
+      type: "hooks_list",
+      ...listHooks({
+        configDir,
+        cwd: this.project?.path ?? this.project?.root ?? null,
+        loadUser,
+        loadLocal,
+        plugins,
+        appHooksOff: this.settings.disableUserHooks === true,
+        managed: { settings: policy.settings, path: policy.sources[0]?.path ?? null },
+      }),
+    };
+  }
+
+  /** §72.2: what `initializationResult()` said (raw): the current style and the names it offers. */
+  private noteOutputStyle(source: ClaudeSessionLike, current: unknown, available: unknown): void {
+    const names = Array.isArray(available) ? available.filter((n): n is string => typeof n === "string" && n.trim() !== "") : [];
+    const now = typeof current === "string" && current.trim() ? current : "default";
+    this.outputStyleOf.set(source, { current: now, available: names });
+    if (source === this.session) this.touch();
+  }
+
+  /** §72.2 `output_styles`: the styles the session offers with their sources, the current one and where it is set. */
+  private outputStyles(): OutputStylesEvent {
+    const configDir = claudeConfigDir(this.childEnv());
+    const loadUser = this.ext?.loadUser ?? (this.settings.loadUserSettings !== false && this.extensionsFallback === null);
+    const loadLocal = this.ext?.loadLocal ?? (this.settings.loadLocalSettings !== false && this.extensionsFallback === null);
+    const cwd = this.project?.path ?? this.project?.root ?? null;
+    const live = this.session && !this.terminal ? this.outputStyleOf.get(this.session) ?? null : null;
+    const policy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const styles = listOutputStyles({
+      available: live && live.available.length > 0 ? live.available : null,
+      configDir,
+      cwd,
+      root: this.project?.root ?? cwd,
+      plugins: loadUser ? this.knownPlugins().filter((p) => p.enabled).map((p) => ({ name: p.name, path: p.path })) : [],
+      managedDir: this.managedPolicyOverride ? null : managedSettingsDir(this.platform.name),
+    });
+    const setIn = outputStyleSetIn({ configDir, cwd, loadUser, loadLocal, managed: policy.settings, managedPath: policy.sources[0]?.path ?? null });
+    const session = this.session && !this.terminal ? this.session : null;
+    const why: OutputStylesEvent["why"] = !session || !live ? "no_session" : !loadLocal ? "local_settings_off" : typeof session.setOutputStyle !== "function" ? "unsupported" : undefined;
+    return { type: "output_styles", styles, current: live?.current ?? null, setIn, canSet: why === undefined, ...(why ? { why } : {}) };
+  }
+
+  /**
+   * §72.2 `output_style_set {name}`: as the terminal's `/output-style <name>` — the name without case, written by the CLI's
+   * own settings writer to `.claude/settings.local.json` and live from the next message.
+   */
+  private async setOutputStyle(name: string): Promise<OutputStylesEvent> {
+    if (typeof name !== "string" || !name.trim()) throw new CommandRefused("invalid_output_style");
+    const before = this.outputStyles();
+    if (!before.canSet) throw new CommandRefused(before.why === "no_session" ? "no_session" : before.why === "local_settings_off" ? "local_settings_off" : "output_style_unsupported");
+    const session = this.session!;
+    const live = this.outputStyleOf.get(session)!;
+    const target = canonicalStyle(name, live.available);
+    if (target === null) throw new CommandRefused(`unknown_output_style:${name.trim().slice(0, 80)}`, { code: "unknown_output_style" });
+    try {
+      await withTimeout(session.setOutputStyle!(target), MCP_CALL_TIMEOUT_MS, "updateSettings");
+    } catch (e) {
+      const why = firstLineOf(errorMessage(e));
+      if (why === "output_style_unsupported") throw new CommandRefused("output_style_unsupported");
+      throw new CommandRefused(`output_style_failed:${why}`, { code: "output_style_failed" });
+    }
+    if (this.session === session) this.outputStyleOf.set(session, { ...live, current: target });
+    this.log("info", `output style: ${target} (written to the local settings by the CLI)`);
+    this.touch();
+    return this.outputStyles();
+  }
+
   /** §33.8: `permission_rules` — every allow rule of the user's settings, what ReviewGate does with it, the terminal's default mode. */
   private permissionRules(): PermissionRulesEvent {
     if (!this.project) throw new CommandRefused("no_project");
@@ -8274,6 +8455,8 @@ export class ReviewEngine {
     if (source instanceof TerminalSession && source.isBackground && this.backgroundTerminals.get(source.chatId) === source) {
       return this.onBackgroundTerminalEvent(source, ev);
     }
+    // §72.2: kept with the CLI that reported it (a parked one too: it is its style when it is taken back).
+    if (ev.type === "output_style_info") this.noteOutputStyle(source, ev.current, ev.available);
     // r2-chats-cards M33 (§9.1): a parked CLI that starts to work (a task's result, a message, a turn of its own) or dies
     // is not taken back — nothing it would do may escape the review.
     if (this.parked?.session === source && !this.closed) {
@@ -10106,6 +10289,7 @@ export class ReviewEngine {
         shellPending: this.shellPending.length,
         thinking: this.thinkingSlice(), // §70.4
         todos: this.currentSessionId ? checklistOf(this.chatPlanMemory()) : [], // §71.2
+        outputStyle: (this.session ? this.outputStyleOf.get(this.session)?.current : undefined) ?? null, // §72.2
       },
       toolchain: this.toolchain,
       gate: this.gate,
@@ -10403,7 +10587,7 @@ function isPrCommand(type: EngineCommand["type"]): boolean {
 }
 
 /** `live` (§34.6, wave2 engine-why): `live_changes` / `live_diff` snapshot the worktree; never behind — or holding up — another lane. */
-type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "nav" | "steer" | "btw" | "remote"; // MARK: git-sync — remote (§68.1) // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); code-nav: nav (§62); §56.1 btw
+type Lane = "main" | "pr" | "side" | "sidectl" | "mcp" | "query" | "live" | "workbench" | "search" | "nav" | "steer" | "btw" | "remote" | "plugin"; // §72.3 plugin // MARK: git-sync — remote (§68.1) // wave3 engine-flow: workbench (§36.12); code-browser: search (§47); code-nav: nav (§62); §56.1 btw
 
 /**
  * PR commands run on their own lane (slow `gh`), side questions too (§21: `side_ask` / drafts must never wait behind
@@ -10501,7 +10685,15 @@ function laneOf(cmd: EngineCommand): Lane {
     // §70.3: a read of the chat's rows (and one file written), never behind a turn.
     case "export_chat":
     case "copy_response":
+    case "hooks_list": // §72.1: reads of the settings files
+    case "output_styles": // §72.2: reads, and one quick call to the CLI's settings writer
+    case "output_style_set":
       return "query";
+    // §72.3: `claude plugin …` can clone for minutes — never behind (or holding up) a turn; a reload waits for the install before it.
+    case "plugins_list":
+    case "plugin_run":
+    case "plugins_reload":
+      return "plugin";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
   }
@@ -10583,6 +10775,12 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "set_thinking": // §70.4
     case "export_chat": // §70.3
     case "copy_response":
+    case "hooks_list": // §72.1
+    case "output_styles": // §72.2
+    case "output_style_set":
+    case "plugins_list": // §72.3
+    case "plugin_run":
+    case "plugins_reload":
       return "session";
     case "side_ask":
     case "side_list":

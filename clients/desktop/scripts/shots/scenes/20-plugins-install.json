@@ -1,0 +1,13 @@
+{
+  "extends": "19-plugins.json",
+  "name": "plugins-install",
+  "description": "/plugin install deploy@acme-market (§72.3): Discover with the install confirmation over it — the warning, the terminal's three scopes, the command that will run.",
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/plugin install deploy@acme-market" } },
+    { "key": "Enter" },
+    { "waitFor": "Plugins confirm" },
+    { "click": "Plugins scope project" },
+    { "wait": 300 }
+  ]
+}

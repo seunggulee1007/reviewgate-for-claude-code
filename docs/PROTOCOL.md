@@ -9068,6 +9068,10 @@ not touched.
 | `/usage` (`/cost`, `/stats`) | §71.1: the usage sheet · dialog — session cost and times, usage by model, plan windows (before: `/cost` the HUD's cost popover) |
 | `/todos` | §71.2: Claude's to-do checklist over the box (as ⌃T · Ctrl+Shift+L) |
 | `/tasks` (`/bashes`) | §71.3: the background work with each task's output tail and [중지] |
+| `/hooks` | §72.1: the hooks in effect by event, read-only, with 에디터에서 열기 |
+| `/output-style [style]` | §72.2: the output style sheet · dialog; with a name, that style from the next message |
+| `/plugin [subcommand]` (`/plugins`, `/marketplace`) | §72.3: the plugin sheet · dialog (설치됨 · 찾아보기 · 마켓플레이스) through `claude plugin` |
+| `/reload-plugins [--force]` | §72.3: the session's plugins again, the terminal's summary in the line under the box |
 | `/permissions` (`/allowed-tools`) | Settings — Mac › General (its permission section) · Windows › Permissions |
 | `/config` (`/settings`) | Settings |
 | `/agents` | the agent panel opens (never toggles closed) |
@@ -9082,9 +9086,9 @@ not touched.
   the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
   project's `/status` still goes to Claude).
 - **`/add-dir`** is the app's own since §67.1 (it adds a directory to the chat); before, it was among the terminal's.
-- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme` … the list is
+- **Only the terminal has it** (`/vim`, `/doctor`, `/login`, `/theme` … the list is
   `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
-  "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
+  "/doctor — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
   its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
   to Claude as before.
 - **When:** the draft is one line `/name [args]`, on ↩ / ⌘↩ (send, queue, steer, stop-and-send) — and on ↩ with the
@@ -11892,6 +11896,239 @@ No engine change: §52 already has the list (`state.session.backgroundTasks`), `
   `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
   `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
   Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.
+
+## 72. Terminal parity, batch F
+
+Three more terminal screens for classic chats, checked against Claude Code's docs (the hooks reference, the commands
+reference, the output-styles page and the plugin pages, as of 2026-11-27): `/hooks`, `/output-style` and `/plugin` with
+`/reload-plugins`. Terminal chats (§57) are the real TUI and keep theirs.
+
+### 72.1 `/hooks` — the hooks in effect, read-only
+
+```ts
+// command (lane query: never behind a turn)
+hooks_list {}   // → hooks_list
+type HooksListEvent = { type: "hooks_list"; hooks: HookEntry[]; files: HookFile[]; off: "app" | "settings" | "managed_only" | "managed" | null };
+type HookEntry = {
+  event: string; matcher: string /* "" = every one */; type: string /* command | http | mcp_tool | prompt | agent */;
+  text: string /* what it runs, ≤ 4000 chars */; if?: string; timeout?: number; async?: true; statusMessage?: string;
+  source: "user" | "project" | "local" | "plugin" | "managed"; plugin?: string; path: string; active?: boolean;
+};
+type HookFile = { source: HookSource; plugin?: string; path: string; exists: boolean; count: number };
+```
+
+- **As the terminal's.** The hooks reference: "Type `/hooks` in Claude Code to open a read-only browser for your
+  configured hooks. The list labels each hook with where it comes from, such as user settings, project settings, local
+  settings, a plugin, or the current session … Select a hook to see the full text of what it runs and where it's defined,
+  such as the path of its settings file or the name of its plugin … To browse all hook events, including ones with no
+  hooks configured, select `All events`". It does not edit: "To remove a hook defined in a settings file, delete its
+  entry from that file." So the app does not edit hooks either; it offers the file.
+- **What the engine reads** — the files the session loads, the way §16 / §36.6 load them: `<config>/settings.json` (only
+  with user settings), `<project>/.claude/settings.json`, `.claude/settings.local.json` (only while local settings load),
+  each enabled plugin's `hooks/hooks.json`, and the managed tier's `hooks` (§44.2's reader). One entry per handler, with
+  the matcher group's `matcher` (`"*"` / none → ""), the handler's `type`, what it runs (`command` with its exec-form
+  `args`, the `url`, `server › tool`, the `prompt`), `if`, `timeout`, `async`, `statusMessage`. Sorted in the reference's
+  lifecycle order of the 34 events (an unknown event after them, by name), then user, project, local, plugin, managed.
+  Every file through `safeReadOrNull` (a regular file ≤ 1 MB). `files` lists each settings file the session would load,
+  `exists: false` when it is not there yet, so Open in Editor has a target before the first hook.
+- **`active` and `off`**, as the CLI: a settings file's `disableAllHooks` (the highest file that sets it wins — "a
+  `disableAllHooks: false` in a project's `.claude/settings.json` overrides a `true` in your user settings") or
+  ReviewGate's "turn off my hooks" (`disableUserHooks`, the flag layer's `disableAllHooks`, §16) stops the settings and
+  plugin hooks; only the managed tier's `disableAllHooks` stops the managed ones; the managed `allowManagedHooksOnly`
+  leaves only those.
+- **Not listed, with why:** the terminal's "current session" hooks — a skill's or subagent's frontmatter `hooks`, which
+  the CLI registers while that skill or subagent runs — are in no settings file; ReviewGate's own SDK callback hooks
+  (budget, git guard, containment) are not the user's and are not in the terminal's list either. A plugin's hooks
+  declared inline in its `plugin.json` are not read (only `hooks/hooks.json`).
+- Engine: `session/hooksList.ts` (`listHooks`, `hookEntriesOf`, `sortHooks`, `HOOK_EVENTS`), `engine.ts`
+  (`hooksList`), `protocol.ts` (`HookEntry`, `HookFile`, `HooksListEvent`). Tests: `engine/test/w72.hooks.test.ts`.
+- **`/hooks` is an app command now** in a classic chat (no longer a terminal-only name, §56.5). It opens the **hooks
+  sheet** (Mac) / dialog (Windows): "훅 — 터미널의 /hooks처럼 보기만 해요", one group per event in the lifecycle order with
+  "훅 N개", and per hook its matcher ("전체" for every one), its type, where it is defined (사용자 설정 · 프로젝트 설정 · 로컬
+  설정 · 플러그인 <name> · 관리 정책), "꺼짐" when it does not run, what it runs (monospaced, selectable, four lines, the
+  whole text in its tooltip), `if` / timeout / background / status message, and **에디터에서 열기** for its file (the
+  editor the diff's Open in Editor remembered, else the system's app). An orange line says why the hooks do not run
+  (`off`). **모든 이벤트** lists every event, an empty one with "훅 없음" (the terminal's All events). **설정 파일** opens
+  any settings file this chat reads, to add a hook — one not there yet is disabled with "…파일이 아직 없어요 — 있으면 이
+  채팅이 읽어요". ↻ reads them again. The note under the list says the skills' and subagents' own hooks are not listed.
+- Mac: Core `Session/HooksList.swift` (`HookEntry`, `HookFile`, `HooksList.byEvent`, `HooksText`, `AppState.hooksList`),
+  `SlashAppCommand.hooks`; App `HooksSheet.swift`, `ComposerSlashCommands.swift`. Tests: `HooksListTests`,
+  `SlashAppCommandsTests`.
+- Windows: `hooksList.ts` (`hooksByEvent`, `HOOK_EVENTS`, the words — their Korean from the Mac's catalogs through
+  `gen-i18n.mjs`, `loadHooks`), `components/dialogs/HooksDialog.tsx` (`Dialog {kind: "hooks"}`; Open in Editor through
+  `window.rg.openInEditor`, the editor of the diff's Open in Editor), `slashAppCommands.ts` / `slashAppRun.ts`
+  (`{kind: "hooks"}`). Tests: `hooksList.test.ts`, `slashAppCommands.test.ts`.
+
+### 72.2 `/output-style` — pick the session's output style
+
+```ts
+// commands (lane query)
+output_styles {}                   // → output_styles
+output_style_set { name: string }  // → output_styles (after the switch)
+type OutputStylesEvent = {
+  type: "output_styles"; styles: OutputStyleInfo[]; current: string | null; setIn: OutputStyleSetIn | null;
+  canSet: boolean; why?: "no_session" | "local_settings_off" | "unsupported";
+};
+type OutputStyleInfo = { name: string; description: string | null; source: "builtin" | "user" | "project" | "plugin" | "managed" | "other"; path?: string; plugin?: string };
+type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path: string; value: string };
+// state.session.outputStyle?: string | null   — the running session's style ("default" without one); null before it said
+```
+
+- **The command still exists.** The commands reference: "`/output-style [style]` — List output styles or switch to one,
+  for example `/output-style concise` … Requires Claude Code v2.1.269 or later". The output-styles page: "The command and
+  both menus save your choice to `.claude/settings.local.json` at the local project level … The command also works in
+  non-interactive mode and Agent SDK sessions … When you switch styles mid-session, Claude uses the new style starting
+  with your next message … Before v2.1.251, the new style applied only after you ran `/clear` or started a new session",
+  and "The `/output-style` command ignores case". Built-ins: Default ("no output style is selected"), Proactive, Concise,
+  Explanatory, Learning; custom styles are Markdown files in `~/.claude/output-styles`, every `.claude/output-styles`
+  from the working directory up to the repository root (the closest wins), the managed folder, and a plugin's
+  `output-styles/`, each with `name` / `description` frontmatter.
+- **So the app switches it the same way, in the current session:** `output_style_set` calls the SDK's
+  `Query.updateSettings("localSettings", {outputStyle})` — "the same path /config uses (canonical store root, gitignore
+  upkeep, hardened write) — and live-apply them" (SDK 0.3.270; `outputStyle` is its only allowed key). The CLI writes
+  `.claude/settings.local.json` itself and the new style applies from the next message; no restart, no file written by
+  ReviewGate. The name is matched without case against the CLI's list (`unknown_output_style:<name>` otherwise).
+- **Where the names come from.** `initializationResult()` (`output_style`, `available_output_styles`) when the session
+  starts → `state.session.outputStyle` and the list; each `output_style_set` updates both. The descriptions of custom styles
+  come from their files' frontmatter (`description` ≤ 300 chars); a built-in's has `description: null` — the clients have
+  its words in both languages; a name no file explains is `other`. Before the session answered: the five built-ins and every
+  style file found, `current: null`, `canSet: false` (`no_session`).
+- **When it cannot.** `local_settings_off` — this project's sessions do not load `.claude/settings.local.json` (§36.6), and
+  the CLI refuses to write a source the session excludes; `unsupported` — a CLI without the writer (older than the SDK's);
+  `output_style_failed:<why>` — the CLI refused. `setIn` names the settings file whose `outputStyle` applies (managed, then
+  local, project, user — the CLI's precedence; null without one), so the clients can say "set in ~/.claude/settings.json".
+- **Not built, with why:** a style file created while the session runs is listed from disk, but the CLI only knows it after
+  `reloadOutputStyles` or a new session ("Claude Code reads style files when it starts"); the SDK method is wired
+  (`ClaudeSession.reloadOutputStyles`) but not offered, as the terminal offers no reload either. `force-for-plugin` (a
+  plugin's style that overrides the setting) is the CLI's to apply; the list shows what the CLI reports as current.
+- Engine: `session/outputStyles.ts` (`listOutputStyles`, `outputStyleSetIn`, `canonicalStyle`, `styleFrontmatter`,
+  `projectStyleDirs`), `session/claude.ts` (`output_style_info`, `setOutputStyle`, `reloadOutputStyles`), `engine.ts`
+  (`noteOutputStyle`, `outputStyles`, `setOutputStyle`, `slices()`), `protocol.ts`. Tests: `engine/test/w72.outputStyle.test.ts`.
+- **`/output-style` is an app command now** (no longer terminal-only, §56.5), with the hint `[style]`:
+  - `/output-style` opens the **output style sheet** (Mac) / dialog (Windows): "다음 메시지부터 새 스타일로 답해요. 터미널의
+    /output-style처럼 .claude/settings.local.json에 저장돼요.", one row per style — the current one checked and marked
+    "현재", its name ("default" reads 기본), where it comes from (기본 제공 · 사용자 · 프로젝트 · 플러그인 <name> · 관리 정책 ·
+    Claude Code) and its line: the built-ins' in the app's words (from the output-styles page's table), a custom style's
+    `description`. A click picks a row, a double click or **이 스타일 쓰기** switches (disabled with the reason: the current
+    one, nothing picked, or `why` in words — "세션이 시작되면 …", "… settings.local.json을 불러오지 않아요", "… 업데이트하거나
+    터미널 채팅을 써요"). Under the list, where the style that applies is set (`setIn`). After a switch the sheet closes
+    and the line under the box says "Output style: Concise — 다음 메시지부터 이 스타일로 답해요"; a refusal says why there.
+  - `/output-style <name>` switches at once, any case, as the terminal's (the same line; a name the CLI does not list:
+    "“x”라는 output style이 없어요 — /output-style로 목록을 봐요", the draft given back).
+  - **The composer bar shows the style**: the mode menu's tooltip ends with "Output style: Concise (/output-style)" and the
+    menu has **Output Style: Concise…**, which opens the sheet; `/status`'s card has an "Output style" row. Nothing shows
+    until the session reported its style (an older engine: never).
+- Mac: Core `Session/OutputStyles.swift` (`OutputStyleInfo`, `OutputStylesReply.blocker`, `OutputStyleWire`,
+  `OutputStyleText`, `AppState.outputStyle` / `outputStyles()` / `setOutputStyle(_:)`), `SessionInfo.outputStyle`,
+  `SlashAppCommand.outputStyle`; App `OutputStyleSheet.swift`, `ComposerModeMenu.swift` (the item and the tooltip line),
+  `ComposerSlashCommands.swift`. Tests: `OutputStylesTests`, `SlashAppCommandsTests`.
+- Windows: `outputStyles.ts` (the words, `styleBlocker`, `loadOutputStyles`, `setOutputStyle`),
+  `components/dialogs/OutputStyleDialog.tsx` (`Dialog {kind: "outputStyle"}`; Tab to a row, Space picks, Enter or a double
+  click switches; after a switch the toast says it), `components/chat/ModeMenu.tsx` (the menu's Output Style item and the
+  tooltip line), `components/chat/SlashCard.tsx` (`/status`'s row), `errorCodes.ts` (the refusals),
+  `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "outputStyle", name}`). Tests: `outputStyles.test.ts`,
+  `slashAppCommands.test.ts`, `errorCodes.test.ts`.
+
+### 72.3 `/plugin` and `/reload-plugins` — plugins and marketplaces
+
+```ts
+// commands (lane plugin: `claude plugin …` may clone for minutes — never behind or holding up a turn)
+plugins_list {}                                                 // → plugins_list
+plugin_run { action: PluginAction; target: string; scope?: "user" | "project" | "local" }   // → plugin_result
+plugins_reload { force?: boolean }                              // → plugins_reloaded
+type PluginAction = "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace_add" | "marketplace_remove" | "marketplace_update";
+type PluginsListEvent = { type: "plugins_list"; installed: PluginInstalled[]; available: PluginAvailable[]; marketplaces: MarketplaceInfo[]; error?: string };
+type PluginInstalled = { id: string; name: string; marketplace: string | null; version: string; scope: string; enabled: boolean;
+                         installPath?: string; projectPath?: string; errors?: string[]; notes?: string[]; appOff?: true };
+type PluginAvailable = { id: string; name: string; marketplace: string; description?: string; version?: string; installCount?: number };
+type MarketplaceInfo = { name: string; source: string; repo?: string; url?: string; path?: string; ref?: string; installLocation?: string };
+type PluginResultEvent = { type: "plugin_result"; action: PluginAction; target: string; ok: boolean; message: string; output: string };
+type PluginsReloadedEvent = { type: "plugins_reloaded"; applied: boolean; held: boolean;
+  cacheImpact?: { mcpServersAdded: string[]; mcpServersRemoved: string[]; lspToolChange: string | null };
+  plugins: number; skills: number; agents: number; hooks: number; mcpServers: number; errors: number };
+```
+
+- **As the terminal's.** The commands reference: "`/plugin [subcommand]` — Manage Claude Code plugins. Run with no
+  argument to open the plugin menu, or pass a subcommand such as `list`, `install`, `enable`, or `disable`", and
+  "`/reload-plugins [--force]` — Reload all active plugins to apply pending changes without restarting … When the reload
+  would change which MCP tools are loaded and invalidate the prompt cache, the command warns and skips unless you pass
+  `--force`. Also available in non-interactive mode (`-p`), the Agent SDK, and the desktop app". The plugin commands
+  reference: "`/plugin` … You can run these commands only in an interactive terminal session. In a non-interactive run
+  such as `claude -p`, Claude Code replies that `/plugin` isn't available in this environment" — so stream-json has no
+  `/plugin`, but every action of its panel exists as a shell command: `claude plugin list --json [--available]`,
+  `claude plugin install | uninstall | enable | disable | update <plugin> [-s user|project|local] --json`,
+  `claude plugin marketplace add <source> | remove <name> | update <name> [--scope …] --json`, "they change the same
+  settings the `/plugin` panel does".
+- **The engine runs exactly those**, without a shell, in the project folder (its project and local installs), with the
+  CLI ReviewGate found (`execClaude`, the same runner as `claude mcp add`, §22). `plugins_list` answers
+  `installed` (each `PluginInstalled` from the list's `id`, `version`, `scope`, `enabled`, `installPath` /
+  `readFromFolder`, `projectPath`, `errors`, `notes`; `appOff` when ReviewGate's own per-plugin switch has it off, §16),
+  `available` (the marketplaces' plugins not installed: `pluginId`, `name`, `marketplaceName`, `description`, `version`,
+  `installCount`) and `marketplaces`. A CLI that cannot list answers `error` with empty lists (an older CLI's array form
+  without `--available` is read too).
+- **`plugin_run`** returns the CLI's own words: the `--json` result line's `outcome` / `message` ("parse only that line"),
+  else the exit status and the first line printed, with `output` (stdout + stderr, ≤ 8 KB) for the clients to show. An
+  enable or disable that is already so (`alreadyInGoalState`) is done. The CLI's failure is `ok: false`, not a refusal.
+  Refused before anything runs: `invalid_plugin_action`, `invalid_plugin_target` (empty, more than one line, longer than
+  500 characters, or starting with `-`, so never read as an option), `invalid_plugin_scope`, `no_project` (project / local
+  scope without one), `cli_not_found`. Timeouts: 180 s for install, update and the marketplace add / update (a clone), 30 s
+  otherwise. Without a terminal the CLI refuses a plugin whose marketplace runs a command to install it ("the install is
+  refused. The output says the command was only displayed") — ReviewGate never passes `-y`; the output says to install it
+  in a terminal.
+- **Applying the change.** As the terminal ("When you close the `/plugin` panel with pending changes … Claude Code runs
+  `/reload-plugins` for you"): the running session picks it up through §36.5's plugin sync (the files changed → the CLI
+  reloads once no turn runs, held when it would change the conversation's tools). `plugins_reload` is the explicit
+  `/reload-plugins`: `Query.reloadPlugins({holdOnCacheImpact: true})` — with `force`, without the hold — and the reload's
+  commands, plugins and hooks replace the session's (the palette, Applied extensions, `/hooks`). The reply has the
+  terminal's summary counts (`Reloaded: N plugins · N skills · N agents · N hooks · N plugin MCP servers`, `errors` = the
+  CLI's `error_count`); `held: true` with `cacheImpact` (the plugin MCP servers it would add or drop) when it was not
+  applied. Refused: `no_session`, `plugins_turn_running` (as the terminal queues it until the turn ends), `plugins_reloading`,
+  `plugins_reload_unsupported`, `plugins_reload_failed:<why>`. In the SDK the reload "doesn't connect or disconnect plugin
+  MCP servers. Those changes take effect in your next session."
+- **Enable / disable here are the CLI's** (`enabledPlugins` in the settings file of the scope that lists the plugin, as
+  the terminal's Installed tab). ReviewGate's own per-plugin switch (§16, Settings › Extensions — the flag layer, for app
+  sessions only) stays; a plugin it has off is `appOff` and stays off in the app whatever the settings say.
+- **Not built, with why:** the panel's Discover search and the Errors tab are the same lists here (each plugin's
+  `errors` / `notes`); `configure` (a plugin's `userConfig` dialog), `details` (token cost), `prune`, `validate`, `tag`
+  and the marketplace's auto-update toggle — interactive or authoring commands with no `--json` result to show.
+- Engine: `session/pluginCli.ts` (`pluginRunArgs`, `parsePluginList`, `parseMarketplaces`, `pluginRunOutcome`,
+  `reloadCounts`), `session/claude.ts` (`reloadPluginsNow`), `engine.ts` (`execClaude`, `pluginsList`, `pluginRun`,
+  `pluginsReload`, `applyPluginReload`), `protocol.ts`. Tests: `engine/test/w72.plugins.test.ts`.
+- **`/plugin` and `/reload-plugins` are app commands now** (`/plugin` is no longer terminal-only, §56.5; the terminal's
+  `/plugins` and `/marketplace` are its other names). `/plugin [subcommand]` opens the **plugin sheet** (Mac) / dialog
+  (Windows) on the tab the subcommand names, as the terminal's session forms: none or `install` → 찾아보기, `manage` /
+  `list` → 설치됨, `marketplace [list]` → 마켓플레이스; `install <plugin>`, `uninstall <plugin>`, `marketplace add <source>` and
+  `marketplace remove <name>` open that tab with their confirmation; `enable | disable | update <plugin>` and
+  `marketplace update <name>` run at once there; anything else opens 찾아보기 with "/plugin에는 여기서 “x”이(가) 없어요".
+  - **설치됨**: per plugin its name, `@marketplace`, version, scope (사용자 · 프로젝트 · 로컬 · 관리됨 · 이 세션 · claude.ai),
+    its `errors` (red) and `notes`, "ReviewGate에서 꺼 두었어요(설정 › 확장) …" for `appOff`, a switch (`enable` /
+    `disable`, no confirmation, as the terminal's Space), **업데이트** and **제거…**; a managed or session-only plugin has
+    them disabled with the reason. **찾아보기**: the marketplaces' plugins not installed with description and version, and
+    **설치…**. **마켓플레이스**: each with its source (`owner/repo#ref`, the URL or the folder), **업데이트** and **삭제…**, and a
+    field + **마켓플레이스 추가…** (owner/repo, a git URL, a folder or a marketplace.json URL). The tab titles carry counts.
+  - **Confirmations** before what installs or deletes, with the command that will run (`claude plugin install x@m
+    --scope user`): install — "플러그인의 훅과 MCP 서버는 내 권한으로 실행돼요 — 믿을 수 있는 것만 설치해요 …" and the
+    terminal's three scopes (나에게, 모든 프로젝트에서 (user) · 이 저장소의 모두에게 (project) · 나에게, 이 저장소에서만
+    (local); without a project only user); uninstall; a marketplace's add (declared in the user settings) and remove
+    ("그 마켓플레이스에서 설치한 플러그인도 모두 제거해요").
+  - While a command runs, its line ("claude plugin install x 실행 중…") shows and every other action is disabled with
+    "claude plugin 명령이 실행 중이에요"; then the CLI's own message (✓, or ⚠ "claude plugin install 실패: …") and,
+    folded, its output (monospaced, selectable), and the lists are read again. ↻ asks for them again.
+  - **플러그인 다시 불러오기** (disabled with the reason without a session or while Claude works) and `/reload-plugins
+    [--force]` typed: the summary in the line under the box — "다시 불러옴: 플러그인 N개 · 스킬 N개 · 에이전트 N개 · 훅 N개 ·
+    플러그인 MCP 서버 N개" (with "불러오다 오류 N개 — /plugin에서 확인해요"), or, held, "이번 다시 불러오기는 MCP 도구를
+    바꿔요(…) — … 적용하려면 /reload-plugins --force를 실행해요". The note under the list says changes reach the chat by
+    themselves once Claude is idle (§36.5) and that plugin MCP servers start with the next chat.
+- Mac: Core `Session/PluginManager.swift` (`PluginAction`, `PluginInstalled`, `PluginAvailable`, `MarketplaceInfo`,
+  `PluginsList`, `PluginResult`, `PluginsReloaded`, `PluginRequest.parse`, `PluginText`, `AppState.pluginsList()` /
+  `runPlugin` / `reloadPlugins` / `reloadPluginsBlocker`), `SlashAppCommand.plugin` / `.reloadPlugins`; App
+  `PluginsSheet.swift` (`InstalledRow`, `PluginConfirmSheet`), `ComposerSlashCommands.swift` (`PluginSheetItem`).
+  Tests: `PluginManagerTests`, `SlashAppCommandsTests`.
+- Windows: `pluginManager.ts` (`parsePluginRequest`, the words, `reloadedText`, `reloadPluginsBlocker`, `loadPlugins`,
+  `runPlugin`, `reloadPlugins`), `components/dialogs/PluginsDialog.tsx` (`Dialog {kind: "plugins", request}`; the
+  confirmation is a dialog over it, Esc closes that one first), `errorCodes.ts` (the refusals), `slashAppCommands.ts` /
+  `slashAppRun.ts` (`{kind: "plugin", arg}`, `{kind: "reloadPlugins", force}`; a reload's summary as a toast, a held one
+  in the composer's line). Tests: `pluginManager.test.ts`, `slashAppCommands.test.ts`, `errorCodes.test.ts`.
 
 ## 74. Clone from Git
 
