@@ -29,6 +29,14 @@ const CLIENT_COMMANDS: ReadonlySet<EngineCommandType> = new Set<EngineCommandTyp
   "export_chat",
   "copy_response",
   "set_thinking",
+  // §72.1 /hooks (a read), §72.2 /output-style (the CLI's own settings writer), §72.3 /plugin through `claude plugin`
+  // (the engine checks the action, the target and the scope) and /reload-plugins
+  "hooks_list",
+  "output_styles",
+  "output_style_set",
+  "plugins_list",
+  "plugin_run",
+  "plugins_reload",
   "request_changes",
   "interrupt",
   "permission_response",
