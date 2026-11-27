@@ -13,7 +13,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = process.argv[2] ? resolve(process.argv[2]) : join(repo, "sidecar/dist/lsp");
@@ -46,7 +46,8 @@ for (const f of readdirSync(join(tsDir, "lib"))) {
 }
 
 // The Vue plugin: one file. esbuild is the sidecar's own build tool (a workspace devDependency).
-const { build } = await import(pathToEsbuild());
+// A file URL: on Windows an absolute path is not an ESM specifier (ERR_UNSUPPORTED_ESM_URL_SCHEME, "protocol 'd:'").
+const { build } = await import(pathToFileURL(pathToEsbuild()).href);
 const vueOut = join(outDir, "node_modules/@vue/typescript-plugin");
 mkdirSync(vueOut, { recursive: true });
 const result = await build({
