@@ -1505,6 +1505,22 @@
         }
       }
     },
+    "1 hook": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 hook"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "훅 1개"
+          }
+        }
+      }
+    },
     "5h %@": {
       "localizations": {
         "en": {

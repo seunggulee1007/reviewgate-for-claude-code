@@ -210,7 +210,9 @@ public enum HooksText {
     }
 
     /// The count in an event's heading.
-    public static func count(_ n: Int) -> String { String(localized: "\(n) hooks", bundle: .module) }
+    public static func count(_ n: Int) -> String {
+        n == 1 ? String(localized: "1 hook", bundle: .module) : String(localized: "\(n) hooks", bundle: .module)
+    }
 }
 
 public extension AppState {
