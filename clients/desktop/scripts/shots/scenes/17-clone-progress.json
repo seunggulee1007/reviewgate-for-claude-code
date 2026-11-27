@@ -1,0 +1,16 @@
+{
+  "extends": "16-clone-project.json",
+  "name": "clone-progress",
+  "description": "Clone from Git while git clone runs (§74.4): the bar, the step with size and speed, Cancel that stops it.",
+  "replies": { "project_clone": { "$pending": true } },
+  "steps": [
+    { "click": "No project choice 4" },
+    { "waitFor": "Clone project url" },
+    { "type": { "testid": "Clone project url", "value": "acme/billing-api" } },
+    { "wait": 700 },
+    { "click": "Clone project clone" },
+    { "waitFor": "Clone project progress" },
+    { "event": { "type": "project_clone_progress", "path": "C:\\Users\\dev\\ReviewGate\\billing-api", "phase": "receiving", "percent": 46, "phasePercent": 48, "detail": "18.40 MiB | 6.20 MiB/s" } },
+    { "wait": 400 }
+  ]
+}

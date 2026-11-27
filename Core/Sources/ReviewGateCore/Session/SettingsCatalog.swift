@@ -139,7 +139,7 @@ public enum SettingsCatalog {
         public static let cliPin = "Claude Code updates itself in the background. Pin a version to keep starting new sessions with it; ReviewGate marks the versions it was checked with."
         public static let toolchainOverrides = "Leave empty to detect via the login shell."
         // MARK: task-start (§63)
-        public static let newProjectParent = "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+        public static let newProjectParent = "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder."
         public static let startScreen = "When a project opens in a window: start straight away, start from a task, or continue a recent chat (1 / 2 / 3, Esc starts straight away). Off: the window opens into its chat."
         public static let taskPlatform = "GitHub Issues are read with the GitHub CLI (gh). Jira, Linear and other trackers are read by Claude through the MCP server below — ReviewGate never calls the tracker and keeps no token."
         public static let taskBranchPrefix = "The task's branch is <prefix><id>-<title words>, e.g. feature/ACME-123-fix-cart-total. {type} becomes fix, docs, chore or feature from the issue's labels."

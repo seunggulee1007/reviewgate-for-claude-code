@@ -4321,6 +4321,22 @@
         }
       }
     },
+    "An https or SSH link, or owner/repo for GitHub — never a password or token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An https or SSH link, or owner/repo for GitHub — never a password or token"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "https나 SSH 주소, GitHub라면 owner/repo — 비밀번호나 토큰은 넣지 마세요"
+          }
+        }
+      }
+    },
     "An ignore pattern in Settings hides this file from the review; it can still be committed": {
       "localizations": {
         "en": {
@@ -5489,6 +5505,22 @@
         }
       }
     },
+    "Branch (optional)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch (optional)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치 (선택)"
+          }
+        }
+      }
+    },
     "Changed outside the review": {
       "localizations": {
         "en": {
@@ -5629,6 +5661,150 @@
           "stringUnit": {
             "state": "translated",
             "value": "선택…"
+          }
+        }
+      }
+    },
+    "Clone %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ clone하기…"
+          }
+        }
+      }
+    },
+    "Clone a fresh copy anyway": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone a fresh copy anyway"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "그래도 새로 clone하기"
+          }
+        }
+      }
+    },
+    "Clone and Open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone and Open"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone하고 열기"
+          }
+        }
+      }
+    },
+    "Clone from Git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone from Git"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Git 저장소로 시작"
+          }
+        }
+      }
+    },
+    "Clone progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone progress"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clone 진행 상황"
+          }
+        }
+      }
+    },
+    "Clones %@ with your own git sign-in, then continues with this task": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clones %@ with your own git sign-in, then continues with this task"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 저장소를 내 git 로그인 정보로 clone한 뒤 이 업무로 이어가요"
+          }
+        }
+      }
+    },
+    "Clones into %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clones into %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 clone해요"
+          }
+        }
+      }
+    },
+    "Clones the repository, then opens it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clones the repository, then opens it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소를 clone한 뒤 열어요"
+          }
+        }
+      }
+    },
+    "Cloning…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloning…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clone하는 중…"
           }
         }
       }
@@ -5777,6 +5953,22 @@
         }
       }
     },
+    "Default branch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default branch"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기본 브랜치"
+          }
+        }
+      }
+    },
     "Definition of %@": {
       "localizations": {
         "en": {
@@ -5837,6 +6029,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 창에서 앞서 찾은 것들"
+          }
+        }
+      }
+    },
+    "Empty: the repository's default branch (or the one the link names)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty: the repository's default branch (or the one the link names)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "비워 두면 저장소의 기본 브랜치(또는 주소에 있는 브랜치)를 받아요"
           }
         }
       }
@@ -6145,6 +6353,70 @@
         }
       }
     },
+    "Open %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 열기"
+          }
+        }
+      }
+    },
+    "Opens the project you already have": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the project you already have"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 있는 프로젝트를 열어요"
+          }
+        }
+      }
+    },
+    "Paste a repository link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a repository link"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소 주소를 붙여 넣어요"
+          }
+        }
+      }
+    },
+    "Paste a repository link first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste a repository link first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 저장소 주소를 붙여 넣어 주세요"
+          }
+        }
+      }
+    },
     "Puts the whole conversation on the clipboard as plain text": {
       "localizations": {
         "en": {
@@ -6157,6 +6429,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "대화 전체를 일반 텍스트로 클립보드에 넣어요"
+          }
+        }
+      }
+    },
+    "Reading the link…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the link…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "주소를 확인하는 중…"
+          }
+        }
+      }
+    },
+    "Repository": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소"
           }
         }
       }
@@ -6193,6 +6497,38 @@
         }
       }
     },
+    "Stops git clone and removes the folder it was cloning into": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stops git clone and removes the folder it was cloning into"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone을 멈추고 받던 폴더를 지워요"
+          }
+        }
+      }
+    },
+    "The repository's name until you edit it; a name already taken gets -2, -3": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The repository's name until you edit it; a name already taken gets -2, -3"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "직접 고치기 전까지는 저장소 이름을 따라요. 이미 있는 이름이면 -2, -3을 붙여요"
+          }
+        }
+      }
+    },
     "Turn extended thinking on or off": {
       "localizations": {
         "en": {
@@ -6205,6 +6541,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "extended thinking 켜기·끄기"
+          }
+        }
+      }
+    },
+    "Uses your git sign-in — nothing is pushed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses your git sign-in — nothing is pushed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내 git 로그인 정보를 써요 — push는 하지 않아요"
+          }
+        }
+      }
+    },
+    "You already have %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 받아 둔 저장소예요 — %@"
+          }
+        }
+      }
+    },
+    "branch %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "branch %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치 %@"
+          }
+        }
+      }
+    },
+    "git clone runs with your own sign-in (keychain, SSH key, gh), then the project opens.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone runs with your own sign-in (keychain, SSH key, gh), then the project opens."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내 git 로그인 정보(키체인, SSH 키, gh)로 git clone한 뒤 프로젝트를 열어요."
+          }
+        }
+      }
+    },
+    "git clone with your own sign-in into %@, then it opens (4)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone with your own sign-in into %@, then it opens (4)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내 git 로그인 정보로 %@ 아래에 git clone한 뒤 열어요 (4)"
           }
         }
       }
@@ -6369,34 +6785,34 @@
         }
       }
     },
-    "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
+    "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+            "value": "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
+            "value": "폴더 없이 새로 시작하거나 Git 저장소로 시작하면 프로젝트 폴더가 여기에 생겨요. 새로 시작은 만들려는 내용에서, clone은 저장소에서 이름을 따와요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
           }
         }
       }
     },
-    "New Project · Start from a task · Open a folder…": {
+    "New Project · Start from a task · Open a folder… · Clone from Git": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Project · Start from a task · Open a folder…"
+            "value": "New Project · Start from a task · Open a folder… · Clone from Git"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새로 시작 · 업무로 시작 · 폴더 열기…"
+            "value": "새로 시작 · 업무로 시작 · 폴더 열기… · Git 저장소로 시작"
           }
         }
       }

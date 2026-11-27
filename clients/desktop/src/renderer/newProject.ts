@@ -66,19 +66,20 @@ export function newProjectRefusal(e: unknown): string {
 
 // ---------------------------------------------------------------- the keys
 
-/** 1 New · 2 Start from a task · 3 Open a folder. */
-export type NoProjectChoice = 1 | 2 | 3;
+/** 1 New · 2 Start from a task · 3 Open a folder · 4 Clone from Git (§74). */
+export type NoProjectChoice = 1 | 2 | 3 | 4;
 
 /**
- * A key on the no-project cards (`KeyboardEvent.key`): 1 / 2 / 3 act at once, the arrows move the mark (stopping at either
+ * A key on the no-project cards (`KeyboardEvent.key`): 1 – 4 act at once, the arrows move the mark (stopping at either
  * end), Enter takes it. `handled` false: not the cards' key.
  */
 export function noProjectKey(key: string, mark: NoProjectChoice): { handled: boolean; mark: NoProjectChoice; act: NoProjectChoice | null } {
-  const clamp = (n: number) => Math.max(1, Math.min(3, n)) as NoProjectChoice;
+  const clamp = (n: number) => Math.max(1, Math.min(4, n)) as NoProjectChoice;
   switch (key) {
     case "1":
     case "2":
     case "3":
+    case "4":
       return { handled: true, mark: Number(key) as NoProjectChoice, act: Number(key) as NoProjectChoice };
     case "ArrowLeft":
     case "ArrowUp":

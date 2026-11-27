@@ -8,6 +8,7 @@ import { outputLogLine, outputToolResult, outputToolUse } from "./outputLog"; //
 import { planHandoffLine, planReviewSupported } from "./planReview"; // MARK: wave4d w4d-plan
 import { applyCodeGraphEvent } from "./codeGraph"; // MARK: wave5 w5-graph (§43.3)
 import { applyStatusLineEvent } from "./statusLine"; // MARK: wave6 w6-statusline (§44.2)
+import { applyCloneEvent, cloneRefusal, useCloneProgress } from "./cloneProject"; // §74
 import type {
   AttachmentRef,
   Budget,
@@ -325,6 +326,8 @@ export type Dialog =
   /** §69 the window with no project: 1 New (components/start/NewProjectDialog.tsx), 2 Start from a task (TaskProjectDialog.tsx). */
   | { kind: "newProject" }
   | { kind: "taskProject" }
+  /** §74 4 Clone from Git (components/start/CloneProjectDialog.tsx); `url` prefilled, `taskRef` the task to continue with (§74.4). */
+  | { kind: "cloneProject"; url?: string; taskRef?: string }
   | { kind: "createPR" }
   /** §55.11: `highlight` — a setting's id (settingsIndex.ts): its tab opens at its row, tinted for a moment. */
   | { kind: "settings"; tab?: import("./settingsIndex").SettingsTab; highlight?: string }
@@ -533,6 +536,13 @@ export type Store = SessionSlice & SideSlice & ComposerSlice & PeerSlice & Backg
    * `project_name` previewed, shown while it opens). `{path}` once open, `{error}` in the user's words (nothing opened).
    */
   createProject(name: string, parent: string | undefined, expected: string): Promise<{ path: string } | { error: string }>;
+  /**
+   * §74 `project_clone` and the open (the way `createProject` opens: "Opening <name>…", a refusal back to the dialog in the
+   * user's words, `cancelled` after the user's Cancel). `expected`: the path the preview named.
+   */
+  cloneProject(opts: { url: string; name?: string; branch?: string; parent: string | undefined; expected: string }): Promise<{ path: string } | { cancelled: true } | { error: string }>;
+  /** §74 `project_clone_cancel`: git stops and its folder is removed; the running `cloneProject` ends `cancelled`. */
+  cancelClone(): Promise<void>;
   /** `project_open_failed`'s Reopen: the folder opened last, again. */
   reopenLastProject(): Promise<void>;
   takeOver(): Promise<void>;
@@ -1304,6 +1314,7 @@ export const useStore = create<Store>((set, get, api) => {
       if (get().applyFlowEvent(ev)) return; // MARK: wave3 desktop-flow — §36.12 workbench_progress, §36.13 prereview
       if (applyCodeGraphEvent(ev)) return; // MARK: wave5 w5-graph — §43.3 the board's code graph (its own store)
       if (applyStatusLineEvent(ev)) return; // MARK: wave6 w6-statusline — §44.2 the user's status line (its own store)
+      if (applyCloneEvent(ev)) return; // §74 the running clone's progress (its own store)
       switch (ev.type) {
         case "state":
           apply(ev.state);
@@ -1581,6 +1592,28 @@ export const useStore = create<Store>((set, get, api) => {
       } finally {
         endOpening(opening);
       }
+    },
+
+    async cloneProject({ url, name, branch, parent, expected }) {
+      resetProjectView();
+      set({ lockedProjectPath: null, refusedLockPid: null, tab: "changes" });
+      useCloneProgress.setState({ progress: null });
+      const opening = beginOpening(expected);
+      try {
+        const reply = await engineRequest({ type: "project_clone", url, ...(name ? { name } : {}), ...(branch ? { branch } : {}), ...parentArg(parent) });
+        await get().settle();
+        return { path: reply.path };
+      } catch (e) {
+        if (refusalOf(e).code === "clone_cancelled") return { cancelled: true };
+        return { error: cloneRefusal(e) };
+      } finally {
+        useCloneProgress.setState({ progress: null });
+        endOpening(opening);
+      }
+    },
+
+    async cancelClone() {
+      await engineRequest({ type: "project_clone_cancel" }).catch(() => undefined);
     },
 
     async reopenLastProject() {

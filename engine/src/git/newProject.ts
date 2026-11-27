@@ -100,8 +100,8 @@ export function taskRepo(text: string): { host: string | null; owner: string; re
   return { host: ref.host, owner, repo };
 }
 
-/** Every remote URL of the repository `path` is in (`git remote -v`); [] when it is none, or git does not answer in time. */
-async function remoteURLs(path: string): Promise<string[]> {
+/** Every remote URL of the repository `path` is in (`git remote -v`); [] when it is none, or git does not answer in time (§74 reads it too). */
+export async function remoteURLs(path: string): Promise<string[]> {
   if (!existsSync(path)) return [];
   try {
     const out = await runGit(path, ["remote", "-v"], { allowFailure: true, discover: true, timeoutMs: PROJECT_MATCH_TIMEOUT_MS });

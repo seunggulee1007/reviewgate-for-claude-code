@@ -168,6 +168,7 @@
   "Windows app only": "Windows 앱에만 있어요",
   "Windows: Ctrl+Shift+O is Switch Project": "Windows 는 Ctrl+Shift+O 가 프로젝트 전환이에요",
   "Windows: Ctrl+T is New chat": "Windows 는 Ctrl+T 가 새 채팅이에요",
+  "git was not found — install Git for Windows, then try again": "git을 찾지 못했어요 — Git for Windows를 설치한 뒤 다시 시도해 주세요",
   "{0} (no commit)": "{0} (커밋 없음)",
   "HEAD has moved since: {0} → {1}": "그 뒤 HEAD 가 바뀌었어요: {0} → {1}",
   "{0} change(s) made outside the app are mixed in": "앱 밖 변경 {0}개가 섞였어요",

@@ -66,7 +66,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // General
   e("appearance", "general", "Appearance", "Theme", "System follows the OS setting. Applies immediately to every window, including the title bar and menus."),
   e("reopenLastProjects", "general", "Appearance", "Reopen last projects on launch"),
-  e("newProjectParent", "general", "Starting without a folder", "Folder for new projects", "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."), // §69
+  e("newProjectParent", "general", "Starting without a folder", "Folder for new projects", "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder."), // §69
   e("showExploreDetail", "general", "Typing and the chat", "Show exploration rows in detail", "Off: reads, searches and read-only commands in a row fold into one line in the chat (click it to open)."),
   e("confirmQuit", "general", "Closing and quitting", "Ask before quitting"),
   e("confirmCloseWhileWorking", "general", "Closing and quitting", "Ask before closing while Claude works"),

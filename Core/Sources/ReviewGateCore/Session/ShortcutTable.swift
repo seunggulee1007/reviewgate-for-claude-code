@@ -42,9 +42,9 @@ public enum ShortcutTable {
             ShortcutRow("New Window", mac: "⌘N", windows: "Ctrl+N"),   // MARK: polish p-lifecycle (P1-chrome-06)
             ShortcutRow("Settings…", mac: "⌘,", windows: "Ctrl+,"),
         ]),
-        // §69.4: the window with no project open — its three cards (both apps).
+        // §69.4 / §74.4: the window with no project open — its four cards (both apps).
         ShortcutSection("Window with no project", note: "When a window has no project open", rows: [
-            ShortcutRow("New Project · Start from a task · Open a folder…", mac: "1 / 2 / 3", windows: "1 / 2 / 3", note: "Each key opens it at once"),
+            ShortcutRow("New Project · Start from a task · Open a folder… · Clone from Git", mac: "1 / 2 / 3 / 4", windows: "1 / 2 / 3 / 4", note: "Each key opens it at once"),
             ShortcutRow("Move between the cards, then take the marked one", mac: "← → ↑ ↓ ↩", windows: "← → ↑ ↓ Enter"),
         ]),
         // MARK: task-start (§63.4): the start screen of a project window (both apps).

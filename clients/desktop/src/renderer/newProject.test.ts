@@ -64,10 +64,13 @@ describe("starting without a folder (§69)", () => {
     respond = () => ({ ok: true, reply: { type: "result", ok: true } });
   });
 
-  it("the keys: 1 / 2 / 3 act at once, the arrows move the mark and stop at either end, Enter takes it", () => {
+  it("the keys: 1 – 4 act at once, the arrows move the mark and stop at either end, Enter takes it", () => {
     expect(m.noProjectKey("2", 1)).toEqual({ handled: true, mark: 2, act: 2 });
     expect(m.noProjectKey("ArrowRight", 1)).toEqual({ handled: true, mark: 2, act: null });
-    expect(m.noProjectKey("ArrowDown", 3)).toEqual({ handled: true, mark: 3, act: null });
+    expect(m.noProjectKey("ArrowDown", 3)).toEqual({ handled: true, mark: 4, act: null });
+    expect(m.noProjectKey("ArrowRight", 4)).toEqual({ handled: true, mark: 4, act: null });
+    expect(m.noProjectKey("4", 1)).toEqual({ handled: true, mark: 4, act: 4 });
+    expect(m.noProjectKey("5", 1).handled).toBe(false);
     expect(m.noProjectKey("ArrowLeft", 1)).toEqual({ handled: true, mark: 1, act: null });
     expect(m.noProjectKey("Enter", 3)).toEqual({ handled: true, mark: 3, act: 3 });
     expect(m.noProjectKey("a", 1).handled).toBe(false);

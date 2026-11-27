@@ -760,6 +760,13 @@ public enum EngineCommand: Sendable, Equatable {
     case projectCreate(name: String, parent: String? = nil)
     /// §69: which of `paths` have the task's repository as a remote → `.projectMatches`.
     case projectMatch(ref: String, paths: [String])
+    /// §74: what a pasted repository link clones and where, and which of `paths` already have it → `.projectClonePreview`
+    /// (Session/CloneProject.swift).
+    case projectClonePreview(url: String, name: String? = nil, parent: String? = nil, paths: [String] = [])
+    /// §74: `git clone` into `<parent>/<name>[-n]` and an open → `.projectCloned`; `.projectCloneProgress` meanwhile.
+    case projectClone(url: String, name: String? = nil, parent: String? = nil, branch: String? = nil)
+    /// §74: stops the running clone; its folder is removed.
+    case projectCloneCancel
     case shutdown
 
     /// The wire `type` discriminator.
@@ -939,6 +946,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .projectName: "project_name"   // §69
         case .projectCreate: "project_create"
         case .projectMatch: "project_match"
+        case .projectClonePreview: "project_clone_preview"   // §74
+        case .projectClone: "project_clone"
+        case .projectCloneCancel: "project_clone_cancel"
         case .shutdown: "shutdown"
         }
     }
@@ -1293,6 +1303,8 @@ extension EngineCommand: Encodable {
         case let .projectMatch(ref, paths):
             try c.encode(ref, forKey: .ref)
             try c.encode(paths, forKey: .paths)
+        case .projectClonePreview, .projectClone, .projectCloneCancel:   // §74
+            try encodeCloneFields(to: encoder)
         case let .requestChanges(extra, noteIds):
             try c.encodeIfPresent(extra, forKey: .extra)
             try c.encodeIfPresent(noteIds, forKey: .noteIds)
@@ -3227,6 +3239,10 @@ public enum EngineEvent: Sendable, Equatable {
     case projectName(ProjectNameReply)
     case projectCreated(ProjectCreatedReply)
     case projectMatches(ProjectMatchesReply)
+    /// §74: reply to `project_clone_preview`; a step of a running `project_clone` (never a reply); reply to `project_clone`.
+    case projectClonePreview(ProjectClonePreviewReply)
+    case projectCloneProgress(ProjectCloneProgress)
+    case projectCloned(ProjectClonedReply)
     // MARK: wave4d w4d-plan
     /// §42.1: `plan_approved` with `into` — the fresh chat, the plan handed to a workbench, or received from one.
     case planApprovedInto(PlanApprovedInfo)
@@ -3287,6 +3303,8 @@ public enum EngineEvent: Sendable, Equatable {
         case let .projectName(reply): reply.id   // §69
         case let .projectCreated(reply): reply.id
         case let .projectMatches(reply): reply.id
+        case let .projectClonePreview(reply): reply.id   // §74
+        case let .projectCloned(reply): reply.id
         default: nil
         }
     }
@@ -3558,6 +3576,12 @@ extension EngineEvent: Decodable {
             self = .projectCreated(try ProjectCreatedReply(from: decoder))
         case "project_matches":
             self = .projectMatches(try ProjectMatchesReply(from: decoder))
+        case "project_clone_preview":   // §74
+            self = .projectClonePreview(try ProjectClonePreviewReply(from: decoder))
+        case "project_clone_progress":
+            self = .projectCloneProgress(try ProjectCloneProgress(from: decoder))
+        case "project_cloned":
+            self = .projectCloned(try ProjectClonedReply(from: decoder))
         case "fetched":   // MARK: git-sync (§68)
             self = .fetched(try FetchedReply(from: decoder))
         case "pulled":

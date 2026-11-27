@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n";
 import { isEnter } from "../../ime";
 import { matchProjects, preselectProject } from "../../newProject";
+import { cloneURLForTask } from "../../cloneProject";
 import { useRecentEntries } from "../../recentProjects";
 import { displayPath } from "../Sidebar";
 import { useStartScreen } from "../../startScreen";
@@ -20,6 +21,7 @@ import "./start.css";
 export function TaskProjectDialog({ onClose }: { onClose: () => void }) {
   const entries = useRecentEntries();
   const openProject = useStore((s) => s.openProject);
+  const openDialog = useStore((s) => s.openDialog);
   const [refText, setRefText] = useState("");
   const [others, setOthers] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -100,6 +102,20 @@ export function TaskProjectDialog({ onClose }: { onClose: () => void }) {
           />
         </label>
         <div className="task-status muted" role="status">{status}</div>
+        {/* §74.4: no recent project has the task's repository — the fourth card's clone, then the task dialog in it. */}
+        {ref && !matching && match.repo && match.matches.length === 0 && (
+          <div>
+            <button
+              type="button"
+              className="small"
+              title={t("Clones {0} with your own git sign-in, then continues with this task", match.repo)}
+              onClick={() => openDialog({ kind: "cloneProject", url: cloneURLForTask(refText.trim(), match.repo!), taskRef: refText.trim() })}
+              data-testid="Task project clone"
+            >
+              {t("Clone {0}…", match.repo)}
+            </button>
+          </div>
+        )}
         <span className="bold">{t("Project")}</span>
         {candidates.length === 0 ? (
           <div className="caption muted">{t("No recent projects — choose its folder.")}</div>

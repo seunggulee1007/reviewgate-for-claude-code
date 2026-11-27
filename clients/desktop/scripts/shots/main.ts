@@ -72,7 +72,10 @@ type Scene = {
   state?: Record<string, unknown>;
   /** Engine events after the state (transcript rows, …). */
   events?: Record<string, unknown>[];
-  /** `request` replies by command type: a reply, `{"$by": "<field>", "map": {value: reply}}`, or `{"__error": "…"}`. */
+  /**
+   * `request` replies by command type: a reply, `{"$by": "<field>", "map": {value: reply}}`, `{"__error": "…"}`, or
+   * `{"$pending": true}` — a request that never answers (§74: a clone still running while its progress events come).
+   */
   replies?: Record<string, Reply>;
   /** Bridge calls (`getSettings` is the scene's settings) by name: the resolved value. */
   bridge?: Record<string, unknown>;
@@ -208,6 +211,8 @@ const COMMON_REPLIES: Record<string, Reply> = {
   commit_format: { type: "commit_format", learned: null, kind: null, examples: [], issue: "", branch: null, effective: null },
 };
 
+const pendingForever: Promise<never>[] = [];
+
 function reply(l: Live, cmd: Record<string, unknown>): unknown {
   const type = String(cmd.type);
   if (type === "select_file" && typeof cmd.path === "string" && l.scene.diffs?.[cmd.path] !== undefined) {
@@ -217,6 +222,12 @@ function reply(l: Live, cmd: Record<string, unknown>): unknown {
   if (r === undefined) {
     l.unanswered.add(`request.${type}`);
     return { __error: `shots: no fixture reply for ${type}` };
+  }
+  if (isPlainObject(r) && r.$pending === true) {
+    // Held for the run: a promise nothing references is collected, and Electron then answers "reply was never sent".
+    const never = new Promise<never>(() => undefined);
+    pendingForever.push(never);
+    return never;
   }
   if (isPlainObject(r) && typeof r.$by === "string" && isPlainObject(r.map)) {
     const hit = r.map[String(cmd[r.$by])];

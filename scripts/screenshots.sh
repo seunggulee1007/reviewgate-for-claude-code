@@ -97,8 +97,9 @@
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with
-#                  no project at 1000 × 637 and 900 × 460, the New Project sheet (empty, typed, a long Korean prompt, an engine before §69) and
-#                  the task's project picker over three fixture repositories in DEMO_DIR-recent (`noproject` lines;
+#                  no project at 1000 × 637 and 900 × 460, the New Project sheet (empty, typed, a long Korean prompt, an engine before §69),
+#                  the task's project picker over three fixture repositories in DEMO_DIR-recent, and §74's Clone from Git
+#                  sheet (a link, its progress, a refusal, "already have it") and the picker's clone offer (`noproject` lines;
 #                  noproject-*.png).
 #                  demo: the README's demo GIF frames (demo-<nn>-<step>.png; scripts/make-gif.swift puts them together) on the
 #                  fake claude in its demo script (a `fake-demo` file next to it): a prompt typed into the terminal chat at

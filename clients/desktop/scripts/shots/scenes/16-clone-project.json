@@ -1,0 +1,18 @@
+{
+  "name": "clone-project",
+  "description": "Clone from Git (§74.4): a pasted owner/repo, what it clones and where, the folder name and the optional branch.",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop", "C:\\Users\\dev\\src\\acme-api"] },
+  "recent": [
+    { "path": "C:\\Users\\dev\\src\\acme-shop", "exists": true },
+    { "path": "C:\\Users\\dev\\src\\acme-api", "exists": true }
+  ],
+  "replies": {
+    "project_clone_preview": { "type": "project_clone_preview", "url": "https://github.com/acme/billing-api.git", "repo": "acme/billing-api", "host": "github.com", "branch": null, "name": "billing-api", "parent": "C:\\Users\\dev\\ReviewGate", "path": "C:\\Users\\dev\\ReviewGate\\billing-api", "matches": [] }
+  },
+  "steps": [
+    { "click": "No project choice 4" },
+    { "waitFor": "Clone project url" },
+    { "type": { "testid": "Clone project url", "value": "acme/billing-api" } },
+    { "wait": 700 }
+  ]
+}

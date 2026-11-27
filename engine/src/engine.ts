@@ -25,7 +25,7 @@ import { branches as listBranches, createBranch, defaultBranch, switchBranch, wo
 import { GitCheckpoint, initRepository, LfsMissingError, openCheckpoint, OpenSupersededError } from "./git/checkpoint.js";
 import { commit as gitCommit, gitIdentity, push as gitPush, stagePaths } from "./git/commit.js";
 import { CommandRefused, refusalFields } from "./errors.js";
-import { NotARepositoryError, registerShadowRepo, setGitPath } from "./git/exec.js";
+import { getGitPath, NotARepositoryError, registerShadowRepo, setGitPath } from "./git/exec.js";
 import { FolderTooLargeError, hasShadowRepo, markShadowRepo, prepareShadowRepo, scanShadowFolder, shadowBaseline } from "./git/shadow.js";
 import { findGitCandidates, looksUnsafeForGitInit } from "./git/repo.js";
 import {
@@ -52,6 +52,7 @@ import { locateToolchain, type Toolchain } from "./platform/toolchain.js";
 import { createPR, parseRemoteURL } from "./pr/create.js";
 import { fetchTask, parseTaskRef, type FetchedTask } from "./pr/task.js"; // MARK: task-start (§63)
 import { createProjectFolder, freeProjectPath, matchProjects, projectSlug, removeEmptyFolder, resolveProjectParent } from "./git/newProject.js"; // §69
+import { CloneError, clonedAlready, cloneFolderName, parseCloneSource, redactCredentials, startClone, type CloneRun, type CloneSource } from "./git/cloneProject.js"; // §74
 import { DEFAULT_GH_HOST, PRStore, type ResolvedGH } from "./pr/store.js";
 import type {
   ActivityKind,
@@ -95,6 +96,7 @@ import type {
   PermissionRulesEvent,
   SideAnchor,
   PRCreatedEvent,
+  ProjectClonePreviewEvent,
   ReadyEvent,
   RefreshScope,
   ReplyEvent,
@@ -598,6 +600,8 @@ export class ReviewEngine {
   private readonly lockOwner: LockOwner;
   /** The open whose first git call is running (`openCheckpoint`): a newer open / switch / close aborts it. */
   private openAbort: AbortController | null = null;
+  /** §74: the `git clone` running for `project_clone` (one at a time); `project_clone_cancel` stops it. */
+  private cloneRun: CloneRun | null = null;
   /** `git rev-parse --git-dir` of the open worktree: home of the review / session / transcript files. */
   private projectGitDir: string | null = null;
   /** Serializes the review-file writes; each write captures the gate at call time. */
@@ -1094,6 +1098,7 @@ export class ReviewEngine {
       this.subBrain.close(); // MARK: wave5 w5-brain — §43.2: no re-read outlives the engine
       await this.side.stopAll().catch(() => undefined);
       for (const stop of this.setupStops) stop(); // MARK: wave3 engine-flow — §36.12: no setup outlives the engine
+      this.cloneRun?.cancel(); // §74: nor a clone (its folder is removed)
       this.codeGraph.stop(); // MARK: wave5 w5-graph — §43.3: nor a graphify build
       this.symbolIndex?.stop(); // MARK: ide-nav — §65: nor a symbol index build
       this.statusLine.dispose(); // MARK: wave6 w6-statusline — §44.2: nor a status line run
@@ -1846,6 +1851,13 @@ export class ReviewEngine {
         return { type: "project_created", path: await this.projectCreate(cmd.name, cmd.parent) };
       case "project_match": // §69
         return { type: "project_matches", ...(await matchProjects(typeof cmd.ref === "string" ? cmd.ref : "", Array.isArray(cmd.paths) ? cmd.paths : [])) };
+      case "project_clone_preview": // §74
+        return await this.projectClonePreview(cmd.url, cmd.name, cmd.parent, cmd.paths);
+      case "project_clone":
+        return { type: "project_cloned", path: await this.projectClone(cmd.url, cmd.name, cmd.parent, cmd.branch) };
+      case "project_clone_cancel":
+        this.cloneRun?.cancel();
+        return;
       case "shutdown":
         return;
       default:
@@ -5767,6 +5779,66 @@ export class ReviewEngine {
       throw new CommandRefused(`git_init_failed:${firstLineOf(errorMessage(e))}`, { code: "git_init_failed" });
     }
     this.log("info", `new project ${path}`);
+    await this.openProject(path, false);
+    return path;
+  }
+
+  // ------------------------------------------------------------------ §74 clone from git
+
+  /** What the user pasted, read as a repository; refused `bad_url:<why>` / `url_has_credentials`. */
+  private cloneSource(raw: unknown): CloneSource {
+    const source = parseCloneSource(typeof raw === "string" ? raw : "");
+    if ("code" in source) throw new CommandRefused(source.detail ? `${source.code}:${source.detail}` : source.code, { code: source.code });
+    return source;
+  }
+
+  /** `project_clone_preview`: the URL as git gets it, the folder it would clone into, the recent projects that have it. */
+  private async projectClonePreview(rawURL: unknown, rawName: unknown, rawParent: unknown, rawPaths: unknown): Promise<ProjectClonePreviewEvent> {
+    const source = this.cloneSource(rawURL);
+    const parent = this.projectParent(rawParent);
+    const name = typeof rawName === "string" && rawName.trim() ? cloneFolderName(rawName) : source.name;
+    const paths = Array.isArray(rawPaths) ? rawPaths.filter((p): p is string => typeof p === "string") : [];
+    return { type: "project_clone_preview", url: source.url, repo: source.repo, host: source.host, branch: source.branch, name, parent, path: freeProjectPath(parent, name), matches: await clonedAlready(source, paths) };
+  }
+
+  /**
+   * `project_clone`: the folder (the first free `<parent>/<name>[-n]`, made empty first so two clones never share one), then
+   * `git clone` into it with the user's own credentials (`project_clone_progress` as git reports), then an open as
+   * `open_project` of a repository. Any failure or a cancel removes the folder; refused with §74.3's codes.
+   */
+  private async projectClone(rawURL: unknown, rawName: unknown, rawParent: unknown, rawBranch: unknown): Promise<string> {
+    if (this.cloneRun) throw new CommandRefused("clone_busy", { code: "clone_busy" });
+    const source = this.cloneSource(rawURL);
+    const parent = this.projectParent(rawParent);
+    const name = typeof rawName === "string" && rawName.trim() ? cloneFolderName(rawName) : source.name;
+    const branch = typeof rawBranch === "string" && rawBranch.trim() ? rawBranch.trim() : source.branch;
+    if (branch !== null && (branch.startsWith("-") || /\s/.test(branch))) throw new CommandRefused(`bad_branch:${branch}`, { code: "bad_branch" });
+    let path: string;
+    try {
+      path = await createProjectFolder(parent, name);
+    } catch (e) {
+      const why = errorMessage(e);
+      throw new CommandRefused(why.includes("all exist") ? `clone_folder_exists:${why.replace(/^parent_not_writable:/, "")}` : why, { code: why.includes("all exist") ? "clone_folder_exists" : "parent_not_writable" });
+    }
+    const run = startClone({
+      git: getGitPath(),
+      source,
+      branch,
+      path,
+      killTree: (pid) => this.platform.killTree(pid),
+      onProgress: (p) => this.emit({ type: "project_clone_progress", path, ...p }),
+    });
+    this.cloneRun = run;
+    try {
+      await run.done;
+    } catch (e) {
+      const code = e instanceof CloneError ? e.code : "clone_failed";
+      this.log("info", `clone of ${redactCredentials(source.url)} stopped: ${redactCredentials(errorMessage(e))}`);
+      throw new CommandRefused(redactCredentials(errorMessage(e)), { code });
+    } finally {
+      this.cloneRun = null;
+    }
+    this.log("info", `cloned ${redactCredentials(source.url)} into ${path}`);
     await this.openProject(path, false);
     return path;
   }
@@ -10421,7 +10493,11 @@ function laneOf(cmd: EngineCommand): Lane {
     // §69: a name preview and `git remote -v` reads for the no-project window, never behind an open.
     case "project_name":
     case "project_match":
+    case "project_clone_preview": // §74
       return "query";
+    // §74: a cancel never waits behind the clone it stops (that one runs on the main lane).
+    case "project_clone_cancel":
+      return "steer";
     // §70.3: a read of the chat's rows (and one file written), never behind a turn.
     case "export_chat":
     case "copy_response":
@@ -10533,6 +10609,7 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "init_repo":
     case "track_without_git": // §59
     case "project_create": // §69
+    case "project_clone": // §74
     case "reject":
     case "reject_all":
     case "reject_hunks":

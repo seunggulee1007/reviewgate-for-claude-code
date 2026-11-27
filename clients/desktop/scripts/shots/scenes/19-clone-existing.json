@@ -1,0 +1,19 @@
+{
+  "name": "clone-existing",
+  "description": "Clone from Git for a repository a recent project already has (§74.2): Open it preselected, Clone a fresh copy anyway beside it.",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop", "D:\\work\\acme\\widgets"] },
+  "recent": [
+    { "path": "C:\\Users\\dev\\src\\acme-shop", "exists": true },
+    { "path": "D:\\work\\acme\\widgets", "exists": true }
+  ],
+  "replies": {
+    "project_clone_preview": { "type": "project_clone_preview", "url": "git@github.com:acme/widgets.git", "repo": "acme/widgets", "host": "github.com", "branch": null, "name": "widgets", "parent": "C:\\Users\\dev\\ReviewGate", "path": "C:\\Users\\dev\\ReviewGate\\widgets", "matches": ["D:\\work\\acme\\widgets"] }
+  },
+  "steps": [
+    { "click": "No project choice 4" },
+    { "waitFor": "Clone project url" },
+    { "type": { "testid": "Clone project url", "value": "git@github.com:acme/widgets.git" } },
+    { "waitFor": "Clone project already have" },
+    { "wait": 400 }
+  ]
+}

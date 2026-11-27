@@ -18,12 +18,12 @@ export const SHORTCUT_SECTIONS: ShortcutSection[] = [
       { action: "Settings…", mac: "⌘,", win: "Ctrl+," },
     ],
   },
-  // §69.4: the window with no project open — its three cards (NoProjectCards in App.tsx).
+  // §69.4 / §74.4: the window with no project open — its four cards (NoProjectCards in App.tsx).
   {
     title: "Window with no project",
     note: "When a window has no project open",
     rows: [
-      { action: "New Project · Start from a task · Open a folder…", mac: "1 / 2 / 3", win: "1 / 2 / 3", note: "Each key opens it at once" },
+      { action: "New Project · Start from a task · Open a folder… · Clone from Git", mac: "1 / 2 / 3 / 4", win: "1 / 2 / 3 / 4", note: "Each key opens it at once" },
       { action: "Move between the cards, then take the marked one", mac: "← → ↑ ↓ ↩", win: "← → ↑ ↓ Enter" },
     ],
   },

@@ -6,6 +6,14 @@
 .start-title { margin: 0; font-size: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 720px) { .start-cards { grid-template-columns: 1fr; } }
+/* §74: the window with no project has four cards — two by two where four in a row would squeeze their captions. */
+.start-cards.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 980px) { .start-cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The clone dialog (CloneProjectDialog.tsx) */
+.task-start fieldset.clone-existing { border: 1px solid var(--green); border-radius: 8px; padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+.task-start fieldset.clone-existing legend { padding: 0 4px; }
+.clone-progress .bar { position: relative; height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
+.clone-progress .bar > div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); transition: width 0.2s ease; }
 .start-card { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 110px; padding: 14px; text-align: left; border-radius: 10px; border: 1px solid var(--border); background: var(--panel);
   /* A button keeps one line (styles.css) and clips the rest: a card's caption wraps instead — whole Korean words, a long token anywhere. */
   white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
