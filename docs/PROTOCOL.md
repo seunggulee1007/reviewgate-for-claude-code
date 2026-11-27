@@ -11854,3 +11854,35 @@ type TodoItem = { text: string; status: "pending" | "in_progress" | "completed";
 - **Shortcut tables.** "Show or hide Claude's to-do checklist" ⌃T / Ctrl+Shift+L is a row of the message box section in
   docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. No clash: ⌃T was unbound on the Mac
   (⌘T is New Chat, ⌃⌘T New Terminal Chat); on Windows Ctrl+Shift+L was free (Ctrl+Alt+L is the diff layout).
+
+### 71.3 `/tasks` and Ctrl+B — the background work (clients only)
+
+No engine change: §52 already has the list (`state.session.backgroundTasks`), `task_stop`, `task_output` and
+`task_background`.
+
+- **As the terminal's.** The commands reference: "`/tasks` — View and manage background work in the current session,
+  including subagents that have finished. Also available as `/bashes`". The interactive-mode reference: "`Ctrl+B` —
+  Background running tasks. Backgrounds Bash commands and agents", and the tools reference: "List and stop background
+  tasks with `/tasks`". `TaskOutput` is gone from the CLI (v2.1.277: "Claude reads a background task's output file with
+  `Read` instead"); the app reads the same file through `task_output` (§52).
+- **What §52 already had** in a classic chat: the HUD's "백그라운드 N" chip (only while something runs) and its list —
+  description, kind, turn, start — with [출력 보기] (the last 64 KB, 새로고침) and [중지]; [백그라운드로] on a running
+  Bash row; and **Ctrl+B / ⌃B** in an empty message box while Claude works, which sends `task_background` without an id.
+  The SDK's `Query.backgroundTasks(toolUseId?)` is the terminal's key over stream-json ("without it, backgrounds all
+  foreground tasks — equivalent to pressing Ctrl+B in the terminal"; it throws while background tasks are off), seen
+  working with CLI 2.1.318 (§52 "Verified"). So nothing new is needed for Ctrl+B; its row stays in the shortcut tables.
+- **New: `/tasks` and `/bashes`** are app commands now (no longer terminal-only names, §56.5). They open the list in a
+  sheet (Mac) / dialog (Windows) even with nothing running ("백그라운드에서 실행 중인 작업이 없어요" — the chip has nothing
+  to click then), with the ⌃B / Ctrl+B hint and 완료.
+- **New: the output's tail.** Each task whose output file is known shows its last three non-empty lines under its row,
+  monospaced and selectable (ANSI colors taken out, a `\r`-redrawn progress line as its last state, each line ≤ 240
+  characters), read again every 3 s while the list is open (`task_output`); "아직 출력이 없어요" before the first line.
+  The list in the HUD chip's popover shows it too.
+- **Tooltips.** [중지] "이 작업을 중지해요 — Claude는 기다리지 않고 이어서 해요" (while it stops: "중지하는 중…"),
+  [출력 보기] "출력의 끝부분을 보여줘요 (마지막 64KB)".
+- **Not built, with why:** the terminal's `/tasks` also lists subagents that have finished; the engine drops a task from
+  `backgroundTasks` when it ends (§52), and a finished subagent is already in the agent panel's history (§39.3), so the
+  list stays the live work.
+- Mac: Core `Session/BackgroundTasksList.swift` (`BackgroundText.tail`, the words), `SlashAppCommand.tasks`; App
+  `BackgroundViews.swift` (`BackgroundTasksSheet`, `BackgroundOutputTail`), `ComposerSlashCommands.swift`. Tests:
+  `BackgroundTasksListTests`, `SlashAppCommandsTests`.

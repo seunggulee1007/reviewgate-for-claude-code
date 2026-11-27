@@ -14,6 +14,8 @@ public enum SlashAppCommand: Equatable, Sendable {
     case usage
     /// §71.2 `/todos`: Claude's to-do checklist over the box (as ⌃T). The CLI has no such command any more; the app keeps it.
     case todos
+    /// §71.3 `/tasks` (the terminal's `/bashes` is its alias): the background work — shells, monitors, agents — with stop.
+    case tasks
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
     /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
@@ -25,19 +27,20 @@ public enum SlashAppCommand: Equatable, Sendable {
 
     /// The app's commands, as the palette lists them (each the terminal's name).
     public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model",
-                               "permissions", "rename", "resume", "rewind", "status", "todos", "usage"]
+                               "permissions", "rename", "resume", "rewind", "status", "tasks", "todos", "usage"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
         "continue": "resume", "quit": "exit", "settings": "config", "checkpoint": "rewind", "allowed-tools": "permissions",
         "cost": "usage", "stats": "usage",   // §71.1: the commands reference — "`/cost` and `/stats` are aliases"
+        "bashes": "tasks",   // §71.3: "`/tasks` … Also available as `/bashes`"
     ]
 
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
-        "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
+        "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
         "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
-        "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "upgrade", "vim",
+        "release-notes", "sandbox", "statusline", "terminal-setup", "theme", "upgrade", "vim",
     ]
 
     /// `text` (one line, `/name [args]`) as the app's command; nil when it goes to Claude as before — another command, a
@@ -63,6 +66,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "context": return .context
         case "usage": return .usage   // §71.1
         case "todos": return .todos   // §71.2
+        case "tasks": return .tasks   // §71.3
         case "permissions": return .permissions
         case "agents": return .agents
         case "memory": return .memory
@@ -97,6 +101,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "rewind": String(localized: "Rewind to before your last message", bundle: .module)
         case "status": String(localized: "Show the model, effort, session and MCP servers", bundle: .module)
         case "todos": TodoText.description   // §71.2
+        case "tasks", "bashes": BackgroundText.tasksDescription   // §71.3
         case "usage", "cost", "stats": UsageText.description   // §71.1 (the terminal lists its aliases too)
         default: nil
         }

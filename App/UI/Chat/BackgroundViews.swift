@@ -36,12 +36,35 @@ struct BackgroundTasksChip: View {
     }
 }
 
-/// The running background tasks, newest at the bottom; each with its output and a stop button.
+/// §71.3 `/tasks` (`/bashes`): the same list in a sheet — it opens with nothing running too, as the terminal's /tasks.
+struct BackgroundTasksSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            BackgroundTasksPopover(width: nil)
+            Text(verbatim: BackgroundText.moveHint).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("tasks.done")
+            }
+        }
+        .padding(16)
+        .frame(width: 520)
+        .accessibilityIdentifier("Background tasks sheet")
+    }
+}
+
+/// The running background tasks, newest at the bottom; each with the end of its output (§71.3), [출력 보기] and [중지].
 struct BackgroundTasksPopover: View {
     @Environment(AppState.self) private var store
     @State private var outputOf: BackgroundTaskInfo?
     @State private var stopping: Set<String> = []
     @State private var failure: String?
+    /// The popover's width; nil in the sheet (§71.3), which sizes it.
+    var width: CGFloat? = 380
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -60,8 +83,8 @@ struct BackgroundTasksPopover: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
-        .frame(width: 380)
+        .padding(width == nil ? 0 : 12)
+        .frame(width: width)
         .sheet(item: $outputOf) { task in
             BackgroundTaskOutputSheet(task: task)
         }
@@ -82,11 +105,13 @@ struct BackgroundTasksPopover: View {
                     }
                 }
                 .font(.caption2).foregroundStyle(.secondary)
+                if task.hasOutput { BackgroundOutputTail(taskId: task.taskId) }   // §71.3
             }
             Spacer(minLength: 4)
             if task.hasOutput {
                 Button("Output") { outputOf = task }
                     .controlSize(.small)
+                    .help(BackgroundText.outputHelp)
                     .accessibilityIdentifier("Background task output")
             }
             Button(role: .destructive) {
@@ -102,7 +127,38 @@ struct BackgroundTasksPopover: View {
             }
             .controlSize(.small)
             .disabled(stopping.contains(task.taskId))
+            .help(stopping.contains(task.taskId) ? BackgroundText.stoppingHelp : BackgroundText.stopHelp)
             .accessibilityIdentifier("Stop background task")
+        }
+    }
+}
+
+/// §71.3: the last lines of a task's output under its row, read again every few seconds while the list is open.
+struct BackgroundOutputTail: View {
+    @Environment(AppState.self) private var store
+    let taskId: String
+    @State private var lines: [String]?
+
+    var body: some View {
+        Group {
+            if let lines {
+                if lines.isEmpty {
+                    Text(verbatim: BackgroundText.noOutputYet).foregroundStyle(.tertiary)
+                } else {
+                    Text(verbatim: lines.joined(separator: "\n")).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.system(.caption2, design: .monospaced))
+        .lineLimit(3)
+        .truncationMode(.tail)
+        .textSelection(.enabled)
+        .accessibilityIdentifier("Background task tail")
+        .task(id: taskId) {
+            while !Task.isCancelled {
+                if case let .success(reply) = await store.backgroundTaskOutput(taskId) { lines = BackgroundText.tail(reply.text) }
+                try? await Task.sleep(for: .seconds(3))
+            }
         }
     }
 }

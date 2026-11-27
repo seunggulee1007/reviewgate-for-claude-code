@@ -3377,6 +3377,22 @@
         }
       }
     },
+    "Background tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업"
+          }
+        }
+      }
+    },
     "Background work is off (Settings › Session, or CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).": {
       "localizations": {
         "en": {
@@ -8359,6 +8375,22 @@
         }
       }
     },
+    "List the shells and agents running in the background — their output, and stop them": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List the shells and agents running in the background — their output, and stop them"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행 중인 셸과 에이전트를 보여줘요 — 출력을 보고 중지할 수 있어요"
+          }
+        }
+      }
+    },
     "Log in…": {
       "localizations": {
         "en": {
@@ -8467,6 +8499,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 기다리는 파일이 없어요"
+          }
+        }
+      }
+    },
+    "No output yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No output yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 출력이 없어요"
           }
         }
       }
@@ -9143,6 +9191,22 @@
         }
       }
     },
+    "Show the end of its output (the last 64 KB)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the end of its output (the last 64 KB)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력의 끝부분을 보여줘요 (마지막 64KB)"
+          }
+        }
+      }
+    },
     "Show the keyboard shortcuts": {
       "localizations": {
         "en": {
@@ -9283,6 +9347,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "셸 명령 중지 (esc)"
+          }
+        }
+      }
+    },
+    "Stop this task — Claude goes on without waiting for it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop this task — Claude goes on without waiting for it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 작업을 중지해요 — Claude는 기다리지 않고 이어서 해요"
+          }
+        }
+      }
+    },
+    "Stopping…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "중지하는 중…"
           }
         }
       }
@@ -10131,6 +10227,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 끝내면 보내요"
+          }
+        }
+      }
+    },
+    "While Claude runs a command, ⌃B in the empty message box moves it here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While Claude runs a command, ⌃B in the empty message box moves it here."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 명령을 실행하는 동안 빈 입력란에서 ⌃B를 누르면 여기로 옮겨져요."
           }
         }
       }

@@ -14,7 +14,7 @@ import Testing
 
     @Test func eachAppCommandParses() {
         let expected: [String: SlashAppCommand] = [
-            "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage, "/todos": .todos,
+            "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage, "/todos": .todos, "/tasks": .tasks,
             "/permissions": .permissions, "/agents": .agents, "/memory": .memory, "/config": .config, "/help": .help,
             "/status": .status, "/exit": .exit, "/rename": .rename, "/add-dir": .addDir(""), "/export": .export(""), "/copy": .copy(""),
         ]
@@ -37,6 +37,7 @@ import Testing
         #expect(SlashAppCommand.parse("/cost", entries: []) == .usage)   // §71.1
         #expect(SlashAppCommand.parse("/stats", entries: []) == .usage)
         #expect(SlashAppCommand.description("cost") == UsageText.description)
+        #expect(SlashAppCommand.parse("/bashes", entries: []) == .tasks)   // §71.3
     }
 
     @Test func terminalOnlyBuiltinsAreNotSent() {
@@ -44,7 +45,7 @@ import Testing
         #expect(SlashAppCommand.parse("/vim", entries: []) == .terminalOnly("vim"))
         #expect(!SlashAppCommand.terminalOnly.contains("add-dir"))   // §67.1: the app's own now
         #expect(!SlashAppCommand.terminalOnly.contains("export"))   // §70.3
-        for name in ["usage", "stats", "todos"] { #expect(!SlashAppCommand.terminalOnly.contains(name), "\(name)") }   // §71.1
+        for name in ["usage", "stats", "todos", "tasks", "bashes"] { #expect(!SlashAppCommand.terminalOnly.contains(name), "\(name)") }   // §71.1
     }
 
     /// §67.1: `/add-dir <path>` keeps the path as typed (case, spaces, quotes — the engine resolves them).
