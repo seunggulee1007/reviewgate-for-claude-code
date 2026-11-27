@@ -220,10 +220,9 @@ struct HUDStrip: View {
                 .frame(width: 380)
                 .accessibilityIdentifier("Context popover")
             }
-            // §56.5: `/context` — and `/cost` while the strip has no cost to open (narrow, or nothing spent yet, §56.6).
+            // §56.5: `/context` (§71.1: `/cost` is `/usage`'s alias — the usage sheet).
             .onChange(of: model.hudPopoverTick) { _, _ in
-                let noCost = compact || !hud.shown(isRunning: store.isRunning).cost
-                if !measuring, model.hudPopover == .context || (noCost && model.hudPopover == .cost) { showContext = true }
+                if !measuring, model.hudPopover == .context { showContext = true }
             }
     }
 

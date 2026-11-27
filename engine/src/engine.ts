@@ -122,7 +122,7 @@ import { ReviewGate, errorMessage, truncateDiff } from "./review/gate.js";
 import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-sync (§68.5)
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
-import type { ChatExportEvent, ResponseTextEvent, ThinkingState } from "./protocol.js"; // §70.3, §70.4
+import type { ChatExportEvent, ResponseTextEvent, ThinkingState, TodoItem } from "./protocol.js"; // §70.3, §70.4, §71.2
 import { chatExportText, exportFileName, nthResponse, writeExport } from "./session/exportChat.js"; // §70.3
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
@@ -246,7 +246,7 @@ import { applyCleanup, cleanupKeep, planCleanup } from "./review/cleanup.js";
 // MARK: wave4b w4b-follow — §39.4
 import { dropIncoming, moveRefusal, moveTarget, readIncoming, waitForExit, writeHandoff, type ChatHandoff } from "./review/chatMove.js";
 // MARK: wave4d w4d-plan — §42.1
-import { applyTaskTool, displayPlanPath, messageSteps, planCandidates, planFilesNamed, planStepBriefs, planView, readPlanFile, requestScope, resolvePlanPath, todoWriteSteps, type TaskItem } from "./review/planSources.js";
+import { applyTaskTool, displayPlanPath, messageSteps, planCandidates, planFilesNamed, planStepBriefs, planView, readPlanFile, requestScope, resolvePlanPath, taskItemsAsTodos, todoWriteItems, todoWriteSteps, type TaskItem } from "./review/planSources.js";
 import { implementPlanText, takePlanHandoff, writePlanHandoff, type PlanHandoff } from "./review/planHandoff.js";
 import { takeTaskHandoff, taskText, writeTaskHandoff, type TaskHandoff } from "./review/taskHandoff.js";
 import { sessionTranscriptPath } from "./review/sessions.js";
@@ -2169,7 +2169,7 @@ export class ReviewEngine {
   /** The open chat's plan sources, read back from its rows the first time they are needed after it was opened. */
   private chatPlanMemory(): ChatPlanMemory {
     if (this.chatPlan) return this.chatPlan;
-    const mem: ChatPlanMemory = { first: null, named: [], todos: null, tasks: [] };
+    const mem: ChatPlanMemory = { first: null, named: [], todos: null, tasks: [], todoItems: null, lastTool: null };
     for (const row of this.transcript?.tail(PLAN_ROWS_SCAN) ?? []) {
       if (row.kind === "user_message") notePlanMessage(mem, row.text, row.mentions ?? []);
       else if (row.kind === "tool_use" && row.parentToolUseId === undefined) notePlanTool(mem, row.name, row.input);
@@ -8336,7 +8336,10 @@ export class ReviewEngine {
         if (continues) ev.continues = continues;
         if (isExploreCall(ev.name, ev.input)) ev.explore = true; // MARK: wave4b w4b-tabs — §39.2 an exploration call (event and row)
         // MARK: wave4d w4d-plan — §42.1: Claude's own to-do list (read before this row is written, so it is not counted twice)
-        if (ev.parentToolUseId === undefined && PLAN_TOOLS.has(ev.name)) notePlanTool(this.chatPlanMemory(), ev.name, ev.input);
+        if (ev.parentToolUseId === undefined && PLAN_TOOLS.has(ev.name)) {
+          notePlanTool(this.chatPlanMemory(), ev.name, ev.input);
+          this.touch(); // §71.2: the checklist follows it live
+        }
         const { type: _type, ...row } = ev;
         this.record({ kind: "tool_use", ...row });
         this.emit(ev);
@@ -10030,13 +10033,23 @@ export class ReviewEngine {
         shell: this.shellRun ? { ...this.shellRun.info } : null, // §67.2
         shellPending: this.shellPending.length,
         thinking: this.thinkingSlice(), // §70.4
+        todos: this.currentSessionId ? checklistOf(this.chatPlanMemory()) : [], // §71.2
       },
       toolchain: this.toolchain,
       gate: this.gate,
       budget: this.settings.budget,
       budgetUsage: this.budgetUsage,
       reviewFirst: this.reviewFirstSlice(), // §64
-      hud: this.rateLimits.length > 0 ? { ...this.hud, rateLimits: this.rateLimits.map((w) => ({ ...w })) } : this.hud, // MARK: wave4 w4-longwork (§38.2)
+      hud: {
+        ...this.hud,
+        ...(this.rateLimits.length > 0 ? { rateLimits: this.rateLimits.map((w) => ({ ...w })) } : {}), // MARK: wave4 w4-longwork (§38.2)
+        sessionTotals: { // §71.1: the terminal's /usage Session block
+          startedAt: this.sessionStartedAt,
+          apiDurationMs: this.session?.statusUsage?.apiDurationMs ?? 0,
+          linesAdded: this.chatLines.added,
+          linesRemoved: this.chatLines.removed,
+        },
+      },
       branches: this.branches,
       sync: { ...this.syncFlags, autoFetch: this.settings.autoFetch !== false }, // MARK: git-sync (§68)
       pr: this.pr,
@@ -10606,6 +10619,10 @@ type ChatPlanMemory = {
   todos: PlanStep[] | null;
   /** The Task tools' list (TaskCreate / TaskUpdate). */
   tasks: TaskItem[];
+  /** §71.2: the latest TodoWrite list with each item's status (the checklist); null before one. */
+  todoItems: TodoItem[] | null;
+  /** §71.2: which of the two Claude used last — the checklist shows that one. */
+  lastTool: "todo" | "tasks" | null;
 };
 
 /** Rows of a chat read back for its plan sources. */
@@ -10626,10 +10643,25 @@ function notePlanTool(mem: ChatPlanMemory, name: string, input: unknown): void {
   if (name === "TodoWrite") {
     const steps = todoWriteSteps(input);
     if (steps) mem.todos = steps;
+    const items = todoWriteItems(input);
+    if (items) {
+      mem.todoItems = items;
+      mem.lastTool = "todo";
+    }
     return;
   }
   const tasks = applyTaskTool(mem.tasks, name, input);
-  if (tasks) mem.tasks = tasks;
+  if (tasks) {
+    mem.tasks = tasks;
+    mem.lastTool = "tasks";
+  }
+}
+
+/** §71.2: `state.session.todos` — the list Claude used last, [] without one. */
+function checklistOf(mem: ChatPlanMemory): TodoItem[] {
+  if (mem.lastTool === "todo") return (mem.todoItems ?? []).map((t) => ({ ...t }));
+  if (mem.lastTool === "tasks") return taskItemsAsTodos(mem.tasks);
+  return [];
 }
 
 // MARK: wave5 w5-model — §43.4

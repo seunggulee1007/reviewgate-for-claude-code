@@ -32,3 +32,19 @@
 .shortcuts-table td { padding: 3px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .shortcuts-table td.mono { font-family: var(--mono); white-space: nowrap; }
 .shortcuts-table .current { color: var(--fg); font-weight: 600; }
+
+/* §71.1 /usage: the terminal's Session block and the plan's usage windows. */
+.usage-body { max-height: calc(100vh - 220px); overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.usage-section { display: flex; flex-direction: column; gap: 6px; }
+.usage-section + .usage-section { border-top: 1px solid var(--border); padding-top: 10px; }
+.usage-grid { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; font-size: 12.5px; user-select: text; }
+.usage-indent { padding-left: 12px; }
+.usage-model { display: flex; align-items: baseline; gap: 6px; min-width: 0; user-select: text; }
+.usage-model .truncate { flex: none; max-width: 40%; }
+.usage-model .tiny.muted { flex: 1 1 auto; min-width: 0; }
+.usage-model > .num:last-child { flex: none; white-space: nowrap; }
+.usage-side { color: var(--blue); }
+.usage-window { display: flex; flex-direction: column; gap: 3px; }
+.usage-bar { height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
+.usage-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.usage-bar.high > span { background: var(--orange); }

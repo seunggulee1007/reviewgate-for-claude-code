@@ -6097,6 +6097,22 @@
         }
       }
     },
+    "In the message box — /todos shows it too. On Windows Ctrl+T is New Chat": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In the message box — /todos shows it too. On Windows Ctrl+T is New Chat"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메시지 입력란에서 — /todos로도 보여요. Windows에서는 Ctrl+T가 새 채팅이에요"
+          }
+        }
+      }
+    },
     "In the message box — press it again for an older match": {
       "localizations": {
         "en": {
@@ -6157,6 +6173,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "프롬프트 기록 검색"
+          }
+        }
+      }
+    },
+    "Show or hide Claude's to-do checklist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show or hide Claude's to-do checklist"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 할 일 목록 보이기·숨기기"
           }
         }
       }

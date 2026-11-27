@@ -197,7 +197,7 @@ final class WindowModel {
     /// Chat › "이미지 첨부…": the composer opens its image picker.
     var attachImagesTick = 0
     // MARK: b-slash (§56.5)
-    /// A HUD popover a typed built-in opens (`/model`, `/context`, `/cost`): the HUD's chip shows `hudPopover` on the tick.
+    /// A HUD popover a typed built-in opens (`/model`, `/context`): the HUD's chip shows `hudPopover` on the tick.
     var hudPopover: HUDPopoverRequest = .model
     var hudPopoverTick = 0
     /// `/agents`: the agent panel opens (never closes, as View › Toggle Agent Panel may).

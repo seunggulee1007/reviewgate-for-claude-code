@@ -1,0 +1,28 @@
+{
+  "extends": "04-review.json",
+  "name": "usage",
+  "description": "/usage (§71.1): the session block — cost, API and wall time, code changes, usage by model — and three plan windows, the five-hour one near its limit.",
+  "state": {
+    "hud": {
+      "sessionCostUSD": 0.4203,
+      "sideCostUSD": 0.0124,
+      "sessionModels": [
+        { "model": "claude-sonnet-4-6", "costUsd": 0.3812, "inputTokens": 1240, "outputTokens": 5310, "cacheReadTokens": 940000, "cacheCreationTokens": 50200 },
+        { "model": "claude-haiku-4-5", "costUsd": 0.0391, "inputTokens": 820, "outputTokens": 2100, "cacheReadTokens": 120400, "cacheCreationTokens": 9800 }
+      ],
+      "sessionTotals": { "startedAt": { "$fromNowMs": -23590000 }, "apiDurationMs": 380000, "linesAdded": 42, "linesRemoved": 7 },
+      "rateLimits": [
+        { "kind": "seven_day", "status": "allowed", "percent": 41, "resetsAt": { "$isoFromNow": 259200 }, "at": { "$isoFromNow": -60 } },
+        { "kind": "five_hour", "status": "allowed_warning", "percent": 86, "resetsAt": { "$isoFromNow": 5400 }, "at": { "$isoFromNow": -60 } },
+        { "kind": "seven_day_opus", "status": "allowed", "percent": 12, "resetsAt": { "$isoFromNow": 259200 }, "at": { "$isoFromNow": -60 } }
+      ]
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/usage" } },
+    { "key": "Enter" },
+    { "waitFor": "Usage dialog" },
+    { "wait": 300 }
+  ]
+}

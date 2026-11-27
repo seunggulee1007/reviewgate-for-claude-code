@@ -9065,7 +9065,9 @@ not touched.
 | `/resume` (`/continue`) | the chat history (⌘Y · Ctrl+H) |
 | `/rewind` (`/checkpoint`) | the rewind sheet of the latest rewind point; none yet: a notice |
 | `/context` | Mac: the HUD's context popover (usage + Compact) · Windows: the Compact dialog (usage + Compact) |
-| `/cost` | the HUD's cost popover (Mac's narrow HUD has none: the context popover) |
+| `/usage` (`/cost`, `/stats`) | §71.1: the usage sheet · dialog — session cost and times, usage by model, plan windows (before: `/cost` the HUD's cost popover) |
+| `/todos` | §71.2: Claude's to-do checklist over the box (as ⌃T · Ctrl+Shift+L) |
+| `/tasks` (`/bashes`) | §71.3: the background work with each task's output tail and [중지] |
 | `/permissions` (`/allowed-tools`) | Settings — Mac › General (its permission section) · Windows › Permissions |
 | `/config` (`/settings`) | Settings |
 | `/agents` | the agent panel opens (never toggles closed) |
@@ -9080,7 +9082,7 @@ not touched.
   the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
   project's `/status` still goes to Claude).
 - **`/add-dir`** is the app's own since §67.1 (it adds a directory to the chat); before, it was among the terminal's.
-- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme`, `/usage` … the list is
+- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme` … the list is
   `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
   "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
   its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
@@ -11754,3 +11756,139 @@ set_thinking { enabled: boolean }   // the current chat's; lane main, allowed wh
 - **Shortcut tables.** ⌃R / Ctrl+R "Search the prompt history" and ⌥T / Alt+T "Turn extended thinking on or off" are rows
   of the message box section in docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. Neither
   clashes: ⌘R / Ctrl+R outside the box is Refresh (70.1), Ctrl+Alt+T is New Terminal Chat, ⌥⌘T New Chat in a Workbench.
+
+## 71. Terminal parity, batch E
+
+Three more terminal screens for classic chats, checked against Claude Code's docs (interactive mode, the commands
+reference, the costs page and the tools reference, as of 2026-11): `/usage`, Claude's to-do checklist (Ctrl+T), and the
+background work (`/tasks`, Ctrl+B). Terminal chats (§57) are the real TUI and keep theirs.
+
+### 71.1 `/usage` — session cost, plan usage and the cost by model
+
+```ts
+// state.hud.sessionTotals?: { startedAt: number | null; apiDurationMs: number; linesAdded: number; linesRemoved: number }
+//   startedAt     — epoch ms the live CLI started (null while none runs): "Total duration (wall)"
+//   apiDurationMs — its results' duration_api_ms, summed: "Total duration (API)"
+//   linesAdded / linesRemoved — the collected turns of this chat since the engine opened it: "Total code changes"
+```
+
+- **As the terminal's command.** The commands reference: "`/usage` — Show session cost, plan usage limits, and activity
+  stats … `/cost` and `/stats` are aliases" (`/stats` "Opens on the Stats tab"). The costs page shows its Session block:
+  `Estimated cost`, `Total duration (API)`, `Total duration (wall)`, `Total code changes: N lines added, M lines removed`
+  and `Usage by model: <model>: 1.2k input, 5.3k output, 940.0k cache read, 50.0k cache write ($0.55)`; subscribers also
+  see the plan usage bars with their reset times.
+- **The engine** adds only what the clients did not have: `hud.sessionTotals` (the same numbers the status line's
+  `cost.*` takes, §44.2). The cost, the per-model tokens (`hud.sessionModels`, §42.4), the side questions' cost (§21) and
+  the plan windows (`hud.rateLimits`, §38.2) were already in the state. A new chat starts the lines again; `startedAt`
+  follows the CLI process (a restart starts it again, as the terminal's clock does).
+- Engine: `engine.ts` (`slices()`), `protocol.ts` (`SessionTotals`). Tests: `engine/test/w71.usage.test.ts`.
+- **`/usage`, `/cost` and `/stats` are app commands now** in a classic chat (no longer terminal-only names, §56.5; `/cost`
+  opened the HUD's cost popover before — the popover stays on the HUD's "$… 세션"). They open the **usage sheet** (Mac) /
+  dialog (Windows), live while open:
+  - **Session**: 예상 비용 `$0.5512`, 총 소요 시간(API) `6분 20초`, 총 경과 시간 (counting from `startedAt`; "실행 중인
+    Claude Code 세션이 없어요" without a CLI), 총 코드 변경 `12줄 추가, 3줄 삭제`, and 모델별 사용량 — one line per model
+    of `hud.sessionModels`: `입력 1.2k, 출력 5.3k, 캐시 읽기 940.0k, 캐시 쓰기 50.0k` and its cost (the terminal's
+    shapes: `k` / `M`, durations `6m 20s` in English). The side questions' cost follows when there is one; the note says it
+    is Claude Code's estimate at list price, not a bill, and that a new chat starts again. An engine without §71.1 shows
+    the cost and the models only.
+  - **Plan usage**: one bar per window of `hud.rateLimits`, in the terminal's order (현재 세션(5시간), 이번 주(모든 모델),
+    이번 주(Opus), 이번 주(Sonnet), then any other kind by name), "72% 사용" (orange from 80 %), "한도에 닿았어요" for
+    a rejected window, and "15:00에 초기화돼요" (a later day with its date). No window yet: the note that a subscription's
+    limits show after Claude's first answer.
+  - **Not built, with why:** the terminal's Stats tab (activity across all sessions) and its plan breakdown
+    (attribution, recommendations, `f` to fix, loops) are computed by the CLI from its local session history; stream-json
+    sends none of it. The sheet says they are in a terminal chat's `/usage`.
+- Mac: Core `Session/UsageReport.swift` (`SessionTotals`, `UsageText`), `HUDWire.sessionTotals`,
+  `SlashAppCommand.usage`; App `UsageSheet.swift`, `ComposerSlashCommands.swift`. Tests: `UsageReportTests`,
+  `SlashAppCommandsTests`.
+- Windows: `usageReport.ts` (the words; its Korean comes from the Mac's catalog through `gen-i18n.mjs`),
+  `components/dialogs/UsageDialog.tsx` (`Dialog {kind: "usage"}`), `slashAppCommands.ts` / `slashAppRun.ts`
+  (`{kind: "usage"}`; the HUD's cost popover no longer opens on a typed `/cost`). Tests: `usageReport.test.ts`,
+  `slashAppCommands.test.ts`.
+
+### 71.2 Ctrl+T — Claude's to-do checklist, live
+
+```ts
+// state.session.todos?: TodoItem[]      // [] when the chat has none; absent from an older engine
+type TodoItem = { text: string; status: "pending" | "in_progress" | "completed"; activeForm?: string };
+```
+
+- **As the terminal's task list.** The interactive-mode reference: "`Ctrl+T` — Toggle Claude's task checklist. Show or hide
+  Claude's to-do checklist in the status area. This is not the background-task view; use `/tasks` to see running shells
+  and subagents", and under "Task list": "items Claude created to plan multi-step work, with indicators showing what's
+  pending, in progress, or complete … The display shows up to five tasks at a time. When Claude hasn't created any
+  checklist items yet, the toggle has no visible effect". The tools reference: `TodoWrite` "Manages the session task
+  checklist. Disabled by default in favor of `TaskCreate`, `TaskGet`, `TaskList`, and `TaskUpdate`", and the task tools
+  are "available by default only on Opus 4.7, Sonnet 4.6, Haiku 4.5, and earlier models" (newer models plan without a
+  written checklist, so the list stays empty there, as in the terminal).
+- **`/todos` is gone from the CLI** (the commands reference has no such row; it lists `/tasks` for background work). The
+  app keeps `/todos` as its own name for the checklist, as it was a terminal-only name before (§56.5), so the habit
+  still finds it; it goes to Claude only when the user has a command of that name.
+- **The engine** keeps the chat's list as it did for "plan vs actual" (§42.1: the main thread's `TodoWrite` /
+  `TaskCreate` / `TaskUpdate` calls, read back from the chat's rows when it opens), now with each item's status and its
+  running words (`activeForm`, which the terminal shows for the item in progress). `todos` is the list of the tool Claude
+  used last. A main-thread call to one of them sends a state at once, so the checklist follows the turn live; a
+  subagent's own list is not the chat's.
+- Engine: `review/planSources.ts` (`todoWriteItems`, `taskItemsAsTodos`, `TaskItem.status` / `activeForm`),
+  `engine.ts` (`ChatPlanMemory.todoItems` / `lastTool`, `checklistOf`, `slices()`), `protocol.ts` (`TodoItem`). Tests:
+  `engine/test/w71.todos.test.ts`.
+- **Clients.** Over the message box of a classic chat, a small panel: "할 일 · 5개 중 2개 완료", then at most five items as
+  the terminal shows them — □ 대기, ◼ 진행 중 (accent, semibold, its `activeForm` words), ✓ 완료 (struck through) — starting
+  one item before the first one not done, with "위에 완료한 일 N개" / "+N개 더" for the rest. Each row's tooltip is the
+  item's text; the panel's says it follows the work live as Ctrl+T in Claude Code. It shows only while the chat has items
+  and the choice is "shown" (kept with the app, on until hidden — as the terminal restores the view it was left in); a
+  chat shown read-only does not show the live chat's list.
+  - **Mac ⌃T** in the message box (instead of AppKit's transpose) shows or hides it, and the line under the box says
+    "할 일 목록을 보여요 — ⌃T로 숨길 수 있어요" / "…숨겼어요 — ⌃T로 다시 볼 수 있어요", or that Claude has no list yet. The
+    panel's chevron hides it too (tooltip: "목록 숨기기 (⌃T나 /todos로 다시 볼 수 있어요)"). An engine without §71.2: ⌃T
+    transposes as before; `/todos` says the engine has no checklist.
+  - **`/todos`** shows it (and says when there is nothing yet).
+  - **Windows Ctrl+Shift+L** does the same — Ctrl+T stays New Chat there (the app's own key since M15, every Windows
+    app's "new tab"); the shortcut tables say so.
+- Mac: Core `Session/TodoChecklist.swift` (`TodoItem`, `TodoWindow`, `TodoText`, `AppSettings.todoListShown`,
+  `todoBlocker`), `SessionInfo.todos`, `SlashAppCommand.todos`; App `ComposerTodos.swift` (`ComposerTodoPanel`,
+  `toggleTodos`, `showTodos`), `ComposerTextView` (`.controlT`), `ChatComposer`. Tests: `TodoChecklistTests`,
+  `SlashAppCommandsTests`, `ShortcutTableTests`.
+- Windows: `todoChecklist.ts` (`todosOf`, `todoWindow`, `isTodosKey`, `useTodoPanel` — the choice in localStorage
+  `reviewgate.todoListShown` —, `toggleTodos`, `showTodos`, `todoBlocker`), `components/chat/TodoChecklist.tsx`,
+  `Composer.tsx` (the key, the panel), `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "todos"}`). The words with the
+  key in them are Windows' own (`ko.extra.json`). Tests: `todoChecklist.test.ts`, `slashAppCommands.test.ts`.
+- **Shortcut tables.** "Show or hide Claude's to-do checklist" ⌃T / Ctrl+Shift+L is a row of the message box section in
+  docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. No clash: ⌃T was unbound on the Mac
+  (⌘T is New Chat, ⌃⌘T New Terminal Chat); on Windows Ctrl+Shift+L was free (Ctrl+Alt+L is the diff layout).
+
+### 71.3 `/tasks` and Ctrl+B — the background work (clients only)
+
+No engine change: §52 already has the list (`state.session.backgroundTasks`), `task_stop`, `task_output` and
+`task_background`.
+
+- **As the terminal's.** The commands reference: "`/tasks` — View and manage background work in the current session,
+  including subagents that have finished. Also available as `/bashes`". The interactive-mode reference: "`Ctrl+B` —
+  Background running tasks. Backgrounds Bash commands and agents", and the tools reference: "List and stop background
+  tasks with `/tasks`". `TaskOutput` is gone from the CLI (v2.1.277: "Claude reads a background task's output file with
+  `Read` instead"); the app reads the same file through `task_output` (§52).
+- **What §52 already had** in a classic chat: the HUD's "백그라운드 N" chip (only while something runs) and its list —
+  description, kind, turn, start — with [출력 보기] (the last 64 KB, 새로고침) and [중지]; [백그라운드로] on a running
+  Bash row; and **Ctrl+B / ⌃B** in an empty message box while Claude works, which sends `task_background` without an id.
+  The SDK's `Query.backgroundTasks(toolUseId?)` is the terminal's key over stream-json ("without it, backgrounds all
+  foreground tasks — equivalent to pressing Ctrl+B in the terminal"; it throws while background tasks are off), seen
+  working with CLI 2.1.318 (§52 "Verified"). So nothing new is needed for Ctrl+B; its row stays in the shortcut tables.
+- **New: `/tasks` and `/bashes`** are app commands now (no longer terminal-only names, §56.5). They open the list in a
+  sheet (Mac) / dialog (Windows) even with nothing running ("백그라운드에서 실행 중인 작업이 없어요" — the chip has nothing
+  to click then), with the ⌃B / Ctrl+B hint and 완료.
+- **New: the output's tail.** Each task whose output file is known shows its last three non-empty lines under its row,
+  monospaced and selectable (ANSI colors taken out, a `\r`-redrawn progress line as its last state, each line ≤ 240
+  characters), read again every 3 s while the list is open (`task_output`); "아직 출력이 없어요" before the first line.
+  The list in the HUD chip's popover shows it too.
+- **Tooltips.** [중지] "이 작업을 중지해요 — Claude는 기다리지 않고 이어서 해요" (while it stops: "중지하는 중…"),
+  [출력 보기] "출력의 끝부분을 보여줘요 (마지막 64KB)".
+- **Not built, with why:** the terminal's `/tasks` also lists subagents that have finished; the engine drops a task from
+  `backgroundTasks` when it ends (§52), and a finished subagent is already in the agent panel's history (§39.3), so the
+  list stays the live work.
+- Mac: Core `Session/BackgroundTasksList.swift` (`BackgroundText.tail`, the words), `SlashAppCommand.tasks`; App
+  `BackgroundViews.swift` (`BackgroundTasksSheet`, `BackgroundOutputTail`), `ComposerSlashCommands.swift`. Tests:
+  `BackgroundTasksListTests`, `SlashAppCommandsTests`.
+- Windows: `background.ts` (`outputTail`, `tasksDescription`), `components/chat/BackgroundChip.tsx` (`OutputTail`,
+  `BackgroundTasksDialog`, the empty line and tooltips in `BackgroundList`), `Dialog {kind: "backgroundTasks"}`,
+  `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "tasks"}`). Its words are the Mac's (the hint's ⌃B reads Ctrl+B there).
+  Tests: `backgroundTasksList.test.ts`, `slashAppCommands.test.ts`.

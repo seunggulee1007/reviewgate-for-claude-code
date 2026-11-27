@@ -1540,6 +1540,8 @@ public struct SessionInfo: Codable, Sendable, Equatable {
     public var shellPending = 0
     /// §70.4: the chat's extended thinking; nil from an engine without it.
     public var thinking: ThinkingState?
+    /// §71.2: Claude's to-do checklist in the chat ([] when none); nil from an engine without it.
+    public var todos: [TodoItem]?
 
     public init(open: Bool, starting: Bool, sessionId: String?, model: String?, capabilities: SessionCapabilities?,
                 pendingPermission: PermissionRequest?, canRestart: Bool = false, rememberedAllows: [String] = [],
@@ -1604,6 +1606,7 @@ public struct SessionInfo: Codable, Sendable, Equatable {
         terminal = TerminalChatWire.session(from: decoder)   // MARK: terminal-chat (§57)
         (addedDirs, shell, shellPending) = AddDirShellWire.session(from: decoder)   // §67
         thinking = ThinkingWire.session(from: decoder)   // §70.4
+        todos = TodoWire.session(from: decoder)   // §71.2
     }
 
     /// Element by element: one entry a newer engine shapes differently never hides the rest.
@@ -2138,6 +2141,8 @@ public struct HUDWire: Codable, Sendable, Equatable {
     // MARK: wave5 w5-model
     /// §43.4: messages auto sent to each family in this chat, most first; empty on older engines / without auto.
     public var autoModelCounts: [AutoModelCount] = []
+    /// §71.1: `/usage`'s session block (API and wall time, lines changed); nil on older engines.
+    public var sessionTotals: SessionTotals?
 
     public init(contextTokens: Int, contextWindow: Int?, sessionCostUSD: Double, turnCount: Int, lastTurnMs: Int,
                 activity: HUDActivity, subagentDepth: Int, turnStartedAt: Double?, agents: [AgentNode] = [], sideCostUSD: Double = 0) {
@@ -2178,6 +2183,7 @@ public struct HUDWire: Codable, Sendable, Equatable {
         agentHistory = AgentGlanceWire.history(from: decoder)   // wave4b w4b-agents (§39.3)
         (turnModels, sessionModels) = AgentCostWire.hud(from: decoder)   // wave4d w4d-agents2 (§42.4)
         autoModelCounts = AutoModelWire.counts(from: decoder)   // wave5 w5-model (§43.4)
+        sessionTotals = SessionTotalsWire.hud(from: decoder)   // §71.1
     }
 }
 

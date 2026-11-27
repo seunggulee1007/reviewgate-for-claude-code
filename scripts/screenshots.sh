@@ -90,7 +90,10 @@
 #                  bar over the box (a match, an older one, no match, no history, a match taken into the box;
 #                  composerbar-history-*.png), the thinking chip off, for a model that always thinks and after ⌥T
 #                  (composerbar-thinking-*.png), and /export's sheet with the lines after a save and a refusal
-#                  (composerbar-export-*.png).
+#                  (composerbar-export-*.png); then §71, dark and light: /usage's sheet (a subscription's windows, none
+#                  yet, one reached; composerbar-usage-*-<appearance>.png), the to-do checklist over the box (idle, while
+#                  Claude works, hidden, none yet; composerbar-todos-*-<appearance>.png) and /tasks' sheet with each task's
+#                  output tail and with nothing running (composerbar-tasks-*-<appearance>.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with

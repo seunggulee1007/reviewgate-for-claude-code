@@ -3,14 +3,14 @@ import ReviewGateCore
 
 // MARK: b-slash — docs/PROTOCOL.md §56.5: the terminal's built-ins typed in a classic chat open the app's own screens
 // (`SlashAppCommand`): /model the HUD's model picker (or sets the model), /resume the chat history, /rewind the rewind sheet
-// of the last message, /context and /cost the HUD's popovers, /permissions and /config Settings, /agents the agent panel,
+// of the last message, /context the HUD's popover, /usage (/cost, /stats) the usage sheet (§71.1), /permissions and /config Settings, /agents the agent panel,
 // /memory the applied extensions (CLAUDE.md and memory), /help the keyboard shortcuts, /status a card over the box, /rename
 // the tab's rename, /exit closes the chat tab (it stays in the history — ⌘⇧T brings it back). A built-in only the terminal
 // has is never sent: the card offers "Continue as Terminal Chat". §67.1: /add-dir <path> adds a directory to the chat
 // (`add_dir`), /add-dir alone opens the folder picker first. §70.3: /export [file] and /copy [N] (ComposerExport.swift).
 
 /// A HUD popover a typed built-in opens (the HUD's chip shows it).
-enum HUDPopoverRequest: Equatable { case model, context, cost }
+enum HUDPopoverRequest: Equatable { case model, context }
 
 /// What the card over the box shows.
 enum SlashCard: Equatable {
@@ -143,6 +143,8 @@ struct ComposerSlashHooks: ViewModifier {
     @State private var rewind: TurnCheckpoint?
     @State private var showExtensions = false
     @State private var exportItem: ChatExportItem?   // §70.3
+    @State private var showUsage = false   // §71.1
+    @State private var showTasks = false   // §71.3
 
     func body(content: Content) -> some View {
         content
@@ -157,6 +159,8 @@ struct ComposerSlashHooks: ViewModifier {
             .sheet(item: $exportItem) { item in
                 ChatExportSheet(item: item, done: { composer.infoNotice = $0 }, failed: { composer.notice = $0 })
             }
+            .sheet(isPresented: $showUsage) { UsageSheet() }
+            .sheet(isPresented: $showTasks) { BackgroundTasksSheet() }
     }
 
     private func run(_ request: SlashRequest) {
@@ -172,7 +176,9 @@ struct ComposerSlashHooks: ViewModifier {
                 composer.notice = String(localized: "Nothing to rewind yet — no message has a rewind point")
             }
         case .context: popover(.context)
-        case .cost: popover(.cost)
+        case .usage: showUsage = true   // §71.1 (/cost and /stats too)
+        case .todos: composer.showTodos(store: store)   // §71.2
+        case .tasks: showTasks = true   // §71.3 (/bashes too)
         case .permissions: settings(.general)   // the permissions are in General
         case .config: settings(.general)
         case .agents: model.showAgentPanelTick += 1

@@ -1,0 +1,20 @@
+{
+  "extends": "04-review.json",
+  "name": "usage-empty",
+  "description": "/cost (an alias of /usage, §71.1) before any answer: no CLI running, no usage per model, no plan windows yet.",
+  "state": {
+    "hud": {
+      "sessionCostUSD": 0,
+      "sessionModels": [],
+      "sessionTotals": { "startedAt": null, "apiDurationMs": 0, "linesAdded": 0, "linesRemoved": 0 },
+      "rateLimits": []
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/cost" } },
+    { "key": "Enter" },
+    { "waitFor": "Usage dialog" },
+    { "wait": 300 }
+  ]
+}

@@ -1185,6 +1185,20 @@ export type SessionState = {
   shellPending?: number;
   /** §70.4: extended thinking for the current chat (absent from an older engine). */
   thinking?: ThinkingState;
+  /**
+   * §71.2: Claude's to-do checklist in the current chat — the latest TodoWrite list, or the Task tools' list
+   * (TaskCreate / TaskUpdate), whichever Claude used last; [] when it has none (absent from an older engine).
+   */
+  todos?: TodoItem[];
+};
+
+/** §71.2: one item of Claude's to-do checklist (the terminal's Ctrl+T list). */
+export type TodoStatus = "pending" | "in_progress" | "completed";
+export type TodoItem = {
+  text: string;
+  status: TodoStatus;
+  /** The words the terminal shows while the item runs ("Running the tests"); absent when Claude gave none. */
+  activeForm?: string;
 };
 
 /**
@@ -1523,7 +1537,16 @@ export type HudState = {
   // MARK: wave5 w5-model
   /** §43.4: messages auto sent to each family in this chat since the engine opened it, most first (reset with the HUD). */
   autoModelCounts?: AutoModelCount[];
+  /** §71.1: the session block of the terminal's `/usage` (absent from an older engine). */
+  sessionTotals?: SessionTotals;
 };
+
+/**
+ * §71.1: what the terminal's `/usage` Session block adds to the cost — the live CLI's start (epoch ms; null while no CLI
+ * runs: its "Total duration (wall)"), the API time of its results (`duration_api_ms`, summed), and the lines the collected
+ * turns of this chat added / removed since the engine opened it (the status line's `cost.total_lines_*`, §44.2).
+ */
+export type SessionTotals = { startedAt: number | null; apiDurationMs: number; linesAdded: number; linesRemoved: number };
 
 // MARK: wave4 w4-longwork
 /**

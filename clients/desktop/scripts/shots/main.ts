@@ -98,9 +98,21 @@ const FRAME = { w: 16, h: 31 + 20 + 8 };
 const THEMES = ["dark", "light"] as const;
 const LOCALES = ["en", "ko"] as const;
 
+/**
+ * A time relative to the run (§71: a session's start, a reset): `{"$fromNowMs": n}` is epoch ms now + n, `{"$isoFromNow": s}`
+ * the ISO time now + s seconds — so "Total duration (wall)" and "Resets 15:00" read as they would.
+ */
+function relativeTimes(_k: string, v: unknown): unknown {
+  if (isPlainObject(v) && Object.keys(v).length === 1) {
+    if (typeof v.$fromNowMs === "number") return Date.now() + v.$fromNowMs;
+    if (typeof v.$isoFromNow === "number") return new Date(Date.now() + v.$isoFromNow * 1000).toISOString();
+  }
+  return v;
+}
+
 /** A scene file; `extends` names another scene file it is merged over (its `steps` replace the other's). */
 function readScene(file: string): Scene {
-  const raw = JSON.parse(readFileSync(join(scenesDir, file), "utf8")) as Scene & { extends?: string };
+  const raw = JSON.parse(readFileSync(join(scenesDir, file), "utf8"), relativeTimes) as Scene & { extends?: string };
   if (!raw.extends) return raw;
   const { extends: base, ...rest } = raw;
   return { ...deepMerge(readScene(base), { ...rest, steps: undefined }), steps: rest.steps ?? [] };

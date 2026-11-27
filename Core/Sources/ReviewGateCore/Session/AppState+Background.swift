@@ -28,7 +28,17 @@ public extension AppState {
         transcript.append(.assistant(id: UUID(), text: "빌드가 끝났어요. 타입 오류 2개를 고칠게요.", streaming: false))
     }
 
-    func debugHideBackgroundWork() { debugBackgroundTasks = nil }
+    func debugHideBackgroundWork() {
+        debugBackgroundTasks = nil
+        debugTaskOutputs = nil
+    }
+
+    /// §71.3 (the composer bar check): the background tasks `/tasks` lists — a dev server, a test run and an agent — with
+    /// their outputs as `task_output` reads them; `[]`: nothing running.
+    func debugShowBackgroundTasks(_ tasks: [BackgroundTaskInfo], outputs: [String: String]) {
+        debugBackgroundTasks = tasks
+        debugTaskOutputs = outputs
+    }
     #endif
 
     /// §52: Settings › Session "Allow background work and /loop" (default on).
@@ -60,6 +70,9 @@ public extension AppState {
 
     /// §52 `task_output`: the end of the task's output.
     func backgroundTaskOutput(_ taskId: String) async -> Result<TaskOutputReply, BackgroundTaskFailure> {
+        #if DEBUG
+        if let text = debugTaskOutputs?[taskId] { return .success(TaskOutputReply(taskId: taskId, text: text, running: true)) }   // §71.3 tour
+        #endif
         do {
             let reply = try await reply(.taskOutput(taskId: taskId))
             guard case let .taskOutput(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }

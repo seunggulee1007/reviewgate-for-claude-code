@@ -48,6 +48,22 @@ public extension AppState {
         shellLive = shell.map { ShellLiveOutput(id: $0.id, output: output) }
     }
 
+    /// §71.1 / §71.2 (the composer bar check): the usage sheet's numbers and Claude's checklist as a snapshot reports them.
+    func debugShowUsage(models: [ModelCost], totals: SessionTotals?, rateLimits: [RateLimitWindow], sideCostUSD: Double = 0) {
+        var snapshot = state
+        snapshot.hud.sessionModels = models
+        snapshot.hud.sessionTotals = totals
+        snapshot.hud.rateLimits = rateLimits
+        snapshot.hud.sideCostUSD = sideCostUSD
+        state = snapshot
+    }
+
+    func debugShowTodos(_ todos: [TodoItem]?) {
+        var snapshot = state
+        snapshot.session.todos = todos
+        state = snapshot
+    }
+
     /// §70.4 (the composer bar check): the chat's extended thinking as a snapshot reports it.
     func debugShowThinking(_ thinking: ThinkingState?) {
         var snapshot = state

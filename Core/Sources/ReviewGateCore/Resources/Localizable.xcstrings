@@ -177,6 +177,22 @@
         }
       }
     },
+    "%@ input, %@ output, %@ cache read, %@ cache write": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ input, %@ output, %@ cache read, %@ cache write"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "입력 %1$@, 출력 %2$@, 캐시 읽기 %3$@, 캐시 쓰기 %4$@"
+          }
+        }
+      }
+    },
     "%@ is a file, not a directory": {
       "localizations": {
         "en": {
@@ -657,6 +673,22 @@
         }
       }
     },
+    "%lld done above": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld done above"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "위에 완료한 일 %lld개"
+          }
+        }
+      }
+    },
     "%lld file(s) changed outside the app stay as they are": {
       "localizations": {
         "en": {
@@ -785,6 +817,22 @@
         }
       }
     },
+    "%lld lines added, %lld lines removed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lines added, %lld lines removed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld줄 추가, %2$lld줄 삭제"
+          }
+        }
+      }
+    },
     "%lld lines added, %lld removed": {
       "localizations": {
         "en": {
@@ -909,6 +957,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "메모 %lld개도 함께 지워져요."
+          }
+        }
+      }
+    },
+    "%lld of %lld done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$lld개 중 %1$lld개 완료"
           }
         }
       }
@@ -1217,6 +1281,70 @@
         }
       }
     },
+    "%lld%% used": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% used"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%% 사용"
+          }
+        }
+      }
+    },
+    "%lldh %lldm %llds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldh %lldm %llds"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld시간 %2$lld분 %3$lld초"
+          }
+        }
+      }
+    },
+    "%lldm %llds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lldm %llds"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld분 %2$lld초"
+          }
+        }
+      }
+    },
+    "%llds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%llds"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld초"
+          }
+        }
+      }
+    },
     "(blank line)": {
       "localizations": {
         "en": {
@@ -1261,6 +1389,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "(shift+tab 전환)"
+          }
+        }
+      }
+    },
+    "+%lld more": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld more"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+%lld개 더"
           }
         }
       }
@@ -1837,6 +1981,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "심볼릭 링크는 부분만 되돌릴 수 없어요 — 파일 전체를 거절하세요"
+          }
+        }
+      }
+    },
+    "A terminal chat has its own Ctrl+T": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A terminal chat has its own Ctrl+T"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널 채팅에서는 터미널의 Ctrl+T를 쓰세요"
           }
         }
       }
@@ -3217,6 +3377,22 @@
         }
       }
     },
+    "Background tasks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background tasks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드 작업"
+          }
+        }
+      }
+    },
     "Background work is off (Settings › Session, or CLAUDE_CODE_DISABLE_BACKGROUND_TASKS).": {
       "localizations": {
         "en": {
@@ -3857,6 +4033,22 @@
         }
       }
     },
+    "Claude Code's estimate from token counts at list price — not a bill. These totals start again in a new chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code's estimate from token counts at list price — not a bill. These totals start again in a new chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 토큰 수와 정가로 계산한 추정치예요 — 청구 금액이 아니에요. 새 채팅에서는 처음부터 다시 세요."
+          }
+        }
+      }
+    },
     "Claude committed %@ — its files stay in the review": {
       "localizations": {
         "en": {
@@ -3981,6 +4173,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 변경을 나누지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude has no to-do list in this chat yet — it makes one for work in several steps (on models with the to-do tools)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude has no to-do list in this chat yet — it makes one for work in several steps (on models with the to-do tools)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude가 아직 할 일 목록을 만들지 않았어요 — 여러 단계로 하는 작업에서 만들어요 (할 일 도구가 있는 모델에서)"
           }
         }
       }
@@ -4205,6 +4413,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude의 git 명령으로 HEAD가 바뀜 (%@) — 리뷰에는 Claude의 변경만 보여요"
+          }
+        }
+      }
+    },
+    "Claude's to-do checklist for this chat — it follows the work live, as Ctrl+T in Claude Code": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude's to-do checklist for this chat — it follows the work live, as Ctrl+T in Claude Code"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude의 할 일 목록이에요 — Claude Code의 Ctrl+T처럼 작업을 따라 바로 바뀌어요"
           }
         }
       }
@@ -6791,6 +7015,70 @@
         }
       }
     },
+    "Current session (5 hours)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current session (5 hours)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 세션(5시간)"
+          }
+        }
+      }
+    },
+    "Current week (all models)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current week (all models)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 주(모든 모델)"
+          }
+        }
+      }
+    },
+    "Current week (Opus)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current week (Opus)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 주(Opus)"
+          }
+        }
+      }
+    },
+    "Current week (Sonnet)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current week (Sonnet)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 주(Sonnet)"
+          }
+        }
+      }
+    },
     "Dark": {
       "localizations": {
         "en": {
@@ -7127,6 +7415,22 @@
         }
       }
     },
+    "Done": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "완료"
+          }
+        }
+      }
+    },
     "Earlier note: %@": {
       "localizations": {
         "en": {
@@ -7283,6 +7587,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "환경 변수"
+          }
+        }
+      }
+    },
+    "Estimated cost": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimated cost"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "예상 비용"
           }
         }
       }
@@ -7911,6 +8231,38 @@
         }
       }
     },
+    "Go back to the running chat to see Claude's checklist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go back to the running chat to see Claude's checklist"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude의 할 일 목록을 보려면 실행 중인 채팅으로 돌아가세요"
+          }
+        }
+      }
+    },
+    "Hide the checklist (⌃T or /todos shows it again)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the checklist (⌃T or /todos shows it again)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "목록 숨기기 (⌃T나 /todos로 다시 볼 수 있어요)"
+          }
+        }
+      }
+    },
     "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
       "localizations": {
         "en": {
@@ -7923,6 +8275,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code 설정에서 hook이 꺼져 있어서(disableAllHooks 또는 allowManagedHooksOnly) ReviewGate가 터미널 채팅을 리뷰할 수 없어요"
+          }
+        }
+      }
+    },
+    "In progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In progress"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "진행 중"
           }
         }
       }
@@ -7991,6 +8359,38 @@
         }
       }
     },
+    "Limit reached": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit reached"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한도에 닿았어요"
+          }
+        }
+      }
+    },
+    "List the shells and agents running in the background — their output, and stop them": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List the shells and agents running in the background — their output, and stop them"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행 중인 셸과 에이전트를 보여줘요 — 출력을 보고 중지할 수 있어요"
+          }
+        }
+      }
+    },
     "Log in…": {
       "localizations": {
         "en": {
@@ -8039,6 +8439,22 @@
         }
       }
     },
+    "No Claude Code session is running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude Code session is running"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행 중인 Claude Code 세션이 없어요"
+          }
+        }
+      }
+    },
     "No MCP server is called “%@” — type /mcp to see the list": {
       "localizations": {
         "en": {
@@ -8083,6 +8499,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 기다리는 파일이 없어요"
+          }
+        }
+      }
+    },
+    "No output yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No output yet"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 출력이 없어요"
           }
         }
       }
@@ -8263,6 +8695,22 @@
         }
       }
     },
+    "Plan usage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan usage"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플랜 사용량"
+          }
+        }
+      }
+    },
     "Prompt history search": {
       "localizations": {
         "en": {
@@ -8403,6 +8851,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "변경 요청 (%lld)"
+          }
+        }
+      }
+    },
+    "Resets %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resets %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 초기화돼요"
           }
         }
       }
@@ -8583,6 +9047,22 @@
         }
       }
     },
+    "Session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션"
+          }
+        }
+      }
+    },
     "Settings › Review holds new messages until every file is accepted or rejected": {
       "localizations": {
         "en": {
@@ -8647,6 +9127,22 @@
         }
       }
     },
+    "Show Claude's to-do checklist for this chat (⌃T)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Claude's to-do checklist for this chat (⌃T)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅에서 Claude의 할 일 목록을 보여줘요 (⌃T)"
+          }
+        }
+      }
+    },
     "Show CLAUDE.md and the memory files Claude reads": {
       "localizations": {
         "en": {
@@ -8691,6 +9187,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "에이전트 패널을 열어요"
+          }
+        }
+      }
+    },
+    "Show the end of its output (the last 64 KB)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the end of its output (the last 64 KB)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력의 끝부분을 보여줘요 (마지막 64KB)"
           }
         }
       }
@@ -8743,6 +9255,22 @@
         }
       }
     },
+    "Show the session cost, plan usage limits and the cost by model": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the session cost, plan usage limits and the cost by model"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세션 비용, 플랜 사용 한도, 모델별 비용을 보여줘요"
+          }
+        }
+      }
+    },
     "Showing the best %lld": {
       "localizations": {
         "en": {
@@ -8791,6 +9319,22 @@
         }
       }
     },
+    "Side questions: %@ — not part of the session cost": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Side questions: %@ — not part of the session cost"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Side question: %@ — 세션 비용과 별도예요"
+          }
+        }
+      }
+    },
     "Stop the shell command (esc)": {
       "localizations": {
         "en": {
@@ -8803,6 +9347,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "셸 명령 중지 (esc)"
+          }
+        }
+      }
+    },
+    "Stop this task — Claude goes on without waiting for it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop this task — Claude goes on without waiting for it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 작업을 중지해요 — Claude는 기다리지 않고 이어서 해요"
+          }
+        }
+      }
+    },
+    "Stopping…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "중지하는 중…"
           }
         }
       }
@@ -9047,6 +9623,38 @@
         }
       }
     },
+    "The terminal's activity stats and its breakdown of what counts against your plan come from its local history — they're in a terminal chat's /usage.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal's activity stats and its breakdown of what counts against your plan come from its local history — they're in a terminal chat's /usage."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 활동 통계와 플랜 사용량 분석은 터미널의 로컬 기록으로 만들어져요 — 터미널 채팅의 /usage에서 볼 수 있어요."
+          }
+        }
+      }
+    },
+    "The usage per model shows here once a turn ends.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The usage per model shows here once a turn ends."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "턴이 끝나면 모델별 사용량이 여기에 나와요."
+          }
+        }
+      }
+    },
     "There is no directory at %@": {
       "localizations": {
         "en": {
@@ -9239,6 +9847,22 @@
         }
       }
     },
+    "This engine has no to-do checklist — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine has no to-do checklist — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진에는 할 일 목록이 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
     "This model always uses extended thinking — ⌥T has no effect on it": {
       "localizations": {
         "en": {
@@ -9319,6 +9943,54 @@
         }
       }
     },
+    "To-do checklist hidden — ⌃T shows it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do checklist hidden — ⌃T shows it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일 목록을 숨겼어요 — ⌃T로 다시 볼 수 있어요"
+          }
+        }
+      }
+    },
+    "To-do checklist shown — ⌃T hides it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do checklist shown — ⌃T hides it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일 목록을 보여요 — ⌃T로 숨길 수 있어요"
+          }
+        }
+      }
+    },
+    "To-dos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일"
+          }
+        }
+      }
+    },
     "Told Claude to continue": {
       "localizations": {
         "en": {
@@ -9347,6 +10019,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude에게 계속하라고 했어요 — 파일 %lld개는 아직 리뷰를 기다려요"
+          }
+        }
+      }
+    },
+    "Total code changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total code changes"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "총 코드 변경"
+          }
+        }
+      }
+    },
+    "Total duration (API)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total duration (API)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "총 소요 시간(API)"
+          }
+        }
+      }
+    },
+    "Total duration (wall)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total duration (wall)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "총 경과 시간"
           }
         }
       }
@@ -9447,6 +10167,38 @@
         }
       }
     },
+    "Usage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usage"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사용량"
+          }
+        }
+      }
+    },
+    "Usage by model": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usage by model"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델별 사용량"
+          }
+        }
+      }
+    },
     "Wait until Claude's work is done — the directories change only between turns": {
       "localizations": {
         "en": {
@@ -9479,6 +10231,22 @@
         }
       }
     },
+    "While Claude runs a command, ⌃B in the empty message box moves it here.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While Claude runs a command, ⌃B in the empty message box moves it here."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 명령을 실행하는 동안 빈 입력란에서 ⌃B를 누르면 여기로 옮겨져요."
+          }
+        }
+      }
+    },
     "While files wait for your review, Claude may fix them but not change other files. Accept or reject them, allow this turn, or change this in Settings › Review.": {
       "localizations": {
         "en": {
@@ -9507,6 +10275,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "라운드 전체"
+          }
+        }
+      }
+    },
+    "With a Claude subscription, the five-hour and weekly limits show here once Claude Code reports them — after Claude's first answer.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With a Claude subscription, the five-hour and weekly limits show here once Claude Code reports them — after Claude's first answer."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 구독이면 Claude Code가 알려 주는 5시간·주간 한도가 여기에 나와요 — Claude의 첫 답변 뒤부터예요."
           }
         }
       }

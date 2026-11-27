@@ -62,6 +62,8 @@ import { addDir } from "../../addedDirs"; // §67.1
 import { copyResponse, exportToFile } from "../../chatExport"; // §70.3
 import { isHistorySearchKey, noteHistorySearchKey, searchAccepted, startHistorySearch, type HistorySearch } from "../../historySearch"; // §70.1
 import { HistorySearchBar } from "./HistorySearchBar";
+import { TodoChecklist } from "./TodoChecklist"; // §71.2
+import { isTodosKey, todoBlocker, todosOf, toggleTodos } from "../../todoChecklist";
 import { isThinkingKey, thinkingBlocker, thinkingOf, toggleThinking } from "../../thinking"; // §70.4
 import { ThinkingChip } from "./ThinkingChip";
 import { AddedDirsChip } from "./AddedDirsChip";
@@ -781,6 +783,9 @@ export function Composer() {
   const runThinkingToggle = () => {
     void toggleThinking(thinking, thinkingWhy).then((r) => (r.warning ? setAttachErrors([r.notice]) : showToast(r.notice)));
   };
+  // §71.2: Claude's to-do checklist over the box (Ctrl+Shift+L, /todos).
+  const todos = todosOf(state.session);
+  const todosWhy = todoBlocker({ todos, terminalChat: !!state.session.terminal, viewing: viewing !== null });
 
   /** §70.1 Enter / Tab: the match goes into the box (the draft stays when nothing matched); Esc: the bar closes. */
   const acceptSearch = () => {
@@ -989,6 +994,14 @@ export function Composer() {
     if (isThinkingKey({ key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }) && thinking !== null) {
       e.preventDefault();
       runThinkingToggle();
+      return;
+    }
+    // §71.2: Ctrl+Shift+L, as Ctrl+T in the terminal (Ctrl+T stays New Chat) — the checklist shown or hidden (an older engine: nothing).
+    if (isTodosKey({ key: e.key, code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }) && todos !== null) {
+      e.preventDefault();
+      const r = toggleTodos(todos, todosWhy);
+      if (r.warning) setAttachErrors([r.notice]);
+      else showToast(r.notice);
       return;
     }
     // §56.1: Enter or Space in an empty box closes the /btw answer over it (Esc closes it below, after the palette).
@@ -1284,6 +1297,7 @@ export function Composer() {
         </div>
       )}
       {dropping && <div className="drop-hint" aria-hidden="true">{t("Drop files to mention them, or images to attach")}</div>}
+      {todos !== null && todosWhy === null && <TodoChecklist todos={todos} /* §71.2 */ />}
       <BtwOverlay /* §56.1: the /btw answer, over the box */ />
       {slashCard !== null && <SlashCard card={slashCard} onClose={() => setSlashCard(null)} /* §56.5 */ />}
       <ExternalEditBar editing={external.editing} onDone={external.done} onCancel={external.cancel} /* §56.3 */ />
