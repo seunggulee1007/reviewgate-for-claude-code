@@ -470,6 +470,12 @@ public enum EngineCommand: Sendable, Equatable {
     case outputStyles
     /// §72.2 `/output-style <name>`: switch through the CLI's settings writer → `.outputStyles`.
     case outputStyleSet(name: String)
+    /// §72.3 `/plugin`: installed, available, marketplaces → `.pluginsList` (Session/PluginManager.swift).
+    case pluginsList
+    /// §72.3: one `claude plugin … --json` → `.pluginResult`.
+    case pluginRun(action: PluginAction, target: String, scope: String?)
+    /// §72.3 `/reload-plugins [--force]` → `.pluginsReloaded`.
+    case pluginsReload(force: Bool)
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -799,6 +805,9 @@ public enum EngineCommand: Sendable, Equatable {
         case .hooksList: "hooks_list"   // §72.1
         case .outputStyles: "output_styles"   // §72.2
         case .outputStyleSet: "output_style_set"
+        case .pluginsList: "plugins_list"   // §72.3
+        case .pluginRun: "plugin_run"
+        case .pluginsReload: "plugins_reload"
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -1048,8 +1057,10 @@ extension EngineCommand: Encodable {
             try encodeInterruptTakeBackFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .reviewFirstAllowTurn, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
-             .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges, .hooksList, .outputStyles:
+             .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges, .hooksList, .outputStyles, .pluginsList:
             break
+        case .pluginRun, .pluginsReload:   // §72.3
+            try encodePluginFields(to: encoder)
         case .outputStyleSet:   // §72.2
             try encodeOutputStyleFields(to: encoder)
         case let .sideAsk(threadId, anchor, question):
@@ -3172,6 +3183,10 @@ public enum EngineEvent: Sendable, Equatable {
     case hooksList(HooksList)
     /// §72.2: reply to `output_styles` / `output_style_set`.
     case outputStyles(OutputStylesReply)
+    /// §72.3: replies to `plugins_list`, `plugin_run`, `plugins_reload`.
+    case pluginsList(PluginsList)
+    case pluginResult(PluginResult)
+    case pluginsReloaded(PluginsReloaded)
     /// §67.2: the running `!` command's output so far (its last few thousand characters).
     case shellOutput(id: String, output: String)
     /// §67.2: a `!` command ended — its row (also in the transcript).
@@ -3522,6 +3537,12 @@ extension EngineEvent: Decodable {
             self = .hooksList(try HooksList(from: decoder))
         case "output_styles":   // §72.2
             self = .outputStyles(try OutputStylesReply(from: decoder))
+        case "plugins_list":   // §72.3
+            self = .pluginsList(try PluginsList(from: decoder))
+        case "plugin_result":
+            self = .pluginResult(try PluginResult(from: decoder))
+        case "plugins_reloaded":
+            self = .pluginsReloaded(try PluginsReloaded(from: decoder))
         case "shell_output":   // §67.2
             self = .shellOutput(id: Self.lenient(String.self, c, .id) ?? "", output: Self.lenient(String.self, c, .output) ?? "")
         case "shell_result":

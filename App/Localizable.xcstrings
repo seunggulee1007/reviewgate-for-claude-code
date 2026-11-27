@@ -4977,6 +4977,22 @@
         }
       }
     },
+    "Ask Claude Code for the plugins again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask Claude Code for the plugins again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code에 플러그인 목록을 다시 물어요"
+          }
+        }
+      }
+    },
     "Ask about the selection": {
       "localizations": {
         "en": {
@@ -6145,6 +6161,22 @@
         }
       }
     },
+    "Install %@ — you pick the scope first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install %@ — you pick the scope first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 설치 — 먼저 범위를 골라요"
+          }
+        }
+      }
+    },
     "Matcher": {
       "localizations": {
         "en": {
@@ -6157,6 +6189,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Matcher"
+          }
+        }
+      }
+    },
+    "Open a project to install for it — without one it installs for you": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a project to install for it — without one it installs for you"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트에 설치하려면 프로젝트를 열어요 — 열지 않으면 나에게 설치돼요"
           }
         }
       }
@@ -6301,6 +6349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "extended thinking 켜기·끄기"
+          }
+        }
+      }
+    },
+    "Where Claude Code turns it on": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where Claude Code turns it on"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 이 플러그인을 켤 곳이에요"
           }
         }
       }

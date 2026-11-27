@@ -12080,3 +12080,33 @@ type PluginsReloadedEvent = { type: "plugins_reloaded"; applied: boolean; held: 
 - Engine: `session/pluginCli.ts` (`pluginRunArgs`, `parsePluginList`, `parseMarketplaces`, `pluginRunOutcome`,
   `reloadCounts`), `session/claude.ts` (`reloadPluginsNow`), `engine.ts` (`execClaude`, `pluginsList`, `pluginRun`,
   `pluginsReload`, `applyPluginReload`), `protocol.ts`. Tests: `engine/test/w72.plugins.test.ts`.
+- **`/plugin` and `/reload-plugins` are app commands now** (`/plugin` is no longer terminal-only, §56.5; the terminal's
+  `/plugins` and `/marketplace` are its other names). `/plugin [subcommand]` opens the **plugin sheet** (Mac) / dialog
+  (Windows) on the tab the subcommand names, as the terminal's session forms: none or `install` → 찾아보기, `manage` /
+  `list` → 설치됨, `marketplace [list]` → 마켓플레이스; `install <plugin>`, `uninstall <plugin>`, `marketplace add <source>` and
+  `marketplace remove <name>` open that tab with their confirmation; `enable | disable | update <plugin>` and
+  `marketplace update <name>` run at once there; anything else opens 찾아보기 with "/plugin에는 여기서 “x”이(가) 없어요".
+  - **설치됨**: per plugin its name, `@marketplace`, version, scope (사용자 · 프로젝트 · 로컬 · 관리됨 · 이 세션 · claude.ai),
+    its `errors` (red) and `notes`, "ReviewGate에서 꺼 두었어요(설정 › 확장) …" for `appOff`, a switch (`enable` /
+    `disable`, no confirmation, as the terminal's Space), **업데이트** and **제거…**; a managed or session-only plugin has
+    them disabled with the reason. **찾아보기**: the marketplaces' plugins not installed with description and version, and
+    **설치…**. **마켓플레이스**: each with its source (`owner/repo#ref`, the URL or the folder), **업데이트** and **삭제…**, and a
+    field + **마켓플레이스 추가…** (owner/repo, a git URL, a folder or a marketplace.json URL). The tab titles carry counts.
+  - **Confirmations** before what installs or deletes, with the command that will run (`claude plugin install x@m
+    --scope user`): install — "플러그인의 훅과 MCP 서버는 내 권한으로 실행돼요 — 믿을 수 있는 것만 설치해요 …" and the
+    terminal's three scopes (나에게, 모든 프로젝트에서 (user) · 이 저장소의 모두에게 (project) · 나에게, 이 저장소에서만
+    (local); without a project only user); uninstall; a marketplace's add (declared in the user settings) and remove
+    ("그 마켓플레이스에서 설치한 플러그인도 모두 제거해요").
+  - While a command runs, its line ("claude plugin install x 실행 중…") shows and every other action is disabled with
+    "claude plugin 명령이 실행 중이에요"; then the CLI's own message (✓, or ⚠ "claude plugin install 실패: …") and,
+    folded, its output (monospaced, selectable), and the lists are read again. ↻ asks for them again.
+  - **플러그인 다시 불러오기** (disabled with the reason without a session or while Claude works) and `/reload-plugins
+    [--force]` typed: the summary in the line under the box — "다시 불러옴: 플러그인 N개 · 스킬 N개 · 에이전트 N개 · 훅 N개 ·
+    플러그인 MCP 서버 N개" (with "불러오다 오류 N개 — /plugin에서 확인해요"), or, held, "이번 다시 불러오기는 MCP 도구를
+    바꿔요(…) — … 적용하려면 /reload-plugins --force를 실행해요". The note under the list says changes reach the chat by
+    themselves once Claude is idle (§36.5) and that plugin MCP servers start with the next chat.
+- Mac: Core `Session/PluginManager.swift` (`PluginAction`, `PluginInstalled`, `PluginAvailable`, `MarketplaceInfo`,
+  `PluginsList`, `PluginResult`, `PluginsReloaded`, `PluginRequest.parse`, `PluginText`, `AppState.pluginsList()` /
+  `runPlugin` / `reloadPlugins` / `reloadPluginsBlocker`), `SlashAppCommand.plugin` / `.reloadPlugins`; App
+  `PluginsSheet.swift` (`InstalledRow`, `PluginConfirmSheet`), `ComposerSlashCommands.swift` (`PluginSheetItem`).
+  Tests: `PluginManagerTests`, `SlashAppCommandsTests`.

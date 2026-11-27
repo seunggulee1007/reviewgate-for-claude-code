@@ -721,6 +721,22 @@
         }
       }
     },
+    "%lld errors during load — see /plugin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld errors during load — see /plugin"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "불러오다 오류 %lld개 — /plugin에서 확인해요"
+          }
+        }
+      }
+    },
     "%lld file(s) changed outside the app stay as they are": {
       "localizations": {
         "en": {
@@ -1473,6 +1489,22 @@
         }
       }
     },
+    "/plugin has no “%@” here — the sheet lists what it can do": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/plugin has no “%@” here — the sheet lists what it can do"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/plugin에는 여기서 “%@”이(가) 없어요 — 할 수 있는 일은 이 창에 있어요"
+          }
+        }
+      }
+    },
     "5h %@": {
       "localizations": {
         "en": {
@@ -1645,6 +1677,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "채팅 하나에 디렉터리는 20개까지예요 — 하나를 빼야 더 추가할 수 있어요"
+          }
+        }
+      }
+    },
+    "A claude plugin command is running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A claude plugin command is running"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin 명령이 실행 중이에요"
           }
         }
       }
@@ -1869,6 +1917,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "'%@' 채팅의 작업이 끝나면 새 터미널 채팅이 열려요"
+          }
+        }
+      }
+    },
+    "A plugin runs its hooks and MCP servers as you — install only one you trust. Claude Code fetches it and turns it on for the scope you pick.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A plugin runs its hooks and MCP servers as you — install only one you trust. Claude Code fetches it and turns it on for the scope you pick."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인의 훅과 MCP 서버는 내 권한으로 실행돼요 — 믿을 수 있는 것만 설치해요. Claude Code가 받아서 고른 범위에 켜요."
           }
         }
       }
@@ -2209,6 +2273,38 @@
         }
       }
     },
+    "Add Marketplace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Marketplace"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 추가"
+          }
+        }
+      }
+    },
+    "Add Marketplace…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Marketplace…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 추가…"
+          }
+        }
+      }
+    },
     "Add a commit first": {
       "localizations": {
         "en": {
@@ -2221,6 +2317,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "커밋을 먼저 추가해 주세요"
+          }
+        }
+      }
+    },
+    "Add the marketplace %@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add the marketplace %@?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 %@을(를) 추가할까요?"
           }
         }
       }
@@ -2977,6 +3089,22 @@
         }
       }
     },
+    "Apply the plugin changes to this chat now, as the terminal's /reload-plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply the plugin changes to this chat now, as the terminal's /reload-plugins"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 /reload-plugins처럼 플러그인 변경을 지금 이 채팅에 적용해요"
+          }
+        }
+      }
+    },
     "Applying the terminal's rules is off": {
       "localizations": {
         "en": {
@@ -3133,6 +3261,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "먼저 물어보기"
+          }
+        }
+      }
+    },
+    "Asking Claude Code for its plugins…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asking Claude Code for its plugins…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code에 플러그인 목록을 묻는 중…"
           }
         }
       }
@@ -3969,6 +4113,22 @@
         }
       }
     },
+    "Changes reach this chat by themselves once Claude is not working; Reload Plugins applies them now. Plugin MCP servers start with the next chat.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes reach this chat by themselves once Claude is not working; Reload Plugins applies them now. Plugin MCP servers start with the next chat."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "변경 사항은 Claude가 일하지 않을 때 이 채팅에 저절로 적용돼요. 플러그인 다시 불러오기를 누르면 지금 적용돼요. 플러그인의 MCP 서버는 다음 채팅부터 시작해요."
+          }
+        }
+      }
+    },
     "Check out a branch to rebase it (HEAD is detached)": {
       "localizations": {
         "en": {
@@ -4065,6 +4225,22 @@
         }
       }
     },
+    "Claude Code also uninstalls every plugin you installed from it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code also uninstalls every plugin you installed from it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 그 마켓플레이스에서 설치한 플러그인도 모두 제거해요."
+          }
+        }
+      }
+    },
     "Claude Code could not change thinking": {
       "localizations": {
         "en": {
@@ -4093,6 +4269,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code가 thinking을 바꾸지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Claude Code could not list the plugins: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code could not list the plugins: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code가 플러그인 목록을 가져오지 못했어요: %@"
           }
         }
       }
@@ -4477,6 +4669,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Claude가 작업 중이에요 — 턴이 끝나면 rebase할 수 있어요"
+          }
+        }
+      }
+    },
+    "Claude is working — reload the plugins once the turn ends": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude is working — reload the plugins once the turn ends"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude가 일하는 중이에요 — 턴이 끝나면 다시 불러와요"
           }
         }
       }
@@ -6151,6 +6359,22 @@
         }
       }
     },
+    "Command output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command output"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "출력"
+          }
+        }
+      }
+    },
     "Commands": {
       "localizations": {
         "en": {
@@ -6999,6 +7223,22 @@
         }
       }
     },
+    "Could not reload the plugins: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reload the plugins: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인을 다시 불러오지 못했어요: %@"
+          }
+        }
+      }
+    },
     "Could not revert: %@": {
       "localizations": {
         "en": {
@@ -7607,6 +7847,22 @@
         }
       }
     },
+    "Discover": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discover"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "찾아보기"
+          }
+        }
+      }
+    },
     "Disk %@ free": {
       "localizations": {
         "en": {
@@ -8151,6 +8407,22 @@
         }
       }
     },
+    "Fetch the marketplace's list again — claude plugin marketplace update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch the marketplace's list again — claude plugin marketplace update"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 목록을 다시 가져와요 — claude plugin marketplace update"
+          }
+        }
+      }
+    },
     "Fetched %@": {
       "localizations": {
         "en": {
@@ -8423,6 +8695,54 @@
         }
       }
     },
+    "For everyone in this repository (project)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For everyone in this repository (project)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 저장소의 모두에게 (project)"
+          }
+        }
+      }
+    },
+    "For you, in every project (user)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For you, in every project (user)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나에게, 모든 프로젝트에서 (user)"
+          }
+        }
+      }
+    },
+    "For you, in this repository only (local)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For you, in this repository only (local)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "나에게, 이 저장소에서만 (local)"
+          }
+        }
+      }
+    },
     "From the next turn: %@": {
       "localizations": {
         "en": {
@@ -8615,6 +8935,70 @@
         }
       }
     },
+    "Install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설치"
+          }
+        }
+      }
+    },
+    "Install %@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install %@?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 설치할까요?"
+          }
+        }
+      }
+    },
+    "Installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설치됨"
+          }
+        }
+      }
+    },
+    "Install…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설치…"
+          }
+        }
+      }
+    },
     "Leads with the result and leaves out the preamble, the narration and the recap": {
       "localizations": {
         "en": {
@@ -8695,6 +9079,38 @@
         }
       }
     },
+    "Load the plugins again — what was installed, updated or turned on or off since the chat started": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load the plugins again — what was installed, updated or turned on or off since the chat started"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인 다시 불러오기 — 채팅을 시작한 뒤 설치·업데이트하거나 켜고 끈 것을 적용해요"
+          }
+        }
+      }
+    },
+    "Loaded for this session only (--plugin-dir)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loaded for this session only (--plugin-dir)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 세션에만 불러온 플러그인이에요(--plugin-dir)"
+          }
+        }
+      }
+    },
     "Local settings": {
       "localizations": {
         "en": {
@@ -8743,6 +9159,22 @@
         }
       }
     },
+    "Manage plugins and marketplaces — install, turn on or off, update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage plugins and marketplaces — install, turn on or off, update"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인과 마켓플레이스 관리 — 설치, 켜고 끄기, 업데이트"
+          }
+        }
+      }
+    },
     "Managed policy": {
       "localizations": {
         "en": {
@@ -8755,6 +9187,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "관리 정책"
+          }
+        }
+      }
+    },
+    "Marketplaces": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marketplaces"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스"
           }
         }
       }
@@ -8871,6 +9319,22 @@
         }
       }
     },
+    "No marketplaces yet — add one below": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No marketplaces yet — add one below"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스가 아직 없어요 — 아래에서 추가해요"
+          }
+        }
+      }
+    },
     "No output style is called “%@” — type /output-style to see the list": {
       "localizations": {
         "en": {
@@ -8899,6 +9363,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "아직 출력이 없어요"
+          }
+        }
+      }
+    },
+    "No plugins installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No plugins installed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설치한 플러그인이 없어요"
           }
         }
       }
@@ -8995,6 +9475,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Node.js(node)를 찾을 수 없어요. Node.js를 설치하거나 설정 › 고급 › 툴체인 경로 지정 › node 경로에 경로를 지정한 뒤 프로젝트를 다시 여세요."
+          }
+        }
+      }
+    },
+    "Off in ReviewGate (Settings › Extensions) — it stays off in the app's chats": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off in ReviewGate (Settings › Extensions) — it stays off in the app's chats"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate에서 꺼 두었어요(설정 › 확장) — 앱의 채팅에서는 계속 꺼져 있어요"
           }
         }
       }
@@ -9207,6 +9703,22 @@
         }
       }
     },
+    "Plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugins"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인"
+          }
+        }
+      }
+    },
     "Project settings": {
       "localizations": {
         "en": {
@@ -9383,6 +9895,86 @@
         }
       }
     },
+    "Reload Plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload Plugins"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인 다시 불러오기"
+          }
+        }
+      }
+    },
+    "Reloaded: %lld plugins · %lld skills · %lld agents · %lld hooks · %lld plugin MCP servers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reloaded: %lld plugins · %lld skills · %lld agents · %lld hooks · %lld plugin MCP servers"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 불러옴: 플러그인 %lld개 · 스킬 %lld개 · 에이전트 %lld개 · 훅 %lld개 · 플러그인 MCP 서버 %lld개"
+          }
+        }
+      }
+    },
+    "Remove Marketplace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Marketplace"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 삭제"
+          }
+        }
+      }
+    },
+    "Remove the marketplace %@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the marketplace %@?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스 %@을(를) 삭제할까요?"
+          }
+        }
+      }
+    },
+    "Remove…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제…"
+          }
+        }
+      }
+    },
     "Rename this chat": {
       "localizations": {
         "en": {
@@ -9495,6 +10087,22 @@
         }
       }
     },
+    "Run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행"
+          }
+        }
+      }
+    },
     "Running a shell command": {
       "localizations": {
         "en": {
@@ -9507,6 +10115,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "셸 명령 실행 중"
+          }
+        }
+      }
+    },
+    "Running claude plugin %@ %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running claude plugin %@ %@…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin %@ %@ 실행 중…"
           }
         }
       }
@@ -10103,6 +10727,22 @@
         }
       }
     },
+    "The app asked Claude Code for something it does not do": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app asked Claude Code for something it does not do"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱이 Claude Code가 하지 않는 일을 요청했어요"
+          }
+        }
+      }
+    },
     "The command is too long (at most 10,000 characters)": {
       "localizations": {
         "en": {
@@ -10195,6 +10835,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "세션이 시작되면 output style을 바꿀 수 있어요"
+          }
+        }
+      }
+    },
+    "The plugins are reloading already": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The plugins are reloading already"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미 플러그인을 다시 불러오는 중이에요"
           }
         }
       }
@@ -10375,6 +11031,22 @@
         }
       }
     },
+    "This Claude Code cannot reload its plugins in a chat — start a new chat to load them": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Claude Code cannot reload its plugins in a chat — start a new chat to load them"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Claude Code는 채팅 중에 플러그인을 다시 불러올 수 없어요 — 새 채팅을 시작해 불러와요"
+          }
+        }
+      }
+    },
     "This Claude Code cannot switch the style from the app — update it, or use a terminal chat": {
       "localizations": {
         "en": {
@@ -10551,6 +11223,22 @@
         }
       }
     },
+    "This reload changes MCP tools (%@) — your next message would read the whole conversation again instead of using the cache. Run /reload-plugins --force to apply it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reload changes MCP tools (%@) — your next message would read the whole conversation again instead of using the cache. Run /reload-plugins --force to apply it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이번 다시 불러오기는 MCP 도구를 바꿔요(%@) — 다음 메시지가 캐시 대신 대화 전체를 다시 읽게 돼요. 적용하려면 /reload-plugins --force를 실행해요."
+          }
+        }
+      }
+    },
     "This review belongs to the running chat — show it to continue Claude there": {
       "localizations": {
         "en": {
@@ -10595,6 +11283,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@의 그 부분들이 디스크에서 수락한 내용으로 돌아가요. 파일의 나머지는 계속 리뷰 대상으로 남아요."
+          }
+        }
+      }
+    },
+    "Through Claude Code's own claude plugin commands — they change the same settings the terminal's /plugin does.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Through Claude Code's own claude plugin commands — they change the same settings the terminal's /plugin does."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code의 claude plugin 명령으로 해요 — 터미널의 /plugin과 같은 설정을 바꿔요."
           }
         }
       }
@@ -10743,6 +11447,38 @@
         }
       }
     },
+    "Turn off — claude plugin disable, in the settings of the scope that lists it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn off — claude plugin disable, in the settings of the scope that lists it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "끄기 — 이 플러그인이 있는 범위의 설정에서 claude plugin disable"
+          }
+        }
+      }
+    },
+    "Turn on — claude plugin enable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on — claude plugin enable"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "켜기 — claude plugin enable"
+          }
+        }
+      }
+    },
     "Type a command after !": {
       "localizations": {
         "en": {
@@ -10791,6 +11527,22 @@
         }
       }
     },
+    "Type a marketplace's source first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a marketplace's source first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "먼저 마켓플레이스 위치를 적어요"
+          }
+        }
+      }
+    },
     "Type a number after /copy — /copy 2 copies the answer before the last": {
       "localizations": {
         "en": {
@@ -10803,6 +11555,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "/copy 뒤에는 숫자를 입력하세요 — /copy 2는 마지막 바로 전 답을 복사해요"
+          }
+        }
+      }
+    },
+    "Type a plugin after the command — name@marketplace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a plugin after the command — name@marketplace"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "명령 뒤에 플러그인을 적어요 — name@marketplace"
           }
         }
       }
@@ -10851,6 +11619,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "수락도 함께 되돌려요. 파일이 이번 라운드 전 상태로 돌아가고 목록에서 빠져요"
+          }
+        }
+      }
+    },
+    "Uninstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uninstall"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제거"
+          }
+        }
+      }
+    },
+    "Uninstall %@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uninstall %@?"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 제거할까요?"
+          }
+        }
+      }
+    },
+    "Uninstall…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uninstall…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제거…"
+          }
+        }
+      }
+    },
+    "Update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "업데이트"
+          }
+        }
+      }
+    },
+    "Update to its marketplace's latest version — claude plugin update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update to its marketplace's latest version — claude plugin update"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스의 최신 버전으로 업데이트해요 — claude plugin update"
           }
         }
       }
@@ -11047,6 +11895,38 @@
         }
       }
     },
+    "Your marketplaces offer no other plugins — add a marketplace first": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your marketplaces offer no other plugins — add a marketplace first"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마켓플레이스에 더 설치할 플러그인이 없어요 — 먼저 마켓플레이스를 추가해요"
+          }
+        }
+      }
+    },
+    "Your organization manages this plugin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your organization manages this plugin"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조직이 관리하는 플러그인이에요"
+          }
+        }
+      }
+    },
     "Your organization's policy allows only its managed hooks — the others do not run.": {
       "localizations": {
         "en": {
@@ -11095,6 +11975,70 @@
         }
       }
     },
+    "claude plugin %@ failed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin %@ failed: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin %@ 실패: %@"
+          }
+        }
+      }
+    },
+    "claude plugin marketplace add fetches it and declares it in your user settings. Its plugins then show under Discover.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin marketplace add fetches it and declares it in your user settings. Its plugins then show under Discover."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin marketplace add가 받아서 사용자 설정에 등록해요. 그 플러그인은 찾아보기에 나와요."
+          }
+        }
+      }
+    },
+    "claude plugin uninstall takes it out of its scope's settings and deletes its files.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin uninstall takes it out of its scope's settings and deletes its files."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude plugin uninstall이 범위의 설정에서 빼고 파일을 지워요."
+          }
+        }
+      }
+    },
+    "claude.ai": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude.ai"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "claude.ai"
+          }
+        }
+      }
+    },
     "disableAllHooks is on in your settings — these hooks are listed but do not run.": {
       "localizations": {
         "en": {
@@ -11123,6 +12067,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "조건 %@"
+          }
+        }
+      }
+    },
+    "owner/repo, a git URL, a folder or a marketplace.json URL": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "owner/repo, a git URL, a folder or a marketplace.json URL"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "owner/repo, git URL, 폴더, 또는 marketplace.json URL"
           }
         }
       }

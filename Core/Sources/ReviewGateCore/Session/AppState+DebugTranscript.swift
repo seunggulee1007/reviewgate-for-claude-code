@@ -10,6 +10,9 @@ public extension AppState {
     /// §72.1: what `/hooks` shows (nil: the engine's answer again).
     func debugShowHooks(_ list: HooksList?) { debugHooksList = list }
 
+    /// §72.3: what `/plugin` lists (nil: the engine's answer again).
+    func debugShowPlugins(_ list: PluginsList?) { debugPlugins = list }
+
     /// §72.2: what `/output-style` lists and the session's style as a snapshot reports it (nil: the engine's again).
     func debugShowOutputStyles(_ reply: OutputStylesReply?) {
         debugOutputStyles = reply

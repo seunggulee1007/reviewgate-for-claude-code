@@ -19,6 +19,12 @@ enum SlashCard: Equatable {
 }
 
 /// A typed built-in for `ComposerSlashHooks` to run with the window's actions.
+/// §72.3: the plugin sheet's request, one per `/plugin` typed.
+struct PluginSheetItem: Identifiable {
+    let id = UUID()
+    let request: PluginRequest
+}
+
 struct SlashRequest: Equatable {
     let id = UUID()
     let command: SlashAppCommand
@@ -148,6 +154,7 @@ struct ComposerSlashHooks: ViewModifier {
     @State private var showTasks = false   // §71.3
     @State private var showHooks = false   // §72.1
     @State private var showOutputStyle = false   // §72.2
+    @State private var pluginRequest: PluginSheetItem?   // §72.3
 
     func body(content: Content) -> some View {
         content
@@ -165,6 +172,9 @@ struct ComposerSlashHooks: ViewModifier {
             .sheet(isPresented: $showUsage) { UsageSheet() }
             .sheet(isPresented: $showTasks) { BackgroundTasksSheet() }
             .sheet(isPresented: $showHooks) { HooksSheet() }
+            .sheet(item: $pluginRequest) { item in
+                PluginsSheet(request: item.request) { text, warning in if warning { composer.notice = text } else { composer.infoNotice = text } }
+            }
             .sheet(isPresented: $showOutputStyle) {
                 OutputStyleSheet { text, warning in if warning { composer.notice = text } else { composer.infoNotice = text } }
             }
@@ -187,6 +197,10 @@ struct ComposerSlashHooks: ViewModifier {
         case .todos: composer.showTodos(store: store)   // §71.2
         case .tasks: showTasks = true   // §71.3 (/bashes too)
         case .hooks: showHooks = true   // §72.1
+        case let .plugin(argument):   // §72.3: the sheet on the tab the subcommand names (an action asks there first)
+            pluginRequest = PluginSheetItem(request: PluginRequest.parse(argument))
+        case let .reloadPlugins(force):
+            reloadPlugins(force: force)
         case let .outputStyle(name):   // §72.2: a name switches at once, as the terminal's
             if name.isEmpty { showOutputStyle = true } else { setOutputStyle(name, typed: request.draft) }
         case .permissions: settings(.general)   // the permissions are in General
@@ -229,6 +243,22 @@ struct ComposerSlashHooks: ViewModifier {
         if store.modelMode == .auto { AutoModelSettings.apply(.manual, from: store) }   // a model is a manual pick, as in the picker
         Task {
             if let refusal = await store.setModel(option?.value ?? name) { composer.notice = refusal }
+        }
+    }
+
+    /// §72.3 `/reload-plugins [--force]`: the terminal's summary (or why it was held) in the line under the box.
+    private func reloadPlugins(force: Bool) {
+        if let blocker = store.reloadPluginsBlocker {
+            composer.notice = blocker
+            return
+        }
+        Task {
+            do {
+                let r = try await store.reloadPlugins(force: force)
+                if r.held { composer.notice = PluginText.reloaded(r) } else { composer.infoNotice = PluginText.reloaded(r) }
+            } catch {
+                composer.notice = (error as? EngineClientError)?.userMessage ?? error.localizedDescription
+            }
         }
     }
 

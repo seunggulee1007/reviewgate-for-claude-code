@@ -17,7 +17,7 @@ import Testing
             "/model": .model(""), "/resume": .resume, "/rewind": .rewind, "/context": .context, "/usage": .usage, "/todos": .todos, "/tasks": .tasks,
             "/permissions": .permissions, "/agents": .agents, "/memory": .memory, "/config": .config, "/help": .help,
             "/status": .status, "/exit": .exit, "/rename": .rename, "/add-dir": .addDir(""), "/export": .export(""), "/copy": .copy(""),
-            "/hooks": .hooks, "/output-style": .outputStyle(""),   // §72.1, §72.2
+            "/hooks": .hooks, "/output-style": .outputStyle(""), "/plugin": .plugin(""), "/reload-plugins": .reloadPlugins(force: false),   // §72
         ]
         for (text, command) in expected { #expect(SlashAppCommand.parse(text, entries: []) == command, "\(text)") }
         #expect(Set(SlashAppCommand.names) == Set(expected.keys.map { String($0.dropFirst()) }))
