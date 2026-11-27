@@ -12120,3 +12120,8 @@ type PluginsReloadedEvent = { type: "plugins_reloaded"; applied: boolean; held: 
   `runPlugin` / `reloadPlugins` / `reloadPluginsBlocker`), `SlashAppCommand.plugin` / `.reloadPlugins`; App
   `PluginsSheet.swift` (`InstalledRow`, `PluginConfirmSheet`), `ComposerSlashCommands.swift` (`PluginSheetItem`).
   Tests: `PluginManagerTests`, `SlashAppCommandsTests`.
+- Windows: `pluginManager.ts` (`parsePluginRequest`, the words, `reloadedText`, `reloadPluginsBlocker`, `loadPlugins`,
+  `runPlugin`, `reloadPlugins`), `components/dialogs/PluginsDialog.tsx` (`Dialog {kind: "plugins", request}`; the
+  confirmation is a dialog over it, Esc closes that one first), `errorCodes.ts` (the refusals), `slashAppCommands.ts` /
+  `slashAppRun.ts` (`{kind: "plugin", arg}`, `{kind: "reloadPlugins", force}`; a reload's summary as a toast, a held one
+  in the composer's line). Tests: `pluginManager.test.ts`, `slashAppCommands.test.ts`, `errorCodes.test.ts`.

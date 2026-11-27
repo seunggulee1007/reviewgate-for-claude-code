@@ -269,6 +269,14 @@ export const REFUSAL_CODES = [
   "local_settings_off",
   "output_style_unsupported",
   "output_style_failed",
+  // §72.3 /plugin and /reload-plugins
+  "invalid_plugin_target",
+  "invalid_plugin_action",
+  "invalid_plugin_scope",
+  "plugins_turn_running",
+  "plugins_reloading",
+  "plugins_reload_unsupported",
+  "plugins_reload_failed",
 ] as const;
 
 /** The detail fields an `error` event may carry (engine `ErrorDetails`). */
@@ -911,6 +919,20 @@ export function refusalCodeText(code: string, detail: string, paths?: string[]):
       return t("This Claude Code cannot switch the style from the app — update it, or use a terminal chat");
     case "output_style_failed":
       return t("Claude Code could not switch the style: {0}", d);
+    // §72.3 /plugin and /reload-plugins (the Mac's words, Core PluginText)
+    case "invalid_plugin_target":
+      return t("Type a plugin after the command — name@marketplace");
+    case "invalid_plugin_action":
+    case "invalid_plugin_scope":
+      return t("The app asked Claude Code for something it does not do");
+    case "plugins_turn_running":
+      return t("Claude is working — reload the plugins once the turn ends");
+    case "plugins_reloading":
+      return t("The plugins are reloading already");
+    case "plugins_reload_unsupported":
+      return t("This Claude Code cannot reload its plugins in a chat — start a new chat to load them");
+    case "plugins_reload_failed":
+      return t("Could not reload the plugins: {0}", d);
     default:
       return null;
   }

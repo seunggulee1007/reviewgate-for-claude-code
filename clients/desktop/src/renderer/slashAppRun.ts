@@ -16,6 +16,7 @@ import { useViewedChat, viewingOf } from "./viewedChat";
 import { showTodos, todoBlocker, todosOf } from "./todoChecklist"; // §71.2
 import { showToast } from "./toast";
 import { setOutputStyle } from "./outputStyles"; // §72.2
+import { parsePluginRequest, reloadPlugins, reloadPluginsBlocker } from "./pluginManager"; // §72.3
 
 /** Requests the HUD and the tab strip take (each `seq` is a new one). */
 type SlashUi = {
@@ -73,6 +74,15 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     case "hooks": // §72.1
       st.openDialog({ kind: "hooks" });
       return null;
+    case "plugin": // §72.3: the dialog on the tab the subcommand names (an action asks there first)
+      st.openDialog({ kind: "plugins", request: parsePluginRequest(cmd.arg) });
+      return null;
+    case "reloadPlugins": {
+      const blocker = reloadPluginsBlocker(st.state);
+      if (blocker !== null) return { notice: blocker };
+      void reloadPlugins(cmd.force).then((r) => (r.warning ? notify(r.notice) : showToast(r.notice)));
+      return null;
+    }
     case "outputStyle": // §72.2: a name switches at once, as the terminal's
       if (cmd.name === "") st.openDialog({ kind: "outputStyle" });
       else void setOutputStyle(cmd.name).then((r) => notify(r.notice));

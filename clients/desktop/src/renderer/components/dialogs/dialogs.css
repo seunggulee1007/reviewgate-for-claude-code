@@ -71,3 +71,20 @@
 .style-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .style-text > .row { gap: 6px; align-items: baseline; }
 .style-text .accent { color: var(--accent); }
+/* §72.3 /plugin: installed, discover, marketplaces through `claude plugin` (PluginsDialog.tsx). */
+.plugins-head { gap: 8px; }
+.plugins-head > .tiny.muted { flex: 1 1 auto; min-width: 0; }
+.segmented.plugins-tabs { margin: 0; }
+.plugins-body { max-height: calc(100vh - 330px); min-height: 110px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.plugins-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; border-radius: 6px; background: var(--bg-2); }
+.plugins-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.plugins-text > .row { gap: 6px; align-items: baseline; min-width: 0; }
+.plugins-scope { padding: 0 5px; border-radius: 4px; background: var(--bg-3); white-space: nowrap; }
+.plugins-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.plugins-switch { display: flex; align-items: center; padding-top: 2px; }
+.plugins-empty { padding: 24px 0; text-align: center; }
+.plugins-add { gap: 6px; margin-top: 4px; }
+.plugins-result { display: flex; flex-direction: column; gap: 3px; }
+.plugins-output { max-height: 90px; overflow: auto; margin: 4px 0 0; padding: 6px; border-radius: 5px; background: var(--bg-2); white-space: pre-wrap; user-select: text; }
+.plugins-scopes { display: flex; flex-direction: column; gap: 4px; }
+.plugins-scopes .row { gap: 6px; }

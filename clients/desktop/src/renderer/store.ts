@@ -363,7 +363,9 @@ export type Dialog =
   /** §72.1 `/hooks`: the hooks in effect, read-only (components/dialogs/HooksDialog.tsx). */
   | { kind: "hooks" }
   /** §72.2 `/output-style`: the styles, the current one, Use Style (components/dialogs/OutputStyleDialog.tsx). */
-  | { kind: "outputStyle" };
+  | { kind: "outputStyle" }
+  /** §72.3 `/plugin …`: installed, discover, marketplaces through `claude plugin` (components/dialogs/PluginsDialog.tsx). */
+  | { kind: "plugins"; request: import("./pluginManager").PluginRequest };
 
 /** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
 const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);
