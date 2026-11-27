@@ -1,0 +1,31 @@
+{
+  "extends": "04-review.json",
+  "name": "tasks",
+  "description": "/tasks (§71.3): a dev server and a test run with the end of their output, a background agent, each with Stop.",
+  "state": {
+    "session": {
+      "backgroundTasks": [
+        { "taskId": "b1", "kind": "bash", "description": "npm run dev (port 3000)", "toolUseId": "toolu_dev", "turn": 2, "startedAt": { "$isoFromNow": -340 }, "hasOutput": true },
+        { "taskId": "b2", "kind": "bash", "description": "npm test -- --watch", "toolUseId": "toolu_test", "turn": 3, "startedAt": { "$isoFromNow": -45 }, "hasOutput": true },
+        { "taskId": "b3", "kind": "agent", "description": "Review the checkout for rounding bugs", "toolUseId": "toolu_agent", "turn": 3, "startedAt": { "$isoFromNow": -20 }, "hasOutput": false }
+      ]
+    }
+  },
+  "replies": {
+    "task_output": {
+      "$by": "taskId",
+      "map": {
+        "b1": { "type": "task_output", "taskId": "b1", "text": "> acme-shop@1.0.0 dev\n> vite\n\n  \u001b[32mVITE v5.4.2\u001b[0m  ready in 412 ms\n  ➜  Local:   http://localhost:3000/\n", "truncated": false, "running": true },
+        "b2": { "type": "task_output", "taskId": "b2", "text": " RUN  v2.1.9 C:\\Users\\dev\\acme-shop\n\n ✓ src/checkout/discount.test.ts (12 tests) 38ms\n\n Tests  12 passed (12)\n", "truncated": false, "running": true }
+      }
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/tasks" } },
+    { "key": "Enter" },
+    { "waitFor": "Background tasks dialog" },
+    { "waitFor": "Background task tail" },
+    { "wait": 400 }
+  ]
+}

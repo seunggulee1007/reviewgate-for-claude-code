@@ -1,0 +1,15 @@
+{
+  "extends": "04-review.json",
+  "name": "tasks-empty",
+  "description": "/bashes (an alias of /tasks, §71.3) with nothing running in the background: the list says so, with the Ctrl+B hint.",
+  "state": {
+    "session": { "backgroundTasks": [] }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/bashes" } },
+    { "key": "Enter" },
+    { "waitFor": "Background tasks dialog" },
+    { "wait": 300 }
+  ]
+}

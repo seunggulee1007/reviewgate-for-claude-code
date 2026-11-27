@@ -1,0 +1,21 @@
+{
+  "extends": "04-review.json",
+  "name": "todos",
+  "description": "Claude's to-do checklist over the message box (§71.2): six items, five shown from the last one done, the one in progress with its running words.",
+  "state": {
+    "session": {
+      "todos": [
+        { "text": "Read the checkout code and its tests", "status": "completed" },
+        { "text": "Add the discount codes to the checkout", "status": "completed" },
+        { "text": "Cover SAVE10 with a test", "status": "in_progress", "activeForm": "Writing the SAVE10 test" },
+        { "text": "Run the checkout tests", "status": "pending" },
+        { "text": "Update the README's discount list", "status": "pending" },
+        { "text": "Check the free-shipping threshold", "status": "pending" }
+      ]
+    }
+  },
+  "steps": [
+    { "waitFor": "Todo checklist" },
+    { "wait": 300 }
+  ]
+}
