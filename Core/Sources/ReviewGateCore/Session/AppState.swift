@@ -301,6 +301,8 @@ public final class AppState {
     public internal(set) var defaultModeOffer: PermissionMode?
     /// §52: the screenshot tour's background tasks (DEBUG only; nil = the engine's).
     var debugBackgroundTasks: [BackgroundTaskInfo]?
+    /// §71.3: the screenshot tour's task outputs by task id (DEBUG only; nil = the engine's `task_output`).
+    var debugTaskOutputs: [String: String]?
     /// §49: a task handed to this worktree that the session could not take — the chat puts it into the composer (once per id).
     public internal(set) var taskForComposer: TaskComposerText?
     /// §50.3: messages in Claude's turn being taken back (their chips wait), and why the last take-back did not happen.

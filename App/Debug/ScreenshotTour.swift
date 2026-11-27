@@ -1029,6 +1029,86 @@ private final class Tour {
         try await gitSyncShots(window, shoot: shoot)
         try await commitOthersShots(window)
         try await parityDShots(window, shoot: shoot)
+        try await parityEShots(window)
+    }
+
+    // MARK: §71 at the laptop size (the composer bar check): /usage's sheet, the to-do checklist, /tasks' sheet.
+
+    /// §71.1 the usage sheet (a subscription's windows, one reached; and none yet), §71.2 the checklist over the box (and the
+    /// line after ⌃T hid it), §71.3 `/tasks`' sheet with each task's tail (and with nothing running) — dark and light.
+    /// `composerbar-usage-*-<appearance>.png`, `composerbar-todos-*-<appearance>.png`, `composerbar-tasks-*-<appearance>.png`.
+    private func parityEShots(_ window: NSWindow) async throws {
+        store.debugShowComposerState(working: false, files: [])
+        store.debugShowGate(.idle)
+        let composer = entry.model.chatComposer
+        let now = Date()
+        let iso = ISO8601DateFormatter()
+        let models = [ModelCost(model: "claude-sonnet-4-6", costUsd: 0.3812, inputTokens: 1_240, outputTokens: 5_310, cacheReadTokens: 940_000, cacheCreationTokens: 50_200),
+                      ModelCost(model: "claude-haiku-4-5", costUsd: 0.0391, inputTokens: 820, outputTokens: 2_100, cacheReadTokens: 120_400, cacheCreationTokens: 9_800)]
+        let totals = SessionTotals(startedAt: now.addingTimeInterval(-23_590).timeIntervalSince1970 * 1000, apiDurationMs: 380_000, linesAdded: 42, linesRemoved: 7)
+        let windows = [RateLimitWindow(kind: "seven_day", status: "allowed", percent: 41, resetsAt: iso.string(from: now.addingTimeInterval(3 * 86_400))),
+                       RateLimitWindow(kind: "five_hour", status: "allowed_warning", percent: 86, resetsAt: iso.string(from: now.addingTimeInterval(5_400))),
+                       RateLimitWindow(kind: "seven_day_opus", status: "allowed", percent: 12, resetsAt: iso.string(from: now.addingTimeInterval(3 * 86_400)))]
+        let todos = [TodoItem(text: "Read pricing.ts and the cart tests", status: .completed),
+                     TodoItem(text: "Add the SAVE10 code to the pricing table", status: .completed),
+                     TodoItem(text: "Cover SAVE10 with a test", status: .inProgress, activeForm: "Writing the SAVE10 test"),
+                     TodoItem(text: "Run the cart tests", status: .pending),
+                     TodoItem(text: "Update the README's discount list", status: .pending),
+                     TodoItem(text: "Check the free-shipping threshold", status: .pending)]
+        let tasks = [BackgroundTaskInfo(taskId: "b1", kind: .bash, description: "npm run dev (port 3000)", toolUseId: "toolu_dev", turn: 2,
+                                        startedAt: iso.string(from: now.addingTimeInterval(-340)), hasOutput: true),
+                     BackgroundTaskInfo(taskId: "b2", kind: .bash, description: "npm test -- --watch", toolUseId: "toolu_test", turn: 3,
+                                        startedAt: iso.string(from: now.addingTimeInterval(-45)), hasOutput: true),
+                     BackgroundTaskInfo(taskId: "b3", kind: .agent, description: "Review the cart module for rounding bugs", toolUseId: "toolu_agent", turn: 3,
+                                        startedAt: iso.string(from: now.addingTimeInterval(-20)), hasOutput: false)]
+        let outputs = ["b1": "> acme-shop@1.0.0 dev\n> vite\n\n  \u{1B}[32mVITE v5.4.2\u{1B}[0m  ready in 412 ms\n  ➜  Local:   http://localhost:3000/\n",
+                       "b2": " RUN  v2.1.9 /Users/Shared/acme-shop\n\n ✓ test/cart.test.ts (14 tests) 38ms\n ✓ test/pricing.test.ts (3 tests) 6ms\n\n Tests  17 passed (17)\n"]
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            let a = appearance.rawValue
+            try await Task.sleep(for: .milliseconds(600))
+            func shot(_ step: String) async throws {
+                try await Task.sleep(for: .milliseconds(1500))
+                try write(try render(window), "composerbar-\(step)-\(a)")
+            }
+            store.debugShowUsage(models: models, totals: totals, rateLimits: windows, sideCostUSD: 0.0124)
+            store.debugShowHUDNumbers(contextTokens: 48_200, contextWindow: 200_000, costUSD: 0.4203, turns: 4, lastTurnMs: 41_000)
+            try await panelShot("usage-sheet-\(a)", UsageSheet(), appearance: appearance)
+            store.debugShowUsage(models: [], totals: SessionTotals(startedAt: nil), rateLimits: [])
+            try await panelShot("usage-empty-\(a)", UsageSheet(), appearance: appearance)
+            store.debugShowUsage(models: models, totals: totals,
+                                 rateLimits: [RateLimitWindow(kind: "five_hour", status: "rejected", percent: 100, resetsAt: iso.string(from: now.addingTimeInterval(2_700))), windows[0]])
+            try await panelShot("usage-limited-\(a)", UsageSheet(), appearance: appearance)
+            log("composerbar usage: \(UsageText.duration(ms: totals.apiDurationMs)) · \(UsageText.codeChanges(added: 42, removed: 7)) · \(UsageText.modelTokens(models[0]))")
+
+            AppSettings.setTodoListShown(true)
+            store.debugShowTodos(todos)
+            log("composerbar todos: " + TodoText.progress(todos) + " · shown " + TodoWindow(todos).items.map(\.shownText).joined(separator: " | "))
+            try await shot("todos")
+            store.debugShowComposerState(working: true, files: [])
+            store.debugShowHUD(turnStartedAt: now.addingTimeInterval(-30), agents: [])
+            try await shot("todos-working")
+            store.debugShowHUD(turnStartedAt: nil, agents: [])
+            store.debugShowComposerState(working: false, files: [])
+            AppSettings.setTodoListShown(false)
+            composer.infoNotice = TodoText.hidden
+            try await shot("todos-hidden")
+            composer.infoNotice = nil
+            AppSettings.setTodoListShown(true)
+            store.debugShowTodos([])
+            composer.infoNotice = TodoText.none
+            try await shot("todos-none")
+            composer.infoNotice = nil
+            store.debugShowTodos(nil)
+
+            store.debugShowBackgroundTasks(tasks, outputs: outputs)
+            try await panelShot("tasks-sheet-\(a)", BackgroundTasksSheet(), appearance: appearance, settle: 3.5)
+            log("composerbar tasks: " + tasks.map { $0.description + " → " + BackgroundText.tail(outputs[$0.taskId] ?? "").joined(separator: " / ") }.joined(separator: " ; "))
+            store.debugShowBackgroundTasks([], outputs: [:])
+            try await panelShot("tasks-empty-\(a)", BackgroundTasksSheet(), appearance: appearance)
+            store.debugHideBackgroundWork()
+        }
+        AppSettings.setAppearance(.dark)
     }
 
     // MARK: §70 at the laptop size (the composer bar check): ⌃R over the prompts, the thinking chip, /export's sheet.
@@ -1102,16 +1182,16 @@ private final class Tour {
 
     /// A view alone in a panel of its own at its fitting size (a popover is a window AppKit captures apart from the main
     /// one), dark, hidden while quiet. `composerbar-<name>.png`.
-    private func panelShot<V: View>(_ name: String, _ content: V) async throws {
+    private func panelShot<V: View>(_ name: String, _ content: V, appearance: Appearance = .dark, settle: Double = 0.7) async throws {
         let view = NSHostingView(rootView: content.environment(store).environment(store.pr).environment(entry.model))
         let panel = NSWindow(contentRect: NSRect(origin: .zero, size: view.fittingSize), styleMask: [.titled], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
-        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
         panel.contentView = view
         ScreenshotTour.hideIfQuiet(panel)
         panel.orderFrontRegardless()
         defer { panel.orderOut(nil) }
-        try await Task.sleep(for: .milliseconds(700))
+        try await Task.sleep(for: .seconds(settle))
         panel.setContentSize(view.fittingSize)
         try await Task.sleep(for: .milliseconds(300))
         try write(try render(panel), "composerbar-\(name)")
