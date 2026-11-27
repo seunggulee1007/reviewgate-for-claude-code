@@ -477,8 +477,9 @@ struct CloneProjectSheet: View {
             if !opensExisting {
                 freshCloneFields
             }
-            if busy, let progress {
-                progressSection(progress)
+            if busy {
+                // Before git's first line: the bar at 0 with "Connecting…", never an empty sheet that looks stuck.
+                progressSection(progress ?? ProjectCloneProgress(path: "", phase: .connecting, percent: 0))
             }
             if let message = shownError ?? error {
                 Text(message).font(.caption).foregroundStyle(.red).textSelection(.enabled)
