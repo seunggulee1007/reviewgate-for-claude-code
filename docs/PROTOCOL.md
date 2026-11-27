@@ -9065,7 +9065,9 @@ not touched.
 | `/resume` (`/continue`) | the chat history (⌘Y · Ctrl+H) |
 | `/rewind` (`/checkpoint`) | the rewind sheet of the latest rewind point; none yet: a notice |
 | `/context` | Mac: the HUD's context popover (usage + Compact) · Windows: the Compact dialog (usage + Compact) |
-| `/cost` | the HUD's cost popover (Mac's narrow HUD has none: the context popover) |
+| `/usage` (`/cost`, `/stats`) | §71.1: the usage sheet · dialog — session cost and times, usage by model, plan windows (before: `/cost` the HUD's cost popover) |
+| `/todos` | §71.2: Claude's to-do checklist over the box (as ⌃T · Ctrl+Shift+L) |
+| `/tasks` (`/bashes`) | §71.3: the background work with each task's output tail and [중지] |
 | `/permissions` (`/allowed-tools`) | Settings — Mac › General (its permission section) · Windows › Permissions |
 | `/config` (`/settings`) | Settings |
 | `/agents` | the agent panel opens (never toggles closed) |
@@ -9080,7 +9082,7 @@ not touched.
   the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
   project's `/status` still goes to Claude).
 - **`/add-dir`** is the app's own since §67.1 (it adds a directory to the chat); before, it was among the terminal's.
-- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme`, `/usage` … the list is
+- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme` … the list is
   `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
   "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
   its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
