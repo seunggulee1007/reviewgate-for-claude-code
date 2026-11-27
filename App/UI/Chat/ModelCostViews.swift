@@ -67,9 +67,8 @@ struct TurnModelCostSection: View {
 /// questions' cost (apart from the session's).
 struct HUDCostButton: View {
     @Environment(AppState.self) private var store
-    @Environment(WindowModel.self) private var model
     @State private var open = false
-    /// The HUD's hidden measuring copy (`FullOrCompact`): never opens on a typed `/cost`.
+    /// The HUD's hidden measuring copy (`FullOrCompact`).
     var measuring = false
 
     var body: some View {
@@ -83,7 +82,6 @@ struct HUDCostButton: View {
         .popover(isPresented: $open, arrowEdge: .top) {
             HUDCostPopover()
         }
-        .onChange(of: model.hudPopoverTick) { _, _ in if !measuring, model.hudPopover == .cost { open = true } }   // §56.5: `/cost`
     }
 }
 

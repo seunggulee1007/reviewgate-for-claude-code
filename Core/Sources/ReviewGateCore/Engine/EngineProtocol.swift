@@ -2138,6 +2138,8 @@ public struct HUDWire: Codable, Sendable, Equatable {
     // MARK: wave5 w5-model
     /// §43.4: messages auto sent to each family in this chat, most first; empty on older engines / without auto.
     public var autoModelCounts: [AutoModelCount] = []
+    /// §71.1: `/usage`'s session block (API and wall time, lines changed); nil on older engines.
+    public var sessionTotals: SessionTotals?
 
     public init(contextTokens: Int, contextWindow: Int?, sessionCostUSD: Double, turnCount: Int, lastTurnMs: Int,
                 activity: HUDActivity, subagentDepth: Int, turnStartedAt: Double?, agents: [AgentNode] = [], sideCostUSD: Double = 0) {
@@ -2178,6 +2180,7 @@ public struct HUDWire: Codable, Sendable, Equatable {
         agentHistory = AgentGlanceWire.history(from: decoder)   // wave4b w4b-agents (§39.3)
         (turnModels, sessionModels) = AgentCostWire.hud(from: decoder)   // wave4d w4d-agents2 (§42.4)
         autoModelCounts = AutoModelWire.counts(from: decoder)   // wave5 w5-model (§43.4)
+        sessionTotals = SessionTotalsWire.hud(from: decoder)   // §71.1
     }
 }
 

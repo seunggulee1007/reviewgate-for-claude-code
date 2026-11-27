@@ -11780,6 +11780,25 @@ background work (`/tasks`, Ctrl+B). Terminal chats (§57) are the real TUI and k
   the plan windows (`hud.rateLimits`, §38.2) were already in the state. A new chat starts the lines again; `startedAt`
   follows the CLI process (a restart starts it again, as the terminal's clock does).
 - Engine: `engine.ts` (`slices()`), `protocol.ts` (`SessionTotals`). Tests: `engine/test/w71.usage.test.ts`.
+- **`/usage`, `/cost` and `/stats` are app commands now** in a classic chat (no longer terminal-only names, §56.5; `/cost`
+  opened the HUD's cost popover before — the popover stays on the HUD's "$… 세션"). They open the **usage sheet** (Mac) /
+  dialog (Windows), live while open:
+  - **Session**: 예상 비용 `$0.5512`, 총 소요 시간(API) `6분 20초`, 총 경과 시간 (counting from `startedAt`; "실행 중인
+    Claude Code 세션이 없어요" without a CLI), 총 코드 변경 `12줄 추가, 3줄 삭제`, and 모델별 사용량 — one line per model
+    of `hud.sessionModels`: `입력 1.2k, 출력 5.3k, 캐시 읽기 940.0k, 캐시 쓰기 50.0k` and its cost (the terminal's
+    shapes: `k` / `M`, durations `6m 20s` in English). The side questions' cost follows when there is one; the note says it
+    is Claude Code's estimate at list price, not a bill, and that a new chat starts again. An engine without §71.1 shows
+    the cost and the models only.
+  - **Plan usage**: one bar per window of `hud.rateLimits`, in the terminal's order (현재 세션(5시간), 이번 주(모든 모델),
+    이번 주(Opus), 이번 주(Sonnet), then any other kind by name), "72% 사용" (orange from 80 %), "한도에 닿았어요" for
+    a rejected window, and "15:00에 초기화돼요" (a later day with its date). No window yet: the note that a subscription's
+    limits show after Claude's first answer.
+  - **Not built, with why:** the terminal's Stats tab (activity across all sessions) and its plan breakdown
+    (attribution, recommendations, `f` to fix, loops) are computed by the CLI from its local session history; stream-json
+    sends none of it. The sheet says they are in a terminal chat's `/usage`.
+- Mac: Core `Session/UsageReport.swift` (`SessionTotals`, `UsageText`), `HUDWire.sessionTotals`,
+  `SlashAppCommand.usage`; App `UsageSheet.swift`, `ComposerSlashCommands.swift`. Tests: `UsageReportTests`,
+  `SlashAppCommandsTests`.
 
 ### 71.2 Ctrl+T — Claude's to-do checklist, live
 

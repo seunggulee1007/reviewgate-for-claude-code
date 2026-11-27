@@ -9,7 +9,9 @@ import Foundation
 public enum SlashAppCommand: Equatable, Sendable {
     /// `/model` alone: the model picker; `/model <name>`: that model at once.
     case model(String)
-    case resume, rewind, context, cost, permissions, agents, memory, config, help, status, exit, rename
+    case resume, rewind, context, permissions, agents, memory, config, help, status, exit, rename
+    /// §71.1 `/usage` (the terminal's `/cost` and `/stats` are its aliases): the usage sheet.
+    case usage
     /// §67.1 `/add-dir <path>`: the directory joins the chat (`add_dir`); `/add-dir` alone (an empty path) opens the folder picker.
     case addDir(String)
     /// §70.3 `/export [file]`: written to that file, or (no file) the export sheet — copy or save.
@@ -20,19 +22,20 @@ public enum SlashAppCommand: Equatable, Sendable {
     case terminalOnly(String)
 
     /// The app's commands, as the palette lists them (each the terminal's name).
-    public static let names = ["add-dir", "agents", "config", "context", "copy", "cost", "exit", "export", "help", "memory", "model",
-                               "permissions", "rename", "resume", "rewind", "status"]
+    public static let names = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model",
+                               "permissions", "rename", "resume", "rewind", "status", "usage"]
 
     /// The terminal's other names for them.
     static let aliases: [String: String] = [
         "continue": "resume", "quit": "exit", "settings": "config", "checkpoint": "rewind", "allowed-tools": "permissions",
+        "cost": "usage", "stats": "usage",   // §71.1: the commands reference — "`/cost` and `/stats` are aliases"
     ]
 
     /// The terminal's built-ins that only its own screen has (CLI 2.x) — the app has nothing to show for them.
     public static let terminalOnly: Set<String> = [
         "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
         "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
-        "release-notes", "sandbox", "stats", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "usage", "vim",
+        "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "vim",
     ]
 
     /// `text` (one line, `/name [args]`) as the app's command; nil when it goes to Claude as before — another command, a
@@ -56,7 +59,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "resume": return .resume
         case "rewind": return .rewind
         case "context": return .context
-        case "cost": return .cost
+        case "usage": return .usage   // §71.1
         case "permissions": return .permissions
         case "agents": return .agents
         case "memory": return .memory
@@ -81,7 +84,6 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "agents": String(localized: "Show the agent panel", bundle: .module)
         case "config": String(localized: "Open Settings", bundle: .module)
         case "context": String(localized: "Show how full the context is — and compact it", bundle: .module)
-        case "cost": String(localized: "Show the session cost by model", bundle: .module)
         case "exit": String(localized: "Close this chat tab — it stays in the chat history", bundle: .module)
         case "help": String(localized: "Show the keyboard shortcuts", bundle: .module)
         case "memory": String(localized: "Show CLAUDE.md and the memory files Claude reads", bundle: .module)
@@ -91,6 +93,7 @@ public enum SlashAppCommand: Equatable, Sendable {
         case "resume": String(localized: "Open the chat history to resume an earlier chat", bundle: .module)
         case "rewind": String(localized: "Rewind to before your last message", bundle: .module)
         case "status": String(localized: "Show the model, effort, session and MCP servers", bundle: .module)
+        case "usage", "cost", "stats": UsageText.description   // §71.1 (the terminal lists its aliases too)
         default: nil
         }
     }
