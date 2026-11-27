@@ -318,6 +318,7 @@ struct CodeNavPopupView: View {
                         Text("Looking for \(popup.symbol)…").font(.callout)
                         NavLspStartingNote()   // MARK: lsp (§73.5)
                     }
+                    .fixedSize()   // the popover is as wide as the line: "Looking for X… 언어 서버 시작 중…" whole
                     .padding(12)
                 case let .peek(reply):
                     CodeNavPeekList(popup: popup, reply: reply)

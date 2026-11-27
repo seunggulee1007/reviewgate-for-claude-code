@@ -31,6 +31,7 @@ struct NavLspStartingNote: View {
         if store.navLspStarting {
             Text(verbatim: NavSourceText.starting)
                 .font(.caption).foregroundStyle(.secondary)
+                .fixedSize()   // never cut to "언어 서버 시작…" beside "Looking for X…"
                 .accessibilityIdentifier("Language server starting")
         }
     }
