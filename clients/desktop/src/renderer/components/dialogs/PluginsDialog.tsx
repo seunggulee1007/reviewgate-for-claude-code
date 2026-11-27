@@ -15,6 +15,7 @@ import {
 import { useStore } from "../../store";
 import { showToast } from "../../toast";
 import { Modal } from "../Menu";
+import { isEnter } from "../../ime";
 
 type Pending = { action: PluginAction; target: string };
 
@@ -124,7 +125,7 @@ export function PluginsDialog({ request, onClose }: { request: PluginRequest; on
             ))}
             <div className="row plugins-add">
               <input className="grow" value={source} placeholder={t("owner/repo, a git URL, a folder or a marketplace.json URL")} onChange={(e) => setSource(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && addBlocker === null) setPending({ action: "marketplace_add", target: source.trim() }); }} data-testid="Plugins marketplace source" />
+                onKeyDown={(e) => { if (isEnter(e) && addBlocker === null) setPending({ action: "marketplace_add", target: source.trim() }); }} data-testid="Plugins marketplace source" />
               <button type="button" className="small" disabled={addBlocker !== null} title={addBlocker ?? pluginConfirmMessage("marketplace_add")} onClick={() => setPending({ action: "marketplace_add", target: source.trim() })} data-testid="Plugins add marketplace">
                 {t("Add Marketplace…")}
               </button>

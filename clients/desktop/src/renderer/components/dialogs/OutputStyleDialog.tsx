@@ -8,6 +8,7 @@ import { t } from "../../i18n";
 import { loadOutputStyles, setOutputStyle, styleBlocker, styleDescription, styleDisplayName, styleSetIn, styleSource, styleWhy, type OutputStyles } from "../../outputStyles";
 import { showToast } from "../../toast";
 import { Modal } from "../Menu";
+import { isEnter } from "../../ime";
 
 export function OutputStyleDialog({ onClose }: { onClose: () => void }) {
   const [styles, setStyles] = useState<OutputStyles | null>(null);
@@ -55,7 +56,7 @@ export function OutputStyleDialog({ onClose }: { onClose: () => void }) {
               onClick={() => setPick(s.name)}
               onDoubleClick={() => use(s.name)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") use(s.name);
+                if (isEnter(e)) use(s.name);
                 if (e.key === " ") setPick(s.name);
               }}
               data-testid={`Output style ${s.name}`}
