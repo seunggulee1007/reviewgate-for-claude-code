@@ -542,7 +542,7 @@ public final class CodeNavStore {
         if referenceSearches.count > Self.searchesLimit { referenceSearches.removeLast(referenceSearches.count - Self.searchesLimit) }
         defer { if seq == referencesSeq { referencesLoading = false } }
         do {
-            let reply = try await request(.findReferences(symbol: symbol, fromPath: from?.path))
+            let reply = try await request(.findReferences(symbol: symbol, fromPath: from?.path, line: from?.line, column: from?.column))   // line / column: §73
             guard seq == referencesSeq else { return }
             guard case let .references(r) = reply else { throw EngineClientError.unexpectedReply(String(describing: reply)) }
             references = r

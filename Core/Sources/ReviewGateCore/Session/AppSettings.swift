@@ -298,6 +298,7 @@ public enum AppSettings {
         settings.newChatKind = newChatKind(defaults: defaults)   // MARK: terminal-default (§57.7, NewChatKind.swift)
         settings.terminalPermissionBridge = terminalPermissionBridge(defaults: defaults)   // MARK: terminal-stage2 (§57.15)
         settings.reviewFirst = reviewFirst(defaults: defaults).rawValue   // §64 (ReviewFirst.swift)
+        settings.languageServer = LanguageServerSetting.isOn(defaults)   // MARK: lsp (§73, LanguageServer.swift)
         return settings
     }
 
