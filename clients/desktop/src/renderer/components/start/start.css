@@ -10,8 +10,8 @@
 .start-cards.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 980px) { .start-cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* The clone dialog (CloneProjectDialog.tsx) */
-.clone-existing { border: 1px solid var(--green); border-radius: 8px; padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
-.clone-existing legend { padding: 0 4px; }
+.task-start fieldset.clone-existing { border: 1px solid var(--green); border-radius: 8px; padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
+.task-start fieldset.clone-existing legend { padding: 0 4px; }
 .clone-progress .bar { position: relative; height: 6px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
 .clone-progress .bar > div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); transition: width 0.2s ease; }
 .start-card { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 110px; padding: 14px; text-align: left; border-radius: 10px; border: 1px solid var(--border); background: var(--panel);
