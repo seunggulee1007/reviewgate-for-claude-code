@@ -315,6 +315,7 @@ export function engineSettings(s: AppSettings = loadSettings(), projectRoot?: st
     commitPushByDefault: s.commitPushByDefault === true,
     commitTrailer: s.commitTrailer.trim(),
     autoFetch: s.autoFetch !== false, // MARK: git-sync (§68.4)
+    languageServer: s.languageServer !== false, // MARK: lsp (§73): on unless turned off
     autoRestartSession: s.autoRestartSession !== false,
     permissionMode: isPermissionMode(s.permissionMode) ? s.permissionMode : "default",
     disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((p) => typeof p === "string" && p.trim().length > 0) : [],

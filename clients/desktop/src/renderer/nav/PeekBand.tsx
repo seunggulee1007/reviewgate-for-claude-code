@@ -7,7 +7,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { searchedWord } from "./navModel";
-import { useNav } from "./navStore";
+import { useNav, where } from "./navStore";
+import { LspStartingNote, NavSourceBadge } from "./NavBits";
 import { BAND_VISIBLE_LINES, bandKey, bandLines, bandScrollLine, bandTitle, type BandLine } from "./peekModel";
 
 const LINE_PX = 18;
@@ -116,7 +117,7 @@ export function PeekBand() {
 
   if (!band) return null;
   const { symbol } = band;
-  const findRefs = () => useNav.getState().findReferences({ symbol, ...(band.fromPath ? { fromPath: band.fromPath } : {}) });
+  const findRefs = () => useNav.getState().findReferences({ symbol, ...(band.fromPath ? { fromPath: band.fromPath } : {}), ...where(band.line, band.column) });
   const close = (
     <button type="button" className="plain small" onClick={() => useNav.getState().closeBand()} title={t("Close (Esc)")} aria-label={t("Close")} data-testid="Peek band close">
       ×
@@ -129,6 +130,7 @@ export function PeekBand() {
         <div className="nav-band-head" style={slow ? undefined : { visibility: "hidden" }}>
           <span className="spinner" aria-hidden="true" />
           <span className="grow truncate">{t("Looking for the definition of {0}…", symbol)}</span>
+          <LspStartingNote />
           {close}
         </div>
       ) : band.error || band.rows.length === 0 ? (
@@ -155,6 +157,7 @@ export function PeekBand() {
             <span className="nav-kind">{data?.symbol?.kind ?? row!.kind}</span>
             <span className="folder grow truncate" title={row!.path}>{row!.folder}</span>
             {band.rows.length > 1 && <span className="tiny faint" title={t("↑ / ↓ switch the definition")}>{t("Definition {0} of {1}", band.selected + 1, band.rows.length)}</span>}
+            <NavSourceBadge source={band.source} fallback={band.fallback} />
             {band.truncated && <span className="caption orange">{t("Showing the best 50")}</span>}
             <button type="button" className="small primary" onClick={() => useNav.getState().openBandSelected()} title={t("Open it in the diff or the file view (Enter)")} data-testid="Peek band open">
               {t("Open")}

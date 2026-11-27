@@ -12,8 +12,8 @@ import { navKey } from "../keymap";
 import { isTerminalTarget } from "../terminal/terminalKeys";
 import { domTargetAt, domTargetAtSelection, navModifier, type DomNavTarget } from "./domTarget";
 import { groupByFile, peekKey, splitPath, type NavLocation, type RefRow } from "./navModel";
-import { currentLocation, endHover, hoverTimer, useNav } from "./navStore";
-import { NavHistoryButtons, Preview } from "./NavBits";
+import { currentLocation, endHover, hoverTimer, useNav, where } from "./navStore";
+import { LspStartingNote, NavHistoryButtons, NavSourceBadge, Preview } from "./NavBits";
 import { openInIde } from "./openInIde";
 import { useBandSlot } from "./bandSlot"; // §65.8
 import { PeekBand } from "./PeekBand";
@@ -193,7 +193,7 @@ function useNavKeys(): void {
         return;
       }
       e.preventDefault();
-      if (k === "references") useNav.getState().findReferences({ symbol: target.symbol, fromPath: target.path });
+      if (k === "references") useNav.getState().findReferences({ symbol: target.symbol, fromPath: target.path, ...where(target.line, target.column) });
       else if (k === "peek") peekFromDom(target);
       else {
         const box = target.range.getBoundingClientRect();
@@ -239,6 +239,7 @@ function HoverCard() {
   return (
     <div ref={ref} className="nav-hover" style={pos} role="tooltip" data-testid="Hover preview">
       <div className="nav-hover-sig">{hover.signature}</div>
+      {hover.doc && <div className="nav-hover-doc">{hover.doc}</div>}
       <div className="nav-hover-where">
         {name}:{hover.line}
         {folder ? ` · ${folder}` : ""}
@@ -316,13 +317,14 @@ function PeekPopover() {
   }, [peek.selected]);
 
   if (peek.loading && !slow) return <div ref={ref} className="nav-peek" style={{ position: "fixed", left: pos.left, top: pos.top, visibility: "hidden" }} />;
-  const findRefs = () => useNav.getState().findReferences({ symbol: peek.symbol, ...(peek.fromPath ? { fromPath: peek.fromPath } : {}) });
+  const findRefs = () => useNav.getState().findReferences({ symbol: peek.symbol, ...(peek.fromPath ? { fromPath: peek.fromPath } : {}), ...where(peek.line, peek.column) });
   return (
     <div ref={ref} className="nav-peek" style={{ left: pos.left, top: pos.top }} role="group" aria-label={t("Go to Definition")} data-testid="Definition peek">
       {peek.loading ? (
         <div className="nav-peek-head">
           <span className="spinner" aria-hidden="true" />
           <span className="grow truncate">{t("Looking for the definition of {0}…", peek.symbol)}</span>
+          <LspStartingNote />
         </div>
       ) : peek.error ? (
         <div className="nav-peek-note" role="alert">
@@ -334,7 +336,10 @@ function PeekPopover() {
           <span>
             <span className="bold">{t("No definition found")}</span> · <span className="mono">{peek.symbol}</span>
           </span>
-          <span className="caption muted">{APPROXIMATE()}</span>
+          <span className="row" style={{ gap: 6 }}>
+            <NavSourceBadge source={peek.source} fallback={peek.fallback} />
+            <span className="caption muted">{peek.source === "lsp" ? t("Found by the language server (TypeScript)") : APPROXIMATE()}</span>
+          </span>
           {peek.timedOut && <span className="caption orange">{t("Search stopped after 10 s")}</span>}
           <div className="row" style={{ gap: 6 }}>
             <button type="button" className="small" onClick={findRefs} data-testid="Peek find references">
@@ -351,7 +356,8 @@ function PeekPopover() {
             <span className="grow truncate">
               {t("Definitions of {0}", peek.symbol)} <span className="faint">· {peek.rows.length}</span>
             </span>
-            <span className="tiny faint" title={APPROXIMATE()}>↑↓ ↩ Esc</span>
+            <NavSourceBadge source={peek.source} fallback={peek.fallback} />
+            <span className="tiny faint">↑↓ ↩ Esc</span>
           </div>
           <div className="nav-peek-list" role="listbox" aria-label={t("Definitions of {0}", peek.symbol)}>
             {peek.rows.map((row, i) => (
@@ -414,6 +420,7 @@ export function NavRefsPanel() {
             {refs.mode === "references" ? t("{0} references in {1} files", refs.rows.length, refs.files) : t("{0} matches in {1} files", refs.rows.length, refs.files)}
           </span>
         )}
+        {!refs.loading && !refs.error && refs.mode === "references" && <NavSourceBadge source={refs.source} fallback={refs.fallback} />}
         {refs.truncated && <span className="caption orange">{t("Only the first {0}", refs.rows.length)}</span>}
         {refs.timedOut && <span className="caption orange">{refs.mode === "references" ? t("Search stopped after 15 s") : t("Search stopped after 20 s")}</span>}
         <span className="grow" />

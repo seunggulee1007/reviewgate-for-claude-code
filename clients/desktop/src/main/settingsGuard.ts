@@ -98,6 +98,7 @@ const RENDERER_WRITABLE: { [K in keyof AppSettings]?: Check } = {
   preferredEditor: oneOf("auto", "vscode", "idea", "explorer"),
   openInIde: oneOf("vscode", "idea", "system"), // §62
   navCtrlClick: oneOf("peek", "jump"), // §65.8
+  languageServer: bool, // MARK: lsp (§73.5)
   commitPushByDefault: bool,
   commitTrailer: text(1000, { singleLine: true }),
   autoFetch: bool, // MARK: git-sync (§68.4)

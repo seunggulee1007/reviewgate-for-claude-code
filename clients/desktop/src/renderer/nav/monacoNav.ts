@@ -208,7 +208,7 @@ export function attachMonacoNav(ed: monaco.editor.IStandaloneCodeEditor, opts: O
       contextMenuOrder: 2,
       run: () => {
         const at = atCaret();
-        if (at) useNav.getState().findReferences({ symbol: at.symbol, fromPath: opts.path });
+        if (at) useNav.getState().findReferences({ symbol: at.symbol, fromPath: opts.path, line: at.line, column: at.start });
       },
     }),
     ed.addAction({

@@ -10,7 +10,7 @@ import { Icon } from "../icons";
 import { groupByFile, markSymbol, splitPath } from "./navModel";
 import { useNav } from "./navStore";
 import { bandLines } from "./peekModel";
-import { NavHistoryButtons, Preview } from "./NavBits";
+import { LspStartingNote, NavHistoryButtons, NavSourceBadge, Preview } from "./NavBits";
 
 const APPROXIMATE = () => t("Search-based: may list look-alikes");
 
@@ -60,6 +60,8 @@ export function ReferencesPanel() {
             {refs.mode === "references" ? t("{0} references in {1} files", refs.rows.length, refs.files) : t("{0} matches in {1} files", refs.rows.length, refs.files)}
           </span>
         )}
+        {refs.loading && <LspStartingNote />}
+        {!refs.loading && !refs.error && refs.mode === "references" && <NavSourceBadge source={refs.source} fallback={refs.fallback} />}
         {refs.truncated && <span className="caption orange">{t("Only the first {0}", refs.rows.length)}</span>}
         {refs.timedOut && <span className="caption orange">{refs.mode === "references" ? t("Search stopped after 15 s") : t("Search stopped after 20 s")}</span>}
         <span className="grow" />

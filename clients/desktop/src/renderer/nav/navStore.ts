@@ -4,7 +4,7 @@
  * Requests are numbered: a newer request's reply replaces an older one's (a stale reply is dropped).
  */
 import { create } from "zustand";
-import type { ProjectFileEvent, SymbolPreviewEvent } from "@reviewgate/engine";
+import type { LspFallback, NavSource, ProjectFileEvent, SymbolPreviewEvent } from "@reviewgate/engine";
 import { engineRequest, refusalOf } from "../engineRequest";
 import { refusalMessage } from "../errorCodes";
 import { t } from "../i18n";
@@ -18,12 +18,21 @@ import { HoverDebounce } from "./hoverModel";
 import type { PaletteMode } from "./quickOpenModel";
 
 export type NavTarget = { path: string; line: number; column: number; symbol?: string };
+/** §73: who answered a lookup (the language server or the search) and why the search did — the "정확 / 추정" label. */
+export type NavAnswer = { source?: NavSource; fallback?: LspFallback };
+/** §73: the reply's `source` / `fallback`, only when present (an older engine sends neither). */
+export function answerOf(reply: NavAnswer): NavAnswer {
+  return { ...(reply.source ? { source: reply.source } : {}), ...(reply.fallback ? { fallback: reply.fallback } : {}) };
+}
 
 export type PeekState = {
   x: number;
   y: number;
   symbol: string;
   fromPath?: string;
+  /** §73: where the name is — Find References from here sends them too. */
+  line?: number;
+  column?: number;
   from: NavLocation | null;
   loading: boolean;
   rows: PeekRow[];
@@ -31,7 +40,7 @@ export type PeekState = {
   truncated: boolean;
   timedOut: boolean;
   error: string | null;
-};
+} & NavAnswer;
 
 export type RefsState = {
   /** Each search's own number: the References tab comes forward for a new one (§65.8). */
@@ -39,6 +48,8 @@ export type RefsState = {
   mode: "references" | "search";
   symbol: string;
   fromPath?: string;
+  line?: number;
+  column?: number;
   loading: boolean;
   /** In the tab's order (`referenceOrder`: by file, then line) — the order F4 / Shift+F4 walk. */
   rows: RefRow[];
@@ -50,7 +61,7 @@ export type RefsState = {
   truncated: boolean;
   timedOut: boolean;
   error: string | null;
-};
+} & NavAnswer;
 
 /** §65.8: the peek band — the definition's lines inline under the clicked line, the candidates beside them. */
 export type BandState = {
@@ -58,6 +69,8 @@ export type BandState = {
   anchor: BandAnchor;
   symbol: string;
   fromPath?: string;
+  line?: number;
+  column?: number;
   from: NavLocation | null;
   loading: boolean;
   error: string | null;
@@ -67,12 +80,16 @@ export type BandState = {
   timedOut: boolean;
   /** `definition_preview` per candidate (its index): the reply, or the refusal said. Absent: on its way. */
   previews: Record<number, SymbolPreviewEvent | string>;
-};
+} & NavAnswer;
 
 /** §65.8: what the hover asks about — the name under the pointer with Ctrl held, and where to show the card. */
 export type HoverQuery = { symbol: string; fromPath?: string; line?: number; column?: number; receiver?: string; x: number; y: number };
 /** The hover card: the declaration's signature (bold) and its lines — the doc comment above and the next 8. */
-export type HoverState = { seq: number; x: number; y: number; signature: string; path: string; line: number; lines: BandLine[] };
+export type HoverState = {
+  seq: number; x: number; y: number; signature: string; path: string; line: number; lines: BandLine[];
+  /** §73: the language server's doc comment of the name (its type line is `signature` then). */
+  doc?: string;
+};
 
 export type FileViewState = NavTarget & { seq: number; data: ProjectFileEvent | null; error: string | null };
 export type RevealState = NavTarget & { seq: number };
@@ -105,7 +122,8 @@ type NavState = {
   /** Opens a palette (a toast says why it cannot: no project, no file shown for its symbols). */
   openPalette(mode: PaletteMode): void;
   closePalette(): void;
-  findReferences(q: { symbol: string; fromPath?: string }): void;
+  /** §73: `line` / `column` of the name let the language server answer (else the search does). */
+  findReferences(q: { symbol: string; fromPath?: string; line?: number; column?: number }): void;
   findInProject(symbol: string): void;
   /** §65.8: the References tab's row `index` — its context in the preview pane. */
   selectReference(index: number): void;
@@ -128,6 +146,11 @@ type NavState = {
   setHere(path: string, line: number): void;
   reset(): void;
 };
+
+/** §73: `line` / `column` (1-based), each only when known. */
+export function where(line: number | undefined, column: number | undefined): { line?: number; column?: number } {
+  return { ...(line && line > 0 ? { line } : {}), ...(column && column > 0 ? { column } : {}) };
+}
 
 /** `find_definition`'s optional fields (§62 `fromPath` / `line`, §65.6 `column` / `receiver`), each only when known. */
 export function definitionHints(q: { fromPath?: string | undefined; line?: number | undefined; column?: number | undefined; receiver?: string | undefined }) {
@@ -218,7 +241,7 @@ export const useNav = create<NavState>((set, get) => {
     goToDefinition({ symbol, fromPath, line, column, receiver, x, y, from }) {
       if (!isSendableSymbol(symbol)) return;
       const seq = ++defSeq;
-      const base = { x, y, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}) };
+      const base = { x, y, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}), ...where(line, column) };
       set({ peek: { ...base, loading: true } });
       engineRequest({ type: "find_definition", symbol, ...definitionHints({ fromPath, line, column, receiver }) })
         .then((reply) => {
@@ -230,7 +253,7 @@ export const useNav = create<NavState>((set, get) => {
             if (reply.timedOut) showToast(t("Search stopped after 10 s"));
             return;
           }
-          set({ peek: { ...base, loading: false, rows, truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          set({ peek: { ...base, loading: false, rows, truncated: reply.truncated, timedOut: reply.timedOut === true, ...answerOf(reply) } });
         })
         .catch((e: unknown) => {
           if (seq !== defSeq || !get().peek) return;
@@ -242,13 +265,13 @@ export const useNav = create<NavState>((set, get) => {
       if (!isSendableSymbol(symbol)) return;
       defSeq++;
       const seq = ++bandSeq;
-      const base = { seq, anchor, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, previews: {}, ...(fromPath ? { fromPath } : {}) };
+      const base = { seq, anchor, symbol, from, rows: [], selected: 0, truncated: false, timedOut: false, error: null, previews: {}, ...(fromPath ? { fromPath } : {}), ...where(line, column) };
       set({ peek: null, band: { ...base, loading: true } });
       if (!sameAnchor(useBandSlot.getState().anchor, anchor)) useBandSlot.setState({ anchor, slot: null });
       engineRequest({ type: "find_definition", symbol, ...definitionHints({ fromPath, line, column, receiver }) })
         .then((reply) => {
           if (seq !== bandSeq || !get().band) return;
-          set({ band: { ...base, loading: false, rows: bandRows(reply.candidates), truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          set({ band: { ...base, loading: false, rows: bandRows(reply.candidates), truncated: reply.truncated, timedOut: reply.timedOut === true, ...answerOf(reply) } });
           loadPreview(seq, 0);
         })
         .catch((e: unknown) => {
@@ -283,7 +306,9 @@ export const useNav = create<NavState>((set, get) => {
           if (!live() || !best) return;
           const preview = await engineRequest({ type: "definition_preview", path: best.path, line: best.line, after: 8 });
           if (!live()) return;
-          set({ hover: { seq, x: q.x, y: q.y, signature: preview.symbol?.signature ?? best.preview, path: best.path, line: best.line, lines: bandLines(preview) } });
+          // §73: the language server's type / signature line when it answered, else the declaration's.
+          const info = reply.quickInfo;
+          set({ hover: { seq, x: q.x, y: q.y, signature: info?.display ?? preview.symbol?.signature ?? best.preview, path: best.path, line: best.line, lines: bandLines(preview), ...(info?.documentation ? { doc: info.documentation } : {}) } });
         })
         .catch(() => undefined); // a hover says nothing about a refusal: the click does
     },
@@ -309,15 +334,15 @@ export const useNav = create<NavState>((set, get) => {
       if (get().palette) set({ palette: null });
     },
 
-    findReferences({ symbol, fromPath }) {
+    findReferences({ symbol, fromPath, line, column }) {
       if (!isSendableSymbol(symbol)) return;
       const seq = ++refSeq;
-      const base = { seq, mode: "references" as const, symbol, rows: [], selected: -1, files: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}) };
+      const base = { seq, mode: "references" as const, symbol, rows: [], selected: -1, files: 0, truncated: false, timedOut: false, error: null, ...(fromPath ? { fromPath } : {}), ...where(line, column) };
       set({ peek: null, refs: { ...base, loading: true } });
-      engineRequest({ type: "find_references", symbol, ...(fromPath ? { fromPath } : {}) })
+      engineRequest({ type: "find_references", symbol, ...(fromPath ? { fromPath } : {}), ...where(line, column) })
         .then((reply) => {
           if (seq !== refSeq || !get().refs) return;
-          set({ refs: { ...base, loading: false, rows: referenceOrder(referenceRows(reply.hits)), files: reply.files, truncated: reply.truncated, timedOut: reply.timedOut === true } });
+          set({ refs: { ...base, loading: false, rows: referenceOrder(referenceRows(reply.hits)), files: reply.files, truncated: reply.truncated, timedOut: reply.timedOut === true, ...answerOf(reply) } });
           if (reply.hits.length > 0) get().selectReference(0);
         })
         .catch((e: unknown) => {
@@ -379,7 +404,7 @@ export const useNav = create<NavState>((set, get) => {
       const r = get().refs;
       if (!r) return;
       if (r.mode === "search") get().findInProject(r.symbol);
-      else get().findReferences({ symbol: r.symbol, ...(r.fromPath ? { fromPath: r.fromPath } : {}) });
+      else get().findReferences({ symbol: r.symbol, ...(r.fromPath ? { fromPath: r.fromPath } : {}), ...where(r.line, r.column) });
     },
 
     openTarget(target, from) {

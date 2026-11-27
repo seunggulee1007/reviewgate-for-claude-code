@@ -12065,6 +12065,14 @@ that folder; one committed into git is the case that is not trusted. `state.nav.
   sent as `set_settings {languageServer}`. Off with its reason when `ready.languageServer.available` is false ("이
   빌드에는 언어 서버가 들어 있지 않아요").
 - Find References sends `line` and `column` of the name too (the word under the pointer / caret).
+- Mac: Core `Engine/LspProtocol.swift` (`NavSource`, `LspFallback`, `LspQuickInfo`, `LspState`), `Session/LanguageServer.swift`
+  (`LanguageServerSetting` — user defaults `languageServer`, `bundled(sidecarPath:)` —, `NavSourceText`), `AppState
+  .navLspStarting`, `updateLanguageServer`; App `Browse/NavSourceViews.swift` (`NavSourceBadge`, `NavLspStartingNote`) in
+  the peek list, the band, the References tab and sheet; the hover card. Tests: `LanguageServerTests`, `CodeNavTests`.
+- Windows: `nav/navSource.ts` (the words), `nav/NavBits.tsx` (`NavSourceBadge`, `LspStartingNote`), `nav/navStore.ts` (each
+  state keeps `source` / `fallback`, `line` / `column` for Find References, the hover's `quickInfo`); Settings › Review ›
+  Code navigation (`AppSettings.languageServer`, off with its reason when `rg:toolchainInfo` says the build has none);
+  main `lspDir.ts` hands `resources/lsp` to the engine. Tests: `nav/navSource.test.ts`, `nav/navStore.test.ts`.
 
 - **Security.** Reads only: tsserver gets the files of the root, no network (typings acquisition off), no plugin from the
   project unless it runs the project's own TypeScript (which loads the plugins its tsconfig names from that

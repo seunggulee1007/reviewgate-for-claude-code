@@ -3,8 +3,32 @@
  * view): a preview line with the name marked, and the Back / Forward buttons. No Monaco here.
  */
 import { t } from "../i18n";
+import { useStore } from "../store";
 import { markSymbol } from "./navModel";
-import { backBlocked, forwardBlocked, useNav } from "./navStore";
+import { sourceHelp, sourceLabel } from "./navSource";
+import { backBlocked, forwardBlocked, useNav, type NavAnswer } from "./navStore";
+
+/** §73.5: "Exact" / "Estimated" with its tooltip (who answered, why the search did). */
+export function NavSourceBadge(props: NavAnswer) {
+  const exact = props.source === "lsp";
+  const help = sourceHelp(props.source, props.fallback);
+  return (
+    <span className={`nav-source${exact ? " exact" : ""}`} title={help} aria-label={`${sourceLabel(props.source)}: ${help}`} data-testid="Nav source">
+      {sourceLabel(props.source)}
+    </span>
+  );
+}
+
+/** §73.5: "Starting the language server…" while `state.nav.lsp` starts (nothing otherwise). */
+export function LspStartingNote() {
+  const starting = useStore((s) => s.state.nav?.lsp?.status === "starting");
+  if (!starting) return null;
+  return (
+    <span className="caption muted" data-testid="Language server starting">
+      {t("Starting the language server…")}
+    </span>
+  );
+}
 
 /** The symbol marked in a preview line. */
 export function Preview(props: { text: string; symbol: string }) {
