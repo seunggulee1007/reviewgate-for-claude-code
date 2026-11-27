@@ -140,26 +140,22 @@ struct BackgroundOutputTail: View {
     @State private var lines: [String]?
 
     var body: some View {
-        Group {
-            if let lines {
-                if lines.isEmpty {
-                    Text(verbatim: BackgroundText.noOutputYet).foregroundStyle(.tertiary)
-                } else {
-                    Text(verbatim: lines.joined(separator: "\n")).foregroundStyle(.secondary)
+        // Always a view (an empty Group would never run its `.task`); no room until the first read.
+        Text(verbatim: lines.map { $0.isEmpty ? BackgroundText.noOutputYet : $0.joined(separator: "\n") } ?? "")
+            .foregroundStyle(lines?.isEmpty == false ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+            .frame(maxHeight: lines == nil ? 0 : nil, alignment: .topLeading)
+            .clipped()
+            .font(.system(.caption2, design: .monospaced))
+            .lineLimit(3)
+            .truncationMode(.tail)
+            .textSelection(.enabled)
+            .accessibilityIdentifier("Background task tail")
+            .task(id: taskId) {
+                while !Task.isCancelled {
+                    if case let .success(reply) = await store.backgroundTaskOutput(taskId) { lines = BackgroundText.tail(reply.text) }
+                    try? await Task.sleep(for: .seconds(3))
                 }
             }
-        }
-        .font(.system(.caption2, design: .monospaced))
-        .lineLimit(3)
-        .truncationMode(.tail)
-        .textSelection(.enabled)
-        .accessibilityIdentifier("Background task tail")
-        .task(id: taskId) {
-            while !Task.isCancelled {
-                if case let .success(reply) = await store.backgroundTaskOutput(taskId) { lines = BackgroundText.tail(reply.text) }
-                try? await Task.sleep(for: .seconds(3))
-            }
-        }
     }
 }
 

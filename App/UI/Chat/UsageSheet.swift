@@ -11,15 +11,13 @@ struct UsageSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(verbatim: UsageText.title).font(.headline)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    session
-                    Divider()
-                    plan
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // No scroll view: a sheet takes its content's ideal height, and the few rows fit the laptop's window.
+            VStack(alignment: .leading, spacing: 14) {
+                session
+                Divider()
+                plan
             }
-            .frame(maxHeight: 430)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(verbatim: UsageText.terminalNote)
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -133,9 +131,16 @@ private struct PlanWindowRow: View {
                 }
             }
             if let percent {
-                ProgressView(value: Double(min(100, max(0, percent))), total: 100)
-                    .progressViewStyle(.linear)
-                    .tint(high ? .orange : .accentColor)
+                // Drawn, not a ProgressView: its tint does not take on macOS, and the colour is what says "near the limit".
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.secondary.opacity(0.2))
+                        Capsule().fill(high ? Color.orange : Color.accentColor)
+                            .frame(width: geo.size.width * CGFloat(min(100, max(0, percent))) / 100)
+                    }
+                }
+                .frame(height: 6)
+                .accessibilityHidden(true)
             }
             if let reset = window.resetDate {
                 Text(verbatim: UsageText.resets(reset)).font(.caption).foregroundStyle(.secondary)
