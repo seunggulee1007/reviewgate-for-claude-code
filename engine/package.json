@@ -1,6 +1,6 @@
 {
   "name": "@reviewgate/engine",
-  "version": "0.5.37",
+  "version": "0.5.38",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
