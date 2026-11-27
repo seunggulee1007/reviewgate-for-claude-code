@@ -11983,6 +11983,9 @@ type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path
   Explanatory, Learning; custom styles are Markdown files in `~/.claude/output-styles`, every `.claude/output-styles`
   from the working directory up to the repository root (the closest wins), the managed folder, and a plugin's
   `output-styles/`, each with `name` / `description` frontmatter.
+  The walk up to the repository root compares folders as the platform does: on Windows without case (`C:\Work` and
+  `c:\work` are one folder), so a lower-case drive letter from the shell still stops at the repository. The list and
+  settings readers take an injectable `path` module, so the Windows rules are unit-tested on every host.
 - **So the app switches it the same way, in the current session:** `output_style_set` calls the SDK's
   `Query.updateSettings("localSettings", {outputStyle})` — "the same path /config uses (canonical store root, gitignore
   upkeep, hardened write) — and live-apply them" (SDK 0.3.270; `outputStyle` is its only allowed key). The CLI writes

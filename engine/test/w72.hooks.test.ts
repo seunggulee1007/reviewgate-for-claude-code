@@ -1,5 +1,5 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import path, { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { hookEntriesOf, listHooks, sortHooks } from "../src/session/hooksList.js";
 import { NO_MANAGED_POLICY } from "../src/statusline/managed.js";
@@ -19,6 +19,12 @@ const temp = (name: string): string => {
   dirs.push(d);
   return d;
 };
+
+/** The same listing on POSIX and Windows path rules, whatever the host (a Windows runner has no `/Users`). */
+const LAYOUTS = [
+  { name: "posix", pa: path.posix, cfg: "/Users/dev/.claude", root: "/work/acme", plug: "/plugins" },
+  { name: "win32", pa: path.win32, cfg: "C:\\Users\\dev\\.claude", root: "C:\\work\\acme", plug: "C:\\plugins" },
+];
 
 const files = (map: Record<string, unknown>) => (p: string): string | null => (p in map ? JSON.stringify(map[p]) : null);
 
@@ -49,16 +55,15 @@ describe("§72.1 the entries (pure)", () => {
     expect(sorted.map((h) => h.text)).toEqual(["SessionStartplugin", "PreToolUseuser", "PreToolUselocal", "Stopuser", "Zetauser"]);
   });
 
-  it("lists the files the session loads, and why the hooks do not run", () => {
-    const cfg = "/Users/dev/.claude";
-    const root = "/work/acme";
+  it.each(LAYOUTS)("lists the files the session loads, and why the hooks do not run ($name paths)", ({ pa, cfg, root, plug }) => {
+    const at = pa.join;
     const read = files({
-      [`${cfg}/settings.json`]: { hooks: { Stop: [{ hooks: [{ type: "command", command: "say u" }] }] } },
-      [`${root}/.claude/settings.json`]: { hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "lint" }] }] } },
-      [`${root}/.claude/settings.local.json`]: { disableAllHooks: true },
-      [`/plugins/fmt/hooks/hooks.json`]: { description: "x", hooks: { PostToolUse: [{ matcher: "Write", hooks: [{ type: "command", command: "${CLAUDE_PLUGIN_ROOT}/fmt.sh" }] }] } },
+      [at(cfg, "settings.json")]: { hooks: { Stop: [{ hooks: [{ type: "command", command: "say u" }] }] } },
+      [at(root, ".claude", "settings.json")]: { hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "lint" }] }] } },
+      [at(root, ".claude", "settings.local.json")]: { disableAllHooks: true },
+      [at(plug, "fmt", "hooks", "hooks.json")]: { description: "x", hooks: { PostToolUse: [{ matcher: "Write", hooks: [{ type: "command", command: "${CLAUDE_PLUGIN_ROOT}/fmt.sh" }] }] } },
     });
-    const base = { configDir: cfg, cwd: root, loadUser: true, loadLocal: true, plugins: [{ name: "fmt", path: "/plugins/fmt" }, { name: "none", path: "/plugins/none" }], appHooksOff: false, managed: { settings: null, path: null }, read };
+    const base = { configDir: cfg, cwd: root, loadUser: true, loadLocal: true, plugins: [{ name: "fmt", path: at(plug, "fmt") }, { name: "none", path: at(plug, "none") }], appHooksOff: false, managed: { settings: null, path: null }, read, pathApi: pa };
     const r = listHooks(base);
     expect(r.hooks.map((h) => [h.event, h.source, h.text, h.active])).toEqual([
       ["PreToolUse", "project", "lint", false],
@@ -67,10 +72,10 @@ describe("§72.1 the entries (pure)", () => {
     ]);
     expect(r.off).toBe("settings"); // the local file's disableAllHooks
     expect(r.files).toEqual([
-      { source: "user", path: `${cfg}/settings.json`, exists: true, count: 1 },
-      { source: "project", path: `${root}/.claude/settings.json`, exists: true, count: 1 },
-      { source: "local", path: `${root}/.claude/settings.local.json`, exists: true, count: 0 },
-      { source: "plugin", plugin: "fmt", path: "/plugins/fmt/hooks/hooks.json", exists: true, count: 1 },
+      { source: "user", path: at(cfg, "settings.json"), exists: true, count: 1 },
+      { source: "project", path: at(root, ".claude", "settings.json"), exists: true, count: 1 },
+      { source: "local", path: at(root, ".claude", "settings.local.json"), exists: true, count: 0 },
+      { source: "plugin", plugin: "fmt", path: at(plug, "fmt", "hooks", "hooks.json"), exists: true, count: 1 },
     ]);
     expect(r.hooks.find((h) => h.source === "plugin")?.plugin).toBe("fmt");
 
@@ -88,11 +93,11 @@ describe("§72.1 the entries (pure)", () => {
     expect(listHooks({ ...base, managed: { ...managed, settings: { ...managed.settings, disableAllHooks: true } } }).hooks.every((h) => h.active === false)).toBe(true);
 
     // A later file's disableAllHooks: false wins over an earlier true (the CLI's precedence).
-    const read4 = files({ [`${cfg}/settings.json`]: { disableAllHooks: true, hooks: { Stop: [{ hooks: [{ command: "u" }] }] } }, [`${root}/.claude/settings.json`]: { disableAllHooks: false } });
+    const read4 = files({ [at(cfg, "settings.json")]: { disableAllHooks: true, hooks: { Stop: [{ hooks: [{ command: "u" }] }] } }, [at(root, ".claude", "settings.json")]: { disableAllHooks: false } });
     const r4 = listHooks({ ...base, read: read4, plugins: [] });
     expect(r4.off).toBeNull();
     expect(r4.hooks[0]?.active).toBe(true);
-    expect(r4.files.find((f) => f.source === "local")).toEqual({ source: "local", path: `${root}/.claude/settings.local.json`, exists: false, count: 0 });
+    expect(r4.files.find((f) => f.source === "local")).toEqual({ source: "local", path: at(root, ".claude", "settings.local.json"), exists: false, count: 0 });
   });
 });
 

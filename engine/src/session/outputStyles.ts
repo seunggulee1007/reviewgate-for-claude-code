@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import path, { type PlatformPath } from "node:path";
 import type { OutputStyleInfo, OutputStyleSetIn } from "../protocol.js";
 import { safeReadOrNull, wellFormed } from "../util/safeRead.js";
 
@@ -34,16 +34,16 @@ export function styleFrontmatter(text: string): { name?: string; description?: s
   return out;
 }
 
-function readFolder(dir: string, source: StyleFile["source"], plugin?: string, read: (p: string) => string | null = (p) => safeReadOrNull(p), list: (d: string) => string[] = listMd): StyleFile[] {
+function readFolder(dir: string, source: StyleFile["source"], plugin: string | undefined, read: (p: string) => string | null, list: (d: string) => string[], pa: PlatformPath): StyleFile[] {
   const out: StyleFile[] = [];
   for (const file of list(dir).slice(0, FOLDER_MAX)) {
-    const path = join(dir, file);
-    const text = read(path);
+    const filePath = pa.join(dir, file);
+    const text = read(filePath);
     if (text === null) continue;
     const fm = styleFrontmatter(text);
-    const name = wellFormed(fm.name ?? basename(file, ".md"));
+    const name = wellFormed(fm.name ?? pa.basename(file, ".md"));
     const description = fm.description ? wellFormed(fm.description).slice(0, DESCRIPTION_MAX) : null;
-    out.push({ name, description, source, path: wellFormed(path), ...(plugin ? { plugin: wellFormed(plugin) } : {}) });
+    out.push({ name, description, source, path: wellFormed(filePath), ...(plugin ? { plugin: wellFormed(plugin) } : {}) });
   }
   return out;
 }
@@ -57,14 +57,16 @@ function listMd(dir: string): string[] {
 }
 
 /** `.claude/output-styles` from `cwd` up to `root` (closest first: the CLI uses the one closest to the working directory). */
-export function projectStyleDirs(cwd: string, root: string): string[] {
+export function projectStyleDirs(cwd: string, root: string, pa: PlatformPath = path): string[] {
   const dirs: string[] = [];
-  let at = resolve(cwd);
-  const top = resolve(root);
+  let at = pa.resolve(cwd);
+  const top = pa.resolve(root);
+  // Windows paths compare without case (C:\Work and c:\work are one folder).
+  const same = (a: string, b: string) => (pa.sep === "\\" ? a.toLowerCase() === b.toLowerCase() : a === b);
   for (let i = 0; i < 64; i++) {
-    dirs.push(join(at, ".claude", "output-styles"));
-    if (at === top) break;
-    const up = dirname(at);
+    dirs.push(pa.join(at, ".claude", "output-styles"));
+    if (same(at, top)) break;
+    const up = pa.dirname(at);
     if (up === at) break;
     at = up;
   }
@@ -82,6 +84,8 @@ export type OutputStyleListOptions = {
   managedDir: string | null;
   read?: (p: string) => string | null;
   list?: (d: string) => string[];
+  /** Path rules (default: this platform's); tests pass `path.win32`. */
+  pathApi?: PlatformPath;
 };
 
 /**
@@ -90,13 +94,14 @@ export type OutputStyleListOptions = {
  * every style file found.
  */
 export function listOutputStyles(opts: OutputStyleListOptions): OutputStyleInfo[] {
-  const read = opts.read;
-  const list = opts.list;
+  const pa = opts.pathApi ?? path;
+  const read = opts.read ?? ((p: string) => safeReadOrNull(p));
+  const list = opts.list ?? listMd;
   const found: StyleFile[] = [];
-  if (opts.cwd && opts.root) for (const d of projectStyleDirs(opts.cwd, opts.root)) found.push(...readFolder(d, "project", undefined, read, list));
-  found.push(...readFolder(join(opts.configDir, "output-styles"), "user", undefined, read, list));
-  for (const p of opts.plugins) if (p.path && p.path !== "builtin") found.push(...readFolder(join(p.path, "output-styles"), "plugin", p.name, read, list));
-  if (opts.managedDir) found.push(...readFolder(join(opts.managedDir, ".claude", "output-styles"), "managed", undefined, read, list));
+  if (opts.cwd && opts.root) for (const d of projectStyleDirs(opts.cwd, opts.root, pa)) found.push(...readFolder(d, "project", undefined, read, list, pa));
+  found.push(...readFolder(pa.join(opts.configDir, "output-styles"), "user", undefined, read, list, pa));
+  for (const p of opts.plugins) if (p.path && p.path !== "builtin") found.push(...readFolder(pa.join(p.path, "output-styles"), "plugin", p.name, read, list, pa));
+  if (opts.managedDir) found.push(...readFolder(pa.join(opts.managedDir, ".claude", "output-styles"), "managed", undefined, read, list, pa));
   const file = (name: string) => found.find((f) => f.name === name) ?? found.find((f) => f.name.toLowerCase() === name.toLowerCase())
     ?? found.find((f) => f.plugin !== undefined && `${f.plugin}:${f.name}` === name);
   const builtin = (name: string) => (BUILTIN_OUTPUT_STYLES as readonly string[]).some((b) => b.toLowerCase() === name.toLowerCase());
@@ -121,7 +126,8 @@ export function listOutputStyles(opts: OutputStyleListOptions): OutputStyleInfo[
 }
 
 /** The settings file whose `outputStyle` applies (managed > local > project > user, as the CLI's precedence); null: none. */
-export function outputStyleSetIn(opts: { configDir: string; cwd: string | null; loadUser: boolean; loadLocal: boolean; managed: Record<string, unknown> | null; managedPath: string | null; read?: (p: string) => string | null }): OutputStyleSetIn | null {
+export function outputStyleSetIn(opts: { configDir: string; cwd: string | null; loadUser: boolean; loadLocal: boolean; managed: Record<string, unknown> | null; managedPath: string | null; read?: (p: string) => string | null; pathApi?: PlatformPath }): OutputStyleSetIn | null {
+  const pa = opts.pathApi ?? path;
   const read = opts.read ?? ((p: string) => safeReadOrNull(p));
   const valueIn = (path: string): string | null => {
     const text = read(path);
@@ -136,9 +142,9 @@ export function outputStyleSetIn(opts: { configDir: string; cwd: string | null; 
   const m = opts.managed?.outputStyle;
   if (typeof m === "string" && m.trim()) return { source: "managed", path: wellFormed(opts.managedPath ?? "managed settings"), value: wellFormed(m) };
   const layers: { source: OutputStyleSetIn["source"]; path: string; on: boolean }[] = [
-    { source: "local", path: opts.cwd ? join(opts.cwd, ".claude", "settings.local.json") : "", on: opts.loadLocal && opts.cwd !== null },
-    { source: "project", path: opts.cwd ? join(opts.cwd, ".claude", "settings.json") : "", on: opts.cwd !== null },
-    { source: "user", path: join(opts.configDir, "settings.json"), on: opts.loadUser },
+    { source: "local", path: opts.cwd ? pa.join(opts.cwd, ".claude", "settings.local.json") : "", on: opts.loadLocal && opts.cwd !== null },
+    { source: "project", path: opts.cwd ? pa.join(opts.cwd, ".claude", "settings.json") : "", on: opts.cwd !== null },
+    { source: "user", path: pa.join(opts.configDir, "settings.json"), on: opts.loadUser },
   ];
   for (const l of layers) {
     if (!l.on) continue;

@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import path, { type PlatformPath } from "node:path";
 import type { HookEntry, HookFile, HookSource, HooksListEvent } from "../protocol.js";
 import { safeReadOrNull, wellFormed } from "../util/safeRead.js";
 
@@ -125,6 +125,8 @@ export type HooksListOptions = {
   /** The managed tier's settings and where it comes from (null: none). */
   managed: { settings: Raw | null; path: string | null };
   read?: (path: string) => string | null;
+  /** Path rules (default: this platform's); tests pass `path.win32`. */
+  pathApi?: PlatformPath;
 };
 
 /**
@@ -134,6 +136,7 @@ export type HooksListOptions = {
  * managed `allowManagedHooksOnly` leaves only the managed ones.
  */
 export function listHooks(opts: HooksListOptions): Omit<HooksListEvent, "type" | "id"> {
+  const pa = opts.pathApi ?? path;
   const read = opts.read ?? ((p: string) => safeReadOrNull(p));
   const files: HookFile[] = [];
   const hooks: HookEntry[] = [];
@@ -145,14 +148,14 @@ export function listHooks(opts: HooksListOptions): Omit<HooksListEvent, "type" |
     hooks.push(...found);
     if (data && typeof data.disableAllHooks === "boolean") disableAll = data.disableAllHooks; // the later (higher) file wins
   };
-  if (opts.loadUser) settingsFile("user", join(opts.configDir, "settings.json"));
+  if (opts.loadUser) settingsFile("user", pa.join(opts.configDir, "settings.json"));
   if (opts.cwd) {
-    settingsFile("project", join(opts.cwd, ".claude", "settings.json"));
-    if (opts.loadLocal) settingsFile("local", join(opts.cwd, ".claude", "settings.local.json"));
+    settingsFile("project", pa.join(opts.cwd, ".claude", "settings.json"));
+    if (opts.loadLocal) settingsFile("local", pa.join(opts.cwd, ".claude", "settings.local.json"));
   }
   for (const p of opts.plugins) {
     if (!p.path || p.path === "builtin") continue;
-    const path = join(p.path, "hooks", "hooks.json");
+    const path = pa.join(p.path, "hooks", "hooks.json");
     const text = read(path);
     if (text === null) continue;
     let data: Raw | null = null;
