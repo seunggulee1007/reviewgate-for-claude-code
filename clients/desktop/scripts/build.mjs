@@ -1,8 +1,10 @@
-// Builds dist/main/main.mjs (ESM, engine bundled, SDK external), dist/main/preload.cjs and dist/renderer/ (vite).
+// Builds dist/main/main.mjs (ESM, engine bundled, SDK external), dist/main/preload.cjs, dist/renderer/ (vite) and
+// lsp-dist/lsp (the language server for JS / TS / Vue, docs/PROTOCOL.md §73; electron-builder ships it as resources/lsp).
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
 import { fileURLToPath } from "node:url";
 import { rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const enginePath = fileURLToPath(new URL("../../../engine/src/index.ts", import.meta.url));
@@ -35,4 +37,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   await rm(`${root}dist`, { recursive: true, force: true });
   await buildMain();
   await viteBuild({ configFile: `${root}vite.config.ts`, logLevel: "info" });
+  execFileSync(process.execPath, [fileURLToPath(new URL("../../../scripts/build-lsp.mjs", import.meta.url)), `${root}lsp-dist/lsp`], { stdio: "inherit" });
 }

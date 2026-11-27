@@ -27,6 +27,10 @@ asarUnpack:
 extraResources:
   - from: THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
+  # §73: the language server for JS / TS / Vue (scripts/build-lsp.mjs via scripts/build.mjs): real files outside app.asar,
+  # so tsserver reads its lib.*.d.ts and loads the Vue plugin from disk; main hands resources/lsp to the engine.
+  - from: lsp-dist/lsp
+    to: lsp
 # The engine spawns external `claude` / `gh` / `git` from PATH (or the Settings overrides); nothing is bundled.
 win:
   files:

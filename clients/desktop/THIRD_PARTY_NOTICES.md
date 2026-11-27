@@ -11,6 +11,17 @@ licence quoted below. The other dependencies (Electron, React, Monaco, …) carr
 | @xterm/xterm | 6.0.0 | MIT | bundled into the renderer |
 | @xterm/addon-fit, -webgl, -unicode11, -web-links, -search, -clipboard | 0.11.0, 0.19.0, 0.9.0, 0.12.0, 0.16.0, 0.2.0 | MIT | bundled into the renderer |
 | js-base64 (used by @xterm/addon-clipboard) | 3.x | BSD-3-Clause | bundled into the renderer |
+| TypeScript (tsserver, the language server for go to definition — docs/PROTOCOL.md §73) | 6.0.3 | Apache-2.0, with its ThirdPartyNoticeText | `resources/lsp/node_modules/typescript` (its `LICENSE.txt` and `ThirdPartyNoticeText.txt` there) |
+| @vue/typescript-plugin, @vue/language-core, vue-component-meta (Vue language tools) | 3.3.14 | MIT | bundled into `resources/lsp/node_modules/@vue/typescript-plugin/index.js` |
+| @volar/typescript, @volar/language-core, @volar/source-map | 2.4.30 | MIT | the same bundle |
+| @vue/compiler-core, @vue/compiler-dom, @vue/shared | 3.5.x | MIT | the same bundle |
+| @babel/parser | 7.x | MIT | the same bundle |
+| source-map-js | 1.x | BSD-3-Clause | the same bundle |
+| entities | 7.x | BSD-2-Clause | the same bundle |
+| alien-signals, muggle-string, path-browserify, picomatch, estree-walker | as bundled | MIT | the same bundle |
+
+The language server's components are listed with their exact versions and full licence texts in `resources/lsp/LICENSES.md`,
+written by `scripts/build-lsp.mjs` from the packages that went into the build.
 
 ---
 
