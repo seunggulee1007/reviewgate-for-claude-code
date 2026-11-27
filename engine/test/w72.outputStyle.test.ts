@@ -1,5 +1,5 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import path, { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { canonicalStyle, listOutputStyles, outputStyleSetIn, projectStyleDirs, styleFrontmatter } from "../src/session/outputStyles.js";
 import { NO_MANAGED_POLICY } from "../src/statusline/managed.js";
@@ -20,29 +20,43 @@ const temp = (name: string): string => {
   return d;
 };
 
+/** The same logic on POSIX and Windows path rules, whatever the host (a Windows runner has no `/work/acme`). */
+const LAYOUTS = [
+  { name: "posix", pa: path.posix, cfg: "/Users/dev/.claude", root: "/work/acme", plug: "/plugins" },
+  { name: "win32", pa: path.win32, cfg: "C:\\Users\\dev\\.claude", root: "C:\\work\\acme", plug: "C:\\plugins" },
+];
+
 describe("§72.2 the styles (pure)", () => {
   it("reads a style file's name and description from its frontmatter", () => {
     expect(styleFrontmatter("---\nname: Diagrams first\ndescription: \"Lead with a diagram\"\nkeep-coding-instructions: true\n---\nBody")).toEqual({ name: "Diagrams first", description: "Lead with a diagram" });
     expect(styleFrontmatter("no frontmatter")).toEqual({});
   });
 
-  it("walks .claude/output-styles from the folder up to the repository, closest first", () => {
-    expect(projectStyleDirs("/work/acme/app/web", "/work/acme")).toEqual([
-      "/work/acme/app/web/.claude/output-styles", "/work/acme/app/.claude/output-styles", "/work/acme/.claude/output-styles",
-    ]);
+  it.each(LAYOUTS)("walks .claude/output-styles from the folder up to the repository, closest first ($name paths)", ({ pa, root }) => {
+    const at = pa.join;
+    expect(projectStyleDirs(at(root, "app", "web"), root, pa)).toEqual([at(root, "app", "web", ".claude", "output-styles"), at(root, "app", ".claude", "output-styles"), at(root, ".claude", "output-styles")]);
+    expect(projectStyleDirs(root, root, pa)).toEqual([at(root, ".claude", "output-styles")]);
   });
 
-  it("explains the CLI's names: built-ins first, then each file's source and description", () => {
+  it("stops at the repository whatever the case of a Windows drive or folder, and at the drive root", () => {
+    expect(projectStyleDirs("c:\\work\\acme\\app", "C:\\Work\\Acme", path.win32)).toEqual(["c:\\work\\acme\\app\\.claude\\output-styles", "c:\\work\\acme\\.claude\\output-styles"]);
+    expect(projectStyleDirs("C:\\work\\acme", "D:\\other", path.win32)).toEqual(["C:\\work\\acme\\.claude\\output-styles", "C:\\work\\.claude\\output-styles", "C:\\.claude\\output-styles"]);
+    // POSIX paths stay case-sensitive.
+    expect(projectStyleDirs("/work/Acme/app", "/work/acme", path.posix).at(-1)).toBe("/.claude/output-styles");
+  });
+
+  it.each(LAYOUTS)("explains the CLI's names: built-ins first, then each file's source and description ($name paths)", ({ pa, cfg, root, plug }) => {
+    const at = pa.join;
     const files: Record<string, string> = {
-      "/work/acme/.claude/output-styles/review.md": "---\ndescription: Short reviews\n---\n",
-      "/Users/dev/.claude/output-styles/diagrams.md": "---\nname: Diagrams first\ndescription: Lead with a diagram\n---\n",
-      "/plugins/teach/output-styles/tutor.md": "---\ndescription: Step by step\n---\n",
+      [at(root, ".claude", "output-styles", "review.md")]: "---\ndescription: Short reviews\n---\n",
+      [at(cfg, "output-styles", "diagrams.md")]: "---\nname: Diagrams first\ndescription: Lead with a diagram\n---\n",
+      [at(plug, "teach", "output-styles", "tutor.md")]: "---\ndescription: Step by step\n---\n",
     };
-    const list = (d: string) => Object.keys(files).filter((p) => p.startsWith(`${d}/`)).map((p) => p.slice(d.length + 1));
+    const list = (d: string) => Object.keys(files).filter((p) => pa.dirname(p) === d).map((p) => pa.basename(p));
     const styles = listOutputStyles({
       available: ["Diagrams first", "default", "Explanatory", "review", "tutor", "Mystery", "Learning", "Concise", "Proactive"],
-      configDir: "/Users/dev/.claude", cwd: "/work/acme", root: "/work/acme", plugins: [{ name: "teach", path: "/plugins/teach" }], managedDir: null,
-      read: (p) => files[p] ?? null, list,
+      configDir: cfg, cwd: root, root, plugins: [{ name: "teach", path: at(plug, "teach") }], managedDir: null,
+      read: (p) => files[p] ?? null, list, pathApi: pa,
     });
     expect(styles).toEqual([
       { name: "default", description: null, source: "builtin" },
@@ -50,21 +64,25 @@ describe("§72.2 the styles (pure)", () => {
       { name: "Concise", description: null, source: "builtin" },
       { name: "Explanatory", description: null, source: "builtin" },
       { name: "Learning", description: null, source: "builtin" },
-      { name: "Diagrams first", description: "Lead with a diagram", source: "user", path: "/Users/dev/.claude/output-styles/diagrams.md" },
-      { name: "review", description: "Short reviews", source: "project", path: "/work/acme/.claude/output-styles/review.md" },
-      { name: "tutor", description: "Step by step", source: "plugin", path: "/plugins/teach/output-styles/tutor.md", plugin: "teach" },
+      { name: "Diagrams first", description: "Lead with a diagram", source: "user", path: at(cfg, "output-styles", "diagrams.md") },
+      { name: "review", description: "Short reviews", source: "project", path: at(root, ".claude", "output-styles", "review.md") },
+      { name: "tutor", description: "Step by step", source: "plugin", path: at(plug, "teach", "output-styles", "tutor.md"), plugin: "teach" },
       { name: "Mystery", description: null, source: "other" },
     ]);
   });
 
-  it("finds the file whose outputStyle applies: managed, local, project, user", () => {
+  it.each(LAYOUTS)("finds the file whose outputStyle applies: managed, local, project, user ($name paths)", ({ pa, cfg, root }) => {
+    const at = pa.join;
     const read = (m: Record<string, unknown>) => (p: string) => (p in m ? JSON.stringify(m[p]) : null);
-    const base = { configDir: "/Users/dev/.claude", cwd: "/work/acme", loadUser: true, loadLocal: true, managed: null, managedPath: null };
-    const all = { "/Users/dev/.claude/settings.json": { outputStyle: "Concise" }, "/work/acme/.claude/settings.json": { outputStyle: "Learning" }, "/work/acme/.claude/settings.local.json": { outputStyle: "Explanatory" } };
-    expect(outputStyleSetIn({ ...base, read: read(all) })).toEqual({ source: "local", path: "/work/acme/.claude/settings.local.json", value: "Explanatory" });
+    const base = { configDir: cfg, cwd: root, loadUser: true, loadLocal: true, managed: null, managedPath: null, pathApi: pa };
+    const user = at(cfg, "settings.json");
+    const project = at(root, ".claude", "settings.json");
+    const local = at(root, ".claude", "settings.local.json");
+    const all = { [user]: { outputStyle: "Concise" }, [project]: { outputStyle: "Learning" }, [local]: { outputStyle: "Explanatory" } };
+    expect(outputStyleSetIn({ ...base, read: read(all) })).toEqual({ source: "local", path: local, value: "Explanatory" });
     expect(outputStyleSetIn({ ...base, loadLocal: false, read: read(all) })?.source).toBe("project");
-    expect(outputStyleSetIn({ ...base, read: read({ "/Users/dev/.claude/settings.json": { outputStyle: "Concise" } }) })?.source).toBe("user");
-    expect(outputStyleSetIn({ ...base, loadUser: false, read: read({ "/Users/dev/.claude/settings.json": { outputStyle: "Concise" } }) })).toBeNull();
+    expect(outputStyleSetIn({ ...base, read: read({ [user]: { outputStyle: "Concise" } }) })?.source).toBe("user");
+    expect(outputStyleSetIn({ ...base, loadUser: false, read: read({ [user]: { outputStyle: "Concise" } }) })).toBeNull();
     expect(outputStyleSetIn({ ...base, managed: { outputStyle: "Concise" }, managedPath: "/m.json", read: read(all) })).toEqual({ source: "managed", path: "/m.json", value: "Concise" });
   });
 
