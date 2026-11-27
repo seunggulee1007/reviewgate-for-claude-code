@@ -265,6 +265,8 @@ public final class AppState {
     /// The folder an open / switch is on its way to, until the engine has answered: the empty window says "Opening <name>…",
     /// and a `project_open_failed` banner offers to try it again. A newer open replaces it (`beginOpening`).
     public internal(set) var openingProject: URL?
+    /// §74: the running clone's latest step (nil: none running) — the clone sheet's progress bar (Session/CloneProject.swift).
+    public internal(set) var cloneProgress: ProjectCloneProgress?
     @ObservationIgnored private var openingTick = 0
     /// §19.6: a transient status (`api_retrying` "재시도 중 (2/10)…", `cli_start_slow`) shown in the HUD — not a banner;
     /// it goes away when the turn makes progress, ends or the session has started.
@@ -2428,6 +2430,10 @@ public final class AppState {
             break
         case .taskFetched, .projectName, .projectCreated, .projectMatches:   // §63 / §69 replies, consumed by the request that asked
             break
+        case .projectClonePreview, .projectCloned:   // §74 replies, consumed by the request that asked
+            break
+        case let .projectCloneProgress(progress):   // §74: the clone sheet's bar
+            applyCloneProgress(progress)
         case .fetched, .pulled, .commitOthers:   // MARK: git-sync — §68 replies, consumed by the request that asked
             break
         }

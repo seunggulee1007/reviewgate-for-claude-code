@@ -72,7 +72,7 @@ import Testing
         #expect(ProjectMatchesReply(guess: "/work/acme/b").preselect(in: recent) == "/work/acme/b")
         #expect(ProjectMatchesReply(guess: "/elsewhere").preselect(in: recent) == "/work/acme/a")
         #expect(ProjectMatchesReply().preselect(in: []) == nil)
-        #expect(NoProjectChoice.new.moved(-1) == .new && NoProjectChoice.new.moved(1) == .task && NoProjectChoice.open.moved(1) == .open)
+        #expect(NoProjectChoice.new.moved(-1) == .new && NoProjectChoice.new.moved(1) == .task && NoProjectChoice.open.moved(1) == .clone && NoProjectChoice.clone.moved(1) == .clone)
     }
 
     @Test func createSendsTheParentAndPutsThePromptInTheComposerNeverSent() async {

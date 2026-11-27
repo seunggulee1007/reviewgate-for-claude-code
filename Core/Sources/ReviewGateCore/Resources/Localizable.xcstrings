@@ -2673,6 +2673,22 @@
         }
       }
     },
+    "Another clone is running — wait for it or cancel it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another clone is running — wait for it or cancel it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 clone이 진행 중이에요 — 끝나길 기다리거나 취소해 주세요"
+          }
+        }
+      }
+    },
     "Another revert is in progress — try again in a moment": {
       "localizations": {
         "en": {
@@ -3837,6 +3853,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "브랜치를 체크아웃해야 rebase할 수 있어요 (HEAD가 분리됨)"
+          }
+        }
+      }
+    },
+    "Checking out files…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking out files…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일을 체크아웃하는 중…"
           }
         }
       }
@@ -5719,6 +5751,22 @@
         }
       }
     },
+    "Clone cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone cancelled"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clone을 취소했어요"
+          }
+        }
+      }
+    },
     "Close": {
       "localizations": {
         "en": {
@@ -6099,6 +6147,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "완료"
+          }
+        }
+      }
+    },
+    "Compressing objects…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compressing objects…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "개체를 압축하는 중…"
           }
         }
       }
@@ -6727,6 +6791,22 @@
         }
       }
     },
+    "Could not reach the server — check the network or VPN, then try again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reach the server — check the network or VPN, then try again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "서버에 연결하지 못했어요 — 네트워크나 VPN을 확인하고 다시 시도해 주세요"
+          }
+        }
+      }
+    },
     "Could not read the issue": {
       "localizations": {
         "en": {
@@ -6947,6 +7027,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "요약을 만들지 못했어요: %@"
+          }
+        }
+      }
+    },
+    "Counting objects…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Counting objects…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "개체를 세는 중…"
           }
         }
       }
@@ -8823,6 +8919,22 @@
         }
       }
     },
+    "Receiving objects…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receiving objects…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "개체를 받는 중…"
+          }
+        }
+      }
+    },
     "Rename this chat": {
       "localizations": {
         "en": {
@@ -8835,6 +8947,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 채팅 이름을 바꿔요"
+          }
+        }
+      }
+    },
+    "Repository not found — check the link, and that your account can see it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository not found — check the link, and that your account can see it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소를 찾지 못했어요 — 주소가 맞는지, 내 계정으로 볼 수 있는 저장소인지 확인해 주세요"
           }
         }
       }
@@ -8867,6 +8995,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@에 초기화돼요"
+          }
+        }
+      }
+    },
+    "Resolving deltas…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolving deltas…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "델타를 처리하는 중…"
           }
         }
       }
@@ -9383,6 +9527,38 @@
         }
       }
     },
+    "Take the password or token out of the link — git signs in with your saved sign-in": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take the password or token out of the link — git signs in with your saved sign-in"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "주소에서 비밀번호나 토큰을 빼 주세요 — git이 저장된 로그인 정보로 로그인해요"
+          }
+        }
+      }
+    },
+    "That branch is not in the repository — leave Branch empty for its default branch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That branch is not in the repository — leave Branch empty for its default branch"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소에 그 브랜치가 없어요 — 기본 브랜치로 받으려면 브랜치를 비워 두세요"
+          }
+        }
+      }
+    },
     "That directory does not exist": {
       "localizations": {
         "en": {
@@ -9447,6 +9623,22 @@
         }
       }
     },
+    "That folder already exists — choose another folder name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That folder already exists — choose another folder name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "폴더가 이미 있어요 — 다른 폴더 이름을 정해 주세요"
+          }
+        }
+      }
+    },
     "That is a file, not a directory": {
       "localizations": {
         "en": {
@@ -9459,6 +9651,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "디렉터리가 아니라 파일이에요"
+          }
+        }
+      }
+    },
+    "That is not a branch name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That is not a branch name"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "브랜치 이름이 아니에요"
           }
         }
       }
@@ -9847,6 +10055,22 @@
         }
       }
     },
+    "This engine cannot clone yet — update ReviewGate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This engine cannot clone yet — update ReviewGate"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 엔진은 아직 clone할 수 없어요 — ReviewGate를 업데이트해 주세요"
+          }
+        }
+      }
+    },
     "This engine has no to-do checklist — update ReviewGate": {
       "localizations": {
         "en": {
@@ -9859,6 +10083,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이 엔진에는 할 일 목록이 없어요 — ReviewGate를 업데이트하세요"
+          }
+        }
+      }
+    },
+    "This is not a repository link — paste an https or SSH URL, or owner/repo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is not a repository link — paste an https or SSH URL, or owner/repo"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장소 주소가 아니에요 — https나 SSH 주소, 또는 owner/repo를 붙여 넣어 주세요"
           }
         }
       }
@@ -10307,6 +10547,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "업무 {id}: {title}\n{url}\n\n{mcp}\n\n{body}\n\n먼저 업무를 요약하고, 코드를 바꾸기 전에 계획을 알려 주세요."
+          }
+        }
+      }
+    },
+    "git clone failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone failed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone에 실패했어요"
+          }
+        }
+      }
+    },
+    "git clone failed: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone failed: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git clone에 실패했어요: %@"
+          }
+        }
+      }
+    },
+    "git could not sign in to this repository. For GitHub, run gh auth login in a terminal (it sets up git's sign-in too), or set up an SSH key.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git could not sign in to this repository. For GitHub, run gh auth login in a terminal (it sets up git's sign-in too), or set up an SSH key."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 저장소에 git으로 로그인하지 못했어요. GitHub라면 터미널에서 gh auth login을 실행하거나(git 로그인도 함께 설정돼요) SSH 키를 설정해 주세요."
+          }
+        }
+      }
+    },
+    "git stopped answering for 2 minutes — check the network, then try again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git stopped answering for 2 minutes — check the network, then try again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git이 2분 동안 응답이 없어요 — 네트워크를 확인하고 다시 시도해 주세요"
+          }
+        }
+      }
+    },
+    "git was not found — install it (xcode-select --install in Terminal), then try again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git was not found — install it (xcode-select --install in Terminal), then try again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git을 찾지 못했어요 — 터미널에서 xcode-select --install로 설치한 뒤 다시 시도해 주세요"
           }
         }
       }

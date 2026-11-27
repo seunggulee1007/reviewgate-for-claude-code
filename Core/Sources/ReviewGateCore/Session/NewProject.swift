@@ -109,13 +109,13 @@ public enum NewProjectText {
     }
 }
 
-/// §69 the three choices of the window with no project: 1 New, 2 Start from a task, 3 Open a folder.
+/// §69 / §74 the four choices of the window with no project: 1 New, 2 Start from a task, 3 Open a folder, 4 Clone from Git.
 public enum NoProjectChoice: Int, CaseIterable, Sendable {
-    case new = 1, task, open
+    case new = 1, task, open, clone
 
     /// ← → ↑ ↓ move the mark, stopping at either end.
     public func moved(_ delta: Int) -> NoProjectChoice {
-        NoProjectChoice(rawValue: max(1, min(3, rawValue + delta))) ?? self
+        NoProjectChoice(rawValue: max(1, min(NoProjectChoice.allCases.count, rawValue + delta))) ?? self
     }
 }
 
