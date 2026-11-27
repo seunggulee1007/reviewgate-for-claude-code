@@ -11984,3 +11984,69 @@ type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path
 - Engine: `session/outputStyles.ts` (`listOutputStyles`, `outputStyleSetIn`, `canonicalStyle`, `styleFrontmatter`,
   `projectStyleDirs`), `session/claude.ts` (`output_style_info`, `setOutputStyle`, `reloadOutputStyles`), `engine.ts`
   (`noteOutputStyle`, `outputStyles`, `setOutputStyle`, `slices()`), `protocol.ts`. Tests: `engine/test/w72.outputStyle.test.ts`.
+
+### 72.3 `/plugin` and `/reload-plugins` — plugins and marketplaces
+
+```ts
+// commands (lane plugin: `claude plugin …` may clone for minutes — never behind or holding up a turn)
+plugins_list {}                                                 // → plugins_list
+plugin_run { action: PluginAction; target: string; scope?: "user" | "project" | "local" }   // → plugin_result
+plugins_reload { force?: boolean }                              // → plugins_reloaded
+type PluginAction = "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace_add" | "marketplace_remove" | "marketplace_update";
+type PluginsListEvent = { type: "plugins_list"; installed: PluginInstalled[]; available: PluginAvailable[]; marketplaces: MarketplaceInfo[]; error?: string };
+type PluginInstalled = { id: string; name: string; marketplace: string | null; version: string; scope: string; enabled: boolean;
+                         installPath?: string; projectPath?: string; errors?: string[]; notes?: string[]; appOff?: true };
+type PluginAvailable = { id: string; name: string; marketplace: string; description?: string; version?: string; installCount?: number };
+type MarketplaceInfo = { name: string; source: string; repo?: string; url?: string; path?: string; ref?: string; installLocation?: string };
+type PluginResultEvent = { type: "plugin_result"; action: PluginAction; target: string; ok: boolean; message: string; output: string };
+type PluginsReloadedEvent = { type: "plugins_reloaded"; applied: boolean; held: boolean;
+  cacheImpact?: { mcpServersAdded: string[]; mcpServersRemoved: string[]; lspToolChange: string | null };
+  plugins: number; skills: number; agents: number; hooks: number; mcpServers: number; errors: number };
+```
+
+- **As the terminal's.** The commands reference: "`/plugin [subcommand]` — Manage Claude Code plugins. Run with no
+  argument to open the plugin menu, or pass a subcommand such as `list`, `install`, `enable`, or `disable`", and
+  "`/reload-plugins [--force]` — Reload all active plugins to apply pending changes without restarting … When the reload
+  would change which MCP tools are loaded and invalidate the prompt cache, the command warns and skips unless you pass
+  `--force`. Also available in non-interactive mode (`-p`), the Agent SDK, and the desktop app". The plugin commands
+  reference: "`/plugin` … You can run these commands only in an interactive terminal session. In a non-interactive run
+  such as `claude -p`, Claude Code replies that `/plugin` isn't available in this environment" — so stream-json has no
+  `/plugin`, but every action of its panel exists as a shell command: `claude plugin list --json [--available]`,
+  `claude plugin install | uninstall | enable | disable | update <plugin> [-s user|project|local] --json`,
+  `claude plugin marketplace add <source> | remove <name> | update <name> [--scope …] --json`, "they change the same
+  settings the `/plugin` panel does".
+- **The engine runs exactly those**, without a shell, in the project folder (its project and local installs), with the
+  CLI ReviewGate found (`execClaude`, the same runner as `claude mcp add`, §22). `plugins_list` answers
+  `installed` (each `PluginInstalled` from the list's `id`, `version`, `scope`, `enabled`, `installPath` /
+  `readFromFolder`, `projectPath`, `errors`, `notes`; `appOff` when ReviewGate's own per-plugin switch has it off, §16),
+  `available` (the marketplaces' plugins not installed: `pluginId`, `name`, `marketplaceName`, `description`, `version`,
+  `installCount`) and `marketplaces`. A CLI that cannot list answers `error` with empty lists (an older CLI's array form
+  without `--available` is read too).
+- **`plugin_run`** returns the CLI's own words: the `--json` result line's `outcome` / `message` ("parse only that line"),
+  else the exit status and the first line printed, with `output` (stdout + stderr, ≤ 8 KB) for the clients to show. An
+  enable or disable that is already so (`alreadyInGoalState`) is done. The CLI's failure is `ok: false`, not a refusal.
+  Refused before anything runs: `invalid_plugin_action`, `invalid_plugin_target` (empty, more than one line, longer than
+  500 characters, or starting with `-`, so never read as an option), `invalid_plugin_scope`, `no_project` (project / local
+  scope without one), `cli_not_found`. Timeouts: 180 s for install, update and the marketplace add / update (a clone), 30 s
+  otherwise. Without a terminal the CLI refuses a plugin whose marketplace runs a command to install it ("the install is
+  refused. The output says the command was only displayed") — ReviewGate never passes `-y`; the output says to install it
+  in a terminal.
+- **Applying the change.** As the terminal ("When you close the `/plugin` panel with pending changes … Claude Code runs
+  `/reload-plugins` for you"): the running session picks it up through §36.5's plugin sync (the files changed → the CLI
+  reloads once no turn runs, held when it would change the conversation's tools). `plugins_reload` is the explicit
+  `/reload-plugins`: `Query.reloadPlugins({holdOnCacheImpact: true})` — with `force`, without the hold — and the reload's
+  commands, plugins and hooks replace the session's (the palette, Applied extensions, `/hooks`). The reply has the
+  terminal's summary counts (`Reloaded: N plugins · N skills · N agents · N hooks · N plugin MCP servers`, `errors` = the
+  CLI's `error_count`); `held: true` with `cacheImpact` (the plugin MCP servers it would add or drop) when it was not
+  applied. Refused: `no_session`, `turn_running` (as the terminal queues it until the turn ends), `plugins_reloading`,
+  `plugins_reload_unsupported`, `plugins_reload_failed:<why>`. In the SDK the reload "doesn't connect or disconnect plugin
+  MCP servers. Those changes take effect in your next session."
+- **Enable / disable here are the CLI's** (`enabledPlugins` in the settings file of the scope that lists the plugin, as
+  the terminal's Installed tab). ReviewGate's own per-plugin switch (§16, Settings › Extensions — the flag layer, for app
+  sessions only) stays; a plugin it has off is `appOff` and stays off in the app whatever the settings say.
+- **Not built, with why:** the panel's Discover search and the Errors tab are the same lists here (each plugin's
+  `errors` / `notes`); `configure` (a plugin's `userConfig` dialog), `details` (token cost), `prune`, `validate`, `tag`
+  and the marketplace's auto-update toggle — interactive or authoring commands with no `--json` result to show.
+- Engine: `session/pluginCli.ts` (`pluginRunArgs`, `parsePluginList`, `parseMarketplaces`, `pluginRunOutcome`,
+  `reloadCounts`), `session/claude.ts` (`reloadPluginsNow`), `engine.ts` (`execClaude`, `pluginsList`, `pluginRun`,
+  `pluginsReload`, `applyPluginReload`), `protocol.ts`. Tests: `engine/test/w72.plugins.test.ts`.

@@ -768,6 +768,15 @@ export type EngineCommand =
    * `.claude/settings.local.json`, live from the next message, as the terminal's command → `output_styles`.
    */
   | Cmd<"output_style_set", { name: string }>
+  /** §72.3 `/plugin`: installed plugins, the ones the marketplaces offer, and the marketplaces → `plugins_list`. */
+  | Cmd<"plugins_list">
+  /**
+   * §72.3: one of the CLI's own plugin commands (`claude plugin <action> <target> [--scope] --json`, never a shell) →
+   * `plugin_result`. The clients confirm install, uninstall and the marketplace changes before they send it.
+   */
+  | Cmd<"plugin_run", { action: PluginAction; target: string; scope?: "user" | "project" | "local" }>
+  /** §72.3 `/reload-plugins [--force]`: the session's plugins from disk again → `plugins_reloaded`. */
+  | Cmd<"plugins_reload", { force?: boolean }>
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -2292,6 +2301,54 @@ export type OutputStylesEvent = {
   canSet: boolean;
   why?: "no_session" | "local_settings_off" | "unsupported";
 };
+/** §72.3: what `plugin_run` asks the CLI to do (`marketplace_*`: `claude plugin marketplace <verb>`). */
+export type PluginAction = "install" | "uninstall" | "enable" | "disable" | "update" | "marketplace_add" | "marketplace_remove" | "marketplace_update";
+/** §72.3: an installed plugin, as `claude plugin list --json` reports it. */
+export type PluginInstalled = {
+  /** `name@marketplace` (`@inline`, `@skills-dir`, `@synced` for the other origins). */
+  id: string;
+  name: string;
+  marketplace: string | null;
+  version: string;
+  /** `user` | `project` | `local` | `managed` | `session` | `synced`. */
+  scope: string;
+  /** Enabled in the merged settings. */
+  enabled: boolean;
+  installPath?: string;
+  projectPath?: string;
+  errors?: string[];
+  notes?: string[];
+  /** Off in ReviewGate (`settings.disabledPlugins`, §16) whatever the settings say. */
+  appOff?: true;
+};
+/** §72.3: a plugin a marketplace offers that is not installed (`--available`). */
+export type PluginAvailable = { id: string; name: string; marketplace: string; description?: string; version?: string; installCount?: number };
+/** §72.3: a configured marketplace (`claude plugin marketplace list --json`). */
+export type MarketplaceInfo = { name: string; source: string; repo?: string; url?: string; path?: string; ref?: string; installLocation?: string };
+/** §72.3: reply to `plugins_list`; `error` — the CLI could not list (not found, an older CLI without `--json`). */
+export type PluginsListEvent = { type: "plugins_list"; id?: string; installed: PluginInstalled[]; available: PluginAvailable[]; marketplaces: MarketplaceInfo[]; error?: string };
+/**
+ * §72.3: reply to `plugin_run` — the CLI's own words (`message`, its `--json` result) and what it printed (`output`,
+ * ≤ 8 KB). A refused or failed command is `ok: false` here, not a refusal: the clients show its output.
+ */
+export type PluginResultEvent = { type: "plugin_result"; id?: string; action: PluginAction; target: string; ok: boolean; message: string; output: string };
+/**
+ * §72.3: reply to `plugins_reload` — the terminal's summary counts. `held`: not applied, it would change the tools this
+ * conversation's prompt cache depends on (`cacheImpact`: the plugin MCP servers it would add or drop); `force` applies it.
+ */
+export type PluginsReloadedEvent = {
+  type: "plugins_reloaded";
+  id?: string;
+  applied: boolean;
+  held: boolean;
+  cacheImpact?: { mcpServersAdded: string[]; mcpServersRemoved: string[]; lspToolChange: string | null };
+  plugins: number;
+  skills: number;
+  agents: number;
+  hooks: number;
+  mcpServers: number;
+  errors: number;
+};
 /** §70.3: `copy_response`'s reply. */
 export type ResponseTextEvent = { type: "response_text"; id?: string; n: number; text: string };
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
@@ -2469,6 +2526,7 @@ export type EngineEvent =
   | ChatExportEvent | ResponseTextEvent // §70.3
   | HooksListEvent // §72.1
   | OutputStylesEvent // §72.2
+  | PluginsListEvent | PluginResultEvent | PluginsReloadedEvent // §72.3
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
@@ -2582,6 +2640,9 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "copy_response" } ? ResponseTextEvent
   : C extends { type: "hooks_list" } ? HooksListEvent // §72.1
   : C extends { type: "output_styles" | "output_style_set" } ? OutputStylesEvent // §72.2
+  : C extends { type: "plugins_list" } ? PluginsListEvent // §72.3
+  : C extends { type: "plugin_run" } ? PluginResultEvent
+  : C extends { type: "plugins_reload" } ? PluginsReloadedEvent
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
@@ -2611,6 +2672,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | ChatExportEvent | ResponseTextEvent // §70.3
   | HooksListEvent // §72.1
   | OutputStylesEvent // §72.2
+  | PluginsListEvent | PluginResultEvent | PluginsReloadedEvent // §72.3
   | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow

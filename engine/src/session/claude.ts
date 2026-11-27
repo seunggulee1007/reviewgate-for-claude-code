@@ -188,6 +188,14 @@ export type PermissionSettings = Pick<SessionSettings, "autoAllowReadOnlyBash" |
 /** The surface `ReviewEngine` drives; `FakeClaudeSession` in tests implements it too. */
 /** §36.5: what `reloadPlugins` gives back (the commands raw, as `commands_info` carries them). */
 export type PluginReload = { commands: unknown; plugins: { name: string; path: string; version?: string }[] };
+/** §72.3: what `/reload-plugins` reports — the reload (or why it was held) with the counts the terminal's summary shows. */
+export type PluginReloadReport = PluginReload & {
+  held: boolean;
+  cacheImpact?: { mcpServersAdded: string[]; mcpServersRemoved: string[]; lspToolChange: string | null };
+  agents: number;
+  mcpServers: string[];
+  errorCount: number;
+};
 
 /** §50.3: what became of a take-back (`ClaudeSessionLike.takeBackSteer`). */
 export type SteerTakeBack = "taken" | "read" | "kept";
@@ -249,6 +257,11 @@ export interface ClaudeSessionLike {
    * conversation's prompt cache depends on): the refreshed commands and plugins, or null when the CLI held the reload.
    */
   reloadPlugins?(): Promise<PluginReload | null>;
+  /**
+   * §72.3 `/reload-plugins [--force]`: as `reloadPlugins`, with the report — held (not applied) when it would change the
+   * conversation's tools unless `force`. Absent on doubles without it.
+   */
+  reloadPluginsNow?(force: boolean): Promise<PluginReloadReport>;
   /** §25: `Query.setModel` (null = the CLI's default model). */
   setModel?(model: string | null): Promise<void>;
   /** §25: the flag-settings `effortLevel` (null = the model's default). */
@@ -1073,6 +1086,25 @@ export class ClaudeSession implements ClaudeSessionLike {
     const r = await q.reloadPlugins({ holdOnCacheImpact: true });
     if (r.held === true) return null;
     return { commands: r.commands, plugins: (r.plugins ?? []).map((p) => ({ name: p.name, path: p.path, ...(p.version ? { version: p.version } : {}) })) };
+  }
+
+  /** §72.3: see `ClaudeSessionLike.reloadPluginsNow`. */
+  async reloadPluginsNow(force: boolean): Promise<PluginReloadReport> {
+    const q = this.requireQuery();
+    if (typeof q.reloadPlugins !== "function") throw new Error("plugins_reload_unsupported");
+    const r = await q.reloadPlugins(force ? undefined : { holdOnCacheImpact: true });
+    const impact = r.cache_impact;
+    return {
+      commands: r.commands,
+      plugins: (r.plugins ?? []).map((p) => ({ name: p.name, path: p.path, ...(p.version ? { version: p.version } : {}) })),
+      held: r.held === true,
+      ...(r.held === true && impact
+        ? { cacheImpact: { mcpServersAdded: [...(impact.mcp_servers_added ?? [])], mcpServersRemoved: [...(impact.mcp_servers_removed ?? [])], lspToolChange: impact.lsp_tool_change ?? null } }
+        : {}),
+      agents: Array.isArray(r.agents) ? r.agents.length : 0,
+      mcpServers: Array.isArray(r.mcpServers) ? r.mcpServers.map((s) => s.name).filter((n): n is string => typeof n === "string") : [],
+      errorCount: typeof r.error_count === "number" ? r.error_count : 0,
+    };
   }
 
   mcpServerStatus(): Promise<McpServerStatus[]> {
