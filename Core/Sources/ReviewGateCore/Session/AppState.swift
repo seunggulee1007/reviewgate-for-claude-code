@@ -166,6 +166,8 @@ public final class AppState {
     /// (what the Navigate menu reads, so its progress does not rebuild the menu bar).
     public private(set) var navIndex: NavIndexState?
     public private(set) var navIndexBuilding = false
+    /// MARK: lsp — §73.2: whether the language server is starting (`state.nav.lsp.status`) — the lookup line says so.
+    public private(set) var navLspStarting = false
     /// What the Review / Workbenches / Chat menus show (`MenuState`), written only when it differs.
     public private(set) var menuState = MenuState()
     public internal(set) var transcript: [ChatItem] = [] {
@@ -1412,6 +1414,14 @@ public final class AppState {
         fire(.setSettings(EngineSettings(commitPushByDefault: pushByDefault, commitTrailer: trailer)))
     }
 
+    /// MARK: lsp — `set_settings{languageServer}` (§73) on a running engine (Settings › Review › Diff).
+    public func updateLanguageServer(_ on: Bool) {
+        guard engineStarted else { return }
+        var settings = EngineSettings()
+        settings.languageServer = on
+        fire(.setSettings(settings))
+    }
+
     /// MARK: git-sync — `set_settings{autoFetch}` (§68.4) on a running engine (Settings › Git).
     public func updateAutoFetch(_ on: Bool) {
         guard engineStarted else { return }
@@ -2563,6 +2573,7 @@ public final class AppState {
         put(\.autoAcceptRules, s.autoAcceptRules ?? .none)
         put(\.navIndex, s.nav?.index)   // MARK: ide-nav (§65.1)
         put(\.navIndexBuilding, s.nav?.index.isBuilding ?? false)
+        put(\.navLspStarting, s.nav?.lsp?.status == .starting)   // MARK: lsp (§73.2)
         return changed
     }
 

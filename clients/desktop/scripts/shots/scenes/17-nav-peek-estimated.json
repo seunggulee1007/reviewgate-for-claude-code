@@ -1,0 +1,32 @@
+{
+  "extends": "04-review.json",
+  "name": "nav-peek-estimated",
+  "description": "§73.5: F12 on a name while the language server still starts — the search's candidates in the peek list, labelled 추정 (estimated) with why.",
+  "state": {
+    "nav": {
+      "index": { "status": "idle", "files": 0, "symbols": 0, "truncated": false, "builtAt": null },
+      "lsp": { "status": "starting" }
+    }
+  },
+  "replies": {
+    "find_definition": {
+      "type": "definitions",
+      "symbol": "subtotal",
+      "candidates": [
+        { "path": "src/checkout/discount.ts", "line": 6, "column": 17, "kind": "function", "preview": "export function subtotal(items: Item[]): number {", "score": 175 },
+        { "path": "src/legacy/cart.js", "line": 14, "column": 10, "kind": "function", "preview": "function subtotal(rows) {", "score": 115 }
+      ],
+      "truncated": false,
+      "source": "grep",
+      "fallback": "starting"
+    }
+  },
+  "steps": [
+    { "click": "File src/checkout/discount.ts" },
+    { "waitFor": { "selector": ".unified-pane[data-nav-path=\"src/checkout/discount.ts\"] .line[data-side=\"new\"][data-line=\"12\"] .text" }, "timeoutMs": 6000 },
+    { "select": { "text": "subtotal", "within": ".unified-pane[data-nav-path] .line[data-side=\"new\"][data-line=\"12\"] .text" } },
+    { "key": "F12" },
+    { "waitFor": "Definition peek" },
+    { "wait": 400 }
+  ]
+}

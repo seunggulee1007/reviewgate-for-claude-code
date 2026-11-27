@@ -98,6 +98,8 @@ export type AppSettings = {
   openInIde?: IdeKind;
   /** §65.8 Settings › Review › Code navigation: Ctrl+click a name peeks its definition in place, or goes to it (absent: peek). */
   navCtrlClick?: "peek" | "jump";
+  /** MARK: lsp — §73.5 Settings › Review › Code navigation: Go to Definition / Find References of JS / TS / Vue ask the bundled language server (absent: on). */
+  languageServer?: boolean;
   /** M12: "Push to origin" default in the commit dialog. */
   commitPushByDefault: boolean;
   /** M12: trailer line appended to every commit message ("" → none). */
@@ -367,7 +369,11 @@ export type NotifyTarget = { chatId?: string; requestId?: string };
 /** `rg:notificationClick` (main → the window that posted it, already in front): the notification the user clicked. */
 export type NotificationClick = { kind: NotifyKind; target?: NotifyTarget };
 
-export type ToolchainInfo = { platform: NodeJS.Platform; electron: string; node: string; chrome: string };
+export type ToolchainInfo = {
+  platform: NodeJS.Platform; electron: string; node: string; chrome: string;
+  /** MARK: lsp — §73.4: whether this build carries the language server (`resources/lsp`; the dev workspace when unpackaged). */
+  languageServer?: { available: boolean; typescript?: string };
+};
 
 /** `window.rg` — what the preload exposes (src/preload.ts). */
 export type McpConfigFileResult = { ok: boolean; mtime: number | null; error?: "refused" | "missing" | "failed" };

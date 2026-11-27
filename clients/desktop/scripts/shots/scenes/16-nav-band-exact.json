@@ -1,0 +1,48 @@
+{
+  "extends": "04-review.json",
+  "name": "nav-band-exact",
+  "description": "§73.5: Alt+F12 on a name in the diff — the peek band with the language server's answer, labelled 정확 (exact).",
+  "state": {
+    "nav": {
+      "index": { "status": "idle", "files": 0, "symbols": 0, "truncated": false, "builtAt": null },
+      "lsp": { "status": "ready", "typescript": { "version": "6.0.3", "source": "bundled" } }
+    }
+  },
+  "replies": {
+    "find_definition": {
+      "type": "definitions",
+      "symbol": "subtotal",
+      "candidates": [{ "path": "src/checkout/discount.ts", "line": 6, "column": 17, "kind": "function", "preview": "export function subtotal(items: Item[]): number {", "score": 1000 }],
+      "truncated": false,
+      "source": "lsp",
+      "quickInfo": { "display": "function subtotal(items: Item[]): number", "documentation": "The order total before any discount.", "kind": "function" }
+    },
+    "definition_preview": {
+      "type": "definition_preview",
+      "path": "src/checkout/discount.ts",
+      "line": 6,
+      "startLine": 5,
+      "lines": [
+        "/** The order total before any discount. */",
+        "export function subtotal(items: Item[]): number {",
+        "  return items.reduce((sum, i) => sum + i.price * i.qty, 0);",
+        "}",
+        "",
+        "/** The total after `discount`, never below zero. */",
+        "export function applyDiscount(items: Item[], discount: DiscountCode | null): number {"
+      ],
+      "totalLines": 37,
+      "language": "typescript",
+      "truncated": false,
+      "symbol": { "name": "subtotal", "kind": "function", "path": "src/checkout/discount.ts", "line": 6, "column": 17, "signature": "export function subtotal(items: Item[]): number" }
+    }
+  },
+  "steps": [
+    { "click": "File src/checkout/discount.ts" },
+    { "waitFor": { "selector": ".unified-pane[data-nav-path=\"src/checkout/discount.ts\"] .line[data-side=\"new\"][data-line=\"12\"] .text" }, "timeoutMs": 6000 },
+    { "select": { "text": "subtotal", "within": ".unified-pane[data-nav-path] .line[data-side=\"new\"][data-line=\"12\"] .text" } },
+    { "key": "F12", "alt": true },
+    { "waitFor": "Peek band title" },
+    { "wait": 400 }
+  ]
+}

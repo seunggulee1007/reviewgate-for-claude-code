@@ -11,6 +11,7 @@ import { createPlatform, ReviewEngine, type EngineEvent, type HelloCommand } fro
 import type { OpenWindow, WindowBounds } from "../shared/ipc.js";
 import type { E2EMode } from "./e2e.js";
 import { logLine } from "./log.js";
+import { lspDir } from "./lspDir.js"; // MARK: lsp (§73.4)
 import { forwardsToRenderer } from "./ipcGuard.js"; // §57.17
 import { syncFlowSettings } from "./flowSync.js"; // MARK: wave3 desktop-flow
 import { addRecentProject, engineSettings, loadSettings, saveSettings, setCachedCapabilities } from "./settings.js";
@@ -222,6 +223,7 @@ export function createWindow(opts: { project?: string; bounds?: WindowBounds; e2
     platform: createPlatform(process.platform),
     env: process.env as Record<string, string>,
     log: (level, msg) => logLine(prefix, level, msg),
+    ...((d) => (d ? { lspDir: d } : {}))(lspDir()), // MARK: lsp — §73.4: resources/lsp in the installed app
   });
   const wb = { win, engine, projectPath: null, projectRoot: null, closing: false } as Workbench;
   wb.pty = createWindowPtyHub({

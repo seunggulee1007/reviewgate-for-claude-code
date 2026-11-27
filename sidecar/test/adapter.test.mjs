@@ -32,7 +32,9 @@ test("v2: hello → ready(id) + state seq 1; shutdown → result + exit 0", { ti
   const tShutdown = Date.now();
   assert.equal(await exit, 0);
   const ready = out.find((m) => m.type === "ready");
-  assert.deepEqual({ ...ready, engineVersion: "x" }, { type: "ready", id: "h", engineVersion: "x", platform: process.platform, protocolVersion: 2 });
+  // §73: whether the language server is there (dist/lsp, else the dev workspace) — its shape only.
+  assert.equal(typeof ready.languageServer?.available, "boolean");
+  assert.deepEqual({ ...ready, engineVersion: "x", languageServer: undefined }, { type: "ready", id: "h", engineVersion: "x", platform: process.platform, protocolVersion: 2, languageServer: undefined });
   const state = out.find((m) => m.type === "state");
   assert.equal(state.state.seq, 1);
   assert.equal(state.state.gate.blockedReason, "no_session");

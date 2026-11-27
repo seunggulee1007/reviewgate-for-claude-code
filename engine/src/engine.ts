@@ -239,7 +239,9 @@ import { remoteBranches, type BranchSwitchBlocker } from "./git/branches.js";
 import { runGit } from "./git/exec.js";
 import { readProjectFile, searchProject } from "./files/browse.js"; // MARK: code-browser (§47)
 import { findDefinition, findReferences } from "./files/navigate.js"; // MARK: code-nav (§62)
-import { SymbolIndex } from "./files/symbolIndex.js"; // MARK: ide-nav (§65)
+import { gitFiles, SymbolIndex } from "./files/symbolIndex.js"; // MARK: ide-nav (§65)
+import { findBundle, type LspBundle } from "./lsp/locate.js"; // MARK: lsp (§73)
+import { LspService, type LspTiming } from "./lsp/service.js";
 import { definitionPreview } from "./files/symbols.js";
 import { cleanCommitDraft, COMMIT_DRAFT_DIFF_LINES, COMMIT_DRAFT_SUBJECTS, COMMIT_DRAFT_SYSTEM, commitDraftPrompt, renderCommitTemplate } from "./review/commitDraft.js";
 import { roundPatch } from "./review/roundPatch.js";
@@ -356,6 +358,11 @@ export type EngineOptions = {
   terminalPromptWaitMs?: number;
   /** §57.10: how many background terminals a window keeps (default `MAX_BACKGROUND_TERMINALS`; test seam). */
   maxBackgroundTerminals?: number;
+  // MARK: lsp
+  /** §73.4: the language server's bundle folder (Windows: `resources/lsp`); default `REVIEWGATE_LSP_DIR`, `lsp/` next to the engine file, the dev workspace. */
+  lspDir?: string;
+  /** §73: the language server's time budgets, idle and backoff (test seam). */
+  lspTiming?: LspTiming;
 };
 
 /** §57.10: the engine's own cap of background terminals per window (the Mac app ends the least recently shown past 4). */
@@ -797,6 +804,11 @@ export class ReviewEngine {
   private fileIndex: FileIndex | null = null;
   /** MARK: ide-nav — §65: the open project's symbol index (built on first use; refreshed where `fileIndex` is invalidated). */
   private symbolIndex: SymbolIndex | null = null;
+  /** MARK: lsp — §73: the open project's language server for JS / TS / Vue (started on first use). */
+  private lsp: LspService | null = null;
+  private lspBundleFound: LspBundle | null | undefined;
+  private readonly lspDir: string | undefined;
+  private readonly lspTiming: LspTiming | undefined;
   /** Turn checkpoints of the current chat (`<gitdir>/reviewgate/checkpoints/<chatId>.json`, §26). */
   private checkpoints: CheckpointFile = { version: 1, records: [] };
   /** The record of the running turn (null between turns). */
@@ -946,6 +958,8 @@ export class ReviewEngine {
       log: (level, msg) => this.log(level, msg),
       ...(opts.graphBuildTimeoutMs !== undefined ? { timeoutMs: opts.graphBuildTimeoutMs } : {}),
     });
+    this.lspDir = opts.lspDir; // MARK: lsp (§73)
+    this.lspTiming = opts.lspTiming;
     // MARK: wave6 w6-statusline — §44.2
     this.managedPolicyOverride = opts.managedPolicy;
     this.statusLine = new StatusLine({
@@ -1110,6 +1124,7 @@ export class ReviewEngine {
       this.cloneRun?.cancel(); // §74: nor a clone (its folder is removed)
       this.codeGraph.stop(); // MARK: wave5 w5-graph — §43.3: nor a graphify build
       this.symbolIndex?.stop(); // MARK: ide-nav — §65: nor a symbol index build
+      await this.stopLsp(); // MARK: lsp — §73.2: nor a language server
       this.statusLine.dispose(); // MARK: wave6 w6-statusline — §44.2: nor a status line run
       // §31 (daily-01): a review with only accepted files left is done — like close_project, it goes now instead of
       // coming back days later. Kept while a turn was running (its changes are not collected yet: the crash path).
@@ -1173,6 +1188,7 @@ export class ReviewEngine {
           engineVersion: ENGINE_VERSION,
           platform: this.platform.name,
           protocolVersion: PROTOCOL_VERSION,
+          languageServer: ((b) => (b ? { available: true, typescript: b.typescriptVersion } : { available: false }))(this.lspBundle()), // MARK: lsp (§73)
         };
         return ready;
       }
@@ -1826,6 +1842,7 @@ export class ReviewEngine {
       case "project_file": {
         const file = readProjectFile(this.requireProject().root, cmd.path);
         this.symbolIndex?.refresh([file.path]); // MARK: ide-nav — §65: a file read is a file the index re-checks
+        this.navLsp().warm(file.path); // MARK: lsp — §73.2: a JS / TS / Vue file shown starts the server (its project loads)
         return { type: "project_file", ...file };
       }
       case "project_search": {
@@ -1836,19 +1853,37 @@ export class ReviewEngine {
       case "find_definition": {
         const root = this.requireProject().root;
         const index = this.symbolIndex; // MARK: ide-nav — §65: containers from the index (files read on demand, never the whole build)
+        const symbolsOf = index ? { symbolsOf: (p: string) => index.fileSymbols(p) } : {};
+        // MARK: lsp — §73.3: the language server for a JS / TS / Vue file; §62 / §65 for everything else and as its fallback
+        const exact = await this.navLsp().definition({ symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, ...symbolsOf });
+        if (exact.ok) {
+          return { type: "definitions", symbol: exact.symbol, candidates: exact.candidates, truncated: false, source: "lsp", ...(exact.quickInfo ? { quickInfo: exact.quickInfo } : {}) };
+        }
         return {
           type: "definitions",
           ...(await findDefinition(root, {
-            symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, receiver: cmd.receiver,
-            ...(index ? { symbolsOf: (p: string) => index.fileSymbols(p) } : {}),
+            symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, receiver: cmd.receiver, ...symbolsOf,
           })),
+          source: "grep", ...(exact.fallback ? { fallback: exact.fallback } : {}),
         };
       }
-      case "find_references":
-        return { type: "references", ...(await findReferences(this.requireProject().root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })) };
+      case "find_references": {
+        const root = this.requireProject().root;
+        const index = this.symbolIndex;
+        const exact = await this.navLsp().references({ // MARK: lsp — §73.3
+          symbol: cmd.symbol, fromPath: cmd.fromPath, line: cmd.line, column: cmd.column, limit: cmd.limit,
+          ...(index ? { symbolsOf: (p: string) => index.fileSymbols(p) } : {}),
+        });
+        if (exact.ok) return { type: "references", symbol: exact.symbol, hits: exact.hits, files: exact.files, truncated: exact.truncated, source: "lsp" };
+        return {
+          type: "references", ...(await findReferences(root, { symbol: cmd.symbol, fromPath: cmd.fromPath, limit: cmd.limit })),
+          source: "grep", ...(exact.fallback ? { fallback: exact.fallback } : {}),
+        };
+      }
       // MARK: ide-nav — §65: read-only, lane "nav"
       case "document_symbols":
         this.requireProject();
+        this.navLsp().warm(cmd.path); // MARK: lsp — §73.2
         return { type: "document_symbols", ...(await this.navIndex().documentSymbols(cmd.path)) };
       case "workspace_symbols":
         this.requireProject();
@@ -2282,6 +2317,7 @@ export class ReviewEngine {
     this.settings = { ...before, ...partial };
     if (partial.systemPromptAppend !== undefined) this.promptBudget = budgetNumbers(this.settings.budget); // MARK: wave4 w4-longwork (daily-18)
     if ("largeFileMB" in partial) setLargeFileLimit(largeFileBytes(partial.largeFileMB)); // MARK: wave4b w4b-bigturn (§39.1, live)
+    if (partial.languageServer !== undefined) this.lsp?.setEnabled(partial.languageServer !== false); // MARK: lsp — §73 (live)
     if (partial.budget) this.session?.setBudget(partial.budget);
     if (partial.autoAllowReadOnlyBash !== undefined || partial.bashAllowPatterns !== undefined) {
       this.session?.setPermissionSettings({
@@ -2542,6 +2578,7 @@ export class ReviewEngine {
     this.pruneRangeRefs();
     this.fileIndex = new FileIndex(() => listRepoFiles(cp));
     this.symbolIndex?.stop(); // MARK: ide-nav — §65: idle until a query needs it
+    this.stopLsp(); // MARK: lsp — §73.2: a new project, a new server (started on first use)
     this.symbolIndex = new SymbolIndex({ root: cp.root, onChange: () => this.touch() });
     this.refreshPlanCandidates(); // MARK: wave4d w4d-plan (§42.1)
     if (this.gate.refNs === "main") void this.pruneWorktreeNamespaces(cp);
@@ -3556,6 +3593,7 @@ export class ReviewEngine {
     if (wants("review")) {
       this.fileIndex?.invalidate();
       this.symbolIndex?.refresh(); // MARK: ide-nav — §65: every file whose mtime / size changed
+      this.lsp?.filesChanged(); // MARK: lsp (§73.2)
     }
     if (cp && wants("review") && gatePhase(this.slices()) === "reviewing") {
       try {
@@ -4114,6 +4152,7 @@ export class ReviewEngine {
     this.fileIndex = null;
     this.symbolIndex?.stop(); // MARK: ide-nav (§65)
     this.symbolIndex = null;
+    this.stopLsp(); // MARK: lsp (§73.2)
     this.checkpoints = { version: 1, records: [] };
     this.turnRecord = null;
     this.modelChoice = {};
@@ -5021,6 +5060,7 @@ export class ReviewEngine {
       this.scheduleCollectRetry(); // M30 (§3)
     }
     this.fileIndex?.invalidate();
+    this.lsp?.filesChanged(); // MARK: lsp — §73.2: the implicit project's list again on the next request
     // MARK: ide-nav — §65: the review's files again (the rest at the next query's 30 s re-check)
     this.symbolIndex?.refresh(this.gate.changedFiles.flatMap((f) => (f.oldPath ? [f.path, f.oldPath] : [f.path])));
     this.touch();
@@ -5488,6 +5528,37 @@ export class ReviewEngine {
   }
 
   // ------------------------------------------------------------------ workbenches (docs/M10-WORKBENCHES.md)
+
+  /** MARK: lsp — §73: the bundle, looked for once per engine. */
+  private lspBundle(): LspBundle | null {
+    if (this.lspBundleFound === undefined) this.lspBundleFound = findBundle(this.lspDir);
+    return this.lspBundleFound;
+  }
+
+  /** MARK: lsp — §73: the open project's language server (`requireProject` first); nothing starts until it is asked. */
+  private navLsp(): LspService {
+    if (!this.lsp) {
+      const cp = this.requireProject();
+      this.lsp = new LspService({
+        root: cp.root,
+        bundle: () => this.lspBundle(),
+        listFiles: () => gitFiles(cp.root),
+        onChange: () => this.touch(),
+        log: (msg) => this.log("info", msg),
+        env: { ...this.childEnv(), ...(this.toolchainPath ? { PATH: this.toolchainPath } : {}) },
+        ...(this.lspTiming ? { timing: this.lspTiming } : {}),
+      });
+      this.lsp.setEnabled(this.settings.languageServer !== false);
+    }
+    return this.lsp;
+  }
+
+  /** MARK: lsp — §73.2: a project closes or switches: its server stops. */
+  private stopLsp(): Promise<void> {
+    const lsp = this.lsp;
+    this.lsp = null;
+    return lsp ? lsp.stop().catch(() => undefined) : Promise.resolve();
+  }
 
   /** MARK: ide-nav — §65: the open project's symbol index (`requireProject` first). */
   private navIndex(): SymbolIndex {
@@ -10323,7 +10394,7 @@ export class ReviewEngine {
       },
       storage: { saveFailed: this.saveHealth.view, disk: this.disk ? { ...this.disk } : null }, // MARK: wave4b w4b-bigturn (§39.1)
       autoAcceptRules: this.autoAcceptRules, // MARK: wave4c w4c-trust (§41.2)
-      ...(this.project && this.symbolIndex ? { nav: { index: this.symbolIndex.state } } : {}), // MARK: ide-nav (§65)
+      ...(this.project && this.symbolIndex ? { nav: { index: this.symbolIndex.state, ...(this.lsp?.state ? { lsp: this.lsp.state } : {}) } } : {}), // MARK: ide-nav (§65); lsp (§73.2)
     };
   }
 

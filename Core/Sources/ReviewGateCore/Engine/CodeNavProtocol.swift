@@ -64,22 +64,34 @@ public struct DefinitionsReply: Sendable, Equatable, Decodable {
     public var candidates: [DefinitionCandidate]
     public var truncated: Bool
     public var timedOut: Bool
+    /// MARK: lsp — §73: who answered (nil: an older engine — the search).
+    public var source: NavSource?
+    /// §73: the search answered a JS / TS / Vue lookup — why.
+    public var fallback: LspFallback?
+    /// §73: the clicked name's type / signature (the language server's answers only).
+    public var quickInfo: LspQuickInfo?
 
-    public init(id: String? = nil, symbol: String, candidates: [DefinitionCandidate], truncated: Bool = false, timedOut: Bool = false) {
+    public init(id: String? = nil, symbol: String, candidates: [DefinitionCandidate], truncated: Bool = false, timedOut: Bool = false,
+                source: NavSource? = nil, fallback: LspFallback? = nil, quickInfo: LspQuickInfo? = nil) {
         self.id = id
         self.symbol = symbol
         self.candidates = candidates
         self.truncated = truncated
         self.timedOut = timedOut
+        self.source = source
+        self.fallback = fallback
+        self.quickInfo = quickInfo
     }
 
-    private enum CodingKeys: String, CodingKey { case id, symbol, candidates, truncated, timedOut }
+    private enum CodingKeys: String, CodingKey { case id, symbol, candidates, truncated, timedOut, source, fallback, quickInfo }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(id: lenientValue(String.self, c, .id), symbol: lenientValue(String.self, c, .symbol) ?? "",
                   candidates: lenientElements(DefinitionCandidate.self, c, .candidates),
-                  truncated: lenientValue(Bool.self, c, .truncated) ?? false, timedOut: lenientValue(Bool.self, c, .timedOut) ?? false)
+                  truncated: lenientValue(Bool.self, c, .truncated) ?? false, timedOut: lenientValue(Bool.self, c, .timedOut) ?? false,
+                  source: lenientValue(NavSource.self, c, .source), fallback: lenientValue(LspFallback.self, c, .fallback),
+                  quickInfo: lenientValue(LspQuickInfo.self, c, .quickInfo))
     }
 }
 
@@ -120,23 +132,30 @@ public struct ReferencesReply: Sendable, Equatable, Decodable {
     public var files: Int
     public var truncated: Bool
     public var timedOut: Bool
+    /// MARK: lsp — §73 (as `DefinitionsReply`).
+    public var source: NavSource?
+    public var fallback: LspFallback?
 
-    public init(id: String? = nil, symbol: String, hits: [ReferenceHit], files: Int? = nil, truncated: Bool = false, timedOut: Bool = false) {
+    public init(id: String? = nil, symbol: String, hits: [ReferenceHit], files: Int? = nil, truncated: Bool = false, timedOut: Bool = false,
+                source: NavSource? = nil, fallback: LspFallback? = nil) {
         self.id = id
         self.symbol = symbol
         self.hits = hits
         self.files = files ?? Set(hits.map(\.path)).count
         self.truncated = truncated
         self.timedOut = timedOut
+        self.source = source
+        self.fallback = fallback
     }
 
-    private enum CodingKeys: String, CodingKey { case id, symbol, hits, files, truncated, timedOut }
+    private enum CodingKeys: String, CodingKey { case id, symbol, hits, files, truncated, timedOut, source, fallback }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(id: lenientValue(String.self, c, .id), symbol: lenientValue(String.self, c, .symbol) ?? "",
                   hits: lenientElements(ReferenceHit.self, c, .hits), files: lenientValue(Int.self, c, .files),
-                  truncated: lenientValue(Bool.self, c, .truncated) ?? false, timedOut: lenientValue(Bool.self, c, .timedOut) ?? false)
+                  truncated: lenientValue(Bool.self, c, .truncated) ?? false, timedOut: lenientValue(Bool.self, c, .timedOut) ?? false,
+                  source: lenientValue(NavSource.self, c, .source), fallback: lenientValue(LspFallback.self, c, .fallback))
     }
 }
 
@@ -270,14 +289,19 @@ public struct NavIndexState: Sendable, Equatable, Codable {
 /// §65: `state.nav`.
 public struct NavState: Sendable, Equatable, Codable {
     public var index: NavIndexState
+    /// MARK: lsp — §73.2: the language server (nil: idle, off, or an older engine).
+    public var lsp: LspState?
 
-    public init(index: NavIndexState) { self.index = index }
+    public init(index: NavIndexState, lsp: LspState? = nil) {
+        self.index = index
+        self.lsp = lsp
+    }
 
-    private enum CodingKeys: String, CodingKey { case index }
+    private enum CodingKeys: String, CodingKey { case index, lsp }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(index: lenientValue(NavIndexState.self, c, .index) ?? NavIndexState(status: .idle))
+        self.init(index: lenientValue(NavIndexState.self, c, .index) ?? NavIndexState(status: .idle), lsp: lenientValue(LspState.self, c, .lsp))
     }
 }
 

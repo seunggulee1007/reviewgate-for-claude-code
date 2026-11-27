@@ -262,6 +262,7 @@ export function ReviewPane({ settings }: PaneProps) {
         </div>
         <div className="note">{t("Peek shows the definition under the line, without leaving the diff (Alt+F12 does it too); Go to opens it. F12 always goes to it.")}</div>
       </section>
+      <LanguageServerSection settings={settings} />{/* MARK: lsp — §73.5 */}
       <StorageSettingsSection settings={settings} />{/* MARK: wave4b w4b-bigturn — §39.1 large-file limit, [오래된 리뷰 기록 정리] */}
     </div>
   );
@@ -429,5 +430,32 @@ function SideModelInput({ value, onCommit }: { value: string; onCommit: (v: stri
       onKeyDown={(e) => isEnter(e) && commit()}
       data-testid="Side model"
     />
+  );
+}
+
+/** MARK: lsp — §73.5: Go to Definition / Find References of JS / TS / Vue from the bundled TypeScript language server. */
+function LanguageServerSection({ settings }: PaneProps) {
+  const patch = usePatch();
+  const [available, setAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    void window.rg.toolchainInfo().then((info) => setAvailable(info.languageServer?.available ?? false));
+  }, []);
+  const off = available === false;
+  const reason = off ? t("This build does not include the language server — definitions are found by searching") : t("Finds definitions and references exactly with the TypeScript language server. Off: found by searching");
+  return (
+    <section data-setting="languageServer">
+      <label className="check" title={reason}>
+        <input
+          type="checkbox"
+          checked={!off && settings.languageServer !== false}
+          disabled={off}
+          onChange={(e) => patch({ languageServer: e.target.checked })}
+          data-testid="Use the language server"
+          aria-label={t("Use the language server for JS/TS/Vue")}
+        />
+        {t("Use the language server for JS/TS/Vue")}
+      </label>
+      <div className="note">{off ? reason : t("Go to Definition and Find References in JavaScript, TypeScript and Vue files ask the TypeScript language server that comes with the app, so they find exactly what the name means. Off, or while it starts, they search the project by name instead.")}</div>
+    </section>
   );
 }

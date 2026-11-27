@@ -51,6 +51,16 @@ public final class CodeNavHoverStore {
         public var preview: SymbolPreviewReply
         /// How many other candidates there are (the card says "+N more").
         public var others: Int
+        /// MARK: lsp — §73: the name's type / signature from the language server (the card's bold line then).
+        public var quickInfo: LspQuickInfo? = nil
+
+        public init(key: CodeNavHoverDebounce.Key, candidate: DefinitionCandidate, preview: SymbolPreviewReply, others: Int, quickInfo: LspQuickInfo? = nil) {
+            self.key = key
+            self.candidate = candidate
+            self.preview = preview
+            self.others = others
+            self.quickInfo = quickInfo
+        }
     }
 
     /// How long the pointer rests before the card is asked for.
@@ -96,7 +106,7 @@ public final class CodeNavHoverStore {
         guard case let .definitionPreview(p)? = try? await request(.definitionPreview(path: first.path, line: first.line, after: Self.lines)),
               !Task.isCancelled, debounce.isCurrent(n)
         else { return }
-        card = Card(key: key, candidate: first, preview: p, others: defs.candidates.count - 1)
+        card = Card(key: key, candidate: first, preview: p, others: defs.candidates.count - 1, quickInfo: defs.quickInfo)
     }
 
     /// The card goes (a click, Esc, the window losing the pointer).

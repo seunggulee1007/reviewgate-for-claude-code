@@ -21,6 +21,8 @@
 #   installed into or stamped, RG_FORCE_INSTALL included: npm ci would wipe the shared tree. A
 #   warning says so (and whether the shared tree looks stale) and the bundle is built from it.
 # - the sidecar bundle is rebuilt every time (esbuild, well under a second).
+# - then the language server for JS / TS / Vue (docs/PROTOCOL.md §73) is assembled into sidecar/dist/lsp by
+#   scripts/build-lsp.mjs (skipped when its stamp says the same versions are there already).
 # - SKIP_SIDECAR_BUILD=YES skips everything.
 # - RG_FORCE_INSTALL=1 forces the install step (never into a linked node_modules).
 # - RG_DRY_RUN=1 prints the decision (`sidecar: decision=<install|skip|record|linked> — <reason>`)
@@ -134,3 +136,4 @@ case "$action" in
 esac
 
 npm run build -w sidecar || fail "esbuild failed"
+node "$ROOT/scripts/build-lsp.mjs" "$ROOT/sidecar/dist/lsp" || fail "language server bundle (scripts/build-lsp.mjs) failed"

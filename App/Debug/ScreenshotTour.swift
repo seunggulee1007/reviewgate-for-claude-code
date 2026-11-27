@@ -1031,6 +1031,7 @@ private final class Tour {
         try await parityDShots(window, shoot: shoot)
         try await parityEShots(window)
         try await parityFShots(window)
+        try await lspNavShots()
     }
 
     // MARK: §72 at the laptop size (the composer bar check): /hooks' sheet, /output-style's sheet, /plugin's sheet.
@@ -1126,6 +1127,45 @@ private final class Tour {
         }
         AppSettings.setAppearance(.dark)
     }
+
+
+    // MARK: §73.5 at the laptop size (the composer bar check): who answered a definition — 정확 / 추정 — and the start.
+
+    /// The definition popover with the language server's answer (정확) and with the search's while it starts (추정, its
+    /// tooltip in the log), "언어 서버 시작 중…" beside "Looking for X…", the hover card's type line from quickInfo, and the
+    /// setting — dark and light. `composerbar-nav-*-<appearance>.png`.
+    private func lspNavShots() async throws {
+        let from = CodeNavLocation(view: .review, path: "src/cart.ts", line: 12, column: 22)
+        let candidates = [DefinitionCandidate(path: "src/pricing.ts", line: 8, column: 3, kind: DefinitionKind(rawValue: "constructor"), preview: "constructor(readonly cents: number) {}", score: 1000, container: "Money"),
+                          DefinitionCandidate(path: "src/pricing.ts", line: 4, column: 14, kind: .class, preview: "export class Money {", score: 990)]
+        let exact = DefinitionsReply(symbol: "Money", candidates: candidates, source: .lsp,
+                                     quickInfo: LspQuickInfo(display: "constructor Money(cents: number): Money", documentation: "An amount in cents."))
+        let estimated = DefinitionsReply(symbol: "Money", candidates: candidates + [DefinitionCandidate(path: "test/fixtures/money.js", line: 2, column: 7, kind: DefinitionKind(rawValue: "variable"), preview: "const Money = { cents: 0 };", score: 40)],
+                                         source: .grep, fallback: .starting)
+        let preview = SymbolPreviewReply(path: "src/pricing.ts", line: 4, startLine: 3,
+                                         lines: ["/** An amount in cents. */", "export class Money {", "  static zero = new Money(0);", "", "  constructor(readonly cents: number) {}", "}"],
+                                         totalLines: 40, language: "typescript",
+                                         symbol: NavSymbol(name: "Money", kind: .class, path: "src/pricing.ts", line: 4, column: 14, signature: "export class Money"))
+        let card = CodeNavHoverStore.Card(key: CodeNavHoverDebounce.Key(symbol: "Money", at: from, anchor: 0),
+                                          candidate: candidates[1], preview: preview, others: 1, quickInfo: exact.quickInfo)
+        for appearance in [Appearance.dark, .light] {
+            AppSettings.setAppearance(appearance)
+            let a = appearance.rawValue
+            store.codeNav.debugShowPopup(symbol: "Money", from: from, reply: exact)
+            try await panelShot("nav-peek-exact-\(a)", CodeNavPopupView(), appearance: appearance)
+            store.codeNav.debugShowPopup(symbol: "Money", from: from, reply: estimated)
+            try await panelShot("nav-peek-estimated-\(a)", CodeNavPopupView(), appearance: appearance)
+            store.debugShowLspStarting(true)
+            store.codeNav.debugShowPopup(symbol: "Money", from: from, reply: nil)
+            log("composerbar nav-starting: navLspStarting \(store.navLspStarting) — \(NavSourceText.starting)")
+            try await panelShot("nav-looking-starting-\(a)", CodeNavPopupView(), appearance: appearance)
+            store.debugShowLspStarting(false)
+            store.codeNav.dismissPopup()
+            try await panelShot("nav-hover-\(a)", CodeNavHoverCard(card: card), appearance: appearance)
+            try await panelShot("nav-setting-\(a)", Form { DiffSettingsSection() }.formStyle(.grouped).frame(width: 560), appearance: appearance)
+        }
+        log("composerbar nav: exact \"\(NavSourceText.label(.lsp))\" — \(NavSourceText.help(.lsp, fallback: nil)); "
+            + "estimated \"\(NavSourceText.label(.grep))\" — \(NavSourceText.help(.grep, fallback: .starting))")
 
     // MARK: §71 at the laptop size (the composer bar check): /usage's sheet, the to-do checklist, /tasks' sheet.
 

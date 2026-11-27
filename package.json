@@ -4,7 +4,8 @@
   "workspaces": [
     "engine",
     "sidecar",
-    "clients/*"
+    "clients/*",
+    "packaging/lsp"
   ],
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@^4.43.0"

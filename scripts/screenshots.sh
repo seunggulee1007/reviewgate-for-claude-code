@@ -97,7 +97,10 @@
 #                  /hooks' sheet (every source, the hooks off with All events, none; composerbar-hooks-*-<appearance>.png),
 #                  /output-style's sheet (and when it cannot switch), /status's card with the style and the line after a
 #                  switch (composerbar-style-*-<appearance>.png), /plugin's sheet on each tab, the install confirmation and
-#                  /reload-plugins' lines, applied and held (composerbar-plugins-*-<appearance>.png).
+#                  /reload-plugins' lines, applied and held (composerbar-plugins-*-<appearance>.png); then §73, dark and light:
+#                  the definition popover with the language server's answer (정확) and the search's while it starts (추정),
+#                  "언어 서버 시작 중…" beside "Looking for…", the hover card's type line and the setting
+#                  (composerbar-nav-*-<appearance>.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with

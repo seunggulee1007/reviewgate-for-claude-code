@@ -1,0 +1,13 @@
+{
+  "name": "settings-review-lsp",
+  "description": "§73.5: Settings › Review › Code navigation — \"JS/TS/Vue에 언어 서버 사용\", on by default.",
+  "settings": { "recentProjects": ["C:\\Users\\dev\\src\\acme-shop"], "newProjectParent": "" },
+  "steps": [
+    { "menu": { "type": "settings" } },
+    { "waitFor": "Settings dialog" },
+    { "click": "Settings Review" },
+    { "waitFor": "Use the language server" },
+    { "select": { "text": "JS/TS/Vue", "within": "[data-setting=\"languageServer\"]", "scrollOnly": true } },
+    { "wait": 300 }
+  ]
+}

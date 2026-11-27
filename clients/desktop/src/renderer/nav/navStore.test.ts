@@ -317,3 +317,39 @@ describe("Go to Definition (§62, Windows)", () => {
     expect(m.useNav.getState().stepReferences(1)).toBe(false);
   });
 });
+
+describe("§73 the language server's answers (Windows)", () => {
+  it("the peek list, the band and the References tab keep source / fallback; Find References sends line and column", async () => {
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "add", candidates: [cand("a.ts", 1, "function"), cand("b.ts", 2, "function")], truncated: false, source: "lsp" }));
+    m.useNav.getState().goToDefinition({ symbol: "add", fromPath: "src/app.ts", line: 3, column: 15, ...at, from: null });
+    await flush();
+    expect(m.useNav.getState().peek).toMatchObject({ source: "lsp", line: 3, column: 15 });
+    expect(m.useNav.getState().peek?.fallback).toBeUndefined();
+
+    replies.set("definition_preview", (cmd) => ({ type: "definition_preview", path: (cmd as { path: string }).path, line: 1, startLine: 1, lines: ["x"], totalLines: 1, language: "typescript", truncated: false }));
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "add", candidates: [cand("a.ts", 1, "function")], truncated: false, source: "grep", fallback: "starting" }));
+    m.useNav.getState().peekDefinition({ symbol: "add", fromPath: "src/app.ts", line: 3, column: 15, anchor: { kind: "dom", path: "src/app.ts", rowId: 1 }, from: null });
+    await flush();
+    expect(m.useNav.getState().band).toMatchObject({ source: "grep", fallback: "starting", line: 3, column: 15 });
+
+    sent = [];
+    replies.set("find_references", () => ({ type: "references", symbol: "add", hits: [{ path: "a.ts", line: 1, column: 17, preview: "function add" }], files: 1, truncated: false, source: "lsp" }));
+    m.useNav.getState().findReferences({ symbol: "add", fromPath: "src/app.ts", line: 3, column: 15 });
+    await flush();
+    expect(sent[0]).toEqual({ type: "find_references", symbol: "add", fromPath: "src/app.ts", line: 3, column: 15 });
+    expect(m.useNav.getState().refs).toMatchObject({ source: "lsp", files: 1 });
+    // The refresh button asks the same, line and column included.
+    sent = [];
+    m.useNav.getState().refreshReferences();
+    expect(sent[0]).toEqual({ type: "find_references", symbol: "add", fromPath: "src/app.ts", line: 3, column: 15 });
+  });
+
+  it("the hover card's bold line is the language server's type, its doc under it", async () => {
+    replies.set("find_definition", () => ({ type: "definitions", symbol: "add", candidates: [cand("a.ts", 1, "function")], truncated: false, source: "lsp", quickInfo: { display: "function add(a: number): number", documentation: "Adds." } }));
+    replies.set("definition_preview", () => ({ type: "definition_preview", path: "a.ts", line: 1, startLine: 1, lines: ["export function add(a: number) {"], totalLines: 1, language: "typescript", truncated: false, symbol: { name: "add", kind: "function", path: "a.ts", line: 1, column: 17, signature: "export function add(a: number)" } }));
+    m.useNav.getState().requestHover({ symbol: "add", fromPath: "src/app.ts", line: 3, column: 15, x: 1, y: 2 });
+    await flush();
+    await flush();
+    expect(m.useNav.getState().hover).toMatchObject({ signature: "function add(a: number): number", doc: "Adds." });
+  });
+});

@@ -25,4 +25,5 @@ engine/dist/
 clients/desktop/dist/
 clients/desktop/out/
 clients/desktop/release/
+clients/desktop/lsp-dist/
 scratchpad/

@@ -57,6 +57,11 @@ targets:
           if [ -f "$SRC" ]; then mkdir -p "$DST" && cp -f "$SRC" "$DST/"; echo "embedded $SRC"
           elif [ "$CONFIGURATION" = "Release" ]; then echo "error: sidecar.mjs missing — refusing to build a Release app without its engine"; exit 1
           else echo "warning: sidecar.mjs missing — app will report it at runtime"; fi
+          # §73: the language server for JS / TS / Vue next to it (pure JS and .d.ts — sealed as resources, nothing to sign).
+          LSP="$SRCROOT/sidecar/dist/lsp"
+          if [ -f "$LSP/node_modules/typescript/lib/tsserver.js" ]; then rm -rf "$DST/lsp" && mkdir -p "$DST" && ditto "$LSP" "$DST/lsp"; echo "embedded $LSP"
+          elif [ "$CONFIGURATION" = "Release" ]; then echo "error: sidecar/dist/lsp missing — refusing to build a Release app without its language server"; exit 1
+          else echo "warning: sidecar/dist/lsp missing — go to definition falls back to search"; fi
         basedOnDependencyAnalysis: false
     settings:
       base:

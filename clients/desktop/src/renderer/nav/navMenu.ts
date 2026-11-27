@@ -28,7 +28,7 @@ export function navLineMenuItems(target: DomNavTarget | null, at: { x: number; y
       {
         label: t("Find References"),
         keys: "Shift+F12",
-        onClick: () => void import("./navStore").then((m) => m.useNav.getState().findReferences({ symbol: target.symbol, fromPath: target.path })),
+        onClick: () => void import("./navStore").then((m) => m.useNav.getState().findReferences({ symbol: target.symbol, fromPath: target.path, ...m.where(target.line, target.column) })),
         testId: "Line menu find references",
         title: target.symbol,
       },

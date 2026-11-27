@@ -1,0 +1,11 @@
+{
+  "name": "@reviewgate/lsp-bundle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The language server ReviewGate ships for JavaScript, TypeScript and Vue (docs/PROTOCOL.md section 73): TypeScript tsserver and the Vue TypeScript plugin, assembled by scripts/build-lsp.mjs.",
+  "license": "MIT",
+  "dependencies": {
+    "@vue/typescript-plugin": "3.3.14",
+    "typescript": "6.0.3"
+  }
+}

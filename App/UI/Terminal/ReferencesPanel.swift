@@ -18,6 +18,7 @@ struct ReferencesPanelControls: View {
                 Text(verbatim: nav.referencesSymbol).font(.caption.weight(.semibold)).lineLimit(1)
                 if let reply = nav.references {
                     Text(verbatim: CodeNavText.summary(reply)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    NavSourceBadge(source: reply.source, fallback: reply.fallback)   // MARK: lsp (§73.5)
                 }
             }
             if nav.referencesLoading { ProgressView().controlSize(.mini) }
@@ -95,6 +96,7 @@ struct ReferencesPanelView: View {
             VStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Looking for references…").font(.caption).foregroundStyle(.secondary)
+                NavLspStartingNote()   // MARK: lsp (§73.5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if nav.referencesSymbol.isEmpty {

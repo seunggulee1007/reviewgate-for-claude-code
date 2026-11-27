@@ -380,6 +380,8 @@ public struct EngineSettings: Encodable, Sendable, Equatable {
     public var terminalPermissionBridge: Bool?
     /// §64: what waits for the review — `edits` (engine default), `prompts`, `off` (`ReviewFirstMode` raw value; live).
     public var reviewFirst: String?
+    /// MARK: lsp — §73: Go to Definition / Find References of JS / TS / Vue from the bundled language server (engine default true; live).
+    public var languageServer: Bool?
 
     public init(budget: Budget? = nil, ignorePatterns: [String]? = nil, autoAllowTools: [String]? = nil,
                 loadUserSettings: Bool? = nil, systemPromptAppend: String? = nil, claudePath: String? = nil,
@@ -754,7 +756,7 @@ public enum EngineCommand: Sendable, Equatable {
     /// `column` (1-based UTF-16) of the clicked name on that line and its `receiver` (`user` of `user.save()`).
     case findDefinition(symbol: String, fromPath: String? = nil, line: Int? = nil, column: Int? = nil, receiver: String? = nil)
     /// §62: every line holding `symbol` as a whole word, the clicked file first → `.references`.
-    case findReferences(symbol: String, fromPath: String? = nil, limit: Int? = nil)
+    case findReferences(symbol: String, fromPath: String? = nil, limit: Int? = nil, line: Int? = nil, column: Int? = nil)   // line / column: §73
     // MARK: ide-nav
     /// §65.2: the symbols of one file in file order (`depth` = its containers) → `.documentSymbols`.
     case documentSymbols(path: String)
@@ -1298,10 +1300,12 @@ extension EngineCommand: Encodable {
             try c.encodeIfPresent(line, forKey: .line)
             try c.encodeIfPresent(column, forKey: .column)   // ide-nav (§65.6)
             try c.encodeIfPresent(receiver, forKey: .receiver)
-        case let .findReferences(symbol, fromPath, limit):
+        case let .findReferences(symbol, fromPath, limit, line, column):
             try c.encode(symbol, forKey: .symbol)
             try c.encodeIfPresent(fromPath, forKey: .fromPath)
             try c.encodeIfPresent(limit, forKey: .limit)
+            try c.encodeIfPresent(line, forKey: .line)   // MARK: lsp (§73.5)
+            try c.encodeIfPresent(column, forKey: .column)
         // MARK: ide-nav (§65)
         case let .documentSymbols(path):
             try c.encode(path, forKey: .path)

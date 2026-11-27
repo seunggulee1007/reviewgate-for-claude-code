@@ -316,7 +316,9 @@ struct CodeNavPopupView: View {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
                         Text("Looking for \(popup.symbol)…").font(.callout)
+                        NavLspStartingNote()   // MARK: lsp (§73.5)
                     }
+                    .fixedSize()   // the popover is as wide as the line: "Looking for X… 언어 서버 시작 중…" whole
                     .padding(12)
                 case let .peek(reply):
                     CodeNavPeekList(popup: popup, reply: reply)
@@ -446,8 +448,7 @@ private struct CodeNavPeekList: View {
                 .help("Every line that holds this name as a whole word")
                 .accessibilityIdentifier("Peek Find references")
                 Spacer()
-                Text("Search-based: may list look-alikes")
-                    .font(.caption2).foregroundStyle(.tertiary)
+                NavSourceBadge(source: reply.source, fallback: reply.fallback)   // MARK: lsp (§73.5): exact or estimated, and why
             }
             .padding(.horizontal, 10).padding(.vertical, 6)
         }
@@ -531,9 +532,13 @@ struct CodeNavReferencesSheet: View {
             Divider()
             content(nav, word: word)
             Divider()
-            Text("Search-based: lines holding the name as a whole word — may list look-alikes")
-                .font(.caption2).foregroundStyle(.tertiary)
-                .padding(.horizontal, 12).padding(.vertical, 6)
+            HStack(spacing: 6) {
+                if let reply = nav.references { NavSourceBadge(source: reply.source, fallback: reply.fallback) }   // MARK: lsp (§73.5)
+                Text(verbatim: nav.references?.source == .lsp ? NavSourceText.help(.lsp, fallback: nil)
+                    : String(localized: "Search-based: lines holding the name as a whole word — may list look-alikes"))
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
         }
         .frame(minWidth: 560, idealWidth: 680, minHeight: 360, idealHeight: 520)
         .accessibilityIdentifier("References sheet")

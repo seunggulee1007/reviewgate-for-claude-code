@@ -102,6 +102,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   e("checkpointIgnorePatterns", "review", "Checkpoint ignore patterns", "Checkpoint ignore patterns"),
   e("testCommandPatterns", "review", "Test command patterns", "Test command patterns"),
   e("navCtrlClick", "review", "Code navigation", "Ctrl+click a name", "Peek shows the definition under the line, without leaving the diff (Alt+F12 does it too); Go to opens it. F12 always goes to it."), // §65.8
+  e("languageServer", "review", "Code navigation", "Use the language server for JS/TS/Vue", "Go to Definition and Find References in JavaScript, TypeScript and Vue files ask the TypeScript language server that comes with the app, so they find exactly what the name means. Off, or while it starts, they search the project by name instead."), // §73.5
   e("largeFileMB", "review", "Disk space", "Leave untracked files out of snapshots from", "Such a file (a heap dump, an archive) stays in the review list but its content is not stored: it cannot be reverted and the app does not commit it. Files git tracks are always stored."),
   e("historyCleanup", "review", "Disk space", "Clean Up Old Review History…"),
   // Git & Workbenches

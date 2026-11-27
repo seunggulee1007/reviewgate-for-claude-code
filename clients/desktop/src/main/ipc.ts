@@ -6,7 +6,7 @@
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type WebContents } from "electron";
 import { openSync, readSync, closeSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { EngineCommand, ReviewEngine } from "@reviewgate/engine";
+import { findBundle, type EngineCommand, type ReviewEngine } from "@reviewgate/engine";
 import type { AppSettings, EditorKind, McpConfigFileResult, OpenInIdeResult, ProjectUI, ToolchainInfo } from "../shared/ipc.js";
 import { checkImage, fitSize, fitTries, fitWith, IMAGE_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, renamedFor, type ImageType, type PickedImage } from "../shared/attachments.js";
 import { createMcpJson, isMcpConfigPath, mcpConfigMtime } from "./mcpConfigFile.js";
@@ -28,6 +28,7 @@ import { refusalText } from "./settingsGuard.js"; // MARK: wave4d w4d-windows
 import { t } from "../renderer/i18n"; // MARK: wave4d w4d-windows (polish-07): dialog titles in the UI language
 // MARK: wave3 desktop-session
 import { projectOpenPath } from "./sessionSettings.js";
+import { lspDir } from "./lspDir.js"; // MARK: lsp (§73.4)
 import { pinnedVersionPath } from "./cliPin.js";
 import { isDirectory, isTransientProjectPath, recentEntries, withoutRecent } from "./recentProjects.js"; // MARK: wave4 w4-install
 import { ptyInfo } from "./pty/nodePty.js"; // MARK: terminal-win (§57.17)
@@ -355,7 +356,13 @@ export function installIPC(deps: Deps): void {
   ipcMain.on("rg:pty:ack", (evt, ptyId: unknown, chars: unknown) => hub(evt.sender)?.ack(evt.sender.id, ptyId, chars));
   ipcMain.on("rg:pty:focus", (evt, focused: unknown) => hub(evt.sender)?.focus(evt.sender.id, focused));
   ipcMain.handle("rg:run:detect", (evt) => hub(evt.sender)?.detectRuns(evt.sender.id) ?? []); // MARK: c-panel (§57.18)
-  ipcMain.handle("rg:toolchainInfo",(): ToolchainInfo => ({ platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome }));
+  ipcMain.handle("rg:toolchainInfo", (): ToolchainInfo => {
+    const lsp = findBundle(lspDir()); // MARK: lsp (§73.4)
+    return {
+      platform: process.platform, electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome,
+      languageServer: lsp ? { available: true, typescript: lsp.typescriptVersion } : { available: false },
+    };
+  });
   // MARK: wave3 desktop-flow (src/main/flowWindows.ts)
   /** §36.12: the new workbench's window takes its failed setup's report once its project is open. */
   ipcMain.handle("rg:takeWorkbenchSetupReport", (_e, paths: unknown) => setupReports.take(paths));

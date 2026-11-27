@@ -437,6 +437,7 @@ struct DiffSettingsSection: View {
     @AppStorage(DiffPrefsKeys.diffLayout) private var layout = DiffLayoutMode.unified
     @AppStorage(ExternalEditor.defaultsKey) private var editor = ""
     @AppStorage(CodeNavCommandClick.defaultsKey) private var commandClick = CodeNavCommandClick.peek.rawValue   // MARK: ide-nav (§65.8)
+    @AppStorage(LanguageServerSetting.defaultsKey) private var languageServer = true   // MARK: lsp (§73.5)
 
     var body: some View {
         Section("Diff") {
@@ -467,6 +468,19 @@ struct DiffSettingsSection: View {
             } label: { SettingLabel("codeNavCommandClick") }
             .accessibilityIdentifier("Settings command click")
             .settingAnchor("codeNavCommandClick")
+            // MARK: lsp (§73.5): Go to Definition / Find References of JS / TS / Vue from the bundled TypeScript language server.
+            let bundled = LanguageServerSetting.bundled(sidecarPath: ReviewGateApp.resolveSidecarScript())
+            Toggle(isOn: Binding(get: { languageServer && bundled }, set: { on in
+                languageServer = on
+                for store in WorkbenchRegistry.shared.allStores { store.updateLanguageServer(on) }
+            })) {
+                SettingLabel("languageServer")
+            }
+            .disabled(!bundled)
+            .help(bundled ? Text("Finds definitions and references exactly with the TypeScript language server. Off: found by searching")
+                          : Text("This build does not include the language server — definitions are found by searching"))
+            .accessibilityIdentifier("Settings language server")
+            .settingAnchor("languageServer")
         }
     }
 }

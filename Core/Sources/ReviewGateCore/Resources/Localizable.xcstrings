@@ -8279,6 +8279,22 @@
         }
       }
     },
+    "Estimated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimated"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "추정"
+          }
+        }
+      }
+    },
     "Estimated cost": {
       "localizations": {
         "en": {
@@ -8323,6 +8339,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "모두 쉬는 중"
+          }
+        }
+      }
+    },
+    "Exact": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exact"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "정확"
           }
         }
       }
@@ -8931,6 +8963,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "나에게, 이 저장소에서만 (local)"
+          }
+        }
+      }
+    },
+    "Found by searching — other things with the same name may be listed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found by searching — other things with the same name may be listed"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "검색으로 찾은 결과예요 — 이름이 같은 다른 것이 섞일 수 있어요"
+          }
+        }
+      }
+    },
+    "Found by the language server (TypeScript)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found by the language server (TypeScript)"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버(TypeScript)가 찾은 결과예요"
           }
         }
       }
@@ -10839,6 +10903,22 @@
         }
       }
     },
+    "Starting the language server…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting the language server…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버 시작 중…"
+          }
+        }
+      }
+    },
     "Starts work right away and makes reasonable assumptions instead of asking about routine decisions": {
       "localizations": {
         "en": {
@@ -11171,6 +11251,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "새 프로젝트 폴더는 전체 경로여야 해요 — 설정 › 일반에서 바꿔 주세요"
+          }
+        }
+      }
+    },
+    "The language server did not answer in time, so this was found by searching": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language server did not answer in time, so this was found by searching"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버가 제때 답하지 않아 검색으로 찾았어요"
+          }
+        }
+      }
+    },
+    "The language server found nothing inside the project, so this was found by searching": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language server found nothing inside the project, so this was found by searching"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버가 프로젝트 안에서 찾지 못해 검색으로 찾았어요"
+          }
+        }
+      }
+    },
+    "The language server is not available, so this was found by searching": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language server is not available, so this was found by searching"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버를 쓸 수 없어 검색으로 찾았어요"
+          }
+        }
+      }
+    },
+    "The language server is off in Settings — found by searching": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language server is off in Settings — found by searching"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정에서 언어 서버를 껐어요 — 검색으로 찾았어요"
+          }
+        }
+      }
+    },
+    "The language server is still starting, so this was found by searching": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The language server is still starting, so this was found by searching"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "언어 서버가 아직 시작하는 중이라 검색으로 찾았어요"
           }
         }
       }
