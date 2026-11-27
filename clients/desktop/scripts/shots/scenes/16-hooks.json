@@ -1,0 +1,33 @@
+{
+  "extends": "04-review.json",
+  "name": "hooks",
+  "description": "/hooks (§72.1): user, project, local and plugin hooks by event — matcher, type, where each is defined, what it runs — with a local file's disableAllHooks saying they do not run.",
+  "replies": {
+    "hooks_list": {
+      "type": "hooks_list",
+      "off": null,
+      "hooks": [
+        { "event": "SessionStart", "matcher": "startup", "type": "command", "text": "node C:\\Users\\dev\\.claude\\hooks\\load-context.js", "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "active": true },
+        { "event": "PreToolUse", "matcher": "Bash", "type": "command", "text": "powershell -File .claude\\hooks\\block-rm.ps1", "if": "Bash(rm *)", "timeout": 30, "source": "project", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.json", "active": true },
+        { "event": "PreToolUse", "matcher": "", "type": "http", "text": "https://hooks.example.com/audit", "source": "local", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.local.json", "active": true },
+        { "event": "PostToolUse", "matcher": "Edit|Write", "type": "command", "text": "${CLAUDE_PLUGIN_ROOT}\\scripts\\format.cmd", "statusMessage": "Formatting", "source": "plugin", "plugin": "formatter", "path": "C:\\Users\\dev\\.claude\\plugins\\cache\\acme-market\\formatter\\1.2.0\\hooks\\hooks.json", "active": true },
+        { "event": "Stop", "matcher": "", "type": "prompt", "text": "Check that every task in the request is done. $ARGUMENTS", "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "active": true },
+        { "event": "Notification", "matcher": "", "type": "command", "text": "powershell -c \"[console]::beep(800,200)\"", "async": true, "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "active": true }
+      ],
+      "files": [
+        { "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "exists": true, "count": 3 },
+        { "source": "project", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.json", "exists": true, "count": 1 },
+        { "source": "local", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.local.json", "exists": true, "count": 1 },
+        { "source": "plugin", "plugin": "formatter", "path": "C:\\Users\\dev\\.claude\\plugins\\cache\\acme-market\\formatter\\1.2.0\\hooks\\hooks.json", "exists": true, "count": 1 }
+      ]
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/hooks" } },
+    { "key": "Enter" },
+    { "waitFor": "Hooks dialog" },
+    { "waitFor": "Hooks row" },
+    { "wait": 300 }
+  ]
+}

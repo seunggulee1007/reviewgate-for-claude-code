@@ -1,0 +1,28 @@
+{
+  "extends": "04-review.json",
+  "name": "hooks-off",
+  "description": "/hooks (§72.1) with the hooks turned off in ReviewGate: the orange line, each row Off; and All events listing the empty ones.",
+  "replies": {
+    "hooks_list": {
+      "type": "hooks_list",
+      "off": "app",
+      "hooks": [
+        { "event": "PreToolUse", "matcher": "Bash", "type": "command", "text": "powershell -File .claude\\hooks\\block-rm.ps1", "source": "project", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.json", "active": false },
+        { "event": "Stop", "matcher": "", "type": "command", "text": "npm run lint --silent", "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "active": false }
+      ],
+      "files": [
+        { "source": "user", "path": "C:\\Users\\dev\\.claude\\settings.json", "exists": true, "count": 1 },
+        { "source": "project", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.json", "exists": true, "count": 1 },
+        { "source": "local", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.local.json", "exists": false, "count": 0 }
+      ]
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/hooks" } },
+    { "key": "Enter" },
+    { "waitFor": "Hooks row" },
+    { "click": "Hooks all events" },
+    { "wait": 300 }
+  ]
+}

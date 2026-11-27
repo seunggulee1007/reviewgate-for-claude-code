@@ -1,0 +1,31 @@
+{
+  "extends": "04-review.json",
+  "name": "output-style",
+  "description": "/output-style (§72.2): the five built-ins, a user and a plugin style, Concise current and set in the local settings.",
+  "state": { "session": { "outputStyle": "Concise" } },
+  "replies": {
+    "output_styles": {
+      "type": "output_styles",
+      "styles": [
+        { "name": "default", "description": null, "source": "builtin" },
+        { "name": "Proactive", "description": null, "source": "builtin" },
+        { "name": "Concise", "description": null, "source": "builtin" },
+        { "name": "Explanatory", "description": null, "source": "builtin" },
+        { "name": "Learning", "description": null, "source": "builtin" },
+        { "name": "Diagrams first", "description": "Lead every explanation with a diagram", "source": "user", "path": "C:\\Users\\dev\\.claude\\output-styles\\diagrams.md" },
+        { "name": "tutor", "description": "Step by step, with a question at the end", "source": "plugin", "plugin": "teach", "path": "C:\\Users\\dev\\.claude\\plugins\\cache\\acme-market\\teach\\1.0.0\\output-styles\\tutor.md" }
+      ],
+      "current": "Concise",
+      "setIn": { "source": "local", "path": "C:\\Users\\dev\\acme-shop\\.claude\\settings.local.json", "value": "Concise" },
+      "canSet": true
+    }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/output-style" } },
+    { "key": "Enter" },
+    { "waitFor": "Output style dialog" },
+    { "click": "Output style Diagrams first" },
+    { "wait": 300 }
+  ]
+}

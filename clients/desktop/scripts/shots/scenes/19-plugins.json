@@ -1,0 +1,34 @@
+{
+  "extends": "04-review.json",
+  "name": "plugins",
+  "description": "/plugin manage (§72.3): three installed plugins — one off in ReviewGate, one disabled with a load error, one managed — and the last command's words with its output.",
+  "replies": {
+    "plugins_list": {
+      "type": "plugins_list",
+      "installed": [
+        { "id": "formatter@acme-market", "name": "formatter", "marketplace": "acme-market", "version": "1.2.0", "scope": "user", "enabled": true, "installPath": "C:\\Users\\dev\\.claude\\plugins\\cache\\acme-market\\formatter\\1.2.0" },
+        { "id": "release-notes@acme-market", "name": "release-notes", "marketplace": "acme-market", "version": "3f2a9c1d0b7e", "scope": "project", "enabled": false, "installPath": "C:\\x", "errors": ["Plugin \"release-notes\" not cached at C:\\Users\\dev\\.claude\\plugins\\cache\\acme-market\\release-notes"] },
+        { "id": "review-kit@acme-market", "name": "review-kit", "marketplace": "acme-market", "version": "0.9.0", "scope": "user", "enabled": true, "installPath": "C:\\y", "appOff": true, "notes": ["Not used recently"] },
+        { "id": "policy-guard@acme-org", "name": "policy-guard", "marketplace": "acme-org", "version": "2.0.0", "scope": "managed", "enabled": true, "installPath": "C:\\z" }
+      ],
+      "available": [
+        { "id": "deploy@acme-market", "name": "deploy", "marketplace": "acme-market", "description": "Deploy helpers: preview environments, rollbacks and release checklists", "version": "0.4.1" },
+        { "id": "db-tools@acme-market", "name": "db-tools", "marketplace": "acme-market", "description": "Migrations and query plans for Postgres" }
+      ],
+      "marketplaces": [
+        { "name": "acme-market", "source": "github", "repo": "acme/claude-plugins" },
+        { "name": "acme-org", "source": "git", "url": "https://git.example.com/acme/plugins.git", "ref": "v2" }
+      ]
+    },
+    "plugin_run": { "type": "plugin_result", "action": "disable", "target": "formatter@acme-market", "ok": true, "message": "Disabled plugin: formatter@acme-market (scope: user)", "output": "Disabled plugin: formatter@acme-market (scope: user)\nRun /reload-plugins to apply." }
+  },
+  "steps": [
+    { "waitFor": "Composer input" },
+    { "type": { "testid": "Composer input", "value": "/plugin manage" } },
+    { "key": "Enter" },
+    { "waitFor": "Plugins installed formatter" },
+    { "click": { "selector": "[data-testid='Plugins installed formatter'] [data-testid='Plugins toggle']" } },
+    { "waitFor": "Plugins result" },
+    { "wait": 300 }
+  ]
+}
