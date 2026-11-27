@@ -53,6 +53,14 @@ public final class CodeNavHoverStore {
         public var others: Int
         /// MARK: lsp — §73: the name's type / signature from the language server (the card's bold line then).
         public var quickInfo: LspQuickInfo? = nil
+
+        public init(key: CodeNavHoverDebounce.Key, candidate: DefinitionCandidate, preview: SymbolPreviewReply, others: Int, quickInfo: LspQuickInfo? = nil) {
+            self.key = key
+            self.candidate = candidate
+            self.preview = preview
+            self.others = others
+            self.quickInfo = quickInfo
+        }
     }
 
     /// How long the pointer rests before the card is asked for.

@@ -687,3 +687,22 @@ extension AppState {
         codeNav.open(place, from: from, sameReviewFile: { [weak self] in self?.changedFile(path: $0) != nil })
     }
 }
+
+#if DEBUG
+// MARK: lsp — the screenshot tour's §73.5 shots (App/Debug/ScreenshotTour.swift): the definition popover as a reply leaves it.
+public extension CodeNavStore {
+    /// The popover for `symbol` clicked at `from`: still looking (`reply` nil) or the peek list of `reply`.
+    func debugShowPopup(symbol: String, from: CodeNavLocation, reply: DefinitionsReply?) {
+        popup = Popup(symbol: symbol, from: from, anchor: 0, content: reply.map { .peek($0) } ?? .looking)
+    }
+}
+
+public extension AppState {
+    /// `state.nav.lsp` starting as a snapshot reports it (the lookup line says so).
+    func debugShowLspStarting(_ starting: Bool) {
+        var snapshot = state
+        snapshot.nav = NavState(index: snapshot.nav?.index ?? NavIndexState(status: .idle), lsp: starting ? LspState(status: .starting) : nil)
+        state = snapshot
+    }
+}
+#endif

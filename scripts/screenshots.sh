@@ -93,7 +93,10 @@
 #                  (composerbar-export-*.png); then §71, dark and light: /usage's sheet (a subscription's windows, none
 #                  yet, one reached; composerbar-usage-*-<appearance>.png), the to-do checklist over the box (idle, while
 #                  Claude works, hidden, none yet; composerbar-todos-*-<appearance>.png) and /tasks' sheet with each task's
-#                  output tail and with nothing running (composerbar-tasks-*-<appearance>.png).
+#                  output tail and with nothing running (composerbar-tasks-*-<appearance>.png); then §73, dark and light:
+#                  the definition popover with the language server's answer (정확) and the search's while it starts (추정),
+#                  "언어 서버 시작 중…" beside "Looking for…", the hover card's type line and the setting
+#                  (composerbar-nav-*-<appearance>.png).
 #                  settings: the Settings window (§55.11) on the same fake claude — each pane at its first size and its
 #                  smallest, the search, a jump to a row and the restart banner, dark and light (`settings` lines;
 #                  settings-*.png; TALLER when the window with its title bar is taller than 637 pt); then §69's window with
