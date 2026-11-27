@@ -463,6 +463,9 @@ public enum EngineCommand: Sendable, Equatable {
     case exportChat(path: String?, replace: Bool)
     /// §70.3 `/copy [N]`: Claude's Nth-latest answer → `.responseText`.
     case copyResponse(n: Int?)
+    // MARK: §72 terminal parity, batch F
+    /// §72.1 `/hooks`: the hooks in effect → `.hooksList` (Session/HooksList.swift).
+    case hooksList
     // MARK: wave5 w5-model
     /// §43.4: `send` with `model` — this message only goes out on that model (wins over auto).
     case sendWithModel(text: String, acceptPending: Bool = false, mentions: [String] = [], attachments: [SendAttachment] = [], model: String)
@@ -789,6 +792,7 @@ public enum EngineCommand: Sendable, Equatable {
         case .setThinking: "set_thinking"   // §70.4
         case .exportChat: "export_chat"   // §70.3
         case .copyResponse: "copy_response"
+        case .hooksList: "hooks_list"   // §72.1
         case .requestChanges: "request_changes"
         case .interrupt: "interrupt"
         case .interruptTakeBack: "interrupt"   // §56.2
@@ -1038,7 +1042,7 @@ extension EngineCommand: Encodable {
             try encodeInterruptTakeBackFields(to: encoder)
         case .closeProject, .initRepo, .cancelGitInit, .restartSession, .interrupt, .acceptAll, .reviewFirstAllowTurn, .retryCollect, .branches,
              .prList, .prClose, .prReloadComments, .accounts, .workbenchList, .workbenchPrune, .push, .sessionList, .sessionNew,
-             .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges:
+             .forgetAllows, .shutdown, .sideList, .mcpStatus, .liveChanges, .hooksList:
             break
         case let .sideAsk(threadId, anchor, question):
             try c.encodeIfPresent(threadId, forKey: .threadId)
@@ -3153,6 +3157,8 @@ public enum EngineEvent: Sendable, Equatable {
     case chatExport(ChatExport)
     /// §70.3: reply to `copy_response`.
     case responseText(ResponseText)
+    /// §72.1: reply to `hooks_list`.
+    case hooksList(HooksList)
     /// §67.2: the running `!` command's output so far (its last few thousand characters).
     case shellOutput(id: String, output: String)
     /// §67.2: a `!` command ended — its row (also in the transcript).
@@ -3499,6 +3505,8 @@ extension EngineEvent: Decodable {
             self = .chatExport(try ChatExport(from: decoder))
         case "response_text":
             self = .responseText(try ResponseText(from: decoder))
+        case "hooks_list":   // §72.1
+            self = .hooksList(try HooksList(from: decoder))
         case "shell_output":   // §67.2
             self = .shellOutput(id: Self.lenient(String.self, c, .id) ?? "", output: Self.lenient(String.self, c, .output) ?? "")
         case "shell_result":

@@ -303,6 +303,8 @@ public final class AppState {
     var debugBackgroundTasks: [BackgroundTaskInfo]?
     /// §71.3: the screenshot tour's task outputs by task id (DEBUG only; nil = the engine's `task_output`).
     var debugTaskOutputs: [String: String]?
+    /// §72.1: the screenshot tour's `/hooks` answer (DEBUG only; nil = the engine's `hooks_list`).
+    var debugHooksList: HooksList?
     /// §49: a task handed to this worktree that the session could not take — the chat puts it into the composer (once per id).
     public internal(set) var taskForComposer: TaskComposerText?
     /// §50.3: messages in Claude's turn being taken back (their chips wait), and why the last take-back did not happen.
@@ -2379,6 +2381,8 @@ public final class AppState {
         case .btwAnswer:   // §56.1: consumed by `askBtw`
             break
         case .chatExport, .responseText:   // §70.3: consumed by `exportChat` / `copyResponse`
+            break
+        case .hooksList:   // §72.1: consumed by `hooksList`
             break
         case let .shellOutput(id, output):   // §67.2
             handleShellOutput(id: id, output: output)

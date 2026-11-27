@@ -145,6 +145,7 @@ struct ComposerSlashHooks: ViewModifier {
     @State private var exportItem: ChatExportItem?   // §70.3
     @State private var showUsage = false   // §71.1
     @State private var showTasks = false   // §71.3
+    @State private var showHooks = false   // §72.1
 
     func body(content: Content) -> some View {
         content
@@ -161,6 +162,7 @@ struct ComposerSlashHooks: ViewModifier {
             }
             .sheet(isPresented: $showUsage) { UsageSheet() }
             .sheet(isPresented: $showTasks) { BackgroundTasksSheet() }
+            .sheet(isPresented: $showHooks) { HooksSheet() }
     }
 
     private func run(_ request: SlashRequest) {
@@ -179,6 +181,7 @@ struct ComposerSlashHooks: ViewModifier {
         case .usage: showUsage = true   // §71.1 (/cost and /stats too)
         case .todos: composer.showTodos(store: store)   // §71.2
         case .tasks: showTasks = true   // §71.3 (/bashes too)
+        case .hooks: showHooks = true   // §72.1
         case .permissions: settings(.general)   // the permissions are in General
         case .config: settings(.general)
         case .agents: model.showAgentPanelTick += 1

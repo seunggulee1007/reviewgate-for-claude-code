@@ -6145,6 +6145,38 @@
         }
       }
     },
+    "Matcher": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matcher"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matcher"
+          }
+        }
+      }
+    },
+    "Open a settings file this chat reads in your editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a settings file this chat reads in your editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅이 읽는 설정 파일을 에디터에서 열어요"
+          }
+        }
+      }
+    },
     "Puts the whole conversation on the clipboard as plain text": {
       "localizations": {
         "en": {
@@ -6157,6 +6189,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "대화 전체를 일반 텍스트로 클립보드에 넣어요"
+          }
+        }
+      }
+    },
+    "Read the settings files again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read the settings files again"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 파일을 다시 읽어요"
           }
         }
       }

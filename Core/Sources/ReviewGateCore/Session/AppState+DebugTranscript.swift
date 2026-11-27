@@ -7,6 +7,9 @@ public extension AppState {
     /// Engine events, handled as if the engine had sent them.
     func debugHandle(_ events: [EngineEvent]) { events.forEach(handle) }
 
+    /// §72.1: what `/hooks` shows (nil: the engine's answer again).
+    func debugShowHooks(_ list: HooksList?) { debugHooksList = list }
+
     /// The gate as a snapshot reports it: `.running` while the turn works, `.reviewing` with `files` pending after it. The
     /// engine's next snapshot puts its own back.
     func debugShowGate(_ phase: GatePhase, files: [ChangedFile] = []) {

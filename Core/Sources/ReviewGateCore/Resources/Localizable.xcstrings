@@ -113,6 +113,22 @@
         }
       }
     },
+    "%@ does not exist yet — this chat would read it": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ does not exist yet — this chat would read it"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 파일이 아직 없어요 — 있으면 이 채팅이 읽어요"
+          }
+        }
+      }
+    },
     "%@ exists already — /export never replaces a file": {
       "localizations": {
         "en": {
@@ -801,6 +817,22 @@
         }
       }
     },
+    "%lld hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld hooks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "훅 %lld개"
+          }
+        }
+      }
+    },
     "%lld large file(s) kept out of snapshots (cannot be reverted)": {
       "localizations": {
         "en": {
@@ -1117,6 +1149,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld명 재시도 중"
+          }
+        }
+      }
+    },
+    "%lld s timeout": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld s timeout"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제한 시간 %lld초"
           }
         }
       }
@@ -2177,6 +2225,22 @@
         }
       }
     },
+    "All events": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All events"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모든 이벤트"
+          }
+        }
+      }
+    },
     "Allow for this turn": {
       "localizations": {
         "en": {
@@ -2301,6 +2365,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "이미 %@의 최신 상태예요"
+          }
+        }
+      }
+    },
+    "Also list the events no hook is set for, as the terminal's All events": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also list the events no hook is set for, as the terminal's All events"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 All events처럼 훅이 없는 이벤트도 보여줘요"
           }
         }
       }
@@ -2733,6 +2813,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "답함 %lld"
+          }
+        }
+      }
+    },
+    "Any": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Any"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전체"
           }
         }
       }
@@ -8263,6 +8359,38 @@
         }
       }
     },
+    "Hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hooks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "훅"
+          }
+        }
+      }
+    },
+    "Hooks a skill or subagent adds while it runs are in no settings file and are not listed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hooks a skill or subagent adds while it runs are in no settings file and are not listed."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "스킬이나 서브에이전트가 실행 중에 추가하는 훅은 설정 파일에 없어서 목록에 나오지 않아요."
+          }
+        }
+      }
+    },
     "Hooks are turned off in your Claude Code settings (disableAllHooks or allowManagedHooksOnly), so ReviewGate cannot review a terminal chat": {
       "localizations": {
         "en": {
@@ -8391,6 +8519,22 @@
         }
       }
     },
+    "Local settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local settings"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로컬 설정"
+          }
+        }
+      }
+    },
     "Log in…": {
       "localizations": {
         "en": {
@@ -8419,6 +8563,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "MCP 서버를 관리해요 — 재연결, 로그인, 켜기·끄기"
+          }
+        }
+      }
+    },
+    "Managed policy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Managed policy"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "관리 정책"
           }
         }
       }
@@ -8499,6 +8659,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "리뷰를 기다리는 파일이 없어요"
+          }
+        }
+      }
+    },
+    "No hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hooks"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "훅 없음"
+          }
+        }
+      }
+    },
+    "No hooks in the settings this chat loads": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hooks in the settings this chat loads"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 채팅이 불러오는 설정에 훅이 없어요"
           }
         }
       }
@@ -8615,6 +8807,22 @@
         }
       }
     },
+    "Open %@ in your editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open %@ in your editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@을(를) 에디터에서 열어요"
+          }
+        }
+      }
+    },
     "Open Review": {
       "localizations": {
         "en": {
@@ -8679,6 +8887,22 @@
         }
       }
     },
+    "Open in Editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Editor"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "에디터에서 열기"
+          }
+        }
+      }
+    },
     "Open the chat history to resume an earlier chat": {
       "localizations": {
         "en": {
@@ -8707,6 +8931,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "플랜 사용량"
+          }
+        }
+      }
+    },
+    "Plugin %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugin %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플러그인 %@"
+          }
+        }
+      }
+    },
+    "Project settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project settings"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프로젝트 설정"
           }
         }
       }
@@ -8803,6 +9059,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "%2$@에서 커밋 %1$lld개를 pull했어요 · 파일 %3$lld개 바뀜"
+          }
+        }
+      }
+    },
+    "Read-only, as the terminal's /hooks. To change a hook, edit the file that defines it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read-only, as the terminal's /hooks. To change a hook, edit the file that defines it."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "터미널의 /hooks처럼 보기만 해요. 훅을 바꾸려면 그 훅이 정의된 파일을 고쳐요."
+          }
+        }
+      }
+    },
+    "Reading the settings files…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reading the settings files…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 파일을 읽는 중…"
           }
         }
       }
@@ -9063,6 +9351,22 @@
         }
       }
     },
+    "Settings files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings files"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정 파일"
+          }
+        }
+      }
+    },
     "Settings › Review holds new messages until every file is accepted or rejected": {
       "localizations": {
         "en": {
@@ -9203,6 +9507,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "출력의 끝부분을 보여줘요 (마지막 64KB)"
+          }
+        }
+      }
+    },
+    "Show the hooks that run — each one's event, matcher and where it is defined": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show the hooks that run — each one's event, matcher and where it is defined"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "실행되는 훅 보기 — 이벤트, matcher, 정의된 곳"
           }
         }
       }
@@ -10199,6 +10519,22 @@
         }
       }
     },
+    "User settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User settings"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사용자 설정"
+          }
+        }
+      }
+    },
     "Wait until Claude's work is done — the directories change only between turns": {
       "localizations": {
         "en": {
@@ -10307,6 +10643,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "업무 {id}: {title}\n{url}\n\n{mcp}\n\n{body}\n\n먼저 업무를 요약하고, 코드를 바꾸기 전에 계획을 알려 주세요."
+          }
+        }
+      }
+    },
+    "Your hooks are off in ReviewGate (Settings › Extensions) — they are listed but do not run. ReviewGate's own safety hooks still run.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your hooks are off in ReviewGate (Settings › Extensions) — they are listed but do not run. ReviewGate's own safety hooks still run."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ReviewGate에서 내 훅을 꺼 두었어요(설정 › 확장) — 목록에는 있지만 실행되지 않아요. ReviewGate의 안전 훅은 계속 실행돼요."
+          }
+        }
+      }
+    },
+    "Your organization's policy allows only its managed hooks — the others do not run.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your organization's policy allows only its managed hooks — the others do not run."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조직 정책이 관리 훅만 허용해요 — 나머지는 실행되지 않아요."
+          }
+        }
+      }
+    },
+    "Your organization's policy turned off every hook.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your organization's policy turned off every hook."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조직 정책이 모든 훅을 껐어요."
+          }
+        }
+      }
+    },
+    "disableAllHooks is on in your settings — these hooks are listed but do not run.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "disableAllHooks is on in your settings — these hooks are listed but do not run."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "설정에서 disableAllHooks가 켜져 있어요 — 목록에는 있지만 실행되지 않아요."
+          }
+        }
+      }
+    },
+    "if %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "if %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "조건 %@"
+          }
+        }
+      }
+    },
+    "runs in the background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "runs in the background"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "백그라운드에서 실행"
           }
         }
       }

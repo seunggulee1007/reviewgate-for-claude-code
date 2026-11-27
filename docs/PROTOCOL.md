@@ -11938,6 +11938,18 @@ type HookFile = { source: HookSource; plugin?: string; path: string; exists: boo
   declared inline in its `plugin.json` are not read (only `hooks/hooks.json`).
 - Engine: `session/hooksList.ts` (`listHooks`, `hookEntriesOf`, `sortHooks`, `HOOK_EVENTS`), `engine.ts`
   (`hooksList`), `protocol.ts` (`HookEntry`, `HookFile`, `HooksListEvent`). Tests: `engine/test/w72.hooks.test.ts`.
+- **`/hooks` is an app command now** in a classic chat (no longer a terminal-only name, §56.5). It opens the **hooks
+  sheet** (Mac) / dialog (Windows): "훅 — 터미널의 /hooks처럼 보기만 해요", one group per event in the lifecycle order with
+  "훅 N개", and per hook its matcher ("전체" for every one), its type, where it is defined (사용자 설정 · 프로젝트 설정 · 로컬
+  설정 · 플러그인 <name> · 관리 정책), "꺼짐" when it does not run, what it runs (monospaced, selectable, four lines, the
+  whole text in its tooltip), `if` / timeout / background / status message, and **에디터에서 열기** for its file (the
+  editor the diff's Open in Editor remembered, else the system's app). An orange line says why the hooks do not run
+  (`off`). **모든 이벤트** lists every event, an empty one with "훅 없음" (the terminal's All events). **설정 파일** opens
+  any settings file this chat reads, to add a hook — one not there yet is disabled with "…파일이 아직 없어요 — 있으면 이
+  채팅이 읽어요". ↻ reads them again. The note under the list says the skills' and subagents' own hooks are not listed.
+- Mac: Core `Session/HooksList.swift` (`HookEntry`, `HookFile`, `HooksList.byEvent`, `HooksText`, `AppState.hooksList`),
+  `SlashAppCommand.hooks`; App `HooksSheet.swift`, `ComposerSlashCommands.swift`. Tests: `HooksListTests`,
+  `SlashAppCommandsTests`.
 
 ### 72.2 `/output-style` — pick the session's output style
 
