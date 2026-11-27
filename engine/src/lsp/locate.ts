@@ -1,7 +1,8 @@
 // MARK: lsp — docs/PROTOCOL.md §73.1 / §73.4: which tsserver runs (the project's own TypeScript 5.x–6.x when it is
 // installed, else the bundled 6.0.3) and where the bundle with the Vue plugin is.
 import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
+// Aliased: the sidecar bundle's banner declares its own `createRequire` (sidecar/package.json build), a second one would clash.
+import { createRequire as requireFrom } from "node:module";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,7 +30,7 @@ function bundleAt(dir: string): LspBundle | null {
 /** The development workspace (`packaging/lsp`, resolved through `node_modules`): its typescript and the plugin's folder. */
 function devBundle(): LspBundle | null {
   try {
-    const req = createRequire(import.meta.url);
+    const req = requireFrom(import.meta.url);
     const pkg = dirname(req.resolve("@reviewgate/lsp-bundle/package.json"));
     const tsPkg = req.resolve("typescript/package.json", { paths: [pkg] });
     const vuePkg = req.resolve("@vue/typescript-plugin/package.json", { paths: [pkg] });
