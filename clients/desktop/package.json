@@ -1,6 +1,6 @@
 {
   "name": "@reviewgate/desktop",
-  "version": "0.5.35",
+  "version": "0.5.36",
   "private": true,
   "author": "leeseunggu",
   "description": "ReviewGate desktop client (Electron) — Windows first, runs on macOS for development",
