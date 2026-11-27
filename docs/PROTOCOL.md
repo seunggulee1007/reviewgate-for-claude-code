@@ -12041,7 +12041,11 @@ that folder; one committed into git is the case that is not trusted. `state.nav.
   unchanged.
 - **Windows.** `clients/desktop/scripts/build.mjs` builds it into `clients/desktop/lsp-dist/lsp`; electron-builder's
   `extraResources` copies it to `resources/lsp` — outside `app.asar`, so tsserver reads its `lib.*.d.ts` and the plugin
-  from real files. main passes that folder to the engine (`EngineOptions.lspDir`).
+  from real files. main passes that folder to the engine (`EngineOptions.lspDir`). The entry copies `lsp-dist` with the
+  filter `lsp/**`: electron-builder's copy filter always drops a `node_modules` folder at the root of a `from`.
+- **Measured** (2026-11, this build): the Mac app +13.6 MiB on disk and the DMG +3.2 MB (UDZO, as `scripts/release.sh`
+  makes it: the same Debug app with and without `dist/lsp`); the Windows installer +1.96 MB (NSIS, 118.0 → 120.0 MB,
+  `electron-builder --win nsis --x64` on a Mac with and without the entry) and +13.9 MB installed.
 - **Where the engine looks**: `EngineOptions.lspDir`, else `REVIEWGATE_LSP_DIR`, else `lsp/` next to the running engine
   file (`sidecar.mjs`), else the development workspace (`packaging/lsp` resolved from `node_modules`).
 - **Licences**: `docs/THIRD_PARTY_NOTICES.md` (the Mac app; also inside it at `Resources/dist/lsp/LICENSES.md`) and
