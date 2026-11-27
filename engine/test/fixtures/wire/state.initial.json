@@ -90,6 +90,7 @@
       "alwaysOn": false
     },
     "todos": [],
+    "outputStyle": null,
     "canRestart": false
   },
   "toolchain": {
