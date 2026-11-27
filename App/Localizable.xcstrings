@@ -6785,18 +6785,18 @@
         }
       }
     },
-    "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder.": {
+    "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Project (with no folder open) makes each project's folder here, named from what you want to make, as a git repository. Empty: ReviewGate in your home folder."
+            "value": "New Project and Clone from Git (with no folder open) make each project's folder here — a new one named from what you want to make, a clone after its repository. Empty: ReviewGate in your home folder."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "폴더 없이 새로 시작하면 프로젝트 폴더가 여기에 생겨요. 이름은 만들려는 내용에서 따오고 git 저장소로 시작해요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
+            "value": "폴더 없이 새로 시작하거나 Git 저장소로 시작하면 프로젝트 폴더가 여기에 생겨요. 새로 시작은 만들려는 내용에서, clone은 저장소에서 이름을 따와요. 비워 두면 홈 폴더 아래 ReviewGate 폴더에 만들어요."
           }
         }
       }

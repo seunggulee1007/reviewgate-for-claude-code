@@ -47,6 +47,7 @@ import Testing
         #expect(AppSettings.defaultNewProjectParent.hasSuffix("/ReviewGate"))
         #expect(SettingsCatalog.entry("newProjectParent")?.pane == .general)
         #expect(SettingsCatalog.search("new projects").map(\.id).contains("newProjectParent"))
+        #expect(SettingsCatalog.search("clone").map(\.id).contains("newProjectParent"))   // §74: clones go there too
     }
 
     @Test func theRefusalsInTheUsersWords() {

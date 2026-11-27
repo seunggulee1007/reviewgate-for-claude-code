@@ -115,6 +115,11 @@ describe("clone from git (§74)", () => {
     expect(m.applyCloneEvent({ type: "result", ok: true } as never)).toBe(false);
   });
 
+  it("the settings search finds the folder clones go into", async () => {
+    const { searchSettings } = await import("./settingsIndex");
+    expect(searchSettings("clone").map((e) => e.id)).toContain("newProjectParent");
+  });
+
   it("the task's clone link: on the issue link's host, else the shorthand", () => {
     expect(m.cloneURLForTask("https://ghe.example.com/team/app/issues/9", "team/app")).toBe("https://ghe.example.com/team/app.git");
     expect(m.cloneURLForTask("fix https://github.com/acme/widgets/issues/42 today", "acme/widgets")).toBe("https://github.com/acme/widgets.git");

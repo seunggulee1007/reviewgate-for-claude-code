@@ -12002,3 +12002,5 @@ create); the reply `project_cloned {path}` comes once the project is open.
   `cloneURLForTask` and the progress store `useCloneProgress` (`applyCloneEvent`); `store.cloneProject` opens the way
   `createProject` does ("Opening <name>…", a refusal back to the dialog, `cancelled`), `store.cancelClone`. The three commands
   are on the renderer's allow list (`ipcGuard.ts`). Tests: `cloneProject.test.ts`, `newProject.test.ts`, `ipcGuard.test.ts`.
+- **Settings.** Clones go into the folder for new projects (§69.4, `newProjectParent`): its line says so ("New Project and
+  Clone from Git … make each project's folder here"), and "clone" finds it in the settings search.
