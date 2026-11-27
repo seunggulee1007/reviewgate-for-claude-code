@@ -9068,6 +9068,10 @@ not touched.
 | `/usage` (`/cost`, `/stats`) | §71.1: the usage sheet · dialog — session cost and times, usage by model, plan windows (before: `/cost` the HUD's cost popover) |
 | `/todos` | §71.2: Claude's to-do checklist over the box (as ⌃T · Ctrl+Shift+L) |
 | `/tasks` (`/bashes`) | §71.3: the background work with each task's output tail and [중지] |
+| `/hooks` | §72.1: the hooks in effect by event, read-only, with 에디터에서 열기 |
+| `/output-style [style]` | §72.2: the output style sheet · dialog; with a name, that style from the next message |
+| `/plugin [subcommand]` (`/plugins`, `/marketplace`) | §72.3: the plugin sheet · dialog (설치됨 · 찾아보기 · 마켓플레이스) through `claude plugin` |
+| `/reload-plugins [--force]` | §72.3: the session's plugins again, the terminal's summary in the line under the box |
 | `/permissions` (`/allowed-tools`) | Settings — Mac › General (its permission section) · Windows › Permissions |
 | `/config` (`/settings`) | Settings |
 | `/agents` | the agent panel opens (never toggles closed) |
@@ -9082,9 +9086,9 @@ not touched.
   the user, a project, a plugin or an MCP server — **a command of the user's own with one of these names wins** (a
   project's `/status` still goes to Claude).
 - **`/add-dir`** is the app's own since §67.1 (it adds a directory to the chat); before, it was among the terminal's.
-- **Only the terminal has it** (`/hooks`, `/vim`, `/doctor`, `/login`, `/theme` … the list is
+- **Only the terminal has it** (`/vim`, `/doctor`, `/login`, `/theme` … the list is
   `SlashAppCommand.terminalOnly` / `TERMINAL_ONLY`): not sent; the draft stays in the box and a card over it says
-  "/hooks — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
+  "/doctor — 이 명령은 터미널 채팅에서 써요" with **[Continue as Terminal Chat]** (the chat on screen, §57.9; disabled with
   its reason) — or **[New Terminal Chat]** when the chat has nothing to continue yet. A typo or an unknown name still goes
   to Claude as before.
 - **When:** the draft is one line `/name [args]`, on ↩ / ⌘↩ (send, queue, steer, stop-and-send) — and on ↩ with the
@@ -12019,7 +12023,7 @@ type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path
   `SlashAppCommand.outputStyle`; App `OutputStyleSheet.swift`, `ComposerModeMenu.swift` (the item and the tooltip line),
   `ComposerSlashCommands.swift`. Tests: `OutputStylesTests`, `SlashAppCommandsTests`.
 - Windows: `outputStyles.ts` (the words, `styleBlocker`, `loadOutputStyles`, `setOutputStyle`),
-  `components/dialogs/OutputStyleDialog.tsx` (`Dialog {kind: "outputStyle"}`; ↑ / Tab to a row, Space picks, Enter or a double
+  `components/dialogs/OutputStyleDialog.tsx` (`Dialog {kind: "outputStyle"}`; Tab to a row, Space picks, Enter or a double
   click switches; after a switch the toast says it), `components/chat/ModeMenu.tsx` (the menu's Output Style item and the
   tooltip line), `components/chat/SlashCard.tsx` (`/status`'s row), `errorCodes.ts` (the refusals),
   `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "outputStyle", name}`). Tests: `outputStyles.test.ts`,
