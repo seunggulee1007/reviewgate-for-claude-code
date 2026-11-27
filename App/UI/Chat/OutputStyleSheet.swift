@@ -127,7 +127,9 @@ private struct StyleRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(verbatim: OutputStyleText.displayName(style.name)).font(.callout.weight(.medium))
-                    Text(verbatim: OutputStyleText.source(style)).font(.caption).foregroundStyle(.secondary)
+                    if style.source != .builtin {   // five times "기본 제공" says nothing; a custom style's origin does
+                        Text(verbatim: OutputStyleText.source(style)).font(.caption).foregroundStyle(.secondary)
+                    }
                     if isCurrent {
                         Text(verbatim: OutputStyleText.current).font(.caption.weight(.semibold)).foregroundStyle(Color.accentColor)
                     }
