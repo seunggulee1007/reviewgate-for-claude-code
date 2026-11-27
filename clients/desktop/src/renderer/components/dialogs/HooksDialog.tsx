@@ -53,7 +53,7 @@ export function HooksDialog({ onClose }: { onClose: () => void }) {
             <section key={g.event} className="hooks-event" data-testid={`Hooks event ${g.event}`}>
               <div className="row">
                 <span className="small bold mono">{g.event}</span>
-                <span className="tiny muted">{g.hooks.length === 0 ? t("No hooks") : t("{0} hooks", g.hooks.length)}</span>
+                <span className="tiny muted">{g.hooks.length === 0 ? t("No hooks") : g.hooks.length === 1 ? t("1 hook") : t("{0} hooks", g.hooks.length)}</span>
               </div>
               {g.hooks.map((h, i) => <HookRow key={`${h.path}|${i}`} hook={h} open={open} />)}
             </section>
