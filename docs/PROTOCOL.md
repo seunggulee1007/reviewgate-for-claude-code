@@ -11938,3 +11938,49 @@ type HookFile = { source: HookSource; plugin?: string; path: string; exists: boo
   declared inline in its `plugin.json` are not read (only `hooks/hooks.json`).
 - Engine: `session/hooksList.ts` (`listHooks`, `hookEntriesOf`, `sortHooks`, `HOOK_EVENTS`), `engine.ts`
   (`hooksList`), `protocol.ts` (`HookEntry`, `HookFile`, `HooksListEvent`). Tests: `engine/test/w72.hooks.test.ts`.
+
+### 72.2 `/output-style` — pick the session's output style
+
+```ts
+// commands (lane query)
+output_styles {}                   // → output_styles
+output_style_set { name: string }  // → output_styles (after the switch)
+type OutputStylesEvent = {
+  type: "output_styles"; styles: OutputStyleInfo[]; current: string | null; setIn: OutputStyleSetIn | null;
+  canSet: boolean; why?: "no_session" | "local_settings_off" | "unsupported";
+};
+type OutputStyleInfo = { name: string; description: string | null; source: "builtin" | "user" | "project" | "plugin" | "managed" | "other"; path?: string; plugin?: string };
+type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path: string; value: string };
+// state.session.outputStyle?: string | null   — the running session's style ("default" without one); null before it said
+```
+
+- **The command still exists.** The commands reference: "`/output-style [style]` — List output styles or switch to one,
+  for example `/output-style concise` … Requires Claude Code v2.1.269 or later". The output-styles page: "The command and
+  both menus save your choice to `.claude/settings.local.json` at the local project level … The command also works in
+  non-interactive mode and Agent SDK sessions … When you switch styles mid-session, Claude uses the new style starting
+  with your next message … Before v2.1.251, the new style applied only after you ran `/clear` or started a new session",
+  and "The `/output-style` command ignores case". Built-ins: Default ("no output style is selected"), Proactive, Concise,
+  Explanatory, Learning; custom styles are Markdown files in `~/.claude/output-styles`, every `.claude/output-styles`
+  from the working directory up to the repository root (the closest wins), the managed folder, and a plugin's
+  `output-styles/`, each with `name` / `description` frontmatter.
+- **So the app switches it the same way, in the current session:** `output_style_set` calls the SDK's
+  `Query.updateSettings("localSettings", {outputStyle})` — "the same path /config uses (canonical store root, gitignore
+  upkeep, hardened write) — and live-apply them" (SDK 0.3.270; `outputStyle` is its only allowed key). The CLI writes
+  `.claude/settings.local.json` itself and the new style applies from the next message; no restart, no file written by
+  ReviewGate. The name is matched without case against the CLI's list (`unknown_output_style:<name>` otherwise).
+- **Where the names come from.** `initializationResult()` (`output_style`, `available_output_styles`) when the session
+  starts → `state.session.outputStyle` and the list; each `output_style_set` updates both. The descriptions of custom styles
+  come from their files' frontmatter (`description` ≤ 300 chars); a built-in's has `description: null` — the clients have
+  its words in both languages; a name no file explains is `other`. Before the session answered: the five built-ins and every
+  style file found, `current: null`, `canSet: false` (`no_session`).
+- **When it cannot.** `local_settings_off` — this project's sessions do not load `.claude/settings.local.json` (§36.6), and
+  the CLI refuses to write a source the session excludes; `unsupported` — a CLI without the writer (older than the SDK's);
+  `output_style_failed:<why>` — the CLI refused. `setIn` names the settings file whose `outputStyle` applies (managed, then
+  local, project, user — the CLI's precedence; null without one), so the clients can say "set in ~/.claude/settings.json".
+- **Not built, with why:** a style file created while the session runs is listed from disk, but the CLI only knows it after
+  `reloadOutputStyles` or a new session ("Claude Code reads style files when it starts"); the SDK method is wired
+  (`ClaudeSession.reloadOutputStyles`) but not offered, as the terminal offers no reload either. `force-for-plugin` (a
+  plugin's style that overrides the setting) is the CLI's to apply; the list shows what the CLI reports as current.
+- Engine: `session/outputStyles.ts` (`listOutputStyles`, `outputStyleSetIn`, `canonicalStyle`, `styleFrontmatter`,
+  `projectStyleDirs`), `session/claude.ts` (`output_style_info`, `setOutputStyle`, `reloadOutputStyles`), `engine.ts`
+  (`noteOutputStyle`, `outputStyles`, `setOutputStyle`, `slices()`), `protocol.ts`. Tests: `engine/test/w72.outputStyle.test.ts`.

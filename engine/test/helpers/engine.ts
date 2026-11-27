@@ -111,6 +111,15 @@ export class FakeClaudeSession implements ClaudeSessionLike {
     return this.reloadResult;
   }
 
+  /** §72.2: the styles `setOutputStyle` wrote, and what the next one throws (a CLI that refuses). */
+  readonly outputStyleSets: string[] = [];
+  outputStyleFailure: Error | null = null;
+
+  async setOutputStyle(name: string): Promise<void> {
+    if (this.outputStyleFailure) throw this.outputStyleFailure;
+    this.outputStyleSets.push(name);
+  }
+
   respondPermission(requestId: string, allow: boolean, message?: string, _updatedInput?: Record<string, unknown>, opts?: DenyOptions): void {
     this.permissionResponses.push({ requestId, allow, message, ...(opts?.interrupt === true ? { interrupt: true as const } : {}) });
   }

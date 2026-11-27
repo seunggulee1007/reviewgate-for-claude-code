@@ -256,6 +256,13 @@ export interface ClaudeSessionLike {
   /** §70.4: extended thinking on (the CLI's default budget) or off, from the next model request on. */
   setThinking?(enabled: boolean): Promise<void>;
   /**
+   * §72.2: `outputStyle` into `.claude/settings.local.json` through the CLI's own writer, live from the next message
+   * (`Query.updateSettings("localSettings", …)`, the path `/config` uses); rejects when this CLI cannot or refuses.
+   */
+  setOutputStyle?(name: string): Promise<void>;
+  /** §72.2: the style folders read again (`Query.reloadOutputStyles`): the names, null when this CLI cannot. */
+  reloadOutputStyles?(): Promise<string[] | null>;
+  /**
    * §29: lets every held peer message through as this session's own turn (the review gate collects it like a send):
    * `crossSessionInbound` accept, straight back to hold; resolves with the ids the CLI released (rejects when none was).
    */
@@ -728,6 +735,10 @@ export class ClaudeSession implements ClaudeSessionLike {
         if (!this.disposing && Array.isArray(commands)) this.emit({ type: "commands_info", commands });
         const agents = (r as { agents?: unknown } | undefined)?.agents; // MARK: wave4d w4d-config (§42.3)
         if (!this.disposing && Array.isArray(agents)) this.emit({ type: "agents_info", agents });
+        const style = r as { output_style?: unknown; available_output_styles?: unknown } | undefined; // §72.2
+        if (!this.disposing && style && (style.output_style !== undefined || style.available_output_styles !== undefined)) {
+          this.emit({ type: "output_style_info", current: style.output_style, available: style.available_output_styles });
+        }
       },
       () => undefined,
     );
@@ -1112,6 +1123,21 @@ export class ClaudeSession implements ClaudeSessionLike {
   /** §70.4: `Query.setMaxThinkingTokens` — 0 turns thinking off, null gives the CLI's default back (what Alt+T does). */
   async setThinking(enabled: boolean): Promise<void> {
     await this.requireQuery().setMaxThinkingTokens(enabled ? null : 0);
+  }
+
+  /** §72.2: see `ClaudeSessionLike.setOutputStyle`. */
+  async setOutputStyle(name: string): Promise<void> {
+    const q = this.requireQuery() as Query & { updateSettings?: unknown };
+    if (typeof q.updateSettings !== "function") throw new Error("output_style_unsupported");
+    await q.updateSettings("localSettings", { outputStyle: name });
+  }
+
+  /** §72.2: see `ClaudeSessionLike.reloadOutputStyles`. */
+  async reloadOutputStyles(): Promise<string[] | null> {
+    const q = this.requireQuery() as Query & { reloadOutputStyles?: unknown };
+    if (typeof q.reloadOutputStyles !== "function") return null;
+    const r = await q.reloadOutputStyles();
+    return Array.isArray(r?.available_output_styles) ? r.available_output_styles.filter((n): n is string => typeof n === "string") : null;
   }
 
   /**

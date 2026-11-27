@@ -761,6 +761,13 @@ export type EngineCommand =
   | Cmd<"copy_response", { n?: number }>
   /** §72.1 `/hooks`: the hooks in effect for the session, read from the settings files it loads → `hooks_list`. */
   | Cmd<"hooks_list">
+  /** §72.2 `/output-style`: the styles the session offers, the current one and where it is set → `output_styles`. */
+  | Cmd<"output_styles">
+  /**
+   * §72.2 `/output-style <name>`: switches the session's style through the CLI's own settings writer — `outputStyle` in
+   * `.claude/settings.local.json`, live from the next message, as the terminal's command → `output_styles`.
+   */
+  | Cmd<"output_style_set", { name: string }>
   /** §67.2 `!`: runs `command` in the project folder between turns; its row and output go to Claude with the next message. */
   | Cmd<"shell_run", { command: string }>
   /** §67.2: stops the running `!` command (its process tree); refused `no_shell_running` when none runs. */
@@ -1192,6 +1199,11 @@ export type SessionState = {
    * (TaskCreate / TaskUpdate), whichever Claude used last; [] when it has none (absent from an older engine).
    */
   todos?: TodoItem[];
+  /**
+   * §72.2: the running session's output style ("default" without one) — the CLI's at initialize, then each
+   * `output_style_set`; null while no session reported it (absent from an older engine).
+   */
+  outputStyle?: string | null;
 };
 
 /** §71.2: one item of Claude's to-do checklist (the terminal's Ctrl+T list). */
@@ -2255,6 +2267,31 @@ export type HookFile = { source: HookSource; plugin?: string; path: string; exis
  * `disableAllHooks` (`managed`, the managed hooks too); null when they run.
  */
 export type HooksListEvent = { type: "hooks_list"; id?: string; hooks: HookEntry[]; files: HookFile[]; off: "app" | "settings" | "managed_only" | "managed" | null };
+/** §72.2: one output style — a built-in (`description` null: the clients have its words), a style file's, or `other`. */
+export type OutputStyleInfo = {
+  name: string;
+  description: string | null;
+  source: "builtin" | "user" | "project" | "plugin" | "managed" | "other";
+  /** The style file. */
+  path?: string;
+  plugin?: string;
+};
+/** §72.2: the settings file whose `outputStyle` applies, and the value written there. */
+export type OutputStyleSetIn = { source: "user" | "project" | "local" | "managed"; path: string; value: string };
+/**
+ * §72.2: reply to `output_styles` / `output_style_set`. `current`: the session's style ("default" without one; null while
+ * no session reported it). `canSet: false` with `why` — `no_session`, `local_settings_off` (the CLI writes the local
+ * settings file, which this session does not load), `unsupported` (a CLI without the settings writer).
+ */
+export type OutputStylesEvent = {
+  type: "output_styles";
+  id?: string;
+  styles: OutputStyleInfo[];
+  current: string | null;
+  setIn: OutputStyleSetIn | null;
+  canSet: boolean;
+  why?: "no_session" | "local_settings_off" | "unsupported";
+};
 /** §70.3: `copy_response`'s reply. */
 export type ResponseTextEvent = { type: "response_text"; id?: string; n: number; text: string };
 export type BtwAnswerEvent = { type: "btw_answer"; id?: string; question: string; answer: string; via: "session" | "fork"; synthetic?: true };
@@ -2431,6 +2468,7 @@ export type EngineEvent =
   | ShellOutputEvent | ShellResultEvent // §67.2
   | ChatExportEvent | ResponseTextEvent // §70.3
   | HooksListEvent // §72.1
+  | OutputStylesEvent // §72.2
   | TerminalSpecEvent // §57 (a reply only)
   | McpStatusEvent
   | FilesEvent
@@ -2543,6 +2581,7 @@ export type ReplyFor<C extends EngineCommand> =
   : C extends { type: "export_chat" } ? ChatExportEvent // §70.3
   : C extends { type: "copy_response" } ? ResponseTextEvent
   : C extends { type: "hooks_list" } ? HooksListEvent // §72.1
+  : C extends { type: "output_styles" | "output_style_set" } ? OutputStylesEvent // §72.2
   : C extends { type: "interrupt" } ? (ResultEvent & { ok: true }) | InterruptedEvent // §56.2: `interrupted` with `takeBack`
   : C extends { type: "terminal_spec" } ? TerminalSpecEvent // §57
   : ResultEvent & { ok: true };
@@ -2571,6 +2610,7 @@ export type ReplyEvent = ReadyEvent | ResultEvent | FileDiffEvent | FullFileCont
   | InterruptedEvent // §56.2
   | ChatExportEvent | ResponseTextEvent // §70.3
   | HooksListEvent // §72.1
+  | OutputStylesEvent // §72.2
   | TerminalSpecEvent; // §57
 
 // ---------------------------------------------------------------- §36 wave 3: agents, sessions and daily flow

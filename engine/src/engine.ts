@@ -123,8 +123,10 @@ import { suggestOthersMessage } from "./review/commitMessage.js"; // MARK: git-s
 import { rangeRefPrefix, sinceOf, withReviewTotals, withTurnCounts } from "./review/ranges.js"; // wave2 engine-review
 import type { DiffSince, RejectTarget } from "./protocol.js"; // §66
 import type { ChatExportEvent, ResponseTextEvent, ThinkingState, TodoItem } from "./protocol.js"; // §70.3, §70.4, §71.2
-import type { HooksListEvent } from "./protocol.js"; // §72.1
+import type { HooksListEvent, OutputStylesEvent } from "./protocol.js"; // §72.1, §72.2
 import { listHooks } from "./session/hooksList.js"; // §72.1
+import { canonicalStyle, listOutputStyles, outputStyleSetIn } from "./session/outputStyles.js"; // §72.2
+import { managedSettingsDir } from "./statusline/managed.js"; // §72.2
 import { chatExportText, exportFileName, nthResponse, writeExport } from "./session/exportChat.js"; // §70.3
 import { appendCapped, completeRound, entryTreeRefs, historyView, loadHistory, saveHistory } from "./review/history.js";
 import { parseUnifiedDiff } from "./diff/parse.js";
@@ -413,7 +415,7 @@ export const INTERRUPT_WAIT_MS = 15_000;
 /** Default of `EngineOptions.parkIdleMs` (§9.1): one idle CLI besides the live one, for five minutes at most. */
 export const PARK_IDLE_MS = 5 * 60_000;
 /** §9.1: what a parked CLI may say and still be taken back (none of it is work); anything else ends it. */
-const PARKED_QUIET_EVENTS: ReadonlySet<string> = new Set(["rate_limit_info", "extensions_info", "models_info", "commands_info", "agents_info"]);
+const PARKED_QUIET_EVENTS: ReadonlySet<string> = new Set(["rate_limit_info", "extensions_info", "models_info", "commands_info", "agents_info", "output_style_info"]);
 /** §31: a restored review saved longer ago than this is stale (`state.gate.stale.reasons` "old"). */
 export const STALE_REVIEW_MS = 12 * 60 * 60 * 1000;
 /** `context_warning` threshold (§27). */
@@ -771,6 +773,8 @@ export class ReviewEngine {
   private readonly mcpFiles = new McpFileIndex();
   /** `initializationResult().agents` of the running session, with their files. */
   private cliAgents: SubagentInfo[] | null = null;
+  /** §72.2: each CLI's output style and the styles it offers (`initializationResult()`, then `output_style_set`). */
+  private readonly outputStyleOf = new WeakMap<ClaudeSessionLike, { current: string; available: string[] }>();
   private disposing: Promise<void> | null = null;
   private closed = false;
   // ---- §23–28
@@ -1620,6 +1624,10 @@ export class ReviewEngine {
         return this.copyResponse(cmd.n);
       case "hooks_list": // §72.1
         return this.hooksList();
+      case "output_styles": // §72.2
+        return this.outputStyles();
+      case "output_style_set":
+        return this.setOutputStyle(cmd.name);
       case "shell_run": // §67.2
         await this.shellRunStart(cmd.command);
         return;
@@ -8122,6 +8130,61 @@ export class ReviewEngine {
     };
   }
 
+  /** §72.2: what `initializationResult()` said (raw): the current style and the names it offers. */
+  private noteOutputStyle(source: ClaudeSessionLike, current: unknown, available: unknown): void {
+    const names = Array.isArray(available) ? available.filter((n): n is string => typeof n === "string" && n.trim() !== "") : [];
+    const now = typeof current === "string" && current.trim() ? current : "default";
+    this.outputStyleOf.set(source, { current: now, available: names });
+    if (source === this.session) this.touch();
+  }
+
+  /** §72.2 `output_styles`: the styles the session offers with their sources, the current one and where it is set. */
+  private outputStyles(): OutputStylesEvent {
+    const configDir = claudeConfigDir(this.childEnv());
+    const loadUser = this.ext?.loadUser ?? (this.settings.loadUserSettings !== false && this.extensionsFallback === null);
+    const loadLocal = this.ext?.loadLocal ?? (this.settings.loadLocalSettings !== false && this.extensionsFallback === null);
+    const cwd = this.project?.path ?? this.project?.root ?? null;
+    const live = this.session && !this.terminal ? this.outputStyleOf.get(this.session) ?? null : null;
+    const policy = this.managedPolicyOverride ? this.managedPolicyOverride() : readManagedPolicy({ platform: this.platform.name, configDir });
+    const styles = listOutputStyles({
+      available: live && live.available.length > 0 ? live.available : null,
+      configDir,
+      cwd,
+      root: this.project?.root ?? cwd,
+      plugins: loadUser ? this.knownPlugins().filter((p) => p.enabled).map((p) => ({ name: p.name, path: p.path })) : [],
+      managedDir: this.managedPolicyOverride ? null : managedSettingsDir(this.platform.name),
+    });
+    const setIn = outputStyleSetIn({ configDir, cwd, loadUser, loadLocal, managed: policy.settings, managedPath: policy.sources[0]?.path ?? null });
+    const session = this.session && !this.terminal ? this.session : null;
+    const why: OutputStylesEvent["why"] = !session || !live ? "no_session" : !loadLocal ? "local_settings_off" : typeof session.setOutputStyle !== "function" ? "unsupported" : undefined;
+    return { type: "output_styles", styles, current: live?.current ?? null, setIn, canSet: why === undefined, ...(why ? { why } : {}) };
+  }
+
+  /**
+   * §72.2 `output_style_set {name}`: as the terminal's `/output-style <name>` — the name without case, written by the CLI's
+   * own settings writer to `.claude/settings.local.json` and live from the next message.
+   */
+  private async setOutputStyle(name: string): Promise<OutputStylesEvent> {
+    if (typeof name !== "string" || !name.trim()) throw new CommandRefused("invalid_output_style");
+    const before = this.outputStyles();
+    if (!before.canSet) throw new CommandRefused(before.why === "no_session" ? "no_session" : before.why === "local_settings_off" ? "local_settings_off" : "output_style_unsupported");
+    const session = this.session!;
+    const live = this.outputStyleOf.get(session)!;
+    const target = canonicalStyle(name, live.available);
+    if (target === null) throw new CommandRefused(`unknown_output_style:${name.trim().slice(0, 80)}`, { code: "unknown_output_style" });
+    try {
+      await withTimeout(session.setOutputStyle!(target), MCP_CALL_TIMEOUT_MS, "updateSettings");
+    } catch (e) {
+      const why = firstLineOf(errorMessage(e));
+      if (why === "output_style_unsupported") throw new CommandRefused("output_style_unsupported");
+      throw new CommandRefused(`output_style_failed:${why}`, { code: "output_style_failed" });
+    }
+    if (this.session === session) this.outputStyleOf.set(session, { ...live, current: target });
+    this.log("info", `output style: ${target} (written to the local settings by the CLI)`);
+    this.touch();
+    return this.outputStyles();
+  }
+
   /** §33.8: `permission_rules` — every allow rule of the user's settings, what ReviewGate does with it, the terminal's default mode. */
   private permissionRules(): PermissionRulesEvent {
     if (!this.project) throw new CommandRefused("no_project");
@@ -8230,6 +8293,8 @@ export class ReviewEngine {
     if (source instanceof TerminalSession && source.isBackground && this.backgroundTerminals.get(source.chatId) === source) {
       return this.onBackgroundTerminalEvent(source, ev);
     }
+    // §72.2: kept with the CLI that reported it (a parked one too: it is its style when it is taken back).
+    if (ev.type === "output_style_info") this.noteOutputStyle(source, ev.current, ev.available);
     // r2-chats-cards M33 (§9.1): a parked CLI that starts to work (a task's result, a message, a turn of its own) or dies
     // is not taken back — nothing it would do may escape the review.
     if (this.parked?.session === source && !this.closed) {
@@ -10062,6 +10127,7 @@ export class ReviewEngine {
         shellPending: this.shellPending.length,
         thinking: this.thinkingSlice(), // §70.4
         todos: this.currentSessionId ? checklistOf(this.chatPlanMemory()) : [], // §71.2
+        outputStyle: (this.session ? this.outputStyleOf.get(this.session)?.current : undefined) ?? null, // §72.2
       },
       toolchain: this.toolchain,
       gate: this.gate,
@@ -10454,6 +10520,8 @@ function laneOf(cmd: EngineCommand): Lane {
     case "export_chat":
     case "copy_response":
     case "hooks_list": // §72.1: reads of the settings files
+    case "output_styles": // §72.2: reads, and one quick call to the CLI's settings writer
+    case "output_style_set":
       return "query";
     default:
       return cmd.type.startsWith("mcp_") ? "mcp" : "main";
@@ -10537,6 +10605,8 @@ function scopeOf(type: EngineCommand["type"]): ErrorScope {
     case "export_chat": // §70.3
     case "copy_response":
     case "hooks_list": // §72.1
+    case "output_styles": // §72.2
+    case "output_style_set":
       return "session";
     case "side_ask":
     case "side_list":

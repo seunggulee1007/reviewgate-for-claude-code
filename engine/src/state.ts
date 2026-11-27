@@ -104,6 +104,8 @@ export type EngineSlices = {
     thinking?: ThinkingState;
     /** §71.2 (see protocol.ts SessionState). */
     todos?: TodoItem[];
+    /** §72.2 (see protocol.ts SessionState). */
+    outputStyle?: string | null;
   };
   toolchain: ToolchainState;
   gate: ReviewGate;
