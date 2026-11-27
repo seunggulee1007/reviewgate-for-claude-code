@@ -3194,10 +3194,12 @@ private final class Tour {
         AppSettings.setAppearance(.dark)
     }
 
-    /// §69 start without a folder: the window with no project — its three cards over the recent projects — at the laptop's
+    /// §69 start without a folder: the window with no project — its four cards over the recent projects — at the laptop's
     /// 1000 × 637 and at the smallest window (900 × 460 inside), the New Project sheet empty, with a prompt typed and with a
     /// long Korean one, and the task's project picker over the recent projects (scripts/screenshots.sh's fixtures under
-    /// /Users/Shared), the one whose remote is the task's repository preselected — dark and light, `noproject-*` PNGs. Each
+    /// /Users/Shared), the one whose remote is the task's repository preselected; §74 the Clone from Git sheet with a link,
+    /// while it clones (a fixed step), refused (git could not sign in), for a repository a fixture already has ("You
+    /// already have it", Open preselected), and the task picker's "Clone owner/repo…" — dark and light, `noproject-*` PNGs. Each
     /// sheet is in a panel of its own (hidden while quiet); its height against the smallest window and the laptop's screen is
     /// in tour.log (TALLER when it does not fit 637).
     private func noProjectShots() async throws {
@@ -3249,6 +3251,15 @@ private final class Tour {
             store.debugRefuseRequests(nil)
             try await sheet("task", TaskProjectSheet(initialRef: "https://github.com/acme/widgets/issues/42"), appearance: appearance)
             try await sheet("task-empty", TaskProjectSheet(), appearance: appearance)
+            // §74: the clone sheet — the engine's real preview of a link under the fixture's parent; the progress and the
+            // refusal fixed (no network: nothing is cloned); the widgets fixture's remote is the link's repository.
+            try await sheet("clone", CloneProjectSheet(initialURL: "acme/billing-api"), appearance: appearance)
+            try await sheet("clone-progress", CloneProjectSheet(initialURL: "acme/billing-api", shownProgress: ProjectCloneProgress(
+                path: "", phase: .receiving, percent: 46, phasePercent: 48, detail: "18.40 MiB | 6.20 MiB/s")), appearance: appearance)
+            try await sheet("clone-error", CloneProjectSheet(initialURL: "acme/billing-api",
+                shownError: EngineMessages.refusal(code: "clone_auth_failed", error: "clone_auth_failed")), appearance: appearance)
+            try await sheet("clone-existing", CloneProjectSheet(initialURL: "https://github.com/acme/widgets.git"), appearance: appearance)
+            try await sheet("task-clone", TaskProjectSheet(initialRef: "https://github.com/acme/billing-api/issues/7"), appearance: appearance)
         }
         window.setFrame(NSRect(origin: origin, size: NSSize(width: 1000, height: 637)), display: true)
     }
