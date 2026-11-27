@@ -7270,7 +7270,7 @@ export class ReviewEngine {
     const session = this.session;
     if (!session || this.terminal) throw new CommandRefused("no_session");
     if (typeof session.reloadPluginsNow !== "function") throw new CommandRefused("plugins_reload_unsupported");
-    if (this.gate.running || this.gate.collecting || session.isTurnActive) throw new CommandRefused("turn_running");
+    if (this.gate.running || this.gate.collecting || session.isTurnActive) throw new CommandRefused("plugins_turn_running");
     if (this.pluginReloading) throw new CommandRefused("plugins_reloading");
     this.pluginReloading = true;
     try {

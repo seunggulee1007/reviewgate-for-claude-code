@@ -149,6 +149,6 @@ describe("§72.3 plugins_list / plugin_run / plugins_reload", () => {
     expect(s.reloadsNow).toEqual([false, false, true]);
 
     await h.engine.handle({ type: "send", text: "hi" });
-    await expect(h.engine.request({ type: "plugins_reload" })).rejects.toThrow("turn_running");
+    await expect(h.engine.request({ type: "plugins_reload" })).rejects.toThrow("plugins_turn_running");
   });
 });

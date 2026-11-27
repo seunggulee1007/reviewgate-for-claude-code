@@ -12068,7 +12068,7 @@ type PluginsReloadedEvent = { type: "plugins_reloaded"; applied: boolean; held: 
   commands, plugins and hooks replace the session's (the palette, Applied extensions, `/hooks`). The reply has the
   terminal's summary counts (`Reloaded: N plugins · N skills · N agents · N hooks · N plugin MCP servers`, `errors` = the
   CLI's `error_count`); `held: true` with `cacheImpact` (the plugin MCP servers it would add or drop) when it was not
-  applied. Refused: `no_session`, `turn_running` (as the terminal queues it until the turn ends), `plugins_reloading`,
+  applied. Refused: `no_session`, `plugins_turn_running` (as the terminal queues it until the turn ends), `plugins_reloading`,
   `plugins_reload_unsupported`, `plugins_reload_failed:<why>`. In the SDK the reload "doesn't connect or disconnect plugin
   MCP servers. Those changes take effect in your next session."
 - **Enable / disable here are the CLI's** (`enabledPlugins` in the settings file of the scope that lists the plugin, as
