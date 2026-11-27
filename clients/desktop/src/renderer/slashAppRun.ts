@@ -13,6 +13,8 @@ import { sessionsOf, sessionSwitchRefusal } from "./sessions";
 import type { SlashAppCommand } from "./slashAppCommands";
 import { useStore } from "./store";
 import { useViewedChat, viewingOf } from "./viewedChat";
+import { showTodos, todoBlocker, todosOf } from "./todoChecklist"; // §71.2
+import { showToast } from "./toast";
 
 /** Requests the HUD and the tab strip take (each `seq` is a new one). */
 type SlashUi = {
@@ -64,6 +66,14 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     case "usage": // §71.1 (/cost and /stats too)
       st.openDialog({ kind: "usage" });
       return null;
+    case "todos": { // §71.2: the checklist shown (it says so when Claude has none yet)
+      const todos = todosOf(st.state.session);
+      const viewing = viewingOf(useViewedChat.getState().chat, st.state) !== null;
+      const r = showTodos(todos, todoBlocker({ todos, terminalChat: !!st.state.session.terminal, viewing }));
+      if (r?.warning) return { notice: r.notice };
+      if (r) showToast(r.notice);
+      return null;
+    }
     case "permissions":
       st.openDialog({ kind: "settings", tab: "permissions" });
       return null;

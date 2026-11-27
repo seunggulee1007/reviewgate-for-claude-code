@@ -1,0 +1,12 @@
+/* §71.2: Claude's to-do checklist over the message box. */
+.todo-panel { margin: 0 0 6px; padding: 5px 10px 6px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--border); font-size: 12px; }
+.todo-head { display: flex; align-items: center; gap: 6px; }
+.todo-head .muted { font-size: 11.5px; }
+.todo-list { list-style: none; margin: 2px 0 0; padding: 0; }
+.todo-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; line-height: 1.5; }
+.todo-mark { flex: none; width: 14px; text-align: center; color: var(--fg-3); }
+.todo-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-item.in_progress .todo-mark, .todo-item.in_progress .todo-text { color: var(--accent); font-weight: 600; }
+.todo-item.completed .todo-mark { color: var(--green); }
+.todo-item.completed .todo-text { color: var(--fg-3); text-decoration: line-through; }
+.todo-more { padding-left: 20px; font-size: 11px; color: var(--fg-3); }

@@ -11847,6 +11847,10 @@ type TodoItem = { text: string; status: "pending" | "in_progress" | "completed";
   `todoBlocker`), `SessionInfo.todos`, `SlashAppCommand.todos`; App `ComposerTodos.swift` (`ComposerTodoPanel`,
   `toggleTodos`, `showTodos`), `ComposerTextView` (`.controlT`), `ChatComposer`. Tests: `TodoChecklistTests`,
   `SlashAppCommandsTests`, `ShortcutTableTests`.
+- Windows: `todoChecklist.ts` (`todosOf`, `todoWindow`, `isTodosKey`, `useTodoPanel` — the choice in localStorage
+  `reviewgate.todoListShown` —, `toggleTodos`, `showTodos`, `todoBlocker`), `components/chat/TodoChecklist.tsx`,
+  `Composer.tsx` (the key, the panel), `slashAppCommands.ts` / `slashAppRun.ts` (`{kind: "todos"}`). The words with the
+  key in them are Windows' own (`ko.extra.json`). Tests: `todoChecklist.test.ts`, `slashAppCommands.test.ts`.
 - **Shortcut tables.** "Show or hide Claude's to-do checklist" ⌃T / Ctrl+Shift+L is a row of the message box section in
   docs/SHORTCUTS.md, Core `ShortcutTable.swift` and Windows `shortcutTable.ts`. No clash: ⌃T was unbound on the Mac
   (⌘T is New Chat, ⌃⌘T New Terminal Chat); on Windows Ctrl+Shift+L was free (Ctrl+Alt+L is the diff layout).

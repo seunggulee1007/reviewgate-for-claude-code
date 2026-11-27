@@ -7,6 +7,7 @@
  */
 import { copyDescription, exportDescription } from "./chatExport"; // §70.3
 import { usageDescription } from "./usageReport"; // §71.1
+import { todosDescription } from "./todoChecklist"; // §71.2
 import { t } from "./i18n";
 import type { SlashEntry } from "./slashCommands";
 
@@ -21,10 +22,12 @@ export type SlashAppCommand =
   | { kind: "resume" | "rewind" | "context" | "permissions" | "agents" | "memory" | "config" | "help" | "status" | "exit" | "rename" }
   /** §71.1 `/usage` (the terminal's `/cost` and `/stats` are its aliases): the usage dialog. */
   | { kind: "usage" }
+  /** §71.2 `/todos`: Claude's to-do checklist over the box. The CLI has no such command any more; the app keeps it. */
+  | { kind: "todos" }
   | { kind: "terminalOnly"; name: string };
 
 /** The app's commands, as the palette lists them (each the terminal's name). */
-export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "usage"] as const;
+export const APP_COMMAND_NAMES = ["add-dir", "agents", "config", "context", "copy", "exit", "export", "help", "memory", "model", "permissions", "rename", "resume", "rewind", "status", "todos", "usage"] as const;
 type AppName = (typeof APP_COMMAND_NAMES)[number];
 
 /** The terminal's other names for them. */
@@ -42,7 +45,7 @@ export const APP_COMMAND_ALIASES: Readonly<Record<string, AppName>> = {
 export const TERMINAL_ONLY: ReadonlySet<string> = new Set([
   "bashes", "bug", "doctor", "extra-usage", "feedback", "hooks", "ide", "install-github-app",
   "install-slack-app", "keybindings", "login", "logout", "migrate-installer", "output-style", "plugin", "privacy-settings",
-  "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "todos", "upgrade", "vim",
+  "release-notes", "sandbox", "statusline", "tasks", "terminal-setup", "theme", "upgrade", "vim",
 ]);
 
 const isAppName = (name: string): name is AppName => (APP_COMMAND_NAMES as readonly string[]).includes(name);
@@ -88,6 +91,7 @@ export function appCommandDescription(name: string): string | null {
     case "resume": return t("Open the chat history to resume an earlier chat");
     case "rewind": return t("Rewind to before your last message");
     case "status": return t("Show the model, effort, session and MCP servers");
+    case "todos": return todosDescription(); // §71.2
     case "usage": case "cost": case "stats": return usageDescription(); // §71.1 (the terminal lists its aliases too)
     default: return null;
   }
