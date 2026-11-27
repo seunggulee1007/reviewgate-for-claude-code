@@ -1,0 +1,15 @@
+{
+  "extends": "03-task-project.json",
+  "name": "task-project-clone",
+  "description": "Start from a task whose repository no recent project has (§74.4): Clone acme/billing-api… right under the task line.",
+  "replies": {
+    "project_match": { "type": "project_matches", "repo": "acme/billing-api", "matches": [], "guess": null }
+  },
+  "steps": [
+    { "click": "No project choice 2" },
+    { "waitFor": "Task project reference" },
+    { "type": { "testid": "Task project reference", "value": "https://github.com/acme/billing-api/issues/7" } },
+    { "waitFor": "Task project clone" },
+    { "wait": 300 }
+  ]
+}

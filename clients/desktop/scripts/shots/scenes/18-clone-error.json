@@ -1,0 +1,15 @@
+{
+  "extends": "16-clone-project.json",
+  "name": "clone-error",
+  "description": "Clone from Git refused (§74.3): git could not sign in — the reason in the user's words with what to do.",
+  "replies": { "project_clone": { "__error": "clone_auth_failed:could not read Username for 'https://github.com': terminal prompts disabled", "__code": "clone_auth_failed" } },
+  "steps": [
+    { "click": "No project choice 4" },
+    { "waitFor": "Clone project url" },
+    { "type": { "testid": "Clone project url", "value": "acme/billing-api" } },
+    { "wait": 700 },
+    { "click": "Clone project clone" },
+    { "waitFor": "Clone project error" },
+    { "wait": 900 }
+  ]
+}
