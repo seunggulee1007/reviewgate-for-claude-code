@@ -12,6 +12,7 @@ export * from "./pr/index.js";
 export * from "./protocol.js";
 export * from "./errors.js";
 export { ReviewEngine, ENGINE_VERSION, DEFAULT_SETTINGS, type EngineOptions } from "./engine.js";
+export { findBundle, type LspBundle } from "./lsp/locate.js"; // MARK: lsp (§73.4): Windows main says whether the build has it
 export { buildState, type EngineSlices } from "./state.js";
 export { ReviewGate, FILE_DIFF_MAX_LINES, patchHash, type CollectResult, type PendingCollect, type PreparedRequestChanges } from "./review/gate.js";
 export { requestChangesMessage, makeNote, type DiffSide, type ReviewNote } from "./review/notes.js";
