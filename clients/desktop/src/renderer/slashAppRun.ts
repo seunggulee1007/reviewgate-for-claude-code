@@ -1,6 +1,6 @@
 /**
  * MARK: b-slash — docs/PROTOCOL.md §56.5: what a typed built-in does in a classic chat (src/renderer/slashAppCommands.ts),
- * with the window's real screens: the HUD's model picker and cost popover (`useSlashUi`), the dialogs, the agent panel,
+ * with the window's real screens: the HUD's model picker (`useSlashUi`), §71.1 the usage dialog, the dialogs, the agent panel,
  * the chat tab's close and rename. As on the Mac (App ComposerSlashCommands.swift).
  */
 import { create } from "zustand";
@@ -16,9 +16,9 @@ import { useViewedChat, viewingOf } from "./viewedChat";
 
 /** Requests the HUD and the tab strip take (each `seq` is a new one). */
 type SlashUi = {
-  hud: { kind: "model" | "cost"; seq: number } | null;
+  hud: { kind: "model"; seq: number } | null;
   rename: number;
-  requestHud(kind: "model" | "cost"): void;
+  requestHud(kind: "model"): void;
   requestRename(): void;
 };
 
@@ -61,8 +61,8 @@ export function runSlashAppCommand(cmd: SlashAppCommand, notify: (text: string) 
     case "context":
       st.openDialog({ kind: "compact" }); // its first line is how full the context is
       return null;
-    case "cost":
-      useSlashUi.getState().requestHud("cost");
+    case "usage": // §71.1 (/cost and /stats too)
+      st.openDialog({ kind: "usage" });
       return null;
     case "permissions":
       st.openDialog({ kind: "settings", tab: "permissions" });

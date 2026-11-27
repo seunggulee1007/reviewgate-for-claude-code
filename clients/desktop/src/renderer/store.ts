@@ -355,7 +355,9 @@ export type Dialog =
   // MARK: wave4d w4d-windows — polish-08: Help › Keyboard Shortcuts (components/dialogs/ShortcutsDialog.tsx)
   | { kind: "shortcuts" }
   /** §70.3 `/export` alone: the conversation as text — copy or save (components/dialogs/ChatExportDialog.tsx). */
-  | { kind: "chatExport"; export: import("./chatExport").ChatExport };
+  | { kind: "chatExport"; export: import("./chatExport").ChatExport }
+  /** §71.1 `/usage` (`/cost`, `/stats`): the session block and the plan windows (components/dialogs/UsageDialog.tsx). */
+  | { kind: "usage" };
 
 /** §59: the dialogs whose commands need a real repository (branches, workbenches, commit, PRs) — never opened on a folder tracked without git. */
 const NEEDS_REPO_DIALOGS: ReadonlySet<Dialog["kind"]> = new Set(["newWorkbench", "newWorkbenchFromPr", "removeWorkbench", "newBranch", "createPR", "commit", "submitReview"]);

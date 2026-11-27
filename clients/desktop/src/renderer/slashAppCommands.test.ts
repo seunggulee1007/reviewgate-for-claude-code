@@ -16,7 +16,7 @@ describe("parseSlashAppCommand", () => {
   it("parses each app command", () => {
     const expected: Record<string, SlashAppCommand> = {
       "/model": { kind: "model", name: "" }, "/resume": { kind: "resume" }, "/rewind": { kind: "rewind" }, "/context": { kind: "context" },
-      "/cost": { kind: "cost" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
+      "/usage": { kind: "usage" }, "/permissions": { kind: "permissions" }, "/agents": { kind: "agents" }, "/memory": { kind: "memory" },
       "/config": { kind: "config" }, "/help": { kind: "help" }, "/status": { kind: "status" }, "/exit": { kind: "exit" }, "/rename": { kind: "rename" },
       "/add-dir": { kind: "addDir", path: "" }, "/export": { kind: "export", file: "" }, "/copy": { kind: "copy", arg: "" },
     };
@@ -36,6 +36,10 @@ describe("parseSlashAppCommand", () => {
     expect(parseSlashAppCommand("/settings", [])).toEqual({ kind: "config" });
     expect(parseSlashAppCommand("/checkpoint", [])).toEqual({ kind: "rewind" });
     expect(parseSlashAppCommand("/allowed-tools", [])).toEqual({ kind: "permissions" });
+    expect(parseSlashAppCommand("/cost", [])).toEqual({ kind: "usage" }); // §71.1
+    expect(parseSlashAppCommand("/stats", [])).toEqual({ kind: "usage" });
+    expect(appCommandDescription("cost")).toBe(appCommandDescription("usage"));
+    for (const name of ["usage", "stats"]) expect(TERMINAL_ONLY.has(name), name).toBe(false);
   });
 
   it("keeps a built-in only the terminal has out of the chat", () => {

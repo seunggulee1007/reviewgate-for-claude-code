@@ -11799,6 +11799,10 @@ background work (`/tasks`, Ctrl+B). Terminal chats (§57) are the real TUI and k
 - Mac: Core `Session/UsageReport.swift` (`SessionTotals`, `UsageText`), `HUDWire.sessionTotals`,
   `SlashAppCommand.usage`; App `UsageSheet.swift`, `ComposerSlashCommands.swift`. Tests: `UsageReportTests`,
   `SlashAppCommandsTests`.
+- Windows: `usageReport.ts` (the words; its Korean comes from the Mac's catalog through `gen-i18n.mjs`),
+  `components/dialogs/UsageDialog.tsx` (`Dialog {kind: "usage"}`), `slashAppCommands.ts` / `slashAppRun.ts`
+  (`{kind: "usage"}`; the HUD's cost popover no longer opens on a typed `/cost`). Tests: `usageReport.test.ts`,
+  `slashAppCommands.test.ts`.
 
 ### 71.2 Ctrl+T — Claude's to-do checklist, live
 
