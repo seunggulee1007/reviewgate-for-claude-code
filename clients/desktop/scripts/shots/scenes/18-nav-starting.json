@@ -1,0 +1,22 @@
+{
+  "extends": "04-review.json",
+  "name": "nav-starting",
+  "description": "§73.5: F12 while the language server starts and the lookup has not answered yet — \"Looking for the definition of subtotal…\" with 언어 서버 시작 중….",
+  "state": {
+    "nav": {
+      "index": { "status": "idle", "files": 0, "symbols": 0, "truncated": false, "builtAt": null },
+      "lsp": { "status": "starting" }
+    }
+  },
+  "replies": {
+    "find_definition": { "$hold": true }
+  },
+  "steps": [
+    { "click": "File src/checkout/discount.ts" },
+    { "waitFor": { "selector": ".unified-pane[data-nav-path=\"src/checkout/discount.ts\"] .line[data-side=\"new\"][data-line=\"12\"] .text" }, "timeoutMs": 6000 },
+    { "select": { "text": "subtotal", "within": ".unified-pane[data-nav-path] .line[data-side=\"new\"][data-line=\"12\"] .text" } },
+    { "key": "F12" },
+    { "waitFor": "Language server starting" },
+    { "wait": 400 }
+  ]
+}

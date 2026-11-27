@@ -57,6 +57,8 @@ type Localized = string | { en: string; ko: string };
 type Target = { testid?: string; selector?: string; text?: Localized };
 type Step =
   | { click: string | Target }
+  /** §73.5: selects the first `text` inside `within` (a selector), as a double-click on a name in a diff row would. */
+  | { select: { text: string; within?: string; scrollOnly?: boolean } }
   | { type: (Target & { value: Localized }) | { testid: string; value: Localized } }
   | { key: string; ctrl?: boolean; shift?: boolean; alt?: boolean }
   | { menu: Record<string, unknown> }
@@ -168,7 +170,7 @@ function defaults(l: Live, name: string, args: unknown[]): unknown {
     case "readiness":
       return { claude: { ok: true }, ghLogin: { ok: true }, gitIdentity: { ok: true } };
     case "toolchainInfo":
-      return { platform: "win32", electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome };
+      return { platform: "win32", electron: process.versions.electron, node: process.versions.node, chrome: process.versions.chrome, languageServer: { available: true, typescript: "6.0.3" } };
     case "updateStatus":
       return { current: pkg.version, release: null, install: null, notice: null, downloadPage: "https://example.com/releases" };
     case "pty.info":
@@ -218,6 +220,9 @@ function reply(l: Live, cmd: Record<string, unknown>): unknown {
     l.unanswered.add(`request.${type}`);
     return { __error: `shots: no fixture reply for ${type}` };
   }
+  // §73.5: a reply that never comes (a lookup still running — its "looking" state is the shot).
+  // A timer holds the pending reply (a bare never-settling promise is collected and Electron answers "reply was never sent").
+  if (isPlainObject(r) && r.$hold === true) return new Promise((resolve) => setTimeout(() => resolve({ __error: "shots: held" }), 600_000).unref());
   if (isPlainObject(r) && typeof r.$by === "string" && isPlainObject(r.map)) {
     const hit = r.map[String(cmd[r.$by])];
     if (hit === undefined) {
@@ -260,6 +265,26 @@ function pageStep(step: Record<string, unknown>): string {
       }
       return document.querySelector(sel(t));
     };
+    if (step.select) {
+      const roots = [...document.querySelectorAll(step.select.within || "body")];
+      for (const root of roots) {
+        const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+          const at = n.textContent.indexOf(step.select.text);
+          if (at < 0) continue;
+          const range = document.createRange();
+          range.setStart(n, at);
+          range.setEnd(n, at + step.select.text.length);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          if (step.select.scrollOnly) { n.parentElement.scrollIntoView({ block: "center" }); return null; }
+          sel.addRange(range);
+          n.parentElement.scrollIntoView({ block: "center" });
+          return null;
+        }
+      }
+      return "no text to select " + JSON.stringify(step.select);
+    }
     if (step.click) {
       const el = find(step.click);
       if (!el) return "no element for click " + JSON.stringify(step.click);

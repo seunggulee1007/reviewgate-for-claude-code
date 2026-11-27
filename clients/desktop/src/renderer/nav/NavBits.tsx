@@ -24,7 +24,7 @@ export function LspStartingNote() {
   const starting = useStore((s) => s.state.nav?.lsp?.status === "starting");
   if (!starting) return null;
   return (
-    <span className="caption muted" data-testid="Language server starting">
+    <span className="caption muted nav-lsp-starting" data-testid="Language server starting">
       {t("Starting the language server…")}
     </span>
   );

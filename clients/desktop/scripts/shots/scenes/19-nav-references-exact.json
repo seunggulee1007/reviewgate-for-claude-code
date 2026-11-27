@@ -1,0 +1,44 @@
+{
+  "extends": "04-review.json",
+  "name": "nav-references-exact",
+  "description": "§73.5: Shift+F12 — the References tab with the language server's references, labelled 정확 (exact).",
+  "state": {
+    "nav": {
+      "index": { "status": "idle", "files": 0, "symbols": 0, "truncated": false, "builtAt": null },
+      "lsp": { "status": "ready", "typescript": { "version": "6.0.3", "source": "bundled" } }
+    }
+  },
+  "replies": {
+    "find_references": {
+      "type": "references",
+      "symbol": "subtotal",
+      "hits": [
+        { "path": "src/checkout/discount.ts", "line": 6, "column": 17, "preview": "export function subtotal(items: Item[]): number {", "kind": "function" },
+        { "path": "src/checkout/discount.ts", "line": 12, "column": 18, "preview": "const before = subtotal(items);" },
+        { "path": "src/checkout/summary.ts", "line": 3, "column": 10, "preview": "import { subtotal } from \"./discount\";" },
+        { "path": "src/checkout/summary.ts", "line": 9, "column": 22, "preview": "  const items = subtotal(cart.items);" }
+      ],
+      "files": 2,
+      "truncated": false,
+      "source": "lsp"
+    },
+    "definition_preview": {
+      "type": "definition_preview",
+      "path": "src/checkout/discount.ts",
+      "line": 6,
+      "startLine": 2,
+      "lines": ["", "export type DiscountCode = { code: string; kind: \"percent\" | \"fixed\"; amount: number };", "", "/** The order total before any discount. */", "export function subtotal(items: Item[]): number {", "  return items.reduce((sum, i) => sum + i.price * i.qty, 0);", "}"],
+      "totalLines": 37,
+      "language": "typescript",
+      "truncated": false
+    }
+  },
+  "steps": [
+    { "click": "File src/checkout/discount.ts" },
+    { "waitFor": { "selector": ".unified-pane[data-nav-path=\"src/checkout/discount.ts\"] .line[data-side=\"new\"][data-line=\"12\"] .text" }, "timeoutMs": 6000 },
+    { "select": { "text": "subtotal", "within": ".unified-pane[data-nav-path] .line[data-side=\"new\"][data-line=\"12\"] .text" } },
+    { "key": "F12", "shift": true },
+    { "waitFor": "References count" },
+    { "wait": 400 }
+  ]
+}
