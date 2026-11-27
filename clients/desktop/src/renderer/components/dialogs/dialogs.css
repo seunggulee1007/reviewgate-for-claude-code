@@ -61,7 +61,7 @@
 .hooks-matcher { padding: 0 5px; border-radius: 4px; background: var(--bg-3); white-space: nowrap; }
 .hooks-text { white-space: pre-wrap; word-break: break-all; user-select: text; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 /* §72.2 /output-style: the styles, the current one marked, the picked one highlighted (OutputStyleDialog.tsx). */
-.style-list { max-height: calc(100vh - 280px); min-height: 100px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.style-list { max-height: calc(100vh - 230px); min-height: 100px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
 .style-row { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; cursor: default; }
 .style-row:hover { background: var(--bg-2); }
 .style-row.picked { background: var(--accent-bg, var(--bg-3)); }

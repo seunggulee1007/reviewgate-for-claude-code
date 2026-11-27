@@ -65,7 +65,7 @@ export function OutputStyleDialog({ onClose }: { onClose: () => void }) {
               <span className="style-text">
                 <span className="row">
                   <span className="small bold">{styleDisplayName(s.name)}</span>
-                  <span className="tiny muted">{styleSource(s)}</span>
+                  {s.source !== "builtin" && <span className="tiny muted">{styleSource(s)}</span>}
                   {current && <span className="tiny bold accent">{t("Current")}</span>}
                 </span>
                 {line && <span className="tiny muted">{line}</span>}
