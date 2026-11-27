@@ -468,7 +468,6 @@ struct CloneProjectSheet: View {
                 .font(.body.monospaced())
                 .focused($urlFocused)
                 .disabled(busy)
-                .onSubmit { primary() }
                 .help("An https or SSH link, or owner/repo for GitHub — never a password or token")
                 .accessibilityIdentifier("Clone project url")
             statusLine
