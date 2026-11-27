@@ -89,6 +89,7 @@
       "enabled": true,
       "alwaysOn": false
     },
+    "todos": [],
     "canRestart": false
   },
   "toolchain": {
@@ -162,7 +163,13 @@
     "turnStartedAt": null,
     "sideCostUSD": 0,
     "turnFiles": 0,
-    "waitingOnAgents": null
+    "waitingOnAgents": null,
+    "sessionTotals": {
+      "startedAt": null,
+      "apiDurationMs": 0,
+      "linesAdded": 0,
+      "linesRemoved": 0
+    }
   },
   "branches": {
     "list": [],
